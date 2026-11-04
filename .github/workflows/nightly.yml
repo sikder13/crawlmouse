@@ -24,6 +24,102 @@ jobs:
       - run: pnpm test
       - run: pnpm test:templates
 
+  # Every absolute timing budget at its real threshold (docs/ops/ci-timing.md): the unit budgets
+  # under PERF_STRICT=1, one file at a time, then the visual budgets on the production build, in
+  # the Playwright image the visual job uses. Each budget is the median of five runs; there is no
+  # retry and no slow-runner pass here, so this job is the backstop a regression cannot pass. The
+  # samples are uploaded for the trend below.
+  perf-strict:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: mcr.microsoft.com/playwright:v1.60.0-noble@sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Runner probe
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/perf-samples"
+          pnpm --filter @crawlmouse/timing exec tsx src/probe-cli.ts | tee "$GITHUB_WORKSPACE/perf-samples/probe.json"
+      - name: Unit timing budgets, strict
+        run: |
+          set -euo pipefail
+          PERF_SAMPLES_DIR="$GITHUB_WORKSPACE/perf-samples" pnpm perf:strict
+      - name: Production build for the budgets
+        if: ${{ !cancelled() }}
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          pnpm exec next build
+      - name: Visual performance budgets, strict
+        if: ${{ !cancelled() }}
+        working-directory: apps/web
+        env:
+          VISUAL_PERF: '1'
+          VISUAL_SERVER: start
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          PERF_SAMPLES_DIR="$GITHUB_WORKSPACE/perf-samples" \
+            pnpm exec playwright test -c ../../tests/visual/playwright.config.ts perf.spec.ts --workers=1
+      - name: Upload the samples
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: perf-samples
+          path: perf-samples/
+          retention-days: 30
+          if-no-files-found: warn
+
+  # One line per budgeted metric in the job summary: tonight's median against the medians of the
+  # last seven nightlies on main, read from their perf-samples artifacts.
+  perf-trend:
+    needs: perf-strict
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Trend against the last seven nightlies
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          gh run download "$GITHUB_RUN_ID" -n perf-samples -D tonight || echo "No samples from tonight's run."
+          mkdir -p history
+          gh run list --workflow nightly.yml --branch main --status completed --limit 30 \
+            --json databaseId --jq '.[].databaseId' | while read -r id; do
+            [ "$id" = "$GITHUB_RUN_ID" ] && continue
+            [ "$(ls history | wc -l)" -ge 7 ] && break
+            gh run download "$id" -n perf-samples -D "history/$id" 2>/dev/null || rm -rf "history/$id"
+          done
+          {
+            echo "### Performance trend"
+            echo
+            if [ -f tonight/probe.json ]; then echo "Runner probe: \`$(cat tonight/probe.json)\`"; echo; fi
+            echo "Compared with $(ls history | wc -l) earlier nightly run(s) on main."
+            echo
+            pnpm --silent --filter @crawlmouse/timing exec tsx src/trend-cli.ts "$PWD/tonight" "$PWD/history"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
   # PLACEHOLDER: the Lighthouse and cross-browser runs land in a later step. Skipped until then.
   lighthouse-and-cross-browser:
     if: false
