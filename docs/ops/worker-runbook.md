@@ -111,7 +111,7 @@ show each fact, and check the result for:
   result; the batch's `requests` counts them, its `coverage` and `partial` do not; a second crawl
   batch on the same origin within ten minutes carries the answers it kept `from_cache: true`, and
   requests again any path that got no answer; a 408, 425, 429 or 5xx is kept for its Retry-After, at
-  least a minute.
+  least a minute and at most ten.
 
 Each row is parsed by its schema before it leaves the worker (`pageRow` in
 `packages/worker/src/batch/crawl.ts`), so the checks above are about the values, not the shape.
