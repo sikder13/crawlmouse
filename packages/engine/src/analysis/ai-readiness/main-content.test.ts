@@ -1,3 +1,4 @@
+import { expectWithinRelative } from '@crawlmouse/timing';
 import * as cheerio from 'cheerio';
 import { describe, it, expect } from 'vitest';
 import { extractMainContent } from './main-content.js';
@@ -310,23 +311,18 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     // discriminated machine state rather than time complexity, and it went red on correct code 1 run in 7.
     //
     // This compares two shapes with the SAME node count instead: flat siblings vs 100-per-parent. The
-    // ratio is self-relative, so machine speed cancels. Measured: quadratic 21.6x, linear 1.1x.
+    // ratio is self-relative, so machine speed cancels. Measured: quadratic 21.6x, linear 1.1x. Each
+    // side is the median of five interleaved runs (docs/ops/ci-timing.md), not one run.
     const N = 20_000;
     const flat = `<html><body><p>hi</p>${'<h1>x</h1>'.repeat(N)}</body></html>`;
     const nested = `<html><body><p>hi</p>${Array.from({ length: N / 100 }, () => `<div>${'<h1>x</h1>'.repeat(100)}</div>`).join('')}</body></html>`;
     const $flat = cheerio.load(flat);
     const $nested = cheerio.load(nested);
-    let t = performance.now();
-    extractMainContent($flat);
-    const flatMs = performance.now() - t;
-    t = performance.now();
-    extractMainContent($nested);
-    const nestedMs = performance.now() - t;
-    const ratio = flatMs / Math.max(nestedMs, 0.5);
-    expect(
-      ratio,
-      `flat ${flatMs.toFixed(0)}ms / nested ${nestedMs.toFixed(0)}ms = ${ratio.toFixed(1)}x`,
-    ).toBeLessThan(5);
+    expectWithinRelative(
+      'main content, flat siblings against the same nodes nested',
+      { measured: () => extractMainContent($flat), reference: () => extractMainContent($nested) },
+      { limit: (nestedMs) => 5 * Math.max(nestedMs, 0.5), rule: 'under 5x the nested shape' },
+    );
   }, 30_000);
 
   it('COMPLEXITY: on the DEPTH axis, extraction stays a small fraction of the parse', () => {
@@ -337,20 +333,16 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     //
     // So the guard is the MARGINAL cost — extraction relative to the parse the page already pays.
     // Measured stable at 0.23x (depth 4 000) and 0.20x (depth 16 000); the bound is 1.0x, which a real
-    // depth regression in this walk would blow through while machine speed cancels out.
+    // depth regression in this walk would blow through while machine speed cancels out. Each side is
+    // the median of five interleaved runs (docs/ops/ci-timing.md), not one run.
     const html = `<html><body>${'<div>'.repeat(8_000)}prose${'</div>'.repeat(8_000)}</body></html>`;
-    let t = performance.now();
     const $ = cheerio.load(html);
-    const parseMs = performance.now() - t;
-    t = performance.now();
-    const out = extractMainContent($);
-    const extractMs = performance.now() - t;
-    expect(out.mainTextChars, 'the prose must survive the depth').toBe(5);
-    const ratio = extractMs / Math.max(parseMs, 1);
-    expect(
-      ratio,
-      `extract ${extractMs.toFixed(0)}ms / parse ${parseMs.toFixed(0)}ms = ${ratio.toFixed(2)}x`,
-    ).toBeLessThan(1);
+    expect(extractMainContent($).mainTextChars, 'the prose must survive the depth').toBe(5);
+    expectWithinRelative(
+      'main content at depth 8,000, extraction against the parse',
+      { measured: () => extractMainContent($), reference: () => cheerio.load(html) },
+      { limit: (parseMs) => Math.max(parseMs, 1), rule: 'under the parse it follows' },
+    );
   }, 30_000);
 
   it('does NOT mutate the caller\u2019s DOM — nothing is cloned, so the walk must be read-only', () => {

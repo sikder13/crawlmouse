@@ -1,4 +1,5 @@
 import { extractPage, toPersistableText } from '@crawlmouse/engine/worker';
+import { expectWithinRelative } from '@crawlmouse/timing';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
@@ -172,12 +173,16 @@ describe('readLinks: cost', () => {
     ['198,000 paragraphs of one letter', '<p>w'.repeat(198_000)],
   ])(
     'costs about the same for 500 links nested around %s as for one',
-    (_name, subtree) => {
-      const nested = time(
+    (name, subtree) => {
+      const $nested = parseHtml(
         `<body>${'<a href="/x">'.repeat(500)}${subtree}${'</a>'.repeat(500)}</body>`,
+      )!;
+      const $single = parseHtml(`<body><a href="/x">${subtree}</a></body>`)!;
+      expectWithinRelative(
+        `readLinks, 500 links nested around ${name} against one`,
+        { measured: () => readLinks($nested, BASE), reference: () => readLinks($single, BASE) },
+        { limit: (singleMs) => singleMs * 3 + 150, rule: '3x one link, plus 150 ms' },
       );
-      const single = time(`<body><a href="/x">${subtree}</a></body>`);
-      expect(nested).toBeLessThan(single * 3 + 150);
     },
     120_000,
   );
@@ -189,9 +194,13 @@ describe('readLinks: cost', () => {
       { length: 46_000 },
       (_, i) => `<p>item ${i} <a href="/p/${i}">link ${i}</a></p>\n`,
     ).join('');
-    const bare = time(inner);
-    const inBody = time(`<html><body>${inner}</body></html>`);
-    expect(bare).toBeLessThan(inBody * 3 + 150);
+    const $bare = parseHtml(inner)!;
+    const $inBody = parseHtml(`<html><body>${inner}</body></html>`)!;
+    expectWithinRelative(
+      'readLinks, 46,000 links with no body element against the same inside one',
+      { measured: () => readLinks($bare, BASE), reference: () => readLinks($inBody, BASE) },
+      { limit: (inBodyMs) => inBodyMs * 3 + 150, rule: '3x inside a body, plus 150 ms' },
+    );
   }, 60_000);
 
   it('reads a small page of 2,000 nested links with full captures quickly', () => {
