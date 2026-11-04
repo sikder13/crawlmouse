@@ -74,7 +74,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -146,7 +146,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -218,7 +218,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -354,7 +354,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -618,7 +618,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -690,7 +690,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -762,7 +762,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -898,7 +898,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -1162,7 +1162,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -1234,7 +1234,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -1306,7 +1306,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -1442,7 +1442,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -1706,7 +1706,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -1778,7 +1778,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -1850,7 +1850,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -1986,7 +1986,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -2250,7 +2250,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -2322,7 +2322,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -2394,7 +2394,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -2530,7 +2530,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -2794,7 +2794,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -2866,7 +2866,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -2938,7 +2938,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -3074,7 +3074,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -3338,7 +3338,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -3410,7 +3410,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -3482,7 +3482,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -3618,7 +3618,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -3882,7 +3882,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -3954,7 +3954,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -4026,7 +4026,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -4162,7 +4162,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -4426,7 +4426,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -4498,7 +4498,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -4570,7 +4570,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -4706,7 +4706,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -4970,7 +4970,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -5042,7 +5042,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -5114,7 +5114,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -5250,7 +5250,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -5514,7 +5514,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -5586,7 +5586,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -5658,7 +5658,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -5794,7 +5794,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -6058,7 +6058,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -6130,7 +6130,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -6202,7 +6202,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -6338,7 +6338,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -6602,7 +6602,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -6674,7 +6674,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -6746,7 +6746,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -6882,7 +6882,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -7146,7 +7146,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -7218,7 +7218,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -7290,7 +7290,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -7426,7 +7426,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -7690,7 +7690,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -7762,7 +7762,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -7834,7 +7834,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -7970,7 +7970,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -8234,7 +8234,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -8306,7 +8306,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -8378,7 +8378,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -8514,7 +8514,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -8778,7 +8778,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -8850,7 +8850,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -8922,7 +8922,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -9058,7 +9058,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -9322,7 +9322,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -9394,7 +9394,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -9466,7 +9466,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -9602,7 +9602,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -9866,7 +9866,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -9938,7 +9938,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -10010,7 +10010,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -10146,7 +10146,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -10410,7 +10410,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -10482,7 +10482,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -10554,7 +10554,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [
@@ -10690,7 +10690,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page."
+        "Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. Claude-SearchBot and ClaudeBot were served on this page. Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler."
       ],
       "cause": null,
       "request_headers": [

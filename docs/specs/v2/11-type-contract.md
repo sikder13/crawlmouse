@@ -749,6 +749,7 @@ What a batch result carries besides its rows, as fields the engine reads (`decla
 | `bytes`          | `integer`                 | yes  |
 | `bytes_complete` | `boolean`                 | yes  |
 | `not_requested`  | `DeclarationNotRequested` | yes  |
+| `from_cache`     | `boolean`                 | no   |
 
 ### BatchPartial
 
@@ -1010,6 +1011,7 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `declaration_answer`        | a declaration status is recorded exactly when the request was answered                         | both ways |
 | `declaration_bytes`         | a declaration byte count is recorded exactly when the request was answered                     | both ways |
 | `declaration_media_type`    | a declaration media type is recorded only from an answer                                       | one way   |
+| `declaration_cache_answer`  | a declaration kept from an earlier batch is an answer or its absence                           | one way   |
 | `declaration_not_requested` | why a declaration was not requested is recorded exactly when it was not requested              | both ways |
 | `head_text_absent`          | a title or description the page does not declare has no length and no cut                      | one way   |
 | `usage_billable`            | only a delivered result is billable                                                            | one way   |
@@ -1098,6 +1100,6 @@ Records per collection in each frozen fixture under `apps/web/lib/fixtures/v2/`.
 
 | Fixture                | as_of                | accounts | seats | sites | checks | page_results | link_edges | access_tests | fixes | fix_events | changes | alert_rules | reports | engine_derived |
 | ---------------------- | -------------------- | -------- | ----- | ----- | ------ | ------------ | ---------- | ------------ | ----- | ---------- | ------- | ----------- | ------- | -------------- |
-| `bad-site.json`        | 2026-10-30T10:05:00Z | 1        | 1     | 5     | 15     | 16           | 11         | 12           | 15    | 4          | 8       | 6           | 4       | 185            |
+| `bad-site.json`        | 2026-10-30T10:05:00Z | 1        | 1     | 5     | 15     | 16           | 11         | 13           | 15    | 4          | 8       | 6           | 4       | 185            |
 | `clean-site.json`      | 2026-10-27T15:42:00Z | 0        | 0     | 1     | 2      | 2            | 2          | 2            | 0     | 0          | 0       | 0           | 0       | 6              |
 | `challenged-site.json` | 2026-11-02T12:00:00Z | 2        | 5     | 3     | 7      | 1            | 0          | 9            | 2     | 3          | 1       | 2           | 6       | 10             |
