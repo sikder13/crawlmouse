@@ -200,77 +200,59 @@ describe('Readable (max 30)', () => {
 });
 
 describe('Quotable (max 20)', () => {
-  const none = { passing: 0, decided: 0 };
+  // The counted checks: question_headings, schema_with_description, author_and_date. Answer-first and
+  // specs-as-text are reported but not counted (CONTENT_CHECKS `scored`), so they are not inputs here.
+  const none = { passing: 0, decided: 0, unread: 0 };
 
-  it('Q1: 20 × (5/13 + 2/13 + 1 + 1)/4 = 12.69 (specs apply to no page)', () => {
+  it('Q1: 20 × (2/13 + 13/13 + 13/13)/3 = 14.36', () => {
     const q = quotableScore({
-      unread: 0,
       checks: {
-        direct_answer_150: { passing: 5, decided: 13 },
-        question_headings: { passing: 2, decided: 13 },
-        schema_with_description: { passing: 13, decided: 13 },
-        author_and_date: { passing: 13, decided: 13 },
-        specs_as_text: none,
+        question_headings: { passing: 2, decided: 13, unread: 0 },
+        schema_with_description: { passing: 13, decided: 13, unread: 0 },
+        author_and_date: { passing: 13, decided: 13, unread: 0 },
       },
     });
-    expect(q).toEqual({ score: 12.69, range: null });
+    expect(q).toEqual({ score: 14.36, range: null });
   });
 
-  it('Q2: fixing the 8 failing openings: 20 × (1 + 2/13 + 1 + 1)/4 = 15.77', () => {
+  it('Q2: 8 more pages with a question heading: 20 × (10/13 + 1 + 1)/3 = 18.46', () => {
     const q = quotableScore({
-      unread: 0,
       checks: {
-        direct_answer_150: { passing: 13, decided: 13 },
-        question_headings: { passing: 2, decided: 13 },
-        schema_with_description: { passing: 13, decided: 13 },
-        author_and_date: { passing: 13, decided: 13 },
-        specs_as_text: none,
+        question_headings: { passing: 10, decided: 13, unread: 0 },
+        schema_with_description: { passing: 13, decided: 13, unread: 0 },
+        author_and_date: { passing: 13, decided: 13, unread: 0 },
       },
     });
-    expect(q.score).toBe(15.77);
+    expect(q.score).toBe(18.46);
   });
 
-  it('Q3: two unread pages make a range: each check could pass or fail on them, so [1.67, 18.33]', () => {
+  it('Q3: two unread pages make a range: each check open on them could pass or fail there, so [9.44, 17.22]', () => {
     const q = quotableScore({
-      unread: 2,
       checks: {
-        direct_answer_150: { passing: 5, decided: 10 },
-        question_headings: none,
-        schema_with_description: none,
-        author_and_date: none,
-        specs_as_text: none,
+        question_headings: { passing: 5, decided: 10, unread: 2 },
+        schema_with_description: { passing: 12, decided: 12, unread: 0 },
+        author_and_date: { passing: 0, decided: 0, unread: 2 },
       },
     });
-    // The four checks no read page applied to could each be anything on the two unread pages: [0, 1].
-    // mean lower = (5/12 + 0 + 0 + 0 + 0)/5; mean upper = (7/12 + 1 + 1 + 1 + 1)/5.
-    expect(q).toEqual({ score: null, range: { min: 1.67, max: 18.33 } });
+    // lower = 20 × (5/12 + 12/12 + 0/2)/3 = 9.44; upper = 20 × (7/12 + 12/12 + 2/2)/3 = 17.22
+    expect(q).toEqual({ score: null, range: { min: 9.44, max: 17.22 } });
   });
 
-  it('Q3b: unread pages with the other checks applying to no page at all still widen only by the unread pages', () => {
+  it('Q3b: a check decided on every read page widens by its own unread pages only: [15, 17.22]', () => {
     const q = quotableScore({
-      unread: 2,
       checks: {
-        direct_answer_150: { passing: 5, decided: 10 },
-        question_headings: { passing: 10, decided: 10 },
-        schema_with_description: { passing: 10, decided: 10 },
-        author_and_date: { passing: 10, decided: 10 },
-        specs_as_text: { passing: 10, decided: 10 },
+        question_headings: { passing: 5, decided: 10, unread: 2 },
+        schema_with_description: { passing: 12, decided: 12, unread: 0 },
+        author_and_date: { passing: 10, decided: 10, unread: 2 },
       },
     });
-    // lower = 20 × (5/12 + 4 × 10/12)/5 = 20 × (45/12)/5 = 15; upper = 20 × (7/12 + 4 × 12/12)/5 = 18.33
-    expect(q).toEqual({ score: null, range: { min: 15, max: 18.33 } });
+    // lower = 20 × (5/12 + 1 + 10/12)/3 = 15; upper = 20 × (7/12 + 1 + 12/12)/3 = 17.22
+    expect(q).toEqual({ score: null, range: { min: 15, max: 17.22 } });
   });
 
-  it('no check applies to any page, and nothing unread: range [0, 20]', () => {
+  it('no counted check applies to any page, and nothing unread: range [0, 20]', () => {
     const q = quotableScore({
-      unread: 0,
-      checks: {
-        direct_answer_150: none,
-        question_headings: none,
-        schema_with_description: none,
-        author_and_date: none,
-        specs_as_text: none,
-      },
+      checks: { question_headings: none, schema_with_description: none, author_and_date: none },
     });
     expect(q).toEqual({ score: null, range: { min: 0, max: 20 } });
   });

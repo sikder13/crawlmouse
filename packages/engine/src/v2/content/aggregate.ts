@@ -111,13 +111,19 @@ export function aggregateContent(pages: readonly ContentPage[]): ContentResult {
     );
 
   const quotable: QuotableInput = {
-    unread: pages.filter(unreadPage).length,
     checks: Object.fromEntries(
-      CHECKS.map((c) => {
+      CHECKS.filter((c) => CONTENT_CHECKS[c].scored).map((c) => {
         const passing = of(c, null, 'pass').length;
-        return [c, { passing, decided: passing + of(c, null, 'fail').length }];
+        return [
+          c,
+          {
+            passing,
+            decided: passing + of(c, null, 'fail').length,
+            unread: of(c, null, 'unread').length,
+          },
+        ];
       }),
-    ) as QuotableInput['checks'],
+    ),
   };
 
   const by_template = CHECKS.map((check) => ({

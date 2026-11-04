@@ -48,8 +48,37 @@ function tally(ua: string, counts: Counts): CrawlerTally {
     },
   };
 }
+const n = (max: number) => fc.nat({ max });
+/** Pages out of the denominator, in any mix. */
+const outside = fc.record({
+  challenged_ua: n(3),
+  refused_unverified: n(3),
+  rate_limited: n(3),
+  edge_blocks_automation: n(3),
+  not_measured: n(3),
+});
+/** A crawler of each standing: measured (2+ weighted pages), unmeasured (under 2), blocked by choice. */
+const measuredCounts = fc
+  .record({
+    allowed: n(6),
+    allowed_thin: n(6),
+    blocked_by_ua_rule: n(6),
+    disallowed_by_robots: n(2),
+  })
+  .filter((c) => c.allowed + c.allowed_thin + c.blocked_by_ua_rule >= 2);
+const unmeasuredCounts = fc
+  .constantFrom({}, { allowed: 1 }, { allowed_thin: 1 }, { blocked_by_ua_rule: 1 })
+  .chain((one) => outside.map((o) => ({ ...o, ...one }) as Counts));
+const byChoiceCounts = fc
+  .record({ disallowed_by_robots: fc.integer({ min: 1, max: 5 }), not_measured: n(2) })
+  .map((c) => c as Counts);
+const crawlerCountsArb: fc.Arbitrary<Counts> = fc.oneof(
+  measuredCounts.chain((m) => outside.map((o) => ({ ...o, ...m }) as Counts)),
+  unmeasuredCounts,
+  byChoiceCounts,
+);
 const crawlersArb = fc
-  .array(countsArb, { minLength: 4, maxLength: 4 })
+  .array(fc.oneof(crawlerCountsArb, countsArb), { minLength: 4, maxLength: 4 })
   .map((cs) => cs.map((c, i) => tally(`c${i}`, c)));
 
 /** The rule, restated from SPEC 17 independently of access.ts: which crawlers count as measured. */
@@ -127,6 +156,44 @@ const pagesArb: fc.Arbitrary<ReadablePage[]> = fc.array(
   { maxLength: 30 },
 );
 
+describe('Access and respected intent', () => {
+  it('a crawler blocked by robots.txt on every page read scores no lower than the same pages blocked by a user-agent rule', () => {
+    fc.assert(
+      fc.property(
+        crawlersArb,
+        fc.nat({ max: 3 }),
+        fc.integer({ min: 2, max: 6 }),
+        (cs, i, pages) => {
+          const byChoice = cs.map((c, j) =>
+            j === i ? tally(c.ua, { disallowed_by_robots: pages }) : c,
+          );
+          const blocked = cs.map((c, j) =>
+            j === i ? tally(c.ua, { blocked_by_ua_rule: pages }) : c,
+          );
+          const [a, b] = [accessScore(byChoice), accessScore(blocked)];
+          if (a.score !== null && b.score !== null) expect(a.score).toBeGreaterThanOrEqual(b.score);
+        },
+      ),
+      RUNS,
+    );
+  });
+
+  it('the generator makes crawlers of each standing, so the properties above see blocked by choice', () => {
+    const standings = new Set<string>();
+    fc.assert(
+      fc.property(crawlersArb, (cs) => {
+        for (const c of cs) {
+          const byChoice =
+            c.extent.robots.read > 0 && c.extent.robots.disallowed === c.extent.robots.read;
+          standings.add(byChoice ? 'by_choice' : measuredByRule(c) ? 'measured' : 'unmeasured');
+        }
+      }),
+      RUNS,
+    );
+    expect(standings).toEqual(new Set(['by_choice', 'measured', 'unmeasured']));
+  });
+});
+
 describe('Readable', () => {
   it('lies in 0..30, and has a score exactly when every template has a rendered page', () => {
     fc.assert(
@@ -173,19 +240,22 @@ const CHECKS: ContentCheck[] = [
   'author_and_date',
   'specs_as_text',
 ];
-const quotableArb: fc.Arbitrary<QuotableInput> = fc.record({
-  unread: fc.nat({ max: 4 }),
-  checks: fc
-    .array(
-      fc
-        .nat({ max: 12 })
-        .chain((decided) =>
-          fc.record({ decided: fc.constant(decided), passing: fc.nat({ max: decided }) }),
-        ),
-      { minLength: 5, maxLength: 5 },
-    )
-    .map((ts) => Object.fromEntries(CHECKS.map((c, i) => [c, ts[i]!])) as QuotableInput['checks']),
-});
+const tallyArb = fc
+  .nat({ max: 12 })
+  .chain((decided) =>
+    fc.record({
+      decided: fc.constant(decided),
+      passing: fc.nat({ max: decided }),
+      unread: fc.oneof(fc.constant(0), fc.nat({ max: 4 })),
+    }),
+  );
+const quotableArb: fc.Arbitrary<QuotableInput> = fc
+  .array(tallyArb, { minLength: 5, maxLength: 5 })
+  .map((ts) => ({
+    checks: Object.fromEntries(CHECKS.map((c, i) => [c, ts[i]!])) as QuotableInput['checks'],
+  }));
+const tallyOf = (q: QuotableInput, c: ContentCheck) => q.checks[c]!;
+const anyUnread = (q: QuotableInput) => Object.values(q.checks).some((t) => t.unread > 0);
 
 describe('Quotable', () => {
   it('lies in 0..20, and has a score exactly when every graded page was read and a check was decided', () => {
@@ -194,7 +264,7 @@ describe('Quotable', () => {
         const r = quotableScore(q);
         expect(within(r, 20)).toBe(true);
         const decided = Object.values(q.checks).some((t) => t.decided > 0);
-        expect(r.score !== null).toBe(q.unread === 0 && decided);
+        expect(r.score !== null).toBe(!anyUnread(q) && decided);
       }),
       RUNS,
     );
@@ -203,7 +273,7 @@ describe('Quotable', () => {
   it('one more passing page never lowers the score or its bounds', () => {
     fc.assert(
       fc.property(quotableArb, fc.constantFrom(...CHECKS), (q, k) => {
-        const t = q.checks[k];
+        const t = tallyOf(q, k);
         fc.pre(t.passing < t.decided);
         const after = { ...q, checks: { ...q.checks, [k]: { ...t, passing: t.passing + 1 } } };
         const [b, a] = [quotableScore(q), quotableScore(after)];
@@ -263,5 +333,97 @@ describe('the AI readability grade', () => {
       ),
       RUNS,
     );
+  });
+});
+
+describe('a range holds the score the unknowns turn out to give', () => {
+  it('Access: give each unmeasured crawler two more pages of any verdict, and the score lies in the range', () => {
+    fc.assert(
+      fc.property(
+        crawlersArb,
+        fc.array(
+          fc.constantFrom('allowed', 'allowed_thin', 'blocked_by_ua_rule') as fc.Arbitrary<
+            'allowed' | 'allowed_thin' | 'blocked_by_ua_rule'
+          >,
+          { minLength: 8, maxLength: 8 },
+        ),
+        (cs, fill) => {
+          const before = accessScore(cs);
+          fc.pre(before.reason === 'too_few_crawlers_measured');
+          const after = cs.map((c, i) => {
+            if (
+              measuredByRule(c) ||
+              (c.extent.robots.read > 0 && c.extent.robots.disallowed === c.extent.robots.read)
+            )
+              return c;
+            const add = { ...c.counts };
+            for (const v of [fill[2 * i]!, fill[2 * i + 1]!]) add[v] = (add[v] ?? 0) + 2;
+            return tally(c.ua, add);
+          });
+          const a = accessScore(after);
+          fc.pre(a.score !== null);
+          expect(a.score).toBeGreaterThanOrEqual(before.range!.min - 0.01);
+          expect(a.score).toBeLessThanOrEqual(before.range!.max + 0.01);
+        },
+      ),
+      RUNS,
+    );
+  });
+
+  it('Readable: render the unrendered templates at any share, and the score lies in the range', () => {
+    fc.assert(
+      fc.property(pagesArb, fc.double({ min: 0, max: 1, noNaN: true }), (pages, share) => {
+        const before = readableScore(pages);
+        fc.pre(before.score === null && pages.length > 0);
+        const a = readableScore(
+          pages.map((p) =>
+            pages.some((q) => q.template_key === p.template_key && q.text_share !== null)
+              ? p
+              : { ...p, text_share: share },
+          ),
+        );
+        expect(a.score!).toBeGreaterThanOrEqual(before.range.min - 0.01);
+        expect(a.score!).toBeLessThanOrEqual(before.range.max + 0.01);
+      }),
+      RUNS,
+    );
+  });
+
+  it('Quotable: read the unread pages, each check passing, failing or not applying, and the score lies in the range', () => {
+    fc.assert(
+      fc.property(
+        quotableArb,
+        fc.array(fc.constantFrom('pass', 'fail', 'none'), { minLength: 20, maxLength: 20 }),
+        (q, outcomes) => {
+          const before = quotableScore(q);
+          fc.pre(anyUnread(q));
+          const checks = Object.fromEntries(
+            CHECKS.map((c, k) => {
+              let { passing, decided, unread } = tallyOf(q, c);
+              for (let page = 0; page < unread; page++) {
+                const o = outcomes[(k * 4 + page) % outcomes.length];
+                if (o === 'pass') ((passing += 1), (decided += 1));
+                else if (o === 'fail') decided += 1;
+              }
+              return [c, { passing, decided, unread: 0 }];
+            }),
+          ) as QuotableInput['checks'];
+          const a = quotableScore({ checks });
+          fc.pre(a.score !== null);
+          expect(a.score).toBeGreaterThanOrEqual(before.range!.min - 0.01);
+          expect(a.score).toBeLessThanOrEqual(before.range!.max + 0.01);
+        },
+      ),
+      RUNS,
+    );
+  });
+
+  it('Signals: decide the undecided declaration either way, and the score lies in the range', () => {
+    for (const s of ['detected', 'not_detected'] as const) {
+      const before = signalsScore({ schema_org: 'detected', content_signals: 'indeterminate' });
+      const a = signalsScore({ schema_org: 'detected', content_signals: s });
+      expect(a.score!).toBeGreaterThanOrEqual(before.range!.min);
+      expect(a.score!).toBeLessThanOrEqual(before.range!.max);
+    }
   });
 });

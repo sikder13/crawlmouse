@@ -1,10 +1,10 @@
 /**
  * The five quotable checks (FACTS B9), each judging one page: `pass`, `fail`, `not_applicable`, or
- * `unread` when the page was served for JavaScript to fill in and its text was not read (rendered text
- * comes with CC-14). Each check is conservative: when the page does not show clearly that it fails,
- * it does not fail.
+ * `unread` when the page was served for JavaScript to fill in and what decides the check was not read
+ * (rendered text comes with CC-14). A check fails a page only on what it reads there: for
+ * direct_answer_150 that means few failures and passes it cannot tell from a failure (labels.test.ts).
  */
-import type { ContentCheck, FixType, RecommendationClass } from '@crawlmouse/types/v2';
+import type { Confidence, ContentCheck, FixType, RecommendationClass } from '@crawlmouse/types/v2';
 import type { ContentFeatures, JsonLdNode } from './read.js';
 import {
   MIN_BLOCK_WORDS,
@@ -83,54 +83,89 @@ function specsAsText(p: ContentFeatures): PageVerdict {
 
 export interface CheckDefinition {
   judge: (p: ContentFeatures) => PageVerdict;
+  /**
+   * The verdict on a page served for JavaScript to fill in, from what is read without rendering
+   * (JSON-LD, byline markup): `unread` where the rendered page could decide otherwise.
+   */
+  onShell: (p: ContentFeatures) => PageVerdict;
   /** The fix a failing template opens; null when the contract has no fix type for the check. */
   fix: Extract<FixType, 'quotable_opening' | 'missing_author_date' | 'specs_as_images'> | null;
   /** The readable key prefix of that fix's fingerprint. */
   key: string | null;
   recommendation_class: RecommendationClass;
+  /** How sure a fix the check opens is: `inconclusive` until its firings are observed on real pages. */
+  confidence: Confidence;
+  /**
+   * The check counts in Quotable. labels.test.ts holds each counted check to MIN_PRECISION on the
+   * label set, on its firings and on its passes; a check that has not shown both is reported and does
+   * not count, so a pass it cannot tell from a failure does not raise the score.
+   */
+  scored: boolean;
 }
 
-/**
- * Each check, in the contract's order. JSON-LD is read whatever the page's rendering, but a page
- * served for JavaScript to fill in is unread for every check, so the five stay comparable.
- */
+const unread = (): PageVerdict => 'unread';
+/** Applies only if the JSON-LD says so; beyond that the rendered page decides. */
+const shellIf = (type: RegExp) => (p: ContentFeatures) =>
+  typed(p.json_ld, type).length === 0 ? 'not_applicable' : 'unread';
+
+/** Each check, in the contract's order. */
 export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
   direct_answer_150: {
     judge: directAnswer,
+    onShell: unread,
     fix: 'quotable_opening',
     key: 'answer',
     recommendation_class: 'experimental',
+    confidence: 'inconclusive',
+    scored: false,
   },
   question_headings: {
     judge: questionHeadings,
+    onShell: unread,
     fix: null,
     key: null,
     recommendation_class: 'experimental',
+    confidence: 'likely',
+    scored: true,
   },
   schema_with_description: {
     judge: schemaWithDescription,
+    onShell: unread,
     fix: null,
     key: null,
     recommendation_class: 'best_practice',
+    confidence: 'likely',
+    scored: true,
   },
   author_and_date: {
     judge: authorAndDate,
+    onShell: (p) =>
+      typed(p.json_ld, ARTICLE).length === 0
+        ? 'not_applicable'
+        : authorAndDate(p) === 'pass'
+          ? 'pass'
+          : 'unread',
     fix: 'missing_author_date',
     key: 'byline',
     recommendation_class: 'best_practice',
+    confidence: 'likely',
+    scored: true,
   },
   specs_as_text: {
     judge: specsAsText,
+    onShell: shellIf(PRODUCT),
     fix: 'specs_as_images',
     key: 'spec',
     recommendation_class: 'best_practice',
+    confidence: 'inconclusive',
+    scored: false,
   },
 };
 
 export function judgePage(p: ContentFeatures): Record<ContentCheck, PageVerdict> {
   const out = {} as Record<ContentCheck, PageVerdict>;
   for (const [check, def] of Object.entries(CONTENT_CHECKS) as [ContentCheck, CheckDefinition][]) {
-    out[check] = p.client_rendered ? 'unread' : def.judge(p);
+    out[check] = p.client_rendered ? def.onShell(p) : def.judge(p);
   }
   return out;
 }

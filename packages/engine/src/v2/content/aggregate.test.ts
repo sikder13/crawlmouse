@@ -117,9 +117,22 @@ describe('page failures and the Quotable input', () => {
       null,
       null,
     ]);
-    expect(r.quotable.unread).toBe(2);
-    expect(r.quotable.checks.direct_answer_150).toEqual({ passing: 1, decided: 2 });
-    expect(r.quotable.checks.author_and_date).toEqual({ passing: 0, decided: 0 });
+    // only the counted checks enter Quotable, each with its own unread pages
+    expect(Object.keys(r.quotable.checks).sort()).toEqual([
+      'author_and_date',
+      'question_headings',
+      'schema_with_description',
+    ]);
+    expect(r.quotable.checks.direct_answer_150).toBeUndefined();
+    // the shell is unread for question headings and schema; for author/date, its JSON-LD (no
+    // Article node here) makes the check not apply, so only the page not fetched at all is unread
+    expect(r.quotable.checks.question_headings).toEqual({ passing: 0, decided: 0, unread: 2 });
+    expect(r.quotable.checks.schema_with_description).toEqual({
+      passing: 0,
+      decided: 0,
+      unread: 2,
+    });
+    expect(r.quotable.checks.author_and_date).toEqual({ passing: 0, decided: 0, unread: 1 });
   });
 
   it('the summary lists, per check, the templates it was decided on', () => {
