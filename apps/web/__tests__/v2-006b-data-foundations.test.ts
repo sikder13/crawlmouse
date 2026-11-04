@@ -681,6 +681,11 @@ describe('the research ledger is de-identified', () => {
       /public\.measurement_lineages: sneaky → accounts: a lineage references nothing/,
     ],
     [
+      'measurement_lineages renamed, so its pin would look at nothing',
+      `alter table public.measurement_lineages rename to lineages`,
+      /public\.measurement_lineages: missing \(renamed or dropped\)/,
+    ],
+    [
       'a partition of a side table in the partitions schema',
       `create table partitions.side (m date) partition by range (m);
        create table partitions.side_a partition of partitions.side for values from ('2026-01-01') to ('2026-02-01')`,
