@@ -39,7 +39,9 @@ describe('computePageAiSignals (§4 dual gate, end-to-end)', () => {
   });
 
   it('is deterministic (A1): identical HTML → byte-identical signals incl. excerpt', () => {
-    expect(computePageAiSignals(cheerio.load(SSR_NEXT))).toEqual(computePageAiSignals(cheerio.load(SSR_NEXT)));
+    expect(computePageAiSignals(cheerio.load(SSR_NEXT))).toEqual(
+      computePageAiSignals(cheerio.load(SSR_NEXT)),
+    );
   });
 
   it('does NOT mutate the shared $ (A1): nav, links, and #__next children survive', () => {
@@ -62,8 +64,15 @@ describe('computePageAiSignals (§4 dual gate, end-to-end)', () => {
   });
 
   it('A17: per-page extraction is bounded on a realistic large page', () => {
-    const paras = Array.from({ length: 400 }, (_, i) => `<p>Paragraph ${i} with a fair amount of genuine readable prose for a crawler to ingest.</p>`).join('');
-    const links = Array.from({ length: 150 }, (_, i) => `<li><a href="/l${i}">Link ${i}</a></li>`).join('');
+    const paras = Array.from(
+      { length: 400 },
+      (_, i) =>
+        `<p>Paragraph ${i} with a fair amount of genuine readable prose for a crawler to ingest.</p>`,
+    ).join('');
+    const links = Array.from(
+      { length: 150 },
+      (_, i) => `<li><a href="/l${i}">Link ${i}</a></li>`,
+    ).join('');
     const html = `<html><head><title>Big</title></head><body><nav><ul>${links}</ul></nav><main>${paras}</main></body></html>`;
     const $ = cheerio.load(html);
     const t0 = performance.now();
