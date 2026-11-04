@@ -132,6 +132,23 @@ describe('accessTestRow: CC-12d identity, vantage and evidence', () => {
     expect(row).toMatchObject({ identity_role: 'crawler', identity_sent: CRAWL.userAgent, tagged: true });
   });
 
+  it("a crawler row that shows the blocked control's request is not tagged: that request was not", () => {
+    // control_blocked: every crawler's row shows the control's challenged request as its evidence.
+    const row = accessTestRow(
+      input({
+        verdict: 'edge_blocks_automation',
+        cause: 'automation_challenge',
+        fetch: outcome({ identity: CONTROL, status: 403 }),
+      }),
+    );
+    expect(row).toMatchObject({
+      ua: 'GPTBot',
+      identity_role: 'crawler',
+      identity_sent: CONTROL.userAgent,
+      tagged: false,
+    });
+  });
+
   it('records the vantage it is given: region, network class and release', () => {
     expect(accessTestRow(input({ vantage: FLY }))).toMatchObject({
       fly_region: 'iad',

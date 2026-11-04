@@ -174,14 +174,17 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
   it('each row names its identity: role, and whether the request sent carried our tag', () => {
     for (const site of SITES) {
       for (const r of results.get(site)!.access_tests) {
+        // A method row is told by the request it shows; a crawler row can show another's (the
+        // control's, when it was blocked), so it is told by naming a crawler.
         const role =
-          r.identity_sent === CONTROL.userAgent
-            ? 'control'
-            : r.identity_sent === CANARY.userAgent
-              ? 'canary'
-              : 'crawler';
+          r.ua !== null
+            ? 'crawler'
+            : r.identity_sent === CONTROL.userAgent
+              ? 'control'
+              : r.identity_sent === CANARY.userAgent
+                ? 'canary'
+                : 'unknown';
         expect(r.identity_role).toBe(role);
-        expect(r.ua === null).toBe(role !== 'crawler');
         expect(r.tagged).toBe(r.identity_sent.includes('Crawlmouse/2.0'));
         if (role === 'control') expect(r.tagged).toBe(false);
       }
