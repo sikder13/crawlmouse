@@ -386,13 +386,19 @@ describe('every value set the contract places at a column has CHECKs with exactl
 });
 
 describe('fields and values declared as not stored yet', () => {
-  it('each is a field of its entity, and none has a column yet', () => {
+  it('each is a field of its entity, and none has a column yet, under its name or flattened', () => {
     const wrong = Object.keys(NOT_STORED_YET).flatMap((at) => {
       const [name, field] = at.split('.') as [string, string];
       const entity = ENTITIES.find((e) => e.name === name);
       if (!entity || !fieldsOf(entity.schema).has(field)) return [`${at}: not a contract field`];
       const table = TABLE_OF[name];
-      return table && columns.has(`${table}.${field}`) ? [`${at}: ${table}.${field} exists`] : [];
+      if (FLATTENED[at] || RELOCATED[at]) return [`${at}: declared flattened or relocated`];
+      if (!table) return [];
+      // Stored under its own name, or flattened into `<field>_<key>` columns as Site.schedule is.
+      const stored = [...columns.keys()].filter(
+        (c) => c === `${table}.${field}` || c.startsWith(`${table}.${field}_`),
+      );
+      return stored.map((c) => `${at}: ${c} exists`);
     });
     expect(wrong).toEqual([]);
   });
