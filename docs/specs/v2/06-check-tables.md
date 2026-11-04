@@ -1341,7 +1341,7 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
 
 | File                                                                     | sha256                                                             |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `664d9cdeb552e09c15542cba6828aef3d05a153b40ee2affb9c412c881a3ae2f` |
+| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `9380c15d6610440d69a5ac39832fd671387b12fac6eb3c92105a579030a870a6` |
 | `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `650aae0c4fc09c6111bb67e7a1879ea73b5b817683f0b7dffb9c9b5a25ba48b6` |
 
 <details><summary>Migration SQL</summary>
@@ -2607,8 +2607,9 @@ alter table public.api_keys enable row level security;
 alter table public.deploy_hooks enable row level security;
 alter table public.seat_sites enable row level security;
 
--- A lineage names builds and versions of Crawlmouse itself, nothing about an account, and is shared
--- by every row it produced, so any signed-in user may read it.
+-- A lineage's columns are build and version identifiers the server writes (06b §1); the database
+-- checks their shape, not their meaning. It is shared by every row it produced and names no account
+-- column, so any signed-in user may read it.
 drop policy if exists measurement_lineages_read on public.measurement_lineages;
 create policy measurement_lineages_read on public.measurement_lineages
   for select to authenticated using (true);
