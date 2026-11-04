@@ -9,8 +9,19 @@ import { VerdictSchema, type FixType } from '@crawlmouse/types/v2';
 import { scoreToLetter } from '../../grade.js';
 import { MAX_HEALTHY_DEPTH, MIN_GRADEABLE_PAGES } from '../../constants.js';
 import { SIGNAL_TABLE } from '../access/declarations.js';
-import { CONTENT_CHECKS } from '../content/checks.js';
-import { MIN_PASS_ACCURACY, MIN_PRECISION, tallies, validated } from '../content/label-set.js';
+import { CONTENT_CHECKS, judgePage } from '../content/checks.js';
+import {
+  lowerBound,
+  MIN_PASS_ACCURACY,
+  MIN_PRECISION,
+  tallies,
+  validated,
+  VARIANTS,
+  variantTallies,
+  type Tally,
+  type Variant,
+} from '../content/label-set.js';
+import type { ContentFeatures } from '../content/read.js';
 import * as T from '../content/thresholds.js';
 import labels from '../../../fixtures/v2/content/labels.json' with { type: 'json' };
 import { code, pct, table } from '../detectors/spec.js';
@@ -81,8 +92,7 @@ const CHECK_RULES: Readonly<
       'a page whose JSON-LD has an Article-family node (`og:type=article` alone does not count)',
     passes:
       'an author (JSON-LD `author`, `meta[name=author]`, `rel=author`, `itemprop=author`) and a date (JSON-LD `datePublished` with a four-digit year, `article:published_time`, `itemprop=datePublished`, `time[datetime]`)',
-    shell:
-      'not applicable without an Article-family node; passes when the markup alone passes; otherwise unread',
+    shell: 'not applicable without an Article-family node; otherwise unread',
   },
   specs_as_text: {
     applies: 'a page with `Product` JSON-LD',
@@ -106,15 +116,15 @@ function letterScale(): string[][] {
 const outOfDenominator = () => VerdictSchema.options.filter((v) => !(v in ACCESS_CELL_WEIGHT));
 
 const share = (n: number, of: number, none: string) =>
-  of === 0 ? none : `${pct(n / of)} (${n} of ${of})`;
+  of === 0 ? none : `${pct(n / of)} (${n} of ${of}; ≥ ${pct(lowerBound(n, of)!)})`;
 
-function tallyTable(t: ReturnType<typeof tallies>): string {
-  const rows = (Object.keys(t) as (keyof typeof CONTENT_CHECKS)[]).map((check) => {
-    const x = t[check];
+function tallyTable(t: Record<string, Tally>, checks = Object.keys(t)): string {
+  const rows = checks.map((check) => {
+    const x = t[check]!;
     return [
       code(check),
-      CONTENT_CHECKS[check].scored ? 'yes' : 'no',
-      String(x.labelled),
+      CONTENT_CHECKS[check as keyof typeof CONTENT_CHECKS].scored ? 'yes' : 'no',
+      String(x.applies),
       String(x.failing),
       share(x.confirmed, x.fires, 'no firing'),
       share(x.passes_confirmed, x.passes, 'no pass'),
@@ -122,7 +132,7 @@ function tallyTable(t: ReturnType<typeof tallies>): string {
     ];
   });
   return table(
-    ['Check', 'Counted', 'Labelled', 'Labelled fail', 'Precision', 'Pass accuracy', 'Recall'],
+    ['Check', 'Counted', 'Applies', 'Labelled fail', 'Precision', 'Pass accuracy', 'Recall'],
     rows,
   );
 }
@@ -139,6 +149,27 @@ function firstReadVerdict(): string {
     : `On the labels as first read, ${list(failing)} would not clear the bar: the corrections are what let ${failing.length === 1 ? 'it' : 'them'} count.`;
 }
 
+/** The pages, grouped by the checks they are labelled for. */
+function coverage(): string {
+  const groups = new Map<string, number>();
+  for (const p of labels.pages) {
+    const key = Object.keys(p.labels).sort().join(',');
+    groups.set(key, (groups.get(key) ?? 0) + 1);
+  }
+  const all = Object.keys(CONTENT_CHECKS).length;
+  return [...groups]
+    .sort((x, y) => y[1] - x[1])
+    .map(([key, n]) => {
+      const checks = key.split(',');
+      return `${n} labelled for ${checks.length === all ? 'all five checks' : `${list(checks)} only`}`;
+    })
+    .join('; ');
+}
+
+/** A label agrees with a verdict when both say pass, both say fail, or both say the check does not apply. */
+const agrees = (label: string, verdict: string) =>
+  label === verdict || (label === 'na' && verdict === 'not_applicable');
+
 function labelSet(): string {
   const all = labels.pages.flatMap((p) => p.corrections);
   const causes = Object.entries(labels.causes).flatMap(([cause, meaning]) => {
@@ -147,16 +178,52 @@ function labelSet(): string {
     const checks = [...new Set(cs.map((c) => c.check))].sort().map(code).join(', ');
     return [`- ${cs.length} on ${checks}: ${meaning}.`];
   });
+  const towardCheck = labels.pages.reduce((n, p) => {
+    const v = judgePage(p.features as ContentFeatures);
+    return (
+      n +
+      p.corrections.filter(
+        (c) =>
+          !agrees(c.from.label, v[c.check as keyof typeof v]) &&
+          agrees(c.to, v[c.check as keyof typeof v]),
+      ).length
+    );
+  }, 0);
+  const withdrawn = labels.pages.flatMap((p) => p.withdrawn);
+  const withdrawnLines = Object.entries(labels.withdrawn_causes).flatMap(([cause, meaning]) => {
+    const ws = withdrawn.filter((w) => w.cause === cause);
+    if (ws.length === 0) return [];
+    const where = ws.map((w) => `${w.heading_position} of ${w.headings_shown}`).join(', ');
+    return [
+      `- ${ws.length} on ${list([...new Set(ws.map((w) => w.check))])}: ${meaning}. The heading's place among those shown: ${where}.`,
+    ];
+  });
+  const variants = variantTallies();
+  const variantRows = (Object.keys(VARIANTS) as Variant[]).map((name) => {
+    const v = VARIANTS[name];
+    const [kept, tried] = [tallies()[v.check], variants[name]];
+    return [
+      code(v.check),
+      v.rule,
+      `${share(tried.confirmed, tried.fires, 'no firing')}; kept: ${share(kept.confirmed, kept.fires, 'no firing')}`,
+      `${share(tried.passes_confirmed, tried.passes, 'no pass')}; kept: ${share(kept.passes_confirmed, kept.passes, 'no pass')}`,
+    ];
+  });
   return [
-    `${labels.pages.length} pages from the production audit corpus (\`packages/engine/fixtures/v2/content/labels.json\`).`,
+    `${labels.pages.length} pages from the production audit corpus (\`packages/engine/fixtures/v2/content/labels.json\`): ${coverage()}. The pages labelled for fewer checks were added afterwards to give a check more pages it applies to; a check's counts leave out the pages not labelled for it.`,
     '',
     '**Who labelled them.** The session that implemented the checks, reading a machine-made text view of each',
-    'saved page against the criteria below, not against the rules. The labels are not an independent',
-    "person's, and the reviewer checks them against the excerpts. Each page carries its URL, fetch date, the",
-    'features `readPage` read, the labels with their reasons, and the sha256 of the excerpt the labels were made',
-    "from. The excerpts are other people's text and are not tracked: the set is reproducible from the URLs, as",
-    '`fixtures/v2/content/fetch.ts` refetches the pages and `generate.ts` rebuilds the features. The file records',
-    "the digest of the reader the features were read with, and labels.test.ts fails when it is not the reader's.",
+    "saved page against the criteria below. The labels are not an independent person's, and the reviewer checks",
+    "them against the excerpts. The corrected labels were made with the checks' verdicts in view: they were",
+    'found where a check and a label disagreed. Each page carries its URL, fetch date, the features `readPage`',
+    'read, the labels with their reasons, and the sha256 of the excerpt the labels were made from. The excerpts',
+    "and the saved pages are other people's text and are not tracked. The set can be re-checked from the URLs:",
+    "`fixtures/v2/content/fetch.ts` refetches today's page, the excerpt hash shows whether the text has changed",
+    'since it was labelled, and `generate.ts` rebuilds the features from saved pages. The file records the digest',
+    "of the reader the features were read with, and labels.test.ts fails when it is not the reader's.",
+    '',
+    '**How the set was used.** To choose rules as well as to measure them, so its counts are not a held-out',
+    'test of the rules they helped choose.',
     '',
     'The criteria, as labels.json carries them:',
     '',
@@ -164,19 +231,29 @@ function labelSet(): string {
     '',
     `A check fires when it judges a page \`fail\`. Precision is the share of its firings labelled \`fail\`;`,
     'pass accuracy the share of the pages it judges `pass` that are labelled `pass`; pages labelled `unsure` are',
-    `left out. A check counts in Quotable only if it fires, passes, and keeps precision at ${pct(MIN_PRECISION)}`,
-    `or more and pass accuracy at ${pct(MIN_PASS_ACCURACY)} or more (labels.test.ts); the others are reported`,
-    'and score nothing.',
+    'left out. "Applies" counts the pages labelled `pass` or `fail`. After each share, ≥ is its exact one-sided 95 % lower',
+    'bound (Clopper-Pearson): how far the sample vouches for it. A check counts in Quotable only if it fires,',
+    `passes, and keeps precision at ${pct(MIN_PRECISION)} or more and pass accuracy at ${pct(MIN_PASS_ACCURACY)} or more`,
+    '(labels.test.ts); the bar is on the shares, not the bounds. The others are reported and score nothing.',
     '',
     tallyTable(tallies()),
     '',
+    '**Rules measured and not kept.** Each was measured on this set beside the rule kept, whose counts the',
+    'table repeats after "kept".',
+    '',
+    table(['Check', 'Rule tried', 'Precision', 'Pass accuracy'], variantRows),
+    '',
     `**Corrections.** ${all.length} labels were changed after the first reading, each recorded with its first`,
-    'label, its reason and its cause. They were found by reading the pages where a check and a label',
-    'disagreed, so they move the counts toward agreement. By cause:',
+    `label, its reason and its cause; ${towardCheck} of them changed a label that disagreed with the check to one`,
+    'that agrees. By cause:',
     '',
     ...causes,
     '',
-    'The same counts with the labels as first read:',
+    `**Withdrawn corrections.** ${withdrawn.length} more changes were withdrawn, so the first label stands:`,
+    '',
+    ...withdrawnLines,
+    '',
+    'The counts with the labels as first read, before the corrections:',
     '',
     tallyTable(tallies(true)),
     '',
@@ -228,6 +305,8 @@ export function renderGradeSpec(): string {
     '',
     '> Generated from `packages/engine/src/v2/grade/spec.ts`; `spec.test.ts` fails when this file differs from',
     '> the render. Regenerate: `pnpm --filter @crawlmouse/engine exec tsx src/v2/grade/write-spec.ts`.',
+    '> Weights, thresholds, counts and tables of data are read from the code and fixtures; the prose and the',
+    '> descriptions of each rule and counterfactual are written in spec.ts and checked against the code by review.',
     '',
     `Grade version: ${code(GRADE_VERSION)} (\`Check.grade_version\`). Grades and components are given to ${DECIMALS} decimal places.`,
     '',
@@ -272,7 +351,7 @@ export function renderGradeSpec(): string {
     '',
     '### Quotable',
     '',
-    `rate(k) = pages passing check k / pages k was decided on; Quotable = ${AI_WEIGHTS.quotable} × mean of rate(k) over the counted checks decided on a page. A check counts once the label set validates it (below); ${list(uncounted)} are reported and do not count. A counted check's graded pages that were not read for it make Quotable a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread), over each check decided or unread on a page. Nothing decided and nothing unread is the range [0, ${AI_WEIGHTS.quotable}].`,
+    `rate(k) = pages passing check k / pages k was decided on; Quotable = ${AI_WEIGHTS.quotable} × mean of rate(k) over the counted checks decided on a page. A check counts once it clears the bar on the label set (below); ${list(uncounted)} are reported and do not count. A counted check's graded pages that were not read for it make Quotable a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread), over each check decided or unread on a page. Nothing decided and nothing unread is the range [0, ${AI_WEIGHTS.quotable}].`,
     '',
     '### Signals',
     '',

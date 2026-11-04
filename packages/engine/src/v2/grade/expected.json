@@ -1,8 +1,8 @@
 {
   "grade_version": "2.0.0",
-  "source_digest": "42fa5f3536b389b4c38c08c14a2ebf6291301e0da611c0c091dcb60acb88334a",
+  "source_digest": "2a162595c0a2ab49c46431b1dc764498db2595c2a8772415d381141bffa63fda",
   "cases": {
-    "client-rendered, 31 % text, every crawler served": {
+    "31 % of words served without JavaScript, every crawler served": {
       "technical_seo": {
         "score": 80.8,
         "grade": "B+",
@@ -79,7 +79,7 @@
         "estimate": true
       }
     },
-    "client-rendered, not yet rendered": {
+    "words without JavaScript not yet measured": {
       "technical_seo": {
         "score": 80.8,
         "grade": "B+",

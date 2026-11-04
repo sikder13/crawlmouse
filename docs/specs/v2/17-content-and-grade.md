@@ -2,17 +2,19 @@
 
 > Generated from `packages/engine/src/v2/grade/spec.ts`; `spec.test.ts` fails when this file differs from
 > the render. Regenerate: `pnpm --filter @crawlmouse/engine exec tsx src/v2/grade/write-spec.ts`.
+> Weights, thresholds, counts and tables of data are read from the code and fixtures; the prose and the
+> descriptions of each rule and counterfactual are written in spec.ts and checked against the code by review.
 
 Grade version: `2.0.0` (`Check.grade_version`). Grades and components are given to 2 decimal places.
 
 ## AI readability
 
-| Component | Max | From                                                                                          |
-| --------- | --- | --------------------------------------------------------------------------------------------- |
-| Access    | 40  | the scored crawlers' sampled pages (CC-15's matrix)                                           |
-| Readable  | 30  | the share of words served without JavaScript (CC-14)                                          |
-| Quotable  | 20  | the counted content checks: `question_headings`, `schema_with_description`, `author_and_date` |
-| Signals   | 10  | schema.org markup and Content Signals                                                         |
+| Component | Max | From                                                                     |
+| --------- | --- | ------------------------------------------------------------------------ |
+| Access    | 40  | the scored crawlers' sampled pages (CC-15's matrix)                      |
+| Readable  | 30  | the share of words served without JavaScript (CC-14)                     |
+| Quotable  | 20  | the counted content checks: `schema_with_description`, `author_and_date` |
+| Signals   | 10  | schema.org markup and Content Signals                                    |
 
 The scored crawlers are the registry's `ai_search` group; the `ai_training` group is shown and not scored.
 
@@ -36,7 +38,7 @@ ratio(t) = median `text_share` of template t's rendered pages; Readable = 30 × 
 
 ### Quotable
 
-rate(k) = pages passing check k / pages k was decided on; Quotable = 20 × mean of rate(k) over the counted checks decided on a page. A check counts once the label set validates it (below); `direct_answer_150`, `specs_as_text` are reported and do not count. A counted check's graded pages that were not read for it make Quotable a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread), over each check decided or unread on a page. Nothing decided and nothing unread is the range [0, 20].
+rate(k) = pages passing check k / pages k was decided on; Quotable = 20 × mean of rate(k) over the counted checks decided on a page. A check counts once it clears the bar on the label set (below); `direct_answer_150`, `question_headings`, `specs_as_text` are reported and do not count. A counted check's graded pages that were not read for it make Quotable a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread), over each check decided or unread on a page. Nothing decided and nothing unread is the range [0, 20].
 
 ### Signals
 
@@ -89,27 +91,32 @@ score = 0.6 × structure + 40 × crawlability. Structure is v1's grade (packages
 
 Site chrome (`nav, footer, aside, form, [role="navigation"], [aria-hidden="true"]`) is set aside before a page is read. A page served for JavaScript to fill in is judged as the column "Client-rendered" says. "Counted" is whether the check counts in Quotable.
 
-| Check                     | Applies to                                                                                                                                     | Passes                                                                                                                                                                                                               | Client-rendered                                                                                      | Fix (key)                         | Counted | Class, confidence               |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------- | ------- | ------------------------------- |
-| `direct_answer_150`       | a page of prose: an H1 with 150 words or more after it, and no `Product` JSON-LD                                                               | within the first 150 words after the H1, a block that is not a list item and has 5 words or more holds a sentence of 8 to 60 words ending in a full stop                                                             | unread                                                                                               | `quotable_opening` (`answer:`)    | no      | `experimental`, `inconclusive`  |
-| `question_headings`       | a page of prose with 3 section headings or more: an h2 or h3 after the H1 followed by a `p`, `blockquote`, `dd`, `td` block of 5 words or more | an h2 or h3 after the H1 has a clause ending in a question mark (`?`, the Arabic `؟`, or the full-width form)                                                                                                        | unread                                                                                               | none in the contract              | yes     | `experimental`, `likely`        |
-| `schema_with_description` | a page with a typed JSON-LD node                                                                                                               | a node of a type about the page itself (`…Page`, `…Article`, `BlogPosting`, `Product`, `Service`, `Event`, `TouristTrip` and the others in checks.ts) has a non-empty `description`                                  | unread                                                                                               | none in the contract              | yes     | `best_practice`, `likely`       |
-| `author_and_date`         | a page whose JSON-LD has an Article-family node (`og:type=article` alone does not count)                                                       | an author (JSON-LD `author`, `meta[name=author]`, `rel=author`, `itemprop=author`) and a date (JSON-LD `datePublished` with a four-digit year, `article:published_time`, `itemprop=datePublished`, `time[datetime]`) | not applicable without an Article-family node; passes when the markup alone passes; otherwise unread | `missing_author_date` (`byline:`) | yes     | `best_practice`, `likely`       |
-| `specs_as_text`           | a page with `Product` JSON-LD                                                                                                                  | fails when an image whose alt text or file name names specifications, and is not a link to another page, is shown with no table or description list and fewer than 2 "Label: value" lines with a digit               | not applicable without `Product` JSON-LD; otherwise unread                                           | `specs_as_images` (`spec:`)       | no      | `best_practice`, `inconclusive` |
+| Check                     | Applies to                                                                                                                                     | Passes                                                                                                                                                                                                               | Client-rendered                                                 | Fix (key)                         | Counted | Class, confidence               |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------- | ------- | ------------------------------- |
+| `direct_answer_150`       | a page of prose: an H1 with 150 words or more after it, and no `Product` JSON-LD                                                               | within the first 150 words after the H1, a block that is not a list item and has 5 words or more holds a sentence of 8 to 60 words ending in a full stop                                                             | unread                                                          | `quotable_opening` (`answer:`)    | no      | `experimental`, `inconclusive`  |
+| `question_headings`       | a page of prose with 3 section headings or more: an h2 or h3 after the H1 followed by a `p`, `blockquote`, `dd`, `td` block of 5 words or more | an h2 or h3 after the H1 has a clause ending in a question mark (`?`, the Arabic `؟`, or the full-width form)                                                                                                        | unread                                                          | none in the contract              | no      | `experimental`, `inconclusive`  |
+| `schema_with_description` | a page with a typed JSON-LD node                                                                                                               | a node of a type about the page itself (`…Page`, `…Article`, `BlogPosting`, `Product`, `Service`, `Event`, `TouristTrip` and the others in checks.ts) has a non-empty `description`                                  | unread                                                          | none in the contract              | yes     | `best_practice`, `likely`       |
+| `author_and_date`         | a page whose JSON-LD has an Article-family node (`og:type=article` alone does not count)                                                       | an author (JSON-LD `author`, `meta[name=author]`, `rel=author`, `itemprop=author`) and a date (JSON-LD `datePublished` with a four-digit year, `article:published_time`, `itemprop=datePublished`, `time[datetime]`) | not applicable without an Article-family node; otherwise unread | `missing_author_date` (`byline:`) | yes     | `best_practice`, `likely`       |
+| `specs_as_text`           | a page with `Product` JSON-LD                                                                                                                  | fails when an image whose alt text or file name names specifications, and is not a link to another page, is shown with no table or description list and fewer than 2 "Label: value" lines with a digit               | not applicable without `Product` JSON-LD; otherwise unread      | `specs_as_images` (`spec:`)       | no      | `best_practice`, `inconclusive` |
 
 A template's content fix is detected when 2 or more of its decided pages fail and they are 50 % or more of them; clear at 10 % or less; indeterminate between (hysteresis), or when a page of the template was not read. An opened content fix is `info` (diff/severity.ts).
 
 ### The label set
 
-141 pages from the production audit corpus (`packages/engine/fixtures/v2/content/labels.json`).
+141 pages from the production audit corpus (`packages/engine/fixtures/v2/content/labels.json`): 113 labelled for all five checks; 28 labelled for `author_and_date` only. The pages labelled for fewer checks were added afterwards to give a check more pages it applies to; a check's counts leave out the pages not labelled for it.
 
 **Who labelled them.** The session that implemented the checks, reading a machine-made text view of each
-saved page against the criteria below, not against the rules. The labels are not an independent
-person's, and the reviewer checks them against the excerpts. Each page carries its URL, fetch date, the
-features `readPage` read, the labels with their reasons, and the sha256 of the excerpt the labels were made
-from. The excerpts are other people's text and are not tracked: the set is reproducible from the URLs, as
-`fixtures/v2/content/fetch.ts` refetches the pages and `generate.ts` rebuilds the features. The file records
-the digest of the reader the features were read with, and labels.test.ts fails when it is not the reader's.
+saved page against the criteria below. The labels are not an independent person's, and the reviewer checks
+them against the excerpts. The corrected labels were made with the checks' verdicts in view: they were
+found where a check and a label disagreed. Each page carries its URL, fetch date, the features `readPage`
+read, the labels with their reasons, and the sha256 of the excerpt the labels were made from. The excerpts
+and the saved pages are other people's text and are not tracked. The set can be re-checked from the URLs:
+`fixtures/v2/content/fetch.ts` refetches today's page, the excerpt hash shows whether the text has changed
+since it was labelled, and `generate.ts` rebuilds the features from saved pages. The file records the digest
+of the reader the features were read with, and labels.test.ts fails when it is not the reader's.
+
+**How the set was used.** To choose rules as well as to measure them, so its counts are not a held-out
+test of the rules they helped choose.
 
 The criteria, as labels.json carries them:
 
@@ -140,38 +147,50 @@ The criteria, as labels.json carries them:
 
 A check fires when it judges a page `fail`. Precision is the share of its firings labelled `fail`;
 pass accuracy the share of the pages it judges `pass` that are labelled `pass`; pages labelled `unsure` are
-left out. A check counts in Quotable only if it fires, passes, and keeps precision at 95 %
-or more and pass accuracy at 95 % or more (labels.test.ts); the others are reported
-and score nothing.
+left out. "Applies" counts the pages labelled `pass` or `fail`. After each share, ≥ is its exact one-sided 95 % lower
+bound (Clopper-Pearson): how far the sample vouches for it. A check counts in Quotable only if it fires,
+passes, and keeps precision at 95 % or more and pass accuracy at 95 % or more
+(labels.test.ts); the bar is on the shares, not the bounds. The others are reported and score nothing.
 
-| Check                     | Counted | Labelled | Labelled fail | Precision        | Pass accuracy    | Recall                   |
-| ------------------------- | ------- | -------- | ------------- | ---------------- | ---------------- | ------------------------ |
-| `direct_answer_150`       | no      | 109      | 11            | no firing        | 81 % (51 of 63)  | 0 of 11                  |
-| `question_headings`       | yes     | 113      | 31            | 95 % (20 of 21)  | 96 % (26 of 27)  | 20 of 31                 |
-| `schema_with_description` | yes     | 113      | 17            | 100 % (16 of 16) | 96 % (64 of 67)  | 16 of 17                 |
-| `author_and_date`         | yes     | 141      | 2             | 100 % (2 of 2)   | 100 % (61 of 61) | 2 of 2                   |
-| `specs_as_text`           | no      | 113      | 0             | no firing        | 93 % (26 of 28)  | no failing page labelled |
+| Check                     | Counted | Applies | Labelled fail | Precision                | Pass accuracy            | Recall                   |
+| ------------------------- | ------- | ------- | ------------- | ------------------------ | ------------------------ | ------------------------ |
+| `direct_answer_150`       | no      | 81      | 11            | no firing                | 81 % (51 of 63; ≥ 71 %)  | 0 of 11                  |
+| `question_headings`       | no      | 61      | 35            | 95 % (20 of 21; ≥ 79 %)  | 85 % (23 of 27; ≥ 69 %)  | 20 of 35                 |
+| `schema_with_description` | yes     | 81      | 17            | 100 % (16 of 16; ≥ 83 %) | 96 % (64 of 67; ≥ 89 %)  | 16 of 17                 |
+| `author_and_date`         | yes     | 63      | 2             | 100 % (2 of 2; ≥ 22 %)   | 100 % (61 of 61; ≥ 95 %) | 2 of 2                   |
+| `specs_as_text`           | no      | 26      | 0             | no firing                | 93 % (26 of 28; ≥ 79 %)  | no failing page labelled |
 
-**Corrections.** 9 labels were changed after the first reading, each recorded with its first
-label, its reason and its cause. They were found by reading the pages where a check and a label
-disagreed, so they move the counts toward agreement. By cause:
+**Rules measured and not kept.** Each was measured on this set beside the rule kept, whose counts the
+table repeats after "kept".
 
-- 6 on `question_headings`: the labelling view listed only the first 12 h2/h3 headings of a page; the full list was read.
+| Check                     | Rule tried                                        | Precision                                               | Pass accuracy                                          |
+| ------------------------- | ------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------ |
+| `question_headings`       | a question counts only among the section headings | 91 % (21 of 23; ≥ 75 %); kept: 95 % (20 of 21; ≥ 79 %)  | 88 % (22 of 25; ≥ 72 %); kept: 85 % (23 of 27; ≥ 69 %) |
+| `schema_with_description` | a client-rendered page is judged on its JSON-LD   | 89 % (16 of 18; ≥ 69 %); kept: 100 % (16 of 16; ≥ 83 %) | 96 % (64 of 67; ≥ 89 %); kept: 96 % (64 of 67; ≥ 89 %) |
+
+**Corrections.** 5 labels were changed after the first reading, each recorded with its first
+label, its reason and its cause; 5 of them changed a label that disagreed with the check to one
+that agrees. By cause:
+
+- 3 on `question_headings`: the labelling view listed only the first 12 h2/h3 headings of a page; the full list was read.
 - 1 on `schema_with_description`: the labelling view did not flatten JSON-LD nested in arrays, so a page with markup read as having none.
 - 1 on `author_and_date`: the labelling view scanned for a byline and missed one marked up as schema.org Person microdata.
-- 1 on `question_headings`: the heading was in the view and the first reading missed it.
 
-The same counts with the labels as first read:
+**Withdrawn corrections.** 4 more changes were withdrawn, so the first label stands:
 
-| Check                     | Counted | Labelled | Labelled fail | Precision       | Pass accuracy   | Recall                   |
-| ------------------------- | ------- | -------- | ------------- | --------------- | --------------- | ------------------------ |
-| `direct_answer_150`       | no      | 109      | 11            | no firing       | 81 % (51 of 63) | 0 of 11                  |
-| `question_headings`       | yes     | 112      | 36            | 95 % (19 of 20) | 78 % (21 of 27) | 19 of 36                 |
-| `schema_with_description` | yes     | 113      | 16            | 94 % (15 of 16) | 96 % (64 of 67) | 15 of 16                 |
-| `author_and_date`         | yes     | 141      | 3             | 100 % (2 of 2)  | 98 % (60 of 61) | 2 of 3                   |
-| `specs_as_text`           | no      | 113      | 0             | no firing       | 93 % (26 of 28) | no failing page labelled |
+- 4 on `question_headings`: the labelling view showed the heading, a call to action phrased as a question, and the first reading labelled the page fail; the label was changed to pass after the check disagreed, so whether a call to action is a content heading was decided with the check's verdict in view. The heading's place among those shown: 10 of 12, 7 of 9, 11 of 12, 12 of 12.
 
-On the labels as first read, `question_headings`, `schema_with_description` would not clear the bar: the corrections are what let them count.
+The counts with the labels as first read, before the corrections:
+
+| Check                     | Counted | Applies | Labelled fail | Precision               | Pass accuracy           | Recall                   |
+| ------------------------- | ------- | ------- | ------------- | ----------------------- | ----------------------- | ------------------------ |
+| `direct_answer_150`       | no      | 81      | 11            | no firing               | 81 % (51 of 63; ≥ 71 %) | 0 of 11                  |
+| `question_headings`       | no      | 60      | 36            | 95 % (19 of 20; ≥ 78 %) | 78 % (21 of 27; ≥ 61 %) | 19 of 36                 |
+| `schema_with_description` | yes     | 80      | 16            | 94 % (15 of 16; ≥ 74 %) | 96 % (64 of 67; ≥ 89 %) | 15 of 16                 |
+| `author_and_date`         | yes     | 63      | 3             | 100 % (2 of 2; ≥ 22 %)  | 98 % (60 of 61; ≥ 92 %) | 2 of 3                   |
+| `specs_as_text`           | no      | 26      | 0             | no firing               | 93 % (26 of 28; ≥ 79 %) | no failing page labelled |
+
+On the labels as first read, `schema_with_description` would not clear the bar: the corrections are what let it count.
 
 ## Fix effects
 
@@ -212,8 +231,8 @@ A structure fix takes its recommendation class from its type; the structure dete
 
 | Site                                                                              | Technical SEO | AI readability                        | Fixes | Fixes add (SEO / AI) |
 | --------------------------------------------------------------------------------- | ------------- | ------------------------------------- | ----- | -------------------- |
-| client-rendered, 31 % text, every crawler served                                  | 80.8 B+       | 79.3                                  | 0     | 0 / 0                |
-| client-rendered, not yet rendered                                                 | 80.8 B+       | withheld: `readable_unmeasured`       | 0     | 0 / 0                |
+| 31 % of words served without JavaScript, every crawler served                     | 80.8 B+       | 79.3                                  | 0     | 0 / 0                |
+| words without JavaScript not yet measured                                         | 80.8 B+       | withheld: `readable_unmeasured`       | 0     | 0 / 0                |
 | blog: a crawler blocked, one served thin, 8 openings without an answer, 2 orphans | 84.27 B+      | 80                                    | 6     | 2.27 / 10            |
 | blog: one scored crawler measured                                                 | 87.42 A-      | withheld: `too_few_crawlers_measured` | 1     | 0 / waits            |
 
