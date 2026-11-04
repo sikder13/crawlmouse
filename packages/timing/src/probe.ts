@@ -1,10 +1,11 @@
 import { median } from './stats.js';
 
 /**
- * The probe's median on a runner of normal speed, in milliseconds: the GitHub-hosted runner the
- * visual job uses, in its Playwright image. docs/ops/ci-timing.md lists the runs it was read from.
+ * The probe's median on a runner of normal speed, in milliseconds: the median of three readings on
+ * the GitHub-hosted runner in the Playwright image, rounded to a whole millisecond.
+ * docs/ops/ci-timing.md lists the three runs.
  */
-export const PROBE_REFERENCE_MS = 100;
+export const PROBE_REFERENCE_MS = 105;
 /** A runner whose probe median is more than this many times the reference is rated slow. */
 export const SLOW_RUNNER_FACTOR = 1.5;
 
