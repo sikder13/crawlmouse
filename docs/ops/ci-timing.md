@@ -29,7 +29,8 @@ nightly trend, and a dated register of the timing failures found to be noise.
   a time per process.
 - `expectWithinRelative(name, { measured, reference }, { limit, rule })` times the two sides in turn,
   five pairs after a warm-up of each, on the same clock, and compares the medians. It has no ceiling
-  factor, and records the measured side's samples.
+  factor, and records the measured side's samples. Its `setup` builds a fresh input for each side
+  of every pair, off the clock, as `expectWithinBudget`'s does.
 - A failure message names the clock, and lists every sample and the warm-up. With
   `PERF_SAMPLES_DIR` set, every budget check appends its samples to `samples.jsonl` there, pass or
   fail.
@@ -92,8 +93,8 @@ trend into the job summary.
   3,000 ms ceiling on one workstation: red by 9%, so a faster runner could pass it per PR. The
   strict job read 3,251 ms against 1,000 ms. The llms.txt ReDoS, undone the same way, read 109,374 ms
   against 1,500 ms.
-- **A cache keyed on a value, not an object, still hides a cold path.** `setup` gives each run a new
-  input object; the robots and llms.txt checks take a string, and a memo keyed on an equal string
+- **A cache keyed on a value, not an object, still hides a cold path.** `setup` gives each run (or
+  each pair, in a relative check) a new input object; the robots and llms.txt checks take a string, and a memo keyed on an equal string
   still hits.
 - **A regression that fails about half the time can pass as "flaky: passed on retry".** The retry
   cannot tell a marginal regression from noise. The row it writes goes into the register, where a
@@ -145,6 +146,8 @@ Three things keep a busy machine from failing `pnpm test` on noise:
   stalled path, its file taking 17.1 s, so the crawl ended early rather than running out of its
   60 s; a 1 s navigation timeout expiring on the fixture's own home page would do that, which is
   not confirmed. Both are in the register below as timer-based. Their budgets are not raised further.
+  "CI unaffected" in their rows means the PR jobs, one package each; the nightly `test` job runs
+  `pnpm test`, so it runs at the cap and both fixtures are exposed there, on a hosted runner.
 
 ## Reading the trend
 
