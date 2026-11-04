@@ -80,8 +80,11 @@ export const tallies = (first = false): Record<ContentCheck, Tally> =>
   tally(judgePage, (p, c) => labelOf(p, c, first));
 
 /**
- * The rulings the labels leave open, each with the label it would give the pages that turn on it.
- * Pages are labelled `unsure` until the owner rules; these count them as each ruling would.
+ * The rulings the labels leave open, each with the label it gives the pages that turn on it, which are
+ * labelled `unsure` until the owner rules. Under the second, a page left with fewer than three content
+ * headings would be `na` rather than `fail`; this counts it `fail`, which can raise "applies" and
+ * "failing" but not precision or pass accuracy, since such a page is one the check judges not
+ * applicable.
  */
 export const RULINGS = {
   cta_is_content: {

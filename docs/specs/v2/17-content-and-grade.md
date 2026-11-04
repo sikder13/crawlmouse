@@ -178,7 +178,7 @@ were not measured.
 | `schema_with_description` | a client-rendered page is judged on its JSON-LD   | 89 % (16 of 18; ≥ 68 %); kept: 100 % (16 of 16; ≥ 82 %) | 96 % (64 of 67; ≥ 88 %); kept: 96 % (64 of 67; ≥ 88 %)  |
 
 **Corrections.** 11 labels were changed after the first reading, each recorded with its first
-label, its reason and its cause. Their effect on agreement with the check: disagreeing → left out 5, disagreeing → agreeing 4, agreeing → left out 1, left out → agreeing 1. By cause:
+label, its reason and its cause. Their effect on agreement with the check: disagreeing → agreeing 4, disagreeing → left out 3, on a page the check does not judge 2, agreeing → left out 1, left out → agreeing 1. By cause:
 
 - 3 on `question_headings` (`fail` → `pass` 2, `unsure` → `fail` 1): the labelling view listed only the first 12 h2/h3 headings of a page; the full list was read.
 - 1 on `schema_with_description` (`na` → `fail` 1): the labelling view did not flatten JSON-LD nested in arrays, so a page with markup read as having none.

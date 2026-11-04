@@ -205,7 +205,8 @@ function labelSet(): string {
     return [`- ${cs.length} on ${checks} (${moves}): ${meaning}.`];
   });
   // Each correction's effect on agreement with the check: a label agrees, disagrees, or is left out
-  // of the counts (`unsure`).
+  // of the counts (`unsure`); on a page the check does not judge pass or fail, it moves no share.
+  // A page the check does not judge pass or fail enters no share whatever its label.
   const standing = (label: string, verdict: string) =>
     label === 'unsure' ? 'left out' : agrees(label, verdict) ? 'agreeing' : 'disagreeing';
   const moves = new Map<string, number>();
@@ -213,7 +214,10 @@ function labelSet(): string {
     const v = judgePage(p.features as ContentFeatures);
     for (const c of p.corrections) {
       const verdict = v[c.check as keyof typeof v];
-      const m = `${standing(c.from.label, verdict)} → ${standing(c.to, verdict)}`;
+      const m =
+        verdict !== 'pass' && verdict !== 'fail'
+          ? 'on a page the check does not judge'
+          : `${standing(c.from.label, verdict)} → ${standing(c.to, verdict)}`;
       moves.set(m, (moves.get(m) ?? 0) + 1);
     }
   }

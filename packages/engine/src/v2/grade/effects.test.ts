@@ -145,7 +145,9 @@ describe('effects that cannot be stated', () => {
   });
 
   it('on a refused grade, fixes with a stated AI effect still rank before those whose AI effect waits', () => {
-    // two posts, both without an answer, and an orphan: 4 graded pages, refused as too small
+    // two posts, both without an answer, and an orphan: 4 graded pages, refused as too small. Under a
+    // rule that called every fix on a refused grade unstated, all three would tie and fingerprint order
+    // would put the content fix first, so this site tells the two rules apart
     const { grades, outcomes } = blog(2, 2, {}, [{ path: '/old-9' }]);
     expect(grades.technical_seo.score).toBe(null);
     const fs = fixes(outcomes).sort((a, b) => a.rank - b.rank);
