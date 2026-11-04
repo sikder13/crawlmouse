@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { VerdictSchema, type AccessCause, type Verdict } from '@crawlmouse/types/v2';
 import { CAUSES, EVIDENCE } from '../../../engine/src/v2/access/cells.js';
-import type { ResponseReading } from './response.js';
+import { NOT_REQUESTED_ROW } from '../batch/access.js';
+import type { ChallengeEvidence, ResponseReading } from './response.js';
 import { DECISION_TABLE, decide, type Cell, type Observed } from './table.js';
 
 /**
  * The engine refuses a crawler row whose cause or evidence class the worker never gives its verdict
  * (packages/engine/src/v2/access/cells.ts, CAUSES and EVIDENCE). Those two tables mirror this
- * package's decision table. This test enumerates every cell the table can be handed and every reading
- * its cause rules can read, and holds what the worker can write equal to what the engine accepts, in
- * both directions: a cause or evidence class added on either side alone turns it red.
+ * package's decision table. This test enumerates the cells the table can be handed, over values that
+ * reach each side of each condition, and the readings its cause rules read (outcome, challenge
+ * evidence, 1020), plus the one row access.ts writes without the table, and holds what the worker can
+ * write equal to what the engine accepts, in both directions.
  *
  * Only crawler rows are compared. The control's and the canary's rows (`ua` null) are the method,
  * which the engine does not read.
@@ -51,10 +53,24 @@ function* cells(): Generator<Cell> {
                     };
 }
 
-/** The readings a request with this outcome can have: none when it was not made, 1020 or not. */
+/**
+ * The readings a request with this outcome can have (verdict/response.ts): none when it was not made;
+ * a challenge recognised by any of the three kinds of evidence, or none; Cloudflare's 1020 only on
+ * the 4xx outcomes, where response.ts looks for it.
+ */
+const EVIDENCE_KINDS: ChallengeEvidence[] = [
+  'mitigation_header',
+  'challenge_redirect',
+  'body_signature',
+];
+const FOUR_XX: Observed[] = ['refused', 'gone', 'challenged'];
 function readings(o: Observed): (ResponseReading | null)[] {
   if (o === 'not_requested') return [null];
-  return [false, true].map((cloudflare1020) => ({ class: o, challenge: null, cloudflare1020 }));
+  const challenges = [null, ...EVIDENCE_KINDS.map((evidence) => ({ evidence, marker: 'm' }))];
+  const codes = FOUR_XX.includes(o) ? [false, true] : [false];
+  return challenges.flatMap((challenge) =>
+    codes.map((cloudflare1020) => ({ class: o, challenge, cloudflare1020 })),
+  );
 }
 
 const key = (verdict: Verdict, part: string | null) => `${verdict} ${part ?? '—'}`;
@@ -71,6 +87,9 @@ function written(): { causes: Set<string>; evidence: Set<string>; rows: Set<stri
       for (const crawler of readings(cell.crawler))
         causes.add(key(row.verdict, row.cause.of({ control, crawler })));
   }
+  // The rows access.ts writes without the table: every crawler on a page that was not requested.
+  causes.add(key(NOT_REQUESTED_ROW.verdict, NOT_REQUESTED_ROW.cause));
+  evidence.add(key(NOT_REQUESTED_ROW.verdict, NOT_REQUESTED_ROW.evidence));
   return { causes, evidence, rows };
 }
 
