@@ -42,12 +42,14 @@ function labelOf(page: Page, check: ContentCheck, first: boolean): string | unde
   return c ? c.from.label : (page.labels as Record<string, { label: string }>)[check]?.label;
 }
 
-function tally(judge: Judge, first: boolean): Record<ContentCheck, Tally> {
+type LabelFor = (page: Page, check: ContentCheck) => string | undefined;
+
+function tally(judge: Judge, labelFor: LabelFor): Record<ContentCheck, Tally> {
   const out = {} as Record<ContentCheck, Tally>;
   for (const page of labels.pages) {
     const verdicts = judge(page.features as ContentFeatures);
     for (const check of Object.keys(CONTENT_CHECKS) as ContentCheck[]) {
-      const label = labelOf(page, check, first);
+      const label = labelFor(page, check);
       if (label === undefined || label === 'unsure') continue;
       const t = (out[check] ??= {
         labelled: 0,
@@ -74,7 +76,46 @@ function tally(judge: Judge, first: boolean): Record<ContentCheck, Tally> {
   return out;
 }
 
-export const tallies = (first = false): Record<ContentCheck, Tally> => tally(judgePage, first);
+export const tallies = (first = false): Record<ContentCheck, Tally> =>
+  tally(judgePage, (p, c) => labelOf(p, c, first));
+
+/**
+ * The rulings the labels leave open, each with the label it would give the pages that turn on it.
+ * Pages are labelled `unsure` until the owner rules; these count them as each ruling would.
+ */
+export const RULINGS = {
+  cta_is_content: {
+    cause: 'criteria_silent_on_cta',
+    check: 'question_headings',
+    ruling: 'a call-to-action question is a content heading',
+    label: 'pass',
+  },
+  cta_is_not: {
+    cause: 'criteria_silent_on_cta',
+    check: 'question_headings',
+    ruling: 'a call-to-action question is not a content heading',
+    label: 'fail',
+  },
+} as const satisfies Record<
+  string,
+  { cause: string; check: ContentCheck; ruling: string; label: string }
+>;
+
+export type Ruling = keyof typeof RULINGS;
+
+/** Each ruling's tally of the check it decides, on the labels as they stand otherwise. */
+export function rulingTallies(): Record<Ruling, Tally> {
+  const out = {} as Record<Ruling, Tally>;
+  for (const name of Object.keys(RULINGS) as Ruling[]) {
+    const r = RULINGS[name];
+    out[name] = tally(judgePage, (p, c) =>
+      c === r.check && p.corrections.some((x) => x.check === c && x.cause === r.cause)
+        ? r.label
+        : labelOf(p, c, false),
+    )[r.check];
+  }
+  return out;
+}
 
 /** The rules measured on the set and not kept, each with the check it would change. */
 export const VARIANTS = {
@@ -101,7 +142,7 @@ export function variantTallies(): Record<Variant, Tally> {
   const out = {} as Record<Variant, Tally>;
   for (const name of Object.keys(VARIANTS) as Variant[]) {
     const v = VARIANTS[name];
-    out[name] = tally(v.judge, false)[v.check];
+    out[name] = tally(v.judge, (p, c) => labelOf(p, c, false))[v.check];
   }
   return out;
 }

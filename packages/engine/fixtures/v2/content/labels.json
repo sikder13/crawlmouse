@@ -15,7 +15,7 @@
     "  page furniture.",
     "- question_headings — applies to a page with at least 3 content h2/h3 headings (site chrome, related",
     "  items and sidebars do not count). pass: at least one content heading is phrased as a question.",
-    "  Added in review: a page whose only question heading is a call to action is unsure, since these",
+    "  Added in review: a page whose question headings are all calls to action is unsure, since these",
     "  criteria do not say whether a call to action is a content heading.",
     "- schema_with_description — applies to a page with JSON-LD. pass: a node describing the page's own",
     "  subject (the page, the article, the product, the service, the trip) carries a description. fail: only",
@@ -30,7 +30,7 @@
   "causes": {
     "view_cut_heading_list": "the labelling view listed only the first 12 h2/h3 headings of a page; the full list was read",
     "view_unflattened_json_ld": "the labelling view did not flatten JSON-LD nested in arrays, so a page with markup read as having none",
-    "criteria_silent_on_cta": "the page's only question heading is a call to action, and the criteria do not say whether a call to action is a content heading; the first reading went both ways on such pages, so each is unsure",
+    "criteria_silent_on_cta": "every question heading on the page is a call to action, and the criteria do not say whether a call to action is a content heading; the first reading went both ways on such pages, so each is unsure",
     "view_missed_byline": "the labelling view scanned for a byline and missed one marked up as schema.org Person microdata"
   },
   "reader_sha256": "f30b5149ec3b69a5567fb5e3ff1de4f81aa25aa0089687e7a98bc48d206ee074",
@@ -1924,7 +1924,7 @@
         },
         "question_headings": {
           "label": "unsure",
-          "reason": "the only question heading, 8 of 9 shown, is a call to action; the criteria do not say whether a call to action is a content heading"
+          "reason": "every question heading on the page is a call to action (the first in the view at 8 of 9 headings shown); the criteria do not say whether a call to action is a content heading"
         },
         "schema_with_description": { "label": "na", "reason": "no JSON-LD" },
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
@@ -3938,7 +3938,7 @@
         },
         "question_headings": {
           "label": "unsure",
-          "reason": "the only question heading, 10 of 12 shown, is a call to action; the criteria do not say whether a call to action is a content heading"
+          "reason": "every question heading on the page is a call to action (the first in the view at 10 of 12 headings shown); the criteria do not say whether a call to action is a content heading"
         },
         "schema_with_description": { "label": "pass", "reason": "WebPage description" },
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
@@ -4130,7 +4130,7 @@
         },
         "question_headings": {
           "label": "unsure",
-          "reason": "the only question heading, 7 of 9 shown, is a call to action; the criteria do not say whether a call to action is a content heading"
+          "reason": "every question heading on the page is a call to action (the first in the view at 7 of 9 headings shown); the criteria do not say whether a call to action is a content heading"
         },
         "schema_with_description": {
           "label": "pass",
@@ -4943,7 +4943,7 @@
         },
         "question_headings": {
           "label": "unsure",
-          "reason": "the only question heading, 11 of 12 shown, is a call to action; the criteria do not say whether a call to action is a content heading"
+          "reason": "every question heading on the page is a call to action (the first in the view at 11 of 12 headings shown); the criteria do not say whether a call to action is a content heading"
         },
         "schema_with_description": { "label": "na", "reason": "no JSON-LD" },
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
@@ -5178,7 +5178,7 @@
         },
         "question_headings": {
           "label": "unsure",
-          "reason": "the only question heading, 2 of 3 shown, is a call to action; the criteria do not say whether a call to action is a content heading"
+          "reason": "every question heading on the page is a call to action (the first in the view at 2 of 3 headings shown); the criteria do not say whether a call to action is a content heading"
         },
         "schema_with_description": { "label": "na", "reason": "no JSON-LD" },
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
@@ -5605,7 +5605,7 @@
         },
         "question_headings": {
           "label": "unsure",
-          "reason": "the only question heading, 12 of 12 shown, is a call to action; the criteria do not say whether a call to action is a content heading"
+          "reason": "every question heading on the page is a call to action (the first in the view at 12 of 12 headings shown); the criteria do not say whether a call to action is a content heading"
         },
         "schema_with_description": { "label": "pass", "reason": "WebPage description" },
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },

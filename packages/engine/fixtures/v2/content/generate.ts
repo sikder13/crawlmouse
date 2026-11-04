@@ -36,7 +36,7 @@ const CAUSES = {
   view_unflattened_json_ld:
     'the labelling view did not flatten JSON-LD nested in arrays, so a page with markup read as having none',
   criteria_silent_on_cta:
-    "the page's only question heading is a call to action, and the criteria do not say whether a call to action is a content heading; the first reading went both ways on such pages, so each is unsure",
+    "every question heading on the page is a call to action, and the criteria do not say whether a call to action is a content heading; the first reading went both ways on such pages, so each is unsure",
   view_missed_byline:
     'the labelling view scanned for a byline and missed one marked up as schema.org Person microdata',
 };

@@ -22,6 +22,7 @@ import {
   lowerBound,
   MIN_PASS_ACCURACY,
   MIN_PRECISION,
+  rulingTallies,
   tallies,
   validated,
   variantTallies,
@@ -73,6 +74,15 @@ describe('the content checks on the labelled pages', () => {
       section_questions: T(107, 55, 31, 23, 21, 21, 21),
       schema_on_shell: T(113, 81, 17, 18, 16, 67, 64),
     });
+  });
+
+  it('the open ruling, counted both ways: question_headings clears the bar only if a call to action is a content heading', () => {
+    const r = rulingTallies();
+    expect(r).toEqual({
+      cta_is_content: T(113, 61, 31, 21, 20, 27, 26),
+      cta_is_not: T(113, 61, 37, 21, 20, 27, 22),
+    });
+    expect([validated(r.cta_is_content), validated(r.cta_is_not)]).toEqual([true, false]);
   });
 
   it.each(CHECKS)(
@@ -128,7 +138,7 @@ describe('the content checks on the labelled pages', () => {
     }
   });
 
-  it('every page whose only question heading is a call to action is unsure for question_headings', () => {
+  it('the six pages whose question headings are all calls to action are unsure for question_headings', () => {
     const cta = labels.pages.flatMap((p) =>
       p.corrections.filter((c) => c.cause === 'criteria_silent_on_cta').map((c) => ({ p, c })),
     );
