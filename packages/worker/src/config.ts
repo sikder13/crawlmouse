@@ -1,4 +1,6 @@
 import { createPublicKey, type KeyObject } from 'node:crypto';
+import { RELEASE } from './release.js';
+import { vantageOf, type Vantage } from './vantage.js';
 
 /**
  * Configuration, from the environment only. The worker holds one secret, the HMAC signing secret it
@@ -17,6 +19,8 @@ export interface WorkerConfig {
   batchConcurrency: number;
   /** CRAWL_PAUSED, read the way the app reads it (apps/web/lib/crawl-pause.ts): only `1`, whitespace ignored. */
   paused: boolean;
+  /** Where requests leave from (FLY_REGION, FLY_MACHINE_ID) and the build; see vantage.ts. */
+  vantage: Vantage;
 }
 
 export const MIN_SECRET_LENGTH = 32;
@@ -65,5 +69,6 @@ export function loadConfig(env: Env): WorkerConfig {
       'BATCH_CONCURRENCY',
     ),
     paused: isCrawlPaused(env),
+    vantage: vantageOf(env, RELEASE),
   };
 }

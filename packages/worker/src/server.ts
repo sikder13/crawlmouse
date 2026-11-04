@@ -138,6 +138,7 @@ export function createWorker(deps: WorkerDeps): Worker {
     fetcher: deps.fetcher ?? createFetcher(clock),
     robotsCache: new RobotsCache(clock),
     reader: deps.reader ?? inlineReader,
+    vantage: deps.config.vantage,
   };
   const store = new BatchStore(now);
   const nonces = new Nonces(now);

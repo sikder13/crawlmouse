@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { build, type Metafile } from 'esbuild';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,23 @@ export async function bundleReader(outfile: string): Promise<Metafile> {
   return bundleOne(READER_ENTRY, outfile);
 }
 
+/**
+ * The release written into the bundle (src/release.ts): the first 12 hex digits of the commit
+ * checked out, or `unreleased` when git cannot say (no repository, no git).
+ */
+export function releaseOf(): string {
+  try {
+    const sha = execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], {
+      cwd: dirname(ENTRY),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return /^[0-9a-f]{12}$/.test(sha) ? sha : 'unreleased';
+  } catch {
+    return 'unreleased';
+  }
+}
+
 async function bundleOne(entry: string, outfile: string): Promise<Metafile> {
   const result = await build({
     entryPoints: [entry],
@@ -36,6 +54,7 @@ async function bundleOne(entry: string, outfile: string): Promise<Metafile> {
     format: 'esm',
     metafile: true,
     legalComments: 'none',
+    define: { __WORKER_RELEASE__: JSON.stringify(releaseOf()) },
     logLevel: 'warning',
     // Some bundled CommonJS dependencies call require() on node built-ins.
     banner: {
