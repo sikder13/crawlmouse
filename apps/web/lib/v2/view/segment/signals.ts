@@ -31,6 +31,10 @@ export const SIGNAL_CLASSES: Record<SignalKind, RecommendationClass> = {
   mcp_server_card: 'experimental',
   markdown_negotiation: 'experimental',
   agent_skills_index: 'experimental',
+  ucp: 'experimental',
+  rsl: 'experimental',
+  agent_card: 'experimental',
+  llms_full: 'experimental',
 };
 
 interface SignalCopy {
@@ -41,6 +45,18 @@ interface SignalCopy {
   lift: string;
   readers: string;
 }
+
+/**
+ * A declaration the worker records by path (CC-12d) and no copy has been written for yet: its file's
+ * name, the table's existing advice and lift, and no claim about who reads it.
+ */
+const declarationOnly = (file: string): SignalCopy => ({
+  name: file,
+  short: file,
+  advice: { present: 'Keep it.', absent: 'Skip for now.' },
+  lift: 'Too new to measure',
+  readers: '',
+});
 
 /** What each signal is and who reads it: the locked page's copy, with Web Bot Auth per FACTS I10. */
 const SIGNAL_COPY: Record<SignalKind, SignalCopy> = {
@@ -113,6 +129,10 @@ const SIGNAL_COPY: Record<SignalKind, SignalCopy> = {
     lift: 'Too new to measure',
     readers: 'Agent frameworks discovering what a site can do',
   },
+  ucp: declarationOnly('/.well-known/ucp'),
+  rsl: declarationOnly('rsl.xml'),
+  agent_card: declarationOnly('agent-card.json'),
+  llms_full: declarationOnly('llms-full.txt'),
 };
 
 const UNTESTED_ADVICE = 'Nothing to do yet: we check it again on the next audit.';

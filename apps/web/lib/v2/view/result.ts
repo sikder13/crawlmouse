@@ -151,6 +151,10 @@ const SIGNAL_NAMES: Record<SignalKind, string> = {
   mcp_server_card: 'MCP server card',
   markdown_negotiation: 'markdown negotiation',
   agent_skills_index: 'agent skills index',
+  ucp: '/.well-known/ucp',
+  rsl: 'rsl.xml',
+  agent_card: 'agent-card.json',
+  llms_full: 'llms-full.txt',
 };
 
 function grade(

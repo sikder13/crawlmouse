@@ -24,6 +24,10 @@ export const SIGNAL_TABLE: Readonly<
   mcp_server_card: { counts_toward_grade: false, recommendation_class: 'experimental' },
   markdown_negotiation: { counts_toward_grade: false, recommendation_class: 'experimental' },
   agent_skills_index: { counts_toward_grade: false, recommendation_class: 'experimental' },
+  ucp: { counts_toward_grade: false, recommendation_class: 'experimental' },
+  rsl: { counts_toward_grade: false, recommendation_class: 'experimental' },
+  agent_card: { counts_toward_grade: false, recommendation_class: 'experimental' },
+  llms_full: { counts_toward_grade: false, recommendation_class: 'experimental' },
 };
 
 /** The declarations one GET can find: where, what the file is, and the media types it is served as. */
