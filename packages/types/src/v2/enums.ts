@@ -297,7 +297,8 @@ export const CmsNameSchema = named(
 /**
  * Why the engine gives no AI readability grade, or no AI effect for a fix: one reason per component
  * that could not be measured, the case where the scored crawlers are blocked by the site's own
- * robots.txt, and, for a fix's effect only, a crawler with too few pages to measure its share. The engine says what each means (packages/engine/src/v2/grade/withheld.ts), and its
+ * robots.txt, and, for a fix's effect only, a crawler with too few pages to measure its share or a
+ * content check that does not count in Quotable. The engine says what each means (packages/engine/src/v2/grade/withheld.ts), and its
  * test pins the two lists to each other.
  */
 export const WithheldReasonSchema = named(
@@ -309,6 +310,7 @@ export const WithheldReasonSchema = named(
     'quotable_unmeasured',
     'signals_unmeasured',
     'crawler_too_few_pages',
+    'check_not_scored',
   ]),
 );
 /** v1 `RefusalTrigger`. */

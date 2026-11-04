@@ -18,4 +18,6 @@ export const WITHHELD_REASON_MEANINGS: Readonly<Record<WithheldReason, string>> 
     'Whether schema.org markup or Content Signals are present could not be decided.',
   crawler_too_few_pages:
     "For a fix's effect only: the fix's crawler has fewer than two pages that decide its share, so how much Access it adds is not known.",
+  check_not_scored:
+    "For a fix's effect only: the fix's content check is reported but not counted in Quotable until the label set shows its firings and passes right, so it adds no points yet.",
 };
