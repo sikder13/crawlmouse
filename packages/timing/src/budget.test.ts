@@ -10,7 +10,7 @@ import {
   expectWithinRelative,
   isStrict,
 } from './budget.js';
-import { median } from './stats.js';
+import { fmt, median } from './stats.js';
 
 /**
  * A clock the measured function moves by the next duration in `durations`, so each run takes
@@ -36,6 +36,16 @@ describe('median', () => {
     expect(median([5, 1, 3])).toBe(3);
     expect(median([4, 1, 3, 2])).toBe(2.5);
     expect(median([7])).toBe(7);
+  });
+
+  it('formats a small value without rounding it to zero', () => {
+    expect([fmt(0.001), fmt(0.0333), fmt(16.8), fmt(1041.1749), fmt(0)]).toEqual([
+      '0.001',
+      '0.0333',
+      '16.8',
+      '1041.17',
+      '0',
+    ]);
   });
 
   it('refuses an empty list rather than reading a median of nothing', () => {
