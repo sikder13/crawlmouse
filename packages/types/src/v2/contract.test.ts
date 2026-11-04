@@ -20,6 +20,7 @@ import {
   EffectSchema,
   ENTITIES,
   FixtureDatasetSchema,
+  BATCH_RESULT_ENUMS,
   DERIVED_ENUMS,
   REGISTRY_ONLY_ENUMS,
   V1_PINNED_ENUMS,
@@ -275,9 +276,13 @@ describe('every enum value appears in at least one fixture', () => {
   });
 
   it('every enum the module defines is in exactly one group, and every group entry is one of them', () => {
-    const groups = [V2_FIXTURE_ENUMS, V1_PINNED_ENUMS, REGISTRY_ONLY_ENUMS, DERIVED_ENUMS].map(
-      (g) => new Set<unknown>(Object.values(g)),
-    );
+    const groups = [
+      V2_FIXTURE_ENUMS,
+      V1_PINNED_ENUMS,
+      REGISTRY_ONLY_ENUMS,
+      DERIVED_ENUMS,
+      BATCH_RESULT_ENUMS,
+    ].map((g) => new Set<unknown>(Object.values(g)));
     expect(ALL_V2_ENUMS.length).toBeGreaterThan(30);
     const wrong = ALL_V2_ENUMS.filter((s) => groups.filter((g) => g.has(s)).length !== 1);
     expect(wrong.map((s) => v2Registry.get(s)?.id)).toEqual([]);
