@@ -1216,8 +1216,8 @@ const BOUNDS: Record<string, string> = {
   // A count or a share (or a yes/no, which is not a number).
   'Fix.before_after[].today': '[0, inf)',
   'Fix.before_after[].after': '[0, inf)',
-  'Fix.effect.technical_seo': '[0, 100]',
-  'Fix.effect.ai_readability': '[0, 100]',
+  'Fix.effect.technical_seo': '[-100, 100]',
+  'Fix.effect.ai_readability': '[-100, 100]',
   'Fix.effort.minutes': 'int [1, inf)',
   'Fix.effort.templates': 'int [1, inf)',
   'Fix.effort.deploys': 'int [1, inf)',

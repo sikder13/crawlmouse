@@ -12,7 +12,6 @@ import {
   FingerprintSchema,
   HttpStatusSchema,
   IdSchema,
-  ScoreSchema,
   TemplateKeySchema,
 } from './common.js';
 import {
@@ -28,12 +27,18 @@ import {
 } from './enums.js';
 import { rules } from './rules.js';
 
+/**
+ * A change in a grade's points: a counterfactual recompute can lower a grade as well as raise it
+ * (adding a link can thin out a hub's share of PageRank), so it is signed.
+ */
+export const PointsDeltaSchema = z.number().min(-100).max(100);
+
 /** Points per grade, always an estimate. Keys follow the FACTS Developers JSON `effect`. */
 export const EffectSchema = z
   .strictObject({
-    technical_seo: ScoreSchema,
+    technical_seo: PointsDeltaSchema,
     /** Null while the AI effect cannot be estimated yet; then `ai_readability_pending_on` says why. */
-    ai_readability: ScoreSchema.nullable(),
+    ai_readability: PointsDeltaSchema.nullable(),
     ai_readability_pending_on: z.array(FingerprintSchema),
     estimate: z.literal(true),
   })
