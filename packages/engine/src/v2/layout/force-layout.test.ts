@@ -4,17 +4,16 @@
  * (apps/web/lib/v2/map-layout.golden.test.ts) pins the positions themselves to the ones main drew
  * before the layout moved here.
  */
+import { TIMING_RUNS, expectWithinBudget } from '@crawlmouse/timing';
 import { describe, expect, it } from 'vitest';
 import { layoutMapFrom, type LayoutNode } from './force-layout.js';
 
-/** Under the 2 s the brief allows on CI, for one cold layout. */
-const BUDGET_MS = 2_000;
 /**
- * The budget is checked against the fastest of this many runs. A shared CI runner only ever adds
- * time (a single run read 2,055 ms on a run where two had read 1,669 ms together, PR #46), so the
- * fastest run is the measure of the layout's own cost; every run must still give the same bytes.
+ * Under the 2 s the brief allows on CI, for one cold layout. Held as a median of runs by the shared
+ * rule (docs/ops/ci-timing.md): the budget itself in the strict job, a ceiling over it here. A
+ * single run read 2,055 ms on PR #46, on a commit where two runs had read 1,669 ms together.
  */
-const RUNS = 3;
+const BUDGET_MS = 2_000;
 
 /**
  * A site-shaped tree, the same on every run: a home page, pages under it to depth six chosen by a
@@ -48,13 +47,12 @@ function generatedGraph(size: number): LayoutNode[] {
 describe('the layout of a 2,000-node graph', () => {
   const nodes = generatedGraph(2_000);
 
-  it(`is byte-identical across ${RUNS} runs, and the fastest finishes inside the budget`, () => {
-    const runs = Array.from({ length: RUNS }, () => {
-      const started = performance.now();
-      const bytes = JSON.stringify(layoutMapFrom(nodes, null, true));
-      return { bytes, ms: performance.now() - started };
-    });
-    for (const run of runs) expect(run.bytes).toBe(runs[0]!.bytes);
-    expect(Math.min(...runs.map((run) => run.ms))).toBeLessThan(BUDGET_MS);
+  it(`is byte-identical across ${TIMING_RUNS} runs, and their median is inside the budget`, () => {
+    const { values } = expectWithinBudget(
+      'force layout, 2,000 nodes',
+      () => JSON.stringify(layoutMapFrom(nodes, null, true)),
+      { budgetMs: BUDGET_MS },
+    );
+    for (const bytes of values) expect(bytes).toBe(values[0]);
   });
 });
