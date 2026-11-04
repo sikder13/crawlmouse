@@ -14,10 +14,13 @@ import {
   lowerBound,
   MIN_PASS_ACCURACY,
   MIN_PRECISION,
+  RULINGS,
+  rulingTallies,
   tallies,
   validated,
   VARIANTS,
   variantTallies,
+  type Ruling,
   type Tally,
   type Variant,
 } from '../content/label-set.js';
@@ -168,11 +171,20 @@ function coverage(): string {
 
 /** The checks that clear the bar and are held out of Quotable, each with its reason, from checks.ts. */
 function held(): string[] {
+  const rulings = rulingTallies();
   return (Object.keys(CONTENT_CHECKS) as (keyof typeof CONTENT_CHECKS)[]).flatMap((c) => {
     const reason = CONTENT_CHECKS[c].held;
-    return reason === null
-      ? []
-      : [`${code(c)} clears the bar and is held out of Quotable: ${reason}.`, ''];
+    if (reason === null) return [];
+    const each = (Object.keys(RULINGS) as Ruling[])
+      .filter((r) => RULINGS[r].check === c)
+      .map((r) => {
+        const t = rulings[r];
+        return `if ${RULINGS[r].ruling}, precision ${share(t.confirmed, t.fires, 'no firing')} and pass accuracy ${share(t.passes_confirmed, t.passes, 'no pass')}, so it ${validated(t) ? 'clears' : 'does not clear'} the bar`;
+      });
+    return [
+      `${code(c)} clears the bar with the pages that turn on the ruling left out, and is held out of Quotable: ${reason}. ${each.length > 0 ? `Ruled, ${each.join('; ')}.` : ''}`,
+      '',
+    ];
   });
 }
 
@@ -192,17 +204,23 @@ function labelSet(): string {
       .join(', ');
     return [`- ${cs.length} on ${checks} (${moves}): ${meaning}.`];
   });
-  const towardCheck = labels.pages.reduce((n, p) => {
+  // Each correction's effect on agreement with the check: a label agrees, disagrees, or is left out
+  // of the counts (`unsure`).
+  const standing = (label: string, verdict: string) =>
+    label === 'unsure' ? 'left out' : agrees(label, verdict) ? 'agreeing' : 'disagreeing';
+  const moves = new Map<string, number>();
+  for (const p of labels.pages) {
     const v = judgePage(p.features as ContentFeatures);
-    return (
-      n +
-      p.corrections.filter(
-        (c) =>
-          !agrees(c.from.label, v[c.check as keyof typeof v]) &&
-          agrees(c.to, v[c.check as keyof typeof v]),
-      ).length
-    );
-  }, 0);
+    for (const c of p.corrections) {
+      const verdict = v[c.check as keyof typeof v];
+      const m = `${standing(c.from.label, verdict)} → ${standing(c.to, verdict)}`;
+      moves.set(m, (moves.get(m) ?? 0) + 1);
+    }
+  }
+  const effect = [...moves]
+    .sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1))
+    .map(([m, n]) => `${m} ${n}`)
+    .join(', ');
   const variants = variantTallies();
   const variantRows = (Object.keys(VARIANTS) as Variant[]).map((name) => {
     const v = VARIANTS[name];
@@ -253,8 +271,7 @@ function labelSet(): string {
     table(['Check', 'Rule tried', 'Precision', 'Pass accuracy'], variantRows),
     '',
     `**Corrections.** ${all.length} labels were changed after the first reading, each recorded with its first`,
-    `label, its reason and its cause; ${towardCheck} of them changed a label that disagreed with the check to one`,
-    'that agrees. By cause:',
+    `label, its reason and its cause. Their effect on agreement with the check: ${effect}. By cause:`,
     '',
     ...causes,
     '',
@@ -356,7 +373,7 @@ export function renderGradeSpec(): string {
     '',
     '### Quotable',
     '',
-    `rate(k) = pages passing check k / pages k was decided on; Quotable = ${AI_WEIGHTS.quotable} × mean of rate(k) over the counted checks decided on a page. A check counts once it clears the bar on the label set (below); ${list(uncounted)} are reported and do not count. A counted check's graded pages that were not read for it make Quotable a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread), over each check decided or unread on a page. Nothing decided and nothing unread is the range [0, ${AI_WEIGHTS.quotable}].`,
+    `rate(k) = pages passing check k / pages k was decided on; Quotable = ${AI_WEIGHTS.quotable} × mean of rate(k) over the counted checks decided on a page. A check counts only if it clears the bar on the label set (below) and is not held; ${list(uncounted)} are reported and do not count. A counted check's graded pages that were not read for it make Quotable a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread), over each check decided or unread on a page. Nothing decided and nothing unread is the range [0, ${AI_WEIGHTS.quotable}].`,
     '',
     '### Signals',
     '',

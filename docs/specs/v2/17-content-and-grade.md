@@ -38,7 +38,7 @@ ratio(t) = median `text_share` of template t's rendered pages; Readable = 30 × 
 
 ### Quotable
 
-rate(k) = pages passing check k / pages k was decided on; Quotable = 20 × mean of rate(k) over the counted checks decided on a page. A check counts once it clears the bar on the label set (below); `direct_answer_150`, `question_headings`, `specs_as_text` are reported and do not count. A counted check's graded pages that were not read for it make Quotable a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread), over each check decided or unread on a page. Nothing decided and nothing unread is the range [0, 20].
+rate(k) = pages passing check k / pages k was decided on; Quotable = 20 × mean of rate(k) over the counted checks decided on a page. A check counts only if it clears the bar on the label set (below) and is not held; `direct_answer_150`, `question_headings`, `specs_as_text` are reported and do not count. A counted check's graded pages that were not read for it make Quotable a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread), over each check decided or unread on a page. Nothing decided and nothing unread is the range [0, 20].
 
 ### Signals
 
@@ -73,15 +73,15 @@ The total is the sum of the four components, given when the four have a score; i
 | `D-`   | 40.00 or more |
 | `F`    | 0.00 or more  |
 
-| Reason                      | Means                                                                                                                                                                      |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `too_few_crawlers_measured` | Fewer than two scored crawlers have enough measured pages to give Access a score.                                                                                          |
-| `blocked_by_choice`         | robots.txt disallows the scored crawlers on the pages whose rules were read: the site's stated choice, so Access is not scored.                                            |
-| `readable_unmeasured`       | A template of the graded pages has no page rendered in a browser, so the share of text served without JavaScript is not known.                                             |
-| `quotable_unmeasured`       | Some graded pages could not be read for the content checks, or no content check applied to any page.                                                                       |
-| `signals_unmeasured`        | Whether schema.org markup or Content Signals are present could not be decided.                                                                                             |
-| `crawler_too_few_pages`     | For a fix's effect only: the fix's crawler has fewer than two pages that decide its share, so how much Access it adds is not known.                                        |
-| `check_not_scored`          | For a fix's effect only: the fix's content check is reported but not counted in Quotable until the label set shows its firings and passes right, so it adds no points yet. |
+| Reason                      | Means                                                                                                                                                                            |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `too_few_crawlers_measured` | Fewer than two scored crawlers have enough measured pages to give Access a score.                                                                                                |
+| `blocked_by_choice`         | robots.txt disallows the scored crawlers on the pages whose rules were read: the site's stated choice, so Access is not scored.                                                  |
+| `readable_unmeasured`       | A template of the graded pages has no page rendered in a browser, so the share of text served without JavaScript is not known.                                                   |
+| `quotable_unmeasured`       | Some graded pages could not be read for the content checks, or no content check applied to any page.                                                                             |
+| `signals_unmeasured`        | Whether schema.org markup or Content Signals are present could not be decided.                                                                                                   |
+| `crawler_too_few_pages`     | For a fix's effect only: the fix's crawler has fewer than two pages that decide its share, so how much Access it adds is not known.                                              |
+| `check_not_scored`          | For a fix's effect only: the fix's content check is reported but not counted in Quotable (it has not cleared the bar on the label set, or it is held), so it adds no points yet. |
 
 ## Technical SEO
 
@@ -138,7 +138,7 @@ The criteria, as labels.json carries them:
 >   page furniture.
 > - question_headings — applies to a page with at least 3 content h2/h3 headings (site chrome, related
 >   items and sidebars do not count). pass: at least one content heading is phrased as a question.
->   Added in review: a page whose only question heading is a call to action is unsure, since these
+>   Added in review: a page whose question headings are all calls to action is unsure, since these
 >   criteria do not say whether a call to action is a content heading.
 > - schema_with_description — applies to a page with JSON-LD. pass: a node describing the page's own
 >   subject (the page, the article, the product, the service, the trip) carries a description. fail: only
@@ -165,7 +165,7 @@ passes, and keeps precision at 95 % or more and pass accuracy at 95 % or more
 | `author_and_date`         | yes     | 63      | 2             | 100 % (2 of 2; ≥ 22 %)   | 100 % (61 of 61; ≥ 95 %) | 2 of 2                   |
 | `specs_as_text`           | no      | 26      | 0             | no firing                | 93 % (26 of 28; ≥ 79 %)  | no failing page labelled |
 
-`question_headings` clears the bar and is held out of Quotable: whether a call-to-action question is a content heading, which the pages labelled unsure on this check turn on, is for the owner to rule.
+`question_headings` clears the bar with the pages that turn on the ruling left out, and is held out of Quotable: whether a call-to-action question is a content heading, which the pages labelled unsure on this check turn on, is for the owner to rule. Ruled, if a call-to-action question is a content heading, precision 95 % (20 of 21; ≥ 79 %) and pass accuracy 96 % (26 of 27; ≥ 83 %), so it clears the bar; if a call-to-action question is not a content heading, precision 95 % (20 of 21; ≥ 79 %) and pass accuracy 81 % (22 of 27; ≥ 64 %), so it does not clear the bar.
 
 **Rules measured and not kept.** Each was measured on this set beside the rule kept, whose counts the
 table repeats after "kept". The table is partial: the reader rules changed in review (the client-rendered
@@ -178,12 +178,11 @@ were not measured.
 | `schema_with_description` | a client-rendered page is judged on its JSON-LD   | 89 % (16 of 18; ≥ 68 %); kept: 100 % (16 of 16; ≥ 82 %) | 96 % (64 of 67; ≥ 88 %); kept: 96 % (64 of 67; ≥ 88 %)  |
 
 **Corrections.** 11 labels were changed after the first reading, each recorded with its first
-label, its reason and its cause; 5 of them changed a label that disagreed with the check to one
-that agrees. By cause:
+label, its reason and its cause. Their effect on agreement with the check: disagreeing → left out 5, disagreeing → agreeing 4, agreeing → left out 1, left out → agreeing 1. By cause:
 
 - 3 on `question_headings` (`fail` → `pass` 2, `unsure` → `fail` 1): the labelling view listed only the first 12 h2/h3 headings of a page; the full list was read.
 - 1 on `schema_with_description` (`na` → `fail` 1): the labelling view did not flatten JSON-LD nested in arrays, so a page with markup read as having none.
-- 6 on `question_headings` (`fail` → `unsure` 4, `pass` → `unsure` 2): the page's only question heading is a call to action, and the criteria do not say whether a call to action is a content heading; the first reading went both ways on such pages, so each is unsure.
+- 6 on `question_headings` (`fail` → `unsure` 4, `pass` → `unsure` 2): every question heading on the page is a call to action, and the criteria do not say whether a call to action is a content heading; the first reading went both ways on such pages, so each is unsure.
 - 1 on `author_and_date` (`fail` → `pass` 1): the labelling view scanned for a byline and missed one marked up as schema.org Person microdata.
 
 The counts with the labels as first read, before the corrections:
