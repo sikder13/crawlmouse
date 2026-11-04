@@ -240,15 +240,13 @@ const CHECKS: ContentCheck[] = [
   'author_and_date',
   'specs_as_text',
 ];
-const tallyArb = fc
-  .nat({ max: 12 })
-  .chain((decided) =>
-    fc.record({
-      decided: fc.constant(decided),
-      passing: fc.nat({ max: decided }),
-      unread: fc.oneof(fc.constant(0), fc.nat({ max: 4 })),
-    }),
-  );
+const tallyArb = fc.nat({ max: 12 }).chain((decided) =>
+  fc.record({
+    decided: fc.constant(decided),
+    passing: fc.nat({ max: decided }),
+    unread: fc.oneof(fc.constant(0), fc.nat({ max: 4 })),
+  }),
+);
 const quotableArb: fc.Arbitrary<QuotableInput> = fc
   .array(tallyArb, { minLength: 5, maxLength: 5 })
   .map((ts) => ({
@@ -399,11 +397,14 @@ describe('a range holds the score the unknowns turn out to give', () => {
           fc.pre(anyUnread(q));
           const checks = Object.fromEntries(
             CHECKS.map((c, k) => {
-              let { passing, decided, unread } = tallyOf(q, c);
-              for (let page = 0; page < unread; page++) {
+              const t = tallyOf(q, c);
+              let { passing, decided } = t;
+              for (let page = 0; page < t.unread; page++) {
                 const o = outcomes[(k * 4 + page) % outcomes.length];
-                if (o === 'pass') ((passing += 1), (decided += 1));
-                else if (o === 'fail') decided += 1;
+                if (o === 'pass') {
+                  passing += 1;
+                  decided += 1;
+                } else if (o === 'fail') decided += 1;
               }
               return [c, { passing, decided, unread: 0 }];
             }),
