@@ -92,6 +92,20 @@ export const LEDGER_COLUMNS: Record<string, string> = {
   'crawler_observations.cause': 'text',
   'crawler_observations.robots_rule': 'text',
 };
+/**
+ * The one table outside the ledger it may reference, pinned like the ledger: exactly these columns,
+ * with these types, and no reference of its own. Exempting it by name alone would let it gain an
+ * account column unseen.
+ */
+export const LINEAGE_COLUMNS: Record<string, string> = {
+  id: 'uuid',
+  engine_sha: 'text',
+  detector_ruleset_version: 'text',
+  crawler_registry_version: 'text',
+  worker_release: 'text',
+  population_version: 'text',
+  created_at: 'timestamp with time zone',
+};
 /** The only references the ledger may make outside itself. */
 export const LEDGER_REFERENCES = ['research.check_runs → public.measurement_lineages'];
 /**
@@ -185,10 +199,13 @@ export async function deidentificationViolations(d: Db): Promise<string[]> {
   const { rows: strays } = await d.query<{ r: string }>(
     `select n.nspname || '.' || c.relname as r from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'partitions'
-        and not exists (select 1 from pg_inherits i join pg_partitioned_table pt on pt.partrelid = i.inhparent
-                         where i.inhrelid = c.oid)
+        and not exists (select 1 from pg_inherits i join pg_class p on p.oid = i.inhparent
+                         where i.inhrelid = c.oid and p.relkind = 'p'
+                           and p.relnamespace in ('public'::regnamespace, 'research'::regnamespace))
         and not exists (select 1 from pg_index x join pg_inherits i on i.inhrelid = x.indrelid
-                         where x.indexrelid = c.oid)
+                         join pg_class p on p.oid = i.inhparent
+                         where x.indexrelid = c.oid
+                           and p.relnamespace in ('public'::regnamespace, 'research'::regnamespace))
       order by 1`,
   );
   for (const { r } of strays)
@@ -286,5 +303,26 @@ export async function deidentificationViolations(d: Db): Promise<string[]> {
   );
   for (const { dep, target } of outbound)
     bad.push(`${dep} depends on ${target}, outside the ledger`);
+  const { rows: lineage } = await d.query<{ col: string; type: string }>(
+    `select a.attname as col, format_type(a.atttypid, a.atttypmod) as type from pg_attribute a
+      where a.attrelid = 'public.measurement_lineages'::regclass and a.attnum > 0 and not a.attisdropped
+      order by a.attnum`,
+  );
+  const lineageSeen = new Set<string>();
+  for (const { col, type } of lineage) {
+    lineageSeen.add(col);
+    if (!Object.hasOwn(LINEAGE_COLUMNS, col))
+      bad.push(`public.measurement_lineages.${col}: not an allowed lineage column`);
+    else if (LINEAGE_COLUMNS[col] !== type)
+      bad.push(`public.measurement_lineages.${col}: is ${type}, allowed ${LINEAGE_COLUMNS[col]}`);
+  }
+  for (const col of Object.keys(LINEAGE_COLUMNS))
+    if (!lineageSeen.has(col)) bad.push(`public.measurement_lineages.${col}: allowed but missing`);
+  const { rows: lineageRefs } = await d.query<{ r: string }>(
+    `select conname || ' → ' || confrelid::regclass::text as r from pg_constraint
+      where conrelid = 'public.measurement_lineages'::regclass and contype = 'f' order by 1`,
+  );
+  for (const { r } of lineageRefs)
+    bad.push(`public.measurement_lineages: ${r}: a lineage references nothing`);
   return bad;
 }
