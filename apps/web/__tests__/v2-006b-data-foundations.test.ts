@@ -671,6 +671,22 @@ describe('the research ledger is de-identified', () => {
       /research\.order_seq: `research` holds only tables and indexes \(relkind S\)/,
     ],
     [
+      'an account column on measurement_lineages, the one table the ledger may reference',
+      `alter table public.measurement_lineages add column account_id uuid references public.accounts (id)`,
+      /public\.measurement_lineages\.account_id: not an allowed lineage column/,
+    ],
+    [
+      'a reference out of measurement_lineages under an allowed column',
+      `alter table public.measurement_lineages add constraint sneaky foreign key (id) references public.accounts (id)`,
+      /public\.measurement_lineages: sneaky → accounts: a lineage references nothing/,
+    ],
+    [
+      'a partition of a side table in the partitions schema',
+      `create table partitions.side (m date) partition by range (m);
+       create table partitions.side_a partition of partitions.side for values from ('2026-01-01') to ('2026-02-01')`,
+      /partitions\.side_a: `partitions` holds only partitions and their indexes/,
+    ],
+    [
       'a composite type in the partitions schema',
       `create type partitions.t as (a text)`,
       /partitions\.t: `partitions` holds only partitions and their indexes/,
