@@ -221,6 +221,7 @@ export const NESTED: Record<string, string[]> = {
   SignalKind: ['checks.signals'],
   StepState: ['checks.progress'],
   Verdict: ['checks.crawlers', 'page_results.robots_search'],
+  WithheldReason: ['site_fixes.effect'],
 };
 
 /** Enums no table of this step holds, and where they live. */

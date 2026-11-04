@@ -40,6 +40,7 @@ import {
   SiteSchema,
   TechnicalSeoSchema,
   TimestampSchema,
+  WithheldReasonSchema,
   RULE_CHECKS,
   RULES,
   UNMEASURED_VERDICTS,
@@ -294,6 +295,15 @@ const CASES: RuleCase[] = [
     input: () => ({
       ...fixNumbered(bad, 'open').effect,
       ai_readability_pending_on: ['0f1e000000000001'],
+    }),
+  },
+  {
+    rule: 'effect_pending',
+    breaks: 'estimated, and also waiting on a reason',
+    schema: EffectSchema,
+    input: () => ({
+      ...fixNumbered(bad, 'open').effect,
+      ai_readability_pending_on: ['readable_unmeasured'],
     }),
   },
   {
@@ -1581,5 +1591,30 @@ describe('CC-12b contract additions', () => {
     expect(AccessTestSchema.safeParse({ ...t, method: null, http_version: null }).success).toBe(
       true,
     );
+  });
+});
+
+describe('CC-17 contract additions', () => {
+  const waiting = (pending: unknown[]) => ({
+    technical_seo: 0,
+    ai_readability: null,
+    ai_readability_pending_on: pending,
+    estimate: true,
+  });
+
+  it('an AI effect not yet estimated may wait on a reason, on fixes, or on both', () => {
+    for (const pending of [
+      ['readable_unmeasured'],
+      ['0f1e000000000001', 'too_few_crawlers_measured'],
+      WithheldReasonSchema.options,
+    ]) {
+      expect(EffectSchema.safeParse(waiting(pending)).success, String(pending)).toBe(true);
+    }
+  });
+
+  it('a waiting entry that is neither a fingerprint nor a reason is refused', () => {
+    for (const entry of ['readable', '0F1E000000000001', '0f1e00000000001', '']) {
+      expect(EffectSchema.safeParse(waiting([entry])).success, entry).toBe(false);
+    }
   });
 });

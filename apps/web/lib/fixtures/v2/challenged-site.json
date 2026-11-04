@@ -2050,8 +2050,8 @@
       "rank": 1,
       "effect": {
         "technical_seo": 0,
-        "ai_readability": 15,
-        "ai_readability_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["too_few_crawlers_measured"],
         "estimate": true
       },
       "effort": {

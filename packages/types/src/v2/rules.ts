@@ -50,7 +50,7 @@ export const RULES = {
   ip_list_url: two('ip_list_url is set exactly when an IP list is published'),
   // Fix
   effect_pending: two(
-    'an AI effect is either estimated, or not yet estimated because of named fixes',
+    'an AI effect is either estimated, or not yet estimated because of named fixes or reasons',
   ),
   fix_last_state: one('last_state does not fit the status'),
   fix_rank: two('every live fix has a rank and a resolved fix has none'),

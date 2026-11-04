@@ -1151,6 +1151,7 @@ The writer parses these with the contract schema (owner default 1). A column a f
 | `SignalKind`          | `checks.signals`                                                                              |
 | `StepState`           | `checks.progress`                                                                             |
 | `Verdict`             | `checks.crawlers`, `page_results.robots_search` (CHECK `page_results_robots_search`)          |
+| `WithheldReason`      | `site_fixes.effect`                                                                           |
 
 ## Where this differs from the design documents
 

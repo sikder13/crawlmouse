@@ -4,10 +4,16 @@
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FixtureDatasetSchema, GradeLetterSchema, type FixtureDataset } from '@crawlmouse/types/v2';
+import {
+  FixtureDatasetSchema,
+  GradeLetterSchema,
+  WithheldReasonSchema,
+  type FixtureDataset,
+} from '@crawlmouse/types/v2';
 import { scoreToLetter } from '../grade.js';
 import { CRAWLER_REGISTRY_V2 } from './crawler-registry.js';
 import { severityOf } from './diff/severity.js';
+import { WITHHELD_REASON_MEANINGS } from './grade/withheld.js';
 
 const DIR = new URL('../../../../apps/web/lib/fixtures/v2/', import.meta.url);
 const fixtures: [string, FixtureDataset][] = readdirSync(DIR)
@@ -19,6 +25,14 @@ describe('GradeLetter is the engine letter scale', () => {
     const reached = new Set<string>();
     for (let i = 0; i <= 10_000; i++) reached.add(scoreToLetter(i / 100));
     expect([...reached].sort()).toEqual([...GradeLetterSchema.options].sort());
+  });
+});
+
+describe('WithheldReason is the engine table of reasons', () => {
+  it('the engine gives a meaning for every reason, and for no other', () => {
+    expect(Object.keys(WITHHELD_REASON_MEANINGS).sort()).toEqual(
+      [...WithheldReasonSchema.options].sort(),
+    );
   });
 });
 

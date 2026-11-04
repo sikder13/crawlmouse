@@ -24,6 +24,7 @@ import {
   V1_PINNED_ENUMS,
   V2_FIXTURE_ENUMS,
   VerdictSchema,
+  WithheldReasonSchema,
   instant,
   v2Registry,
   type Check,
@@ -597,8 +598,9 @@ describe.each(FIXTURE_NAMES)('%s.json is coherent', (name) => {
   });
 
   it('a fix whose AI effect waits on other fixes names fixes that exist on the same site', () => {
+    const reasons: readonly string[] = WithheldReasonSchema.options;
     for (const fix of data().fixes) {
-      for (const fp of fix.effect.ai_readability_pending_on) {
+      for (const fp of fix.effect.ai_readability_pending_on.filter((p) => !reasons.includes(p))) {
         const target = data().fixes.find((f) => f.fingerprint === fp);
         expect(target?.site_id, `${fix.id} waits on ${fp}`).toBe(fix.site_id);
       }

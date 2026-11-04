@@ -24,6 +24,7 @@ import {
   FixTypeSchema,
   PacketFrameworkSchema,
   RecommendationClassSchema,
+  WithheldReasonSchema,
 } from './enums.js';
 import { rules } from './rules.js';
 
@@ -39,7 +40,8 @@ export const EffectSchema = z
     technical_seo: PointsDeltaSchema,
     /** Null while the AI effect cannot be estimated yet; then `ai_readability_pending_on` says why. */
     ai_readability: PointsDeltaSchema.nullable(),
-    ai_readability_pending_on: z.array(FingerprintSchema),
+    /** What the estimate waits on: fixes, by fingerprint, or a grade component the check could not measure. */
+    ai_readability_pending_on: z.array(z.union([FingerprintSchema, WithheldReasonSchema])),
     estimate: z.literal(true),
   })
   .check(

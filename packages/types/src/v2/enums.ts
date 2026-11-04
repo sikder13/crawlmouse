@@ -274,6 +274,22 @@ export const CmsNameSchema = named(
   'CmsName',
   z.enum(['shopify', 'wordpress', 'webflow', 'wix', 'squarespace', 'framer', 'ghost', 'custom']),
 );
+/**
+ * Why the engine gives no AI readability grade, or no AI effect for a fix: one reason per component
+ * that could not be measured, and the case where every scored crawler is blocked by the site's own
+ * robots.txt. The engine says what each means (packages/engine/src/v2/grade/withheld.ts), and its
+ * test pins the two lists to each other.
+ */
+export const WithheldReasonSchema = named(
+  'WithheldReason',
+  z.enum([
+    'too_few_crawlers_measured',
+    'blocked_by_choice',
+    'readable_unmeasured',
+    'quotable_unmeasured',
+    'signals_unmeasured',
+  ]),
+);
 /** v1 `RefusalTrigger`. */
 export const RefusalTriggerSchema = named(
   'RefusalTrigger',
@@ -333,6 +349,7 @@ export const V1_PINNED_ENUMS = {
   PageKind: PageKindSchema,
   CmsName: CmsNameSchema,
   RefusalTrigger: RefusalTriggerSchema,
+  WithheldReason: WithheldReasonSchema,
 } as const;
 
 export const REGISTRY_ONLY_ENUMS = {
@@ -361,6 +378,7 @@ export type AlertRuleKind = z.infer<typeof AlertRuleKindSchema>;
 export type ReportKind = z.infer<typeof ReportKindSchema>;
 export type SeatRole = z.infer<typeof SeatRoleSchema>;
 export type ChangeKind = z.infer<typeof ChangeKindSchema>;
+export type WithheldReason = z.infer<typeof WithheldReasonSchema>;
 export type Severity = z.infer<typeof SeveritySchema>;
 
 /** Every enum this module defined, in definition order, whichever group it was put in. */
