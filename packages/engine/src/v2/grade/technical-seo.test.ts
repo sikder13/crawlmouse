@@ -156,8 +156,9 @@ describe('the grade', () => {
       { path: '/gone', status: 404 },
       { path: '/moved', status: 301 },
       { path: '/tag/a', kind: 'archive', links: ['/p/0', '/p/1'] },
-      // no page links the 404, the 301 or the PDF (found through the sitemap); /lonely is a graded
-      // orphan, so the size of the graded population moves the orphan ratio
+      // the homepage links the 404 and the 301, which would hold PageRank as nodes; no page links
+      // the PDF (found through the sitemap); /lonely is a graded orphan, so the size of the graded
+      // population moves the orphan ratio
       { path: '/file.pdf' },
       { path: '/lonely' },
     ];
@@ -173,8 +174,30 @@ describe('the grade', () => {
         (p) => `https://a.test${p === '/' ? '' : p}`,
       ),
     );
+    // v1's SPEC 01 graph, written out: its nodes are the pages answering 200 (audit.ts), so the
+    // 404 and the 301 are not nodes and the links to them drop
+    const nodes = [
+      '/',
+      '/p/0',
+      '/p/1',
+      '/p/2',
+      '/p/3',
+      '/p/4',
+      '/p/5',
+      '/tag/a',
+      '/file.pdf',
+      '/lonely',
+    ].map((p) => `https://a.test${p === '/' ? '' : p}`);
+    expect(
+      input.pages
+        .filter((p) => !nodes.includes(p.url))
+        .map((p) => p.status_code)
+        .sort(),
+    ).toEqual([301, 404]);
     const graph = buildGraph(
-      input.pages.map((p) => ({ url: p.url, urlHash: p.url, statusCode: p.status_code })),
+      input.pages
+        .filter((p) => nodes.includes(p.url))
+        .map((p) => ({ url: p.url, urlHash: p.url, statusCode: p.status_code })),
       input.edges.map((e) => ({
         fromUrl: e.from_url,
         toUrl: e.to_url,

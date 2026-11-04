@@ -94,13 +94,19 @@ export function crawlabilityMeasures(input: TechnicalSeoInput): Record<string, n
 export const combine = (structure: number, crawlability: number): number =>
   round((SEO_WEIGHTS.structure / 100) * structure + SEO_WEIGHTS.crawlability * crawlability);
 
-/** The structure grade (v1's) and the evidence the refusal reads, from the link graph. */
+/**
+ * The structure grade (v1's) and the evidence the refusal reads, from the link graph. The graph's
+ * nodes are the pages answering 200, as on v1's SPEC 01 path (audit.ts analyzeCrawl with v2 set):
+ * a 404 or a redirect is a crawl outcome, not a node, so it neither holds PageRank nor counts as a
+ * page; links to or from it drop out of the graph. The graded population within it is `isGraded`.
+ */
 function structureOf(input: TechnicalSeoInput) {
   const graded = new Set(input.pages.filter(isGraded).map((p) => p.url));
+  const nodes = input.pages.filter((p) => p.status_code === 200);
   const analyse = (edges: readonly LinkEdge[]) =>
     deriveGradeInputs(
       buildGraph(
-        input.pages.map((p) => ({ url: p.url, urlHash: p.url, statusCode: p.status_code })),
+        nodes.map((p) => ({ url: p.url, urlHash: p.url, statusCode: p.status_code })),
         edges.map((e) => ({
           fromUrl: e.from_url,
           toUrl: e.to_url,
