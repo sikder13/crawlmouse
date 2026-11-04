@@ -9,6 +9,8 @@ const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'p
 
 const BUDGET_FAIL =
   '  ✘  2 [chromium] › ../../tests/visual/perf.spec.ts:172:5 › crawl screen performance › the crawl, the map growing: within the budget (1.6m)';
+const EXPLORER_FAIL =
+  '  ✘  5 [chromium] › ../../tests/visual/perf.spec.ts:215:3 › crawl screen performance › the explorer, 2,000 pages on the canvas: within the budget, no frame over 50 ms as the selection moves (40.1s)';
 const CONTROL_FAIL =
   '  ✘  1 [chromium] › ../../tests/visual/perf.spec.ts:150:3 › crawl screen performance › the trace reading finds a long task and a layout shift planted in the page (9.0s)';
 
@@ -20,10 +22,32 @@ const CONTROL_FAIL =
  * What one attempt of the stand-in prints: a pass; a budget miss; a failed control; a budget test
  * and the control failing together; a budget-titled test whose measurement was invalid (perf.spec.ts
  * prefixes those assertion messages with MEASUREMENT INVALID); a budget-titled test failing on
- * another assertion (the explorer's canvas never rendering); a budget-titled test timing out; or a
- * server that never started. Each failure prints its error as Playwright's list reporter does.
+ * another assertion (the explorer's canvas never rendering); a budget-titled test timing out; one
+ * that threw (Playwright prints a thrown error under its own name); a budget miss beside a budget
+ * test that threw; an error that only starts like the budget assertion's; a budget test that printed
+ * no error; a budget miss with a second error from teardown; a budget miss beside a budget test that
+ * printed nothing; a budget miss then a teardown timeout, coloured as Playwright's workers print it
+ * (FORCE_COLOR=1); a budget miss beside a TimeoutError; a server that never started; or a command
+ * that fails having printed nothing. Each failure prints its error as Playwright's list reporter does.
  */
-type Outcome = 'pass' | 'budget' | 'control' | 'both' | 'invalid' | 'canvas' | 'timeout' | 'crash';
+type Outcome =
+  | 'pass'
+  | 'budget'
+  | 'control'
+  | 'both'
+  | 'invalid'
+  | 'canvas'
+  | 'timeout'
+  | 'thrown'
+  | 'budget-and-thrown'
+  | 'near-budget'
+  | 'silent'
+  | 'budget-and-teardown'
+  | 'budget-and-silent'
+  | 'budget-then-coloured-timeout'
+  | 'budget-and-timeout-error'
+  | 'nothing'
+  | 'crash';
 
 function fakeCommand(dir: string, plan: Array<Outcome>) {
   const path = join(dir, 'fake.sh');
@@ -43,7 +67,16 @@ case "$outcome" in
   invalid) echo '${BUDGET_FAIL}'; echo "    Error: MEASUREMENT INVALID: run 2: only 40 frames"; exit 1 ;;
   canvas) echo '${BUDGET_FAIL}'; echo "    Error: Timed out 15000ms waiting for expect(locator).toHaveCount(expected)"; exit 1 ;;
   timeout) echo '${BUDGET_FAIL}'; echo "    Test timeout of 300000ms exceeded."; exit 1 ;;
+  thrown) echo '${BUDGET_FAIL}'; echo "    TypeError: Cannot read properties of undefined (reading 'traceEvents')"; exit 1 ;;
+  budget-and-thrown) echo '${BUDGET_FAIL}'; echo "    Error: medians of 5 runs"; echo '${EXPLORER_FAIL}'; echo "    SyntaxError: Unexpected end of JSON input"; exit 1 ;;
+  near-budget) echo '${BUDGET_FAIL}'; echo "    Error: medians of 5 runs could not be read: no samples"; exit 1 ;;
+  silent) echo '${BUDGET_FAIL}'; exit 1 ;;
+  budget-and-teardown) echo '${BUDGET_FAIL}'; echo "    Error: medians of 5 runs"; echo "    TargetClosedError: browserContext.close: Target page, context or browser has been closed"; exit 1 ;;
+  budget-and-silent) echo '${BUDGET_FAIL}'; echo "    Error: medians of 5 runs"; echo '${EXPLORER_FAIL}'; exit 1 ;;
+  budget-then-coloured-timeout) echo '${BUDGET_FAIL}'; echo "    Error: medians of 5 runs"; printf '    \\033[31mTest timeout of 300000ms exceeded while tearing down "context".\\033[39m\\n'; exit 1 ;;
+  budget-and-timeout-error) echo '${BUDGET_FAIL}'; echo "    Error: medians of 5 runs"; echo '${EXPLORER_FAIL}'; echo "    TimeoutError: page.waitForFunction: Timeout 15000ms exceeded."; exit 1 ;;
   crash) echo "Error: Timed out waiting 240000ms from config.webServer."; exit 1 ;;
+  nothing) exit 1 ;;
 esac
 `,
     { mode: 0o755 },
@@ -156,6 +189,38 @@ describe('perf-retry.sh: the decision table', () => {
     expect(run(['budget', 'timeout'], 'slow').status).toBe(1);
   });
 
+  it('fail twice on a slow runner, a budget test that threw: fails', () => {
+    expect(run(['budget', 'thrown'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget miss beside a budget test that threw: fails', () => {
+    expect(run(['budget', 'budget-and-thrown'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, an error that only starts like the budget assertion: fails', () => {
+    expect(run(['budget', 'near-budget'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget test that printed no error: fails', () => {
+    expect(run(['budget', 'silent'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget miss with a teardown error beside it: fails', () => {
+    expect(run(['budget', 'budget-and-teardown'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget miss beside a budget test that printed nothing: fails', () => {
+    expect(run(['budget', 'budget-and-silent'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget miss then a coloured timeout in the same test: fails', () => {
+    expect(run(['budget', 'budget-then-coloured-timeout'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget miss beside a TimeoutError: fails', () => {
+    expect(run(['budget', 'budget-and-timeout-error'], 'slow').status).toBe(1);
+  });
+
   it('fail twice with a probe file that is not one JSON line: fails, as on a normal runner', () => {
     const r = run(['budget', 'budget'], 'malformed');
     expect(r.status).toBe(1);
@@ -164,6 +229,10 @@ describe('perf-retry.sh: the decision table', () => {
 
   it('fail twice on a slow runner with no failed test listed (the server never started): fails', () => {
     expect(run(['crash', 'crash'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, having printed no test and no error: fails', () => {
+    expect(run(['nothing', 'nothing'], 'slow').status).toBe(1);
   });
 
   it('refuses to run without a command', () => {

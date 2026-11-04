@@ -53,12 +53,14 @@ budgets and decides what a failure means:
 | fail      | fail                        | slow           | inconclusive: slow runner | pass |
 
 "Slow" means the probe's median is over `SLOW_RUNNER_FACTOR` (1.5) times `PROBE_REFERENCE_MS`. An
-inconclusive pass also needs, on the second attempt, at least one failed test, every one a budget
-test (its title holds "within the budget"), and at least one reported error, every one the budget
-assertion's own (`Error: medians of 5 runs`). Any other error fails the job on any runner: a failed
-control, a server that did not start, a failure that names no test, a test timeout, or another
-assertion inside a budget test, such as one marked `MEASUREMENT INVALID` (the checks that a run
-measured anything) or the explorer's canvas not rendering. Both attempts' `[perf]` lines go to the job summary. A flaky or
+inconclusive pass also needs, on the second attempt, one reported error per failed test, every one
+the budget assertion's own (`Error: medians of 5 runs`, which only a budget test raises). Errors
+are read with colour codes stripped (Playwright's workers print with `FORCE_COLOR=1`), from the
+lines that start with an error's name (`Error:`, `TypeError:`, `TimeoutError:`, ...) or with
+`Test timeout of`. Any other failure fails the job on any runner, alone or beside a budget miss: a
+failed control, a server that did not start, a failure that names no test, a test timeout, a thrown
+error, or another assertion inside a budget test, such as one marked `MEASUREMENT INVALID` (the
+checks that a run measured anything) or the explorer's canvas not rendering. Both attempts' `[perf]` lines go to the job summary. A flaky or
 inconclusive outcome writes a warning annotation and a register row (below). It is the one step
 the workflow retries (`grep -n "perf-retry\|--last-failed\|retries" .github/workflows/*.yml` finds
 it and the baselines step, which re-draws screenshots and asserts nothing); production checks run

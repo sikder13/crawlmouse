@@ -8,12 +8,13 @@
 #   fail        fail        normal/unknown   failed: reproduced                  1
 #   fail        fail        slow             inconclusive: slow runner           0
 #
-# An inconclusive pass needs three things of the second attempt: a probe that rates the runner
-# slow; at least one failed test, every one of them a budget test by its title (BUDGET_TITLE); and
-# at least one reported error, every one of them the budget assertion itself (BUDGET_ERROR, the
-# message perf.spec.ts gives `expect(missed)`). Any other error inside a budget test (a measurement
-# marked MEASUREMENT INVALID, a canvas that never rendered, a test timeout) is not excused, nor is a
-# failed trace control, a server that did not start, or a failure that names no test.
+# An inconclusive pass needs two things of the second attempt: a probe that rates the runner
+# slow, and one reported error per failed test, every one of them the budget assertion itself
+# (BUDGET_ERROR, the message perf.spec.ts gives `expect(missed)`, which only a budget test has).
+# Errors are read, colour codes stripped, from the lines Playwright starts with an error's name
+# (`Error:`, `TypeError:`, ...) or with `Test timeout of`. So any other failure is not excused: a
+# measurement marked MEASUREMENT INVALID, a canvas that never rendered, a thrown error, a test
+# timeout, a failed trace control, a server that did not start, a failure that names no test.
 #
 # Usage: perf-retry.sh <probe.json> -- <command...>
 #   The command runs as given, then once more with --last-failed appended.
@@ -23,7 +24,6 @@
 #   RUN_URL              the run link written into that row (optional)
 set -uo pipefail
 
-BUDGET_TITLE='within the budget'
 BUDGET_ERROR='^ *Error: medians of [0-9]+ runs$'
 
 probe_json=${1:?usage: perf-retry.sh <probe.json> -- <command...>}
@@ -42,9 +42,15 @@ probe_field() {
   node -e 'try { const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const v = r[process.argv[2]]; console.log(typeof v === "number" ? Number(v.toFixed(1)) : (v ?? "unknown")); } catch { console.log("unknown"); }' "$probe_json" "$1"
 }
 
+# A log without its colour codes: Playwright's workers print with FORCE_COLOR=1, so a timeout
+# line, for one, arrives coloured even in CI.
+plain() {
+  sed -E 's/\x1b\[[0-9;]*m//g' "$1"
+}
+
 # The titles of the tests an attempt's list reporter marked failed, one per line.
 failed_titles() {
-  grep -E '^\s*✘' "$1" | sed -E 's/.* › //; s/ \([0-9.]+(ms|s|m)\)$//'
+  plain "$1" | grep -E '^\s*✘' | sed -E 's/.* › //; s/ \([0-9.]+(ms|s|m)\)$//'
 }
 
 attempt() {
@@ -100,9 +106,11 @@ if attempt 2 "$@" --last-failed; then
 fi
 
 failed=$(failed_titles "$logs/attempt-2.log")
-errors=$(grep -E '^ *(Error: |Test timeout of )' "$logs/attempt-2.log")
-if [ "$rating" = slow ] && [ -n "$failed" ] && ! grep -vqF "$BUDGET_TITLE" <<<"$failed" &&
-  [ -n "$errors" ] && ! grep -vqE "$BUDGET_ERROR" <<<"$errors"; then
+errors=$(plain "$logs/attempt-2.log" | grep -E '^ *([A-Za-z]*Error: |Test timeout of )')
+budget_errors=$(grep -cE "$BUDGET_ERROR" <<<"$errors")
+# With no error at all, "$errors" reads as one empty line, which is not BUDGET_ERROR: refused.
+if [ "$rating" = slow ] && ! grep -vqE "$BUDGET_ERROR" <<<"$errors" &&
+  [ "$budget_errors" -eq "$(grep -c . <<<"$failed")" ]; then
   echo "::warning title=inconclusive: slow runner::The performance budgets failed twice on a runner the probe rates slow ($probe_line). The strict nightly job holds the budgets."
   echo "**inconclusive: slow runner.** The strict nightly job holds the budgets." >>"$summary"
   register_row "inconclusive: slow runner; $probe_line"
