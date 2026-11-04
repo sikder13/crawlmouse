@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   AccessTestSchema,
+  DeclarationFetchSchema,
   PageTitleSchema,
   AccountSchema,
   AgencyBrandingSchema,
@@ -120,6 +121,25 @@ const registryEntry = () => ({
   cloudflare_as_of: '2026-11-03',
 });
 
+const answered = () => ({
+  origin: 'https://example-outfitter.com',
+  path: '/llms.txt',
+  state: 'answered',
+  status: 200,
+  media_type: 'text/plain',
+  bytes: 10,
+  bytes_complete: true,
+  not_requested: null,
+});
+const unanswered = (state: 'no_response' | 'not_requested') => ({
+  ...answered(),
+  state,
+  status: null,
+  media_type: null,
+  bytes: null,
+  bytes_complete: null,
+  not_requested: state === 'not_requested' ? 'budget' : null,
+});
 
 interface RuleCase {
   rule: RuleId;
@@ -834,6 +854,49 @@ const CASES: RuleCase[] = [
     breaks: 'a version without a method',
     schema: AccessTestSchema,
     input: () => ({ ...copy(bad.access_tests[0]!), method: null }),
+  },
+  // ── DeclarationFetch ────────────────────────────────────────────────────────────────────────
+  {
+    rule: 'declaration_answer',
+    breaks: 'a status with no answer',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...unanswered('no_response'), status: 200 }),
+  },
+  {
+    rule: 'declaration_answer',
+    breaks: 'an answer with no status',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...answered(), status: null }),
+  },
+  {
+    rule: 'declaration_bytes',
+    breaks: 'a byte count with no answer',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...unanswered('no_response'), bytes: 3, bytes_complete: true }),
+  },
+  {
+    rule: 'declaration_bytes',
+    breaks: 'an answer with no byte count',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...answered(), bytes: null }),
+  },
+  {
+    rule: 'declaration_media_type',
+    breaks: 'a media type with no answer',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...unanswered('no_response'), media_type: 'text/plain' }),
+  },
+  {
+    rule: 'declaration_not_requested',
+    breaks: 'a reason not to request on a request that was answered',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...answered(), not_requested: 'budget' }),
+  },
+  {
+    rule: 'declaration_not_requested',
+    breaks: 'not requested, with no reason',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...unanswered('not_requested'), not_requested: null }),
   },
   // ── PageResult head text ────────────────────────────────────────────────────────────────────
   {

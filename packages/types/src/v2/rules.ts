@@ -103,6 +103,14 @@ export const RULES = {
   // AccessTest
   observed_owner_logs: two('observed evidence comes from owner logs, and only it does'),
   access_request_line: two('the request method and HTTP version are recorded together'),
+  declaration_answer: two('a declaration status is recorded exactly when the request was answered'),
+  declaration_bytes: two(
+    'a declaration byte count is recorded exactly when the request was answered',
+  ),
+  declaration_media_type: one('a declaration media type is recorded only from an answer'),
+  declaration_not_requested: two(
+    'why a declaration was not requested is recorded exactly when it was not requested',
+  ),
   head_text_absent: one(
     'a title or description the page does not declare has no length and no cut',
   ),
