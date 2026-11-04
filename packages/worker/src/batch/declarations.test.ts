@@ -5,7 +5,13 @@ import { createFetcher } from '../fetch/fetcher.js';
 import { Sites } from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
-import { DECLARATION_KEEP_BYTES, DeclarationCache } from './declarations.js';
+import {
+  DECLARATION_BACKOFF_MS,
+  DECLARATION_KEEP_BYTES,
+  DeclarationCache,
+  keepFor,
+  retryAfterMs,
+} from './declarations.js';
 import type { BatchRequest } from './request.js';
 import { runBatch, type BatchResult } from './run.js';
 import { RobotsCache } from './site-rules.js';
@@ -247,18 +253,45 @@ describe('declaration fetches', () => {
     expect(declarationRequests(s)).toHaveLength(2 * DECLARATION_PATHS.length);
   });
 
-  it('a 429 or a 5xx is asked again by the next batch, a 404 is kept', async () => {
+  it('a 429 or a 5xx is kept for its Retry-After, at least a minute; a 404 for ten', async () => {
+    const asked: Record<string, number> = {};
     const s = await serve('User-agent: *\nAllow: /\n', (path, res) => {
-      res.statusCode = path === '/rsl.xml' ? 503 : path === '/llms.txt' ? 429 : 404;
+      asked[path] = (asked[path] ?? 0) + 1;
+      if (path === '/llms.txt')
+        res.statusCode = 429; // no Retry-After: the one-minute floor
+      else if (path === '/rsl.xml') {
+        res.statusCode = 503;
+        res.setHeader('retry-after', '300');
+      } else res.statusCode = 404;
       res.end();
     });
     const w = worker();
-    await w.run({ ...req('crawl', s.base, ['/']), batch: 1 });
-    const second = await w.run({ ...req('crawl', s.base, ['/a']), batch: 2 });
-    const of = (p: string) => second.declarations.find((d) => d.path === p)!;
-    expect(of('/rsl.xml').from_cache).toBe(false);
-    expect(of('/llms.txt').from_cache).toBe(false);
-    expect(of('/sitemap.xml')).toMatchObject({ status: 404, from_cache: true });
+    for (let i = 1; i <= 4; i++) await w.run({ ...req('crawl', s.base, [`/${i}`]), batch: i });
+    expect([asked['/llms.txt'], asked['/rsl.xml'], asked['/sitemap.xml']]).toEqual([1, 1, 1]);
+    w.clock.advance(DECLARATION_BACKOFF_MS);
+    await w.run({ ...req('crawl', s.base, ['/5']), batch: 5 });
+    expect([asked['/llms.txt'], asked['/rsl.xml'], asked['/sitemap.xml']]).toEqual([2, 1, 1]);
+    w.clock.advance(300_000);
+    const later = await w.run({ ...req('crawl', s.base, ['/6']), batch: 6 });
+    expect([asked['/rsl.xml'], asked['/sitemap.xml']]).toEqual([2, 1]);
+    expect(later.declarations.find((d) => d.path === '/sitemap.xml')).toMatchObject({
+      status: 404,
+      from_cache: true,
+    });
+  });
+
+  it('reads Retry-After as delta-seconds or an HTTP date, and nothing else', () => {
+    const now = Date.parse('2026-11-04T00:00:00Z');
+    expect(retryAfterMs('120', now)).toBe(120_000);
+    expect(retryAfterMs('Wed, 04 Nov 2026 00:02:00 GMT', now)).toBe(120_000);
+    expect(retryAfterMs('soon', now)).toBeNull();
+    expect(retryAfterMs(undefined, now)).toBeNull();
+    expect(keepFor(429, null)).toBe(DECLARATION_BACKOFF_MS);
+    expect(keepFor(503, 10 * 3_600_000)).toBe(10 * 60_000);
+    expect(keepFor(200, null)).toBe(10 * 60_000);
+    expect(keepFor(404, null)).toBe(10 * 60_000);
+    expect(keepFor(408, null)).toBe(DECLARATION_BACKOFF_MS);
+    expect(keepFor(425, 120_000)).toBe(120_000);
   });
 
   it('a request that got no answer is asked again by the next batch', async () => {
