@@ -2,15 +2,16 @@
  * Each fix's effect on the two grades, by counterfactual recompute: apply what fixing it means to the
  * grade inputs, recompute, take the difference. Never typed.
  *
- * Order and sum. Fixes are ranked by their effect applied alone (Technical SEO plus AI readability,
- * larger first; ties by fingerprint). In that order each fix's effect is the grade with it and every
+ * Order and sum. Fixes whose effect applied alone can be stated rank first, by that effect (Technical
+ * SEO plus AI readability, larger first); then those whose effect cannot (an AI effect waiting on a
+ * reason, or a refused Technical SEO grade); ties by fingerprint. In that order each fix's effect is the grade with it and every
  * fix ranked above it applied, less the grade without it:
  *
  *   effect(i) = grade(fixes 1..i) − grade(fixes 1..i−1)
  *
  * so the effects add up to the projected grade less the current one, before rounding to DECIMALS.
  *
- * Technical SEO is 0 while the grade is refused, before or after the fix (effectOf). AI readability is
+ * Technical SEO is 0 while the grade is refused: as checked, or before or after the fix (effectOf). AI readability is
  * the change in the component the fix moves: Access for an edge-rule fix, Quotable for a content fix,
  * none for a structure fix. When that component has no score before or after, or an edge fix's crawler
  * has too few pages for a share, the AI effect is null and waits on the reason. A content fix on a check
@@ -122,7 +123,8 @@ export function applyFix(inputs: Inputs, f: FixRecord): Inputs {
   }
   if (f.family === 'content') {
     const t = ai.quotable.checks[f.record.check];
-    if (t === undefined) return inputs; // the check does not count in Quotable
+    // a check Quotable does not count moves nothing, whatever the inputs carry (`counts`)
+    if (!counts(f) || t === undefined) return inputs;
     const checks = {
       ...ai.quotable.checks,
       [f.record.check]: { ...t, passing: t.passing + f.record.extent.failing },
@@ -212,14 +214,23 @@ function aiChange(
 }
 
 /**
- * The effect of `fixes` from inputs `before` (scores `a`) to scores `b`. Technical SEO is 0 when the
- * grade is refused before or after: there is no score to move, and the contract's Effect has no way to
- * say "not estimated" for Technical SEO yet (reported for CC-11).
+ * The effect of `fixes` from inputs `before` (scores `a`) to scores `b`, in a chain that began at
+ * scores `start`. Technical SEO is 0 when the grade is refused at the start of the chain, before this
+ * fix or after it: there is no score to move, and the contract's Effect has no way to say "not
+ * estimated" for Technical SEO yet (reported for CC-11). Zeroing from the start keeps the effects
+ * adding up to the overview when a fix part-way down the chain lifts the grade out of refusal.
  */
-function effectOf(a: Scores, b: Scores, fixes: readonly FixRecord[], before: Inputs): Effect {
+function effectOf(
+  a: Scores,
+  b: Scores,
+  fixes: readonly FixRecord[],
+  before: Inputs,
+  start: Scores,
+): Effect {
   const ai = aiChange(a, b, fixes, before);
+  const refused = start.seo === null || a.seo === null || b.seo === null;
   return {
-    technical_seo: a.seo === null || b.seo === null ? 0 : round(b.seo - a.seo),
+    technical_seo: refused ? 0 : round(b.seo! - a.seo!),
     ai_readability: 'points' in ai ? round(ai.points) : null,
     ai_readability_pending_on: 'waits' in ai ? ai.waits : [],
     estimate: true,
@@ -238,10 +249,19 @@ export interface Effects {
 export function effectsOf(inputs: Inputs, fixes: readonly FixRecord[]): Effects {
   const base = scoresOf(inputs);
   const alone = fixes.map((f) => {
-    const e = effectOf(base, scoresOf(applyFix(inputs, f)), [f], inputs);
-    return { f, size: e.technical_seo + (e.ai_readability ?? 0) };
+    const after = scoresOf(applyFix(inputs, f));
+    const e = effectOf(base, after, [f], inputs, base);
+    // stated: neither grade's effect is unknown (an AI effect waiting on a reason, or a refused
+    // Technical SEO grade before or after)
+    const stated = e.ai_readability !== null && base.seo !== null && after.seo !== null;
+    return { f, stated, size: e.technical_seo + (e.ai_readability ?? 0) };
   });
-  alone.sort((x, y) => y.size - x.size || (fingerprintOf(x.f) < fingerprintOf(y.f) ? -1 : 1));
+  alone.sort(
+    (x, y) =>
+      Number(y.stated) - Number(x.stated) ||
+      y.size - x.size ||
+      (fingerprintOf(x.f) < fingerprintOf(y.f) ? -1 : 1),
+  );
   const byFix = new Map<string, { effect: Effect; rank: number }>();
   let state = inputs;
   let before = base;
@@ -249,9 +269,9 @@ export function effectsOf(inputs: Inputs, fixes: readonly FixRecord[]): Effects 
     const prior = state;
     state = applyFix(state, f);
     const after = scoresOf(state);
-    byFix.set(fingerprintOf(f), { effect: effectOf(before, after, [f], prior), rank: i + 1 });
+    byFix.set(fingerprintOf(f), { effect: effectOf(before, after, [f], prior, base), rank: i + 1 });
     before = after;
   });
   // The projection leaves out fixes that move no score, so the overview waits on no reason of theirs.
-  return { byFix, overview: effectOf(base, before, fixes.filter(counts), inputs) };
+  return { byFix, overview: effectOf(base, before, fixes.filter(counts), inputs, base) };
 }
