@@ -136,7 +136,9 @@ const OWNER_OF = `
   union all select 'pg_trigger'::regclass, oid, tgrelid from pg_trigger
   union all select 'pg_policy'::regclass, oid, polrelid from pg_policy
   union all select 'pg_rewrite'::regclass, oid, ev_class from pg_rewrite
-  union all select 'pg_type'::regclass, oid, typrelid from pg_type where typrelid <> 0`;
+  union all select 'pg_type'::regclass, oid, typrelid from pg_type where typrelid <> 0
+  union all select 'pg_type'::regclass, a.oid, t.typrelid from pg_type a join pg_type t on t.oid = a.typelem
+   where t.typrelid <> 0`;
 
 export async function deidentificationViolations(d: Db): Promise<string[]> {
   const bad: string[] = [];
@@ -178,14 +180,26 @@ export async function deidentificationViolations(d: Db): Promise<string[]> {
     if (!internal && !LEDGER_REFERENCES.includes(r))
       bad.push(`${r}: the ledger may not reference a customer table`);
 
+  // Every kind of relation, not only tables: a sequence or a composite type is a relation too, and a
+  // sequence default on a ledger column would record insertion order.
   const { rows: strays } = await d.query<{ r: string }>(
     `select n.nspname || '.' || c.relname as r from pg_class c join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'partitions' and c.relkind in ('r', 'p', 'v', 'm', 'f')
+      where n.nspname = 'partitions'
         and not exists (select 1 from pg_inherits i join pg_partitioned_table pt on pt.partrelid = i.inhparent
                          where i.inhrelid = c.oid)
+        and not exists (select 1 from pg_index x join pg_inherits i on i.inhrelid = x.indrelid
+                         where x.indexrelid = c.oid)
       order by 1`,
   );
-  for (const { r } of strays) bad.push(`${r}: \`partitions\` holds only partitions`);
+  for (const { r } of strays)
+    bad.push(`${r}: \`partitions\` holds only partitions and their indexes`);
+  const { rows: kinds } = await d.query<{ r: string; k: string }>(
+    `select n.nspname || '.' || c.relname as r, c.relkind::text as k
+       from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'research' and c.relkind not in ('r', 'p', 'i', 'I') order by 1`,
+  );
+  for (const { r, k } of kinds)
+    bad.push(`${r}: \`research\` holds only tables and indexes (relkind ${k})`);
 
   const { rows: fns } = await d.query<{ f: string; h: string }>(
     `select p.oid::regprocedure::text as f, md5(pg_get_functiondef(p.oid)) as h
@@ -237,7 +251,13 @@ export async function deidentificationViolations(d: Db): Promise<string[]> {
      select pg_describe_object(d.classid, d.objid, d.objsubid) as dep,
             pg_describe_object(d.refclassid, d.refobjid, d.refobjsubid) as target
        from pg_depend d left join owner_of o on o.classid = d.classid and o.objid = d.objid
-      where d.refclassid = 'pg_class'::regclass and d.refobjid in (select oid from ledger)
+      where ((d.refclassid = 'pg_class'::regclass and d.refobjid in (select oid from ledger))
+             -- A ledger table's row type, and its array type: a function returning ledger rows, a
+             -- column holding one.
+             or (d.refclassid = 'pg_type'::regclass and d.refobjid in (
+                   select t.oid from pg_type t where t.typrelid in (select oid from ledger)
+                   union select a.oid from pg_type a join pg_type t on t.oid = a.typelem
+                    where t.typrelid in (select oid from ledger))))
         and (o.rel is null or o.rel not in (select oid from ledger))
         and not (o.rel = 'public.check_ledger_links'::regclass and d.classid = 'pg_constraint'::regclass
                  and (select contype from pg_constraint where oid = d.objid) = 'f')
