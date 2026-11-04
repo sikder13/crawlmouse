@@ -1258,8 +1258,9 @@ alter table public.api_keys enable row level security;
 alter table public.deploy_hooks enable row level security;
 alter table public.seat_sites enable row level security;
 
--- A lineage names builds and versions of Crawlmouse itself, nothing about an account, and is shared
--- by every row it produced, so any signed-in user may read it.
+-- A lineage's columns are build and version identifiers the server writes (06b §1); the database
+-- checks their shape, not their meaning. It is shared by every row it produced and names no account
+-- column, so any signed-in user may read it.
 drop policy if exists measurement_lineages_read on public.measurement_lineages;
 create policy measurement_lineages_read on public.measurement_lineages
   for select to authenticated using (true);
