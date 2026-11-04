@@ -1,8 +1,9 @@
 /**
  * What the content checks read of one page's static HTML, as features that hold no page text: the
  * shape of the text after its title heading, its section headings, its JSON-LD, its byline markup and
- * how it shows specifications. Read from the page as served, without running scripts; a page served
- * for JavaScript to fill in is marked so, and only its JSON-LD and meta tags are read.
+ * how it shows specifications. Read from the page as served, without running scripts. A page served
+ * for JavaScript to fill in (client_rendered) keeps its JSON-LD and byline markup; its text features
+ * are empty.
  *
  * Site chrome (CHROME) is set aside first, so a menu's links and headings are not taken for the
  * page's own. A <header> is kept: on article templates it holds the H1.
@@ -43,7 +44,10 @@ export interface Block {
 }
 
 export interface ContentFeatures {
-  /** The page is served as a shell for JavaScript to fill in: its text was not read. */
+  /**
+   * Served for JavaScript to fill in: the page looks like an app shell (v1's looksJsRendered) and has
+   * no H1 with text, or under MIN_BLOCK_WORDS words after it. Its text features are then empty.
+   */
   client_rendered: boolean;
   /** An H1 with text exists. */
   has_h1: boolean;
@@ -52,8 +56,11 @@ export interface ContentFeatures {
   /** Those blocks, up to and including the one that reaches OPENING_WORDS words. */
   opening: Block[];
   /**
-   * After the H1: section headings (an h2 or h3 followed by prose) and headings phrased as a question
-   * (any h2 or h3: a question is not site chrome).
+   * After the H1: `count` is the section headings (an h2 or h3 followed by a prose block of
+   * MIN_BLOCK_WORDS words); `questions` is every h2 or h3 phrased as a question, section heading or
+   * not, so a related-post title outside CHROME that asks a question counts. Counting only section
+   * headings was measured against the label set on 2026-11-03 and more of its firings were wrong; the
+   * counts are in the CC-17 pull request.
    */
   headings: { count: number; questions: number };
   json_ld: JsonLdNode[];
@@ -78,11 +85,18 @@ export interface ContentFeatures {
 const squash = (s: string) => s.replace(/\s+/g, ' ').trim();
 export const wordsIn = (s: string): number => (s ? s.split(' ').length : 0);
 
-/** A statement of ANSWER_SENTENCE_WORDS words, ending in a full stop. */
+/** A statement of ANSWER_SENTENCE_WORDS words, ending in a full stop, a closing quote or bracket after it allowed. */
 export function isAnswerSentence(sentence: string): boolean {
   const n = wordsIn(sentence);
-  return /\.$/.test(sentence) && n >= ANSWER_SENTENCE_WORDS.min && n <= ANSWER_SENTENCE_WORDS.max;
+  return (
+    /\.["'”’)\]»]*$/.test(sentence) &&
+    n >= ANSWER_SENTENCE_WORDS.min &&
+    n <= ANSWER_SENTENCE_WORDS.max
+  );
 }
+
+/** A JSON-LD type with any schema.org IRI prefix removed: `https://schema.org/Product` is `Product`. */
+const typeName = (t: string) => t.replace(/^https?:\/\/schema\.org\//, '');
 
 /** The last path segment of an image URL, percent-decoded where it decodes. */
 function fileName(src: string): string {
@@ -101,10 +115,11 @@ function jsonLd($: cheerio.CheerioAPI): JsonLdNode[] {
     if (!n || typeof n !== 'object') return;
     const o = n as Record<string, unknown>;
     if (Array.isArray(o['@graph'])) (o['@graph'] as unknown[]).forEach(visit);
+    visit(o.mainEntity);
     const type = o['@type'];
-    const types = (Array.isArray(type) ? type : [type]).filter(
-      (t): t is string => typeof t === 'string',
-    );
+    const types = (Array.isArray(type) ? type : [type])
+      .filter((t): t is string => typeof t === 'string')
+      .map(typeName);
     if (types.length === 0) return;
     const author = o.author;
     nodes.push({
@@ -136,18 +151,54 @@ function openingWindow(blocks: readonly Block[]): Block[] {
   return blocks.filter((_, i) => end === -1 || i <= end);
 }
 
+const isHeading = (b: Block) => b.tag === 'h2' || b.tag === 'h3';
+
 export function readPage(html: string): ContentFeatures {
   const $ = cheerio.load(html);
   const json_ld = jsonLd($);
+  const served = looksJsRendered(html);
+  $('script, style, noscript, template, svg').remove();
+  $(CHROME).remove();
+  const body = $('body');
   const byline = {
     meta_author: !!$('meta[name="author"]').attr('content')?.trim(),
     published_time: !!$('meta[property="article:published_time"]').attr('content')?.trim(),
     rel_author: $('a[rel~="author"], link[rel~="author"]').length > 0,
-    itemprop_author: $('[itemprop="author"]').length > 0,
-    itemprop_date: $('[itemprop="datePublished"]').length > 0,
-    time_datetime: false,
+    itemprop_author: body.find('[itemprop="author"]').length > 0,
+    itemprop_date: body.find('[itemprop="datePublished"]').length > 0,
+    time_datetime: body.find('time[datetime]').length > 0,
   };
-  if (looksJsRendered(html)) {
+
+  // A block that holds another reading block is read through the inner one, so its text counts once.
+  const holders = new Set<unknown>();
+  body.find([...OPENING_BLOCKS].join(',')).each((_, el) => {
+    for (let p = el.parent; p && p !== body[0]; p = p.parent) holders.add(p);
+  });
+  const h1 = body
+    .find('h1')
+    .filter((_, e) => squash($(e).text()) !== '')
+    .first();
+  const blocks: Block[] = [];
+  if (h1.length) {
+    let after = false;
+    body.find('*').each((_, el) => {
+      if (el === h1[0]) after = true;
+      else if (after && OPENING_BLOCKS.has(el.tagName) && !holders.has(el)) {
+        const text = squash($(el).text());
+        if (!text) return;
+        blocks.push({
+          tag: el.tagName,
+          words: wordsIn(text),
+          answer_sentences: text.split(/(?<=[.!?؟]["'”’)\]»]*)\s+/).filter(isAnswerSentence).length,
+          question: QUESTION_MARK.test(text),
+        });
+      }
+    });
+  }
+  const words_after_h1 = blocks.reduce((n, b) => n + b.words, 0);
+
+  // Served for JavaScript to fill in: the page looks like an app shell and has no title and text of its own.
+  if (served && (h1.length === 0 || words_after_h1 < MIN_BLOCK_WORDS)) {
     return {
       client_rendered: true,
       has_h1: false,
@@ -159,36 +210,10 @@ export function readPage(html: string): ContentFeatures {
       specs: { structured: 0, label_value_lines: 0, spec_images: 0 },
     };
   }
-  $('script, style, noscript, template, svg').remove();
-  $(CHROME).remove();
-  const body = $('body');
-  byline.time_datetime = body.find('time[datetime]').length > 0;
-
-  const h1 = body
-    .find('h1')
-    .filter((_, e) => squash($(e).text()) !== '')
-    .first();
-  const blocks: Block[] = [];
-  if (h1.length) {
-    let after = false;
-    body.find('*').each((_, el) => {
-      if (el === h1[0]) after = true;
-      else if (after && OPENING_BLOCKS.has(el.tagName)) {
-        const text = squash($(el).text());
-        if (!text) return;
-        blocks.push({
-          tag: el.tagName,
-          words: wordsIn(text),
-          answer_sentences: text.split(/(?<=[.!?؟])\s+/).filter(isAnswerSentence).length,
-          question: QUESTION_MARK.test(text),
-        });
-      }
-    });
-  }
   const headings = blocks.filter((b, i) => {
     const next = blocks[i + 1];
     return (
-      (b.tag === 'h2' || b.tag === 'h3') &&
+      isHeading(b) &&
       next !== undefined &&
       PROSE_BLOCKS.has(next.tag) &&
       next.words >= MIN_BLOCK_WORDS
@@ -201,11 +226,11 @@ export function readPage(html: string): ContentFeatures {
   return {
     client_rendered: false,
     has_h1: h1.length > 0,
-    words_after_h1: blocks.reduce((n, b) => n + b.words, 0),
+    words_after_h1,
     opening: openingWindow(blocks),
     headings: {
       count: headings.length,
-      questions: blocks.filter((b) => (b.tag === 'h2' || b.tag === 'h3') && b.question).length,
+      questions: blocks.filter((b) => isHeading(b) && b.question).length,
     },
     json_ld,
     byline,

@@ -161,3 +161,59 @@ describe('a page served for JavaScript to fill in', () => {
     expect(f.words_after_h1).toBe(0);
   });
 });
+
+describe('round-1 review cases', () => {
+  it('a block inside another reading block is read through the inner one, so its words count once', () => {
+    const f = readPage(
+      page(`<h1>T</h1><li>${prose(12)}</li><blockquote>${prose(10)}</blockquote>`),
+    );
+    expect(f.opening.map((b) => [b.tag, b.words])).toEqual([
+      ['p', 12],
+      ['p', 10],
+    ]);
+    expect(f.words_after_h1).toBe(22);
+  });
+
+  it('a page with a "requires JavaScript" notice that also serves its title and text is read', () => {
+    const f = readPage(
+      page(`<noscript>This site requires JavaScript.</noscript><h1>T</h1>${prose(40)}`),
+    );
+    expect(f.client_rendered).toBe(false);
+    expect(f.words_after_h1).toBe(40);
+  });
+
+  it('the same notice with no H1, or too few words after it, is client-rendered', () => {
+    const notice = '<noscript>This site requires JavaScript.</noscript>';
+    expect(readPage(page(`${notice}${prose(40)}`)).client_rendered).toBe(true);
+    expect(readPage(page(`${notice}<h1>T</h1><p>one two</p>`)).client_rendered).toBe(true);
+  });
+
+  it('byline microdata in site chrome is not the page byline', () => {
+    const f = readPage(
+      page(
+        '<footer><span itemprop="author">A</span><span itemprop="datePublished">2025</span></footer>',
+      ),
+    );
+    expect(f.byline.itemprop_author).toBe(false);
+    expect(f.byline.itemprop_date).toBe(false);
+  });
+
+  it('a schema.org IRI type is read as its name, and mainEntity is visited', () => {
+    const f = readPage(
+      page(
+        ld({
+          '@type': 'https://schema.org/FAQPage',
+          mainEntity: { '@type': 'http://schema.org/Question', description: 'q' },
+        }),
+      ),
+    );
+    expect(f.json_ld.map((n) => n.types)).toEqual([['Question'], ['FAQPage']]);
+    expect(f.json_ld[0]!.has_description).toBe(true);
+  });
+
+  it('a sentence ending in a full stop and a closing quote or bracket is an answer, and splits from the next', () => {
+    const words = Array.from({ length: 10 }, (_, i) => `w${i}`).join(' ');
+    const f = readPage(page(`<h1>T</h1><p>“${words}.” ${words} (${words}.) ${words}</p>`));
+    expect(f.opening[0]!.answer_sentences).toBe(2);
+  });
+});
