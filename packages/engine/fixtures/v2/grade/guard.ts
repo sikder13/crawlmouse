@@ -18,20 +18,28 @@ const SRC = new URL('../../../src/', import.meta.url);
  */
 const ENTRIES = ['v2/grade/index.ts', 'v2/grade/outcomes.ts', 'v2/content/read.ts'];
 
+/** Comments, removed before imports are read, so a comment cannot hide or fake one. */
+const COMMENTS = /\/\*[\s\S]*?\*\/|(^|[^:'"`\\])\/\/.*$/gm;
+
 /**
- * A relative module specifier in `from '…'` or `import '…'`, not in an `import type` or `export type`
- * statement: those are erased when compiled, so they cannot change a computed grade. Package imports
- * are not followed.
+ * A relative module specifier in an `import … from` or `export … from` statement, a bare `import '…'`
+ * or a dynamic `import('…')`. A statement's clause holds no quote, semicolon, or another `import` or
+ * `export`, so a match cannot run from one statement into the next. `import type` and `export type`
+ * statements (group 1) are erased when compiled and cannot change a computed grade, so they are not
+ * followed; an inline `type` inside braces is, with its statement. Package imports are not followed.
  */
 const RELATIVE =
-  /(?<!\b(?:import|export)\s+type\s[^;]*?)(?:\bfrom|\bimport)\s*['"](\.{1,2}\/[^'"]+)['"]/g;
+  /\b(?:import|export)\s+(type\s+)?(?:(?!\b(?:import|export)\b)[^;'"])*?\bfrom\s*['"](\.{1,2}\/[^'"]+)['"]|\bimport\s*\(?\s*['"](\.{1,2}\/[^'"]+)['"]/g;
 
 /** The relative runtime imports of the engine source file `file` (a path under src/), as paths under src/. */
 export function importsOf(file: string, source: string): string[] {
-  return [...source.matchAll(RELATIVE)].map((m) => {
-    const url = new URL(m[1]!.replace(/\.js$/, '.ts'), new URL(file, SRC));
-    return url.pathname.slice(SRC.pathname.length);
-  });
+  const code = source.replace(COMMENTS, '$1');
+  return [...code.matchAll(RELATIVE)]
+    .filter((m) => m[1] === undefined)
+    .map((m) => {
+      const url = new URL((m[2] ?? m[3])!.replace(/\.js$/, '.ts'), new URL(file, SRC));
+      return url.pathname.slice(SRC.pathname.length);
+    });
 }
 
 /** `entries` and every engine file they import at runtime, directly or through another, sorted. */
@@ -95,8 +103,8 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
     PerplexityBot: blocked,
   });
   return {
-    'client-rendered, 31 % text, every crawler served': outcomeOf(csrSite(0.31)),
-    'client-rendered, not yet rendered': outcomeOf(csrSite(null)),
+    '31 % of words served without JavaScript, every crawler served': outcomeOf(csrSite(0.31)),
+    'words without JavaScript not yet measured': outcomeOf(csrSite(null)),
     'blog: a crawler blocked, one served thin, 8 openings without an answer, 2 orphans': outcomeOf(
       blog.input,
       blog.access,

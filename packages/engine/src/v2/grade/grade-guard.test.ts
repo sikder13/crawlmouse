@@ -25,7 +25,7 @@ describe('the grade-change guard', () => {
     expect(sourceDigest(), 'grade code changed without expected.json').toBe(expected.source_digest);
   });
 
-  it('follows relative runtime imports through `from` and bare `import`; skips type-only imports and packages', () => {
+  it('follows relative runtime imports through `from`, bare and dynamic `import`; skips type-only imports, packages and comments', () => {
     const source = [
       "import { a } from './a.js';",
       "import type { B } from '../b/b.js';",
@@ -36,12 +36,23 @@ describe('the grade-change guard', () => {
       'import {\n  type E,\n  d,\n} from "./d.js";',
       "import type {\n  F,\n} from './f.js';",
       "export type { G } from './g.js';",
+      // a comment naming a type-only export does not hide the import after it
+      "/** Each fix's export type is listed below */\nimport { h } from './h.js';",
+      // a type alias with no semicolon does not swallow the next import
+      'export type K = { k: number }\nimport { m } from "./m.js";',
+      "// import { fake } from './fake.js';",
+      "const lazy = () => import('./lazy.js');",
+      "const url = 'https://a.test'; import { n } from './n.js';",
     ].join('\n');
     expect(importsOf('v2/grade/x.ts', source)).toEqual([
       'v2/grade/a.ts',
       'v2/grade/c.ts',
       'v2/grade/side.ts',
       'v2/grade/d.ts',
+      'v2/grade/h.ts',
+      'v2/grade/m.ts',
+      'v2/grade/lazy.ts',
+      'v2/grade/n.ts',
     ]);
   });
 
