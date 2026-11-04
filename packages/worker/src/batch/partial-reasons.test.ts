@@ -4,9 +4,14 @@ import { createFetcher } from '../fetch/fetcher.js';
 import { Sites } from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
 import { startServer } from '../test-support/http.js';
-import { PARTIAL_REASONS } from './findings.js';
+import { Findings, PARTIAL_REASONS } from './findings.js';
+import {
+  MAX_CRAWL_DELAY_S,
+  RobotsCache,
+  SLOW_CRAWL_DELAY_S,
+  type OriginRules,
+} from './site-rules.js';
 import { runBatch } from './run.js';
-import { RobotsCache } from './site-rules.js';
 
 /**
  * Why a batch did less than it was asked, as fields the engine reads (CC-15's follow-up, PR #54),
@@ -15,8 +20,31 @@ import { RobotsCache } from './site-rules.js';
  */
 
 describe('batch partial reasons', () => {
-  it("are exactly the contract's BatchPartialReason values, in its order", () => {
-    expect([...PARTIAL_REASONS]).toEqual(BatchPartialReasonSchema.options);
+  it('every finding that makes a batch partial gives a contract value, and every value has one', () => {
+    // One of each finding the batch can record, made the way the batch makes it.
+    const f = new Findings();
+    for (const budget of ['requests', 'bytes', 'seconds'] as const) f.budgetSpent(budget);
+    const at = 1_700_000_000_000;
+    f.notRequested({
+      reason: 'site_stopped',
+      site: 'example.com',
+      stop: { reason: 'three_429_responses', at, until: at + 1 },
+    });
+    // A reading as the batch holds it; only its state and the Crawl-delay are read here.
+    const origin = (host: string, state: string, crawlDelayS: number | null): OriginRules => ({
+      origin: `https://${host}`,
+      reading: { state, why: 'status_5xx' } as unknown as OriginRules['reading'],
+      crawlDelayS,
+      fromCache: false,
+    });
+    f.origin(origin('a.example.com', 'unreachable', null));
+    f.origin(origin('b.example.com', 'too_large', null));
+    f.origin(origin('c.example.com', 'refused', null));
+    f.origin(origin('d.example.com', 'rules', SLOW_CRAWL_DELAY_S));
+    f.origin(origin('e.example.com', 'rules', MAX_CRAWL_DELAY_S + 1));
+    f.resultSizeLimit(8);
+    expect(f.partialReasons().sort()).toEqual([...BatchPartialReasonSchema.options].sort());
+    expect(PARTIAL_REASONS).toBe(BatchPartialReasonSchema.options);
   });
 
   it('robots_unreachable reaches the result as a field the contract parses', async () => {
