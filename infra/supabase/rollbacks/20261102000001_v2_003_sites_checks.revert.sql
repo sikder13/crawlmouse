@@ -1,9 +1,9 @@
 -- Revert of infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql.
 --
--- ⚠ Drops the tables 003 creates, with their rows, and frontier.check_id /
--- frontier_politeness.check_id. Take a dump first. Revert 007 and 005 before this file: their
--- objects reference these tables, and this file drops nothing with CASCADE, so it fails rather than
--- take them along.
+-- ⚠ Drops the tables 003 creates, with their rows (partitions included), the `partitions` schema,
+-- and frontier.check_id / frontier_politeness.check_id. Take a dump first. Revert 006b, 007 and 005
+-- before this file: their objects reference these tables, and this file drops nothing with CASCADE,
+-- so it fails rather than take them along.
 --
 -- Every statement is re-runnable (v2-003-check-tables.test.ts, "the revert runs twice").
 -- apply_entitlement_transition is restored to its body in
@@ -135,7 +135,12 @@ alter table public.frontier drop column if exists check_id;
 
 drop table if exists public.checks;
 drop table if exists public.sites;
+drop table if exists public.measurement_lineages;
+-- The partitions went with their parents; the schema is empty unless 006b's are still there, and
+-- then the drop fails rather than take them (revert 006b first).
+drop schema if exists partitions;
 
+drop function if exists public.v2_premake_month_partitions(date, date);
 drop function if exists public.is_member_for_site(uuid);
 drop function if exists public.alert_events_rule_scope();
 drop function if exists public.alert_rules_fired_check_scope();
@@ -145,6 +150,7 @@ drop function if exists public.fix_events_append_only();
 drop function if exists public.link_edges_url_hash();
 drop function if exists public.page_results_url_hash();
 -- page_results' CHECK functions, after the table whose CHECKs call them; the ones the others call last.
+drop function if exists public.v2_headers_shape_ok(jsonb);
 drop function if exists public.v2_search_robots_ua_unique(jsonb);
 drop function if exists public.v2_search_robots_verdicts_ok(jsonb);
 drop function if exists public.v2_search_robots_shape_ok(jsonb);

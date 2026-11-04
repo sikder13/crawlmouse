@@ -43,3 +43,40 @@ export const CrawlerRegistryEntrySchema = z
   );
 
 export type CrawlerRegistryEntry = z.infer<typeof CrawlerRegistryEntrySchema>;
+
+/**
+ * The registry as one string: every entry, parsed with CrawlerRegistryEntrySchema (so it is JSON data
+ * the contract accepts, or this throws), as JSON with its keys in sorted order; the entries sorted by
+ * that text and joined with newlines. Key order and entry order do not change it; any change to any
+ * value does.
+ */
+export function serialiseRegistry(entries: readonly CrawlerRegistryEntry[]): string {
+  return entries
+    .map((entry) => canonicalJson(CrawlerRegistryEntrySchema.parse(entry)))
+    .sort()
+    .join('\n');
+}
+
+/**
+ * The crawler registry's version: sha256 hex of serialiseRegistry(entries), which is what
+ * measurement_lineages.crawler_registry_version holds. Unlike an `as_of` date it tells apart two
+ * edits made on the same day. Uses the Web Crypto API, which Node 22 and browsers both provide.
+ */
+export async function crawlerRegistryVersion(
+  entries: readonly CrawlerRegistryEntry[],
+): Promise<string> {
+  const bytes = new TextEncoder().encode(serialiseRegistry(entries));
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** JSON with every object's keys sorted, recursively. A parsed entry holds strings, booleans, null and arrays. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    const keys = Object.keys(value).sort();
+    const record = value as Record<string, unknown>;
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(record[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}

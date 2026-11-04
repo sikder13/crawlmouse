@@ -40,6 +40,7 @@ import {
   SiteSchema,
   TechnicalSeoSchema,
   TimestampSchema,
+  UsageEventSchema,
   RULE_CHECKS,
   RULES,
   UNMEASURED_VERDICTS,
@@ -824,6 +825,16 @@ const CASES: RuleCase[] = [
     schema: AccessTestSchema,
     input: () => ({ ...copy(bad.access_tests[0]!), method: null }),
   },
+  // ── UsageEvent ──────────────────────────────────────────────────────────────────────────────
+  {
+    rule: 'usage_billable',
+    breaks: 'a refused result billed',
+    schema: UsageEventSchema,
+    input: () => ({
+      ...copy(bad.usage_events.find((u) => u.result === 'refused')!),
+      billable: true,
+    }),
+  },
   // ── Change ──────────────────────────────────────────────────────────────────────────────────
   {
     rule: 'change_severity',
@@ -1198,6 +1209,8 @@ const BOUNDS: Record<string, string> = {
   'Check.structure.hub_pagerank_share': '[0, 1]',
   'Check.structure.generic_anchor_share': '[0, 1]',
   'Check.without_js.site_text_share': '[0, 1]',
+  // Seconds of compute, so not a whole number.
+  'UsageEvent.compute_seconds': '[0, inf)',
   'Check.content.score': '[0, 100]',
   'Check.crawlers[].status': 'int [100, 599]',
   'Check.crawlers[].text_share': '[0, 1]',

@@ -102,6 +102,8 @@ export const RULES = {
   // AccessTest
   observed_owner_logs: two('observed evidence comes from owner logs, and only it does'),
   access_request_line: two('the request method and HTTP version are recorded together'),
+  // UsageEvent
+  usage_billable: one('only a delivered result is billable'),
   // Change
   change_severity: two('severity is set exactly on an opened or resolved change'),
   change_resolved_info: one('a resolved change is info'),

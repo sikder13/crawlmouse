@@ -1,11 +1,17 @@
 -- v2 migration 003 (ARCH-2 §6.1): the check-data tables.
 --
--- Additive only. It creates sites, checks, page_results, link_edges, access_tests, site_fixes,
--- fix_events, changes, evidence_blobs, alert_rules, alert_events, reports, report_schedules,
--- share_links, api_keys, deploy_hooks and seat_sites; adds seats.client_scope_all and
--- frontier.check_id / frontier_politeness.check_id; creates is_member_for_site(); and replaces
+-- Additive only. It creates measurement_lineages, sites, checks, page_results, link_edges,
+-- access_tests, site_fixes, fix_events, changes, evidence_blobs, alert_rules, alert_events, reports,
+-- report_schedules, share_links, api_keys, deploy_hooks and seat_sites; adds seats.client_scope_all
+-- and frontier.check_id / frontier_politeness.check_id; creates is_member_for_site(); and replaces
 -- apply_entitlement_transition() with a body that also applies the site effects. No existing table,
 -- column, policy or grant is dropped or renamed. v1 reads none of the new objects.
+--
+-- Data foundations (CC-06b, docs/specs/v2/06b-data-foundations.md). Each measurement row names the
+-- lineage that produced it (measurement_lineages). page_results, link_edges and access_tests are
+-- partitioned by the month their check was queued (checks.check_month), with the partitions in the
+-- schema `partitions`, which no client role can use; v2_premake_month_partitions() creates them.
+-- checks and access_tests carry their measurement status as generated columns.
 --
 -- Columns follow the v2 contract (packages/types/src/v2): one column per contract field, of the same
 -- name, with nested objects as jsonb. Site.schedule is flattened into schedule_* columns,
@@ -44,6 +50,33 @@ $$;
 
 -- Lets a table pair a seat with the account it belongs to (seat_sites, sites, reports).
 create unique index if not exists seats_id_account_uq on public.seats (id, account_id);
+
+-- ─── measurement_lineages ─────────────────────────────────────────────────────────────────────────
+-- What produced a measurement: the engine build, the detector rules, the crawler registry, the worker
+-- release when a worker took part, and the graded-population definition where one applies. One row
+-- per distinct combination, shared by every row it produced, so a time series can be split wherever
+-- any of them changed.
+
+create table if not exists public.measurement_lineages (
+  id uuid primary key default gen_random_uuid(),
+  engine_sha text not null,
+  detector_ruleset_version text not null,
+  -- sha256 of the registry's serialised entries (crawlerRegistryVersion in packages/types/src/v2).
+  crawler_registry_version text not null,
+  worker_release text,
+  population_version text,
+  created_at timestamptz not null default now(),
+  constraint measurement_lineages_engine_sha check (engine_sha ~ '^[0-9a-f]{40}$'),
+  constraint measurement_lineages_detector_ruleset_version check (
+    detector_ruleset_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
+  constraint measurement_lineages_crawler_registry_version check (
+    crawler_registry_version ~ '^[0-9a-f]{64}$'),
+  constraint measurement_lineages_worker_release check (worker_release ~ '^[!-~]{1,200}$'),
+  constraint measurement_lineages_population_version check (
+    population_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
+  constraint measurement_lineages_uq unique nulls not distinct (
+    engine_sha, detector_ruleset_version, crawler_registry_version, worker_release, population_version)
+);
 
 -- ─── sites ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -123,7 +156,26 @@ create table if not exists public.checks (
   stack jsonb,
   competitors jsonb not null default '[]',
   progress jsonb,
+  -- The lineage the grading ran under; per-row lineages are on the measurement tables.
+  lineage_id uuid references public.measurement_lineages (id),
+  -- Database only: the UTC month the check was queued, the partition key of its measurement rows.
+  check_month date generated always as ((date_trunc('month', queued_at at time zone 'UTC'))::date) stored,
+  -- The contract's MeasurementStatus of each grade (technicalSeoStatus and aiReadabilityStatus in
+  -- packages/types/src/v2/measurement.ts): null until the check has ended.
+  technical_seo_status text generated always as (case
+    when status not in ('finished', 'partial', 'failed') then null
+    when technical_seo is null or technical_seo = 'null'::jsonb then 'not_measurable'
+    when technical_seo -> 'refusal' -> 'refused' = 'true'::jsonb then 'withheld'
+    else 'measured' end) stored
+    check (technical_seo_status in ('measured', 'not_measurable', 'unevaluable', 'withheld')),
+  ai_readability_status text generated always as (case
+    when status not in ('finished', 'partial', 'failed') then null
+    when ai_readability is null or ai_readability = 'null'::jsonb then 'not_measurable'
+    when ai_readability -> 'withheld' = 'true'::jsonb then 'withheld'
+    else 'measured' end) stored
+    check (ai_readability_status in ('measured', 'not_measurable', 'unevaluable', 'withheld')),
   constraint checks_id_site_uq unique (id, site_id),
+  constraint checks_id_month_uq unique (id, check_month),
   constraint checks_previous_check_site_fkey foreign key (previous_check_id, site_id)
     references public.checks (id, site_id) on delete set null (previous_check_id),
   constraint checks_grade_version check (grade_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
@@ -140,10 +192,21 @@ create table if not exists public.checks (
   constraint checks_both_grades check (
     status <> 'finished' or (technical_seo is not null and ai_readability is not null)),
   constraint checks_grades_when_ended check (
-    status in ('finished', 'partial') or (technical_seo is null and ai_readability is null))
+    status in ('finished', 'partial') or (technical_seo is null and ai_readability is null)),
+  constraint checks_lineage check ((status in ('finished', 'partial')) = (lineage_id is not null)),
+  -- The two values the generated statuses read are present and boolean (coalesce: a CHECK passes a
+  -- null), so the database and the contract's functions read every stored grade the same way. The
+  -- rest of each grade is the writer's to parse.
+  constraint checks_technical_seo_refused check (
+    technical_seo is null or technical_seo = 'null'::jsonb
+    or coalesce(jsonb_typeof(technical_seo -> 'refusal' -> 'refused') = 'boolean', false)),
+  constraint checks_ai_readability_withheld check (
+    ai_readability is null or ai_readability = 'null'::jsonb
+    or coalesce(jsonb_typeof(ai_readability -> 'withheld') = 'boolean', false))
 );
 
 create index if not exists checks_site_queued_idx on public.checks (site_id, queued_at desc);
+create index if not exists checks_lineage_idx on public.checks (lineage_id);
 create index if not exists checks_previous_idx on public.checks (previous_check_id);
 create index if not exists checks_active_idx on public.checks (status) where status in ('queued', 'running');
 create index if not exists checks_expires_idx on public.checks (expires_at) where expires_at is not null;
@@ -309,25 +372,54 @@ as $f$
               else true end
 $f$;
 
+-- The contract's Header list: an array of at most 32 (MAX_HEADERS), each exactly name (crawled text,
+-- 1 to 128 UTF-8 bytes) and value (crawled text, at most 1,024 UTF-8 bytes).
+create or replace function public.v2_headers_shape_ok(p_headers jsonb)
+returns boolean language plpgsql immutable strict set search_path = pg_catalog
+as $f$
+declare
+  v_header jsonb;
+begin
+  -- One test per statement, as v2_redirect_shape_ok.
+  if jsonb_typeof(p_headers) <> 'array' then return false; end if;
+  if jsonb_array_length(p_headers) > 32 then return false; end if;
+  for v_header in select e from jsonb_array_elements(p_headers) e loop
+    if jsonb_typeof(v_header) <> 'object' then return false; end if;
+    if v_header - array['name', 'value'] <> '{}'::jsonb then return false; end if;
+    if not coalesce(public.v2_crawled_text_ok(v_header -> 'name', 128, 1), false) then return false; end if;
+    if not coalesce(public.v2_crawled_text_ok(v_header -> 'value', 1024, 0), false) then return false; end if;
+  end loop;
+  return true;
+end;
+$f$;
+
 revoke all on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
   public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
   public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
   public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
-  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb),
+  public.v2_headers_shape_ok(jsonb)
   from public, anon, authenticated;
 grant execute on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
   public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
   public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
   public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
-  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb),
+  public.v2_headers_shape_ok(jsonb)
   to service_role;
 
 -- ─── page_results and link_edges ──────────────────────────────────────────────────────────────────
 -- Keyed by sha256 hex of the UTF-8 URL, as frontier.url_hash, set by a trigger because the
 -- text-to-bytes conversion is not immutable and so cannot be a generated column.
+--
+-- Partitioned by check_month. The foreign key (check_id, check_month) to checks keeps every row of a
+-- check in the partition of the month the check was queued, so dropping a partition never splits a
+-- check. A key that names a row includes check_month, as a partitioned table requires.
 
 create table if not exists public.page_results (
-  check_id uuid not null references public.checks (id) on delete cascade,
+  check_id uuid not null,
+  check_month date not null,
+  lineage_id uuid not null references public.measurement_lineages (id),
   url text not null,
   url_hash text not null,
   template_key text not null,
@@ -357,7 +449,14 @@ create table if not exists public.page_results (
   is_html boolean not null,
   links_read boolean not null,
   robots_search jsonb not null,
-  primary key (check_id, url_hash),
+  -- The vantage of the fetch, as the worker returns it on its crawl row.
+  identity_sent text not null,
+  source_ip_class text not null check (source_ip_class in ('fly_egress', 'browser_rendering', 'owner_logs')),
+  request_headers jsonb not null default '[]',
+  headers jsonb not null default '[]',
+  primary key (check_id, url_hash, check_month),
+  constraint page_results_check_fkey foreign key (check_id, check_month)
+    references public.checks (id, check_month) on delete cascade,
   -- The bounds of the contract's PageResult that the column types do not hold. crawl_worker writes
   -- this table straight from the worker, so the database checks them (owner ruling 1). A URL's
   -- scheme only: the contract also parses the URL (v2_http_url_ok).
@@ -421,14 +520,20 @@ create table if not exists public.page_results (
     or coalesce(canonical_declared -> 'url', 'null'::jsonb) = 'null'::jsonb
     or canonical_declared -> 'href' is distinct from 'null'::jsonb),
   constraint page_results_robots_verdict check (public.v2_search_robots_verdicts_ok(robots_search)),
-  constraint page_results_robots_ua_unique check (public.v2_search_robots_ua_unique(robots_search))
-);
+  constraint page_results_robots_ua_unique check (public.v2_search_robots_ua_unique(robots_search)),
+  -- The contract's crawledText(512, 1), and its Header lists.
+  constraint page_results_identity_sent check (identity_sent <> '' and octet_length(identity_sent) <= 512),
+  constraint page_results_request_headers check (public.v2_headers_shape_ok(request_headers)),
+  constraint page_results_headers check (public.v2_headers_shape_ok(headers))
+) partition by range (check_month);
 
 create index if not exists page_results_template_idx on public.page_results (check_id, template_key);
 create index if not exists page_results_orphan_idx on public.page_results (check_id) where is_orphan;
 
 create table if not exists public.link_edges (
-  check_id uuid not null references public.checks (id) on delete cascade,
+  check_id uuid not null,
+  check_month date not null,
+  lineage_id uuid not null references public.measurement_lineages (id),
   from_url text not null,
   to_url text not null,
   from_hash text not null,
@@ -436,8 +541,10 @@ create table if not exists public.link_edges (
   anchor_text text not null,
   is_generic_anchor boolean not null,
   js_only boolean not null,
-  primary key (check_id, from_hash, to_hash)
-);
+  primary key (check_id, from_hash, to_hash, check_month),
+  constraint link_edges_check_fkey foreign key (check_id, check_month)
+    references public.checks (id, check_month) on delete cascade
+) partition by range (check_month);
 
 create index if not exists link_edges_to_idx on public.link_edges (check_id, to_hash);
 
@@ -476,9 +583,12 @@ create trigger link_edges_url_hash before insert or update on public.link_edges
 
 -- ─── access_tests ─────────────────────────────────────────────────────────────────────────────────
 
+-- Partitioned by check_month, as page_results.
 create table if not exists public.access_tests (
-  id uuid primary key default gen_random_uuid(),
-  check_id uuid not null references public.checks (id) on delete cascade,
+  id uuid not null default gen_random_uuid(),
+  check_id uuid not null,
+  check_month date not null,
+  lineage_id uuid not null references public.measurement_lineages (id),
   ua text,
   page_url text not null,
   template_key text not null,
@@ -503,10 +613,20 @@ create table if not exists public.access_tests (
   body_excerpt text,
   method text check (method in ('GET')),
   http_version text check (http_version in ('1.1')),
+  -- The contract's MeasurementStatus of the verdict (verdictStatus in
+  -- packages/types/src/v2/measurement.ts).
+  measurement_status text generated always as (case verdict
+    when 'not_measured' then 'unevaluable'
+    when 'edge_blocks_automation' then 'not_measurable'
+    else 'measured' end) stored not null
+    check (measurement_status in ('measured', 'not_measurable', 'unevaluable', 'withheld')),
+  primary key (id, check_month),
+  constraint access_tests_check_fkey foreign key (check_id, check_month)
+    references public.checks (id, check_month) on delete cascade,
   constraint access_tests_observed_owner_logs check (
     (evidence_class = 'observed') = (source_ip_class = 'owner_logs')),
   constraint access_tests_request_line check ((method is null) = (http_version is null))
-);
+) partition by range (check_month);
 
 create index if not exists access_tests_check_idx on public.access_tests (check_id);
 
@@ -1025,8 +1145,101 @@ $$;
 revoke all on function public.is_member_for_site(uuid) from public, anon, authenticated;
 grant execute on function public.is_member_for_site(uuid) to authenticated, service_role;
 
+-- ─── Monthly partitions ───────────────────────────────────────────────────────────────────────────
+-- A partition is a table of its own, and on production a new table in `public` would arrive with
+-- every privilege for anon and authenticated (pg_default_acl). Partitions are therefore created in
+-- the schema `partitions`, which no client role may use, each with RLS on and every role's
+-- privileges revoked. A row is read and written through its parent, whose grants and policies apply.
+--
+-- v2_premake_month_partitions(from, through) creates each missing month from the month of `from` to
+-- the month of `through` (inclusive, at most 37 months) for every table in `public` or `research` that is range-partitioned
+-- on one date column named check_month or observed_month, found from the catalog, so a table
+-- partitioned later is covered without editing this function. It returns how many it created. There
+-- is no default partition: a row for a month that has no partition is refused, not misfiled. Postgres
+-- clones a parent's row triggers onto a new partition but not its statement triggers, so each of the
+-- parent's TRUNCATE triggers (the ledger's append-only rule) is created on the partition too. Run
+-- daily by the owner's pg_cron job (docs/specs/v2/06b-data-foundations.md, runbook).
+
+create schema if not exists partitions;
+revoke all on schema partitions from public, anon, authenticated;
+
+create or replace function public.v2_premake_month_partitions(p_from date, p_through date)
+returns integer
+language plpgsql
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  v_parent record;
+  v_trigger record;
+  v_first date;
+  v_last date;
+  v_month date;
+  v_name text;
+  v_role text;
+  v_made integer := 0;
+begin
+  if p_from is null or p_through is null then
+    raise exception 'partitions: from and through are required' using errcode = '22004';
+  end if;
+  v_first := date_trunc('month', p_from)::date;
+  v_last := date_trunc('month', p_through)::date;
+  if v_last < v_first or v_last >= v_first + interval '37 months' then
+    raise exception 'partitions: % to % is not a range of at most 37 months', p_from, p_through
+      using errcode = '22023';
+  end if;
+  for v_parent in
+    select c.oid as parent_oid, n.nspname as schema_name, c.relname
+      from pg_partitioned_table pt
+      join pg_class c on c.oid = pt.partrelid
+      join pg_namespace n on n.oid = c.relnamespace
+      join pg_attribute a on a.attrelid = c.oid and a.attnum = pt.partattrs[0]
+     where n.nspname in ('public', 'research')
+       and pt.partstrat = 'r'
+       and pt.partnatts = 1
+       and a.attname in ('check_month', 'observed_month')
+       and a.atttypid = 'date'::regtype
+     order by 1, 2
+  loop
+    v_month := v_first;
+    while v_month <= v_last loop
+      v_name := format('%s_%s_%s', v_parent.schema_name, v_parent.relname, to_char(v_month, 'YYYY_MM'));
+      if to_regclass(format('partitions.%I', v_name)) is null then
+        execute format('create table partitions.%I partition of %I.%I for values from (%L) to (%L)',
+                       v_name, v_parent.schema_name, v_parent.relname,
+                       v_month, (v_month + interval '1 month')::date);
+        execute format('alter table partitions.%I enable row level security', v_name);
+        execute format('revoke all on table partitions.%I from public', v_name);
+        for v_role in
+          select rolname from pg_roles
+           where rolname in ('anon', 'authenticated', 'service_role', 'crawl_worker', 'research_retention')
+        loop
+          execute format('revoke all on table partitions.%I from %I', v_name, v_role);
+        end loop;
+        for v_trigger in
+          select t.tgname, t.tgfoid::regproc::text as fn
+            from pg_trigger t
+           where t.tgrelid = v_parent.parent_oid and not t.tgisinternal
+             and (t.tgtype & 32) <> 0  -- TRUNCATE
+        loop
+          execute format('create trigger %I before truncate on partitions.%I for each statement execute function %s()',
+                         v_trigger.tgname, v_name, v_trigger.fn);
+        end loop;
+        v_made := v_made + 1;
+      end if;
+      v_month := (v_month + interval '1 month')::date;
+    end loop;
+  end loop;
+  return v_made;
+end;
+$$;
+
+revoke all on function public.v2_premake_month_partitions(date, date) from public, anon, authenticated;
+grant execute on function public.v2_premake_month_partitions(date, date) to service_role;
+
 -- ─── RLS ──────────────────────────────────────────────────────────────────────────────────────────
 
+alter table public.measurement_lineages enable row level security;
 alter table public.sites enable row level security;
 alter table public.checks enable row level security;
 alter table public.page_results enable row level security;
@@ -1044,6 +1257,13 @@ alter table public.share_links enable row level security;
 alter table public.api_keys enable row level security;
 alter table public.deploy_hooks enable row level security;
 alter table public.seat_sites enable row level security;
+
+-- A lineage's columns are build and version identifiers the server writes (06b §1); the database
+-- checks their shape, not their meaning. It is shared by every row it produced and names no account
+-- column, so any signed-in user may read it.
+drop policy if exists measurement_lineages_read on public.measurement_lineages;
+create policy measurement_lineages_read on public.measurement_lineages
+  for select to authenticated using (true);
 
 drop policy if exists sites_member_read on public.sites;
 create policy sites_member_read on public.sites
@@ -1133,19 +1353,24 @@ create policy alert_rules_member_delete on public.alert_rules
 -- changes.fix_id and changes.subject (J10), reports.storage_path, api_keys.key_hash and
 -- deploy_hooks.token_hash.
 
-revoke all on table public.sites, public.checks, public.page_results, public.link_edges,
-  public.access_tests, public.site_fixes, public.fix_events, public.changes, public.evidence_blobs,
-  public.alert_rules, public.alert_events, public.reports, public.report_schedules, public.share_links,
-  public.api_keys, public.deploy_hooks, public.seat_sites
+revoke all on table public.measurement_lineages, public.sites, public.checks, public.page_results,
+  public.link_edges, public.access_tests, public.site_fixes, public.fix_events, public.changes,
+  public.evidence_blobs, public.alert_rules, public.alert_events, public.reports,
+  public.report_schedules, public.share_links, public.api_keys, public.deploy_hooks, public.seat_sites
   from public, anon, authenticated;
 
-grant all on table public.sites, public.checks, public.page_results, public.link_edges,
-  public.access_tests, public.site_fixes, public.fix_events, public.changes, public.evidence_blobs,
-  public.alert_rules, public.alert_events, public.reports, public.report_schedules, public.share_links,
-  public.api_keys, public.deploy_hooks, public.seat_sites
+grant all on table public.measurement_lineages, public.sites, public.checks, public.page_results,
+  public.link_edges, public.access_tests, public.site_fixes, public.fix_events, public.changes,
+  public.evidence_blobs, public.alert_rules, public.alert_events, public.reports,
+  public.report_schedules, public.share_links, public.api_keys, public.deploy_hooks, public.seat_sites
   to service_role;
 
 grant select (client_scope_all) on public.seats to authenticated;
+
+grant select (
+  id, engine_sha, detector_ruleset_version, crawler_registry_version, worker_release,
+  population_version, created_at
+) on public.measurement_lineages to authenticated;
 
 grant select (
   id, account_id, host, staging_of_site_id, client_name, client_contact_name, client_contact_email,
@@ -1155,21 +1380,24 @@ grant select (
 grant select (
   id, site_id, previous_check_id, status, trigger, grade_version, queued_at, started_at, finished_at,
   tested_at, expires_at, deferred_until, failure_reason, result_email, coverage, technical_seo,
-  ai_readability, structure, without_js, content, signals, crawlers, stack, competitors, progress
+  ai_readability, structure, without_js, content, signals, crawlers, stack, competitors, progress,
+  lineage_id, check_month, technical_seo_status, ai_readability_status
 ) on public.checks to authenticated;
 grant select (
-  check_id, url, url_hash, template_key, kind, status_code, depth, links_in, links_out, pagerank_share,
-  is_orphan, js_only, found_via, sitemap_lastmod, suggested_parent_url, sampled, without_js,
-  crawlers_reached, crawlers_reading_text, content_failures, final_url, redirect, canonical_declared,
-  hreflang, content_simhash, is_html, links_read, robots_search
+  check_id, check_month, lineage_id, url, url_hash, template_key, kind, status_code, depth, links_in,
+  links_out, pagerank_share, is_orphan, js_only, found_via, sitemap_lastmod, suggested_parent_url,
+  sampled, without_js, crawlers_reached, crawlers_reading_text, content_failures, final_url, redirect,
+  canonical_declared, hreflang, content_simhash, is_html, links_read, robots_search, identity_sent,
+  source_ip_class, request_headers, headers
 ) on public.page_results to authenticated;
 grant select (
-  check_id, from_url, to_url, from_hash, to_hash, anchor_text, is_generic_anchor, js_only
+  check_id, check_month, lineage_id, from_url, to_url, from_hash, to_hash, anchor_text,
+  is_generic_anchor, js_only
 ) on public.link_edges to authenticated;
 grant select (
-  id, check_id, ua, page_url, template_key, tested_at, verdict, evidence_class, identity_sent,
-  source_ip_class, limitations, cause, request_headers, raw_status, final_url, headers, byte_count,
-  word_count, body_excerpt, method, http_version
+  id, check_id, check_month, lineage_id, ua, page_url, template_key, tested_at, verdict,
+  evidence_class, identity_sent, source_ip_class, limitations, cause, request_headers, raw_status,
+  final_url, headers, byte_count, word_count, body_excerpt, method, http_version, measurement_status
 ) on public.access_tests to authenticated;
 grant select (
   id, site_id, check_id, previous_check_id, detected_at, kind, severity, summary, "where",
@@ -1394,3 +1622,10 @@ revoke all on function public.apply_entitlement_transition(
 grant execute on function public.apply_entitlement_transition(
   uuid, integer, text, text, text, timestamptz, text, timestamptz, timestamptz, timestamptz,
   integer, integer, integer, timestamptz, text, timestamptz) to service_role;
+
+-- ─── The first partitions ─────────────────────────────────────────────────────────────────────────
+-- The month this runs in and the three after it. Rows for an earlier month (004's backfill of
+-- migrated audits) need their months created first, by the same function.
+
+select public.v2_premake_month_partitions(
+  date_trunc('month', now())::date, (date_trunc('month', now()) + interval '3 months')::date);
