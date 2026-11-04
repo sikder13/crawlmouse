@@ -23,6 +23,7 @@ import {
   MENU_AVG_LINK_CHARS,
 } from './constants.js';
 import { collapseWs, DENSITY_TAGS, MIN_MENU_LINKS } from './main-content.js';
+import { ImpliedBody } from './main-content-implied-body.js';
 
 /** One simple selector of the strip set. */
 type StripRule =
@@ -113,7 +114,8 @@ export function collapsedLength(s: string): number {
 }
 
 interface Frame {
-  node: AnyNode;
+  /** Null for the implied body, which has no element. */
+  node: AnyNode | null;
   /** Visited by extractMainContent's stats pass: the root, and tags reached through tags. */
   stats: boolean;
   /** Where this node's text starts in `parts`. */
@@ -123,12 +125,29 @@ interface Frame {
   linkCount: number;
 }
 
+export interface MainContentWalkOptions {
+  /**
+   * Read a document with no `<body>` element from the body its HTML implies (ImpliedBody), as a
+   * browser builds it. Off, such a document has no main content, as extractMainContent gives it on
+   * the same tree. A document with a `<body>` element anywhere reads the same either way.
+   */
+  impliedBody?: boolean;
+}
+
 /**
  * Feed it a whole document in pre-order: `enter` for every node, and `exit` after the descendants of
  * every node that has children. Then `result()` is `extractMainContent($)` for that document.
+ *
+ * With `impliedBody`, until a `<body>` element is met, the nodes ImpliedBody puts in the body are
+ * read under a root of their own, as a body's would be. The elements open when that body started
+ * have no frame: their exits are passed over. Meeting a `<body>` element later drops all of that and
+ * starts again from the element, as without the option.
  */
 export class MainContentWalk {
   private root: AnyNode | null = null;
+  private readonly implied: ImpliedBody | null;
+  /** Reading the implied body. */
+  private virtual = false;
   private done = false;
   /** Nesting inside a stripped element: its descendants are not read. */
   private skip = 0;
@@ -140,16 +159,32 @@ export class MainContentWalk {
   blocksDropped = 0;
   fellBack = false;
 
+  constructor(options: MainContentWalkOptions = {}) {
+    this.implied = options.impliedBody ? new ImpliedBody() : null;
+  }
+
   enter(node: AnyNode): void {
     if (this.done) return;
     const hasChildren = 'children' in node;
     if (this.root === null) {
       // `$('body').get(0)`: the first body element in document order.
       if (isElement(node) && node.name === 'body') {
+        this.clear();
         this.root = node;
         this.frames.push(frame(node, true, 0));
+        return;
       }
-      return;
+      if (this.implied === null) return;
+      this.implied.enter(node);
+      if (this.implied.state === 'none') {
+        if (this.virtual) this.clear();
+        return;
+      }
+      if (this.implied.state === 'head') return;
+      if (!this.virtual) {
+        this.virtual = true;
+        this.frames.push(frame(null, true, 0));
+      }
     }
     if (this.skip > 0) {
       if (hasChildren) this.skip++;
@@ -171,7 +206,13 @@ export class MainContentWalk {
   }
 
   exit(node: AnyNode): void {
-    if (this.done || this.root === null) return;
+    if (this.done) return;
+    if (this.root === null) {
+      this.implied?.exit(node);
+      if (!this.virtual) return;
+      // An element open when the implied body started: the body runs on past its end.
+      if (this.skip === 0 && this.frames.length === 1) return;
+    }
     if (this.skip > 0) {
       this.skip--;
       return;
@@ -205,8 +246,24 @@ export class MainContentWalk {
     }
   }
 
+  /** Everything read so far, dropped: a `<body>` element was met, or the implied body was replaced. */
+  private clear(): void {
+    this.virtual = false;
+    this.skip = 0;
+    this.frames.length = 0;
+    this.parts.length = 0;
+    this.dropped.clear();
+    this.blocksDropped = 0;
+    this.fellBack = false;
+  }
+
+  /** A body element, or the implied body, is being or was read. */
+  private get reading(): boolean {
+    return this.root !== null || this.virtual;
+  }
+
   result(): { mainTextChars: number; text: string } {
-    if (this.root === null) return { mainTextChars: 0, text: '' };
+    if (!this.reading) return { mainTextChars: 0, text: '' };
     const fallback = this.fallsBack();
     const text = collapseWs((fallback ? this.parts : this.kept()).join(''));
     return { mainTextChars: text.length, text };
@@ -218,7 +275,7 @@ export class MainContentWalk {
    * A collapsed prefix agrees with the whole text's collapse wherever it reaches.
    */
   textPrefix(chars: number): string {
-    if (this.root === null || chars <= 0) return '';
+    if (!this.reading || chars <= 0) return '';
     const parts = this.fallsBack() ? this.parts : this.kept();
     let target = chars;
     for (;;) {
@@ -262,7 +319,7 @@ export class MainContentWalk {
   }
 }
 
-const frame = (node: AnyNode, stats: boolean, start: number): Frame => ({
+const frame = (node: AnyNode | null, stats: boolean, start: number): Frame => ({
   node,
   stats,
   start,
