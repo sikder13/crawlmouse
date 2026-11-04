@@ -10,22 +10,26 @@
  *
  * so the effects add up to the projected grade less the current one, before rounding to DECIMALS.
  *
- * Technical SEO is measured on its formula's value whether or not the grade is refused. AI readability
- * is the change in the component the fix moves: Access for an edge-rule fix, Quotable for a content
- * fix, none for a structure fix. When that component has no score before or after, the AI effect is
- * null and waits on the component's reason. A robots.txt disallow is the site's stated intent: it opens
- * no fix, so it has no counterfactual here.
+ * Technical SEO is 0 while the grade is refused, before or after the fix (effectOf). AI readability is
+ * the change in the component the fix moves: Access for an edge-rule fix, Quotable for a content fix,
+ * none for a structure fix. When that component has no score before or after, or an edge fix's crawler
+ * has too few pages for a share, the AI effect is null and waits on the reason. A content fix on a check
+ * Quotable does not count (CONTENT_CHECKS `scored`) moves no score: its AI effect is null and waits on
+ * check_not_scored, and the overview leaves it out. A robots.txt disallow
+ * is the site's stated intent: it opens no fix, so it has no counterfactual here.
  */
 import type { Effect, LinkEdge, WithheldReason } from '@crawlmouse/types/v2';
 import type { AccessDetection } from '../access/types.js';
 import type { ContentDetection } from '../content/aggregate.js';
+import { CONTENT_CHECKS } from '../content/checks.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
 import type { Detection } from '../detectors/types.js';
-import { accessScore, type CrawlerTally } from './access.js';
+import { accessScore, crawlerShare, type CrawlerTally } from './access.js';
 import type { AiInputs } from './index.js';
 import { round, type Measure } from './numbers.js';
 import { quotableScore } from './quotable.js';
-import { seoFormula, type TechnicalSeoInput } from './technical-seo.js';
+import { MAX_HEALTHY_DEPTH } from '../../constants.js';
+import { isGraded, seoParts, type TechnicalSeoInput } from './technical-seo.js';
 
 export type FixRecord =
   | { family: 'structure'; record: Detection }
@@ -37,17 +41,51 @@ interface Inputs {
   ai: AiInputs;
 }
 
+/** The counterfactual's link from `from` to `to`, recorded so anchor diversity leaves it out. */
 function addEdge(seo: TechnicalSeoInput, from: string, to: string): TechnicalSeoInput {
   if (from === to || seo.edges.some((e) => e.from_url === from && e.to_url === to)) return seo;
   const edge: LinkEdge = {
     check_id: seo.pages[0]?.check_id ?? '',
     from_url: from,
     to_url: to,
-    anchor_text: to,
+    anchor_text: '',
     is_generic_anchor: false,
     js_only: false,
   };
-  return { ...seo, edges: [...seo.edges, edge] };
+  return {
+    ...seo,
+    edges: [...seo.edges, edge],
+    added_links: [...seo.added_links, `${from}\u0000${to}`],
+  };
+}
+
+/**
+ * The page a deep page is linked from: one MAX_HEALTHY_DEPTH − 1 clicks from the homepage (the lowest
+ * URL), so the page lands within MAX_HEALTHY_DEPTH clicks with the smallest change to the link graph;
+ * the shallowest page there is when none is that deep.
+ */
+function shallowParent(seo: TechnicalSeoInput): string {
+  const depth = new Map([[seo.homepage_url, 0]]);
+  const out = new Map<string, string[]>();
+  for (const e of seo.edges) out.set(e.from_url, [...(out.get(e.from_url) ?? []), e.to_url]);
+  let frontier = [seo.homepage_url];
+  for (let d = 1; frontier.length > 0 && d < MAX_HEALTHY_DEPTH; d++) {
+    const next: string[] = [];
+    for (const u of frontier)
+      for (const v of out.get(u) ?? [])
+        if (!depth.has(v)) {
+          depth.set(v, d);
+          next.push(v);
+        }
+    frontier = next;
+  }
+  const graded = new Set(seo.pages.filter(isGraded).map((p) => p.url));
+  const best = [...depth].filter(([u]) => graded.has(u) || u === seo.homepage_url);
+  const deepest = Math.max(...best.map(([, d]) => d));
+  return best
+    .filter(([, d]) => d === deepest)
+    .map(([u]) => u)
+    .sort()[0]!;
 }
 
 const cleared = (seo: TechnicalSeoInput, fingerprint: string): TechnicalSeoInput => ({
@@ -84,11 +122,12 @@ export function applyFix(inputs: Inputs, f: FixRecord): Inputs {
   }
   if (f.family === 'content') {
     const t = ai.quotable.checks[f.record.check];
+    if (t === undefined) return inputs; // the check does not count in Quotable
     const checks = {
       ...ai.quotable.checks,
       [f.record.check]: { ...t, passing: t.passing + f.record.extent.failing },
     };
-    return { seo, ai: { ...ai, quotable: { ...ai.quotable, checks } } };
+    return { seo, ai: { ...ai, quotable: { checks } } };
   }
   const r = f.record;
   const url = subjectOfKey(r.key);
@@ -98,7 +137,7 @@ export function applyFix(inputs: Inputs, f: FixRecord): Inputs {
       return { seo: addEdge(seo, parent, url), ai };
     }
     case 'deep_pages':
-      return { seo: addEdge(seo, seo.homepage_url, url), ai };
+      return { seo: addEdge(seo, shallowParent(seo), url), ai };
     case 'generic_anchor_text':
       return {
         seo: {
@@ -115,40 +154,72 @@ export function applyFix(inputs: Inputs, f: FixRecord): Inputs {
 }
 
 interface Scores {
-  seo: number;
+  /** The Technical SEO score; null when the grade is refused. */
+  seo: number | null;
   access: ReturnType<typeof accessScore>;
   quotable: Measure;
 }
 
-const scoresOf = (i: Inputs): Scores => ({
-  seo: seoFormula(i.seo),
-  access: accessScore(i.ai.crawlers),
-  quotable: quotableScore(i.ai.quotable),
-});
-
-const same = (x: Measure, y: Measure) =>
-  x.score === y.score && x.range?.min === y.range?.min && x.range?.max === y.range?.max;
-
-/** The AI readability change from `a` to `b`, or the reasons it cannot be given. */
-function aiChange(a: Scores, b: Scores): { points: number } | { waits: WithheldReason[] } {
-  const waits: WithheldReason[] = [];
-  let points = 0;
-  if (!same(a.access, b.access) || a.access.reason !== b.access.reason) {
-    if (a.access.score === null || b.access.score === null)
-      waits.push((a.access.reason ?? b.access.reason)!);
-    else points += b.access.score - a.access.score;
-  }
-  if (!same(a.quotable, b.quotable)) {
-    if (a.quotable.score === null || b.quotable.score === null) waits.push('quotable_unmeasured');
-    else points += b.quotable.score - a.quotable.score;
-  }
-  return waits.length ? { waits } : { points };
+function scoresOf(i: Inputs): Scores {
+  const { refusal, formula } = seoParts(i.seo);
+  return {
+    seo: refusal.refused ? null : formula,
+    access: accessScore(i.ai.crawlers),
+    quotable: quotableScore(i.ai.quotable),
+  };
 }
 
-function effectOf(a: Scores, b: Scores): Effect {
-  const ai = aiChange(a, b);
+/** A fix that can move a grade: any but a content fix on a check Quotable does not count. */
+const counts = (f: FixRecord) => f.family !== 'content' || CONTENT_CHECKS[f.record.check].scored;
+
+/** The AI component each family of fix moves; a structure fix moves none. */
+const MOVES = { access: 'access', content: 'quotable', structure: null } as const;
+
+/**
+ * The AI readability change from `a` to `b` caused by `fixes`, or the reasons it cannot be given: the
+ * component a fix moves has no score before or after, or an edge fix's crawler has too few pages to
+ * have a share of its own.
+ */
+function aiChange(
+  a: Scores,
+  b: Scores,
+  fixes: readonly FixRecord[],
+  before: Inputs,
+): { points: number } | { waits: WithheldReason[] } {
+  const waits = new Set<WithheldReason>();
+  let points = 0;
+  // A fix on a check Quotable does not count moves no score: it waits on that reason alone.
+  if (!fixes.every(counts)) return { waits: ['check_not_scored'] };
+  const moved = new Set(fixes.map((f) => MOVES[f.family]));
+  if (moved.has('access')) {
+    if (a.access.score === null || b.access.score === null)
+      waits.add((a.access.reason ?? b.access.reason)!);
+    const unmeasured = fixes.some(
+      (f) =>
+        f.family === 'access' &&
+        before.ai.crawlers.some(
+          (c) => c.ua === f.record.crawler && crawlerShare(c).standing !== 'measured',
+        ),
+    );
+    if (unmeasured) waits.add('crawler_too_few_pages');
+    if (waits.size === 0) points += b.access.score! - a.access.score!;
+  }
+  if (moved.has('quotable')) {
+    if (a.quotable.score === null || b.quotable.score === null) waits.add('quotable_unmeasured');
+    else points += b.quotable.score - a.quotable.score;
+  }
+  return waits.size ? { waits: [...waits] } : { points };
+}
+
+/**
+ * The effect of `fixes` from inputs `before` (scores `a`) to scores `b`. Technical SEO is 0 when the
+ * grade is refused before or after: there is no score to move, and the contract's Effect has no way to
+ * say "not estimated" for Technical SEO yet (reported for CC-11).
+ */
+function effectOf(a: Scores, b: Scores, fixes: readonly FixRecord[], before: Inputs): Effect {
+  const ai = aiChange(a, b, fixes, before);
   return {
-    technical_seo: round(b.seo - a.seo),
+    technical_seo: a.seo === null || b.seo === null ? 0 : round(b.seo - a.seo),
     ai_readability: 'points' in ai ? round(ai.points) : null,
     ai_readability_pending_on: 'waits' in ai ? ai.waits : [],
     estimate: true,
@@ -167,7 +238,7 @@ export interface Effects {
 export function effectsOf(inputs: Inputs, fixes: readonly FixRecord[]): Effects {
   const base = scoresOf(inputs);
   const alone = fixes.map((f) => {
-    const e = effectOf(base, scoresOf(applyFix(inputs, f)));
+    const e = effectOf(base, scoresOf(applyFix(inputs, f)), [f], inputs);
     return { f, size: e.technical_seo + (e.ai_readability ?? 0) };
   });
   alone.sort((x, y) => y.size - x.size || (fingerprintOf(x.f) < fingerprintOf(y.f) ? -1 : 1));
@@ -175,10 +246,12 @@ export function effectsOf(inputs: Inputs, fixes: readonly FixRecord[]): Effects 
   let state = inputs;
   let before = base;
   alone.forEach(({ f }, i) => {
+    const prior = state;
     state = applyFix(state, f);
     const after = scoresOf(state);
-    byFix.set(fingerprintOf(f), { effect: effectOf(before, after), rank: i + 1 });
+    byFix.set(fingerprintOf(f), { effect: effectOf(before, after, [f], prior), rank: i + 1 });
     before = after;
   });
-  return { byFix, overview: effectOf(base, before) };
+  // The projection leaves out fixes that move no score, so the overview waits on no reason of theirs.
+  return { byFix, overview: effectOf(base, before, fixes.filter(counts), inputs) };
 }

@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { every } from '../../../fixtures/v2/access/builders.js';
 import { blogSite, type Cells } from '../../../fixtures/v2/grade/sites.js';
 import type { PageSpec } from '../../../fixtures/v2/detectors/builders.js';
-import { applyFix } from './effects.js';
+import { applyFix, effectsOf } from './effects.js';
+import { technicalSeo } from './technical-seo.js';
 import { gradeCheck } from './index.js';
 import { detectorOutcomes } from './outcomes.js';
 
@@ -68,8 +69,50 @@ describe('the access fix', () => {
   });
 });
 
+describe('effects that cannot be stated', () => {
+  it('a refused Technical SEO grade gives every fix a Technical SEO effect of 0: there is no score to move', () => {
+    // the homepage, two posts and an orphan are 4 graded pages, under the floor of 5
+    const { grades, outcomes } = blog(2, 0, {}, [{ path: '/old-1' }]);
+    expect(grades.technical_seo.score).toBe(null);
+    const fs = fixes(outcomes);
+    expect(fs.map((f) => f.type)).toContain('orphan_pages');
+    for (const f of fs) expect(f.effect.technical_seo).toBe(0);
+  });
+
+  it('a fix that would lift a refused grade out of refusal still has a Technical SEO effect of 0', () => {
+    // no internal link observed: refused (no_observed_links); the orphan fix adds the first link
+    const { grades } = blog(6, 0);
+    const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, edges: [] } };
+    const page = inputs.seo.pages.find((p) => p.url.endsWith('/blog/post-0'))!;
+    const record = {
+      type: 'orphan_pages',
+      state: 'detected',
+      fingerprint: 'o',
+      key: `orphan:${page.url}`,
+    } as never;
+    const after = applyFix(inputs, { family: 'structure', record });
+    expect(technicalSeo(inputs.seo).score).toBe(null);
+    expect(technicalSeo(after.seo).score).not.toBe(null);
+    expect(effectsOf(inputs, [{ family: 'structure', record }]).overview.technical_seo).toBe(0);
+  });
+
+  it('an edge fix for a crawler with one page that decides its share waits on crawler_too_few_pages', () => {
+    // one sampled page blocked, the other rate-limited (out of the denominator)
+    const { grades, outcomes } = blog(6, 0, {
+      PerplexityBot: ['blocked_by_ua_rule', 'rate_limited'],
+    });
+    expect(grades.ai_readability.components.access.score).not.toBe(null);
+    const edge = fixes(outcomes).filter((f) => f.type === 'edge_rule_blocks_crawler');
+    expect(edge.map((f) => f.crawler_uas[0])).toEqual(['PerplexityBot']);
+    expect(edge[0]!.effect).toMatchObject({
+      ai_readability: null,
+      ai_readability_pending_on: ['crawler_too_few_pages'],
+    });
+  });
+});
+
 describe('the content fix', () => {
-  it('scores in AI readability, not Technical SEO: 8 failing of 14 graded pages (13 posts and the homepage), fixed, is 20 × (8/14)/4 = +2.86', () => {
+  it('an answer-first fix opens per template, scores nothing in Technical SEO, and waits on check_not_scored for AI readability', () => {
     const { outcomes } = blog(13, 8);
     const [answer] = fixes(outcomes).filter((f) => f.type === 'quotable_opening');
     expect(answer).toMatchObject({
@@ -78,10 +121,12 @@ describe('the content fix', () => {
       section: 'content',
       recommendation_class: 'experimental',
     });
+    // answer-first is reported but not counted in Quotable until the label set validates it, so
+    // fixing it adds no points that can be stated
     expect(answer!.effect).toEqual({
       technical_seo: 0,
-      ai_readability: 2.86,
-      ai_readability_pending_on: [],
+      ai_readability: null,
+      ai_readability_pending_on: ['check_not_scored'],
       estimate: true,
     });
   });
@@ -115,15 +160,118 @@ describe('the counterfactuals', () => {
 });
 
 describe('the content fix while Quotable has no score', () => {
-  it('waits on quotable_unmeasured: a client-rendered page elsewhere leaves Quotable a range', () => {
+  it('an uncounted check waits on check_not_scored alone, whatever Quotable holds', () => {
     const shellPage: PageSpec = { path: '/app/x', template: '/app/{slug}', links: ['/'] };
     const r = blog(13, 8, {}, [shellPage]);
     expect(r.grades.ai_readability.components.quotable.score).toBe(null);
     const answer = fixes(r.outcomes).find((f) => f.type === 'quotable_opening');
     expect(answer?.effect).toMatchObject({
       ai_readability: null,
+      ai_readability_pending_on: ['check_not_scored'],
+    });
+  });
+});
+
+describe('a fix on a counted check', () => {
+  // No counted check has a fix type yet, so the record is built by hand: it is the path a counted
+  // check takes once one does.
+  const { grades } = blog(13, 0);
+  const record = (failing: number) => ({
+    family: 'content' as const,
+    record: {
+      check: 'question_headings',
+      fingerprint: 'f',
+      extent: { failing, of: 14, unread: 0 },
+    } as never,
+  });
+  const withChecks = (checks: object) => ({
+    ...grades.inputs,
+    ai: { ...grades.inputs.ai, quotable: { checks } as never },
+  });
+
+  it('moves Quotable by the hand value: 12 of 14 pages fixed is 20 × (12/14)/3 = +5.71', () => {
+    const inputs = withChecks({
+      question_headings: { passing: 2, decided: 14, unread: 0 },
+      schema_with_description: { passing: 14, decided: 14, unread: 0 },
+      author_and_date: { passing: 14, decided: 14, unread: 0 },
+    });
+    const { overview } = effectsOf(inputs, [record(12)]);
+    expect(overview).toEqual({
+      technical_seo: 0,
+      ai_readability: 5.71,
+      ai_readability_pending_on: [],
+      estimate: true,
+    });
+  });
+
+  it('waits on quotable_unmeasured while an unread page leaves Quotable a range', () => {
+    const inputs = withChecks({
+      question_headings: { passing: 2, decided: 14, unread: 1 },
+      schema_with_description: { passing: 14, decided: 14, unread: 0 },
+      author_and_date: { passing: 14, decided: 14, unread: 0 },
+    });
+    const { overview } = effectsOf(inputs, [record(12)]);
+    expect(overview).toMatchObject({
+      ai_readability: null,
       ai_readability_pending_on: ['quotable_unmeasured'],
     });
+  });
+});
+
+describe('the structure counterfactuals, by hand', () => {
+  it('clearing one of two redirect records: crawlability (1 + 0/2)/2 → (1 + 1/2)/2, so 40 × 0.25 = +10.00', () => {
+    const { grades } = blog(6, 0);
+    const redirect = (i: number) =>
+      ({
+        type: 'redirect_chain',
+        state: 'detected',
+        fingerprint: `r${i}`,
+        key: `redirect:/r${i}`,
+      }) as never;
+    const inputs = {
+      ...grades.inputs,
+      seo: { ...grades.inputs.seo, detections: [redirect(0), redirect(1)] },
+    };
+    const { overview } = effectsOf(inputs, [{ family: 'structure', record: redirect(0) }]);
+    expect(overview.technical_seo).toBe(10);
+    expect(overview.ai_readability).toBe(0);
+  });
+
+  it("descriptive anchors on the homepage take the generic share under v1's alert: 0.6 × 20 × 0.2 = +2.40", () => {
+    // three extra hubs link to every post with anchors of their own, so anchor diversity is not 0;
+    // the homepage's and /x1's links are generic, above v1's 0.2 alert, and the homepage's alone are not
+    const posts = Array.from({ length: 6 }, (_, i) => `/blog/post-${i}`);
+    const extra: PageSpec[] = ['/x1', '/x2', '/x3'].map((path) => ({
+      path,
+      links: posts.map((to) => ({ to, anchor: `${path} ${to}` })),
+    }));
+    const { grades } = blog(6, 0, {}, extra);
+    const home = grades.inputs.seo.homepage_url;
+    const generic = new Set([home, 'https://a.test/x1']);
+    const seo = {
+      ...grades.inputs.seo,
+      edges: grades.inputs.seo.edges.map((e) =>
+        generic.has(e.from_url) ? { ...e, is_generic_anchor: true } : e,
+      ),
+    };
+    const inputs = { ...grades.inputs, seo };
+    const record = {
+      type: 'generic_anchor_text',
+      state: 'detected',
+      fingerprint: 'g',
+      key: `anchors:${home}`,
+    } as never;
+    const after = applyFix(inputs, { family: 'structure', record });
+    expect(after.seo.edges.filter((e) => e.from_url === home && e.is_generic_anchor)).toEqual([]);
+    const [b, a] = [technicalSeo(seo).breakdown, technicalSeo(after.seo).breakdown];
+    expect(a.anchorDiversityScore - b.anchorDiversityScore).toBeCloseTo(0.2, 9);
+    expect([a.orphanRatioScore, a.depthScore, a.structureScore]).toEqual([
+      b.orphanRatioScore,
+      b.depthScore,
+      b.structureScore,
+    ]);
+    const { overview } = effectsOf(inputs, [{ family: 'structure', record }]);
+    expect(overview.technical_seo).toBe(2.4);
   });
 });
 
@@ -150,15 +298,85 @@ describe('the effects', () => {
     expect(fs[0]!.type).toBe('edge_rule_blocks_crawler');
   });
 
-  it('an orphan no path reaches is also a deep page: the two fixes overlap, and the higher-ranked takes the effect', () => {
-    const { outcomes } = blog(6, 0, {}, [{ path: '/old-1' }]);
+  it('an orphan no path reaches is also a deep page: two fixes, one link apart, adding up to both applied', () => {
+    const { outcomes, overview } = blog(6, 0, {}, [{ path: '/old-1' }]);
     const fs = fixes(outcomes).sort((a, b) => a.rank - b.rank);
-    expect(fs.map((f) => f.type)).toEqual(['deep_pages', 'orphan_pages']);
-    // both mean a link from the homepage: applied first, the deep-page fix raises Technical SEO;
-    // the orphan fix after it adds that link again, which changes nothing
+    // the orphan fix links it from the homepage, the deep-page fix from a page two clicks away
+    expect(fs.map((f) => f.type).sort()).toEqual(['deep_pages', 'orphan_pages']);
     expect(fs[0]!.effect.technical_seo).toBeGreaterThan(0);
-    expect(fs[1]!.effect.technical_seo).toBe(0);
+    expect(fs[0]!.effect.technical_seo).toBeGreaterThanOrEqual(fs[1]!.effect.technical_seo);
+    expect(fs[0]!.effect.technical_seo + fs[1]!.effect.technical_seo).toBeCloseTo(
+      overview.technical_seo,
+      6,
+    );
     expect(fs.every((f) => f.effect.ai_readability === 0)).toBe(true);
+  });
+
+  it('a link a fix adds moves no anchor score: the fix prescribes the link, not its text', () => {
+    // /deep/5 has two inbound links already, so a third anchor would reach v1's per-target sample
+    // and change anchor diversity on its own
+    const chain: PageSpec[] = Array.from({ length: 6 }, (_, i) => ({
+      path: `/deep/${i}`,
+      links: i < 5 ? [{ to: `/deep/${i + 1}`, anchor: 'next' }] : [],
+    }));
+    const extra: PageSpec[] = [
+      { path: '/hub', links: [{ to: '/deep/0', anchor: 'next' }] },
+      ...chain,
+      { path: '/side', links: [{ to: '/deep/5', anchor: 'last step' }] },
+    ];
+    const { grades, outcomes } = blog(4, 0, {}, extra);
+    const deep = outcomes.find(
+      (o) =>
+        o.state === 'detected' && o.fix.type === 'deep_pages' && o.fix.title.includes('/deep/5'),
+    );
+    expect(deep).toBeDefined();
+    const record = grades.inputs.seo.detections.find(
+      (d) => d.fingerprint === deep!.fingerprint,
+    ) as never;
+    const after = applyFix(grades.inputs, { family: 'structure', record });
+    const anchors = (seo: typeof after.seo) => technicalSeo(seo).breakdown.anchorDiversityScore;
+    expect(after.seo.edges.length).toBe(grades.inputs.seo.edges.length + 1);
+    // no page is two clicks from the homepage here, so the link comes from the lowest-URL page one click away
+    expect(after.seo.edges.at(-1)!.from_url).toBe('https://a.test/blog/post-0');
+    expect(anchors(after.seo)).toBe(anchors(grades.inputs.seo));
+  });
+
+  it('a deep page is linked from the deepest graded page within two clicks, the lowest URL there', () => {
+    const chain: PageSpec[] = Array.from({ length: 5 }, (_, i) => ({
+      path: `/deep/${i}`,
+      links: i < 4 ? [`/deep/${i + 1}`] : [],
+    }));
+    const { grades } = blog(4, 0, {}, [
+      { path: '/sec-b' },
+      { path: '/sec-a', links: ['/deep/0'] },
+      ...chain,
+    ]);
+    const url = (p: string) => grades.inputs.seo.pages.find((x) => x.url.endsWith(p))!.url;
+    // two pages two clicks away: /sec-a and /sec-b, both linked from post-0
+    const edge = (from: string, to: string) => ({
+      ...grades.inputs.seo.edges[0]!,
+      from_url: url(from),
+      to_url: url(to),
+    });
+    const seo = {
+      ...grades.inputs.seo,
+      edges: [
+        ...grades.inputs.seo.edges,
+        edge('/blog/post-0', '/sec-b'),
+        edge('/blog/post-0', '/sec-a'),
+      ],
+    };
+    const record = {
+      type: 'deep_pages',
+      state: 'detected',
+      fingerprint: 'd',
+      key: `deep:${url('/deep/4')}`,
+    } as never;
+    const after = applyFix({ ...grades.inputs, seo }, { family: 'structure', record });
+    expect(after.seo.edges.at(-1)).toMatchObject({
+      from_url: url('/sec-a'),
+      to_url: url('/deep/4'),
+    });
   });
 
   it('add up on random sites too: any number of orphans and deep pages, any blocked crawlers', () => {
@@ -200,6 +418,33 @@ describe('the effects', () => {
 });
 
 describe('the outcomes', () => {
+  it('are one per record, by fingerprint: every structure, content and access record but a respected-intent block', () => {
+    const { input, access } = blogSite(
+      13,
+      8,
+      { PerplexityBot: blocked, 'Claude-SearchBot': every(2, 'disallowed_by_robots') },
+      [{ path: '/old-1' }, { path: '/gone', status: 404 }],
+    );
+    const grades = gradeCheck(input);
+    const { outcomes } = detectorOutcomes(grades, access, input.structure);
+    const respected = access.filter((r) => r.state === 'detected' && !r.opens_fix);
+    expect(respected.length).toBeGreaterThan(0);
+    const expected = [
+      ...input.structure,
+      ...grades.content_detections,
+      ...access.filter((r) => !respected.includes(r)),
+    ].map((r) => r.fingerprint);
+    const got = outcomes.map((o) => o.fingerprint);
+    expect(new Set(got).size).toBe(got.length);
+    expect([...got].sort()).toEqual([...expected].sort());
+    for (const o of outcomes) {
+      const r = [...input.structure, ...grades.content_detections, ...access].find(
+        (x) => x.fingerprint === o.fingerprint,
+      )!;
+      expect(o.state).toBe(r.state);
+    }
+  });
+
   it('carry every record: detected with a draft, not detected, and indeterminate with the gone page', () => {
     const { outcomes } = blog(6, 0, {}, [{ path: '/gone', status: 404 }]);
     const states = new Set(outcomes.map((o) => o.state));
