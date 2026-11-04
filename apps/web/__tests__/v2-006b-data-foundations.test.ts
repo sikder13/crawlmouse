@@ -549,6 +549,13 @@ describe('the research ledger is de-identified', () => {
     expect(await deidentificationViolations(db)).toEqual([]);
   });
 
+  it('reports nothing on a ledger with three years of partitions', async () => {
+    const d = await freshDb();
+    await applyAllMigrations(d);
+    await d.query(`select public.v2_premake_month_partitions('2025-01-01', '2027-12-01')`);
+    expect(await deidentificationViolations(d)).toEqual([]);
+  }, 120_000);
+
   it.each([
     [
       'an account_id',
@@ -621,7 +628,7 @@ describe('the research ledger is de-identified', () => {
     [
       'a side table in the partitions schema',
       `create table partitions.research_sites (site_key text, account_id uuid)`,
-      'partitions.research_sites: `partitions` holds only partitions',
+      'partitions.research_sites: `partitions` holds only partitions and their indexes',
     ],
   ])(
     'catches %s',
@@ -645,6 +652,28 @@ describe('the research ledger is de-identified', () => {
       `create or replace function research.check_runs_supersedes_same_site() returns trigger
          language plpgsql set search_path = pg_catalog as $f$ begin return new; end $f$`,
       /research\.check_runs_supersedes_same_site\(\): its definition is not the allowed one/,
+    ],
+    [
+      'a function outside the schema that returns ledger rows',
+      `create function public.peek_rows() returns setof research.check_runs language sql
+         as $f$ select * from research.check_runs $f$`,
+      /function peek_rows\(\) depends on the ledger/,
+    ],
+    [
+      'a column outside the schema that holds a ledger row',
+      `create table public.copy_of (r research.check_runs)`,
+      /column r of table copy_of depends on the ledger/,
+    ],
+    [
+      'a sequence in the schema, as a column default',
+      `create sequence research.order_seq;
+       alter table research.check_runs alter column site_key_version set default nextval('research.order_seq')`,
+      /research\.order_seq: `research` holds only tables and indexes \(relkind S\)/,
+    ],
+    [
+      'a composite type in the partitions schema',
+      `create type partitions.t as (a text)`,
+      /partitions\.t: `partitions` holds only partitions and their indexes/,
     ],
     [
       'a CHECK that reaches a function through an operator',
