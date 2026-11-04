@@ -2,14 +2,15 @@
  * The content checks against the labels on real pages (fixtures/v2/content/labels.json). A check
  * fires when it judges a page `fail`; precision is the share of its firings the label also judges
  * `fail`. Pass accuracy is the share of the pages it judges `pass` that the label also judges `pass`.
- * Pages labelled `unsure` are left out.
+ * Pages labelled `unsure`, and pages not labelled for the check, are left out.
  *
  * `tallies()` counts the labels as they stand; `tallies(true)` counts them as first read, before the
- * corrections the label set records, so both can be shown.
+ * corrections the label set records, so both can be shown. `variantTallies()` counts two rules that
+ * were measured on the set and not kept, so the choice between them can be shown.
  */
 import type { ContentCheck } from '@crawlmouse/types/v2';
 import labels from '../../../fixtures/v2/content/labels.json' with { type: 'json' };
-import { judgePage } from './checks.js';
+import { CONTENT_CHECKS, judgePage, type PageVerdict } from './checks.js';
 import type { ContentFeatures } from './read.js';
 
 /** A counted check must be right on at least this share of its firings and of its passes. */
@@ -17,8 +18,10 @@ export const MIN_PRECISION = 0.95;
 export const MIN_PASS_ACCURACY = 0.95;
 
 export interface Tally {
-  /** Pages labelled for the check (not `unsure`). */
+  /** Pages labelled for the check, `unsure` left out. */
   labelled: number;
+  /** Of those, pages labelled `pass` or `fail`: the check applies. */
+  applies: number;
   /** Pages labelled `fail`. */
   failing: number;
   /** Pages the check judged `fail`. */
@@ -32,21 +35,23 @@ export interface Tally {
 }
 
 type Page = (typeof labels.pages)[number];
+type Judge = (f: ContentFeatures) => Record<ContentCheck, PageVerdict>;
 
-function labelOf(page: Page, check: ContentCheck, first: boolean): string {
+function labelOf(page: Page, check: ContentCheck, first: boolean): string | undefined {
   const c = first ? page.corrections.find((x) => x.check === check) : undefined;
-  return c ? c.from.label : (page.labels as Record<string, { label: string }>)[check]!.label;
+  return c ? c.from.label : (page.labels as Record<string, { label: string }>)[check]?.label;
 }
 
-export function tallies(first = false): Record<ContentCheck, Tally> {
+function tally(judge: Judge, first: boolean): Record<ContentCheck, Tally> {
   const out = {} as Record<ContentCheck, Tally>;
   for (const page of labels.pages) {
-    const verdicts = judgePage(page.features as ContentFeatures);
-    for (const check of Object.keys(page.labels) as ContentCheck[]) {
+    const verdicts = judge(page.features as ContentFeatures);
+    for (const check of Object.keys(CONTENT_CHECKS) as ContentCheck[]) {
       const label = labelOf(page, check, first);
-      if (label === 'unsure') continue;
+      if (label === undefined || label === 'unsure') continue;
       const t = (out[check] ??= {
         labelled: 0,
+        applies: 0,
         failing: 0,
         fires: 0,
         confirmed: 0,
@@ -54,6 +59,7 @@ export function tallies(first = false): Record<ContentCheck, Tally> {
         passes_confirmed: 0,
       });
       t.labelled += 1;
+      if (label === 'pass' || label === 'fail') t.applies += 1;
       if (label === 'fail') t.failing += 1;
       if (verdicts[check] === 'fail') {
         t.fires += 1;
@@ -68,6 +74,38 @@ export function tallies(first = false): Record<ContentCheck, Tally> {
   return out;
 }
 
+export const tallies = (first = false): Record<ContentCheck, Tally> => tally(judgePage, first);
+
+/** The rules measured on the set and not kept, each with the check it would change. */
+export const VARIANTS = {
+  section_questions: {
+    check: 'question_headings',
+    rule: 'a question counts only among the section headings',
+    judge: (f: ContentFeatures) =>
+      judgePage({ ...f, headings: { ...f.headings, questions: f.headings.section_questions } }),
+  },
+  schema_on_shell: {
+    check: 'schema_with_description',
+    rule: 'a client-rendered page is judged on its JSON-LD',
+    judge: (f: ContentFeatures) => ({
+      ...judgePage(f),
+      schema_with_description: CONTENT_CHECKS.schema_with_description.judge(f),
+    }),
+  },
+} as const satisfies Record<string, { check: ContentCheck; rule: string; judge: Judge }>;
+
+export type Variant = keyof typeof VARIANTS;
+
+/** Each variant's tally of the check it changes, on the labels as they stand. */
+export function variantTallies(): Record<Variant, Tally> {
+  const out = {} as Record<Variant, Tally>;
+  for (const name of Object.keys(VARIANTS) as Variant[]) {
+    const v = VARIANTS[name];
+    out[name] = tally(v.judge, false)[v.check];
+  }
+  return out;
+}
+
 /** Whether a tally clears the bar for counting in Quotable: the check fires and passes, right enough. */
 export function validated(t: Tally): boolean {
   return (
@@ -76,4 +114,33 @@ export function validated(t: Tally): boolean {
     t.confirmed >= MIN_PRECISION * t.fires &&
     t.passes_confirmed >= MIN_PASS_ACCURACY * t.passes
   );
+}
+
+/** P(X ≥ x) for X ~ Binomial(n, p), 0 < p < 1. */
+function binomialTail(x: number, n: number, p: number): number {
+  let sum = 0;
+  let term = (1 - p) ** n;
+  for (let k = 0; k <= n; k++) {
+    if (k >= x) sum += term;
+    term = (term * (n - k) * p) / ((k + 1) * (1 - p));
+  }
+  return sum;
+}
+
+/**
+ * The exact (Clopper-Pearson) one-sided 95 % lower bound on a rate seen as `x` of `n`: the rate at
+ * which `x` or more of `n` has a 5 % chance. 0 when `x` is 0; null when `n` is 0.
+ */
+export function lowerBound(x: number, n: number): number | null {
+  if (n === 0) return null;
+  if (x === 0) return 0;
+  if (x === n) return 0.05 ** (1 / n);
+  let lo = 0;
+  let hi = x / n;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (binomialTail(x, n, mid) < 0.05) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
 }

@@ -62,7 +62,15 @@ export interface ContentFeatures {
    * headings was measured against the label set on 2026-11-03 and more of its firings were wrong; the
    * counts are in the CC-17 pull request.
    */
-  headings: { count: number; questions: number };
+  headings: {
+    count: number;
+    questions: number;
+    /**
+     * Of the section headings, those phrased as a question. No check reads it: the label set measures
+     * the rule that counts only these against the one question_headings uses (SPEC 17).
+     */
+    section_questions: number;
+  };
   json_ld: JsonLdNode[];
   byline: {
     meta_author: boolean;
@@ -204,7 +212,7 @@ export function readPage(html: string): ContentFeatures {
       has_h1: false,
       words_after_h1: 0,
       opening: [],
-      headings: { count: 0, questions: 0 },
+      headings: { count: 0, questions: 0, section_questions: 0 },
       json_ld,
       byline,
       specs: { structured: 0, label_value_lines: 0, spec_images: 0 },
@@ -231,6 +239,7 @@ export function readPage(html: string): ContentFeatures {
     headings: {
       count: headings.length,
       questions: blocks.filter((b) => isHeading(b) && b.question).length,
+      section_questions: headings.filter((b) => b.question).length,
     },
     json_ld,
     byline,

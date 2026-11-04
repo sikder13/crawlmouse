@@ -93,12 +93,15 @@ export interface CheckDefinition {
   /** The readable key prefix of that fix's fingerprint. */
   key: string | null;
   recommendation_class: RecommendationClass;
-  /** How sure a fix the check opens is: `inconclusive` until its firings are observed on real pages. */
+  /**
+   * How sure a fix the check opens is, set by hand: `likely` for a counted check and `inconclusive`
+   * for the others (checks.test.ts pins the pairing).
+   */
   confidence: Confidence;
   /**
-   * The check counts in Quotable. labels.test.ts holds each counted check to MIN_PRECISION on the
-   * label set, on its firings and on its passes; a check that has not shown both is reported and does
-   * not count, so a pass it cannot tell from a failure does not raise the score.
+   * The check counts in Quotable. labels.test.ts holds each counted check to the bar in label-set.ts
+   * (`validated`: MIN_PRECISION on its firings, MIN_PASS_ACCURACY on its passes, on the label set); a
+   * check that does not clear it is reported and does not count.
    */
   scored: boolean;
 }
@@ -125,8 +128,8 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
     fix: null,
     key: null,
     recommendation_class: 'experimental',
-    confidence: 'likely',
-    scored: true,
+    confidence: 'inconclusive',
+    scored: false,
   },
   schema_with_description: {
     judge: schemaWithDescription,
@@ -139,12 +142,9 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
   },
   author_and_date: {
     judge: authorAndDate,
-    onShell: (p) =>
-      typed(p.json_ld, ARTICLE).length === 0
-        ? 'not_applicable'
-        : authorAndDate(p) === 'pass'
-          ? 'pass'
-          : 'unread',
+    // without an Article-family node the check does not apply; with one, a byline may be in the
+    // rendered text, so the page is unread whatever its markup says
+    onShell: shellIf(ARTICLE),
     fix: 'missing_author_date',
     key: 'byline',
     recommendation_class: 'best_practice',

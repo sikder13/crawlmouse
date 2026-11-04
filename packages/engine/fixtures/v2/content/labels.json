@@ -28,10 +28,12 @@
   "causes": {
     "view_cut_heading_list": "the labelling view listed only the first 12 h2/h3 headings of a page; the full list was read",
     "view_unflattened_json_ld": "the labelling view did not flatten JSON-LD nested in arrays, so a page with markup read as having none",
-    "view_missed_byline": "the labelling view scanned for a byline and missed one marked up as schema.org Person microdata",
-    "labeller_misread": "the heading was in the view and the first reading missed it"
+    "view_missed_byline": "the labelling view scanned for a byline and missed one marked up as schema.org Person microdata"
   },
-  "reader_sha256": "f26163e5ada3c102e957b7975d6b54c6a1bda37629f75685d20086603a204e45",
+  "withdrawn_causes": {
+    "rejudged_after_check": "the labelling view showed the heading, a call to action phrased as a question, and the first reading labelled the page fail; the label was changed to pass after the check disagreed, so whether a call to action is a content heading was decided with the check's verdict in view"
+  },
+  "reader_sha256": "a4894d1e16585271ea9ede9c8fcd2fbfa3cf1a79552aff4fddb7490b1a33084d",
   "pages": [
     {
       "url": "https://ablepackers.com/blog/industrial-packing-specialised-packing-services-in-saudi-arabia",
@@ -49,7 +51,7 @@
           { "tag": "li", "words": 6, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 8, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 4, "questions": 1 },
+        "headings": { "count": 4, "questions": 1, "section_questions": 1 },
         "json_ld": [],
         "byline": {
           "meta_author": true,
@@ -71,7 +73,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://ablepackers.com/cargo-logistics-saudi-arabia",
@@ -87,7 +90,7 @@
           { "tag": "h2", "words": 4, "answer_sentences": 0, "question": true },
           { "tag": "p", "words": 51, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 8, "questions": 2 },
+        "headings": { "count": 8, "questions": 2, "section_questions": 2 },
         "json_ld": [
           {
             "types": ["BreadcrumbList"],
@@ -119,7 +122,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://alltopreviews.net/most-popular-online-jewelry-websites-to-shop",
@@ -133,7 +137,7 @@
           { "tag": "p", "words": 80, "answer_sentences": 4, "question": false },
           { "tag": "p", "words": 77, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 18, "questions": 0 },
+        "headings": { "count": 18, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Person", "Organization"],
@@ -192,7 +196,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://altaasis.sa/blog/beyond-the-business-the-modern-expats-guide-to-life-in-saudi-arabia",
@@ -210,7 +215,7 @@
           { "tag": "p", "words": 36, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 56, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -275,7 +280,8 @@
         "author_and_date": { "label": "pass", "reason": "JSON-LD author and datePublished" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://altaasis.sa/blog/find-out-why-saudi-business-license-applications-get-delayed-and-how-al-taasis-helps-prevent-document-activity-approval-and-registration-problems-in-ksa",
@@ -292,7 +298,7 @@
           { "tag": "p", "words": 37, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 41, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -357,7 +363,8 @@
         "author_and_date": { "label": "pass", "reason": "JSON-LD author and datePublished" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://aplusksa.com/relocating-to-the-kingdom-of-saudi-arabia-the-complete-2026-guide",
@@ -374,7 +381,7 @@
           { "tag": "h2", "words": 9, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 32, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 29, "questions": 0 },
+        "headings": { "count": 29, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["SiteNavigationElement"],
@@ -605,7 +612,8 @@
           "to": "fail",
           "cause": "view_unflattened_json_ld"
         }
-      ]
+      ],
+      "withdrawn": []
     },
     {
       "url": "https://base-xtech.com/blog/de/bigcommerce-zu-shopify-migration",
@@ -621,7 +629,7 @@
           { "tag": "p", "words": 42, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 85, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 16, "questions": 3 },
+        "headings": { "count": 16, "questions": 3, "section_questions": 2 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -672,7 +680,8 @@
           "to": "pass",
           "cause": "view_cut_heading_list"
         }
-      ]
+      ],
+      "withdrawn": []
     },
     {
       "url": "https://base-xtech.com/de/pages/service/mvp-design-services",
@@ -700,7 +709,7 @@
           { "tag": "h3", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 19, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 21, "questions": 6 },
+        "headings": { "count": 21, "questions": 6, "section_questions": 6 },
         "json_ld": [
           {
             "types": ["BreadcrumbList"],
@@ -787,7 +796,8 @@
           "to": "pass",
           "cause": "view_cut_heading_list"
         }
-      ]
+      ],
+      "withdrawn": []
     },
     {
       "url": "https://bellovietnam.vn/blog/nhung-dieu-can-biet-ve-chau-tasca",
@@ -806,7 +816,7 @@
           { "tag": "h3", "words": 7, "answer_sentences": 0, "question": false },
           { "tag": "h3", "words": 7, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -828,7 +838,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://bellovietnam.vn/san-pham/chau-rua-bat-planum-xl70-sink-overmount",
@@ -852,7 +863,7 @@
           { "tag": "p", "words": 46, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 113, "answer_sentences": 5, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Product"],
@@ -887,7 +898,8 @@
           "reason": "hard negative: own specs as text; the spec image belongs to a related product"
         }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://bellovietnam.vn/san-pham/chau-rua-bat-planum-xl81-sink-overmount",
@@ -911,7 +923,7 @@
           { "tag": "p", "words": 46, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 117, "answer_sentences": 5, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Product"],
@@ -946,7 +958,8 @@
           "reason": "hard negative: own specs as \"Kích thước: 860*10*254mm\" text; the spec image belongs to a related product"
         }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://bitis.com.vn/blogs/cach-phoi-giay/phoi-do-voi-giay-tay",
@@ -964,7 +977,7 @@
           { "tag": "p", "words": 58, "answer_sentences": 1, "question": false },
           { "tag": "h3", "words": 11, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 13, "questions": 3 },
+        "headings": { "count": 13, "questions": 3, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -989,7 +1002,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://bitis.com.vn/products/dep-eva-phun-nu-biti-s-dew007900",
@@ -1011,7 +1025,7 @@
           { "tag": "li", "words": 59, "answer_sentences": 2, "question": false },
           { "tag": "li", "words": 38, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 6, "questions": 0 },
+        "headings": { "count": 6, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -1033,7 +1047,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "no Product JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://bitis.com.vn/products/giay-the-thao-nu-hunter-x-x-nite-22-collection-dswh10500",
@@ -1057,7 +1072,7 @@
           { "tag": "p", "words": 40, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 36, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 11, "questions": 0 },
+        "headings": { "count": 11, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -1079,7 +1094,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "no Product JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://coastalkayakers.co.nz/guided-waterfall-kayaking-tours-bay-of-islands-action-world-paihia-combo-deals",
@@ -1095,7 +1111,7 @@
           { "tag": "h4", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 15, "answer_sentences": 0, "question": true }
         ],
-        "headings": { "count": 1, "questions": 0 },
+        "headings": { "count": 1, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -1114,7 +1130,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://delaterre.co.nz/product/arneis-2022",
@@ -1134,7 +1151,7 @@
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 3, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebPage"],
@@ -1190,7 +1207,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "no specifications in images" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://delaterre.co.nz/product/reserve-viognier-2019",
@@ -1214,7 +1232,7 @@
           { "tag": "h2", "words": 4, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebPage"],
@@ -1279,7 +1297,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specifications as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://desertfun.ae/desert-safari-with-dhow-cruise",
@@ -1290,7 +1309,7 @@
         "has_h1": true,
         "words_after_h1": 5,
         "opening": [{ "tag": "h4", "words": 5, "answer_sentences": 0, "question": false }],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article", "BlogPosting"],
@@ -1345,7 +1364,8 @@
           "reason": "JSON-LD author (organisation) and datePublished"
         }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://desertsafaridoha.com/hello-world",
@@ -1385,7 +1405,7 @@
           { "tag": "li", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 3, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 2, "questions": 0 },
+        "headings": { "count": 2, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -1437,7 +1457,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD and visible" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://drivepei.ca/guides/awd-vs-fwd-pei",
@@ -1457,7 +1478,7 @@
           { "tag": "h2", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 41, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 4, "questions": 0 },
+        "headings": { "count": 4, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -1498,7 +1519,8 @@
         },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://drivepei.ca/guides/used-car-test-drive-checklist-pei",
@@ -1517,7 +1539,7 @@
           { "tag": "h2", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 51, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 4, "questions": 0 },
+        "headings": { "count": 4, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -1552,7 +1574,8 @@
         "author_and_date": { "label": "pass", "reason": "organisation author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://drivepei.ca/vehicles/2020-audi-q3-wa1eecf39l1070101",
@@ -1571,7 +1594,7 @@
           { "tag": "h3", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 8, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 3, "questions": 0 },
+        "headings": { "count": 3, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -1590,7 +1613,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "no Product JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://drivepei.ca/vehicles/2024-volkswagen-atlas-1v2br2ca2rc503862",
@@ -1619,7 +1643,7 @@
           { "tag": "h3", "words": 8, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 114, "answer_sentences": 5, "question": false }
         ],
-        "headings": { "count": 13, "questions": 5 },
+        "headings": { "count": 13, "questions": 5, "section_questions": 5 },
         "json_ld": [
           {
             "types": ["AutoDealer"],
@@ -1657,7 +1681,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specifications in a description list" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://ebmsbusiness.com/e-commerce-license",
@@ -1672,7 +1697,7 @@
           { "tag": "h2", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 104, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 5, "questions": 3 },
+        "headings": { "count": 5, "questions": 3, "section_questions": 2 },
         "json_ld": [
           {
             "types": ["Person", "Organization"],
@@ -1761,7 +1786,8 @@
         "author_and_date": { "label": "pass", "reason": "Article author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://efirst.ae/how-to-start-a-business-in-dubai-uae.php",
@@ -1778,7 +1804,7 @@
           { "tag": "h2", "words": 9, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 51, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 20, "questions": 1 },
+        "headings": { "count": 20, "questions": 1, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["Corporation"],
@@ -1875,7 +1901,8 @@
           "reason": "Article author present; datePublished is an empty string and no date is shown on the page"
         }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://etihad-dermalaser.com/blog/choose-aesthetic-clinic-salmiya",
@@ -1903,7 +1930,7 @@
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 30, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 7, "questions": 1 },
+        "headings": { "count": 7, "questions": 1, "section_questions": 1 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -1925,7 +1952,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://fitlyguide.com/bloated-on-healthy-diet",
@@ -1945,7 +1973,7 @@
           { "tag": "p", "words": 30, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 26, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 28, "questions": 9 },
+        "headings": { "count": 28, "questions": 9, "section_questions": 9 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -1995,7 +2023,8 @@
         "specs": { "structured": 0, "label_value_lines": 1, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://fitlyguide.com/energy-fatigue-supplement-stack",
@@ -2017,7 +2046,7 @@
           { "tag": "li", "words": 4, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 9, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 37, "questions": 12 },
+        "headings": { "count": 37, "questions": 12, "section_questions": 12 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -2067,7 +2096,8 @@
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://ghost.org/resources/how-to-sell-premium-memberships",
@@ -2087,7 +2117,7 @@
           { "tag": "p", "words": 27, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 38, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 2, "questions": 0 },
+        "headings": { "count": 2, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -2116,7 +2146,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://ghost.org/resources/publishing-podcasts",
@@ -2136,7 +2167,7 @@
           { "tag": "p", "words": 30, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 22, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 8, "questions": 0 },
+        "headings": { "count": 8, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -2165,7 +2196,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://halcyonaestheticsdubai.com/treatments/dermaclear-led-facial",
@@ -2186,7 +2218,7 @@
           { "tag": "li", "words": 9, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 13, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 14, "questions": 8 },
+        "headings": { "count": 14, "questions": 8, "section_questions": 8 },
         "json_ld": [
           {
             "types": ["Place"],
@@ -2323,7 +2355,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "a treatment; no specifications in images" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://halcyonaestheticsdubai.com/what-is-exosome-treatment-and-how-can-it-benefit-you",
@@ -2340,7 +2373,7 @@
           { "tag": "h2", "words": 4, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 89, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 8, "questions": 1 },
+        "headings": { "count": 8, "questions": 1, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -2396,7 +2429,8 @@
         "specs": { "structured": 0, "label_value_lines": 2, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "visible byline and date" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://halcyonaestheticsdubai.com/what-is-the-safest-filler-for-the-buttocks",
@@ -2414,7 +2448,7 @@
           { "tag": "h2", "words": 7, "answer_sentences": 0, "question": true },
           { "tag": "p", "words": 44, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 12, "questions": 2 },
+        "headings": { "count": 12, "questions": 2, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -2470,7 +2504,8 @@
         "specs": { "structured": 1, "label_value_lines": 1, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "visible byline and date" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://hokitikascenictours.nz/west-coast-transport",
@@ -2494,7 +2529,7 @@
           { "tag": "h2", "words": 4, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 123, "answer_sentences": 6, "question": false }
         ],
-        "headings": { "count": 4, "questions": 1 },
+        "headings": { "count": 4, "questions": 1, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["Organization"],
@@ -2546,7 +2581,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "author reference and date in JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://horizondent.com/faq",
@@ -2557,7 +2593,7 @@
         "has_h1": false,
         "words_after_h1": 0,
         "opening": [],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Place"],
@@ -3225,7 +3261,8 @@
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://icbs.sa/withholding-tax-in-saudi-arabia-a-guide-for-gcc-investors",
@@ -3244,7 +3281,7 @@
           { "tag": "p", "words": 39, "answer_sentences": 1, "question": false },
           { "tag": "h2", "words": 8, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 6, "questions": 0 },
+        "headings": { "count": 6, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -3312,7 +3349,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://judgerock.co.nz/product/judge-rock-t-shirts",
@@ -3323,7 +3361,7 @@
         "has_h1": true,
         "words_after_h1": 6,
         "opening": [{ "tag": "p", "words": 6, "answer_sentences": 0, "question": false }],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Product"],
@@ -3349,7 +3387,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "no specifications in images" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://judgerock.co.nz/product/judge-rock-your-honour-pinot-noir-2019",
@@ -3360,7 +3399,7 @@
         "has_h1": true,
         "words_after_h1": 6,
         "opening": [{ "tag": "p", "words": 6, "answer_sentences": 0, "question": false }],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Product"],
@@ -3386,7 +3425,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "no specifications in images" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://kaewatours.co.nz/2022/02/16/kapiti-foodie-experience-enjoy-kapiti-coast-tour-guided",
@@ -3402,7 +3442,7 @@
           { "tag": "p", "words": 41, "answer_sentences": 0, "question": true },
           { "tag": "p", "words": 56, "answer_sentences": 0, "question": true }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -3461,7 +3501,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://lansingbp.com/blog/living-true-blue",
@@ -3478,7 +3519,7 @@
           { "tag": "p", "words": 38, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 99, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -3540,7 +3581,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://lansingbp.com/product/columns",
@@ -3560,7 +3602,7 @@
           { "tag": "p", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 4, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 1, "questions": 0 },
+        "headings": { "count": 1, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebPage"],
@@ -3607,7 +3649,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "no Product JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://lansingbp.com/product/house-wrap-insulation",
@@ -3626,7 +3669,7 @@
           { "tag": "h4", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 54, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 1, "questions": 0 },
+        "headings": { "count": 1, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebPage"],
@@ -3673,7 +3716,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "no Product JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://manandvanleicestershire.uk/blog/f/house-move-from-a-flat-in-wigston-to-a-house-in-oadby",
@@ -3691,7 +3735,7 @@
           { "tag": "h4", "words": 4, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 28, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": true,
@@ -3713,7 +3757,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://manandvanleicestershire.uk/leicester-to-manchester",
@@ -3724,7 +3769,7 @@
         "has_h1": true,
         "words_after_h1": 1394,
         "opening": [{ "tag": "p", "words": 187, "answer_sentences": 9, "question": false }],
-        "headings": { "count": 1, "questions": 0 },
+        "headings": { "count": 1, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": true,
@@ -3746,7 +3791,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://mgminteriorsuae.com/news/mgm-interiors-delivers-event-fit-out-for-the-winter-fair-at-dubai-center-for-special-needs",
@@ -3762,7 +3808,7 @@
           { "tag": "p", "words": 46, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 8, "answer_sentences": 0, "question": true }
         ],
-        "headings": { "count": 3, "questions": 0 },
+        "headings": { "count": 3, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -3854,7 +3900,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://mountroof.com/best-monowall-sheet-manufacturers",
@@ -3876,7 +3923,7 @@
           { "tag": "h3", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 19, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 11, "questions": 2 },
+        "headings": { "count": 11, "questions": 2, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["WebPage"],
@@ -3924,20 +3971,19 @@
           "label": "pass",
           "reason": "first sentence answers the H1 (who the manufacturer is)"
         },
-        "question_headings": {
-          "label": "pass",
-          "reason": "\"Looking for a Quality Product?\" (view cut the list at 12)"
-        },
+        "question_headings": { "label": "fail", "reason": "statement headings only" },
         "schema_with_description": { "label": "pass", "reason": "WebPage description" },
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": [
+      "corrections": [],
+      "withdrawn": [
         {
           "check": "question_headings",
-          "from": { "label": "fail", "reason": "statement headings only" },
-          "to": "pass",
-          "cause": "view_cut_heading_list"
+          "label": "pass",
+          "cause": "rejudged_after_check",
+          "heading_position": 10,
+          "headings_shown": 12
         }
       ]
     },
@@ -3996,7 +4042,7 @@
           { "tag": "p", "words": 10, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 11, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 7, "questions": 1 },
+        "headings": { "count": 7, "questions": 1, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["WebPage"],
@@ -4116,10 +4162,7 @@
           "label": "pass",
           "reason": "first sentence states what the panels are for"
         },
-        "question_headings": {
-          "label": "pass",
-          "reason": "\"Why Choose Mount?\" is among the first 12 headings the view showed; the first reading missed it"
-        },
+        "question_headings": { "label": "fail", "reason": "statement headings only" },
         "schema_with_description": {
           "label": "pass",
           "reason": "WebPage and Product descriptions"
@@ -4127,12 +4170,14 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specification table as text" }
       },
-      "corrections": [
+      "corrections": [],
+      "withdrawn": [
         {
           "check": "question_headings",
-          "from": { "label": "fail", "reason": "statement headings only" },
-          "to": "pass",
-          "cause": "labeller_misread"
+          "label": "pass",
+          "cause": "rejudged_after_check",
+          "heading_position": 7,
+          "headings_shown": 9
         }
       ]
     },
@@ -4159,7 +4204,7 @@
           { "tag": "p", "words": 10, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 12, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 5, "questions": 0 },
+        "headings": { "count": 5, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebPage"],
@@ -4287,7 +4332,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "\"Thickness: 1.5-3.5mm\" as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://mountroof.com/standing-seam-roofing-sheet",
@@ -4311,7 +4357,7 @@
           { "tag": "p", "words": 12, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 12, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 4, "questions": 0 },
+        "headings": { "count": 4, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebPage"],
@@ -4439,7 +4485,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "performance attributes as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://mountroof.com/why-cold-storage-operators-are-reevaluating-insulation-thickness-in-2026",
@@ -4453,7 +4500,7 @@
           { "tag": "p", "words": 95, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 73, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 6, "questions": 1 },
+        "headings": { "count": 6, "questions": 1, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -4509,7 +4556,8 @@
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://museoevolucionhumana.com/en/atapuerca-the-project",
@@ -4524,7 +4572,7 @@
           { "tag": "h2", "words": 9, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 170, "answer_sentences": 6, "question": false }
         ],
-        "headings": { "count": 1, "questions": 0 },
+        "headings": { "count": 1, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Museum"],
@@ -4592,7 +4640,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://nahltech.com/ai-consulting-indianapolis",
@@ -4609,7 +4658,7 @@
           { "tag": "p", "words": 25, "answer_sentences": 1, "question": false },
           { "tag": "li", "words": 22, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 3, "questions": 6 },
+        "headings": { "count": 3, "questions": 6, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Organization"],
@@ -4698,7 +4747,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://nahltech.com/blog/iso-13485-documentation-ai",
@@ -4715,7 +4765,7 @@
           { "tag": "h2", "words": 4, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 106, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 10, "questions": 3 },
+        "headings": { "count": 10, "questions": 3, "section_questions": 3 },
         "json_ld": [
           {
             "types": ["Organization"],
@@ -4786,7 +4836,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://nahltech.com/blog/pdpl-compliance-small-business-website-saudi-arabia",
@@ -4802,7 +4853,7 @@
           { "tag": "p", "words": 85, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 125, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 14, "questions": 6 },
+        "headings": { "count": 14, "questions": 6, "section_questions": 6 },
         "json_ld": [
           {
             "types": ["Organization"],
@@ -4885,7 +4936,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://new.drupal.org/industries/enterprise",
@@ -4912,7 +4964,7 @@
           { "tag": "li", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 10, "answer_sentences": 0, "question": true }
         ],
-        "headings": { "count": 3, "questions": 1 },
+        "headings": { "count": 3, "questions": 1, "section_questions": 1 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -4929,20 +4981,19 @@
           "label": "pass",
           "reason": "\"Global enterprises choose Drupal to manage hundreds of brands ...\""
         },
-        "question_headings": {
-          "label": "pass",
-          "reason": "\"Ready to see what Drupal can do for your enterprise?\", a question, as on 39ad3aa4affd83f2 (view cut the list at 12)"
-        },
+        "question_headings": { "label": "fail", "reason": "statement headings only" },
         "schema_with_description": { "label": "na", "reason": "no JSON-LD" },
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": [
+      "corrections": [],
+      "withdrawn": [
         {
           "check": "question_headings",
-          "from": { "label": "fail", "reason": "statement headings only" },
-          "to": "pass",
-          "cause": "view_cut_heading_list"
+          "label": "pass",
+          "cause": "rejudged_after_check",
+          "heading_position": 11,
+          "headings_shown": 12
         }
       ]
     },
@@ -4963,7 +5014,7 @@
           { "tag": "h2", "words": 8, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 80, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 12, "questions": 6 },
+        "headings": { "count": 12, "questions": 6, "section_questions": 6 },
         "json_ld": [
           {
             "types": ["Place"],
@@ -5019,7 +5070,8 @@
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://nextjs.org/blog/next-15",
@@ -5042,7 +5094,7 @@
           { "tag": "li", "words": 10, "answer_sentences": 1, "question": false },
           { "tag": "li", "words": 9, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 23, "questions": 0 },
+        "headings": { "count": 23, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["TechArticle"],
@@ -5071,7 +5123,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://nextjs.org/blog/next-8-1",
@@ -5093,7 +5146,7 @@
           { "tag": "p", "words": 57, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 35, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 8, "questions": 1 },
+        "headings": { "count": 8, "questions": 1, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["TechArticle"],
@@ -5122,7 +5175,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://nodejs.org/en/about/previous-releases",
@@ -5147,7 +5201,7 @@
           { "tag": "td", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "td", "words": 3, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 2, "questions": 1 },
+        "headings": { "count": 2, "questions": 1, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -5172,7 +5226,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://onerahiphysio.co.nz/kinesio-taping",
@@ -5187,7 +5242,7 @@
           { "tag": "h3", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 54, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 1, "questions": 0 },
+        "headings": { "count": 1, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -5237,7 +5292,8 @@
         "specs": { "structured": 0, "label_value_lines": 1, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://realrotorua.co.nz/2019/02/01/wildlife-you-are-most-likely-to-see-at-night",
@@ -5254,7 +5310,7 @@
           { "tag": "h2", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 60, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 4, "questions": 0 },
+        "headings": { "count": 4, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -5276,7 +5332,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://redbirdaviation.com/blog/pilot-training-course",
@@ -5292,7 +5349,7 @@
           { "tag": "p", "words": 55, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 34, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 7, "questions": 0 },
+        "headings": { "count": 7, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["LocalBusiness"],
@@ -5321,7 +5378,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://redbirdaviation.com/blog/pilot-training-institute-in-delhi",
@@ -5337,7 +5395,7 @@
           { "tag": "h2", "words": 7, "answer_sentences": 0, "question": true },
           { "tag": "p", "words": 50, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 16, "questions": 8 },
+        "headings": { "count": 16, "questions": 8, "section_questions": 8 },
         "json_ld": [
           {
             "types": ["LocalBusiness"],
@@ -5372,7 +5430,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://riverstonekaramea.co.nz/see-and-do",
@@ -5383,7 +5442,7 @@
         "has_h1": false,
         "words_after_h1": 0,
         "opening": [],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -5402,7 +5461,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://roofingandsidingofcapecod.com/framingham-roof-installation",
@@ -5422,7 +5482,7 @@
           { "tag": "h2", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 16, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 2, "questions": 0 },
+        "headings": { "count": 2, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": true,
@@ -5441,7 +5501,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://safamovers.com/services/piano-moving-sharjah",
@@ -5473,7 +5534,7 @@
           { "tag": "p", "words": 86, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 27, "answer_sentences": 1, "question": true }
         ],
-        "headings": { "count": 12, "questions": 1 },
+        "headings": { "count": 12, "questions": 1, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["WebPage"],
@@ -5581,20 +5642,19 @@
           "label": "pass",
           "reason": "after the service menu: \"Our flat shifting services in Dubai take that weight off your shoulders ...\""
         },
-        "question_headings": {
-          "label": "pass",
-          "reason": "\"Ready for Easy Apartment Moving in Dubai?\" (view cut the list at 12)"
-        },
+        "question_headings": { "label": "fail", "reason": "statement headings only" },
         "schema_with_description": { "label": "pass", "reason": "WebPage description" },
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": [
+      "corrections": [],
+      "withdrawn": [
         {
           "check": "question_headings",
-          "from": { "label": "fail", "reason": "statement headings only" },
-          "to": "pass",
-          "cause": "view_cut_heading_list"
+          "label": "pass",
+          "cause": "rejudged_after_check",
+          "heading_position": 12,
+          "headings_shown": 12
         }
       ]
     },
@@ -5614,7 +5674,7 @@
           { "tag": "p", "words": 28, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 43, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 3, "questions": 0 },
+        "headings": { "count": 3, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -5732,7 +5792,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "author in JSON-LD, visible date" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://setupinbahrain.com/company-formation-in-bahrain",
@@ -5756,7 +5817,7 @@
           { "tag": "li", "words": 10, "answer_sentences": 1, "question": false },
           { "tag": "li", "words": 8, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 40, "questions": 11 },
+        "headings": { "count": 40, "questions": 11, "section_questions": 11 },
         "json_ld": [
           {
             "types": ["Organization", "LocalBusiness"],
@@ -6024,7 +6085,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "author reference and date in JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://snclinics.com/veneers-vs-lumineers-in-kuwait-which-smile-makeoveris-right-for-you",
@@ -6035,7 +6097,7 @@
         "has_h1": false,
         "words_after_h1": 0,
         "opening": [],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Dentist", "Organization"],
@@ -6097,7 +6159,8 @@
         "author_and_date": { "label": "pass", "reason": "author reference and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://stanfordclinics.com/where-to-get-cosmetic-gynecology-treatment-in-bahrain",
@@ -6115,7 +6178,7 @@
           { "tag": "h2", "words": 9, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 69, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 14, "questions": 5 },
+        "headings": { "count": 14, "questions": 5, "section_questions": 4 },
         "json_ld": [
           {
             "types": ["Place"],
@@ -6233,7 +6296,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "author reference and date in JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://taumarunuicanoehire.co.nz/trip-info",
@@ -6244,7 +6308,7 @@
         "has_h1": false,
         "words_after_h1": 0,
         "opening": [],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["BreadcrumbList"],
@@ -6288,7 +6352,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://thedesertsafari.com/4-seater-dune-buggy-dubai",
@@ -6313,7 +6378,7 @@
           { "tag": "li", "words": 8, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 9, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 5, "questions": 0 },
+        "headings": { "count": 5, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebPage", "ItemPage"],
@@ -6387,7 +6452,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "no specifications in images" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://thedesertsafari.com/dubai-desert-birthday-party-guide",
@@ -6406,7 +6472,7 @@
           { "tag": "h3", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 68, "answer_sentences": 4, "question": true }
         ],
-        "headings": { "count": 47, "questions": 1 },
+        "headings": { "count": 47, "questions": 1, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -6492,7 +6558,8 @@
         "specs": { "structured": 0, "label_value_lines": 1, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://theseventhgeneration.org/akaroa",
@@ -6509,7 +6576,7 @@
           { "tag": "p", "words": 25, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 34, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 19, "questions": 4 },
+        "headings": { "count": 19, "questions": 4, "section_questions": 3 },
         "json_ld": [
           {
             "types": ["SiteNavigationElement"],
@@ -6687,7 +6754,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD, visible date" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://tripsandtramps.com/experiences/fiordland-guided-walks/routeburn-guided-walk",
@@ -6714,7 +6782,7 @@
           { "tag": "p", "words": 47, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 64, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 9, "questions": 0 },
+        "headings": { "count": 9, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -6736,7 +6804,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://vuejs.org/guide/essentials/forms",
@@ -6756,7 +6825,7 @@
           { "tag": "p", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 44, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 10, "questions": 0 },
+        "headings": { "count": 10, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -6778,7 +6847,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://wefixuae.com/apartment-renovation",
@@ -6797,7 +6867,7 @@
           { "tag": "p", "words": 28, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 34, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 19, "questions": 10 },
+        "headings": { "count": 19, "questions": 10, "section_questions": 10 },
         "json_ld": [
           {
             "types": ["WebPage"],
@@ -6853,7 +6923,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://wildearth.co.nz/school-programmes",
@@ -6881,7 +6952,7 @@
           { "tag": "li", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 49, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 1, "questions": 0 },
+        "headings": { "count": 1, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Organization"],
@@ -6931,7 +7002,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.alynthe.com/blog/agency-dead",
@@ -6942,7 +7014,7 @@
         "has_h1": false,
         "words_after_h1": 0,
         "opening": [],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["ProfessionalService"],
@@ -6971,7 +7043,8 @@
         "author_and_date": { "label": "na", "reason": "client-rendered: nothing served to read" },
         "specs_as_text": { "label": "na", "reason": "client-rendered: nothing served to read" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.alynthe.com/blog/roi-of-silence",
@@ -6982,7 +7055,7 @@
         "has_h1": false,
         "words_after_h1": 0,
         "opening": [],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["ProfessionalService"],
@@ -7011,7 +7084,8 @@
         "author_and_date": { "label": "na", "reason": "client-rendered: nothing served to read" },
         "specs_as_text": { "label": "na", "reason": "client-rendered: nothing served to read" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.aurionuae.com/industry-license-in-uae-how-to-start-a-manufacturing-unit-in-uae",
@@ -7030,7 +7104,7 @@
           { "tag": "li", "words": 15, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 42, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 8, "questions": 2 },
+        "headings": { "count": 8, "questions": 2, "section_questions": 2 },
         "json_ld": [
           {
             "types": ["Organization"],
@@ -7092,7 +7166,8 @@
         "author_and_date": { "label": "pass", "reason": "organisation author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.baiyiadhesive.com/news/industry-news/what-glue-is-the-strongest.html",
@@ -7117,7 +7192,7 @@
           { "tag": "p", "words": 77, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 65, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 9, "questions": 1 },
+        "headings": { "count": 9, "questions": 1, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["BreadcrumbList"],
@@ -7155,7 +7230,8 @@
         "author_and_date": { "label": "pass", "reason": "organisation author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.baiyiadhesive.com/product/adhesive/waterproof-self-adhesive-pp.html",
@@ -7170,7 +7246,7 @@
           { "tag": "p", "words": 30, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 80, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["BreadcrumbList"],
@@ -7205,7 +7281,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specifications as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.baiyiadhesive.com/product/label/clear-bopp-selfadhesive-label.html",
@@ -7224,7 +7301,7 @@
           { "tag": "h4", "words": 7, "answer_sentences": 0, "question": true },
           { "tag": "p", "words": 57, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["BreadcrumbList"],
@@ -7259,7 +7336,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specifications as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.baiyiadhesive.com/product/nano-tape/diy-blow-bubbles-nano-tape.html",
@@ -7286,7 +7364,7 @@
           { "tag": "td", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "td", "words": 6, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["BreadcrumbList"],
@@ -7318,7 +7396,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specifications as text and a table" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.baiyiadhesive.com/product/other-tape/mopp-protective-tape.html",
@@ -7332,7 +7411,7 @@
           { "tag": "p", "words": 79, "answer_sentences": 4, "question": false },
           { "tag": "p", "words": 80, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["BreadcrumbList"],
@@ -7367,7 +7446,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specifications as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.beaksandfeathers.co.nz/kaka-on-ulva-island",
@@ -7384,7 +7464,7 @@
           { "tag": "li", "words": 11, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 5, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -7440,7 +7520,8 @@
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.bladen.co.nz/product-page/pinot-noir",
@@ -7468,7 +7549,7 @@
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 45, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 3, "questions": 0 },
+        "headings": { "count": 3, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Product"],
@@ -7497,7 +7578,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "\"RS: <2.0g/L / Alc: 13%\" as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.catlinstours.co.nz/post/iconic-new-zealand",
@@ -7513,7 +7595,7 @@
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 4, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["BlogPosting"],
@@ -7539,7 +7621,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.centauruscharter.com/blogs/yacht-vs-hotel-private-charters-dubai",
@@ -7558,7 +7641,7 @@
           { "tag": "h4", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 36, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 2, "questions": 0 },
+        "headings": { "count": 2, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -7580,7 +7663,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.cleaning-kwt.com/cleaning-service-shuwaikh-industrial",
@@ -7608,7 +7692,7 @@
           { "tag": "h2", "words": 6, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 22, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 6, "questions": 0 },
+        "headings": { "count": 6, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -7633,7 +7717,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.coneywines.co.nz/musings/lisa-gets-some-more-gongs",
@@ -7652,7 +7737,7 @@
           { "tag": "p", "words": 21, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 29, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 2, "questions": 1 },
+        "headings": { "count": 2, "questions": 1, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -7692,7 +7777,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "visible \"Written by\", date in JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.coneywines.co.nz/shop/p/que-sera-syrah-2020",
@@ -7706,7 +7792,7 @@
           { "tag": "p", "words": 93, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 64, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -7753,7 +7839,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specifications as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.coneywines.co.nz/shop/p/ragtime-riesling-2016",
@@ -7764,7 +7851,7 @@
         "has_h1": true,
         "words_after_h1": 336,
         "opening": [{ "tag": "p", "words": 168, "answer_sentences": 7, "question": false }],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -7811,7 +7898,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specifications as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.crabfarmwinery.co.nz/shop/rose",
@@ -7827,7 +7915,7 @@
           { "tag": "p", "words": 32, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 96, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -7874,7 +7962,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "no specifications in images" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.farewellspit.com/news/whats-happening-on-farewell-spit-in-winter",
@@ -7890,7 +7979,7 @@
           { "tag": "p", "words": 39, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 98, "answer_sentences": 5, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["BreadcrumbList"],
@@ -7934,7 +8023,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.fiordlandfishingguide.co.nz/testimonials/2026/6/12/jack-shuttleworth-2025",
@@ -7948,7 +8038,7 @@
           { "tag": "h2", "words": 4, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 5, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -7976,7 +8066,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "visible \"Written by\", date in JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.foundationsoft.com/learn/how-clients-of-top-construction-cpa-firm-succeed-using-foundation",
@@ -7994,7 +8085,7 @@
           { "tag": "h2", "words": 6, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 20, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 6, "questions": 0 },
+        "headings": { "count": 6, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -8044,7 +8135,8 @@
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.ghoflmarket.com/blog/angle-grinders-buying-guide",
@@ -8060,7 +8152,7 @@
           { "tag": "p", "words": 54, "answer_sentences": 2, "question": false },
           { "tag": "li", "words": 27, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 21, "questions": 4 },
+        "headings": { "count": 21, "questions": 4, "section_questions": 2 },
         "json_ld": [
           {
             "types": ["Article", "BlogPosting"],
@@ -8128,7 +8220,8 @@
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.ghoflmarket.com/product/%D8%A2%DA%86%D8%A7%D8%B1-%D8%A2%D9%84%D9%86-%D8%B3%D8%AA%D8%A7%D8%B1%D9%87-%D8%A7%DB%8C-t50-%D8%A8%D9%84%D9%86%D8%AF-%D9%86%D9%88%D9%88%D8%A7-%D9%85%D8%AF%D9%84-ntk-1450",
@@ -8148,7 +8241,7 @@
           { "tag": "li", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 132, "answer_sentences": 7, "question": false }
         ],
-        "headings": { "count": 1, "questions": 0 },
+        "headings": { "count": 1, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebPage", "ItemPage"],
@@ -8219,7 +8312,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specification table as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.ghoflmarket.com/product/%D8%A2%DA%86%D8%A7%D8%B1-%D8%A2%D9%84%D9%86-5-%D8%A7%DB%8C%D8%B1%D8%A7%D9%86-%D9%BE%D8%AA%DA%A9-%D9%85%D8%AF%D9%84-sl-501056",
@@ -8248,7 +8342,7 @@
           { "tag": "h2", "words": 5, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 32, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 6, "questions": 0 },
+        "headings": { "count": 6, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebPage", "ItemPage"],
@@ -8322,7 +8416,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "specification tables as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.glaciervalley.co.nz/post/glacier-valley-eco-tours-on-abc-news",
@@ -8338,7 +8433,7 @@
           { "tag": "p", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["BlogPosting"],
@@ -8364,7 +8459,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.glowworm.co.nz/tour/spellbound-private-tour",
@@ -8386,7 +8482,7 @@
           { "tag": "h3", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 45, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 4, "questions": 0 },
+        "headings": { "count": 4, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Question"],
@@ -8475,7 +8571,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.goldenbaykayaks.co.nz/stories/2020/10/28/orcas-in-tata-beach",
@@ -8490,7 +8587,7 @@
           { "tag": "p", "words": 56, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 110, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -8537,7 +8634,8 @@
         "author_and_date": { "label": "pass", "reason": "Article author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.gulfdunestourism.com/blog/desert-safari-qatar-complete-guide",
@@ -8554,7 +8652,7 @@
           { "tag": "li", "words": 62, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 44, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 8, "questions": 5 },
+        "headings": { "count": 8, "questions": 5, "section_questions": 3 },
         "json_ld": [
           {
             "types": ["TravelAgency"],
@@ -8625,7 +8723,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.gulfdunestourism.com/doha-top-city-tour-landmarks",
@@ -8642,7 +8741,7 @@
           { "tag": "p", "words": 57, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 53, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 9, "questions": 0 },
+        "headings": { "count": 9, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["TravelAgency"],
@@ -8750,7 +8849,8 @@
           "to": "fail",
           "cause": "view_cut_heading_list"
         }
-      ]
+      ],
+      "withdrawn": []
     },
     {
       "url": "https://www.junctionwines.co.nz/product-page/2020-persistance",
@@ -8765,7 +8865,7 @@
           { "tag": "p", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 23, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Product"],
@@ -8791,7 +8891,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "\"Residual Sugar 7.5 g/L\" as text" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.justshinecleaningservices.com/blog/complete-guide-to-deep-cleaning-in-abu-dhabi",
@@ -8810,7 +8911,7 @@
           { "tag": "li", "words": 9, "answer_sentences": 0, "question": false },
           { "tag": "li", "words": 8, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 5, "questions": 1 },
+        "headings": { "count": 5, "questions": 1, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["BlogPosting"],
@@ -8839,7 +8940,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.justshinecleaningservices.com/blog/sofa-stain-cleaning-and-steam-cleaning-guide",
@@ -8856,7 +8958,7 @@
           { "tag": "h2", "words": 6, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 56, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 5, "questions": 0 },
+        "headings": { "count": 5, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["BlogPosting"],
@@ -8885,7 +8987,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.kaikourakayaks.nz/about/blog/post/10-years-of-traveller-choice-awards",
@@ -8901,7 +9004,7 @@
           { "tag": "p", "words": 56, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 53, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 1, "questions": 0 },
+        "headings": { "count": 1, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": true,
@@ -8923,7 +9026,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.kaikourakayaks.nz/wildlife-meet-the-locals/dusky-dolphins",
@@ -8941,7 +9045,7 @@
           { "tag": "p", "words": 22, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 44, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 14, "questions": 9 },
+        "headings": { "count": 14, "questions": 9, "section_questions": 7 },
         "json_ld": [],
         "byline": {
           "meta_author": true,
@@ -8963,7 +9067,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.kayak-newzealand.com/new-zealand-mountains",
@@ -8981,7 +9086,7 @@
           { "tag": "h3", "words": 2, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 21, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 19, "questions": 0 },
+        "headings": { "count": 19, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -9033,7 +9138,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "author reference and date in JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.letitflowmassageandwellness.com/post/how-lymphatic-drainage-therapy-enhances-health",
@@ -9050,7 +9156,7 @@
           { "tag": "p", "words": 9, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 16, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 6, "questions": 0 },
+        "headings": { "count": 6, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["BlogPosting"],
@@ -9079,7 +9185,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.nelsontoursandtravel.co.nz/store/p/chef-curry-unisex-organic-cotton-creator-20-t-shirt",
@@ -9090,7 +9197,7 @@
         "has_h1": true,
         "words_after_h1": 0,
         "opening": [],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -9137,7 +9244,8 @@
         "author_and_date": { "label": "na", "reason": "client-rendered: nothing served to read" },
         "specs_as_text": { "label": "na", "reason": "client-rendered: nothing served to read" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.nelsontoursandtravel.co.nz/store/p/unisex-organic-cotton-creator-20-t-shirt",
@@ -9148,7 +9256,7 @@
         "has_h1": true,
         "words_after_h1": 0,
         "opening": [],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -9195,7 +9303,8 @@
         "author_and_date": { "label": "na", "reason": "client-rendered: nothing served to read" },
         "specs_as_text": { "label": "na", "reason": "client-rendered: nothing served to read" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.newenglandweddingfilm.com/blog/bostonweddinglakeview",
@@ -9213,7 +9322,7 @@
           { "tag": "p", "words": 6, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 58, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -9269,7 +9378,8 @@
         "specs": { "structured": 0, "label_value_lines": 1, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.northlandphysiotherapy.co.nz/acc-careway-provider-whangarei",
@@ -9283,7 +9393,7 @@
           { "tag": "p", "words": 6, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 7, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -9318,7 +9428,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.northlandphysiotherapy.co.nz/northland-physio-blog/olive-oil-ibuprofen",
@@ -9337,7 +9448,7 @@
           { "tag": "p", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 33, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -9371,7 +9482,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "visible \"Written by\", date in JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.okaritoboattours.co.nz/blog/guarding-the-okarito-wetlands-a-novel-strategy-to-safeguard-and-revive-biodiversity-in-south-westland",
@@ -9382,7 +9494,7 @@
         "has_h1": false,
         "words_after_h1": 0,
         "opening": [],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -9401,7 +9513,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.orisdentalcenter.ae/blog/melasma-treatment-in-dubai",
@@ -9419,7 +9532,7 @@
           { "tag": "h2", "words": 3, "answer_sentences": 0, "question": true },
           { "tag": "p", "words": 50, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 19, "questions": 2 },
+        "headings": { "count": 19, "questions": 2, "section_questions": 2 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -9487,7 +9600,8 @@
         "specs": { "structured": 0, "label_value_lines": 0, "spec_images": 0 }
       },
       "labels": { "author_and_date": { "label": "pass", "reason": "author and date in JSON-LD" } },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.orisdentalcenter.ae/full-mouth-rehabilitation",
@@ -9516,7 +9630,7 @@
           { "tag": "li", "words": 8, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 6, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 12, "questions": 2 },
+        "headings": { "count": 12, "questions": 2, "section_questions": 2 },
         "json_ld": [
           {
             "types": ["WebPage"],
@@ -9644,7 +9758,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.pohatu.co.nz/shop/Apparel/sheep_and_penguins_tee_shirt.html",
@@ -9666,7 +9781,7 @@
           { "tag": "h4", "words": 6, "answer_sentences": 0, "question": false },
           { "tag": "h4", "words": 4, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 1 },
+        "headings": { "count": 0, "questions": 1, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -9685,7 +9800,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "no Product JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.radiantbiz.com/blog/dmcc-vs-ifza-comparison",
@@ -9703,7 +9819,7 @@
           { "tag": "li", "words": 56, "answer_sentences": 2, "question": false },
           { "tag": "li", "words": 51, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 17, "questions": 12 },
+        "headings": { "count": 17, "questions": 12, "section_questions": 9 },
         "json_ld": [
           {
             "types": ["ProfessionalService"],
@@ -9744,7 +9860,8 @@
         },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.radiantbiz.com/blog/will-creation-in-dubai-uae---everything-you-need-to-know",
@@ -9762,7 +9879,7 @@
           { "tag": "p", "words": 96, "answer_sentences": 4, "question": false },
           { "tag": "p", "words": 8, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 3, "questions": 1 },
+        "headings": { "count": 3, "questions": 1, "section_questions": 1 },
         "json_ld": [
           {
             "types": ["ProfessionalService"],
@@ -9797,7 +9914,8 @@
         "author_and_date": { "label": "pass", "reason": "organisation author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.radiantbiz.com/services/vat-services-dubai",
@@ -9815,7 +9933,7 @@
           { "tag": "p", "words": 31, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 48, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 30, "questions": 5 },
+        "headings": { "count": 30, "questions": 5, "section_questions": 4 },
         "json_ld": [
           {
             "types": ["ProfessionalService"],
@@ -9847,7 +9965,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.raglanboatcharters.co.nz/blog/post/108785/discover-raglan-wharf",
@@ -9865,7 +9984,7 @@
           { "tag": "p", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 106, "answer_sentences": 5, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -9913,7 +10032,8 @@
           "to": "pass",
           "cause": "view_missed_byline"
         }
-      ]
+      ],
+      "withdrawn": []
     },
     {
       "url": "https://www.reel-therapy.co.nz/our-trips/half-day-fishing-sightseeing",
@@ -9937,7 +10057,7 @@
           { "tag": "p", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 7, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -10049,7 +10169,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "visible \"Written by\", date in JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.restorephysio.co.nz/product-page/book-women-s-guide-to-drug-free-pain-relief-before-during-and-after-the-birth",
@@ -10067,7 +10188,7 @@
           { "tag": "p", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 2, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Product"],
@@ -10096,7 +10217,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "no specifications in images" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.rimugrove.co.nz/wines/rimu-grove-pinot-gris-2007",
@@ -10124,7 +10246,7 @@
           { "tag": "h2", "words": 4, "answer_sentences": 0, "question": true },
           { "tag": "p", "words": 11, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 2, "questions": 1 },
+        "headings": { "count": 2, "questions": 1, "section_questions": 1 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -10143,7 +10265,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "no Product JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.rivertestate.co.nz/shop/product/462811/pinot-gris-2020",
@@ -10157,7 +10280,7 @@
           { "tag": "p", "words": 15, "answer_sentences": 1, "question": false },
           { "tag": "h2", "words": 8, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -10176,7 +10299,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "no Product JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.rivertestate.co.nz/shop/product/724525/pinot-gris-2023",
@@ -10190,7 +10314,7 @@
           { "tag": "p", "words": 15, "answer_sentences": 1, "question": false },
           { "tag": "h2", "words": 8, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -10209,7 +10333,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "no Product JSON-LD" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.shopify.com/ae/case-studies/alive-body",
@@ -10225,7 +10350,7 @@
           { "tag": "p", "words": 55, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 64, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 3, "questions": 0 },
+        "headings": { "count": 3, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -10247,7 +10372,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.snaptrude.com/blog/ai-design-review-checkpoints",
@@ -10265,7 +10391,7 @@
           { "tag": "p", "words": 46, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 50, "answer_sentences": 4, "question": false }
         ],
-        "headings": { "count": 10, "questions": 7 },
+        "headings": { "count": 10, "questions": 7, "section_questions": 7 },
         "json_ld": [
           {
             "types": ["BlogPosting"],
@@ -10300,7 +10426,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.squarespace.com/press-coverage/2020/11/30/can-a-start-up-mentality-save-small-businesses",
@@ -10314,7 +10441,7 @@
           { "tag": "p", "words": 19, "answer_sentences": 1, "question": false },
           { "tag": "p", "words": 2, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["WebSite"],
@@ -10361,7 +10488,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.taurangamarinecharters.co.nz/types-of-fishing-trips",
@@ -10380,7 +10508,7 @@
           { "tag": "h2", "words": 3, "answer_sentences": 0, "question": false },
           { "tag": "p", "words": 27, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 4, "questions": 0 },
+        "headings": { "count": 4, "questions": 0, "section_questions": 0 },
         "json_ld": [],
         "byline": {
           "meta_author": false,
@@ -10402,7 +10530,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.versaillesdentalclinic.com/blogs-news/unveiling-the-secrets-of-digital-smile-design-in-cosmetic-dentistry",
@@ -10417,7 +10546,7 @@
           { "tag": "p", "words": 72, "answer_sentences": 3, "question": false },
           { "tag": "p", "words": 70, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Dentist"],
@@ -10467,7 +10596,8 @@
         },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.wairereheights.co.nz/product-page/gift-pack-4",
@@ -10481,7 +10611,7 @@
           { "tag": "h2", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 3, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Product"],
@@ -10507,7 +10637,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "no specifications in images" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.wairereheights.co.nz/product-page/olive-oil",
@@ -10521,7 +10652,7 @@
           { "tag": "h2", "words": 1, "answer_sentences": 0, "question": false },
           { "tag": "h2", "words": 3, "answer_sentences": 0, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Product"],
@@ -10547,7 +10678,8 @@
         "author_and_date": { "label": "na", "reason": "no Article JSON-LD" },
         "specs_as_text": { "label": "pass", "reason": "no specifications in images" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.webdatascraping.us/how-to-scrape-amazon-products.php",
@@ -10567,7 +10699,7 @@
           { "tag": "li", "words": 18, "answer_sentences": 1, "question": false },
           { "tag": "li", "words": 14, "answer_sentences": 1, "question": false }
         ],
-        "headings": { "count": 16, "questions": 5 },
+        "headings": { "count": 16, "questions": 5, "section_questions": 5 },
         "json_ld": [
           {
             "types": ["BlogPosting"],
@@ -10589,7 +10721,8 @@
       "labels": {
         "author_and_date": { "label": "pass", "reason": "organisation author and date" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://www.whitehouse.gov/briefings-statements/2026/04/presidential-message-on-the-anniversary-of-the-death-of-pope-saint-john-paul-ii",
@@ -10604,7 +10737,7 @@
           { "tag": "p", "words": 63, "answer_sentences": 2, "question": false },
           { "tag": "p", "words": 86, "answer_sentences": 3, "question": false }
         ],
-        "headings": { "count": 0, "questions": 0 },
+        "headings": { "count": 0, "questions": 0, "section_questions": 0 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -10660,7 +10793,8 @@
         },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     },
     {
       "url": "https://ziedasclinic.com/5-ways-picoway-can-help-you",
@@ -10678,7 +10812,7 @@
           { "tag": "h2", "words": 8, "answer_sentences": 0, "question": true },
           { "tag": "p", "words": 36, "answer_sentences": 2, "question": false }
         ],
-        "headings": { "count": 8, "questions": 3 },
+        "headings": { "count": 8, "questions": 3, "section_questions": 3 },
         "json_ld": [
           {
             "types": ["Article"],
@@ -10746,7 +10880,8 @@
         "author_and_date": { "label": "pass", "reason": "author and date" },
         "specs_as_text": { "label": "na", "reason": "not a product" }
       },
-      "corrections": []
+      "corrections": [],
+      "withdrawn": []
     }
   ]
 }

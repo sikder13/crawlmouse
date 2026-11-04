@@ -112,19 +112,24 @@ describe('both grades for a check', () => {
   it('the Content section score is 100 × the mean pass rate of the counted checks, rounded once', () => {
     const base = csrSite(0.31);
     const ids = [...base.content.keys()];
-    const noQuestion = { ...post(true), headings: { count: 4, questions: 0 } };
-    // the answer-first check fails everywhere: it is reported, not counted, so it moves neither score
+    const undescribed = {
+      ...post(true),
+      json_ld: post(true).json_ld.map((n) => ({ ...n, has_description: false })),
+      headings: { count: 4, questions: 0, section_questions: 0 },
+    };
+    // answer-first fails everywhere and question headings on pages 1..4: both are reported, not
+    // counted, so they move neither score
     const content = new Map(
       ids.map((u, i) => [
         u,
-        i >= 1 && i <= 4 ? { ...noQuestion, opening: post(false).opening } : post(false),
+        i >= 1 && i <= 4 ? { ...undescribed, opening: post(false).opening } : post(false),
       ]),
     );
     const g = gradeCheck({ ...base, content });
-    // question headings: 2 of 6 pass (pages 1..4 have none); schema and author/date pass on all 6
-    // rate = (2/6 + 1 + 1)/3 = 0.7777…; 100 × that = 77.78 (from the rounded Quotable, 15.56 × 5 = 77.8)
-    expect(g.content!.score).toBe(77.78);
-    expect(g.ai_readability.components.quotable.score).toBe(15.56);
+    // schema with a description: 2 of 6 pass (pages 1..4 have none); author/date passes on all 6
+    // rate = (2/6 + 1)/2 = 0.6666…; 100 × that = 66.67 (from the rounded Quotable, 13.33 × 5 = 66.65)
+    expect(g.content!.score).toBe(66.67);
+    expect(g.ai_readability.components.quotable.score).toBe(13.33);
   });
 
   it('a graded page not fetched leaves the Content section without a score, and Quotable a range', () => {

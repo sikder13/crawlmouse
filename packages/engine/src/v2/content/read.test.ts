@@ -48,13 +48,13 @@ describe('the opening', () => {
 });
 
 describe('section headings', () => {
-  it('are h2/h3 after the H1 followed by prose; any h2/h3 question counts as a question', () => {
+  it('are h2/h3 after the H1 followed by prose; any h2/h3 question counts as a question, and those among section headings apart', () => {
     const f = readPage(
       page(
         `<h1>T</h1><h2>One</h2>${prose(6)}<h2>Recent posts</h2><ul><li>a link to another post here</li></ul><h3>Why? Because</h3>${prose(6)}<h3>FAQ?</h3><ul><li>x</li></ul>`,
       ),
     );
-    expect(f.headings).toEqual({ count: 2, questions: 2 });
+    expect(f.headings).toEqual({ count: 2, questions: 2, section_questions: 1 });
   });
 
   it('a heading followed by under five words of prose is not a section heading', () => {

@@ -19,7 +19,7 @@ function prose(answers: boolean): ContentFeatures {
     has_h1: true,
     words_after_h1: 200,
     opening: [{ tag: 'p', words: 200, answer_sentences: answers ? 1 : 0, question: false }],
-    headings: { count: 0, questions: 0 },
+    headings: { count: 0, questions: 0, section_questions: 0 },
     json_ld: [],
     byline: NO_BYLINE,
     specs: { structured: 0, label_value_lines: 0, spec_images: 0 },
@@ -99,7 +99,7 @@ describe('the template rule', () => {
     expect(answerRecord(pages('/f', [notProse, notProse]))).toEqual([]);
   });
 
-  it('question_headings and schema_with_description score Quotable but have no fix type, so no record', () => {
+  it('question_headings and schema_with_description have no fix type, so no record', () => {
     const types = new Set(
       aggregateContent(pages('/g', [prose(false), prose(false)])).detections.map((d) => d.type),
     );
@@ -120,13 +120,12 @@ describe('page failures and the Quotable input', () => {
     // only the counted checks enter Quotable, each with its own unread pages
     expect(Object.keys(r.quotable.checks).sort()).toEqual([
       'author_and_date',
-      'question_headings',
       'schema_with_description',
     ]);
     expect(r.quotable.checks.direct_answer_150).toBeUndefined();
-    // the shell is unread for question headings and schema; for author/date, its JSON-LD (no
-    // Article node here) makes the check not apply, so only the page not fetched at all is unread
-    expect(r.quotable.checks.question_headings).toEqual({ passing: 0, decided: 0, unread: 2 });
+    expect(r.quotable.checks.question_headings).toBeUndefined();
+    // the shell is unread for schema; for author/date, its JSON-LD (no Article node here) makes the
+    // check not apply, so only the page not fetched at all is unread
     expect(r.quotable.checks.schema_with_description).toEqual({
       passing: 0,
       decided: 0,

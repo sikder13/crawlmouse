@@ -19,7 +19,7 @@ export const post = (answers: boolean): ContentFeatures => ({
   has_h1: true,
   words_after_h1: 300,
   opening: [{ tag: 'p', words: 160, answer_sentences: answers ? 1 : 0, question: false }],
-  headings: { count: 4, questions: 1 },
+  headings: { count: 4, questions: 1, section_questions: 1 },
   json_ld: [
     {
       types: ['BlogPosting'],

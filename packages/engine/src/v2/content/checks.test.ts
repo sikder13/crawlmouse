@@ -34,7 +34,7 @@ function features(over: Partial<ContentFeatures> = {}): ContentFeatures {
     has_h1: true,
     words_after_h1: opening.reduce((n, b) => n + b.words, 0),
     opening,
-    headings: { count: 0, questions: 0 },
+    headings: { count: 0, questions: 0, section_questions: 0 },
     json_ld: [],
     byline: NO_BYLINE,
     specs: { structured: 0, label_value_lines: 0, spec_images: 0 },
@@ -76,18 +76,26 @@ describe('question_headings', () => {
   const judge = (f: Partial<ContentFeatures>) => judgePage(features(f)).question_headings;
 
   it('passes with a question among three or more section headings, fails with none', () => {
-    expect(judge({ headings: { count: 3, questions: 1 } })).toBe('pass');
-    expect(judge({ headings: { count: 3, questions: 0 } })).toBe('fail');
+    expect(judge({ headings: { count: 3, questions: 1, section_questions: 1 } })).toBe('pass');
+    expect(judge({ headings: { count: 3, questions: 0, section_questions: 0 } })).toBe('fail');
   });
 
   it('does not apply under three section headings, or off a page of prose', () => {
-    expect(judge({ headings: { count: 2, questions: 0 } })).toBe('not_applicable');
-    expect(judge({ headings: { count: 5, questions: 0 }, json_ld: [node(['Product'])] })).toBe(
+    expect(judge({ headings: { count: 2, questions: 0, section_questions: 0 } })).toBe(
       'not_applicable',
     );
-    expect(judge({ headings: { count: 5, questions: 0 }, opening: [block('p', 100, 1)] })).toBe(
-      'not_applicable',
-    );
+    expect(
+      judge({
+        headings: { count: 5, questions: 0, section_questions: 0 },
+        json_ld: [node(['Product'])],
+      }),
+    ).toBe('not_applicable');
+    expect(
+      judge({
+        headings: { count: 5, questions: 0, section_questions: 0 },
+        opening: [block('p', 100, 1)],
+      }),
+    ).toBe('not_applicable');
   });
 });
 
@@ -199,5 +207,18 @@ describe('a client-rendered page', () => {
       features({ client_rendered: true, json_ld: [node(['Product', 'Article'])] }),
     );
     expect(new Set(Object.values(v))).toEqual(new Set(['unread']));
+  });
+
+  it('with full Article markup is still unread for author and date: the criteria mark a shell na, so markup alone decides nothing', () => {
+    const marked = node(['Article'], { has_author: true, has_dated_publication: true });
+    expect(judgePage(features({ client_rendered: true, json_ld: [marked] })).author_and_date).toBe(
+      'unread',
+    );
+  });
+
+  it('without the node a check needs, the check does not apply to it', () => {
+    const v = judgePage(features({ client_rendered: true, json_ld: [node(['WebPage'])] }));
+    expect([v.author_and_date, v.specs_as_text]).toEqual(['not_applicable', 'not_applicable']);
+    expect(v.schema_with_description).toBe('unread');
   });
 });
