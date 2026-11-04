@@ -58,9 +58,9 @@ export interface ContentFeatures {
   /**
    * After the H1: `count` is the section headings (an h2 or h3 followed by a prose block of
    * MIN_BLOCK_WORDS words); `questions` is every h2 or h3 phrased as a question, section heading or
-   * not, so a related-post title outside CHROME that asks a question counts. Counting only section
-   * headings was measured against the label set on 2026-11-03 and more of its firings were wrong; the
-   * counts are in the CC-17 pull request.
+   * not, so a related-post title outside CHROME that asks a question counts. The rule that counts
+   * only section headings (`section_questions`) is measured against the label set beside it, and
+   * SPEC 17 renders both (label-set.ts VARIANTS).
    */
   headings: {
     count: number;

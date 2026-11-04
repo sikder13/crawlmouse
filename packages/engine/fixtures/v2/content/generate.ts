@@ -27,13 +27,6 @@ interface Labelled {
     to: string;
     cause: string;
   }[];
-  withdrawn: {
-    check: string;
-    label: string;
-    cause: string;
-    heading_position: number;
-    headings_shown: number;
-  }[];
 }
 
 /** Why a label was corrected after the first reading. */
@@ -42,14 +35,10 @@ const CAUSES = {
     'the labelling view listed only the first 12 h2/h3 headings of a page; the full list was read',
   view_unflattened_json_ld:
     'the labelling view did not flatten JSON-LD nested in arrays, so a page with markup read as having none',
+  criteria_silent_on_cta:
+    "the page's only question heading is a call to action, and the criteria do not say whether a call to action is a content heading; the first reading went both ways on such pages, so each is unsure",
   view_missed_byline:
     'the labelling view scanned for a byline and missed one marked up as schema.org Person microdata',
-};
-
-/** Why a correction was withdrawn, so the first label stands. */
-const WITHDRAWN = {
-  rejudged_after_check:
-    "the labelling view showed the heading, a call to action phrased as a question, and the first reading labelled the page fail; the label was changed to pass after the check disagreed, so whether a call to action is a content heading was decided with the check's verdict in view",
 };
 
 const dir = process.argv[2];
@@ -60,11 +49,6 @@ for (const p of labelled) {
     if (!(c.cause in CAUSES)) throw new Error(`${p.id}: unknown correction cause ${c.cause}`);
     if (p.labels[c.check]?.label !== c.to) throw new Error(`${p.id}: ${c.check} is not ${c.to}`);
   }
-  for (const w of p.withdrawn) {
-    if (!(w.cause in WITHDRAWN)) throw new Error(`${p.id}: unknown withdrawal cause ${w.cause}`);
-    if (p.labels[w.check]?.label === w.label)
-      throw new Error(`${p.id}: ${w.check} is still ${w.label}`);
-  }
 }
 const pages = labelled
   .map((p) => ({
@@ -74,14 +58,12 @@ const pages = labelled
     features: readPage(readFileSync(`${dir}/raw/${p.id}.html`, 'utf8')),
     labels: p.labels,
     corrections: p.corrections,
-    withdrawn: p.withdrawn,
   }))
   .sort((a, b) => (a.url < b.url ? -1 : 1));
 const out = new URL('./labels.json', import.meta.url);
 const json = JSON.stringify({
   criteria: readFileSync(`${dir}/labels/criteria.md`, 'utf8').trim().split('\n'),
   causes: CAUSES,
-  withdrawn_causes: WITHDRAWN,
   reader_sha256: readerDigest(),
   pages,
 });

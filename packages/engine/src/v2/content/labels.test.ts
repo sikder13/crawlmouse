@@ -50,15 +50,15 @@ describe('the content checks on the labelled pages', () => {
     expect(labels.pages).toHaveLength(141);
     expect(t).toEqual({
       direct_answer_150: T(109, 81, 11, 0, 0, 63, 51),
-      question_headings: T(113, 61, 35, 21, 20, 27, 23),
+      question_headings: T(107, 55, 31, 21, 20, 23, 22),
       schema_with_description: T(113, 81, 17, 16, 16, 67, 64),
       author_and_date: T(141, 63, 2, 2, 2, 61, 61),
       specs_as_text: T(113, 26, 0, 0, 0, 28, 26),
     });
   });
 
-  it('the counts as first read, before the 5 recorded corrections', () => {
-    expect(labels.pages.flatMap((p) => p.corrections)).toHaveLength(5);
+  it('the counts as first read, before the 11 recorded corrections', () => {
+    expect(labels.pages.flatMap((p) => p.corrections)).toHaveLength(11);
     expect(tallies(true)).toEqual({
       direct_answer_150: T(109, 81, 11, 0, 0, 63, 51),
       question_headings: T(112, 60, 36, 20, 19, 27, 21),
@@ -70,10 +70,18 @@ describe('the content checks on the labelled pages', () => {
 
   it('the rule variants measured and not kept, on the labels as they stand', () => {
     expect(variantTallies()).toEqual({
-      section_questions: T(113, 61, 35, 23, 21, 25, 22),
+      section_questions: T(107, 55, 31, 23, 21, 21, 21),
       schema_on_shell: T(113, 81, 17, 18, 16, 67, 64),
     });
   });
+
+  it.each(CHECKS)(
+    '%s: held, with its reason, exactly when it clears the bar and is not counted',
+    (check) => {
+      const d = CONTENT_CHECKS[check];
+      expect(d.held !== null).toBe(validated(t[check]) && !d.scored);
+    },
+  );
 
   it.each(CHECKS.filter((c) => CONTENT_CHECKS[c].scored))(
     `%s counts in Quotable, so it fires, passes, and is right on ${MIN_PRECISION * 100} % and ${MIN_PASS_ACCURACY * 100} % of each`,
@@ -120,14 +128,21 @@ describe('the content checks on the labelled pages', () => {
     }
   });
 
-  it('a withdrawn correction leaves the first label standing, and names where the heading was shown', () => {
-    const withdrawn = labels.pages.flatMap((p) => p.withdrawn.map((w) => ({ p, w })));
-    expect(withdrawn).toHaveLength(4);
-    for (const { p, w } of withdrawn) {
-      expect(p.labels[w.check as keyof typeof p.labels]!.label).not.toBe(w.label);
-      expect(w.heading_position).toBeLessThanOrEqual(w.headings_shown);
-      expect(Object.keys(labels.withdrawn_causes)).toContain(w.cause);
-    }
+  it('every page whose only question heading is a call to action is unsure for question_headings', () => {
+    const cta = labels.pages.flatMap((p) =>
+      p.corrections.filter((c) => c.cause === 'criteria_silent_on_cta').map((c) => ({ p, c })),
+    );
+    expect(cta).toHaveLength(6);
+    // the first reading went both ways on them
+    expect(cta.map(({ c }) => c.from.label).sort()).toEqual([
+      'fail',
+      'fail',
+      'fail',
+      'fail',
+      'pass',
+      'pass',
+    ]);
+    for (const { p } of cta) expect(p.labels.question_headings!.label).toBe('unsure');
   });
 });
 

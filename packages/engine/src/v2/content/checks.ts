@@ -104,6 +104,11 @@ export interface CheckDefinition {
    * check that does not clear it is reported and does not count.
    */
   scored: boolean;
+  /**
+   * Why a check that clears the bar is not counted; null otherwise. labels.test.ts requires it of
+   * every such check, so a hold is always stated.
+   */
+  held: string | null;
 }
 
 const unread = (): PageVerdict => 'unread';
@@ -121,6 +126,7 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
     recommendation_class: 'experimental',
     confidence: 'inconclusive',
     scored: false,
+    held: null,
   },
   question_headings: {
     judge: questionHeadings,
@@ -130,6 +136,7 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
     recommendation_class: 'experimental',
     confidence: 'inconclusive',
     scored: false,
+    held: 'whether a call-to-action question is a content heading, which the pages labelled unsure on this check turn on, is for the owner to rule',
   },
   schema_with_description: {
     judge: schemaWithDescription,
@@ -139,6 +146,7 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
     recommendation_class: 'best_practice',
     confidence: 'likely',
     scored: true,
+    held: null,
   },
   author_and_date: {
     judge: authorAndDate,
@@ -150,6 +158,7 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
     recommendation_class: 'best_practice',
     confidence: 'likely',
     scored: true,
+    held: null,
   },
   specs_as_text: {
     judge: specsAsText,
@@ -159,6 +168,7 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
     recommendation_class: 'best_practice',
     confidence: 'inconclusive',
     scored: false,
+    held: null,
   },
 };
 
