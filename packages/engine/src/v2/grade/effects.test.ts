@@ -2,7 +2,7 @@
  * Fix effects by counterfactual recompute: the exact values the formula table gives, the effects
  * adding up to the projected grades, and what a respected-intent robots.txt disallow does (nothing).
  */
-import type { PageResult } from '@crawlmouse/types/v2';
+import { EffectSchema, type PageResult } from '@crawlmouse/types/v2';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { every, grid } from '../../../fixtures/v2/access/builders.js';
@@ -242,6 +242,7 @@ describe('the effects', () => {
           const cells = Object.fromEntries(blockedBots.map((b) => [b, blocked]));
           const r = blog(8, unanswered, cells, extra);
           const fs = fixes(r.outcomes);
+          for (const f of fs) expect(EffectSchema.safeParse(f.effect).success).toBe(true);
           const seo = fs.reduce((n, f) => n + f.effect.technical_seo, 0);
           expect(Math.abs(seo - r.overview.technical_seo)).toBeLessThanOrEqual(
             0.005 * fs.length + 1e-9,
