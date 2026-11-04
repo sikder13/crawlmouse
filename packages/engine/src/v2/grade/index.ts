@@ -22,7 +22,7 @@ import { accessScore, type CrawlerTally } from './access.js';
 import { aiReadability } from './ai-readability.js';
 import { round } from './numbers.js';
 import { contentSignals, schemaOrg } from './declarations.js';
-import { quotableScore, type QuotableInput } from './quotable.js';
+import { quotableRate, quotableScore, type QuotableInput } from './quotable.js';
 import { readableScore, type ReadablePage } from './readable.js';
 import { signalsScore, type SignalStates } from './signals.js';
 import { isGraded, technicalSeo, type Tally, type TechnicalSeoInput } from './technical-seo.js';
@@ -86,6 +86,7 @@ export function gradeCheck(input: GradeInput): Grades {
     detections: input.structure,
     title_and_meta: input.title_and_meta,
     refusal: input.refusal,
+    added_links: [],
   };
   const content = aggregateContent(
     graded.map((p) => ({
@@ -95,7 +96,10 @@ export function gradeCheck(input: GradeInput): Grades {
     })),
   );
   const declarations = [
-    schemaOrg(graded.flatMap((p) => input.content.get(p.url) ?? [])),
+    schemaOrg(
+      graded.flatMap((p) => input.content.get(p.url) ?? []),
+      graded.filter((p) => !input.content.has(p.url)).length,
+    ),
     contentSignals(input.robots_txt),
   ];
   const ai: AiInputs = {
@@ -108,18 +112,12 @@ export function gradeCheck(input: GradeInput): Grades {
     signals: { schema_org: declarations[0]!.state, content_signals: declarations[1]!.state },
   };
   const ai_readability = aiFrom(ai);
-  const quotable = ai_readability.components.quotable.score;
+  const rate = quotableRate(content.quotable);
   return {
     grade_version: GRADE_VERSION,
     technical_seo: technicalSeo(seo),
     ai_readability,
-    content:
-      quotable === null
-        ? null
-        : {
-            score: round((100 * quotable) / ai_readability.components.quotable.max),
-            checks: content.by_template,
-          },
+    content: rate === null ? null : { score: round(100 * rate), checks: content.by_template },
     signals: declarations,
     content_failures: content.content_failures,
     content_detections: content.detections,

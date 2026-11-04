@@ -11,9 +11,9 @@
  * every scored crawler blocked by choice is `blocked_by_choice`; otherwise `too_few_crawlers_measured`,
  * with the range the score could take when each unmeasured crawler is anything from 0 to 1.
  *
- * Words served are compared with our control's words for the same static page (the worker's
- * `allowed_thin`), so a page that needs JavaScript reads the same for both and is counted once, in
- * Readable.
+ * Words served are compared with the browser control's words for the same static page (the worker's
+ * `allowed_thin`, packages/worker/src/verdict/table.ts), so a page that needs JavaScript reads the same
+ * for both and is counted once, in Readable.
  */
 import type { WithheldReason } from '@crawlmouse/types/v2';
 import type { CrawlerAccess } from '../access/types.js';

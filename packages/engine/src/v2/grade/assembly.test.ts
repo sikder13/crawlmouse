@@ -36,6 +36,10 @@ describe('Content Signals', () => {
   it('is absent with no such line, or one naming none of search, ai-input, ai-train', () => {
     expect(contentSignals('User-agent: *\nDisallow:').state).toBe('not_detected');
     expect(contentSignals('Content-Signal: foo=yes').state).toBe('not_detected');
+    // a key that merely ends in a signal's name is not that signal
+    expect(contentSignals('Content-Signal: x-search=yes').state).toBe('not_detected');
+    expect(contentSignals('Content-Signal: no-ai-train=no').state).toBe('not_detected');
+    expect(contentSignals('Content-Signal: foo=1;ai-train=no').state).toBe('detected');
     expect(contentSignals('').state).toBe('not_detected');
   });
 
@@ -60,9 +64,18 @@ describe('schema.org', () => {
         }) as ContentFeatures,
     );
   it('is present when a graded page carries a typed JSON-LD node, absent when none does, undecided with no page', () => {
-    expect(schemaOrg(f([[], ['WebPage']])).state).toBe('detected');
-    expect(schemaOrg(f([[], []])).state).toBe('not_detected');
-    expect(schemaOrg([]).state).toBe('indeterminate');
+    expect(schemaOrg(f([[], ['WebPage']]), 0).state).toBe('detected');
+    expect(schemaOrg(f([[], []]), 0).state).toBe('not_detected');
+    expect(schemaOrg([], 0).state).toBe('indeterminate');
+  });
+
+  it('with a graded page not fetched: present if a read page is marked, otherwise undecided, not absent', () => {
+    expect(schemaOrg(f([[], ['WebPage']]), 3).state).toBe('detected');
+    expect(schemaOrg(f([[], []]), 1)).toMatchObject({
+      state: 'indeterminate',
+      evidence: 'No JSON-LD on the 2 graded pages read; 1 not read.',
+    });
+    expect(schemaOrg([], 2).state).toBe('indeterminate');
   });
 });
 
@@ -73,7 +86,7 @@ describe('both grades for a check', () => {
     const g = gradeCheck(csrSite(0.31));
     expect(g.ai_readability.components.access.score).toBe(40);
     expect(g.ai_readability.components.readable.score).toBe(9.3);
-    // Quotable: every check that applies passes on all six pages (specs apply to none): 20.
+    // Quotable: each counted check passes on all six pages: 20.
     // Signals: schema and Content Signals present: 10. Total 40 + 9.30 + 20 + 10 = 79.30.
     expect(g.ai_readability).toMatchObject({ withheld: false, total: 79.3, grade: 'B' });
     expect(g.content).toMatchObject({ score: 100 });
@@ -94,6 +107,34 @@ describe('both grades for a check', () => {
     });
     expect(g.ai_readability.components.access.score).toBe(40);
     expect(g.technical_seo.score).not.toBeNull();
+  });
+
+  it('the Content section score is 100 × the mean pass rate of the counted checks, rounded once', () => {
+    const base = csrSite(0.31);
+    const ids = [...base.content.keys()];
+    const noQuestion = { ...post(true), headings: { count: 4, questions: 0 } };
+    // the answer-first check fails everywhere: it is reported, not counted, so it moves neither score
+    const content = new Map(
+      ids.map((u, i) => [
+        u,
+        i >= 1 && i <= 4 ? { ...noQuestion, opening: post(false).opening } : post(false),
+      ]),
+    );
+    const g = gradeCheck({ ...base, content });
+    // question headings: 2 of 6 pass (pages 1..4 have none); schema and author/date pass on all 6
+    // rate = (2/6 + 1 + 1)/3 = 0.7777…; 100 × that = 77.78 (from the rounded Quotable, 15.56 × 5 = 77.8)
+    expect(g.content!.score).toBe(77.78);
+    expect(g.ai_readability.components.quotable.score).toBe(15.56);
+  });
+
+  it('a graded page not fetched leaves the Content section without a score, and Quotable a range', () => {
+    const base = csrSite(0.31);
+    const [first, ...rest] = [...base.content.entries()];
+    expect(first).toBeDefined();
+    const g = gradeCheck({ ...base, content: new Map(rest) });
+    expect(g.content).toBe(null);
+    expect(g.ai_readability.components.quotable.score).toBe(null);
+    expect(g.ai_readability.components.quotable.range).not.toBe(null);
   });
 
   it('a client-rendered homepage turns on v1 orphan suppression, read from the homepage features', () => {
