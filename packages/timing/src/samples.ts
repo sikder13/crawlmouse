@@ -8,6 +8,8 @@ export interface Sample {
   median: number;
   /** The limit the median was held to on this run. */
   limit: number;
+  /** Whether the median met the limit, by the recorder's own rule. */
+  pass: boolean;
   samples: number[];
 }
 

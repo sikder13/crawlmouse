@@ -18,7 +18,7 @@ const percent = (now: number, then: number): string => {
 export function trendLines(current: Sample[], history: Sample[][]): string[] {
   const recent = history.slice(0, TREND_NIGHTLIES);
   const lines = current.map((c) => {
-    const over = c.median < c.limit ? '' : ', OVER';
+    const over = c.pass ? '' : ', OVER';
     const head = `- ${c.metric}: ${fmt(c.median)} ${c.unit} (limit ${fmt(c.limit)}${over})`;
     const past = recent.flatMap((run) =>
       run.filter((s) => s.metric === c.metric).map((s) => s.median),

@@ -125,7 +125,7 @@ describe('expectWithinBudget', () => {
     expectWithinBudget('m', c.work, { budgetMs: 10, now: c.now, env: { PERF_SAMPLES_DIR: dir } });
     const lines = readFileSync(join(dir, 'samples.jsonl'), 'utf8').trim().split('\n');
     expect(lines.map((l) => JSON.parse(l))).toEqual([
-      { metric: 'm', unit: 'ms', median: 3, limit: 30, samples: [1, 2, 3, 4, 5] },
+      { metric: 'm', unit: 'ms', median: 3, limit: 30, pass: true, samples: [1, 2, 3, 4, 5] },
     ]);
   });
 
@@ -139,7 +139,10 @@ describe('expectWithinBudget', () => {
         env: { PERF_SAMPLES_DIR: dir },
       }),
     ).toThrow();
-    expect(readFileSync(join(dir, 'samples.jsonl'), 'utf8')).toContain('"median":50');
+    expect(JSON.parse(readFileSync(join(dir, 'samples.jsonl'), 'utf8'))).toMatchObject({
+      median: 50,
+      pass: false,
+    });
   });
 
   it('measures real work on the real clock', () => {

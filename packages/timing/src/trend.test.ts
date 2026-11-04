@@ -7,6 +7,7 @@ const s = (metric: string, median: number, limit = 100, unit = 'ms'): Sample => 
   unit,
   median,
   limit,
+  pass: median < limit,
   samples: [median],
 });
 
@@ -39,7 +40,8 @@ describe('trendLines', () => {
     );
   });
 
-  it('marks a breach of its limit', () => {
+  it('marks a breach by the verdict the recorder wrote, not by comparing again', () => {
+    expect(trendLines([{ ...s('a', 100), pass: true }], [])[0]).not.toContain('OVER');
     expect(trendLines([s('a', 120)], [])[0]).toBe(
       '- a: 120 ms (limit 100, OVER) · no earlier nightly to compare',
     );

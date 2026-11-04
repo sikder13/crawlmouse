@@ -61,14 +61,16 @@ export function expectWithinBudget<T>(
   const runs = Array.from({ length: TIMING_RUNS }, () => timed(fn, now));
   const samples = runs.map((r) => r.ms);
   const mid = median(samples);
+  const pass = mid < limitMs;
   recordSample(env.PERF_SAMPLES_DIR, {
     metric: name,
     unit: 'ms',
     median: mid,
     limit: limitMs,
+    pass,
     samples,
   });
-  if (!(mid < limitMs)) {
+  if (!pass) {
     const against = strict
       ? `the budget of ${fmt(budgetMs)} ms (PERF_STRICT=1)`
       : `the default ceiling of ${fmt(limitMs)} ms (${DEFAULT_CEILING_FACTOR} × the ${fmt(budgetMs)} ms budget, which the strict job holds)`;
