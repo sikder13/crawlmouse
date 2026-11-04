@@ -207,6 +207,8 @@ export const ENTITIES: readonly EntityDoc[] = [
       links_read: 'PR #47',
       is_html: 'brief',
       robots_search: 'PR #47',
+      title: 'CC-12d',
+      meta_description: 'CC-12d',
     },
   },
   {

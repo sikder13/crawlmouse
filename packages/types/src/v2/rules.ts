@@ -103,6 +103,9 @@ export const RULES = {
   // AccessTest
   observed_owner_logs: two('observed evidence comes from owner logs, and only it does'),
   access_request_line: two('the request method and HTTP version are recorded together'),
+  head_text_absent: one(
+    'a title or description the page does not declare has no length and no cut',
+  ),
   // UsageEvent
   usage_billable: one('only a delivered result is billable'),
   // Change

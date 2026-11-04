@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import {
   CountSchema,
+  crawledText,
   DateSchema,
   HttpStatusSchema,
   HttpUrlSchema,
@@ -18,6 +19,26 @@ import {
   RedirectChainSchema,
   SearchRobotsSchema,
 } from './page-facts.js';
+
+/** The UTF-8 bytes a page's title and meta description keep. Their true length is `chars`. */
+export const TITLE_BYTES = 512;
+export const DESCRIPTION_BYTES = 1024;
+
+/**
+ * Text a page declares in its head, as a search engine reads it: ASCII whitespace collapsed to one
+ * space and trimmed (as document.title is). `text` null: the page declares none. `chars`: the
+ * collapsed text's length in code points, before any cut. `cut`: `text` is its first bytes.
+ */
+const headText = (bytes: number) =>
+  z
+    .strictObject({ text: crawledText(bytes).nullable(), chars: CountSchema, cut: z.boolean() })
+    .check(
+      rules((h, rule) => {
+        if (h.text === null && (h.chars !== 0 || h.cut)) rule.fail('head_text_absent');
+      }),
+    );
+export const PageTitleSchema = headText(TITLE_BYTES);
+export const MetaDescriptionSchema = headText(DESCRIPTION_BYTES);
 
 export const PageResultSchema = z
   .strictObject({
@@ -87,6 +108,13 @@ export const PageResultSchema = z
     links_read: z.boolean(),
     /** robots.txt's verdict on this URL for each search engine (Googlebot, Bingbot). */
     robots_search: SearchRobotsSchema,
+    /**
+     * The page's first `<title>` and first `<meta name="description">` (the name compared without
+     * case). Null when the page was not read, or was read in part and none was found before reading
+     * stopped.
+     */
+    title: PageTitleSchema.nullable(),
+    meta_description: MetaDescriptionSchema.nullable(),
   })
   .check(
     rules((p, rule) => {

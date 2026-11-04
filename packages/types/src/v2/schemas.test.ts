@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   AccessTestSchema,
+  PageTitleSchema,
   AccountSchema,
   AgencyBrandingSchema,
   AiReadabilitySchema,
@@ -834,6 +835,13 @@ const CASES: RuleCase[] = [
     schema: AccessTestSchema,
     input: () => ({ ...copy(bad.access_tests[0]!), method: null }),
   },
+  // ── PageResult head text ────────────────────────────────────────────────────────────────────
+  {
+    rule: 'head_text_absent',
+    breaks: 'a length for a title the page does not declare',
+    schema: PageTitleSchema,
+    input: () => ({ text: null, chars: 3, cut: false }),
+  },
   // ── UsageEvent ──────────────────────────────────────────────────────────────────────────────
   {
     rule: 'usage_billable',
@@ -1154,6 +1162,8 @@ const CRAWLED_BUDGETS: Record<string, number> = {
   'LinkEdge.anchor_text': 2000,
   'PageResult.canonical_declared.href': 8192,
   'PageResult.hreflang.links[].hreflang': 256,
+  'PageResult.title.text': 512,
+  'PageResult.meta_description.text': 1024,
 };
 
 /** The most entries every capped array may hold, and the most characters every capped string. */
