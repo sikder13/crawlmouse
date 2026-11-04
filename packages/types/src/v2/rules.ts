@@ -48,6 +48,7 @@ export const RULES = {
   verification_alone: one('none_published stands alone'),
   verification_unique: one('verification methods are listed once each'),
   ip_list_url: two('ip_list_url is set exactly when an IP list is published'),
+  cloudflare_unique: one("Cloudflare's categories are listed once each"),
   // Fix
   effect_pending: two(
     'an AI effect is either estimated, or not yet estimated because of named fixes',

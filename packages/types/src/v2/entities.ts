@@ -368,6 +368,8 @@ export const ENTITIES: readonly EntityDoc[] = [
       operator: 'Final-Result',
       ip_list_url: 'brief',
       source_notes: 'brief',
+      cloudflare_categories: 'PR #54',
+      cloudflare_as_of: 'PR #54',
     },
   },
   {

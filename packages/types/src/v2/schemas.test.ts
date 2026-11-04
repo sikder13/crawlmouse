@@ -115,7 +115,10 @@ const registryEntry = () => ({
   source_url: 'https://developers.openai.com/api/docs/bots',
   source_notes: [],
   as_of: '2026-10-27',
+  cloudflare_categories: ['training'],
+  cloudflare_as_of: '2026-11-03',
 });
+
 
 interface RuleCase {
   rule: RuleId;
@@ -280,6 +283,12 @@ const CASES: RuleCase[] = [
     breaks: 'a URL with no IP list method',
     schema: CrawlerRegistryEntrySchema,
     input: () => ({ ...registryEntry(), verification_method: ['reverse_dns'] }),
+  },
+  {
+    rule: 'cloudflare_unique',
+    breaks: 'a Cloudflare category listed twice',
+    schema: CrawlerRegistryEntrySchema,
+    input: () => ({ ...registryEntry(), cloudflare_categories: ['training', 'training'] }),
   },
   // ── Fix ─────────────────────────────────────────────────────────────────────────────────────
   {
