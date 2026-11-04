@@ -46,8 +46,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/perf-samples"
-          pnpm --filter @crawlmouse/timing exec tsx src/probe-cli.ts | tee "$GITHUB_WORKSPACE/perf-samples/probe.json"
+          pnpm --silent --filter @crawlmouse/timing exec tsx src/probe-cli.ts | tee "$GITHUB_WORKSPACE/perf-samples/probe.json"
       - name: Unit timing budgets, strict
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           PERF_SAMPLES_DIR="$GITHUB_WORKSPACE/perf-samples" pnpm perf:strict
@@ -81,12 +82,14 @@ jobs:
           path: perf-samples/
           retention-days: 30
           if-no-files-found: warn
+          # A re-run of the job uploads under the same name; the trend reads the latest.
+          overwrite: true
 
   # One line per budgeted metric in the job summary: tonight's median against the medians of the
   # last seven nightlies on main, read from their perf-samples artifacts.
   perf-trend:
     needs: perf-strict
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -102,14 +105,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          # The trend is information, not a gate: GitHub runs this under bash -e, so errexit is turned
+          # off and a failed lookup or download is reported and skipped.
+          set +e
           set -uo pipefail
           gh run download "$GITHUB_RUN_ID" -n perf-samples -D tonight || echo "No samples from tonight's run."
           mkdir -p history
-          gh run list --workflow nightly.yml --branch main --status completed --limit 30 \
-            --json databaseId --jq '.[].databaseId' | while read -r id; do
+          ids=$(gh run list --workflow nightly.yml --branch main --status completed --limit 30 \
+            --json databaseId --jq '.[].databaseId') || { echo "Could not list earlier nightlies."; ids=""; }
+          for id in $ids; do
             [ "$id" = "$GITHUB_RUN_ID" ] && continue
             [ "$(ls history | wc -l)" -ge 7 ] && break
-            gh run download "$id" -n perf-samples -D "history/$id" 2>/dev/null || rm -rf "history/$id"
+            gh run download "$id" -n perf-samples -D "history/$id" 2>/dev/null || true
+            # Only a nightly that recorded samples counts toward the seven.
+            [ -s "history/$id/samples.jsonl" ] || rm -rf "history/$id"
           done
           {
             echo "### Performance trend"

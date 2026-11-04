@@ -183,7 +183,7 @@ jobs:
         if: ${{ matrix.shard == 1 && !cancelled() }}
         run: |
           set -euo pipefail
-          pnpm --filter @crawlmouse/timing exec tsx src/probe-cli.ts | tee "$RUNNER_TEMP/probe.json"
+          pnpm --silent --filter @crawlmouse/timing exec tsx src/probe-cli.ts | tee "$RUNNER_TEMP/probe.json"
       # Alone and on one worker, so they measure the page and not the other specs. next start
       # serves the previews only with V2_PREVIEW_ON_NEXT_START=1, which playwright.config.ts sets
       # for VISUAL_SERVER=start. perf-retry.sh runs the budgets, retries a failure once, and decides
