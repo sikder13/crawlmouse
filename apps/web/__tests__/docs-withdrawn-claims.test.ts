@@ -81,6 +81,17 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     allowedIn: [],
   },
   {
+    // The verdict meaning (worker/src/verdict/meanings.ts), rendered into SPEC 12 and the runbook; a
+    // reviewer found it after the two wordings above were registered.
+    text: 'refused while the tagged Googlebot canary was served on the same page',
+    withdrawnIn:
+      'packages/worker/src/verdict/meanings.ts, SPEC 12, docs/ops/worker-runbook.md (CC-12d)',
+    truth:
+      'blocked_by_ua_rule means another tested crawler or the tagged Googlebot canary was served on ' +
+      'the same page from the same address; the canary is one possible witness, not the only one.',
+    allowedIn: [],
+  },
+  {
     text: 'the tagged Googlebot canary was not served on those pages, so IP verification is not ruled out',
     withdrawnIn: 'packages/engine/src/v2/access/spec.ts, SPEC 15 (CC-12d)',
     truth:
