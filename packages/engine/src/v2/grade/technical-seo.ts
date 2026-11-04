@@ -2,7 +2,8 @@
  * Technical SEO (v2): site structure 60 / crawlability 40.
  *
  *   structure    = v1's grade (packages/engine/src/grade.ts, its four components and weights unchanged)
- *                  of the link graph of the crawled pages, 0..100; also `site_structure_score`
+ *                  of the link graph of the crawled pages answering 200 (structureOf), 0..100;
+ *                  also `site_structure_score`
  *   crawlability = mean over the measures that apply of the share of subjects that pass, 0..1
  *   score        = 0.6 × structure + 40 × crawlability
  *

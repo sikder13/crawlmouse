@@ -6,10 +6,14 @@
  * which refuses changed results under an unchanged version.
  */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   gradeSources,
   guardCases,
   importsOf,
+  LIBRARIES,
+  PACKAGE_VALUES,
+  packageImportsOf,
   sourceDigest,
 } from '../../../fixtures/v2/grade/guard.js';
 import expected from './expected.json' with { type: 'json' };
@@ -43,6 +47,11 @@ describe('the grade-change guard', () => {
       "// import { fake } from './fake.js';",
       "const lazy = () => import('./lazy.js');",
       "const url = 'https://a.test'; import { n } from './n.js';",
+      // text inside a string is not code: it neither hides nor fakes an import
+      "const mime = 'text/html,*/*'; import { o } from './o.js'; /** note */",
+      "const joined = `${a}//${b}`; import { p } from './p.js';",
+      'export const s = "x from \'./fake.js\'"',
+      '"foo"// import { f } from \'./fake.js\'',
     ].join('\n');
     expect(importsOf('v2/grade/x.ts', source)).toEqual([
       'v2/grade/a.ts',
@@ -53,7 +62,26 @@ describe('the grade-change guard', () => {
       'v2/grade/m.ts',
       'v2/grade/lazy.ts',
       'v2/grade/n.ts',
+      'v2/grade/o.ts',
+      'v2/grade/p.ts',
     ]);
+  });
+
+  it("the grade's files call three libraries and take one value from a workspace package, and the digest holds each", () => {
+    const found = gradeSources().flatMap((f) =>
+      packageImportsOf(readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8')).map(
+        (spec) => `${f} ${spec}`,
+      ),
+    );
+    expect(found).toEqual([
+      'analysis/js-detect.ts cheerio',
+      'analysis/pagerank.ts graphology-pagerank',
+      'constants.ts @crawlmouse/types',
+      'graph.ts graphology',
+      'v2/content/read.ts cheerio',
+    ]);
+    const packages = new Set(found.map((x) => x.split(' ')[1]!));
+    expect([...Object.keys(PACKAGE_VALUES), ...LIBRARIES].sort()).toEqual([...packages].sort());
   });
 
   it('it is recorded under the current grade version', () => {
