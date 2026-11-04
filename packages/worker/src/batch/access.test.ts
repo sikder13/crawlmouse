@@ -89,7 +89,8 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
     // The first identity served in request order: the registry's order, then the canary.
     expect(row.witness).toEqual({ role: 'crawler', ua: 'Claude-SearchBot' });
     expect(row.limitations.join(' ')).toContain(
-      'Claude-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address.',
+      // Hedged: a caveat follows (the witness went as its bare token).
+      'Claude-SearchBot was served on this page from the same address, so this refusal is likely aimed at the user agent rather than at an unverified address.',
     );
     expect(row.limitations.join(' ')).toContain(
       'Claude-SearchBot and ClaudeBot were served on this page.',
@@ -124,6 +125,12 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
       'The tagged Googlebot request was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address.',
     );
     expect(row.limitations.join(' ')).toContain('No other tested crawler was served on this page.');
+  });
+
+  it('every limitation fits its 500-byte budget whole, so none is cut', () => {
+    for (const site of SITES)
+      for (const r of results.get(site)!.access_tests)
+        for (const l of r.limitations) expect(Buffer.byteLength(l), l).toBeLessThan(500);
   });
 
   it('a witness is recorded on exactly the blocked_by_ua_rule rows', () => {

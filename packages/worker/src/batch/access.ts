@@ -424,25 +424,32 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
           limitations: [say.TAGGED_REQUEST, ...notesOn(c), ...controlCountNote],
         };
       case 'refused_witnessed':
-      case 'refused':
+      case 'refused': {
+        const decidedWitness = decided.id === 'refused_witnessed' ? witness : null;
+        const caveats = say.witnessCaveats(
+          decidedWitness,
+          servedOnlyBefore(c),
+          decidedWitness?.role === 'crawler'
+            ? (CRAWLERS.find((x) => x.token === decidedWitness.ua)?.bareTokenOf ?? null)
+            : null,
+        );
         return {
           fetch: c.fetch,
           words: c.words,
           limitations: [
             say.TAGGED_REQUEST,
             say.witnessReading(
-              decided.id === 'refused_witnessed' ? witness : null,
+              decidedWitness,
               canary.observed,
               canaryNote,
               served.filter((t) => t !== c.identity.token),
-              servedOnlyBefore(c),
-              witness?.role === 'crawler' && decided.id === 'refused_witnessed'
-                ? (CRAWLERS.find((x) => x.token === witness.ua)?.bareTokenOf ?? null)
-                : null,
+              caveats.length > 0,
             ),
+            ...caveats,
             ...notesOn(c),
           ],
         };
+      }
       default:
         return { fetch: c.fetch, words: c.words, limitations: [say.TAGGED_REQUEST, ...notesOn(c)] };
     }

@@ -63,7 +63,8 @@ const EVIDENCE_KINDS: ChallengeEvidence[] = [
   'challenge_redirect',
   'body_signature',
 ];
-const FOUR_XX: Observed[] = ['refused', 'gone', 'challenged'];
+// Every outcome response.ts can read from a 4xx: it looks for 1020 on any of them.
+const FOUR_XX: Observed[] = ['refused', 'gone', 'challenged', 'rate_limited', 'payment'];
 function readings(o: Observed): (ResponseReading | null)[] {
   if (o === 'not_requested') return [null];
   const challenges = [null, ...EVIDENCE_KINDS.map((evidence) => ({ evidence, marker: 'm' }))];
