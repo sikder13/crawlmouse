@@ -144,6 +144,17 @@ describe('effects that cannot be stated', () => {
     expect(overview.technical_seo).toBe(0);
   });
 
+  it('on a refused grade, fixes with a stated AI effect still rank before those whose AI effect waits', () => {
+    // two posts, both without an answer, and an orphan: 4 graded pages, refused as too small
+    const { grades, outcomes } = blog(2, 2, {}, [{ path: '/old-9' }]);
+    expect(grades.technical_seo.score).toBe(null);
+    const fs = fixes(outcomes).sort((a, b) => a.rank - b.rank);
+    expect(fs.map((f) => f.type)).toContain('quotable_opening');
+    const waits = fs.map((f) => f.effect.ai_readability === null);
+    expect(waits).toContain(false);
+    expect(waits.slice(waits.indexOf(true)).every(Boolean)).toBe(true);
+  });
+
   it('an edge fix for a crawler with one page that decides its share waits on crawler_too_few_pages', () => {
     // one sampled page blocked, the other rate-limited (out of the denominator)
     const { grades, outcomes } = blog(6, 0, {

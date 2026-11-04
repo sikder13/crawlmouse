@@ -9,7 +9,8 @@
  *
  *   effect(i) = grade(fixes 1..i) − grade(fixes 1..i−1)
  *
- * so the effects add up to the projected grade less the current one, before rounding to DECIMALS.
+ * so the effects add up to the projected grade less the current one, both as given (each component
+ * already to DECIMALS places).
  *
  * Technical SEO is 0 while the grade is refused: as checked, or before or after the fix (effectOf). AI readability is
  * the change in the component the fix moves: Access for an edge-rule fix, Quotable for a content fix,
