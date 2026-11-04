@@ -612,34 +612,6 @@
           "counts_toward_grade": false,
           "recommendation_class": "experimental",
           "evidence": "/.well-known/skills/index.json → 404 · a proposed location"
-        },
-        {
-          "signal": "llms_full",
-          "state": "not_detected",
-          "counts_toward_grade": false,
-          "recommendation_class": "experimental",
-          "evidence": "/llms-full.txt → 404"
-        },
-        {
-          "signal": "ucp",
-          "state": "not_detected",
-          "counts_toward_grade": false,
-          "recommendation_class": "experimental",
-          "evidence": "/.well-known/ucp → 404"
-        },
-        {
-          "signal": "agent_card",
-          "state": "not_detected",
-          "counts_toward_grade": false,
-          "recommendation_class": "experimental",
-          "evidence": "/.well-known/agent-card.json → 404"
-        },
-        {
-          "signal": "rsl",
-          "state": "not_detected",
-          "counts_toward_grade": false,
-          "recommendation_class": "experimental",
-          "evidence": "/rsl.xml → 404"
         }
       ],
       "crawlers": [
@@ -1761,6 +1733,34 @@
           "counts_toward_grade": false,
           "recommendation_class": "experimental",
           "evidence": "/.well-known/skills/index.json → 404 · a proposed location"
+        },
+        {
+          "signal": "llms_full",
+          "state": "not_detected",
+          "counts_toward_grade": false,
+          "recommendation_class": "experimental",
+          "evidence": "/llms-full.txt → 404"
+        },
+        {
+          "signal": "ucp",
+          "state": "not_detected",
+          "counts_toward_grade": false,
+          "recommendation_class": "experimental",
+          "evidence": "/.well-known/ucp → 404"
+        },
+        {
+          "signal": "agent_card",
+          "state": "not_detected",
+          "counts_toward_grade": false,
+          "recommendation_class": "experimental",
+          "evidence": "/.well-known/agent-card.json → 404"
+        },
+        {
+          "signal": "rsl",
+          "state": "not_detected",
+          "counts_toward_grade": false,
+          "recommendation_class": "experimental",
+          "evidence": "/rsl.xml → 404"
         }
       ],
       "crawlers": [
@@ -7044,7 +7044,7 @@
     },
     {
       "id": "d0000000-0000-4000-8000-00000000000b",
-      "check_id": "c0000000-0000-4000-8000-000000000001",
+      "check_id": "c0000000-0000-4000-8000-000000000003",
       "ua": null,
       "page_url": "https://example-outfitter.com/",
       "template_key": "/",
@@ -7108,7 +7108,7 @@
     },
     {
       "id": "d0000000-0000-4000-8000-00000000000c",
-      "check_id": "c0000000-0000-4000-8000-000000000001",
+      "check_id": "c0000000-0000-4000-8000-000000000003",
       "ua": "ChatGPT-User",
       "page_url": "https://example-outfitter.com/products/ridge-2p",
       "template_key": "/products/{slug}",
@@ -8458,7 +8458,7 @@
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",
       "collection": "access_tests",
-      "included": 10,
+      "included": 8,
       "total": 408
     },
     {
@@ -8466,6 +8466,12 @@
       "collection": "access_tests",
       "included": 2,
       "total": 308
+    },
+    {
+      "check_id": "c0000000-0000-4000-8000-000000000003",
+      "collection": "access_tests",
+      "included": 2,
+      "total": 408
     }
   ]
 }
