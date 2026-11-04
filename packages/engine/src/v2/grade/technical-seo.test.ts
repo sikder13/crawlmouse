@@ -13,6 +13,7 @@ import type { Detection } from '../detectors/types.js';
 import {
   combine,
   crawlabilityMeasures,
+  seoParts,
   technicalSeo,
   type TechnicalSeoInput,
 } from './technical-seo.js';
@@ -39,6 +40,7 @@ function inputOf(
     detections: detectStructure(s),
     title_and_meta: null,
     refusal: { excludedPageCount: 0, estimateSource: 'frontier', crawlTruncated: false },
+    added_links: [],
     ...over,
   };
 }
@@ -87,7 +89,7 @@ describe('crawlability', () => {
     expect(Object.keys(m)).toEqual(['answers_200']);
   });
 
-  it('title and meta description facts join the same mean once recorded, with no re-weighting', () => {
+  it('title and meta description facts join the same mean once recorded, as one more equal measure', () => {
     const m = crawlabilityMeasures({
       ...base,
       detections: [],
@@ -142,6 +144,77 @@ describe('the grade', () => {
       ),
     );
     expect(TechnicalSeoSchema.safeParse(t).success).toBe(true);
+  });
+
+  it('matches v1 with the pages v1 leaves out of the grade: a 404, a 301, an archive page and a PDF', () => {
+    const specs: PageSpec[] = [
+      {
+        path: '/',
+        links: ['/p/0', '/p/1', '/p/2', '/p/3', '/p/4', '/p/5', '/gone', '/moved', '/tag/a'],
+      },
+      ...Array.from({ length: 6 }, (_, i) => ({ path: `/p/${i}`, links: ['/', '/tag/a'] })),
+      { path: '/gone', status: 404 },
+      { path: '/moved', status: 301 },
+      { path: '/tag/a', kind: 'archive', links: ['/p/0', '/p/1'] },
+      // no page links the 404, the 301 or the PDF (found through the sitemap); /lonely is a graded
+      // orphan, so the size of the graded population moves the orphan ratio
+      { path: '/file.pdf' },
+      { path: '/lonely' },
+    ];
+    const base = inputOf(specs);
+    const input = {
+      ...base,
+      pages: base.pages.map((p) => (p.url.endsWith('/file.pdf') ? { ...p, is_html: false } : p)),
+    };
+    // v1's population, written out: the HTML content pages answering 200; its page count, the
+    // pages answering 2xx or 3xx (audit.ts), which leaves out only the 404
+    const gradeable = new Set(
+      ['/', '/p/0', '/p/1', '/p/2', '/p/3', '/p/4', '/p/5', '/lonely'].map(
+        (p) => `https://a.test${p === '/' ? '' : p}`,
+      ),
+    );
+    const graph = buildGraph(
+      input.pages.map((p) => ({ url: p.url, urlHash: p.url, statusCode: p.status_code })),
+      input.edges.map((e) => ({
+        fromUrl: e.from_url,
+        toUrl: e.to_url,
+        anchorText: e.anchor_text,
+        isGenericAnchor: e.is_generic_anchor,
+      })),
+    );
+    const ga = deriveGradeInputs(graph, {
+      homepageUrl: input.homepage_url,
+      isGradeable: (u) => gradeable.has(u),
+      jsRendered: false,
+    });
+    expect(ga.gradeableCount).toBe(8);
+    const v1 = computeGrade(gradeInputsFrom(ga, 11));
+    const t = technicalSeo(input);
+    expect(t.site_structure_score).toBe(v1.score);
+    expect(t.breakdown).toEqual(v1.breakdown);
+  });
+
+  it("v1's page count is the pages answering 2xx or 3xx: it decides v1's thin-crawl cap of 60 under 5 pages", () => {
+    // read before the refusal: a site this small is refused, and the cap is v1's own
+    const structure = (specs: PageSpec[]) => seoParts(inputOf(specs)).structure.score;
+    // three 200s and a 301 count 4, so the cap applies; the 404 does not count
+    const four = structure([
+      { path: '/', links: ['/p/0', '/p/1', '/moved', '/gone'] },
+      { path: '/p/0', links: ['/'] },
+      { path: '/p/1', links: ['/'] },
+      { path: '/moved', status: 301 },
+      { path: '/gone', status: 404 },
+    ]);
+    expect(four).toBe(60);
+    // four 200s and a 301 count 5, so it does not
+    const five = structure([
+      { path: '/', links: ['/p/0', '/p/1', '/p/2', '/moved'] },
+      { path: '/p/0', links: ['/'] },
+      { path: '/p/1', links: ['/'] },
+      { path: '/p/2', links: ['/'] },
+      { path: '/moved', status: 301 },
+    ]);
+    expect(five).toBeGreaterThan(60);
   });
 
   it('an orphan lowers the structure part, so the grade', () => {

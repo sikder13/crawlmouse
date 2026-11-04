@@ -9,7 +9,8 @@
  * The crawlability measures are: crawled URLs that answer 200; and, for each of CC-16's redirect,
  * canonical, pagination and hreflang detectors, the records decided `not_detected` of those decided.
  * A measure with nothing decided does not apply. Title and meta description facts are not recorded by
- * the crawl worker yet (CC-12d); they join as one more measure in the same mean, with no re-weighting.
+ * the crawl worker yet (CC-12d); they join as one more measure in the same mean. The 60/40 split is
+ * unchanged by that, and the measures stay equally weighted, so each one's share of the mean shrinks.
  *
  * The 5.1a refusal is v1's `decideRefusal`, on the same evidence: a refused grade has no score.
  */
@@ -48,6 +49,11 @@ export interface TechnicalSeoInput {
   title_and_meta: Tally | null;
   /** What `decideRefusal` reads that the records do not carry. */
   refusal: Pick<RefusalEvidence, 'excludedPageCount' | 'estimateSource' | 'crawlTruncated'>;
+  /**
+   * Links a fix's counterfactual added (effects.ts), as `from\u0000to`. They count toward orphans,
+   * depth and hubs but not toward anchor diversity: the fix prescribes a link, not its text.
+   */
+  added_links: readonly string[];
 }
 
 /** A page is graded when it is a 200 HTML content page (v1's population). */
@@ -88,36 +94,43 @@ export function crawlabilityMeasures(input: TechnicalSeoInput): Record<string, n
 export const combine = (structure: number, crawlability: number): number =>
   round((SEO_WEIGHTS.structure / 100) * structure + SEO_WEIGHTS.crawlability * crawlability);
 
-/** The structure grade (v1's) and the evidence the refusal reads, from one link graph. */
+/** The structure grade (v1's) and the evidence the refusal reads, from the link graph. */
 function structureOf(input: TechnicalSeoInput) {
-  const graph = buildGraph(
-    input.pages.map((p) => ({ url: p.url, urlHash: p.url, statusCode: p.status_code })),
-    input.edges.map((e) => ({
-      fromUrl: e.from_url,
-      toUrl: e.to_url,
-      anchorText: e.anchor_text,
-      isGenericAnchor: e.is_generic_anchor,
-    })),
-  );
   const graded = new Set(input.pages.filter(isGraded).map((p) => p.url));
-  const ga = deriveGradeInputs(graph, {
-    homepageUrl: input.homepage_url,
-    isGradeable: (u) => graded.has(u),
-    jsRendered: input.homepage_client_rendered,
-  });
+  const analyse = (edges: readonly LinkEdge[]) =>
+    deriveGradeInputs(
+      buildGraph(
+        input.pages.map((p) => ({ url: p.url, urlHash: p.url, statusCode: p.status_code })),
+        edges.map((e) => ({
+          fromUrl: e.from_url,
+          toUrl: e.to_url,
+          anchorText: e.anchor_text,
+          isGenericAnchor: e.is_generic_anchor,
+        })),
+      ),
+      {
+        homepageUrl: input.homepage_url,
+        isGradeable: (u) => graded.has(u),
+        jsRendered: input.homepage_client_rendered,
+      },
+    );
+  const ga = analyse(input.edges);
+  const added = new Set(input.added_links);
+  const anchors =
+    added.size === 0
+      ? ga
+      : analyse(input.edges.filter((e) => !added.has(`${e.from_url}\u0000${e.to_url}`)));
   const fetched = input.pages.filter((p) => p.status_code >= 200 && p.status_code < 400).length;
-  return { ga, grade: computeGrade(gradeInputsFrom(ga, fetched)) };
+  const inputs = {
+    ...gradeInputsFrom(ga, fetched),
+    meanAnchorHHI: anchors.meanAnchorHHI,
+    genericAnchorFraction: anchors.genericAnchorFraction,
+  };
+  return { ga, grade: computeGrade(inputs) };
 }
 
-/**
- * The formula's value whether or not the grade is refused: what a fix's effect is measured on, so a
- * fix on a site too thin to grade still moves a number.
- */
-export function seoFormula(input: TechnicalSeoInput): number {
-  return combine(structureOf(input).grade.score, mean(Object.values(crawlabilityMeasures(input))));
-}
-
-export function technicalSeo(input: TechnicalSeoInput): TechnicalSeo {
+/** The grade's formula value and refusal, from one link graph: what technicalSeo and effects.ts read. */
+export function seoParts(input: TechnicalSeoInput) {
   const { ga, grade: structure } = structureOf(input);
   const refusal = decideRefusal({
     gradeablePageCount: ga.gradeableCount,
@@ -125,9 +138,13 @@ export function technicalSeo(input: TechnicalSeoInput): TechnicalSeo {
     fetchedOkCount: input.pages.filter((p) => p.status_code === 200).length,
     ...input.refusal,
   });
-  const score = refusal.refused
-    ? null
-    : combine(structure.score, mean(Object.values(crawlabilityMeasures(input))));
+  const formula = combine(structure.score, mean(Object.values(crawlabilityMeasures(input))));
+  return { structure, refusal, formula };
+}
+
+export function technicalSeo(input: TechnicalSeoInput): TechnicalSeo {
+  const { structure, refusal, formula } = seoParts(input);
+  const score = refusal.refused ? null : formula;
   return {
     score,
     grade: score === null ? null : (scoreToLetter(score) as TechnicalSeo['grade']),
