@@ -11,6 +11,7 @@ import type { Confidence, Effect, FixType, RecommendationClass } from '@crawlmou
 import type { AccessDetection } from '../access/types.js';
 import { FIX_SECTION } from '../diff/subjects.js';
 import type { DetectorOutcome, FixDraft } from '../diff/types.js';
+import { subjectOfKey } from '../detectors/fingerprint.js';
 import type { Detection } from '../detectors/types.js';
 import { effectsOf, type FixRecord } from './effects.js';
 import type { Grades } from './index.js';
@@ -30,8 +31,6 @@ export const STRUCTURE_CLASS: Readonly<Partial<Record<FixType, RecommendationCla
 
 /** The structure and content detectors read our own crawl, so a finding is likely, not confirmed. */
 const CRAWL_CONFIDENCE: Confidence = 'likely';
-
-const subjectOf = (key: string) => key.slice(key.indexOf(':') + 1);
 
 /** A fix's title, from its record. */
 export const TITLES: Readonly<Partial<Record<FixType, (subject: string) => string>>> = {
@@ -84,11 +83,11 @@ function draft(f: FixRecord, effect: Effect, rank: number): FixDraft {
     ...base,
     type,
     section: FIX_SECTION[type],
-    title: TITLES[type]!(subjectOf(r.key)),
+    title: TITLES[type]!(subjectOfKey(r.key)),
     recommendation_class: STRUCTURE_CLASS[type]!,
     confidence: CRAWL_CONFIDENCE,
     affected_pages: r.affected_urls.length,
-    template_key: type === 'duplicate_pagination' ? subjectOf(r.key) : null,
+    template_key: type === 'duplicate_pagination' ? subjectOfKey(r.key) : null,
     crawler_uas: [],
   };
 }

@@ -133,7 +133,7 @@ function jsonLd($: cheerio.CheerioAPI): JsonLdNode[] {
 function openingWindow(blocks: readonly Block[]): Block[] {
   let read = 0;
   const end = blocks.findIndex((b) => (read += b.words) >= OPENING_WORDS);
-  return end === -1 ? [...blocks] : blocks.slice(0, end + 1);
+  return blocks.filter((_, i) => end === -1 || i <= end);
 }
 
 export function readPage(html: string): ContentFeatures {

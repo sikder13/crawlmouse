@@ -19,6 +19,7 @@
 import type { Effect, LinkEdge, WithheldReason } from '@crawlmouse/types/v2';
 import type { AccessDetection } from '../access/types.js';
 import type { ContentDetection } from '../content/aggregate.js';
+import { subjectOfKey } from '../detectors/fingerprint.js';
 import type { Detection } from '../detectors/types.js';
 import { accessScore, type CrawlerTally } from './access.js';
 import type { AiInputs } from './index.js';
@@ -35,8 +36,6 @@ interface Inputs {
   seo: TechnicalSeoInput;
   ai: AiInputs;
 }
-
-const subjectOf = (key: string) => key.slice(key.indexOf(':') + 1);
 
 function addEdge(seo: TechnicalSeoInput, from: string, to: string): TechnicalSeoInput {
   if (from === to || seo.edges.some((e) => e.from_url === from && e.to_url === to)) return seo;
@@ -92,7 +91,7 @@ export function applyFix(inputs: Inputs, f: FixRecord): Inputs {
     return { seo, ai: { ...ai, quotable: { ...ai.quotable, checks } } };
   }
   const r = f.record;
-  const url = subjectOf(r.key);
+  const url = subjectOfKey(r.key);
   switch (r.type) {
     case 'orphan_pages': {
       const parent = seo.pages.find((p) => p.url === url)?.suggested_parent_url ?? seo.homepage_url;
