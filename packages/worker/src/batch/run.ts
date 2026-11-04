@@ -1,17 +1,25 @@
 import { canonicalizeUrl } from '@crawlmouse/engine/worker';
-import type { AccessTest, LinkEdge } from '@crawlmouse/types/v2';
+import {
+  BatchPartialSchema,
+  type AccessTest,
+  type BatchPartial,
+  type DeclarationFetch,
+  type LinkEdge,
+} from '@crawlmouse/types/v2';
 import type { Clock } from '../clock.js';
 import type { Fetcher } from '../fetch/fetcher.js';
-import { CANARY, CRAWLERS } from '../identities.js';
+import { CANARY, CRAWL, CRAWLERS } from '../identities.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import type { Sites } from '../politeness/sites.js';
 import { bounded, CAPS } from '../rows/bounded.js';
-import { bodyExcerpt, storedUrl } from '../rows/evidence.js';
+import { bodyExcerpt, storedUrl, userAgentOf } from '../rows/evidence.js';
+import { LOCAL_VANTAGE, type Vantage } from '../vantage.js';
 import type { CrawlPage } from '../rows/crawl-page.js';
 import { runAccess } from './access.js';
 import { Budget } from './budget.js';
 import { runCrawl } from './crawl.js';
-import { Findings, type Finding, type PartialReason } from './findings.js';
+import { fetchDeclarations } from './declarations.js';
+import { Findings, type Finding } from './findings.js';
 import { inlineReader, type PageReader } from '../reader/read.js';
 import type { FetchContext } from './polite-fetch.js';
 import { batchIdOf, urlsOf, type BatchRequest } from './request.js';
@@ -26,10 +34,14 @@ export interface BatchDeps {
   robotsCache: RobotsCache;
   /** Reads pages; the server passes the reader thread. Inline when not given, as tests run it. */
   reader?: PageReader;
+  /** Where requests leave from; off Fly and unreleased when not given, as tests run it. */
+  vantage?: Vantage;
 }
 
 export interface RobotsEvidence {
   origin: string;
+  /** The user agent robots.txt was requested with: always our crawler's. */
+  identity_sent: string;
   state: OriginRules['reading']['state'];
   why: string | null;
   status: number | null;
@@ -49,10 +61,12 @@ interface ResultCommon {
   requests: number;
   bytes: number;
   coverage: { urls_requested: number; urls_complete: number };
-  /** Null when the batch did everything it was asked; otherwise why it did not. */
-  partial: { reasons: PartialReason[] } | null;
+  /** Null when the batch did everything it was asked; otherwise why it did not (the contract's). */
+  partial: BatchPartial;
   findings: Finding[];
   robots: RobotsEvidence[];
+  /** The declaration files a crawl batch requested, once each (declarations.ts); none for access. */
+  declarations: DeclarationFetch[];
 }
 
 export type BatchResult =
@@ -107,6 +121,7 @@ export async function runBatch(
     checkId: req.check_id,
     blocked,
     pageDone,
+    vantage: deps.vantage ?? LOCAL_VANTAGE,
   };
 
   const done =
@@ -119,6 +134,10 @@ export async function runBatch(
     if (stop && stop.at >= startedAt) findings.stopped(site, stop);
   }
   const reasons = findings.partialReasons();
+  // After the pages and after their accounting: a declaration takes from the same budget and limiter,
+  // so a spent budget leaves a declaration unrequested, never a page, and what became of each is on
+  // its own record, not in the batch's coverage, findings or partial reasons.
+  const declarations = req.kind === 'crawl' ? await fetchDeclarations(run, req.urls[0]!) : [];
   const common: ResultCommon = {
     batch_id: batchIdOf(req),
     check_id: req.check_id,
@@ -128,9 +147,10 @@ export async function runBatch(
     requests: budget.used.requests,
     bytes: budget.used.bytes,
     coverage: { urls_requested: requested.length, urls_complete: done.complete },
-    partial: reasons.length ? { reasons } : null,
+    partial: BatchPartialSchema.parse(reasons.length ? { reasons } : null),
     findings: findings.list(),
     robots: origins.map(robotsEvidence),
+    declarations,
   };
   if ('rows' in done) return { ...common, kind: 'access', access_tests: done.rows };
   // Compared in the canonical spelling the edges use, so a page already crawled is not rediscovered.
@@ -152,6 +172,7 @@ function robotsEvidence(o: OriginRules): RobotsEvidence {
   const f = o.reading.fetch;
   return {
     origin: bounded(o.origin, CAPS.origin),
+    identity_sent: userAgentOf(f, CRAWL),
     state: o.reading.state,
     why: 'why' in o.reading ? o.reading.why : null,
     status: f.status,

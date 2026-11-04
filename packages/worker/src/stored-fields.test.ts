@@ -1,4 +1,4 @@
-import { AccessTestSchema, LinkEdgeSchema } from '@crawlmouse/types/v2';
+import { AccessTestSchema, DECLARATION_PATHS, LinkEdgeSchema } from '@crawlmouse/types/v2';
 import { describe, expect, it, vi } from 'vitest';
 import type { BatchRequest } from './batch/request.js';
 import { runBatch, type BatchResult } from './batch/run.js';
@@ -47,7 +47,10 @@ type Format =
   | 'method'
   | 'http_version'
   | 'simhash'
-  | 'search_engine';
+  | 'search_engine'
+  | 'fly_region'
+  | 'worker_release'
+  | 'declaration_path';
 /** A field is either made by the helper with the cap named, or a fixed format. */
 type Field = Cap | Format;
 const FORMATS: Record<Format, RegExp> = {
@@ -58,6 +61,10 @@ const FORMATS: Record<Format, RegExp> = {
   method: /^GET$/,
   http_version: /^1\.1$/,
   simhash: /^[0-9a-f]{16}$/,
+  // vantage.ts: validated at start against the contract's own patterns.
+  fly_region: /^[a-z]{3}$/,
+  worker_release: /^(?:[0-9a-f]{12}|unreleased)$/,
+  declaration_path: new RegExp(`^(?:${DECLARATION_PATHS.map((p) => p.replace(/\./g, '\\.')).join('|')})$`),
   // A registry token, a module constant (identities.ts SEARCH_ENGINES).
   search_engine: new RegExp(`^(?:${identities.SEARCH_ENGINES.map((e) => e.token).join('|')})$`),
 };
@@ -74,6 +81,10 @@ const EVIDENCE = {
   final_url: 'url',
   ...row('headers[]', HEADERS),
   evidence_class: 'enum',
+  fly_region: 'fly_region',
+  request_signing: 'enum',
+  signature_verified: 'enum',
+  worker_release: 'worker_release',
 } as const;
 
 /** Every string path a batch result can hold, and what it must be. */
@@ -97,6 +108,7 @@ const FIELDS: Record<string, Field> = {
   }),
   ...row('robots[]', {
     origin: 'origin',
+    identity_sent: 'identity',
     state: 'enum',
     why: 'enum',
     final_url: 'url',
@@ -120,6 +132,15 @@ const FIELDS: Record<string, Field> = {
     content_simhash: 'simhash',
     'robots_search[].ua': 'search_engine',
     'robots_search[].verdict': 'enum',
+    'title.text': 'title',
+    'meta_description.text': 'description',
+  }),
+  ...row('declarations[]', {
+    origin: 'origin',
+    path: 'declaration_path',
+    state: 'enum',
+    media_type: 'mediaType',
+    not_requested: 'enum',
   }),
   ...row('link_edges[]', {
     check_id: 'id',
@@ -138,6 +159,9 @@ const FIELDS: Record<string, Field> = {
     verdict: 'enum',
     cause: 'enum',
     body_excerpt: 'bodyExcerpt',
+    identity_role: 'enum',
+    'witness.role': 'enum',
+    'witness.ua': 'token',
     method: 'method',
     http_version: 'http_version',
   }),
@@ -340,9 +364,9 @@ describe('stored fields', () => {
       ...schemaStrings(LinkEdgeSchema).map((p) => `link_edges[].${p}`),
       ...schemaStrings(AccessTestSchema).map((p) => `access_tests[].${p}`),
     ];
-    // 24 in CrawlPage, 4 in LinkEdge, 19 in AccessTest: the walk reaches the nested header and page
+    // 30 in CrawlPage, 4 in LinkEdge, 26 in AccessTest: the walk reaches the nested header and page
     // fact fields. AccessTest's request line is two literals, a fixed format the walk does not list.
-    expect(declared).toHaveLength(47);
+    expect(declared).toHaveLength(60);
     expect(declared.filter((p) => !(p in FIELDS))).toEqual([]);
   });
 

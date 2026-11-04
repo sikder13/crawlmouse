@@ -55,6 +55,10 @@ export interface RequestPolicy {
   gate?: (url: string) => Promise<RedirectGate>;
   /** The decoded body cap for each request, when it is below MAX_BODY_BYTES. */
   maxBytes?: number;
+  /** How much of each body to keep and read, when less than the fetcher keeps. */
+  keepBytes?: number;
+  /** `false`: a redirect is returned as it answered and its Location is not requested. */
+  follow?: boolean;
 }
 
 function locationOf(f: FetchOutcome): string | null {
@@ -68,6 +72,7 @@ async function oneRequest(
   url: string,
   identity: Identity,
   ceiling: number,
+  keepBytes: number | undefined,
 ): Promise<FetchOutcome | NotRequested> {
   const site = siteKeyOf(url);
   const before = refusal(ctx, site);
@@ -84,6 +89,7 @@ async function oneRequest(
     const f = await ctx.fetcher(url, identity, {
       ...limits,
       maxBytes: Math.min(limits.maxBytes, ceiling),
+      ...(keepBytes !== undefined && { keepBytes }),
     });
     ctx.budget.addBytes(f.bytes);
     // Cut off by what the batch had left, rather than by the request's own ceiling.
@@ -116,7 +122,13 @@ export async function politeFetch(
   // The redirect response that led to `current`, once there is one.
   let previous: FetchOutcome | null = null;
   for (;;) {
-    const r = await oneRequest(ctx, current, identity, policy.maxBytes ?? MAX_BODY_BYTES);
+    const r = await oneRequest(
+      ctx,
+      current,
+      identity,
+      policy.maxBytes ?? MAX_BODY_BYTES,
+      policy.keepBytes,
+    );
     if ('reason' in r) {
       if (!previous) return { notRequested: r };
       // A hop already answered: keep its response, and say why the chain went no further.
@@ -129,6 +141,7 @@ export async function politeFetch(
       };
       return { fetch, cut: r };
     }
+    if (policy.follow === false) return { fetch: { ...r, url, hops } };
     const location = locationOf(r);
     let next: string | null = null;
     try {
