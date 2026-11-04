@@ -1,7 +1,8 @@
 /**
  * One verdict per crawler for the site, from its cells. Rules 2 to 4 each need at least half of the
- * pages that decide them, a tie between a serve and a block going to the serve (the weaker claim);
- * `extent` keeps the counts whatever the verdict.
+ * pages that decide them. A tie between a serve and a user-agent block goes to the serve (the weaker
+ * claim); a robots.txt disallow on exactly half the pages read is still `disallowed_by_robots` (rule
+ * 2). `extent` keeps the counts whatever the verdict.
  *
  * 1. No measured cell (the contract's UNMEASURED_VERDICTS): `edge_blocks_automation` when any cell
  *    carries it, otherwise `not_measured`. Never an allow.
