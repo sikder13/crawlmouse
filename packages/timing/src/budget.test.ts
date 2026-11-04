@@ -119,12 +119,12 @@ describe('the clock', () => {
     expect(() => expectWithinBudget('a wait', waits, { budgetMs: 10, env: {} })).not.toThrow();
     expect(() =>
       expectWithinBudget('a wait', waits, { budgetMs: 10, env: { PERF_STRICT: '1' } }),
-    ).toThrow(/of wall-clock time/);
+    ).toThrow(/wall-clock time against the budget/);
   });
 
   it('names the clock it read in a failure', () => {
     expect(() => expectWithinBudget('busy', () => spin(20), { budgetMs: 1, env: {} })).toThrow(
-      /median [0-9.]+ ms of CPU time over 5 runs/,
+      /CPU time against the default ceiling/,
     );
   });
 
@@ -155,13 +155,50 @@ describe('the clock', () => {
 });
 
 describe('expectWithinBudget', () => {
-  it('runs the warm-up and then TIMING_RUNS measured runs, and returns every run value', () => {
+  it('runs the warm-up and then TIMING_RUNS measured runs, and returns every value, the cold one first', () => {
     const c = scripted([999, 1, 2, 3, 4, 5]);
     const r = expectWithinBudget('x', c.work, { budgetMs: 10, now: c.now, env: {} });
     expect(c.calls()).toBe(WARMUP_RUNS + TIMING_RUNS);
     expect(r.samples).toEqual([1, 2, 3, 4, 5]);
-    expect(r.values).toEqual([2, 3, 4, 5, 6]);
+    expect(r.values).toEqual([1, 2, 3, 4, 5, 6]);
     expect(r.median).toBe(3);
+  });
+
+  it('gives every run, the warm-up included, a fresh input from setup, off the clock', () => {
+    let t = 0;
+    const made: object[] = [];
+    const seen: object[] = [];
+    const r = expectWithinBudget(
+      'x',
+      (input: object) => {
+        seen.push(input);
+        t += 2;
+        return input;
+      },
+      {
+        budgetMs: 10,
+        now: () => t,
+        env: {},
+        setup: () => {
+          t += 1_000; // a slow setup is not timed
+          const input = {};
+          made.push(input);
+          return input;
+        },
+      },
+    );
+    expect(made).toHaveLength(WARMUP_RUNS + TIMING_RUNS);
+    expect(new Set(seen).size).toBe(WARMUP_RUNS + TIMING_RUNS);
+    expect(seen).toEqual(made);
+    expect(r.samples).toEqual([2, 2, 2, 2, 2]);
+  });
+
+  it('stops once three of the five runs are over the limit, since the median then is', () => {
+    const c = scripted([0, 50, 1, 50, 50]); // a fifth measured run would throw: no duration left
+    expect(() =>
+      expectWithinBudget('x', c.work, { budgetMs: 10, now: c.now, env: { PERF_STRICT: '1' } }),
+    ).toThrow(/3 of 4 runs over the limit, so the median of 5 is over it/);
+    expect(c.calls()).toBe(5);
   });
 
   it('judges the median, so two slow runs out of five do not fail it', () => {
@@ -172,10 +209,10 @@ describe('expectWithinBudget', () => {
   });
 
   it('fails when three runs out of five are over, and the warm-up is not one of the five', () => {
-    const c = scripted([0, 11, 11, 11, 1, 1]);
+    const c = scripted([0, 11, 1, 11, 1, 11]);
     expect(() =>
       expectWithinBudget('x', c.work, { budgetMs: 10, now: c.now, env: { PERF_STRICT: '1' } }),
-    ).toThrow(/median 11 ms of wall-clock time/);
+    ).toThrow(/median 11 ms of wall-clock time over 5 runs/);
     const warm = scripted([10_000, 1, 1, 1, 1, 1]);
     expect(() =>
       expectWithinBudget('x', warm.work, {
@@ -198,7 +235,7 @@ describe('expectWithinBudget', () => {
   });
 
   it('names every sample, the warm-up and the limit when it fails', () => {
-    const c = scripted([40, 31.25, 32, 33, 34, 35]);
+    const c = scripted([40, 31.25, 1, 33, 2, 35]);
     let message = '';
     try {
       expectWithinBudget('the layout', c.work, { budgetMs: 10, now: c.now, env: {} });
@@ -206,7 +243,7 @@ describe('expectWithinBudget', () => {
       message = (e as Error).message;
     }
     expect(message).toContain('the layout');
-    expect(message).toContain('31.25, 32, 33, 34, 35 ms');
+    expect(message).toContain('31.25, 1, 33, 2, 35 ms');
     expect(message).toContain('warm-up 40 ms');
     expect(message).toContain('3 × the 10 ms budget');
   });
@@ -251,6 +288,25 @@ describe('expectWithinBudget', () => {
 });
 
 describe('expectWithinRelative', () => {
+  it('appends the measured side to PERF_SAMPLES_DIR against the limit it was held to', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'timing-'));
+    let t = 0;
+    const tick = (d: number) => () => void (t += d);
+    expectWithinRelative(
+      'rel',
+      { measured: tick(3), reference: tick(2) },
+      { limit: (r) => r * 2, rule: 'twice', now: () => t, env: { PERF_SAMPLES_DIR: dir } },
+    );
+    expect(JSON.parse(readFileSync(join(dir, 'samples.jsonl'), 'utf8'))).toEqual({
+      metric: 'rel',
+      unit: 'ms',
+      median: 3,
+      limit: 4,
+      pass: true,
+      samples: [3, 3, 3, 3, 3],
+    });
+  });
+
   /** Two functions on one clock: `measured` and `reference` take the next duration from their own list. */
   function pair(measured: number[], reference: number[]) {
     let t = 0;

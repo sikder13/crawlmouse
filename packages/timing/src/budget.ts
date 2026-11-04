@@ -56,12 +56,18 @@ interface Options {
   env?: Env;
 }
 
-export interface BudgetOptions extends Options {
+export interface BudgetOptions<I> extends Options {
   budgetMs: number;
+  /**
+   * Builds the input for one run, off the clock. Each run, the warm-up included, gets a fresh one,
+   * so a cache keyed on the input cannot turn the measured runs into cache hits. An input of equal
+   * value (a string, say) still reaches a cache keyed on its value.
+   */
+  setup?: () => I;
 }
 
 export interface BudgetResult<T> {
-  /** What each measured run returned, in order. */
+  /** What each run returned, the warm-up first: `values[0]` is the cold call. */
   values: T[];
   samples: number[];
   median: number;
@@ -76,26 +82,40 @@ function timed<T>(fn: () => T, now: () => number): { value: T; ms: number } {
   return { value, ms: now() - start };
 }
 
+/** Runs needed over the limit for the median of TIMING_RUNS to be over it. */
+const MAJORITY = Math.floor(TIMING_RUNS / 2) + 1;
+
 /**
- * Runs `fn` WARMUP_RUNS times, then TIMING_RUNS times on the clock clockFor picks, and throws
+ * Runs `fn` WARMUP_RUNS times, then up to TIMING_RUNS times on the clock clockFor picks, and throws
  * unless the median of those runs is under the limit: the budget, on the wall clock, under
- * PERF_STRICT=1; DEFAULT_CEILING_FACTOR times it, in CPU time, otherwise. The samples are recorded
- * to PERF_SAMPLES_DIR, when set, pass or fail.
+ * PERF_STRICT=1; DEFAULT_CEILING_FACTOR times it, in CPU time, otherwise. It stops as soon as
+ * MAJORITY runs are over the limit, since the median is then over it whatever the rest read. The
+ * samples are recorded to PERF_SAMPLES_DIR, when set, pass or fail.
  */
-export function expectWithinBudget<T>(
+export function expectWithinBudget<T, I = undefined>(
   name: string,
-  fn: () => T,
-  { budgetMs, now, env = process.env }: BudgetOptions,
+  fn: (input: I) => T,
+  { budgetMs, setup, now, env = process.env }: BudgetOptions<I>,
 ): BudgetResult<T> {
   const strict = isStrict(env);
   const clock = clockFor(env);
   const read = now ?? clock.now;
   const limitMs = strict ? budgetMs : budgetMs * DEFAULT_CEILING_FACTOR;
-  const warmups = Array.from({ length: WARMUP_RUNS }, () => timed(fn, read).ms);
-  const runs = Array.from({ length: TIMING_RUNS }, () => timed(fn, read));
+  const run = () => {
+    const input = (setup ? setup() : undefined) as I;
+    return timed(() => fn(input), read);
+  };
+  const warmups = Array.from({ length: WARMUP_RUNS }, run);
+  const runs: Array<{ value: T; ms: number }> = [];
+  let over = 0;
+  while (runs.length < TIMING_RUNS && over < MAJORITY) {
+    const r = run();
+    runs.push(r);
+    if (!(r.ms < limitMs)) over++;
+  }
   const samples = runs.map((r) => r.ms);
   const mid = median(samples);
-  const pass = mid < limitMs;
+  const pass = over < MAJORITY && mid < limitMs;
   recordSample(env.PERF_SAMPLES_DIR, {
     metric: name,
     unit: 'ms',
@@ -108,12 +128,20 @@ export function expectWithinBudget<T>(
     const against = strict
       ? `the budget of ${fmt(budgetMs)} ms (PERF_STRICT=1)`
       : `the default ceiling of ${fmt(limitMs)} ms (${DEFAULT_CEILING_FACTOR} × the ${fmt(budgetMs)} ms budget, which the strict job holds)`;
+    const verdict =
+      runs.length < TIMING_RUNS
+        ? `${over} of ${runs.length} runs over the limit, so the median of ${TIMING_RUNS} is over it: ${clock.name} against ${against}`
+        : `median ${fmt(mid)} ms of ${clock.name} over ${TIMING_RUNS} runs is not under ${against}`;
     throw new Error(
-      `${name}: median ${fmt(mid)} ms of ${clock.name} over ${TIMING_RUNS} runs is not under ${against}. ` +
-        `Samples: ${list(samples)}; warm-up ${list(warmups)}.`,
+      `${name}: ${verdict}. Samples: ${list(samples)}; warm-up ${list(warmups.map((w) => w.ms))}.`,
     );
   }
-  return { values: runs.map((r) => r.value), samples, median: mid, limitMs };
+  return {
+    values: [...warmups, ...runs].map((r) => r.value),
+    samples,
+    median: mid,
+    limitMs,
+  };
 }
 
 export interface RelativeOptions extends Options {
@@ -147,7 +175,16 @@ export function expectWithinRelative(
     r.push(timed(reference, read).ms);
   }
   const bound = limit(median(r));
-  if (!(median(m) < bound)) {
+  const pass = median(m) < bound;
+  recordSample(env.PERF_SAMPLES_DIR, {
+    metric: name,
+    unit: 'ms',
+    median: median(m),
+    limit: bound,
+    pass,
+    samples: m,
+  });
+  if (!pass) {
     throw new Error(
       `${name}: median ${fmt(median(m))} ms of ${clock.name} is not under ${fmt(bound)} ms (${rule}). ` +
         `Measured: ${list(m)}; reference: ${list(r)}, median ${fmt(median(r))} ms.`,
