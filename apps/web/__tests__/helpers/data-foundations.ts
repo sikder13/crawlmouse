@@ -156,6 +156,12 @@ const OWNER_OF = `
 
 export async function deidentificationViolations(d: Db): Promise<string[]> {
   const bad: string[] = [];
+  // The rules below name measurement_lineages; without it they could not run, so report that alone.
+  const { rows: lineageTable } = await d.query<{ t: string | null }>(
+    `select to_regclass('public.measurement_lineages')::text as t`,
+  );
+  if (lineageTable[0]!.t === null)
+    return ['public.measurement_lineages: missing (renamed or dropped)'];
   const { rows: cols } = await d.query<{ col: string; type: string }>(
     `select c.relname || '.' || a.attname as col, format_type(a.atttypid, a.atttypmod) as type
        from pg_attribute a join pg_class c on c.oid = a.attrelid
