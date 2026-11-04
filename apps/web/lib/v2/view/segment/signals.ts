@@ -4,13 +4,8 @@
  * What each signal is and who reads it is product copy (SIGNAL_COPY); what the check found is the
  * fixture's.
  */
-import {
-  SignalKindSchema,
-  type Check,
-  type FixtureDataset,
-  type RecommendationClass,
-  type SignalKind,
-} from '@crawlmouse/types/v2';
+import type { Check, FixtureDataset, RecommendationClass } from '@crawlmouse/types/v2';
+import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from '../screen-signals';
 import { findCheck } from '../../fixtures';
 import { listOf, percent, testedAt } from '../../format';
 import { isAi, isAllowed } from '../../sentences';
@@ -23,7 +18,7 @@ import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
  * The recommendation class of each signal. PROPOSED: the contract's SignalResult has no
  * `recommendation_class` (only Fix does), so the class is set here until it does.
  */
-export const SIGNAL_CLASSES: Record<SignalKind, RecommendationClass> = {
+export const SIGNAL_CLASSES: Record<ScreenSignal, RecommendationClass> = {
   schema_org: 'best_practice',
   content_signals: 'best_practice',
   web_bot_auth: 'experimental',
@@ -31,10 +26,6 @@ export const SIGNAL_CLASSES: Record<SignalKind, RecommendationClass> = {
   mcp_server_card: 'experimental',
   markdown_negotiation: 'experimental',
   agent_skills_index: 'experimental',
-  ucp: 'experimental',
-  rsl: 'experimental',
-  agent_card: 'experimental',
-  llms_full: 'experimental',
 };
 
 interface SignalCopy {
@@ -46,20 +37,8 @@ interface SignalCopy {
   readers: string;
 }
 
-/**
- * A declaration the worker records by path (CC-12d) and no copy has been written for yet: its file's
- * name, the table's existing advice and lift, and no claim about who reads it.
- */
-const declarationOnly = (file: string): SignalCopy => ({
-  name: file,
-  short: file,
-  advice: { present: 'Keep it.', absent: 'Skip for now.' },
-  lift: 'Too new to measure',
-  readers: '',
-});
-
 /** What each signal is and who reads it: the locked page's copy, with Web Bot Auth per FACTS I10. */
-const SIGNAL_COPY: Record<SignalKind, SignalCopy> = {
+const SIGNAL_COPY: Record<ScreenSignal, SignalCopy> = {
   schema_org: {
     name: 'schema.org structured data',
     short: 'schema',
@@ -129,16 +108,12 @@ const SIGNAL_COPY: Record<SignalKind, SignalCopy> = {
     lift: 'Too new to measure',
     readers: 'Agent frameworks discovering what a site can do',
   },
-  ucp: declarationOnly('/.well-known/ucp'),
-  rsl: declarationOnly('rsl.xml'),
-  agent_card: declarationOnly('agent-card.json'),
-  llms_full: declarationOnly('llms-full.txt'),
 };
 
 const UNTESTED_ADVICE = 'Nothing to do yet: we check it again on the next audit.';
 
 export interface SignalRowView {
-  signal: SignalKind;
+  signal: ScreenSignal;
   name: string;
   status: { state: DoorView['pill']['state']; label: string };
   advice: string;
@@ -169,9 +144,9 @@ export interface SignalsView {
   keep: { title: string; sub: string } | null;
 }
 
-const KINDS = SignalKindSchema.options;
+const KINDS = SCREEN_SIGNALS;
 
-function row(check: Check, signal: SignalKind): SignalRowView {
+function row(check: Check, signal: ScreenSignal): SignalRowView {
   const copy = SIGNAL_COPY[signal];
   const rec = check.signals.find((s) => s.signal === signal);
   const status: SignalRowView['status'] = !rec
@@ -288,7 +263,7 @@ export function signalsView(
   const check = findCheck(d, checkId);
   const frame = segmentFrame(d, checkId, 'signals', options);
   const rows = KINDS.map((k) => row(check, k));
-  const by = (state: string) => check.signals.filter((s) => s.state === state).length;
+  const by = (state: string) => screenSignals(check).filter((s) => s.state === state).length;
   const present = by('detected');
   const absent = by('not_detected');
   const competitor = competitorOf(check, present);
