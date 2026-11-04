@@ -2,10 +2,12 @@
  * The reader's link walk feeds the engine's MainContentWalk, and the simhash reads the main content
  * it gives (`mainTextStart`). That must be extractMainContent's text, cut at HASHED_TEXT_CHARS: on
  * every corpus document the worker parses (packages/engine/fixtures/v2/main-content), and on
- * generated pages.
+ * generated pages. A page with no body element in the worker's parse is read from the body its HTML
+ * implies, so for it the text is parse5's extractMainContent, which builds that body.
  */
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
+import * as cheerio from 'cheerio';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { extractMainContent } from '../../../engine/src/analysis/ai-readiness/main-content.js';
@@ -21,21 +23,35 @@ const CORPUS: string[] = JSON.parse(
 );
 
 const BASE = 'https://a.test/';
-const expected = (html: string) =>
-  extractMainContent(parseHtml(html)!).text.slice(0, HASHED_TEXT_CHARS);
+/**
+ * extractMainContent on the worker's parse; for a page with no body element there, on parse5's
+ * (cheerio's default), which builds the body the page implies, as the reader reads it.
+ */
+const expected = (html: string) => {
+  const $ = parseHtml(html)!;
+  const $read = $('body').length > 0 ? $ : cheerio.load(html);
+  return extractMainContent($read).text.slice(0, HASHED_TEXT_CHARS);
+};
 const fromWalk = (html: string) => readLinks(parseHtml(html)!, BASE).mainTextStart;
 
 describe('the main content the reader hashes', () => {
   it('is extractMainContent’s, cut at HASHED_TEXT_CHARS, on every corpus document the worker parses', () => {
     const differ: number[] = [];
     let tooDeep = 0;
+    let bodyless = 0;
     CORPUS.forEach((html, i) => {
-      if (parseHtml(html) === null) tooDeep++;
-      else if (fromWalk(html) !== expected(html)) differ.push(i);
+      const $ = parseHtml(html);
+      if ($ === null) tooDeep++;
+      else {
+        if ($('body').length === 0) bodyless++;
+        if (fromWalk(html) !== expected(html)) differ.push(i);
+      }
     });
     expect(differ).toEqual([]);
     // Documents nested past MAX_DOM_DEPTH, which the worker does not read: stated, not skipped.
     expect(tooDeep).toBe(TOO_DEEP);
+    // Documents with no body element, read from the body they imply: compared with parse5's.
+    expect(bodyless).toBe(BODYLESS);
   }, 600_000);
 
   it('is the same on generated pages of links, menus and prose', () => {
@@ -66,3 +82,5 @@ describe('the main content the reader hashes', () => {
 
 /** Measured: the corpus documents parseHtml refuses as nested past MAX_DOM_DEPTH. */
 const TOO_DEEP = 2;
+/** Measured: the corpus documents the worker reads that have no body element. */
+const BODYLESS = 11;
