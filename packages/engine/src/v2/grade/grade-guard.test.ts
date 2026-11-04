@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import ts from 'typescript';
 import {
   gradeSources,
   guardCases,
@@ -47,11 +48,16 @@ describe('the grade-change guard', () => {
       "// import { fake } from './fake.js';",
       "const lazy = () => import('./lazy.js');",
       "const url = 'https://a.test'; import { n } from './n.js';",
-      // text inside a string is not code: it neither hides nor fakes an import
+      // text inside a string, a comment or a regular expression is not code
       "const mime = 'text/html,*/*'; import { o } from './o.js'; /** note */",
       "const joined = `${a}//${b}`; import { p } from './p.js';",
       'export const s = "x from \'./fake.js\'"',
       '"foo"// import { f } from \'./fake.js\'',
+      'const t = "import { f } from \'./fake.js\'";',
+      "const u = `import x from './fake.js'`;",
+      "const r = /\\//; import { real } from './real.js';",
+      // braces holding only type names are erased too
+      "import { type Q } from './q-type.js';",
     ].join('\n');
     expect(importsOf('v2/grade/x.ts', source)).toEqual([
       'v2/grade/a.ts',
@@ -64,6 +70,7 @@ describe('the grade-change guard', () => {
       'v2/grade/n.ts',
       'v2/grade/o.ts',
       'v2/grade/p.ts',
+      'v2/grade/real.ts',
     ]);
   });
 
@@ -80,6 +87,23 @@ describe('the grade-change guard', () => {
       'graph.ts graphology',
       'v2/content/read.ts cheerio',
     ]);
+    // the one value constants.ts takes from @crawlmouse/types, by name
+    const constants = ts.createSourceFile(
+      'constants.ts',
+      readFileSync(new URL('../../constants.ts', import.meta.url), 'utf8'),
+      ts.ScriptTarget.Latest,
+    );
+    const names = constants.statements.flatMap((st) =>
+      ts.isExportDeclaration(st) &&
+      st.moduleSpecifier &&
+      ts.isStringLiteral(st.moduleSpecifier) &&
+      st.moduleSpecifier.text === '@crawlmouse/types' &&
+      st.exportClause &&
+      ts.isNamedExports(st.exportClause)
+        ? st.exportClause.elements.map((e) => e.name.text)
+        : [],
+    );
+    expect(names).toEqual(Object.keys(PACKAGE_VALUES['@crawlmouse/types']));
     const packages = new Set(found.map((x) => x.split(' ')[1]!));
     expect([...Object.keys(PACKAGE_VALUES), ...LIBRARIES].sort()).toEqual([...packages].sort());
   });

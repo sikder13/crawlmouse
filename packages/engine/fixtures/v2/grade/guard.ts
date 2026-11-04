@@ -3,6 +3,7 @@
  * from, by digest, and the grades and effects of the example sites.
  */
 import { createHash } from 'node:crypto';
+import ts from 'typescript';
 import { MIN_GRADEABLE_PAGES } from '@crawlmouse/types';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -22,29 +23,51 @@ const SRC = new URL('../../../src/', import.meta.url);
 const ENTRIES = ['v2/grade/index.ts', 'v2/grade/outcomes.ts', 'v2/content/read.ts'];
 
 /**
- * Strings and comments. A string is kept whole and a comment removed, so neither a comment nor text
- * inside a string can hide or fake an import. Regular-expression literals are not recognised; none in
- * the grade's files holds a quote or a comment marker that would mislead this.
+ * The runtime module specifiers of `source`, relative or not, in order, read by the TypeScript parser:
+ * `import … from` and `export … from` declarations, bare `import '…'`, `import x = require('…')` and
+ * dynamic `import('…')` with a literal specifier. A declaration that is type-only (`import type`,
+ * `export type`, or braces holding only `type` names) is erased when compiled and cannot change a
+ * computed grade, so it is not followed. Text in strings, comments and regular expressions is not code.
  */
-const STRINGS_AND_COMMENTS =
-  /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
-
-/**
- * A module specifier in an `import … from` or `export … from` statement, a bare `import '…'` or a
- * dynamic `import('…')`. A statement's clause holds no quote, semicolon, or another `import` or
- * `export`, so a match cannot run from one statement into the next or out of a string. `import type`
- * and `export type` statements (group 1) are erased when compiled and cannot change a computed grade,
- * so they are not followed; an inline `type` inside braces is, with its statement.
- */
-const SPECIFIER =
-  /\b(?:import|export)\s+(type\s+)?(?:(?!\b(?:import|export)\b)[^;'"`])*?\bfrom\s*['"]([^'"]+)['"]|\bimport\s*\(?\s*['"]([^'"]+)['"]/g;
-
-/** The runtime module specifiers of `source`, relative or not, in order. */
 function runtimeSpecifiers(source: string): string[] {
-  const code = source.replace(STRINGS_AND_COMMENTS, (_, str: string | undefined) => str ?? '');
-  return [...code.matchAll(SPECIFIER)]
-    .filter((m) => m[1] === undefined)
-    .map((m) => (m[2] ?? m[3])!);
+  const file = ts.createSourceFile('x.ts', source, ts.ScriptTarget.Latest, true);
+  const out: string[] = [];
+  const specifier = (e: ts.Expression | undefined) => {
+    if (e && ts.isStringLiteralLike(e)) out.push(e.text);
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node)) {
+      const c = node.importClause;
+      const typeOnly =
+        c !== undefined &&
+        (c.isTypeOnly ||
+          (c.name === undefined &&
+            c.namedBindings !== undefined &&
+            ts.isNamedImports(c.namedBindings) &&
+            c.namedBindings.elements.length > 0 &&
+            c.namedBindings.elements.every((e) => e.isTypeOnly)));
+      if (!typeOnly) specifier(node.moduleSpecifier);
+    } else if (ts.isExportDeclaration(node)) {
+      const typeOnly =
+        node.isTypeOnly ||
+        (node.exportClause !== undefined &&
+          ts.isNamedExports(node.exportClause) &&
+          node.exportClause.elements.length > 0 &&
+          node.exportClause.elements.every((e) => e.isTypeOnly));
+      if (!typeOnly) specifier(node.moduleSpecifier);
+    } else if (
+      ts.isImportEqualsDeclaration(node) &&
+      !node.isTypeOnly &&
+      ts.isExternalModuleReference(node.moduleReference)
+    ) {
+      specifier(node.moduleReference.expression);
+    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      specifier(node.arguments[0]);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return out;
 }
 
 const isRelative = (spec: string) => /^\.{1,2}\//.test(spec);
