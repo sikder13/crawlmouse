@@ -76,6 +76,17 @@ describe('the rule', () => {
 /** Blocks this thread for `ms` of wall-clock time without using the CPU. */
 const sleepSync = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
+/**
+ * A fixed amount of CPU work, about 1.3 ms a unit on the workstation these tests were written on.
+ * Fixed work rather than a busy wait on the clock: on a loaded machine a busy wait is descheduled
+ * and does less work, which would make these tests measure the machine.
+ */
+const spin = (units: number) => {
+  let x = 0;
+  for (let i = 0; i < units * 1e6; i++) x += i % 7;
+  return x;
+};
+
 describe('the clock', () => {
   it('is CPU time in the default suite and the wall clock under PERF_STRICT=1', () => {
     expect(clockFor({}).name).toBe('CPU time');
@@ -94,9 +105,8 @@ describe('the clock', () => {
   it('counts work the thread does', () => {
     const cpu = clockFor({}).now;
     const c0 = cpu();
-    const until = performance.now() + 50;
-    while (performance.now() < until);
-    expect(cpu() - c0).toBeGreaterThanOrEqual(40);
+    spin(50); // about 64 ms of CPU
+    expect(cpu() - c0).toBeGreaterThanOrEqual(30);
   });
 
   it('refuses CPU time inside a worker thread, where it counts every thread of the process', () => {
@@ -113,37 +123,31 @@ describe('the clock', () => {
   });
 
   it('names the clock it read in a failure', () => {
-    const busy = () => {
-      const until = performance.now() + 20;
-      while (performance.now() < until);
-    };
-    expect(() => expectWithinBudget('busy', busy, { budgetMs: 1, env: {} })).toThrow(
+    expect(() => expectWithinBudget('busy', () => spin(20), { budgetMs: 1, env: {} })).toThrow(
       /median [0-9.]+ ms of CPU time over 5 runs/,
     );
   });
 
   it('compares relative costs in CPU time in the default suite', () => {
-    const work = (ms: number) => () => {
-      const until = performance.now() + ms;
-      while (performance.now() < until);
-    };
-    // The reference waits 40 ms and works 2; the measured side works 10. In CPU time the measured
-    // side is five times the reference; on the wall clock it is a quarter of it.
+    // The reference waits 500 ms and does one unit of work; the measured side does ten. In CPU time
+    // the measured side is about ten times the reference. On the wall clock it is far under it: ten
+    // units read about 140 ms beside twelve CPU busy loops, so the wait is long enough to hold there.
+    const measured = () => spin(10);
     const reference = () => {
-      sleepSync(40);
-      work(2)();
+      sleepSync(500);
+      spin(1);
     };
     expect(() =>
       expectWithinRelative(
         'cpu',
-        { measured: work(10), reference },
+        { measured, reference },
         { limit: (r) => r * 2, rule: 'twice', env: {} },
       ),
     ).toThrow(/of CPU time/);
     expect(() =>
       expectWithinRelative(
         'wall',
-        { measured: work(10), reference },
+        { measured, reference },
         { limit: (r) => r * 2, rule: 'twice', env: { PERF_STRICT: '1' } },
       ),
     ).not.toThrow();
