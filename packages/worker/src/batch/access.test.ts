@@ -94,6 +94,15 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
     expect(row.limitations.join(' ')).toContain(
       'Claude-SearchBot and ClaudeBot were served on this page.',
     );
+    // Anthropic publishes no user agent for it, so the witness went as its bare token, and says so.
+    expect(row.limitations.join(' ')).toContain(
+      "Claude-SearchBot was sent as its bare token, because Anthropic publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler.",
+    );
+  });
+
+  it("en.wikipedia.org: a witness sent with its operator's user agent carries no bare-token caveat", () => {
+    const row = results.get('en.wikipedia.org')!.access_tests.find((r) => r.ua === 'ClaudeBot')!;
+    expect(row.limitations.join(' ')).not.toContain('bare token');
   });
 
   it('en.wikipedia.org: ClaudeBot is witnessed by the first crawler served, OAI-SearchBot', () => {
@@ -252,5 +261,92 @@ describe('the witness rule: the browser control is not a witness', () => {
     expect(rows[0]!.limitations.join(' ')).toContain(
       'No other tested crawler was served on this page, and the tagged Googlebot request was refused, so this refusal cannot be told apart from IP verification.',
     );
+  });
+});
+
+describe('the witness rule: a witness requested before the refusal is said to be', () => {
+  let server: FixtureServer;
+  let result: BatchResult & { kind: 'access' };
+  beforeAll(async () => {
+    // The first two crawlers in request order are served, every later one and the canary refused: the
+    // shape a limit on requests per address gives.
+    const firstTwo = CRAWLERS.slice(0, 2).map((c) => c.token!);
+    server = await startServer((req, res) => {
+      if (req.url === '/robots.txt') return res.end('User-agent: *\nAllow: /\n');
+      const who = whoSent(String(req.headers['user-agent'] ?? ''));
+      if (who === 'control' || who === 'crawl' || firstTwo.includes(who)) {
+        res.setHeader('content-type', 'text/html');
+        return res.end('<html><body><p>one two three four five</p></body></html>');
+      }
+      res.statusCode = 403;
+      res.end('Forbidden');
+    });
+    const clock = new InstantClock();
+    const one = accessRequest(server.base);
+    if (one.kind !== 'access') throw new Error('expected an access request');
+    const r = await runBatch(
+      { ...one, pages: [{ url: `${server.base}/`, template_key: '/' }] },
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+    );
+    if (r.kind !== 'access') throw new Error('expected an access result');
+    result = r;
+  });
+  afterAll(() => server.close());
+
+  it('a refusal after every identity served carries the request-limit caveat, and says so only then', () => {
+    const late = result.access_tests.find((r) => r.ua === CRAWLERS.at(-1)!.token)!;
+    expect(late.verdict).toBe('blocked_by_ua_rule');
+    expect(late.limitations.join(' ')).toContain(
+      'Every identity served on this page was requested before this one, so a limit on requests per address would look the same.',
+    );
+  });
+});
+
+describe('the witness rule: no request-limit caveat when a witness came after', () => {
+  it('nike.com: a refusal with a crawler served after it carries none', async () => {
+    const row = results.get('nike.com')!.access_tests.find((r) => r.ua === 'OAI-SearchBot')!;
+    expect(row.verdict).toBe('blocked_by_ua_rule');
+    expect(row.limitations.join(' ')).not.toContain('a limit on requests per address');
+  });
+});
+
+describe('the witness rule: a crawler served is the witness before the canary', () => {
+  it('records the first crawler served, though the canary was served too', async () => {
+    const server = await startServer((req, res) => {
+      if (req.url === '/robots.txt') return res.end('User-agent: *\nAllow: /\n');
+      if (whoSent(String(req.headers['user-agent'] ?? '')) === 'GPTBot') {
+        res.statusCode = 403;
+        return res.end('Forbidden');
+      }
+      res.setHeader('content-type', 'text/html');
+      res.end('<html><body><p>one two three four five</p></body></html>');
+    });
+    try {
+      const clock = new InstantClock();
+      const one = accessRequest(server.base);
+      if (one.kind !== 'access') throw new Error('expected an access request');
+      const r = await runBatch(
+        { ...one, pages: [{ url: `${server.base}/`, template_key: '/' }] },
+        {
+          clock,
+          sites: new Sites(clock),
+          fetcher: createFetcher(clock, { bypassSsrf: true }),
+          robotsCache: new RobotsCache(clock),
+        },
+      );
+      if (r.kind !== 'access') throw new Error('expected an access result');
+      expect(r.access_tests.find((t) => t.identity_role === 'canary')!.verdict).toBe('allowed');
+      expect(r.access_tests.find((t) => t.ua === 'GPTBot')).toMatchObject({
+        verdict: 'blocked_by_ua_rule',
+        witness: { role: 'crawler', ua: CRAWLERS[0]!.token },
+      });
+    } finally {
+      await server.close();
+    }
   });
 });

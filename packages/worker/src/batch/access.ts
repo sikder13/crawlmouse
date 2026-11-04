@@ -47,6 +47,17 @@ export interface AccessRun {
   vantage?: Vantage;
 }
 
+/**
+ * What every crawler's row is on a page the batch did not request (a stopped batch, robots.txt that
+ * could not be read): written without the decision table, so named here for the drift test
+ * (verdict/engine-mirror.test.ts).
+ */
+export const NOT_REQUESTED_ROW = {
+  verdict: 'not_measured',
+  evidence: 'simulated',
+  cause: null,
+} as const satisfies { verdict: Verdict; evidence: EvidenceClass; cause: AccessCause | null };
+
 /** One identity's request on a page, or why it was not made for a batch-level reason. */
 interface Probe {
   identity: Identity;
@@ -222,8 +233,9 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
       witness: witness ?? null,
       vantage: run.vantage,
     });
+  const { verdict: nv, evidence: ne, cause: nc } = NOT_REQUESTED_ROW;
   const notMeasured = (why: string) =>
-    CRAWLERS.map((c) => row(c.token, c, 'not_measured', 'simulated', null, [why], null, null));
+    CRAWLERS.map((c) => row(c.token, c, nv, ne, nc, [why], null, null));
 
   const blocked = run.blocked;
   if (blocked && 'reason' in blocked) return notMeasured(say.notRequested(blocked));
@@ -286,6 +298,13 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
     const other = served.find((t) => t !== c.identity.token);
     if (other !== undefined) return { role: 'crawler', ua: other };
     return canary.observed === 'served' ? { role: 'canary', ua: CANARY.token! } : null;
+  };
+  // Requests go in registry order, the canary last. A limit on requests per address serves the first
+  // and refuses the rest, which looks like a user-agent rule when every witness came before.
+  const servedOnlyBefore = (c: Probe): boolean => {
+    if (canary.observed === 'served') return false;
+    const at = CRAWLERS.indexOf(c.identity);
+    return !crawlers.some((o, i) => i > at && o.observed === 'served');
   };
   for (const c of crawlers) {
     const witness = witnessFor(c);
@@ -416,6 +435,10 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
               canary.observed,
               canaryNote,
               served.filter((t) => t !== c.identity.token),
+              servedOnlyBefore(c),
+              witness?.role === 'crawler' && decided.id === 'refused_witnessed'
+                ? (CRAWLERS.find((x) => x.token === witness.ua)?.bareTokenOf ?? null)
+                : null,
             ),
             ...notesOn(c),
           ],

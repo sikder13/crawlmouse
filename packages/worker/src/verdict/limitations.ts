@@ -240,6 +240,10 @@ export function witnessReading(
   canary: Observed,
   canaryNote: string | null,
   othersServed: readonly string[],
+  /** Every identity served on the page was requested before this one. */
+  allBefore = false,
+  /** The witness was sent as its bare token: its operator, which publishes no user agent. */
+  witnessBareOf: string | null = null,
 ): string {
   const tail = othersServed.length
     ? ` ${list(othersServed)} ${othersServed.length === 1 ? 'was' : 'were'} served on this page.`
@@ -247,5 +251,11 @@ export function witnessReading(
   if (witness === null)
     return `No other tested crawler was served on this page, and the tagged Googlebot request ${canaryNote ?? CANARY_OUTCOME[canary]}, so this refusal cannot be told apart from IP verification.`;
   const who = witness.role === 'canary' ? 'The tagged Googlebot request' : witness.ua;
-  return `${who} was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address.${tail}`;
+  const order = allBefore
+    ? ' Every identity served on this page was requested before this one, so a limit on requests per address would look the same.'
+    : '';
+  const bare = witnessBareOf
+    ? ` ${who} was sent as its bare token, because ${witnessBareOf} publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler.`
+    : '';
+  return `${who} was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address.${tail}${order}${bare}`;
 }
