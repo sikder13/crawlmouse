@@ -19,7 +19,11 @@ import {
 
 const records = (type: Detection['type'], states: Partial<Record<Detection['state'], number>>) =>
   Object.entries(states).flatMap(([state, n]) =>
-    Array.from({ length: n ?? 0 }, () => ({ type, state: state as Detection['state'] })),
+    Array.from({ length: n ?? 0 }, (_, i) => ({
+      type,
+      state: state as Detection['state'],
+      fingerprint: `${type}-${state}-${i}`,
+    })),
   );
 
 function inputOf(

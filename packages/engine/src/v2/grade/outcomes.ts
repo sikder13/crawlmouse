@@ -1,0 +1,126 @@
+/**
+ * The diff's input (`DetectorOutcome`, diff/types.ts) from the three detector families' records: the
+ * structure detectors (CC-16), the access detectors (CC-15) and the content checks. A detected record
+ * that opens a fix carries a draft with its computed effect and rank (effects.ts); a record not
+ * detected, or that could not decide, carries its state.
+ *
+ * A robots.txt disallow is the site's stated intent (`opens_fix: false`): it opens no fix, so a
+ * detected robots record has no outcome at all, and no counterfactual in the effects.
+ */
+import type { Confidence, Effect, FixType, RecommendationClass } from '@crawlmouse/types/v2';
+import type { AccessDetection } from '../access/types.js';
+import { FIX_SECTION } from '../diff/subjects.js';
+import type { DetectorOutcome, FixDraft } from '../diff/types.js';
+import type { Detection } from '../detectors/types.js';
+import { effectsOf, type FixRecord } from './effects.js';
+import type { Grades } from './index.js';
+
+type StructureType = Detection['type'];
+
+/** How strong the case for a structure fix is: a search engine documents the rule, or it is practice. */
+export const STRUCTURE_CLASS: Readonly<Partial<Record<FixType, RecommendationClass>>> = {
+  orphan_pages: 'best_practice',
+  deep_pages: 'best_practice',
+  generic_anchor_text: 'best_practice',
+  redirect_chain: 'best_practice',
+  duplicate_pagination: 'best_practice',
+  canonical_mismatch: 'documented_requirement',
+  hreflang_gap: 'documented_requirement',
+};
+
+/** The structure and content detectors read our own crawl, so a finding is likely, not confirmed. */
+const CRAWL_CONFIDENCE: Confidence = 'likely';
+
+const subjectOf = (key: string) => key.slice(key.indexOf(':') + 1);
+
+/** A fix's title, from its record. */
+export const TITLES: Readonly<Partial<Record<FixType, (subject: string) => string>>> = {
+  orphan_pages: (s) => `Link to ${s} from another page`,
+  deep_pages: (s) => `Bring ${s} within 3 clicks of the homepage`,
+  generic_anchor_text: (s) => `Use descriptive link text on ${s}`,
+  redirect_chain: (s) => `Link straight to where ${s} redirects`,
+  duplicate_pagination: (s) => `Make the later pages of ${s} distinct`,
+  canonical_mismatch: (s) => `Correct the canonical of ${s}`,
+  hreflang_gap: (s) => `Complete the hreflang annotations of ${s}`,
+  edge_rule_blocks_crawler: (s) => `Let ${s} through the user-agent rule`,
+  quotable_opening: (s) => `Open ${s} pages with a direct answer`,
+  missing_author_date: (s) => `Show an author and a date on ${s} pages`,
+  specs_as_images: (s) => `Give the specifications on ${s} pages as text`,
+};
+
+function draft(f: FixRecord, effect: Effect, rank: number): FixDraft {
+  const base = { detail: null, effort: null, before_after: [], packet: null, effect, rank };
+  if (f.family === 'access') {
+    const r = f.record;
+    return {
+      ...base,
+      type: r.type,
+      section: FIX_SECTION[r.type],
+      title: TITLES[r.type]!(r.crawler),
+      recommendation_class: r.recommendation_class,
+      confidence: r.confidence,
+      affected_pages: r.affected_urls.length,
+      template_key: null,
+      crawler_uas: [r.crawler],
+    };
+  }
+  if (f.family === 'content') {
+    const r = f.record;
+    return {
+      ...base,
+      type: r.type,
+      section: FIX_SECTION[r.type],
+      title: TITLES[r.type]!(r.template_key),
+      recommendation_class: r.recommendation_class,
+      confidence: CRAWL_CONFIDENCE,
+      affected_pages: r.affected_urls.length,
+      template_key: r.template_key,
+      crawler_uas: [],
+    };
+  }
+  const r = f.record;
+  const type: StructureType = r.type;
+  return {
+    ...base,
+    type,
+    section: FIX_SECTION[type],
+    title: TITLES[type]!(subjectOf(r.key)),
+    recommendation_class: STRUCTURE_CLASS[type]!,
+    confidence: CRAWL_CONFIDENCE,
+    affected_pages: r.affected_urls.length,
+    template_key: type === 'duplicate_pagination' ? subjectOf(r.key) : null,
+    crawler_uas: [],
+  };
+}
+
+export interface Outcomes {
+  outcomes: DetectorOutcome[];
+  /** The projected grades less the current ones, every fix applied: what the effects add up to. */
+  overview: Effect;
+}
+
+export function detectorOutcomes(
+  grades: Grades,
+  access: readonly AccessDetection[],
+  structure: readonly Detection[],
+): Outcomes {
+  const records: FixRecord[] = [
+    ...structure.map((record) => ({ family: 'structure' as const, record })),
+    ...access
+      .filter((r) => r.state !== 'detected' || r.opens_fix)
+      .map((record) => ({ family: 'access' as const, record })),
+    ...grades.content_detections.map((record) => ({ family: 'content' as const, record })),
+  ];
+  const fixes = records.filter((f) => f.record.state === 'detected');
+  const { byFix, overview } = effectsOf(grades.inputs, fixes);
+  const outcomes = records.map((f): DetectorOutcome => {
+    const { fingerprint, state } = f.record;
+    if (state === 'detected') {
+      const { effect, rank } = byFix.get(fingerprint)!;
+      return { fingerprint, state, fix: draft(f, effect, rank) };
+    }
+    if (state === 'not_detected') return { fingerprint, state };
+    return { fingerprint, state, gone: f.family === 'structure' ? f.record.page_gone : null };
+  });
+  return { outcomes, overview };
+}

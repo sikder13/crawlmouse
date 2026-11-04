@@ -43,7 +43,7 @@ export interface TechnicalSeoInput {
   /** The homepage is served for JavaScript to fill in: v1's orphan suppression applies. */
   homepage_client_rendered: boolean;
   /** CC-16's records for this check. */
-  detections: readonly Pick<Detection, 'type' | 'state'>[];
+  detections: readonly Pick<Detection, 'type' | 'state' | 'fingerprint'>[];
   /** Pages titled and described, of those read (CC-12d); null until the worker records them. */
   title_and_meta: Tally | null;
   /** What `decideRefusal` reads that the records do not carry. */
@@ -88,7 +88,8 @@ export function crawlabilityMeasures(input: TechnicalSeoInput): Record<string, n
 export const combine = (structure: number, crawlability: number): number =>
   round((SEO_WEIGHTS.structure / 100) * structure + SEO_WEIGHTS.crawlability * crawlability);
 
-export function technicalSeo(input: TechnicalSeoInput): TechnicalSeo {
+/** The structure grade (v1's) and the evidence the refusal reads, from one link graph. */
+function structureOf(input: TechnicalSeoInput) {
   const graph = buildGraph(
     input.pages.map((p) => ({ url: p.url, urlHash: p.url, statusCode: p.status_code })),
     input.edges.map((e) => ({
@@ -105,15 +106,28 @@ export function technicalSeo(input: TechnicalSeoInput): TechnicalSeo {
     jsRendered: input.homepage_client_rendered,
   });
   const fetched = input.pages.filter((p) => p.status_code >= 200 && p.status_code < 400).length;
-  const structure = computeGrade(gradeInputsFrom(ga, fetched));
+  return { ga, grade: computeGrade(gradeInputsFrom(ga, fetched)) };
+}
+
+/**
+ * The formula's value whether or not the grade is refused: what a fix's effect is measured on, so a
+ * fix on a site too thin to grade still moves a number.
+ */
+export function seoFormula(input: TechnicalSeoInput): number {
+  return combine(structureOf(input).grade.score, mean(Object.values(crawlabilityMeasures(input))));
+}
+
+export function technicalSeo(input: TechnicalSeoInput): TechnicalSeo {
+  const { ga, grade: structure } = structureOf(input);
   const refusal = decideRefusal({
     gradeablePageCount: ga.gradeableCount,
     observedEdgeCount: ga.observedEdgeCount,
     fetchedOkCount: input.pages.filter((p) => p.status_code === 200).length,
     ...input.refusal,
   });
-  const measures = Object.values(crawlabilityMeasures(input));
-  const score = refusal.refused ? null : combine(structure.score, mean(measures));
+  const score = refusal.refused
+    ? null
+    : combine(structure.score, mean(Object.values(crawlabilityMeasures(input))));
   return {
     score,
     grade: score === null ? null : (scoreToLetter(score) as TechnicalSeo['grade']),
