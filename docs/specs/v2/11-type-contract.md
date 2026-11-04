@@ -899,75 +899,76 @@ Fixture collection: `usage_events`.
 
 Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X exactly when Y") can break in either direction, and has test cases that break it each way.
 
-| Rule                      | Message                                                                                  | Breaks    |
-| ------------------------- | ---------------------------------------------------------------------------------------- | --------- |
-| `billing_period`          | billing is monthly (1) or annual (12)                                                    | one way   |
-| `history_current`         | the last state_history entry must be the current state                                   | one way   |
-| `history_forward`         | state_history must move forward in time                                                  | one way   |
-| `trial_consent`           | trial consent is recorded exactly when the account has had an Agency trial               | both ways |
-| `trial_ends`              | trial_ends_at is set exactly while on a trial                                            | both ways |
-| `branding_dns`            | dns status exists exactly when a report domain is set                                    | both ways |
-| `branding_email_auth`     | email checks exist exactly when a sender is set                                          | both ways |
-| `branding_postal`         | a sender address needs a postal address for the footer                                   | one way   |
-| `time_zone`               | not an IANA time zone                                                                    | one way   |
-| `crawled_text_budget`     | crawled text is over its UTF-8 byte budget                                               | one way   |
-| `crawled_text_surrogate`  | crawled text has a lone surrogate, which cannot be stored                                | one way   |
-| `verification_alone`      | none_published stands alone                                                              | one way   |
-| `verification_unique`     | verification methods are listed once each                                                | one way   |
-| `ip_list_url`             | ip_list_url is set exactly when an IP list is published                                  | both ways |
-| `effect_pending`          | an AI effect is either estimated, or not yet estimated because of named fixes or reasons | both ways |
-| `fix_last_state`          | last_state does not fit the status                                                       | one way   |
-| `fix_rank`                | every live fix has a rank and a resolved fix has none                                    | both ways |
-| `packet_framework`        | the packet framework must be one of its switch options                                   | one way   |
-| `packet_bodies`           | each further packet body is for another framework of the switch, once                    | one way   |
-| `page_gone_status`        | a gone page answered 404 or 410                                                          | one way   |
-| `fix_gone`                | a fix whose page is gone was last measured indeterminate                                 | one way   |
-| `coverage_gradeable`      | gradeable and excluded pages cannot exceed the pages crawled                             | one way   |
-| `coverage_crawled`        | pages_crawled cannot exceed pages_discovered                                             | one way   |
-| `coverage_sampled`        | pages_sampled cannot exceed the crawl or the sample cap                                  | one way   |
-| `coverage_robots`         | pages crawled and pages excluded by robots.txt cannot exceed the pages discovered        | one way   |
-| `crawler_scored`          | exactly the ai_search crawlers are scored (FACTS I6)                                     | both ways |
-| `check_progress`          | progress is present exactly while running                                                | both ways |
-| `check_not_started`       | not started yet                                                                          | one way   |
-| `check_started`           | started_at is required                                                                   | one way   |
-| `check_finished_at`       | finished_at is set exactly when the check has ended                                      | both ways |
-| `check_deferred_until`    | deferred_until is set exactly when deferred                                              | both ways |
-| `check_failure_reason`    | failure_reason is set exactly when failed                                                | both ways |
-| `check_coverage`          | coverage is set exactly when the crawl has finished                                      | both ways |
-| `check_both_grades`       | a finished check carries both grades                                                     | one way   |
-| `check_grades_when_ended` | only a finished or partial check carries grades                                          | one way   |
-| `check_result_link`       | the result link expires after it is sent                                                 | one way   |
-| `i4_withheld`             | AI readability is withheld when fewer than two scored crawlers were measured (I4)        | one way   |
-| `score_grade_pair`        | score and grade are both present or both null                                            | both ways |
-| `refusal_score`           | a refused grade has no score; a given one has                                            | both ways |
-| `total_sum`               | total is not the sum of its components                                                   | one way   |
-| `withheld_reasons`        | a withheld grade names why, and a given one names no reason                              | both ways |
-| `component_range`         | a component without a score carries the range it could take, and a scored one none       | both ways |
-| `range_order`             | a component range's min must not exceed its max                                          | one way   |
-| `access_range_mirror`     | access_range is the Access component's range                                             | one way   |
-| `withheld_unmeasured`     | a withheld grade has at least one component without a score                              | one way   |
-| `schedule_timed`          | a timed schedule has a weekday; on_deploy has none                                       | both ways |
-| `schedule_pair`           | a schedule sets its weekday and its hour together                                        | both ways |
-| `unkept_audit`            | an unkept audit has no schedule, client report or owner                                  | one way   |
-| `client_report_cadence`   | client reports go out weekly or monthly                                                  | one way   |
-| `alert_threshold`         | only the text-drop rule has a threshold, and it always has one                           | both ways |
-| `alert_fired_pair`        | a firing records both when and which check                                               | both ways |
-| `report_sent`             | sent_at is set exactly when sent                                                         | both ways |
-| `report_send_time`        | a scheduled or held report has a send time                                               | one way   |
-| `report_slug`             | only a public link has a slug                                                            | both ways |
-| `report_open_tracking`    | an open is known only with tracking on                                                   | one way   |
-| `observed_owner_logs`     | observed evidence comes from owner logs, and only it does                                | both ways |
-| `access_request_line`     | the request method and HTTP version are recorded together                                | both ways |
-| `usage_billable`          | only a delivered result is billable                                                      | one way   |
-| `change_severity`         | severity is set exactly on an opened or resolved change                                  | both ways |
-| `change_resolved_info`    | a resolved change is info                                                                | one way   |
-| `change_baseline`         | a baseline row is about the grade, compares no scores and names no fix                   | one way   |
-| `redirect_status`         | a redirect hop answers 301, 302, 303, 307 or 308                                         | one way   |
-| `redirect_loop`           | a redirect loop has at least one hop                                                     | one way   |
-| `canonical_href`          | a resolved canonical needs the href it was resolved from                                 | one way   |
-| `robots_verdict`          | a robots.txt verdict is allowed, disallowed_by_robots or not_measured                    | one way   |
-| `robots_ua_unique`        | each search engine has one robots.txt verdict                                            | one way   |
-| `links_read_html`         | only an HTML response has its links read                                                 | one way   |
+| Rule                      | Message                                                                                                                                                   | Breaks    |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `billing_period`          | billing is monthly (1) or annual (12)                                                                                                                     | one way   |
+| `history_current`         | the last state_history entry must be the current state                                                                                                    | one way   |
+| `history_forward`         | state_history must move forward in time                                                                                                                   | one way   |
+| `trial_consent`           | trial consent is recorded exactly when the account has had an Agency trial                                                                                | both ways |
+| `trial_ends`              | trial_ends_at is set exactly while on a trial                                                                                                             | both ways |
+| `branding_dns`            | dns status exists exactly when a report domain is set                                                                                                     | both ways |
+| `branding_email_auth`     | email checks exist exactly when a sender is set                                                                                                           | both ways |
+| `branding_postal`         | a sender address needs a postal address for the footer                                                                                                    | one way   |
+| `time_zone`               | not an IANA time zone                                                                                                                                     | one way   |
+| `crawled_text_budget`     | crawled text is over its UTF-8 byte budget                                                                                                                | one way   |
+| `crawled_text_surrogate`  | crawled text has a lone surrogate, which cannot be stored                                                                                                 | one way   |
+| `verification_alone`      | none_published stands alone                                                                                                                               | one way   |
+| `verification_unique`     | verification methods are listed once each                                                                                                                 | one way   |
+| `ip_list_url`             | ip_list_url is set exactly when an IP list is published                                                                                                   | both ways |
+| `effect_pending`          | an AI effect is either estimated, or not yet estimated because of named fixes or reasons                                                                  | both ways |
+| `fix_last_state`          | last_state does not fit the status                                                                                                                        | one way   |
+| `fix_rank`                | every live fix has a rank and a resolved fix has none                                                                                                     | both ways |
+| `packet_framework`        | the packet framework must be one of its switch options                                                                                                    | one way   |
+| `packet_bodies`           | each further packet body is for another framework of the switch, once                                                                                     | one way   |
+| `page_gone_status`        | a gone page answered 404 or 410                                                                                                                           | one way   |
+| `fix_gone`                | a fix whose page is gone was last measured indeterminate                                                                                                  | one way   |
+| `coverage_gradeable`      | gradeable and excluded pages cannot exceed the pages crawled                                                                                              | one way   |
+| `coverage_crawled`        | pages_crawled cannot exceed pages_discovered                                                                                                              | one way   |
+| `coverage_sampled`        | pages_sampled cannot exceed the crawl or the sample cap                                                                                                   | one way   |
+| `coverage_robots`         | pages crawled and pages excluded by robots.txt cannot exceed the pages discovered                                                                         | one way   |
+| `crawler_scored`          | exactly the ai_search crawlers are scored (FACTS I6)                                                                                                      | both ways |
+| `check_progress`          | progress is present exactly while running                                                                                                                 | both ways |
+| `check_not_started`       | not started yet                                                                                                                                           | one way   |
+| `check_started`           | started_at is required                                                                                                                                    | one way   |
+| `check_finished_at`       | finished_at is set exactly when the check has ended                                                                                                       | both ways |
+| `check_deferred_until`    | deferred_until is set exactly when deferred                                                                                                               | both ways |
+| `check_failure_reason`    | failure_reason is set exactly when failed                                                                                                                 | both ways |
+| `check_coverage`          | coverage is set exactly when the crawl has finished                                                                                                       | both ways |
+| `check_both_grades`       | a finished check carries both grades                                                                                                                      | one way   |
+| `check_grades_when_ended` | only a finished or partial check carries grades                                                                                                           | one way   |
+| `check_result_link`       | the result link expires after it is sent                                                                                                                  | one way   |
+| `i4_withheld`             | AI readability is withheld when fewer than two scored crawlers were measured (I4)                                                                         | one way   |
+| `score_grade_pair`        | score and grade are both present or both null                                                                                                             | both ways |
+| `refusal_score`           | a refused grade has no score; a given one has                                                                                                             | both ways |
+| `total_sum`               | total is not the sum of its components                                                                                                                    | one way   |
+| `withheld_reasons`        | a withheld grade names why, and a given one names no reason                                                                                               | both ways |
+| `component_range`         | a component without a score carries the range it could take, and a scored one none                                                                        | both ways |
+| `range_order`             | a component range's min must not exceed its max                                                                                                           | one way   |
+| `access_range_mirror`     | access_range is the Access component's range                                                                                                              | one way   |
+| `withheld_unmeasured`     | a withheld grade has at least one component without a score                                                                                               | one way   |
+| `withheld_reasons_match`  | withheld_reasons names each unscored component once: one Access reason, and readable_unmeasured, quotable_unmeasured or signals_unmeasured for the others | one way   |
+| `schedule_timed`          | a timed schedule has a weekday; on_deploy has none                                                                                                        | both ways |
+| `schedule_pair`           | a schedule sets its weekday and its hour together                                                                                                         | both ways |
+| `unkept_audit`            | an unkept audit has no schedule, client report or owner                                                                                                   | one way   |
+| `client_report_cadence`   | client reports go out weekly or monthly                                                                                                                   | one way   |
+| `alert_threshold`         | only the text-drop rule has a threshold, and it always has one                                                                                            | both ways |
+| `alert_fired_pair`        | a firing records both when and which check                                                                                                                | both ways |
+| `report_sent`             | sent_at is set exactly when sent                                                                                                                          | both ways |
+| `report_send_time`        | a scheduled or held report has a send time                                                                                                                | one way   |
+| `report_slug`             | only a public link has a slug                                                                                                                             | both ways |
+| `report_open_tracking`    | an open is known only with tracking on                                                                                                                    | one way   |
+| `observed_owner_logs`     | observed evidence comes from owner logs, and only it does                                                                                                 | both ways |
+| `access_request_line`     | the request method and HTTP version are recorded together                                                                                                 | both ways |
+| `usage_billable`          | only a delivered result is billable                                                                                                                       | one way   |
+| `change_severity`         | severity is set exactly on an opened or resolved change                                                                                                   | both ways |
+| `change_resolved_info`    | a resolved change is info                                                                                                                                 | one way   |
+| `change_baseline`         | a baseline row is about the grade, compares no scores and names no fix                                                                                    | one way   |
+| `redirect_status`         | a redirect hop answers 301, 302, 303, 307 or 308                                                                                                          | one way   |
+| `redirect_loop`           | a redirect loop has at least one hop                                                                                                                      | one way   |
+| `canonical_href`          | a resolved canonical needs the href it was resolved from                                                                                                  | one way   |
+| `robots_verdict`          | a robots.txt verdict is allowed, disallowed_by_robots or not_measured                                                                                     | one way   |
+| `robots_ua_unique`        | each search engine has one robots.txt verdict                                                                                                             | one way   |
+| `links_read_html`         | only an HTML response has its links read                                                                                                                  | one way   |
 
 ## Enums
 
@@ -1018,7 +1019,7 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `PageKind`            | pinned to v1 or the engine                            | content, auth, search, pagination, archive, feed, status, utility, duplicate, thin                                                                                                                                                                                               |
 | `CmsName`             | pinned to v1 or the engine                            | shopify, wordpress, webflow, wix, squarespace, framer, ghost, custom                                                                                                                                                                                                             |
 | `RefusalTrigger`      | pinned to v1 or the engine                            | too_few_gradeable_pages, site_too_small_to_measure, too_few_gradeable_after_exclusion, nothing_read, no_observed_links                                                                                                                                                           |
-| `WithheldReason`      | pinned to v1 or the engine                            | too_few_crawlers_measured, blocked_by_choice, readable_unmeasured, quotable_unmeasured, signals_unmeasured                                                                                                                                                                       |
+| `WithheldReason`      | pinned to v1 or the engine                            | too_few_crawlers_measured, blocked_by_choice, readable_unmeasured, quotable_unmeasured, signals_unmeasured, crawler_too_few_pages                                                                                                                                                |
 | `VerificationMethod`  | registry seed only                                    | ip_list, reverse_dns, none_published                                                                                                                                                                                                                                             |
 | `MeasurementStatus`   | computed by a function, every value from the fixtures | measured, not_measurable, unevaluable, withheld                                                                                                                                                                                                                                  |
 

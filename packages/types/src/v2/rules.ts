@@ -91,6 +91,9 @@ export const RULES = {
   range_order: one("a component range's min must not exceed its max"),
   access_range_mirror: one("access_range is the Access component's range"),
   withheld_unmeasured: one('a withheld grade has at least one component without a score'),
+  withheld_reasons_match: one(
+    'withheld_reasons names each unscored component once: one Access reason, and readable_unmeasured, quotable_unmeasured or signals_unmeasured for the others',
+  ),
   // Site
   schedule_timed: two('a timed schedule has a weekday; on_deploy has none'),
   schedule_pair: two('a schedule sets its weekday and its hour together'),

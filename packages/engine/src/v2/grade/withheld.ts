@@ -1,5 +1,5 @@
 /**
- * Why the engine gives no AI readability grade, or no AI effect for a fix, and what each reason means.
+ * Why the engine gives no AI readability grade, or no AI effect for a fix, and what the reasons mean.
  * The spec renders this table; contract-pins.test.ts checks that it names exactly the contract's
  * WithheldReason values.
  */
@@ -13,7 +13,9 @@ export const WITHHELD_REASON_MEANINGS: Readonly<Record<WithheldReason, string>> 
   readable_unmeasured:
     'A template of the graded pages has no page rendered in a browser, so the share of text served without JavaScript is not known.',
   quotable_unmeasured:
-    'Some graded pages could not be read for the content checks, or no content check applied to a page.',
+    'Some graded pages could not be read for the content checks, or no content check applied to any page.',
   signals_unmeasured:
     'Whether schema.org markup or Content Signals are present could not be decided.',
+  crawler_too_few_pages:
+    "For a fix's effect only: the fix's crawler has fewer than two pages that decide its share, so how much Access it adds is not known.",
 };

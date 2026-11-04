@@ -119,6 +119,23 @@ const withheld = z
           ? range === g.access_range
           : range.min === g.access_range.min && range.max === g.access_range.max;
       if (!same) rule.fail('access_range_mirror');
+      const named: readonly string[] = g.withheld_reasons ?? [];
+      const expected: string[] = [
+        c?.readable?.score === null ? 'readable_unmeasured' : null,
+        c?.quotable?.score === null ? 'quotable_unmeasured' : null,
+        c?.signals?.score === null ? 'signals_unmeasured' : null,
+      ].filter((r): r is string => r !== null);
+      const access: readonly string[] = named.filter(
+        (r) => r === 'too_few_crawlers_measured' || r === 'blocked_by_choice',
+      );
+      const others = named.filter((r) => !access.includes(r));
+      const matches =
+        new Set(named).size === named.length &&
+        access.length === (c?.access?.score === null ? 1 : 0) &&
+        others.length === expected.length &&
+        expected.every((r) => others.includes(r));
+      const unscored = parts.some((p) => p && p.score === null);
+      if (named.length > 0 && unscored && !matches) rule.fail('withheld_reasons_match');
     }),
   );
 

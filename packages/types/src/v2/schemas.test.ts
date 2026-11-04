@@ -666,6 +666,7 @@ const CASES: RuleCase[] = [
       const g = withheldAi() as { components: Record<string, object> };
       return {
         ...g,
+        withheld_reasons: ['too_few_crawlers_measured', 'readable_unmeasured'],
         components: {
           ...g.components,
           readable: { score: null, max: 30, heuristic: false, range: null },
@@ -696,6 +697,7 @@ const CASES: RuleCase[] = [
       const g = withheldAi() as { components: Record<string, object> };
       return {
         ...g,
+        withheld_reasons: ['too_few_crawlers_measured', 'quotable_unmeasured'],
         components: {
           ...g.components,
           quotable: { score: null, max: 20, heuristic: true, range: { min: 15, max: 5 } },
@@ -724,6 +726,33 @@ const CASES: RuleCase[] = [
         },
       };
     },
+  },
+  {
+    rule: 'withheld_reasons_match',
+    breaks: 'a reason for a component that has a score',
+    schema: AiReadabilitySchema,
+    input: () => ({
+      ...withheldAi()!,
+      withheld_reasons: ['too_few_crawlers_measured', 'signals_unmeasured'],
+    }),
+  },
+  {
+    rule: 'withheld_reasons_match',
+    breaks: 'the same reason twice',
+    schema: AiReadabilitySchema,
+    input: () => ({
+      ...withheldAi()!,
+      withheld_reasons: ['too_few_crawlers_measured', 'too_few_crawlers_measured'],
+    }),
+  },
+  {
+    rule: 'withheld_reasons_match',
+    breaks: "a fix's reason on a grade",
+    schema: AiReadabilitySchema,
+    input: () => ({
+      ...withheldAi()!,
+      withheld_reasons: ['too_few_crawlers_measured', 'crawler_too_few_pages'],
+    }),
   },
   {
     rule: 'total_sum',
@@ -1716,7 +1745,12 @@ describe('CC-17 contract additions', () => {
     });
     const all = {
       ...g,
-      withheld_reasons: [...WithheldReasonSchema.options],
+      withheld_reasons: [
+        'too_few_crawlers_measured',
+        'readable_unmeasured',
+        'quotable_unmeasured',
+        'signals_unmeasured',
+      ],
       access_range: { min: 0, max: 40 },
       components: {
         access: unmeasured(40, false),

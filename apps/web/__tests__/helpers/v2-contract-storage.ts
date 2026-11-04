@@ -213,6 +213,7 @@ export const RULES_AT_WRITE: Record<string, string> = {
   range_order: 'per component inside checks.ai_readability',
   access_range_mirror: 'compares two objects inside checks.ai_readability',
   withheld_unmeasured: 'reads every component inside checks.ai_readability',
+  withheld_reasons_match: 'compares the reasons with the components inside checks.ai_readability',
   time_zone:
     'a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses',
   coverage_robots: 'compares counts inside checks.coverage',
