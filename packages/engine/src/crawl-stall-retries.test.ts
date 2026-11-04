@@ -46,7 +46,11 @@ beforeAll(async () => {
     res.on('error', () => {});
     const path = (req.url ?? '/').split('?')[0]!;
     requested.push(path);
-    if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+    if (path === '/robots.txt' || path === '/sitemap.xml') {
+      res.statusCode = 404;
+      res.end('');
+      return;
+    }
     // The stall: accept the connection, never answer. Every retry is a fresh request and shows up in
     // `requested`, which is what makes the retry count observable rather than inferred.
     if (stallPaths.includes(path)) return;
@@ -62,7 +66,9 @@ afterAll(async () => {
   await new Promise<void>((r) => server.close(() => r()));
 });
 
-beforeEach(() => { requested = []; });
+beforeEach(() => {
+  requested = [];
+});
 
 const INPUT = () => ({
   startUrls: [baseUrl],
@@ -77,7 +83,8 @@ const INPUT = () => ({
   navigationTimeoutSecsForTesting: NAV_TIMEOUT_SECS,
 });
 
-const pathsOf = (out: { pages: { url: string }[] }) => out.pages.map((p) => new URL(p.url).pathname);
+const pathsOf = (out: { pages: { url: string }[] }) =>
+  out.pages.map((p) => new URL(p.url).pathname);
 
 describe('SPEC 5.1a §6 — a navigation timeout is a verdict, not a throttle', () => {
   it('spends ONE request on a stalled URL, not the whole retry budget', async () => {
