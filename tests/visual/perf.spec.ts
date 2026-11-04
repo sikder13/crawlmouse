@@ -88,6 +88,12 @@ const WINDOWS = [
   },
 ];
 
+/**
+ * The prefix of every assertion that says a run measured nothing, as opposed to a budget missed.
+ * packages/timing/scripts/perf-retry.sh reads it: a slow runner never excuses one of these.
+ */
+const INVALID = 'MEASUREMENT INVALID';
+
 /** What the trace records: `toplevel` holds `RunTask`, `loading` holds `LayoutShift`. */
 const CATEGORIES = [
   'devtools.timeline',
@@ -144,8 +150,10 @@ function fromTrace(path: string) {
 }
 
 test.describe('crawl screen performance', () => {
-  // Each window reports on its own: one over budget does not hide the others' numbers.
-  test.describe.configure({ timeout: 180_000 });
+  // Each window reports on its own: one over budget does not hide the others' numbers. The timeout
+  // grows with RUNS: a crawl window's run took about 31 s on CI (five took 154.8 s in run
+  // 41754514564), so 60 s a run leaves the same room at any run count.
+  test.describe.configure({ timeout: RUNS * 60_000 });
 
   test('the trace reading finds a long task and a layout shift planted in the page', async ({
     browser,
@@ -201,11 +209,20 @@ test.describe('crawl screen performance', () => {
           { metric: 'maxFrameMs', unit: 'ms', limit: BUDGET.maxFrameMs },
         ],
       );
-      expect(runs.flatMap((r) => r.broken)).toEqual([]);
+      expect(
+        runs.flatMap((r) => r.broken),
+        INVALID,
+      ).toEqual([]);
       if ('spans' in w) {
         for (const r of runs) {
-          expect(r.before?.trim(), `${w.spans} is still to come as the window opens`).toBe('next');
-          expect(r.after?.trim(), `${w.spans} has started by the window's end`).not.toBe('next');
+          expect(
+            r.before?.trim(),
+            `${INVALID}: ${w.spans} is still to come as the window opens`,
+          ).toBe('next');
+          expect(
+            r.after?.trim(),
+            `${INVALID}: ${w.spans} has started by the window's end`,
+          ).not.toBe('next');
         }
       }
       expect(missed, `medians of ${RUNS} runs`).toEqual([]);
@@ -229,7 +246,10 @@ test.describe('crawl screen performance', () => {
         { metric: 'maxFrameMs', unit: 'ms', limit: EXPLORER.frameMs },
       ],
     );
-    expect(runs.flatMap((r) => r.broken)).toEqual([]);
+    expect(
+      runs.flatMap((r) => r.broken),
+      INVALID,
+    ).toEqual([]);
     expect(missed, `medians of ${RUNS} runs`).toEqual([]);
   });
 });

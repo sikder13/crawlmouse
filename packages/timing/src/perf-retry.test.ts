@@ -16,7 +16,14 @@ const CONTROL_FAIL =
  * A stand-in for the Playwright command: each call takes the next outcome from `plan` and prints
  * what the list reporter would. It records its arguments, so a test can see what the retry ran.
  */
-function fakeCommand(dir: string, plan: Array<'pass' | 'budget' | 'control' | 'crash'>) {
+/**
+ * What one attempt of the stand-in prints: a pass; a budget miss; a failed control; a budget test
+ * and the control failing together; a budget-titled test whose measurement was invalid (perf.spec.ts
+ * prefixes those assertion messages with MEASUREMENT INVALID); or a server that never started.
+ */
+type Outcome = 'pass' | 'budget' | 'control' | 'both' | 'invalid' | 'crash';
+
+function fakeCommand(dir: string, plan: Array<Outcome>) {
   const path = join(dir, 'fake.sh');
   writeFileSync(join(dir, 'plan'), plan.join('\n') + '\n');
   writeFileSync(
@@ -30,6 +37,8 @@ case "$outcome" in
   pass) echo "  ✓  2 [chromium] › perf.spec.ts › the crawl: within the budget (30s)"; exit 0 ;;
   budget) echo '${BUDGET_FAIL}'; exit 1 ;;
   control) echo '${CONTROL_FAIL}'; exit 1 ;;
+  both) echo '${CONTROL_FAIL}'; echo '${BUDGET_FAIL}'; exit 1 ;;
+  invalid) echo '${BUDGET_FAIL}'; echo "    Error: MEASUREMENT INVALID: run 2: only 40 frames"; exit 1 ;;
   crash) echo "Error: Timed out waiting 240000ms from config.webServer."; exit 1 ;;
 esac
 `,
@@ -38,8 +47,12 @@ esac
   return path;
 }
 
-function probeFile(dir: string, rating: 'normal' | 'slow') {
+function probeFile(dir: string, rating: 'normal' | 'slow' | 'malformed') {
   const path = join(dir, 'probe.json');
+  if (rating === 'malformed') {
+    writeFileSync(path, 'Progress: resolved 12\n{"rating":"slow"}\n');
+    return path;
+  }
   const medianMs = rating === 'slow' ? 210.4 : 101.2;
   writeFileSync(
     path,
@@ -48,10 +61,7 @@ function probeFile(dir: string, rating: 'normal' | 'slow') {
   return path;
 }
 
-function run(
-  plan: Array<'pass' | 'budget' | 'control' | 'crash'>,
-  probe: 'normal' | 'slow' | 'missing',
-) {
+function run(plan: Array<Outcome>, probe: 'normal' | 'slow' | 'missing' | 'malformed') {
   const dir = mkdtempSync(join(tmpdir(), 'perf-retry-'));
   const cmd = fakeCommand(dir, plan);
   const probePath = probe === 'missing' ? join(dir, 'absent.json') : probeFile(dir, probe);
@@ -100,7 +110,7 @@ describe('perf-retry.sh: the decision table', () => {
   it('fail twice on a normal runner: fails the job', () => {
     const r = run(['budget', 'budget'], 'normal');
     expect(r.status).toBe(1);
-    expect(r.stdout).toContain('::error title=performance budget::');
+    expect(r.stdout).toContain('::error title=performance budget::failed: reproduced');
     expect(r.entry).toBeNull();
   });
 
@@ -123,6 +133,21 @@ describe('perf-retry.sh: the decision table', () => {
   it('fail twice on a slow runner, but not on a budget: fails', () => {
     expect(run(['control', 'control'], 'slow').status).toBe(1);
     expect(run(['budget', 'control'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget test and the control together: fails', () => {
+    expect(run(['budget', 'both'], 'slow').status).toBe(1);
+    expect(run(['both', 'both'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice on a slow runner, a budget test whose measurement was invalid: fails', () => {
+    expect(run(['budget', 'invalid'], 'slow').status).toBe(1);
+  });
+
+  it('fail twice with a probe file that is not one JSON line: fails, as on a normal runner', () => {
+    const r = run(['budget', 'budget'], 'malformed');
+    expect(r.status).toBe(1);
+    expect(r.summary).toContain(': unknown');
   });
 
   it('fail twice on a slow runner with no failed test listed (the server never started): fails', () => {

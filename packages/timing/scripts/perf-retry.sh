@@ -8,9 +8,12 @@
 #   fail        fail        normal/unknown   failed: reproduced                  1
 #   fail        fail        slow             inconclusive: slow runner           0
 #
-# "Slow" needs both a probe that rates the runner slow and a second attempt in which every failed
-# test is a budget test (its title holds BUDGET_TITLE). A failure that is not a budget miss (the
-# trace control, a server that did not start, no failed test listed at all) fails on any runner.
+# An inconclusive pass needs three things of the second attempt: a probe that rates the runner
+# slow; at least one failed test, every one of them a budget test by its title (BUDGET_TITLE); and
+# no line holding INVALID_MARK, which perf.spec.ts puts on the assertions that say a run measured
+# nothing (no main thread or task in the trace, too few frames, the window missing its moment).
+# So a failed trace control, a server that did not start, a failure that names no test, or an
+# invalid measurement inside a budget test fails the job on any runner.
 #
 # Usage: perf-retry.sh <probe.json> -- <command...>
 #   The command runs as given, then once more with --last-failed appended.
@@ -21,6 +24,7 @@
 set -uo pipefail
 
 BUDGET_TITLE='within the budget'
+INVALID_MARK='MEASUREMENT INVALID'
 
 probe_json=${1:?usage: perf-retry.sh <probe.json> -- <command...>}
 shift
@@ -96,13 +100,14 @@ if attempt 2 "$@" --last-failed; then
 fi
 
 failed=$(failed_titles "$logs/attempt-2.log")
-if [ "$rating" = slow ] && [ -n "$failed" ] && ! grep -vqF "$BUDGET_TITLE" <<<"$failed"; then
+if [ "$rating" = slow ] && [ -n "$failed" ] && ! grep -vqF "$BUDGET_TITLE" <<<"$failed" &&
+  ! grep -qF "$INVALID_MARK" "$logs/attempt-2.log"; then
   echo "::warning title=inconclusive: slow runner::The performance budgets failed twice on a runner the probe rates slow ($probe_line). The strict nightly job holds the budgets."
   echo "**inconclusive: slow runner.** The strict nightly job holds the budgets." >>"$summary"
   register_row "inconclusive: slow runner; $probe_line"
   exit 0
 fi
 
-echo "::error title=performance budget::Failed on both attempts; $probe_line."
-echo "**Failed on both attempts** ($probe_line)." >>"$summary"
+echo "::error title=performance budget::failed: reproduced on both attempts; $probe_line."
+echo "**failed: reproduced** on both attempts ($probe_line)." >>"$summary"
 exit 1
