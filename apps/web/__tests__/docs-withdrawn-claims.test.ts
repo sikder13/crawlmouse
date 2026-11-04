@@ -69,6 +69,25 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    // SPEC 12 and SPEC 15 both said it, each rendered from code (worker/src/spec/render.ts,
+    // engine/src/v2/access/spec.ts); CC-12d replaced the canary rule with the witness rule.
+    text: 'only when the tagged Googlebot canary was served',
+    withdrawnIn: 'packages/worker/src/verdict/table.ts (the witness rule) and SPEC 12, SPEC 15 (CC-12d)',
+    truth:
+      'A refusal is blocked_by_ua_rule when another tested crawler or the tagged Googlebot canary ' +
+      'was served on the same page (ENGINE-GAP §3.5a). On the nike.com shape, Claude-SearchBot served ' +
+      'makes four refusals user-agent rules although the canary is refused.',
+    allowedIn: [],
+  },
+  {
+    text: 'the tagged Googlebot canary was not served on those pages, so IP verification is not ruled out',
+    withdrawnIn: 'packages/engine/src/v2/access/spec.ts, SPEC 15 (CC-12d)',
+    truth:
+      'An unverified refusal is one where nothing we sent that claims to be a crawler, the canary ' +
+      'included, was served on the page: the canary alone being refused does not make it one.',
+    allowedIn: [],
+  },
+  {
     // The spelling that SURVIVED the withdrawal, in the evidence file, and that a reviewer found.
     text: 'can only happen when `page_count < 5`',
     withdrawnIn: 'evidence/2026-08-08-hotfix-01.md §H1 and docs/OPERATING-RULES.md §5 (Amendment 2)',

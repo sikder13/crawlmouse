@@ -11,7 +11,17 @@ import {
   SIMHASH_MAX_TOKENS,
   SIMHASH_MIN_TOKENS,
 } from '@crawlmouse/engine/worker';
-import { MAX_HREFLANG_CHARS, MAX_HREFLANG_LINKS, MAX_REDIRECT_HOPS } from '@crawlmouse/types/v2';
+import {
+  DECLARATION_PATHS,
+  DESCRIPTION_BYTES,
+  MAX_HREFLANG_CHARS,
+  MAX_HREFLANG_LINKS,
+  MAX_REDIRECT_HOPS,
+  MAX_TIMING_MS,
+  TITLE_BYTES,
+} from '@crawlmouse/types/v2';
+import { DECLARATION_KEEP_BYTES } from '../batch/declarations.js';
+import { UNRELEASED } from '../vantage.js';
 import { IAT_SKEW_S, JWT_AUDIENCE, MAX_JWT_LIFETIME_S } from '../auth/jwt.js';
 import { MAX_SKEW_MS } from '../auth/hmac.js';
 import { NONCE_TTL_MS } from '../auth/nonces.js';
@@ -229,6 +239,8 @@ export function renderSpec(): string {
       ],
     ),
 
+    "Each access row names its identity: `identity_role` is `control`, `crawler` or `canary` (`render` is CC-14's), and only a `crawler` row has a `ua`, the crawler its verdict is about. `tagged` says whether the request the row shows carried the tag: never the control's; a crawler row whose evidence is the robots.txt read shows that read, made as our crawler, so it is tagged. robots.txt evidence on a batch result records the `identity_sent` it was read with, always our crawler's.",
+
     '## Politeness',
     `- Request starts at least ${FLOOR_GAP_MS} ms apart per registrable domain (eTLD+1, Public Suffix List with its private section), shared by every batch in the process, measured start to start.`,
     `- One request in flight per site; two when the median latency of the last ${SLOW_WINDOW} responses is over ${SLOW_MEDIAN_MS} ms and no Crawl-delay raised the gap.`,
@@ -280,7 +292,7 @@ export function renderSpec(): string {
     ),
 
     '## The decision table',
-    `One verdict per tested crawler per sampled page. Rows are evaluated top to bottom; the first whose conditions all hold wins. A refusal is \`blocked_by_ua_rule\` only when the tagged Googlebot canary was served on that page; otherwise \`refused_unverified\`, with the crawlers served on the page named in the row's limitations. The canary is requested on a page only when a crawler was refused there and robots.txt allows Googlebot. Thin is under ${THIN_RATIO * 100}% of the control's words.`,
+    `One verdict per tested crawler per sampled page. Rows are evaluated top to bottom; the first whose conditions all hold wins. A refusal is \`blocked_by_ua_rule\` when another tested crawler or the tagged Googlebot canary was served on that page (the witness rule, ENGINE-GAP §3.5a), and the first served, in request order, is the row's \`witness\`; the browser control is not a witness. Otherwise it is \`refused_unverified\`, with the crawlers served on the page named in the row's limitations. The canary is requested on a page only when a crawler was refused there and robots.txt allows Googlebot. Thin is under ${THIN_RATIO * 100}% of the control's words.`,
     table(
       ['#', 'Row', 'When', 'Verdict', 'Evidence class', 'Cause'],
       DECISION_TABLE.map((r, i) => [
@@ -294,6 +306,8 @@ export function renderSpec(): string {
     ),
     'The control and canary rows carry `ua: null` and a verdict about their own request.',
     renderVerdictMeanings(),
+
+    "The engine's crawler-access module refuses a crawler row whose cause or evidence class this table never gives its verdict (`packages/engine/src/v2/access/cells.ts`). `src/verdict/engine-mirror.test.ts` holds the two equal: it enumerates every cell the table can be handed and every reading its cause rules read, and compares the verdicts, causes and evidence classes the worker can write with what the engine accepts, both ways: `pnpm --filter @crawlmouse/worker exec vitest run src/verdict/engine-mirror.test.ts`.",
 
     '## The page facts on a crawl row',
     `What one request showed about a page beyond its status, recorded with the contract's own schemas (\`packages/types/src/v2/page-facts.ts\`), which \`PageResult\` carries too. A null fact was not read. Tests: \`src/batch/page-facts.test.ts\`.`,
@@ -325,6 +339,10 @@ export function renderSpec(): string {
           `Every link on the page was read: the whole response parsed, no link past the first ${MAX_LINKS_READ} or over ${MAX_URL_LENGTH} characters, and the page's own URL within the cap. False whenever the page was not read.`,
         ],
         [
+          `${code('title')}, ${code('meta_description')}`,
+          `The page's first \`<title>\` and first \`<meta name="description">\` (the name compared without case; \`property\`, \`http-equiv\` and \`og:description\` are not it), found in the reader's link walk. The text is ASCII whitespace collapsed to one space and trimmed, as \`document.title\` is, then cut to ${TITLE_BYTES} and ${DESCRIPTION_BYTES} bytes like every crawled string; \`chars\` is that text's length in code points before the cut, and \`cut\` says it was cut. \`{ text: null }\` when the page declares none; a meta description without \`content\` is declared and empty. Null when the page was not read, or was read in part and none was found before reading stopped.`,
+        ],
+        [
           code('robots_search'),
           `robots.txt's verdict on the URL for ${SEARCH_ENGINES.map((e) => code(e.token)).join(' and ')}, from the reading the crawl obeyed: \`allowed\`, \`disallowed_by_robots\`, or \`not_measured\` when no rules were evaluated or that engine's group was left out as too large. Recorded on every row, a URL robots.txt kept our crawler from included.`,
         ],
@@ -332,11 +350,40 @@ export function renderSpec(): string {
     ),
 
     '## Evidence on a row',
-    `Rows are \`AccessTest\` (CC-11) for access batches, \`CrawlPage\` and \`LinkEdge\` for crawl batches, validated against their schemas before they leave the worker. Each carries \`source_ip_class: fly_egress\`, the identity sent, the request headers, these response headers only: ${EVIDENCE_HEADERS.map(code).join(', ')}, byte and word counts, the final URL, and \`limitations[]\`.`,
-    `A batch result is \`partial\` when any of these held: ${PARTIAL_REASONS.map(code).join(', ')}. \`coverage\` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than \`not_measured\`; in a crawl batch, a page that got a response, other than a redirect the batch stopped before following or an HTML page that was not read, or a page robots.txt disallows.`,
+    `Rows are \`AccessTest\` (CC-11) for access batches, \`CrawlPage\` and \`LinkEdge\` for crawl batches, validated against their schemas before they leave the worker. Each carries the identity sent, the request headers, these response headers only: ${EVIDENCE_HEADERS.map(code).join(', ')}, byte and word counts, the final URL, \`limitations[]\`, and the vantage below.`,
+    'Where the CDN and proxy headers come from, each from its vendor: `x-vercel-id`, [Vercel](https://vercel.com/docs/headers/response-headers); `x-amz-cf-id`, [Amazon CloudFront](https://aws.amazon.com/developer/application-security-performance/articles/troubleshooting); `via`, [RFC 9110 §7.6.3](https://www.rfc-editor.org/rfc/rfc9110#section-7.6.3); `akamai-grn` and `akamai-cache-status`, the default names of two headers an Akamai property can turn on ([Global Request Number](https://techdocs.akamai.com/terraform/docs/global-request-number), [Return Cache Status](https://techdocs.akamai.com/terraform/docs/return-cache-status)), so a property may send them under other names or not at all; `x-sucuri-id` and `x-sucuri-cache`, [Sucuri](https://docs.sucuri.net/website-firewall/troubleshooting/investigating-cache-headers/). Each value is cut like every header value.',
+    '### Vantage',
+    table(
+      ['Field', 'Recorded'],
+      [
+        [
+          code('source_ip_class'),
+          '`fly_egress` when the worker runs on a Fly Machine, read from the environment Fly gives every Machine: both `FLY_REGION` and `FLY_MACHINE_ID` set. Otherwise `other_egress` (a developer machine, CI): `FLY_REGION` alone is a variable anyone can set.',
+        ],
+        [
+          code('fly_region'),
+          "`FLY_REGION`, on Fly only; null otherwise. A value that is not three lower-case letters stops the worker at start rather than be recorded.",
+        ],
+        [
+          `${code('request_signing')}, ${code('signature_verified')}`,
+          '`unsigned` and `not_observable`: the worker does not sign its requests yet, and the fields exist so Web Bot Auth can fill them.',
+        ],
+        [
+          code('worker_release'),
+          `The first 12 hex digits of the commit the bundle was built from (\`build.ts\` writes it in); \`${UNRELEASED}\` for code that is not bundled.`,
+        ],
+        [
+          code('timing'),
+          `\`dns_ms\`, \`connect_ms\` (TLS included), \`ttfb_ms\` and \`total_ms\` of the last request the row shows, whole milliseconds from the moment the request was created, each 0 to ${MAX_TIMING_MS}. Observed from Node's \`http.client.request.created\` diagnostics channel without touching safeFetch, each request told apart by the async context its fetch runs in. Two limits: the address lookup safeFetch's SSRF guard makes before the request is not timed, only the socket's own (pinned) lookup is \`dns_ms\`; and a connection reused from the agent's pool makes no lookup and no connection, so both are null. \`dns_ms\` is null for an address literal too, and \`ttfb_ms\` when nothing answered. Null on a row whose request was not made.`,
+        ],
+      ],
+    ),
+    '## Declaration files',
+    `Once per crawl batch, after its pages and after the batch's own accounting, the worker requests each of ${DECLARATION_PATHS.map(code).join(', ')} on the origin of the batch's first URL, as our crawler, through the site's limiter and the batch's budget like any request (\`/robots.txt\` is read already). Each is recorded as \`DeclarationFetch\` (\`packages/types/src/v2/declaration.ts\`): status, media type (the Content-Type as sent, cut to its budget) and the decoded bytes read, never the body. The body is read no further than ${DECLARATION_KEEP_BYTES} bytes, past which \`bytes_complete\` is false; a redirect is recorded as it answered and not followed; a path robots.txt disallows us is \`not_requested: robots_disallowed\`, and the others not requested say why (\`budget\`, \`site_stopped\`, \`site_blocked\`). What became of each is on its own record only: a declaration does not change the batch's coverage, findings or partial reasons. An access batch requests none. Tests: \`src/batch/declarations.test.ts\`.`,
+    `A batch result is \`partial\` when any of these held, the contract's \`BatchPartialReason\` values: ${PARTIAL_REASONS.map(code).join(', ')}. \`coverage\` gives the URLs requested and the URLs complete: in an access batch, a page where every tested crawler's verdict is other than \`not_measured\`; in a crawl batch, a page that got a response, other than a redirect the batch stopped before following or an HTML page that was not read, or a page robots.txt disallows.`,
 
     '## The five discriminator sites',
-    `The recorded response shapes of the POC runs (POC-1, POC-2b), classified under the canary rule, ${SAMPLE_PAGES} sampled pages each. \`src/batch/access.test.ts\` runs an access batch against a server answering with these shapes and asserts these counts.`,
+    `The recorded response shapes of the POC runs (POC-1, POC-2b), classified under the witness rule, ${SAMPLE_PAGES} sampled pages each. \`src/batch/access.test.ts\` runs an access batch against a server answering with these shapes and asserts these counts.`,
     table(
       ['Site', 'Crawler', 'Verdicts'],
       SITES.flatMap((site) =>
@@ -344,7 +391,7 @@ export function renderSpec(): string {
       ),
     ),
     `### Live, Fly run 2 (${FLY_RUN_2.date})`,
-    `From [the run](${FLY_RUN_2.run})'s results. The run recorded counts only, not the responses behind them, and classified with the spike's rules, under which a refusal counted as a user-agent rule when the canary or another crawler was served on the page. They cannot be re-classified under the canary rule. This worker's rows carry the responses, so a staging run can be.`,
+    `From [the run](${FLY_RUN_2.run})'s results. The run recorded counts only, not the responses behind them, and classified with the spike's rules, under which a refusal counted as a user-agent rule when the canary or another crawler was served on the page. The counts are the run's own and cannot be re-checked; this worker's rows carry the responses, so a staging run's can be.`,
     table(
       ['Site', 'Crawler', 'Verdicts'],
       Object.entries(FLY_RUN_2.counts).flatMap(([site, byCrawler]) =>

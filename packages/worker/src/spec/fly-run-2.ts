@@ -2,7 +2,7 @@
  * The spike's second Fly run (2026-10-27, run 40577051856), discriminators scenario: per site and
  * crawler, how many sampled pages produced each verdict. Copied from the run's results artifact. The
  * run recorded these counts only, not the responses behind them, and it classified with the spike's
- * rules, not this worker's canary rule.
+ * rules.
  */
 export const FLY_RUN_2 = {
   date: '2026-10-27',
