@@ -156,15 +156,18 @@ export const RULE_CHECKS: Record<string, { table: string; constraint: string }> 
 export const RULES_AT_WRITE: Record<string, string> = {
   check_result_link: 'compares two timestamps inside checks.result_email',
   i4_withheld: 'counts measured crawlers across checks.crawlers',
-  i4_given: 'counts measured crawlers across checks.crawlers',
   coverage_gradeable: 'sums an array inside checks.coverage',
   coverage_crawled: 'compares two counts inside checks.coverage',
   coverage_sampled: 'compares counts inside checks.coverage',
   crawler_scored: 'per element of checks.crawlers',
   score_grade_pair: 'inside checks.technical_seo and checks.ai_readability',
   refusal_score: 'inside checks.technical_seo',
-  access_range_order: 'inside checks.ai_readability',
   total_sum: 'sums inside checks.ai_readability',
+  withheld_reasons: 'inside checks.ai_readability',
+  component_range: 'per component inside checks.ai_readability',
+  range_order: 'per component inside checks.ai_readability',
+  access_range_mirror: 'compares two objects inside checks.ai_readability',
+  withheld_unmeasured: 'reads every component inside checks.ai_readability',
   time_zone:
     'a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses',
   coverage_robots: 'compares counts inside checks.coverage',
@@ -221,7 +224,7 @@ export const NESTED: Record<string, string[]> = {
   SignalKind: ['checks.signals'],
   StepState: ['checks.progress'],
   Verdict: ['checks.crawlers', 'page_results.robots_search'],
-  WithheldReason: ['site_fixes.effect'],
+  WithheldReason: ['checks.ai_readability', 'site_fixes.effect'],
 };
 
 /** Enums no table of this step holds, and where they live. */

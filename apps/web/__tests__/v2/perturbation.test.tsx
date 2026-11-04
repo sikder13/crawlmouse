@@ -270,7 +270,8 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
         change: (c) => {
           const ai = c.ai_readability!;
           if (!ai.withheld) throw new Error('challenged-site is withheld');
-          ai.access_range.max = 25;
+          ai.access_range!.max = 25;
+          ai.components.access.range!.max = 25;
         },
         expect: { Result: ['between 0 and 25 of 40'], Crawl: ['between 0 and 25 of 40'] },
       },

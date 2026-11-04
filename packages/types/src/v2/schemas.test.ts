@@ -610,12 +610,6 @@ const CASES: RuleCase[] = [
     schema: CheckSchema,
     input: () => ({ ...partial(), ai_readability: finished().ai_readability }),
   },
-  {
-    rule: 'i4_given',
-    breaks: 'a withheld grade on a measured site',
-    schema: CheckSchema,
-    input: () => ({ ...finished(), ai_readability: withheldAi() }),
-  },
   // ── Grades ──────────────────────────────────────────────────────────────────────────────────
   {
     rule: 'score_grade_pair',
@@ -652,10 +646,83 @@ const CASES: RuleCase[] = [
     input: () => ({ ...finished().technical_seo!, score: null, grade: null }),
   },
   {
-    rule: 'access_range_order',
-    breaks: 'min above max',
+    rule: 'withheld_reasons',
+    breaks: 'withheld, naming no reason',
     schema: AiReadabilitySchema,
-    input: () => ({ ...withheldAi()!, access_range: { min: 30, max: 10 } }),
+    input: () => ({ ...withheldAi()!, withheld_reasons: [] }),
+  },
+  {
+    rule: 'withheld_reasons',
+    breaks: 'given, naming a reason',
+    schema: AiReadabilitySchema,
+    input: () => ({ ...finished().ai_readability!, withheld_reasons: ['readable_unmeasured'] }),
+  },
+  {
+    rule: 'component_range',
+    breaks: 'a component without a score and without a range',
+    schema: AiReadabilitySchema,
+    input: () => {
+      const g = withheldAi() as { components: Record<string, object> };
+      return {
+        ...g,
+        components: {
+          ...g.components,
+          readable: { score: null, max: 30, heuristic: false, range: null },
+        },
+      };
+    },
+  },
+  {
+    rule: 'component_range',
+    breaks: 'a scored component with a range',
+    schema: AiReadabilitySchema,
+    input: () => {
+      const g = withheldAi() as { components: Record<string, object> };
+      return {
+        ...g,
+        components: {
+          ...g.components,
+          readable: { score: 18, max: 30, heuristic: false, range: { min: 0, max: 30 } },
+        },
+      };
+    },
+  },
+  {
+    rule: 'range_order',
+    breaks: 'a component range with min above max',
+    schema: AiReadabilitySchema,
+    input: () => {
+      const g = withheldAi() as { components: Record<string, object> };
+      return {
+        ...g,
+        components: {
+          ...g.components,
+          quotable: { score: null, max: 20, heuristic: true, range: { min: 15, max: 5 } },
+        },
+      };
+    },
+  },
+  {
+    rule: 'access_range_mirror',
+    breaks: 'access_range differs from the Access component range',
+    schema: AiReadabilitySchema,
+    input: () => ({ ...withheldAi()!, access_range: { min: 5, max: 30 } }),
+  },
+  {
+    rule: 'withheld_unmeasured',
+    breaks: 'withheld with every component scored',
+    schema: AiReadabilitySchema,
+    input: () => {
+      const g = withheldAi() as { components: Record<string, object> };
+      return {
+        ...g,
+        access_range: null,
+        components: {
+          ...g.components,
+          access: { score: 12, max: 40, heuristic: false, range: null },
+        },
+      };
+    },
   },
   {
     rule: 'total_sum',
@@ -1203,6 +1270,14 @@ const BOUNDS: Record<string, string> = {
   'Check.ai_readability.components.signals.score': '[0, 10]',
   'Check.ai_readability.access_range.min': '[0, 40]',
   'Check.ai_readability.access_range.max': '[0, 40]',
+  'Check.ai_readability.components.access.range.min': '[0, 40]',
+  'Check.ai_readability.components.access.range.max': '[0, 40]',
+  'Check.ai_readability.components.readable.range.min': '[0, 30]',
+  'Check.ai_readability.components.readable.range.max': '[0, 30]',
+  'Check.ai_readability.components.quotable.range.min': '[0, 20]',
+  'Check.ai_readability.components.quotable.range.max': '[0, 20]',
+  'Check.ai_readability.components.signals.range.min': '[0, 10]',
+  'Check.ai_readability.components.signals.range.max': '[0, 10]',
   // A mean, so not a whole number.
   'Check.structure.avg_click_depth': '[0, inf)',
   'Check.structure.hub_pagerank_share': '[0, 1]',
@@ -1375,7 +1450,15 @@ describe('shapes and definitions', () => {
   it('a withheld access range may be a single point', () => {
     const ai = withheldAi()!;
     if (!ai.withheld) throw new Error('the partial check in challenged-site must be withheld');
-    const point = { ...ai, access_range: { min: ai.access_range.min, max: ai.access_range.min } };
+    const min = ai.access_range!.min;
+    const point = {
+      ...ai,
+      access_range: { min, max: min },
+      components: {
+        ...ai.components,
+        access: { ...ai.components.access, range: { min, max: min } },
+      },
+    };
     expect(AiReadabilitySchema.safeParse(point).success).toBe(true);
   });
 
@@ -1595,6 +1678,55 @@ describe('CC-12b contract additions', () => {
 });
 
 describe('CC-17 contract additions', () => {
+  it('a grade withheld for Readable alone keeps a measured Access score, with no access_range', () => {
+    const g = withheldAi() as { components: Record<string, object> };
+    const readableOnly = {
+      ...g,
+      withheld_reasons: ['readable_unmeasured'],
+      access_range: null,
+      components: {
+        ...g.components,
+        access: { score: 30, max: 40, heuristic: false, range: null },
+        readable: { score: null, max: 30, heuristic: false, range: { min: 0, max: 30 } },
+      },
+    };
+    expect(AiReadabilitySchema.safeParse(readableOnly).success).toBe(true);
+  });
+
+  it('a withheld grade may name several reasons, each with an unmeasured component', () => {
+    const g = withheldAi() as { components: Record<string, { max: number; heuristic: boolean }> };
+    const unmeasured = (max: number, heuristic: boolean) => ({
+      score: null,
+      max,
+      heuristic,
+      range: { min: 0, max },
+    });
+    const all = {
+      ...g,
+      withheld_reasons: [...WithheldReasonSchema.options],
+      access_range: { min: 0, max: 40 },
+      components: {
+        access: unmeasured(40, false),
+        readable: unmeasured(30, false),
+        quotable: unmeasured(20, true),
+        signals: unmeasured(10, false),
+      },
+    };
+    expect(AiReadabilitySchema.safeParse(all).success).toBe(true);
+  });
+
+  it('a given grade may not carry a range on any component', () => {
+    const g = finished().ai_readability as { components: Record<string, object> };
+    const ranged = {
+      ...g,
+      components: {
+        ...g.components,
+        signals: { score: 10, max: 10, heuristic: false, range: { min: 0, max: 10 } },
+      },
+    };
+    expect(AiReadabilitySchema.safeParse(ranged).success).toBe(false);
+  });
+
   const waiting = (pending: unknown[]) => ({
     technical_seo: 0,
     ai_readability: null,

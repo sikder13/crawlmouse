@@ -80,12 +80,17 @@ export const RULES = {
   i4_withheld: one(
     'AI readability is withheld when fewer than two scored crawlers were measured (I4)',
   ),
-  i4_given: one('AI readability is given when two or more scored crawlers were measured (I4)'),
   // Grades
   score_grade_pair: two('score and grade are both present or both null'),
   refusal_score: two('a refused grade has no score; a given one has'),
-  access_range_order: one('access_range.min must not exceed max'),
   total_sum: one('total is not the sum of its components'),
+  withheld_reasons: two('a withheld grade names why, and a given one names no reason'),
+  component_range: two(
+    'a component without a score carries the range it could take, and a scored one none',
+  ),
+  range_order: one("a component range's min must not exceed its max"),
+  access_range_mirror: one("access_range is the Access component's range"),
+  withheld_unmeasured: one('a withheld grade has at least one component without a score'),
   // Site
   schedule_timed: two('a timed schedule has a weekday; on_deploy has none'),
   schedule_pair: two('a schedule sets its weekday and its hour together'),

@@ -270,10 +270,10 @@ export const CheckSchema = z
       if (sent && instant(c.result_email!.link_expires_at) <= instant(sent)) {
         rule.fail('check_result_link');
       }
-      if (c.ai_readability) {
-        const withheld = scoredCrawlersMeasured(c.crawlers ?? []) < 2;
-        if (withheld && !c.ai_readability.withheld) rule.fail('i4_withheld');
-        if (!withheld && c.ai_readability.withheld) rule.fail('i4_given');
+      // Fewer than two measured scored crawlers always withholds the grade (I4). The engine may
+      // withhold it for other reasons too; the grade names them (`withheld_reasons`).
+      if (c.ai_readability && !c.ai_readability.withheld) {
+        if (scoredCrawlersMeasured(c.crawlers ?? []) < 2) rule.fail('i4_withheld');
       }
     }),
   );

@@ -68,13 +68,14 @@ export function check(n: number, edit: (c: Check) => void = () => {}): Check {
     },
     ai_readability: {
       withheld: false,
+      withheld_reasons: [],
       total: 40,
       grade: 'D',
       components: {
-        access: { score: 20, max: 40, heuristic: false },
-        readable: { score: 10, max: 30, heuristic: false },
-        quotable: { score: 5, max: 20, heuristic: true },
-        signals: { score: 5, max: 10, heuristic: false },
+        access: { score: 20, max: 40, heuristic: false, range: null },
+        readable: { score: 10, max: 30, heuristic: false, range: null },
+        quotable: { score: 5, max: 20, heuristic: true, range: null },
+        signals: { score: 5, max: 10, heuristic: false, range: null },
       },
       access_range: null,
     },

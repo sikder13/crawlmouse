@@ -424,28 +424,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 41,
         "grade": "D",
         "components": {
           "access": {
             "score": 12,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 9,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 10,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -993,28 +998,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 41,
         "grade": "D",
         "components": {
           "access": {
             "score": 12,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 9,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 10,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -1545,28 +1555,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 41,
         "grade": "D",
         "components": {
           "access": {
             "score": 12,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 9,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 10,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -2097,28 +2112,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 41,
         "grade": "D",
         "components": {
           "access": {
             "score": 12,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 9,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 10,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -2649,28 +2669,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 41,
         "grade": "D",
         "components": {
           "access": {
             "score": 12,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 9,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 10,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -3201,28 +3226,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 22,
         "grade": "F",
         "components": {
           "access": {
             "score": 3,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 5,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 4,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -3765,28 +3795,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 93,
         "grade": "A",
         "components": {
           "access": {
             "score": 40,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 28,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 15,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -3968,28 +4003,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 93,
         "grade": "A",
         "components": {
           "access": {
             "score": 40,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 28,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 15,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -4171,28 +4211,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 78,
         "grade": "B",
         "components": {
           "access": {
             "score": 30,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 24,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 14,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -4374,28 +4419,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 78,
         "grade": "B",
         "components": {
           "access": {
             "score": 30,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 24,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 14,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -4577,28 +4627,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 66,
         "grade": "C",
         "components": {
           "access": {
             "score": 24,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 20,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 12,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -4780,28 +4835,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 66,
         "grade": "C",
         "components": {
           "access": {
             "score": 24,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 20,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 12,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -5015,28 +5075,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 88,
         "grade": "A-",
         "components": {
           "access": {
             "score": 40,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 26,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 12,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null
@@ -5223,28 +5288,33 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 88,
         "grade": "A-",
         "components": {
           "access": {
             "score": 40,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 26,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 12,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
         "access_range": null

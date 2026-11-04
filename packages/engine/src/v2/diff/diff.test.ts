@@ -363,13 +363,14 @@ describe('grade rows', () => {
         c.crawlers = c.crawlers.map((r) => ({ ...r, verdict: 'not_measured' }));
         c.ai_readability = {
           withheld: true,
+          withheld_reasons: ['too_few_crawlers_measured'],
           total: null,
           grade: null,
           components: {
-            access: { score: null, max: 40, heuristic: false },
-            readable: { score: 10, max: 30, heuristic: false },
-            quotable: { score: 5, max: 20, heuristic: true },
-            signals: { score: 5, max: 10, heuristic: false },
+            access: { score: null, max: 40, heuristic: false, range: { min: 0, max: 40 } },
+            readable: { score: 10, max: 30, heuristic: false, range: null },
+            quotable: { score: 5, max: 20, heuristic: true, range: null },
+            signals: { score: 5, max: 10, heuristic: false, range: null },
           },
           access_range: { min: 0, max: 40 },
         };

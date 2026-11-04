@@ -209,6 +209,7 @@ Fixture collection: `checks`.
 | `technical_seo.site_structure_score`           | `number`              | yes  |                    | Final-Seg-Structure |
 | `ai_readability`                               | `one of 2 variants`   | yes  |                    |                     |
 | `ai_readability.withheld`                      | `false`               | no   | `withheld = false` |                     |
+| `ai_readability.withheld_reasons`              | `WithheldReason[]`    | no   | `withheld = false` |                     |
 | `ai_readability.total`                         | `number`              | no   | `withheld = false` |                     |
 | `ai_readability.grade`                         | `GradeLetter`         | no   | `withheld = false` |                     |
 | `ai_readability.components`                    | `object`              | no   | `withheld = false` |                     |
@@ -216,40 +217,57 @@ Fixture collection: `checks`.
 | `ai_readability.components.access.score`       | `number`              | no   | `withheld = false` |                     |
 | `ai_readability.components.access.max`         | `40`                  | no   | `withheld = false` |                     |
 | `ai_readability.components.access.heuristic`   | `false`               | no   | `withheld = false` |                     |
+| `ai_readability.components.access.range`       | `null`                | no   | `withheld = false` |                     |
 | `ai_readability.components.readable`           | `object`              | no   | `withheld = false` |                     |
 | `ai_readability.components.readable.score`     | `number`              | no   | `withheld = false` |                     |
 | `ai_readability.components.readable.max`       | `30`                  | no   | `withheld = false` |                     |
 | `ai_readability.components.readable.heuristic` | `false`               | no   | `withheld = false` |                     |
+| `ai_readability.components.readable.range`     | `null`                | no   | `withheld = false` |                     |
 | `ai_readability.components.quotable`           | `object`              | no   | `withheld = false` |                     |
 | `ai_readability.components.quotable.score`     | `number`              | no   | `withheld = false` |                     |
 | `ai_readability.components.quotable.max`       | `20`                  | no   | `withheld = false` |                     |
 | `ai_readability.components.quotable.heuristic` | `true`                | no   | `withheld = false` |                     |
+| `ai_readability.components.quotable.range`     | `null`                | no   | `withheld = false` |                     |
 | `ai_readability.components.signals`            | `object`              | no   | `withheld = false` |                     |
 | `ai_readability.components.signals.score`      | `number`              | no   | `withheld = false` |                     |
 | `ai_readability.components.signals.max`        | `10`                  | no   | `withheld = false` |                     |
 | `ai_readability.components.signals.heuristic`  | `false`               | no   | `withheld = false` |                     |
+| `ai_readability.components.signals.range`      | `null`                | no   | `withheld = false` |                     |
 | `ai_readability.access_range`                  | `null`                | no   | `withheld = false` |                     |
 | `ai_readability.withheld`                      | `true`                | no   | `withheld = true`  |                     |
+| `ai_readability.withheld_reasons`              | `WithheldReason[]`    | no   | `withheld = true`  |                     |
 | `ai_readability.total`                         | `null`                | no   | `withheld = true`  |                     |
 | `ai_readability.grade`                         | `null`                | no   | `withheld = true`  |                     |
 | `ai_readability.components`                    | `object`              | no   | `withheld = true`  |                     |
 | `ai_readability.components.access`             | `object`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.access.score`       | `null`                | no   | `withheld = true`  |                     |
+| `ai_readability.components.access.score`       | `number`              | yes  | `withheld = true`  |                     |
 | `ai_readability.components.access.max`         | `40`                  | no   | `withheld = true`  |                     |
 | `ai_readability.components.access.heuristic`   | `false`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.access.range`       | `object`              | yes  | `withheld = true`  |                     |
+| `ai_readability.components.access.range.min`   | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.access.range.max`   | `number`              | no   | `withheld = true`  |                     |
 | `ai_readability.components.readable`           | `object`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.readable.score`     | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable.score`     | `number`              | yes  | `withheld = true`  |                     |
 | `ai_readability.components.readable.max`       | `30`                  | no   | `withheld = true`  |                     |
 | `ai_readability.components.readable.heuristic` | `false`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable.range`     | `object`              | yes  | `withheld = true`  |                     |
+| `ai_readability.components.readable.range.min` | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable.range.max` | `number`              | no   | `withheld = true`  |                     |
 | `ai_readability.components.quotable`           | `object`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.quotable.score`     | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable.score`     | `number`              | yes  | `withheld = true`  |                     |
 | `ai_readability.components.quotable.max`       | `20`                  | no   | `withheld = true`  |                     |
 | `ai_readability.components.quotable.heuristic` | `true`                | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable.range`     | `object`              | yes  | `withheld = true`  |                     |
+| `ai_readability.components.quotable.range.min` | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable.range.max` | `number`              | no   | `withheld = true`  |                     |
 | `ai_readability.components.signals`            | `object`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.signals.score`      | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals.score`      | `number`              | yes  | `withheld = true`  |                     |
 | `ai_readability.components.signals.max`        | `10`                  | no   | `withheld = true`  |                     |
 | `ai_readability.components.signals.heuristic`  | `false`               | no   | `withheld = true`  |                     |
-| `ai_readability.access_range`                  | `object`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals.range`      | `object`              | yes  | `withheld = true`  |                     |
+| `ai_readability.components.signals.range.min`  | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals.range.max`  | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.access_range`                  | `object`              | yes  | `withheld = true`  |                     |
 | `ai_readability.access_range.min`              | `number`              | no   | `withheld = true`  |                     |
 | `ai_readability.access_range.max`              | `number`              | no   | `withheld = true`  |                     |
 | `structure`                                    | `object`              | yes  |                    | Final-Seg-Structure |
@@ -871,11 +889,14 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `check_grades_when_ended` | only a finished or partial check carries grades                                          | one way   |
 | `check_result_link`       | the result link expires after it is sent                                                 | one way   |
 | `i4_withheld`             | AI readability is withheld when fewer than two scored crawlers were measured (I4)        | one way   |
-| `i4_given`                | AI readability is given when two or more scored crawlers were measured (I4)              | one way   |
 | `score_grade_pair`        | score and grade are both present or both null                                            | both ways |
 | `refusal_score`           | a refused grade has no score; a given one has                                            | both ways |
-| `access_range_order`      | access_range.min must not exceed max                                                     | one way   |
 | `total_sum`               | total is not the sum of its components                                                   | one way   |
+| `withheld_reasons`        | a withheld grade names why, and a given one names no reason                              | both ways |
+| `component_range`         | a component without a score carries the range it could take, and a scored one none       | both ways |
+| `range_order`             | a component range's min must not exceed its max                                          | one way   |
+| `access_range_mirror`     | access_range is the Access component's range                                             | one way   |
+| `withheld_unmeasured`     | a withheld grade has at least one component without a score                              | one way   |
 | `schedule_timed`          | a timed schedule has a weekday; on_deploy has none                                       | both ways |
 | `schedule_pair`           | a schedule sets its weekday and its hour together                                        | both ways |
 | `unkept_audit`            | an unkept audit has no schedule, client report or owner                                  | one way   |

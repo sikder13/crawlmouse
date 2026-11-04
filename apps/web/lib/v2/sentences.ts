@@ -302,5 +302,6 @@ export function aiWithheldSummary(check: Check, measured: number): string {
   const why = meetsEdge(check)
     ? `${EDGE_SENTENCE}, so only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`
     : `Only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`;
-  return `${why} Access is somewhere between ${ai.access_range.min} and ${ai.access_range.max} of 40.`;
+  const range = ai.access_range;
+  return range ? `${why} Access is somewhere between ${range.min} and ${range.max} of 40.` : why;
 }

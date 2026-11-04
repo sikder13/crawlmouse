@@ -6,13 +6,14 @@
  * v1-pins.test.ts. The contract carries no weights: how the score is computed is the engine's.
  *
  * AiReadability is new: four components with fixed maxima (Access 40 / Readable 30 / Quotable 20 /
- * Signals 10) and a total. It is withheld, with Access shown as a range, when fewer than two scored
- * crawlers were measured (FACTS I4). Its letter scale is not defined anywhere yet, so the contract does
- * not pin AI letters to scores.
+ * Signals 10) and a total. It is withheld when a component could not be measured (FACTS I4 for Access):
+ * the grade then names why in `withheld_reasons`, and each component without a score carries the
+ * range its score could take. `access_range` repeats the Access component's range for the screens that
+ * read it. The engine scores letters on v1's scale; the contract does not pin AI letters to scores.
  */
 import { z } from 'zod';
 import { ScoreSchema, ShareSchema } from './common.js';
-import { GradeLetterSchema, RefusalTriggerSchema } from './enums.js';
+import { GradeLetterSchema, RefusalTriggerSchema, WithheldReasonSchema } from './enums.js';
 import { rules } from './rules.js';
 
 export const GradeBreakdownSchema = z.strictObject({
@@ -45,47 +46,85 @@ export const TechnicalSeoSchema = z
     }),
   );
 
+/** The scores a component could take, within its maximum. */
+function rangeOf(max: number) {
+  return z.strictObject({ min: z.number().min(0).max(max), max: z.number().min(0).max(max) });
+}
+
+/** A component of a given grade: scored, with no range. */
 function component<Max extends number, H extends boolean>(max: Max, heuristic: H) {
   return z.strictObject({
     score: z.number().min(0).max(max),
     max: z.literal(max),
     heuristic: z.literal(heuristic),
+    range: z.null(),
   });
 }
 
-const readable = component(30, false);
-const quotable = component(20, true);
-const signals = component(10, false);
+/** A component of a withheld grade: scored, or unscored with the range it could take. */
+function maybeScored<Max extends number, H extends boolean>(max: Max, heuristic: H) {
+  return z
+    .strictObject({
+      score: z.number().min(0).max(max).nullable(),
+      max: z.literal(max),
+      heuristic: z.literal(heuristic),
+      range: rangeOf(max).nullable(),
+    })
+    .check(
+      rules((c, rule) => {
+        rule.exactlyWhen('component_range', c.score === null, c.range !== null);
+        if (c.range && c.range.min > c.range.max) rule.fail('range_order');
+      }),
+    );
+}
+
+const reasons = z.array(WithheldReasonSchema);
 
 const measured = z.strictObject({
   withheld: z.literal(false),
+  withheld_reasons: reasons,
   total: ScoreSchema,
   grade: GradeLetterSchema,
-  components: z.strictObject({ access: component(40, false), readable, quotable, signals }),
+  components: z.strictObject({
+    access: component(40, false),
+    readable: component(30, false),
+    quotable: component(20, true),
+    signals: component(10, false),
+  }),
   access_range: z.null(),
 });
 
-const withheld = z.strictObject({
-  withheld: z.literal(true),
-  total: z.null(),
-  grade: z.null(),
-  components: z.strictObject({
-    access: z.strictObject({ score: z.null(), max: z.literal(40), heuristic: z.literal(false) }),
-    readable,
-    quotable,
-    signals,
-  }),
-  access_range: z
-    .strictObject({ min: z.number().min(0).max(40), max: z.number().min(0).max(40) })
-    .check(
-      rules((r, rule) => {
-        if (r.min > r.max) rule.fail('access_range_order');
-      }),
-    ),
-});
+const withheld = z
+  .strictObject({
+    withheld: z.literal(true),
+    withheld_reasons: reasons,
+    total: z.null(),
+    grade: z.null(),
+    components: z.strictObject({
+      access: maybeScored(40, false),
+      readable: maybeScored(30, false),
+      quotable: maybeScored(20, true),
+      signals: maybeScored(10, false),
+    }),
+    access_range: rangeOf(40).nullable(),
+  })
+  .check(
+    rules((g, rule) => {
+      const c = g.components;
+      const parts = [c?.access, c?.readable, c?.quotable, c?.signals];
+      if (parts.every((p) => p && p.score !== null)) rule.fail('withheld_unmeasured');
+      const range = c?.access?.range ?? null;
+      const same =
+        range === null || g.access_range === null
+          ? range === g.access_range
+          : range.min === g.access_range.min && range.max === g.access_range.max;
+      if (!same) rule.fail('access_range_mirror');
+    }),
+  );
 
 export const AiReadabilitySchema = z.discriminatedUnion('withheld', [measured, withheld]).check(
   rules((g, rule) => {
+    rule.exactlyWhen('withheld_reasons', g.withheld, (g.withheld_reasons ?? []).length > 0);
     if (g.withheld) return;
     const c = g.components;
     const sum = c.access.score + c.readable.score + c.quotable.score + c.signals.score;
