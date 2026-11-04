@@ -1,3 +1,4 @@
+import { expectWithinBudget } from '@crawlmouse/timing';
 import * as cheerio from 'cheerio';
 import { describe, it, expect } from 'vitest';
 import { computePageAiSignals } from './page-signals.js';
@@ -75,10 +76,12 @@ describe('computePageAiSignals (§4 dual gate, end-to-end)', () => {
     ).join('');
     const html = `<html><head><title>Big</title></head><body><nav><ul>${links}</ul></nav><main>${paras}</main></body></html>`;
     const $ = cheerio.load(html);
-    const t0 = performance.now();
-    const s = computePageAiSignals($);
-    const ms = performance.now() - t0;
-    expect(s.pageClass).toBe('readable');
-    expect(ms).toBeLessThan(250); // O(page): a large realistic page must stay well under the per-page budget
+    // O(page): a large realistic page must stay well under the per-page budget.
+    const { values } = expectWithinBudget(
+      'page AI signals, 400 paragraphs and 150 links',
+      () => computePageAiSignals($),
+      { budgetMs: 250 },
+    );
+    for (const s of values) expect(s.pageClass).toBe('readable');
   });
 });

@@ -1,5 +1,5 @@
 import { extractPage, toPersistableText } from '@crawlmouse/engine/worker';
-import { expectWithinRelative } from '@crawlmouse/timing';
+import { expectWithinBudget, expectWithinRelative } from '@crawlmouse/timing';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
@@ -154,13 +154,6 @@ describe('readLinks: pinned readings', () => {
 });
 
 describe('readLinks: cost', () => {
-  const time = (html: string): number => {
-    const $ = parseHtml(html)!;
-    const t = performance.now();
-    readLinks($, BASE);
-    return performance.now() - t;
-  };
-
   // Review rounds 3 and 4: reading a link's text by walking what it holds costs links x text. The
   // subtree under the links varies what that cost keys on: nodes with no text, runs that never fill
   // a link's capture (whitespace, controls), and many one-character text nodes.
@@ -206,7 +199,14 @@ describe('readLinks: cost', () => {
   it('reads a small page of 2,000 nested links with full captures quickly', () => {
     // Review round 4: 4 x 500 nested links around 2,160 characters, so every link's capture is full.
     const group = `${'<a href="/x">'.repeat(500)}${'word '.repeat(432)}${'</a>'.repeat(500)}`;
-    expect(time(`<body>${group.repeat(4)}</body>`)).toBeLessThan(500);
+    const $ = parseHtml(`<body>${group.repeat(4)}</body>`)!;
+    expectWithinBudget(
+      'readLinks, 2,000 nested links with full captures',
+      () => readLinks($, BASE),
+      {
+        budgetMs: 500,
+      },
+    );
   });
 });
 

@@ -1,3 +1,4 @@
+import { expectWithinBudget } from '@crawlmouse/timing';
 import { describe, it, expect } from 'vitest';
 import { parseLlmsTxt } from './llms-txt.js';
 
@@ -35,10 +36,12 @@ describe('parseLlmsTxt (§8 — informational, ZERO weight)', () => {
 
   it('bounds cost on a hostile body — no ReDoS on a huge run of "[" (§12)', () => {
     const hostile = '['.repeat(500_000); // an unbounded [text](url) regex backtracks O(n^2) → seconds
-    const t0 = performance.now();
-    const s = parseLlmsTxt(200, hostile);
-    const ms = performance.now() - t0;
-    expect(s.parseable).toBe(false);
-    expect(ms).toBeLessThan(500); // bounded scan + bounded-quantifier regex → milliseconds
+    // A bounded scan and a bounded-quantifier regex: milliseconds.
+    const { values } = expectWithinBudget(
+      'llms.txt parse of 500,000 "["',
+      () => parseLlmsTxt(200, hostile),
+      { budgetMs: 500 },
+    );
+    expect(values[0]!.parseable).toBe(false);
   });
 });

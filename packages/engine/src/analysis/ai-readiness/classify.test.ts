@@ -1,3 +1,4 @@
+import { expectWithinBudget } from '@crawlmouse/timing';
 import * as cheerio from 'cheerio';
 import { describe, it, expect } from 'vitest';
 import { classifyPageClass, detectCsrSignals } from './classify.js';
@@ -102,13 +103,14 @@ describe('detectCsrSignals (§4.2 affirmative per-page CSR evidence)', () => {
 
   it('bounds the noscript scan — no ReDoS on a huge <noscript>, still detects a short notice', () => {
     const huge = 'need '.repeat(40_000); // ~200KB of "need " with no "JavaScript" → quadratic backtracking pre-fix
-    const t0 = performance.now();
-    const s = detectCsrSignals(
-      cheerio.load(`<body><noscript>${huge}</noscript><div id="root"></div></body>`),
+    const html = `<body><noscript>${huge}</noscript><div id="root"></div></body>`;
+    // Bounded: the unbounded regex takes seconds on this input pre-fix.
+    const { values } = expectWithinBudget(
+      'noscript scan of 200 KB with no notice',
+      () => detectCsrSignals(cheerio.load(html)),
+      { budgetMs: 1000 },
     );
-    const ms = performance.now() - t0;
-    expect(s).not.toContain('noscript_js_notice'); // no false positive
-    expect(ms).toBeLessThan(1000); // bounded (the unbounded regex takes seconds on this input pre-fix)
+    expect(values[0]).not.toContain('noscript_js_notice'); // no false positive
     // a short, real notice is still caught
     expect(
       detectCsrSignals(
