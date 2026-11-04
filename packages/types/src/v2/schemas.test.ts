@@ -755,6 +755,15 @@ const CASES: RuleCase[] = [
     }),
   },
   {
+    rule: 'withheld_reasons_match',
+    breaks: "a content fix's reason on a grade",
+    schema: AiReadabilitySchema,
+    input: () => ({
+      ...withheldAi()!,
+      withheld_reasons: ['too_few_crawlers_measured', 'check_not_scored'],
+    }),
+  },
+  {
     rule: 'total_sum',
     breaks: 'a total three points off',
     schema: AiReadabilitySchema,
