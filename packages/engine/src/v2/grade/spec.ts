@@ -1,15 +1,16 @@
 /**
- * Renders docs/specs/v2/17-content-and-grade.md from the code: the weights, thresholds and tables come
- * from the modules that use them, the letter scale from scoreToLetter, the label-set results from the
- * labelled fixture, and the example sites from expected.json. spec.test.ts fails when the file differs
- * from this render.
+ * Renders docs/specs/v2/17-content-and-grade.md. The weights and thresholds are read from the modules
+ * that use them, the letter scale from scoreToLetter, the label-set counts from the labelled fixture,
+ * and the example sites from expected.json. The prose, the counterfactual descriptions and the
+ * per-check rule descriptions are written here, and only review checks them against the code.
+ * spec.test.ts fails when the file differs from this render.
  */
 import { VerdictSchema, type FixType } from '@crawlmouse/types/v2';
 import { scoreToLetter } from '../../grade.js';
-import { MIN_GRADEABLE_PAGES } from '../../constants.js';
+import { MAX_HEALTHY_DEPTH, MIN_GRADEABLE_PAGES } from '../../constants.js';
 import { SIGNAL_TABLE } from '../access/declarations.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
-import { MIN_PRECISION, tallies } from '../content/label-set.js';
+import { MIN_PASS_ACCURACY, MIN_PRECISION, tallies, validated } from '../content/label-set.js';
 import * as T from '../content/thresholds.js';
 import labels from '../../../fixtures/v2/content/labels.json' with { type: 'json' };
 import { code, pct, table } from '../detectors/spec.js';
@@ -39,7 +40,7 @@ const list = (vs: readonly string[]) => vs.map(code).join(', ');
 export const COUNTERFACTUALS: Readonly<Record<FixType, string>> = {
   orphan_pages:
     'a link to the page from its `suggested_parent_url`, or from the homepage when it has none',
-  deep_pages: 'a link to the page from the homepage',
+  deep_pages: `a link to the page from the deepest graded page within ${MAX_HEALTHY_DEPTH - 1} clicks of the homepage (the lowest URL among them), or from the homepage when none is`,
   generic_anchor_text: "the hub's outbound links get descriptive anchors",
   redirect_chain: 'the record becomes `not_detected`',
   canonical_mismatch: 'the record becomes `not_detected`',
@@ -47,40 +48,46 @@ export const COUNTERFACTUALS: Readonly<Record<FixType, string>> = {
   hreflang_gap: 'the record becomes `not_detected`',
   edge_rule_blocks_crawler: "the crawler's `blocked_by_ua_rule` pages become `allowed`",
   robots_txt_blocks_crawler: 'none: respected intent opens no fix',
-  quotable_opening: "the template's failing pages pass the check",
-  missing_author_date: "the template's failing pages pass the check",
-  specs_as_images: "the template's failing pages pass the check",
+  quotable_opening: "the template's failing pages pass the check, when the check counts",
+  missing_author_date: "the template's failing pages pass the check, when the check counts",
+  specs_as_images: "the template's failing pages pass the check, when the check counts",
   client_rendered_template: 'none yet: the fix type needs rendered pages (CC-14)',
   js_only_navigation: 'none yet: the fix type needs rendered pages (CC-14)',
 };
 
 /** What each content check applies to and passes on, said with the constants it reads. */
 const CHECK_RULES: Readonly<
-  Record<keyof typeof CONTENT_CHECKS, { applies: string; passes: string }>
+  Record<keyof typeof CONTENT_CHECKS, { applies: string; passes: string; shell: string }>
 > = {
   direct_answer_150: {
     applies: `a page of prose: an H1 with ${T.MIN_BODY_WORDS} words or more after it, and no \`Product\` JSON-LD`,
     passes: `within the first ${T.OPENING_WORDS} words after the H1, a block that is not a list item and has ${T.MIN_BLOCK_WORDS} words or more holds a sentence of ${T.ANSWER_SENTENCE_WORDS.min} to ${T.ANSWER_SENTENCE_WORDS.max} words ending in a full stop`,
+    shell: 'unread',
   },
   question_headings: {
     applies: `a page of prose with ${T.MIN_HEADINGS} section headings or more: an h2 or h3 after the H1 followed by a ${list([...T.PROSE_BLOCKS])} block of ${T.MIN_BLOCK_WORDS} words or more`,
     passes:
       'an h2 or h3 after the H1 has a clause ending in a question mark (`?`, the Arabic `؟`, or the full-width form)',
+    shell: 'unread',
   },
   schema_with_description: {
     applies: 'a page with a typed JSON-LD node',
     passes:
       'a node of a type about the page itself (`…Page`, `…Article`, `BlogPosting`, `Product`, `Service`, `Event`, `TouristTrip` and the others in checks.ts) has a non-empty `description`',
+    shell: 'unread',
   },
   author_and_date: {
     applies:
       'a page whose JSON-LD has an Article-family node (`og:type=article` alone does not count)',
     passes:
       'an author (JSON-LD `author`, `meta[name=author]`, `rel=author`, `itemprop=author`) and a date (JSON-LD `datePublished` with a four-digit year, `article:published_time`, `itemprop=datePublished`, `time[datetime]`)',
+    shell:
+      'not applicable without an Article-family node; passes when the markup alone passes; otherwise unread',
   },
   specs_as_text: {
     applies: 'a page with `Product` JSON-LD',
     passes: `fails when an image whose alt text or file name names specifications, and is not a link to another page, is shown with no table or description list and fewer than ${T.MIN_SPEC_LINES} "Label: value" lines with a digit`,
+    shell: 'not applicable without `Product` JSON-LD; otherwise unread',
   },
 };
 
@@ -98,31 +105,82 @@ function letterScale(): string[][] {
 
 const outOfDenominator = () => VerdictSchema.options.filter((v) => !(v in ACCESS_CELL_WEIGHT));
 
+const share = (n: number, of: number, none: string) =>
+  of === 0 ? none : `${pct(n / of)} (${n} of ${of})`;
+
+function tallyTable(t: ReturnType<typeof tallies>): string {
+  const rows = (Object.keys(t) as (keyof typeof CONTENT_CHECKS)[]).map((check) => {
+    const x = t[check];
+    return [
+      code(check),
+      CONTENT_CHECKS[check].scored ? 'yes' : 'no',
+      String(x.labelled),
+      String(x.failing),
+      share(x.confirmed, x.fires, 'no firing'),
+      share(x.passes_confirmed, x.passes, 'no pass'),
+      x.failing === 0 ? 'no failing page labelled' : `${x.confirmed} of ${x.failing}`,
+    ];
+  });
+  return table(
+    ['Check', 'Counted', 'Labelled', 'Labelled fail', 'Precision', 'Pass accuracy', 'Recall'],
+    rows,
+  );
+}
+
+/** Which counted checks would clear the bar on the labels as first read, said from the tallies. */
+function firstReadVerdict(): string {
+  const first = tallies(true);
+  const counted = (Object.keys(CONTENT_CHECKS) as (keyof typeof CONTENT_CHECKS)[]).filter(
+    (c) => CONTENT_CHECKS[c].scored,
+  );
+  const failing = counted.filter((c) => !validated(first[c]));
+  return failing.length === 0
+    ? 'On the labels as first read, every counted check also clears the bar.'
+    : `On the labels as first read, ${list(failing)} would not clear the bar: the corrections are what let ${failing.length === 1 ? 'it' : 'them'} count.`;
+}
+
 function labelSet(): string {
-  const t = tallies();
-  const corrections = labels.pages.reduce((n, p) => n + p.corrections.length, 0);
-  const rows = Object.entries(t).map(([check, x]) => [
-    code(check),
-    String(x.labelled),
-    String(x.failing),
-    String(x.fires),
-    String(x.confirmed),
-    x.fires === 0 ? 'not measurable: no firing' : pct(x.confirmed / x.fires),
-    x.failing === 0 ? 'no failing page labelled' : `${x.confirmed} of ${x.failing}`,
-  ]);
+  const all = labels.pages.flatMap((p) => p.corrections);
+  const causes = Object.entries(labels.causes).flatMap(([cause, meaning]) => {
+    const cs = all.filter((c) => c.cause === cause);
+    if (cs.length === 0) return [];
+    const checks = [...new Set(cs.map((c) => c.check))].sort().map(code).join(', ');
+    return [`- ${cs.length} on ${checks}: ${meaning}.`];
+  });
   return [
-    `${labels.pages.length} pages from the production audit corpus, labelled by a person before the checks existed`,
-    `(\`packages/engine/fixtures/v2/content/labels.json\`), with ${corrections} corrections, each recorded with its cause.`,
-    'Each page carries its URL, fetch date, the features `readPage` read, the labels with their reasons, and the',
-    "sha256 of the excerpt the labels were made from. The excerpts are other people's text and are not tracked:",
-    '`fixtures/v2/content/fetch.ts` refetches the pages from their URLs and `generate.ts` rebuilds the features.',
-    `A check fires when it judges a page \`fail\`; precision is the share of its firings the person also judged`,
-    `\`fail\`, and a check that fires at all must keep it at ${pct(MIN_PRECISION)} or more (labels.test.ts).`,
+    `${labels.pages.length} pages from the production audit corpus (\`packages/engine/fixtures/v2/content/labels.json\`).`,
     '',
-    table(
-      ['Check', 'Labelled', 'Failing (person)', 'Fires', 'Confirmed', 'Precision', 'Recall'],
-      rows,
-    ),
+    '**Who labelled them.** The session that implemented the checks, reading a machine-made text view of each',
+    'saved page against the criteria below, not against the rules. The labels are not an independent',
+    "person's, and the reviewer checks them against the excerpts. Each page carries its URL, fetch date, the",
+    'features `readPage` read, the labels with their reasons, and the sha256 of the excerpt the labels were made',
+    "from. The excerpts are other people's text and are not tracked: the set is reproducible from the URLs, as",
+    '`fixtures/v2/content/fetch.ts` refetches the pages and `generate.ts` rebuilds the features. The file records',
+    "the digest of the reader the features were read with, and labels.test.ts fails when it is not the reader's.",
+    '',
+    'The criteria, as labels.json carries them:',
+    '',
+    ...labels.criteria.map((l) => `> ${l}`.trimEnd()),
+    '',
+    `A check fires when it judges a page \`fail\`. Precision is the share of its firings labelled \`fail\`;`,
+    'pass accuracy the share of the pages it judges `pass` that are labelled `pass`; pages labelled `unsure` are',
+    `left out. A check counts in Quotable only if it fires, passes, and keeps precision at ${pct(MIN_PRECISION)}`,
+    `or more and pass accuracy at ${pct(MIN_PASS_ACCURACY)} or more (labels.test.ts); the others are reported`,
+    'and score nothing.',
+    '',
+    tallyTable(tallies()),
+    '',
+    `**Corrections.** ${all.length} labels were changed after the first reading, each recorded with its first`,
+    'label, its reason and its cause. They were found by reading the pages where a check and a label',
+    'disagreed, so they move the counts toward agreement. By cause:',
+    '',
+    ...causes,
+    '',
+    'The same counts with the labels as first read:',
+    '',
+    tallyTable(tallies(true)),
+    '',
+    firstReadVerdict(),
   ].join('\n');
 }
 
@@ -147,15 +205,24 @@ function exampleSites(): string {
 }
 
 export function renderGradeSpec(): string {
-  const contentRows = Object.entries(CONTENT_CHECKS).map(([check, def]) => [
-    code(check),
-    CHECK_RULES[check as keyof typeof CONTENT_CHECKS].applies,
-    CHECK_RULES[check as keyof typeof CONTENT_CHECKS].passes,
-    def.fix === null
-      ? 'none in the contract: scores Quotable only'
-      : `${code(def.fix)} (${code(`${def.key}:`)})`,
-    code(def.recommendation_class),
-  ]);
+  const contentRows = Object.entries(CONTENT_CHECKS).map(([check, def]) => {
+    const rule = CHECK_RULES[check as keyof typeof CONTENT_CHECKS];
+    return [
+      code(check),
+      rule.applies,
+      rule.passes,
+      rule.shell,
+      def.fix === null ? 'none in the contract' : `${code(def.fix)} (${code(`${def.key}:`)})`,
+      def.scored ? 'yes' : 'no',
+      `${code(def.recommendation_class)}, ${code(def.confidence)}`,
+    ];
+  });
+  const counted = (Object.keys(CONTENT_CHECKS) as (keyof typeof CONTENT_CHECKS)[]).filter(
+    (c) => CONTENT_CHECKS[c].scored,
+  );
+  const uncounted = (Object.keys(CONTENT_CHECKS) as (keyof typeof CONTENT_CHECKS)[]).filter(
+    (c) => !CONTENT_CHECKS[c].scored,
+  );
   return `${[
     '# SPEC 17 — Content checks, the two v2 grades, and fix effects',
     '',
@@ -179,7 +246,7 @@ export function renderGradeSpec(): string {
           String(AI_WEIGHTS.readable),
           'the share of words served without JavaScript (CC-14)',
         ],
-        ['Quotable', String(AI_WEIGHTS.quotable), 'the five content checks'],
+        ['Quotable', String(AI_WEIGHTS.quotable), `the counted content checks: ${list(counted)}`],
         ['Signals', String(AI_WEIGHTS.signals), 'schema.org markup and Content Signals'],
       ],
     ),
@@ -205,7 +272,7 @@ export function renderGradeSpec(): string {
     '',
     '### Quotable',
     '',
-    `rate(k) = pages passing check k / pages k was decided on; Quotable = ${AI_WEIGHTS.quotable} × mean of rate(k) over the checks decided on a page. Graded pages not read for content make it a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread).`,
+    `rate(k) = pages passing check k / pages k was decided on; Quotable = ${AI_WEIGHTS.quotable} × mean of rate(k) over the counted checks decided on a page. A check counts once the label set validates it (below); ${list(uncounted)} are reported and do not count. A counted check's graded pages that were not read for it make Quotable a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread), over each check decided or unread on a page. Nothing decided and nothing unread is the range [0, ${AI_WEIGHTS.quotable}].`,
     '',
     '### Signals',
     '',
@@ -218,7 +285,7 @@ export function renderGradeSpec(): string {
       ]),
     ),
     '',
-    'Content Signals: a `Content-Signal:` line in robots.txt naming `search`, `ai-input` or `ai-train` with `yes` or `no`, as a directive or in the comment form Cloudflare writes; robots.txt not read is undecided. schema.org: a graded page carries a typed JSON-LD node. An undecided declaration makes Signals a range.',
+    'Content Signals: a `Content-Signal:` line in robots.txt naming `search`, `ai-input` or `ai-train` (as a key of its own: at the start of the value or after a space, comma or semicolon) with `yes` or `no`, as a directive or in the comment form Cloudflare writes; robots.txt not read is undecided. schema.org: a graded page carries a typed JSON-LD node; with none marked, it is undecided while a graded page was not fetched, or when there is no graded page. An undecided declaration makes Signals a range.',
     '',
     '### The grade and withholding',
     '',
@@ -237,9 +304,20 @@ export function renderGradeSpec(): string {
     '',
     '## Content checks',
     '',
-    `A page served for JavaScript to fill in is unread for the five checks. Site chrome (${code(T.CHROME)}) is set aside before a page is read.`,
+    `Site chrome (${code(T.CHROME)}) is set aside before a page is read. A page served for JavaScript to fill in is judged as the column "Client-rendered" says. "Counted" is whether the check counts in Quotable.`,
     '',
-    table(['Check', 'Applies to', 'Passes', 'Fix (key)', 'Class'], contentRows),
+    table(
+      [
+        'Check',
+        'Applies to',
+        'Passes',
+        'Client-rendered',
+        'Fix (key)',
+        'Counted',
+        'Class, confidence',
+      ],
+      contentRows,
+    ),
     '',
     `A template's content fix is detected when ${T.TEMPLATE_RULE.DETECT_MIN_PAGES} or more of its decided pages fail and they are ${pct(T.TEMPLATE_RULE.DETECT_SHARE)} or more of them; clear at ${pct(T.TEMPLATE_RULE.CLEAR_SHARE)} or less; indeterminate between (hysteresis), or when a page of the template was not read. An opened content fix is \`info\` (diff/severity.ts).`,
     '',
@@ -249,7 +327,9 @@ export function renderGradeSpec(): string {
     '',
     '## Fix effects',
     '',
-    'Each effect is a counterfactual recompute. Fixes are ranked by their effect applied alone (Technical SEO plus AI readability, larger first; ties by fingerprint); in that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade. Two fixes whose counterfactuals overlap share one effect, taken by the higher-ranked. Technical SEO is measured on its formula before the refusal. The AI effect is the change in the component the fix moves; when that component has no score before or after, it is null and waits on its reason.',
+    "Each effect is a counterfactual recompute. Fixes are ranked by their effect applied alone (Technical SEO plus AI readability, larger first; ties by fingerprint). In that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade less the current one. When two fixes' counterfactuals overlap, the higher-ranked takes the shared change and the lower-ranked shows what remains, which can be 0; no field says which fix took it.",
+    '',
+    "Technical SEO is 0 when the grade is refused before or after the fix: there is no score to move, and the contract's `Effect.technical_seo` cannot say \"not estimated\" (a reported gap). The AI effect is the change in the component the fix moves: Access for an edge-rule fix, Quotable for a content fix, none for a structure fix. It is null and waits on a reason when that component has no score before or after, when an edge fix's crawler has too few pages for a share (`crawler_too_few_pages`), or when a content fix's check does not count in Quotable (`check_not_scored`). The projected grades leave out fixes on checks that do not count. A link a counterfactual adds carries no anchor text, and anchor diversity leaves it out.",
     '',
     table(
       ['Fix', 'Counterfactual'],

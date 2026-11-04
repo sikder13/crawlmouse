@@ -1,6 +1,6 @@
 {
   "grade_version": "2.0.0",
-  "source_digest": "20dc563b4896f8274f333a8200918ad5043a7865e795b2a2e45487742b8f77cb",
+  "source_digest": "42fa5f3536b389b4c38c08c14a2ebf6291301e0da611c0c091dcb60acb88334a",
   "cases": {
     "client-rendered, 31 % text, every crawler served": {
       "technical_seo": {
@@ -182,18 +182,18 @@
       "ai_readability": {
         "withheld": false,
         "withheld_reasons": [],
-        "total": 77.5,
-        "grade": "B",
+        "total": 80,
+        "grade": "B+",
         "components": {
           "access": { "score": 25, "max": 40, "heuristic": false, "range": null },
           "readable": { "score": 30, "max": 30, "heuristic": false, "range": null },
-          "quotable": { "score": 17.5, "max": 20, "heuristic": true, "range": null },
+          "quotable": { "score": 20, "max": 20, "heuristic": true, "range": null },
           "signals": { "score": 5, "max": 10, "heuristic": false, "range": null }
         },
         "access_range": null
       },
       "content": {
-        "score": 87.5,
+        "score": 100,
         "checks": [
           {
             "check": "direct_answer_150",
@@ -251,20 +251,9 @@
           }
         },
         {
-          "type": "quotable_opening",
-          "fingerprint": "995cd022806d66ef",
+          "type": "orphan_pages",
+          "fingerprint": "66c6e4c24be83395",
           "rank": 2,
-          "effect": {
-            "technical_seo": 0,
-            "ai_readability": 2.5,
-            "ai_readability_pending_on": [],
-            "estimate": true
-          }
-        },
-        {
-          "type": "deep_pages",
-          "fingerprint": "0a49cb169022b634",
-          "rank": 3,
           "effect": {
             "technical_seo": 1.28,
             "ai_readability": 0,
@@ -273,9 +262,9 @@
           }
         },
         {
-          "type": "deep_pages",
-          "fingerprint": "2ce4f3c17dffa487",
-          "rank": 4,
+          "type": "orphan_pages",
+          "fingerprint": "6a9d03c8fa9d7581",
+          "rank": 3,
           "effect": {
             "technical_seo": 1.33,
             "ai_readability": 0,
@@ -284,31 +273,42 @@
           }
         },
         {
-          "type": "orphan_pages",
-          "fingerprint": "66c6e4c24be83395",
-          "rank": 5,
+          "type": "deep_pages",
+          "fingerprint": "0a49cb169022b634",
+          "rank": 4,
           "effect": {
-            "technical_seo": 0,
+            "technical_seo": -0.26,
             "ai_readability": 0,
             "ai_readability_pending_on": [],
             "estimate": true
           }
         },
         {
-          "type": "orphan_pages",
-          "fingerprint": "6a9d03c8fa9d7581",
+          "type": "deep_pages",
+          "fingerprint": "2ce4f3c17dffa487",
+          "rank": 5,
+          "effect": {
+            "technical_seo": -0.08,
+            "ai_readability": 0,
+            "ai_readability_pending_on": [],
+            "estimate": true
+          }
+        },
+        {
+          "type": "quotable_opening",
+          "fingerprint": "995cd022806d66ef",
           "rank": 6,
           "effect": {
             "technical_seo": 0,
-            "ai_readability": 0,
-            "ai_readability_pending_on": [],
+            "ai_readability": null,
+            "ai_readability_pending_on": ["check_not_scored"],
             "estimate": true
           }
         }
       ],
       "overview": {
-        "technical_seo": 2.61,
-        "ai_readability": 12.5,
+        "technical_seo": 2.27,
+        "ai_readability": 10,
         "ai_readability_pending_on": [],
         "estimate": true
       }
