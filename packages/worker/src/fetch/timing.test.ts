@@ -109,7 +109,8 @@ describe('request timing', () => {
       clock,
       () =>
         new Promise<void>((resolve) => {
-          const req = http.get(`http://localhost:${port}/?wait=20`, (res) => {
+          // A connection of its own (no agent), so connect is marked before the step back.
+          const req = http.get(`http://localhost:${port}/?wait=20`, { agent: false }, (res) => {
             back = 5_000;
             res.resume();
             res.on('end', () => resolve());
@@ -120,6 +121,7 @@ describe('request timing', () => {
     const known = [timing.dns_ms, timing.connect_ms, timing.ttfb_ms, timing.total_ms].filter(
       (v): v is number => v !== null,
     );
+    expect(timing.connect_ms).not.toBeNull();
     expect(known.every((v, i) => i === 0 || v >= known[i - 1]!)).toBe(true);
   });
 });
