@@ -15,8 +15,8 @@ export const BUDGET = {
 /** How long each crawl-screen window plays. */
 export const WINDOW_MS = 12_000;
 
-/** How many runs a window may take to meet its budget; it is judged on the best. */
-export const RUNS = 3;
+/** How many times each window is measured; each budget is judged on the median of the runs. */
+export const RUNS = 5;
 
 /** The explorer window: the 2,000-node map, the selection stepping every 100 ms for 2 s. */
 export const EXPLORER = {
