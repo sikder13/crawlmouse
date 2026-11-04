@@ -17,6 +17,10 @@ import type { Clock } from '../clock.js';
  * - the address lookup safeFetch's SSRF guard makes before the request (validateUrlOrThrow): only the
  *   socket's own lookup, the pinned one, is `dns_ms`;
  * - a connection reused from the agent's pool makes no lookup and no connection, so both are null.
+ *
+ * The phases are recorded in order, each no earlier than the one before it: a clock that steps back
+ * between two marks (an NTP correction) gives the later phase the earlier one's time rather than a
+ * smaller number.
  */
 
 export { MAX_TIMING_MS };
@@ -61,14 +65,15 @@ export async function timed<T>(
   const value = await context.run({ clock, marks }, fetch);
   const ended = clock.now();
   const from = marks.sent ?? called;
-  const since = (t: number | null) => (t === null ? null : boundedMs(t - from));
-  return {
-    value,
-    timing: {
-      dns_ms: since(marks.lookup),
-      connect_ms: since(marks.connect),
-      ttfb_ms: since(marks.response),
-      total_ms: boundedMs(ended - from),
-    },
+  let floor = 0;
+  const since = (t: number | null): number | null => {
+    if (t === null) return null;
+    floor = Math.max(floor, boundedMs(t - from));
+    return floor;
   };
+  const dns_ms = since(marks.lookup);
+  const connect_ms = since(marks.connect);
+  const ttfb_ms = since(marks.response);
+  const total_ms = since(ended)!;
+  return { value, timing: { dns_ms, connect_ms, ttfb_ms, total_ms } };
 }

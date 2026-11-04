@@ -4,7 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { systemClock } from '../clock.js';
 import { CRAWL } from '../identities.js';
 import { createFetcher, MAX_BODY_BYTES } from './fetcher.js';
-import { MAX_TIMING_MS, boundedMs } from './timing.js';
+import { MAX_TIMING_MS, boundedMs, timed } from './timing.js';
+import type { Clock } from '../clock.js';
 
 /**
  * Per-request timing, observed from Node's http client diagnostics channel without touching
@@ -98,5 +99,27 @@ describe('request timing', () => {
     expect(boundedMs(12.6)).toBe(13);
     expect(boundedMs(MAX_TIMING_MS + 1)).toBe(MAX_TIMING_MS);
     expect(boundedMs(Number.POSITIVE_INFINITY)).toBe(MAX_TIMING_MS);
+  });
+
+  it('keeps the phases in order when the clock steps back between two marks', async () => {
+    // Real time, with 5 s taken off from the request's response onwards: an NTP step mid-request.
+    let back = 0;
+    const clock: Clock = { now: () => Date.now() - back, sleep: async () => undefined };
+    const { timing } = await timed(
+      clock,
+      () =>
+        new Promise<void>((resolve) => {
+          const req = http.get(`http://localhost:${port}/?wait=20`, (res) => {
+            back = 5_000;
+            res.resume();
+            res.on('end', () => resolve());
+          });
+          req.on('error', () => resolve());
+        }),
+    );
+    const known = [timing.dns_ms, timing.connect_ms, timing.ttfb_ms, timing.total_ms].filter(
+      (v): v is number => v !== null,
+    );
+    expect(known.every((v, i) => i === 0 || v >= known[i - 1]!)).toBe(true);
   });
 });
