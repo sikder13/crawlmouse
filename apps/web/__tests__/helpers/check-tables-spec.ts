@@ -6,7 +6,14 @@ import { ENTITIES } from '@crawlmouse/types/v2';
 import { format, resolveConfig } from 'prettier';
 import { REPO_ROOT } from './accounts-spec-catalog';
 import { MIGRATIONS_DIR, ROLLBACKS_DIR, applyAllMigrations, freshDb } from './pglite-migrations';
-import { MIGRATION_003, MIGRATION_005, MIGRATION_007, before, revertFile } from './v2-check-tables';
+import {
+  MIGRATION_003,
+  MIGRATION_005,
+  MIGRATION_007,
+  before,
+  revertFile,
+  through,
+} from './v2-check-tables';
 import {
   FLATTENED,
   NESTED,
@@ -29,14 +36,15 @@ const MIGRATIONS = [MIGRATION_003, MIGRATION_005, MIGRATION_007];
 const CLIENT_ROLES = ['anon', 'authenticated', 'crawl_worker'] as const;
 
 const cell = (text: string): string => text.replace(/\|/g, '\\|').replace(/\n/g, ' ');
-const code = (text: string): string => `\`${text}\``;
-const table = (head: string[], rows: string[][]): string =>
+export const code = (text: string): string => `\`${text}\``;
+export const table = (head: string[], rows: string[][]): string =>
   [
     `| ${head.map(cell).join(' | ')} |`,
     `| ${head.map(() => '---').join(' | ')} |`,
     ...rows.map((r) => `| ${r.map(cell).join(' | ')} |`),
   ].join('\n');
-const sha256 = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex');
+export const sha256 = (path: string) =>
+  createHash('sha256').update(readFileSync(path)).digest('hex');
 
 async function names(db: PGlite, sql: string, args: unknown[] = []): Promise<string[]> {
   return (await db.query<{ n: string }>(sql, args)).rows.map((r) => r.n);
@@ -79,7 +87,9 @@ async function readCatalog(pre: PGlite, db: PGlite): Promise<Catalog> {
   return { newTables, addedColumns, anonTruncate };
 }
 
-async function tableSection(db: PGlite, t: string): Promise<string> {
+/** One table's columns, keys, CHECKs, indexes, policies and client privileges, from the catalog. */
+export async function tableSection(db: PGlite, t: string, schema = 'public'): Promise<string> {
+  const rel = `${schema}.${t}`;
   const cols = await db.query<{
     c: string;
     type: string;
@@ -95,19 +105,19 @@ async function tableSection(db: PGlite, t: string): Promise<string> {
               case when has_column_privilege('authenticated', a.attrelid, a.attnum, 'INSERT') then 'INSERT' end,
               case when has_column_privilege('authenticated', a.attrelid, a.attnum, 'UPDATE') then 'UPDATE' end) as authed
        from pg_attribute a left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
-      where a.attrelid = ('public.' || $1)::regclass and a.attnum > 0 and not a.attisdropped
+      where a.attrelid = $1::regclass and a.attnum > 0 and not a.attisdropped
       order by a.attnum`,
-    [t],
+    [rel],
   );
   const cons = await db.query<{ name: string; type: string; def: string }>(
     `select conname as name, contype as type, pg_get_constraintdef(oid) as def from pg_constraint
-      where conrelid = ('public.' || $1)::regclass order by contype, conname`,
-    [t],
+      where conrelid = $1::regclass and conparentid = 0 order by contype, conname`,
+    [rel],
   );
   const idx = await names(
     db,
-    `select indexdef as n from pg_indexes where schemaname = 'public' and tablename = $1 order by indexname`,
-    [t],
+    `select indexdef as n from pg_indexes where schemaname = $2 and tablename = $1 order by indexname`,
+    [t, schema],
   );
   const pols = await db.query<{
     name: string;
@@ -117,18 +127,27 @@ async function tableSection(db: PGlite, t: string): Promise<string> {
     chk: string | null;
   }>(
     `select policyname as name, cmd, array_to_string(roles, ', ') as roles, qual, with_check as chk
-       from pg_policies where schemaname = 'public' and tablename = $1 order by policyname`,
-    [t],
+       from pg_policies where schemaname = $2 and tablename = $1 order by policyname`,
+    [t, schema],
   );
   const tablePrivs = await db.query<{ role: string; privs: string }>(
     `select r.role, concat_ws(', ',
-              case when has_table_privilege(r.role, ('public.' || $1)::regclass, 'INSERT') then 'INSERT' end,
-              case when has_table_privilege(r.role, ('public.' || $1)::regclass, 'DELETE') then 'DELETE' end,
-              case when has_table_privilege(r.role, ('public.' || $1)::regclass, 'TRUNCATE') then 'TRUNCATE' end) as privs
+              case when has_table_privilege(r.role, $1::regclass, 'INSERT') then 'INSERT' end,
+              case when has_table_privilege(r.role, $1::regclass, 'DELETE') then 'DELETE' end,
+              case when has_table_privilege(r.role, $1::regclass, 'TRUNCATE') then 'TRUNCATE' end) as privs
        from unnest($2::text[]) r(role)`,
-    [t, CLIENT_ROLES],
+    [rel, CLIENT_ROLES],
   );
-  const parts = [`### \`${t}\``, ''];
+  const parts = [`### \`${schema === 'public' ? t : rel}\``, ''];
+  const { rows: key } = await db.query<{ k: string | null }>(
+    `select pg_get_partkeydef($1::regclass) as k`,
+    [rel],
+  );
+  if (key[0]!.k)
+    parts.push(
+      `Partitioned by ${code(key[0]!.k)}, one partition a month in the schema ${code('partitions')} (06b).`,
+      '',
+    );
   parts.push(
     table(
       ['Column', 'Type', 'Null', 'Default', '`authenticated`'],
@@ -216,6 +235,12 @@ async function databaseOnlyColumns(db: PGlite): Promise<string[][]> {
   }
   const rows: string[][] = [];
   for (const [table, { entity, fields }] of covered) {
+    // A table a later migration creates (006b's usage_events) is 06b's to list.
+    const { rows: exists } = await db.query<{ t: string | null }>(
+      `select to_regclass('public.' || $1)::text as t`,
+      [table],
+    );
+    if (exists[0]!.t === null) continue;
     const cols = await names(
       db,
       `select attname as n from pg_attribute where attrelid = ('public.' || $1)::regclass and attnum > 0
@@ -251,7 +276,7 @@ function contractLists(): string {
       ['Constraint', 'Field', 'Agreement with the contract'],
       Object.entries(SHAPE_CHECKS).map(([c, x]) => [
         `${code(x.table)}.${code(c)}`,
-        code(x.field),
+        x.shapeOf ? `${code(x.field)} (database only; the shape of ${x.shapeOf}’s)` : code(x.field),
         x.exact === true ? 'exact' : x.exact,
       ]),
     ),
@@ -325,7 +350,7 @@ async function workerSection(db: PGlite): Promise<string> {
   const privs = await db.query<{ t: string; p: string }>(
     `select n.nspname || '.' || c.relname as t, p.p from pg_class c join pg_namespace n on n.oid = c.relnamespace
        cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p(p)
-      where n.nspname in ('public', 'storage') and c.relkind = 'r' and has_table_privilege('crawl_worker', c.oid, p.p)
+      where n.nspname in ('public', 'storage') and c.relkind in ('r', 'p') and has_table_privilege('crawl_worker', c.oid, p.p)
       order by 1, 2`,
   );
   const storagePols = await db.query<{
@@ -399,7 +424,7 @@ function sqlSection(): string {
 
 // ─── Prose: decisions, not schema facts ───────────────────────────────────────────────────────────
 
-const V = (file: string, t = '') =>
+export const V = (file: string, t = '') =>
   `\`pnpm --filter @crawlmouse/web exec vitest run __tests__/${file}${t ? ` -t "${t}"` : ''}\``;
 
 const intro = (tables: string[]) => `# SPEC 06: the check-data tables (CC-06)
@@ -412,6 +437,8 @@ Three migrations, applied by the owner (OPERATING-RULES §7), in this order:
 - **005 \`v2_sharing_columns\`**: nullable columns on v1's sharing and ledger tables (listed under "Columns added to existing tables"). Nothing dropped, renamed or re-granted.
 - **007 \`v2_storage\`**: the private \`evidence\` and \`reports\` buckets and the \`crawl_worker\` role.
 
+CC-06b changed 003 and 007 before either was applied: every measurement row names its lineage (\`measurement_lineages\`), \`checks\` and \`access_tests\` carry their measurement status as generated columns, \`page_results\`, \`link_edges\` and \`access_tests\` are partitioned by the month their check was queued, and \`page_results\` records the vantage of its fetch. Those decisions, and 006b (the research ledger and usage metering, applied after 007), are \`docs/specs/v2/06b-data-foundations.md\`.
+
 Nothing in \`apps/web\`, \`inngest\` or \`packages\` reads or writes the new tables through a Supabase client yet: \`grep -rnE 'from\\(.(${tables.join('|')})\\b' apps/web/app apps/web/lib inngest packages\` finds none. Backfills are later steps (004, and the 005 columns' values).
 
 ## How access works
@@ -421,6 +448,8 @@ Nothing in \`apps/web\`, \`inngest\` or \`packages\` reads or writes the new tab
 - **Client scope.** \`is_member_for_site\` is true when the caller has an active seat on the site's live (not soft-deleted) account and that seat covers the site. A seat covers a site when \`seats.client_scope_all\` is true (the contract's \`client_scope: 'all'\`; the default, so the seats 001 created keep full access) or when \`seat_sites\` pairs the seat with the site or with the production site it stages. An owner seat cannot be scoped (\`seats_owner_unscoped\`).
 - \`site_fixes\` (the packet is Pro content), \`fix_events\` and \`share_links\` have no client grant: reading \`site_fixes.packet\` as \`authenticated\` is a permission error, not an empty result. Verify: ${V('v2-003-cross-account.test.ts', 'packet')}.
 - \`alert_rules\` is the one client-written table: a site rule by the seats that cover the site, an account-wide rule by the owner. The trigger \`alert_rules_entitlement_check\` refuses a write that adds Slack while the account's effective tier is Free; it runs after the row's RLS check and for the service role too. Verify: ${V('v2-003-check-tables.test.ts', 'alert_rules')}.
+- \`measurement_lineages\` is readable by every signed-in user: it names Crawlmouse's own builds, nothing of an account's. Verify: ${V('v2-003-cross-account.test.ts', 'measurement_lineages')}.
+- A partition is reached only through its parent: partitions live in the schema \`partitions\`, which no client role may use, with RLS on and every role's privileges revoked. Verify: ${V('v2-006b-data-foundations.test.ts', 'monthly partitions')}.
 - An anonymous site (\`account_id is null\`) is not readable through RLS (\`is_member_for_site\` joins the site's account); \`/audit/[id]\` reads it with the service role, as v1 does. Verify: ${V('v2-003-cross-account.test.ts', 'anonymous sites')}.
 `;
 
@@ -429,8 +458,9 @@ const TOKEN = `## The \`crawl_worker\` token
 The Fly worker is meant to reach Supabase with this token and nothing else. It never holds the project's JWT signing key: whoever holds a signing key can mint a \`service_role\` token too.
 
 - **Who mints it.** The server, in the Inngest step that posts a batch to the worker, one token per check (or per batch). It is signed with a project JWT signing key the server holds: the legacy JWT secret, or a key imported into the project's JWT signing keys (Supabase supports importing a private key or setting a shared secret for this). That key is server-side, at the same tier as the service-role key.
-- **Claims.** \`role: "crawl_worker"\`, \`check_id\` (a lowercase uuid), \`iat\` and \`exp\` as numbers, \`exp − iat\` at most 900 seconds. No \`sub\`: the token is not a user.
+- **Claims.** \`role: "crawl_worker"\`, \`check_id\` (a lowercase uuid), \`lineage_id\` (the lowercase uuid of the \`measurement_lineages\` row the server registered for the batch), \`iat\` and \`exp\` as numbers, \`exp − iat\` at most 900 seconds. No \`sub\`: the token is not a user.
 - **What the database checks.** \`crawl_worker_check_id()\` reads the verified claims (\`auth.jwt()\`) and returns the check only when the role claim is \`crawl_worker\`, \`check_id\` is a well-formed uuid naming a check in status \`running\`, \`exp\` has not passed, \`iat\` is at most 60 seconds ahead of the database clock, and the lifetime is at most 900 seconds. Both policies hold only for that check, so a token minted with a longer life, for another check, or for a finished one is refused by the database, not only by the minter. Verify: ${V('v2-007-storage.test.ts')}.
+- **Lineage and month.** A \`page_results\` row must name the token's \`lineage_id\`. A row that leaves out \`check_month\` or \`lineage_id\` takes them from the token (column defaults that call \`crawl_worker_check_month()\` and \`crawl_worker_lineage_id()\`), so the worker's row needs no partition key of its own. Verify: ${V('v2-007-storage.test.ts', 'from the token')}.
 - **What it may do.** Insert \`page_results\` rows for its check, without RETURNING (\`Prefer: return=minimal\`), and upload \`evidence\` parts under \`{account_id | anon}/{site_id}/{check_id}.part{n}.json.gz\`. It cannot read, update or delete either, and holds no grant on \`frontier\` until \`frontier.audit_id\` stops being NOT NULL. A leaked token can still write any number of rows and parts for its check within its 15 minutes; nothing in the database caps volume.
 - **For the step that wires the worker.** Whether the server can mint today depends on the project's key setup, which this step does not read. If the project signs only with Supabase-managed asymmetric keys, the server has no private key to sign with, and a key must be imported (or a shared secret set) before the worker can run. That is a blocker for the wiring step, not for these migrations.
 `;
@@ -445,7 +475,7 @@ The merged contract (\`packages/types/src/v2\`) wins where it and ARCH-2 disagre
 - **Per-seat client scoping is in the database** (\`is_member_for_site\`), not only in route handlers: a signed-in user can call PostgREST directly.
 - **No client write on \`sites\`.** ARCH-2 §2.2 rule 3 grants a client update on the schedule columns behind an entitlement trigger; the brief keeps \`alert_rules\` the only client-written table, so schedule changes go through a route.
 - **\`checks\` has no \`account_id\`.** ARCH-2 copies it for RLS speed; here a check reaches its account through \`sites\`, so no copy can drift from the site's. Its listing index is \`(site_id, queued_at desc)\` (ARCH-2: \`finished_at\`), because a queued or running check has no \`finished_at\`. ARCH-2 says a check is immutable once finished; nothing enforces it here (the contract clears \`expires_at\` when an account keeps a finished check).
-- **\`page_results\` and \`link_edges\` are keyed by URL hashes** (sha256 of the UTF-8 URL, as \`frontier.url_hash\`), set by a trigger: the contract identifies them by URL, and a URL can exceed a btree key.
+- **\`page_results\` and \`link_edges\` are keyed by URL hashes** (sha256 of the UTF-8 URL, as \`frontier.url_hash\`), set by a trigger: the contract identifies them by URL, and a URL can exceed a btree key. Their keys, and \`access_tests\`', also hold \`check_month\`, because a partitioned table's unique keys must include its partition key; a writer's \`on conflict\` target names it too.
 - **The \`changes\` idempotency index** is \`(check_id, kind, subject, "where", ua, fix_id)\` with \`nulls not distinct\`. ARCH-2's \`(check_id, kind, subject)\` assumed a fine-grained subject (\`crawler:claude-searchbot\`); the contract's is a category (\`ChangeSubject\`). The owner approved the key without \`fix_id\`; review showed two fixes opened in one check can share subject, place and crawler, so \`fix_id\` is part of it (owner ruling 4: confirmed).
 - **\`alert_events\`** is unique on \`(rule_id, check_id, channel)\`: one rule sends on each of its channels. ARCH-2 says \`(rule_id, check_id)\`.
 - **\`alert_rules_entitlement_check\`** (ARCH-2's name) refuses only a write that adds Slack, and runs after RLS. A rule that already sends to Slack stays updatable after a downgrade, so the owner can switch it off and alertFn can stamp \`last_fired_*\`; alertFn decides at send time whether the plan still includes Slack.
@@ -503,7 +533,7 @@ const RUNBOOK = `## Runbook (owner-applied, OPERATING-RULES §7)
    - \`select r, has_schema_privilege(r, 'public', 'CREATE') from unnest(array['anon', 'authenticated', 'service_role', 'crawl_worker']) r\`: false for each. The SECURITY DEFINER functions resolve names through \`public\` before \`pg_catalog\`, so no client role may create objects in \`public\`.
    - If the Storage upload is refused for want of SELECT (an upload that reads its row back), stop and report it. Do not widen the grant without review.
    - Revert 007, 005 and 003 in that order, then apply all three again.
-3. **Apply window.** One transaction per file, 003 then 005 then 007, at a quiet hour. Each \`alter table\` on an existing table (listed under "Columns added to existing tables") takes a brief exclusive lock on it.
+3. **Apply window.** One transaction per file, 003 then 005 then 007, then 006b (its own runbook, in 06b), at a quiet hour. Each \`alter table\` on an existing table (listed under "Columns added to existing tables") takes a brief exclusive lock on it.
 4. **Verify on production.**
    - \`get_advisors\` (security): no new finding on the tables or functions these migrations create or change.
    - Grants, rendered above, against the catalog:
@@ -521,14 +551,14 @@ const RUNBOOK = `## Runbook (owner-applied, OPERATING-RULES §7)
    - The name-free routine check of \`docs/deploy/spec51a-stage6-frontier-functions-runbook.md\` returns \`is_member\`, \`is_member_for_site\` and \`member_role\`, each with \`anon = false\` and \`authed = true\` (PGlite: ${V('v2-001-entitlement-tables.test.ts', 'routines')}). Any other row is a finding.
    - \`select id, public from storage.buckets where id in ('evidence', 'reports');\`: two rows, \`public = false\`.
    - \`select rolname, rolcanlogin, rolbypassrls from pg_roles where rolname = 'crawl_worker';\`: one row, \`false\`, \`false\`.
-5. **Revert, if needed:** 007, then 005, then 003, each file twice-safe and tested on PGlite and in step 2. 003's revert drops its tables with their rows; take the dump first. 007's revert stops at a bucket that still holds objects: empty it through the Storage API first (Supabase refuses a direct delete of storage rows).
+5. **Revert, if needed:** 006b, then 007, then 005, then 003, each file twice-safe and tested on PGlite and in step 2. 003's revert drops its tables with their rows; take the dump first. 007's revert stops at a bucket that still holds objects: empty it through the Storage API first (Supabase refuses a direct delete of storage rows).
 `;
 
 export async function buildCheckTablesSpec(): Promise<string> {
   const pre = await freshDb();
   await applyAllMigrations(pre, undefined, before(MIGRATION_003));
   const db = await freshDb();
-  await applyAllMigrations(db);
+  await applyAllMigrations(db, undefined, through(MIGRATION_007));
   const cat = await readCatalog(pre, db);
 
   const parts = [intro(cat.newTables), '## Tables', ''];

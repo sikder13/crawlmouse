@@ -8006,6 +8006,64 @@
       "opened_at": null
     }
   ],
+  "lineages": [
+    {
+      "id": "1e000000-0000-4000-8000-000000000001",
+      "engine_sha": "5d165fa15d165fa15d165fa15d165fa15d165fa1",
+      "detector_ruleset_version": "1.0.0",
+      "crawler_registry_version": "a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7",
+      "worker_release": null,
+      "population_version": "1.0.0",
+      "created_at": "2026-10-20T00:00:00Z"
+    },
+    {
+      "id": "1e000000-0000-4000-8000-000000000011",
+      "engine_sha": "5d165fa15d165fa15d165fa15d165fa15d165fa1",
+      "detector_ruleset_version": "1.0.0",
+      "crawler_registry_version": "a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7a1c7",
+      "worker_release": "registry.fly.io/crawlmouse-worker:fixture-1",
+      "population_version": null,
+      "created_at": "2026-10-20T00:00:00Z"
+    }
+  ],
+  "usage_events": [
+    {
+      "id": "0e000000-0000-4000-8000-000000000001",
+      "account_id": "a0000000-0000-4000-8000-000000000001",
+      "kind": "check_finished",
+      "check_id": "c0000000-0000-4000-8000-000000000001",
+      "report_id": null,
+      "result": "delivered",
+      "billable": true,
+      "compute_seconds": 412.5,
+      "request_count": 610,
+      "occurred_at": "2026-10-25T02:34:00Z"
+    },
+    {
+      "id": "0e000000-0000-4000-8000-000000000002",
+      "account_id": "a0000000-0000-4000-8000-000000000001",
+      "kind": "export",
+      "check_id": null,
+      "report_id": "60000000-0000-4000-8000-000000000001",
+      "result": "delivered",
+      "billable": true,
+      "compute_seconds": 3.2,
+      "request_count": 0,
+      "occurred_at": "2026-10-30T10:04:00Z"
+    },
+    {
+      "id": "0e000000-0000-4000-8000-000000000003",
+      "account_id": "a0000000-0000-4000-8000-000000000001",
+      "kind": "api_call",
+      "check_id": null,
+      "report_id": null,
+      "result": "refused",
+      "billable": false,
+      "compute_seconds": 0,
+      "request_count": 0,
+      "occurred_at": "2026-10-30T10:05:00Z"
+    }
+  ],
   "withheld": [
     {
       "check_id": "c0000000-0000-4000-8000-000000000001",

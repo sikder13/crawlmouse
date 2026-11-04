@@ -7,7 +7,7 @@
  */
 import type { z } from 'zod';
 import { ENTITIES } from '../entities.js';
-import { REGISTRY_ONLY_ENUMS, V1_PINNED_ENUMS, V2_FIXTURE_ENUMS } from '../enums.js';
+import { DERIVED_ENUMS, REGISTRY_ONLY_ENUMS, V1_PINNED_ENUMS, V2_FIXTURE_ENUMS } from '../enums.js';
 import type { FixtureDataset } from '../fixture.js';
 import {
   arrayElement,
@@ -144,6 +144,7 @@ function enumSection(): string {
     ['every value in a fixture', V2_FIXTURE_ENUMS],
     ['pinned to v1 or the engine', V1_PINNED_ENUMS],
     ['registry seed only', REGISTRY_ONLY_ENUMS],
+    ['computed by a function, every value from the fixtures', DERIVED_ENUMS],
   ];
   const body = groups.flatMap(([group, enums]) =>
     Object.entries(enums).map(([name, schema]) => [

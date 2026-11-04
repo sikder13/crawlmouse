@@ -25,5 +25,7 @@ export * from './change.js';
 export * from './alert-rule.js';
 export * from './report.js';
 export * from './crawler-registry.js';
+export * from './measurement.js';
+export * from './usage-event.js';
 export * from './fixture.js';
 export { ENTITIES, type EntityDoc } from './entities.js';

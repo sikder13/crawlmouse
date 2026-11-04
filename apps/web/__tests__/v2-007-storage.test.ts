@@ -11,10 +11,12 @@ import {
   readRollback,
 } from './helpers/pglite-migrations';
 import {
+  LINEAGE,
   MIGRATION_007,
   ROWS,
   before,
   insertRow,
+  prepareMeasurement,
   seedWorld,
   through,
   revertFile,
@@ -43,6 +45,7 @@ const now = () => Math.floor(Date.now() / 1000);
 const token = (checkId: string, over: Record<string, unknown> = {}) => ({
   role: 'crawl_worker',
   check_id: checkId,
+  lineage_id: LINEAGE,
   iat: now() - 10,
   exp: now() + 600,
   ...over,
@@ -51,6 +54,7 @@ const token = (checkId: string, over: Record<string, unknown> = {}) => ({
 beforeAll(async () => {
   db = await freshDb();
   await applyAllMigrations(db);
+  await prepareMeasurement(db);
   world = await seedWorld(db, 'worker');
   const checkId = randomUUID();
   await insertRow(db, 'checks', {
@@ -61,6 +65,7 @@ beforeAll(async () => {
     technical_seo: null,
     ai_readability: null,
     progress: { steps: [] },
+    lineage_id: null,
   });
   running = { checkId, siteId: world.site1 };
   const { rows } = await db.query<{ id: string }>(
@@ -117,7 +122,7 @@ describe('the crawl_worker role', () => {
     expect(rows).toEqual([]);
   });
 
-  it('can execute only its two policy helpers and page_results’ CHECK helpers in public, and no client can', async () => {
+  it('can execute only its four token helpers and page_results’ CHECK helpers in public, and no client can', async () => {
     const { rows } = await db.query<{
       name: string;
       worker: boolean;
@@ -136,12 +141,15 @@ describe('the crawl_worker role', () => {
     // The CHECK helpers are v2_* (003): a CHECK's function needs EXECUTE for the role that inserts.
     expect(rows.filter((r) => !r.name.startsWith('v2_'))).toEqual([
       { name: 'crawl_worker_check_id', worker: true, anon: false, authed: false },
+      { name: 'crawl_worker_check_month', worker: true, anon: false, authed: false },
+      { name: 'crawl_worker_lineage_id', worker: true, anon: false, authed: false },
       { name: 'crawl_worker_part_path_ok', worker: true, anon: false, authed: false },
     ]);
     const helpers = rows.filter((r) => r.name.startsWith('v2_'));
     expect(helpers.map((r) => r.name)).toEqual([
       'v2_canonical_shape_ok',
       'v2_crawled_text_ok',
+      'v2_headers_shape_ok',
       'v2_hreflang_shape_ok',
       'v2_http_url_ok',
       'v2_nullable_url_ok',
@@ -261,6 +269,58 @@ describe('page_results: the worker inserts rows for the running check its token 
     await expect(attempt()).rejects.toThrow(/row-level security/);
   });
 
+  it('a row that leaves out check_month and lineage_id takes both from the token', async () => {
+    const url = `https://w.example/${randomUUID()}`;
+    const row = ROWS.page_results(running.checkId, url);
+    delete row.check_month;
+    delete row.lineage_id;
+    await asWorker(db, token(running.checkId), (tx) => insertRow(tx, 'page_results', row));
+    const { rows } = await db.query<{ month: string; lineage: string }>(
+      `select check_month::text as month, lineage_id::text as lineage from public.page_results
+        where check_id = $1 and url = $2`,
+      [running.checkId, url],
+    );
+    expect(rows).toEqual([{ month: '2026-10-01', lineage: LINEAGE }]);
+  });
+
+  it('refuses a lineage that exists but is not the one its token names', async () => {
+    // An existing lineage, so the foreign key accepts it and only the policy can refuse it.
+    const other = randomUUID();
+    await insertRow(db, 'measurement_lineages', ROWS.measurement_lineages(other, 0x7001));
+    await expect(
+      asWorker(db, token(running.checkId), (tx) =>
+        insertRow(tx, 'page_results', { ...pageRow(running.checkId), lineage_id: other }),
+      ),
+    ).rejects.toThrow(/row-level security/);
+  });
+
+  it.each([
+    ['a token with no lineage_id claim', { lineage_id: undefined }],
+    ['a token whose lineage_id is not a uuid', { lineage_id: `${LINEAGE}'--` }],
+  ])('refuses %s', async (_label, claimChange) => {
+    await expect(
+      asWorker(db, token(running.checkId, claimChange), (tx) =>
+        insertRow(tx, 'page_results', pageRow(running.checkId)),
+      ),
+    ).rejects.toThrow(/row-level security/);
+  });
+
+  it('refuses a check_month other than its check’s: the row names no check', async () => {
+    await expect(
+      asWorker(db, token(running.checkId), (tx) =>
+        insertRow(tx, 'page_results', { ...pageRow(running.checkId), check_month: '2026-11-01' }),
+      ),
+    ).rejects.toThrow(/page_results_check_fkey/);
+  });
+
+  it('a service_role row that leaves out check_month is refused: the default is the worker’s alone', async () => {
+    const row = pageRow(running.checkId);
+    delete row.check_month;
+    await expect(
+      asRole(db, 'service_role', null, (tx) => insertRow(tx, 'page_results', row)),
+    ).rejects.toThrow(/permission denied for function crawl_worker_check_month/);
+  });
+
   // Owner ruling 1: the contract's PageResult bounds hold for the worker's own check too.
   it.each([
     ['a javascript: URL', { url: 'javascript:alert(1)' }, 'page_results_url'],
@@ -375,6 +435,7 @@ describe('evidence part uploads: one running check’s parts, under its own path
       technical_seo: null,
       ai_readability: null,
       progress: { steps: [] },
+      lineage_id: null,
     });
     await upload(token(check), 'evidence', `anon/${site}/${check}.part1.json.gz`);
   });

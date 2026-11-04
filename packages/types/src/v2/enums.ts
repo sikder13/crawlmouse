@@ -7,6 +7,9 @@
  *   - V1_PINNED_ENUMS: value sets v1 or the engine already define. Reused, pinned to the v1 type
  *     (v1-pins.test.ts) or to the engine (packages/engine/src/v2), and not re-covered by fixtures.
  *   - REGISTRY_ONLY_ENUMS: used only by crawler-registry seed data, which is not fixture data.
+ *   - DERIVED_ENUMS: values the contract's functions compute from other fields (measurement.ts); no
+ *     field holds them, and the database stores them in generated columns. Every value must be
+ *     produced by those functions over the fixtures.
  */
 import { z } from 'zod';
 import { v2Registry } from './registry.js';
@@ -240,6 +243,23 @@ export const IntegrationKindSchema = named(
   'IntegrationKind',
   z.enum(['slack', 'search_console', 'vercel', 'cloudflare_analytics', 'vercel_drain']),
 );
+/**
+ * What a scored measurement asserts (CC-06b). `measured`: observed and asserted. `not_measurable`: we
+ * tried and the site or our method prevented the observation. `unevaluable`: no usable observation
+ * exists to decide from. `withheld`: observed, and declined because the evidence cannot support a
+ * value. The mapping from the contract's other states is in measurement.ts.
+ */
+export const MeasurementStatusSchema = named(
+  'MeasurementStatus',
+  z.enum(['measured', 'not_measurable', 'unevaluable', 'withheld']),
+);
+/** What a usage event records the delivery of. */
+export const UsageKindSchema = named('UsageKind', z.enum(['check_finished', 'export', 'api_call']));
+/** How a metered request ended; only `delivered` can be billable. */
+export const UsageResultSchema = named(
+  'UsageResult',
+  z.enum(['delivered', 'refused', 'withheld', 'failed']),
+);
 /** Which collection a fixture's `withheld` entry describes. */
 export const WithheldCollectionSchema = named(
   'WithheldCollection',
@@ -342,6 +362,8 @@ export const V2_FIXTURE_ENUMS = {
   Theme: ThemeSchema,
   IntegrationKind: IntegrationKindSchema,
   WithheldCollection: WithheldCollectionSchema,
+  UsageKind: UsageKindSchema,
+  UsageResult: UsageResultSchema,
 } as const;
 
 export const V1_PINNED_ENUMS = {
@@ -354,6 +376,10 @@ export const V1_PINNED_ENUMS = {
 
 export const REGISTRY_ONLY_ENUMS = {
   VerificationMethod: VerificationMethodSchema,
+} as const;
+
+export const DERIVED_ENUMS = {
+  MeasurementStatus: MeasurementStatusSchema,
 } as const;
 
 export type Verdict = z.infer<typeof VerdictSchema>;
@@ -380,6 +406,9 @@ export type SeatRole = z.infer<typeof SeatRoleSchema>;
 export type ChangeKind = z.infer<typeof ChangeKindSchema>;
 export type WithheldReason = z.infer<typeof WithheldReasonSchema>;
 export type Severity = z.infer<typeof SeveritySchema>;
+export type MeasurementStatus = z.infer<typeof MeasurementStatusSchema>;
+export type UsageKind = z.infer<typeof UsageKindSchema>;
+export type UsageResult = z.infer<typeof UsageResultSchema>;
 
 /** Every enum this module defined, in definition order, whichever group it was put in. */
 export const ALL_V2_ENUMS: readonly z.ZodEnum[] = recorded;
