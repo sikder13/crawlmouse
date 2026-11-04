@@ -12,9 +12,13 @@ export type Measure = { score: number; range: null } | { score: null; range: Ran
 
 const SCALE = 10 ** DECIMALS;
 
-/** `x` to DECIMALS places, halves away from zero. */
+/**
+ * `x` to DECIMALS places, halves away from zero. The scaled value is read to 15 significant digits
+ * first, so a decimal half that binary floating point stores just under (1.005 × 100 is 100.49999…)
+ * still rounds up.
+ */
 export function round(x: number): number {
-  return Math.sign(x) * (Math.round(Math.abs(x) * SCALE + Number.EPSILON) / SCALE);
+  return (Math.sign(x) * Math.round(Number((Math.abs(x) * SCALE).toPrecision(15)))) / SCALE;
 }
 
 export const mean = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
