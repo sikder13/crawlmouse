@@ -72,7 +72,7 @@ export function headText(raw: string | null, cap: TextCap, inPart: boolean): Hea
       space = false;
     }
     if (from < 0) from = i;
-    const pairs = isLow(c) && high;
+    const pairs: boolean = isLow(c) && high;
     if (!pairs) chars++;
     high = !pairs && isHigh(c);
   }
