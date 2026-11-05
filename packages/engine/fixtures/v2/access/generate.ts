@@ -14,9 +14,10 @@
  *     www.npr.org, whose robots.txt timed out from the Fly egress. This is the access batch the worker
  *     gives for the same two URLs when robots.txt times out; no live access batch was run on NPR.
  *   - `edge-default-*.json`: synthetic. A site whose robots.txt allows every crawler and serves the
- *     browser control, while the edge refuses some crawler user agents: a firewall rule's 403 with
- *     error 1020 and a challenge marked `cf-mitigated` (ua-rule), or a plain 403 that refuses the
- *     canary too (unverified).
+ *     browser control, while the edge refuses crawler user agents: a firewall rule's 403 with error
+ *     1020 and a challenge marked `cf-mitigated` (ua-rule); a plain 403 to three crawlers and the
+ *     canary while the other three are served (witnessed); or a plain 403 to all six and the canary
+ *     (unverified).
  *
  * Row ids are renumbered, so a regeneration changes only what the worker changed.
  */
@@ -178,15 +179,23 @@ const EDGE_PAGES = [
 async function edgeDefault(): Promise<void> {
   write(
     'edge-default-ua-rule.json',
-    "Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers GPTBot and ClaudeBot with Cloudflare's firewall-rule 403 (error code: 1020), challenges ChatGPT-User (cf-mitigated: challenge), and serves OAI-SearchBot, PerplexityBot and Claude-SearchBot. The tagged Googlebot canary is served, so the worker reads the refusals as user-agent rules.",
+    "Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers GPTBot and ClaudeBot with Cloudflare's firewall-rule 403 (error code: 1020), challenges ChatGPT-User (cf-mitigated: challenge), and serves OAI-SearchBot, PerplexityBot and Claude-SearchBot. Other crawlers and the tagged Googlebot canary are served on the same pages, so the worker reads the refusals as user-agent rules, witnessed by the first crawler served.",
     await access(EDGE_PAGES, site(ROBOTS_ALLOW_ALL, byCategory, SERVED)),
   );
   write(
-    'edge-default-unverified.json',
-    'Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers GPTBot, ClaudeBot and ChatGPT-User with a plain 403 from Cloudflare (server: cloudflare, no error code, no challenge header), refuses the tagged Googlebot canary the same way, and serves OAI-SearchBot, PerplexityBot and Claude-SearchBot. With the canary refused, the worker cannot tell a user-agent rule from IP verification.',
+    'edge-default-witnessed.json',
+    'Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers GPTBot, ClaudeBot and ChatGPT-User with a plain 403 from Cloudflare (server: cloudflare, no error code, no challenge header), refuses the tagged Googlebot canary the same way, and serves OAI-SearchBot, PerplexityBot and Claude-SearchBot. The canary alone cannot tell a user-agent rule from IP verification; the crawlers served from the same address can, so the worker reads the refusals as user-agent rules, witnessed by OAI-SearchBot. Before the witness rule (CC-12d) this shape was the unverified one.',
     await access(
       EDGE_PAGES,
       site(ROBOTS_ALLOW_ALL, (id) => (byCategory(id) === SERVED ? SERVED : PLAIN_403), PLAIN_403),
+    ),
+  );
+  write(
+    'edge-default-unverified.json',
+    'Synthetic. robots.txt allows every crawler and the browser control is served. The edge answers all six crawlers and the tagged Googlebot canary with a plain 403 from Cloudflare (server: cloudflare, no error code, no challenge header). Nothing we sent that claims to be a crawler was served, and the browser control is no witness, so the worker cannot tell a user-agent rule from IP verification: every refusal is refused_unverified.',
+    await access(
+      EDGE_PAGES,
+      site(ROBOTS_ALLOW_ALL, () => PLAIN_403, PLAIN_403),
     ),
   );
 }

@@ -1,8 +1,8 @@
 /**
  * Every enum in the v2 contract.
  *
- * Every enum is created through `named()`, which records it in ALL_V2_ENUMS. Three groups, and the
- * contract test checks that each entry of ALL_V2_ENUMS belongs to exactly one:
+ * Every enum is created through `named()`, which records it in ALL_V2_ENUMS. The groups below, and the
+ * contract test checks that each entry of ALL_V2_ENUMS belongs to exactly one of them:
  *   - V2_FIXTURE_ENUMS: owned by v2; every value must appear in at least one fixture.
  *   - V1_PINNED_ENUMS: value sets v1 or the engine already define. Reused, pinned to the v1 type
  *     (v1-pins.test.ts) or to the engine (packages/engine/src/v2), and not re-covered by fixtures.
@@ -10,6 +10,8 @@
  *   - DERIVED_ENUMS: values the contract's functions compute from other fields (measurement.ts); no
  *     field holds them, and the database stores them in generated columns. Every value must be
  *     produced by those functions over the fixtures.
+ *   - BATCH_RESULT_ENUMS: values of a worker batch result, which is not fixture data; pinned to the
+ *     worker's tests.
  */
 import { z } from 'zod';
 import { v2Registry } from './registry.js';
@@ -77,9 +79,13 @@ export const ConfidenceSchema = named(
 
 // ─── Named by the brief inside an entity ───────────────────────────────────────────────────────
 
+/**
+ * Where a request came from. `fly_egress`: a worker on a Fly Machine. `other_egress`: a worker
+ * anywhere else (a developer's machine, CI), whose address says nothing about Fly's.
+ */
 export const SourceIpClassSchema = named(
   'SourceIpClass',
-  z.enum(['fly_egress', 'browser_rendering', 'owner_logs']),
+  z.enum(['fly_egress', 'browser_rendering', 'owner_logs', 'other_egress']),
 );
 export const VerificationMethodSchema = named(
   'VerificationMethod',
@@ -164,6 +170,11 @@ export const SignalKindSchema = named(
     'mcp_server_card',
     'markdown_negotiation',
     'agent_skills_index',
+    // Declarations the worker requests by path (CC-12d): presence only, zero weight.
+    'ucp',
+    'rsl',
+    'agent_card',
+    'llms_full',
   ]),
 );
 export const ContentCheckSchema = named(
@@ -264,6 +275,70 @@ export const UsageResultSchema = named(
 export const WithheldCollectionSchema = named(
   'WithheldCollection',
   z.enum(['page_results', 'link_edges', 'access_tests']),
+);
+
+// ─── The identity and vantage of a request (CC-12d) ────────────────────────────────────────────
+
+/**
+ * Who an access row is: the browser control, a crawler the verdict is about, the tagged Googlebot
+ * canary, or a browser render of the page (CC-14). Only a `crawler` row names a crawler (`ua`).
+ */
+export const IdentityRoleSchema = named(
+  'IdentityRole',
+  z.enum(['control', 'crawler', 'canary', 'render']),
+);
+/** The identity whose being served on the same page made a refusal a user-agent rule. */
+export const WitnessRoleSchema = named('WitnessRole', z.enum(['crawler', 'canary']));
+/** Whether the request was signed (Web Bot Auth). Every request is unsigned today. */
+export const RequestSigningSchema = named('RequestSigning', z.enum(['unsigned']));
+/** Whether the site verified a signature. Not observable from outside today. */
+export const SignatureVerificationSchema = named(
+  'SignatureVerification',
+  z.enum(['not_observable']),
+);
+/** Cloudflare's own categories for a crawler (Radar's bots directory); a crawler may have several. */
+export const CloudflareCategorySchema = named(
+  'CloudflareCategory',
+  z.enum(['search', 'agent', 'training']),
+);
+/** Why a worker batch did less than it was asked (the batch result's `partial.reasons`). */
+export const BatchPartialReasonSchema = named(
+  'BatchPartialReason',
+  z.enum([
+    'budget_requests',
+    'budget_bytes',
+    'budget_seconds',
+    'site_stopped',
+    'robots_unreachable',
+    'robots_too_large',
+    'site_refused',
+    'crawl_delay_over_limit',
+    'crawl_delay_10s_or_more',
+    'result_size',
+  ]),
+);
+/** The declaration files a crawl batch requests on its first URL's origin (CC-12d; CC-15's follow-ups). */
+export const DeclarationPathSchema = named(
+  'DeclarationPath',
+  z.enum([
+    '/llms.txt',
+    '/llms-full.txt',
+    '/.well-known/ucp',
+    '/.well-known/mcp',
+    '/.well-known/agent-card.json',
+    '/rsl.xml',
+    '/sitemap.xml',
+  ]),
+);
+/** What became of one declaration request: an answer, none (the request failed), or not made. */
+export const DeclarationStateSchema = named(
+  'DeclarationState',
+  z.enum(['answered', 'no_response', 'not_requested']),
+);
+/** Why a declaration was not requested. */
+export const DeclarationNotRequestedSchema = named(
+  'DeclarationNotRequested',
+  z.enum(['robots_disallowed', 'budget', 'site_stopped', 'site_blocked']),
 );
 
 // ─── Reused value sets (pinned, not re-covered) ────────────────────────────────────────────────
@@ -373,6 +448,10 @@ export const V2_FIXTURE_ENUMS = {
   WithheldCollection: WithheldCollectionSchema,
   UsageKind: UsageKindSchema,
   UsageResult: UsageResultSchema,
+  IdentityRole: IdentityRoleSchema,
+  WitnessRole: WitnessRoleSchema,
+  RequestSigning: RequestSigningSchema,
+  SignatureVerification: SignatureVerificationSchema,
 } as const;
 
 export const V1_PINNED_ENUMS = {
@@ -386,6 +465,18 @@ export const V1_PINNED_ENUMS = {
 
 export const REGISTRY_ONLY_ENUMS = {
   VerificationMethod: VerificationMethodSchema,
+  CloudflareCategory: CloudflareCategorySchema,
+} as const;
+
+/**
+ * Values of a worker batch result, which is not fixture data. Each is pinned to the worker
+ * (packages/worker/src/batch/partial-reasons.test.ts, declarations.test.ts).
+ */
+export const BATCH_RESULT_ENUMS = {
+  BatchPartialReason: BatchPartialReasonSchema,
+  DeclarationPath: DeclarationPathSchema,
+  DeclarationState: DeclarationStateSchema,
+  DeclarationNotRequested: DeclarationNotRequestedSchema,
 } as const;
 
 export const DERIVED_ENUMS = {
@@ -402,6 +493,11 @@ export type CheckStatus = z.infer<typeof CheckStatusSchema>;
 export type AccountState = z.infer<typeof AccountStateSchema>;
 export type Confidence = z.infer<typeof ConfidenceSchema>;
 export type SourceIpClass = z.infer<typeof SourceIpClassSchema>;
+export type IdentityRole = z.infer<typeof IdentityRoleSchema>;
+export type WitnessRole = z.infer<typeof WitnessRoleSchema>;
+export type CloudflareCategory = z.infer<typeof CloudflareCategorySchema>;
+export type BatchPartialReason = z.infer<typeof BatchPartialReasonSchema>;
+export type DeclarationPath = z.infer<typeof DeclarationPathSchema>;
 export type VerificationMethod = z.infer<typeof VerificationMethodSchema>;
 export type GradeName = z.infer<typeof GradeNameSchema>;
 export type GradeLetter = z.infer<typeof GradeLetterSchema>;

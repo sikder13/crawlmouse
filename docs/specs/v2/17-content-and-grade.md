@@ -53,6 +53,10 @@ rate(k) = pages passing check k / pages k was decided on; Quotable = 20 × mean 
 | `mcp_server_card`      | 0      | `experimental`  |
 | `markdown_negotiation` | 0      | `experimental`  |
 | `agent_skills_index`   | 0      | `experimental`  |
+| `ucp`                  | 0      | `experimental`  |
+| `rsl`                  | 0      | `experimental`  |
+| `agent_card`           | 0      | `experimental`  |
+| `llms_full`            | 0      | `experimental`  |
 
 Content Signals: a `Content-Signal:` line in robots.txt naming `search`, `ai-input` or `ai-train` (as a key of its own: at the start of the value or after a space, comma or semicolon) with `yes` or `no`, as a directive or in the comment form Cloudflare writes; robots.txt not read is undecided. schema.org: a graded page carries a typed JSON-LD node; with none marked, it is undecided while a graded page was not fetched, or when there is no graded page. An undecided declaration makes Signals a range.
 

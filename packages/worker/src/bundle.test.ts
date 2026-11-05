@@ -1,11 +1,11 @@
-import { spawn } from 'node:child_process';
-import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Metafile } from 'esbuild';
-import { bundle } from '../build.js';
+import { bundle, releaseOf } from '../build.js';
 import { READER_FILE } from './reader/file.js';
 import { keyPair } from './test-support/jwt.js';
 
@@ -27,6 +27,26 @@ const freePort = () =>
       s.close(() => resolve(port));
     });
   });
+
+describe('the release the bundle names', () => {
+  it('is the first 12 hex digits of the commit checked out, written into main.mjs', () => {
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+    expect(releaseOf({})).toBe(head.slice(0, 12));
+    expect(readFileSync(outfile, 'utf8')).toContain(JSON.stringify(head.slice(0, 12)));
+  });
+
+  it('is unreleased where git cannot say, and an error in CI', () => {
+    const fails = () => {
+      throw new Error('fatal: detected dubious ownership');
+    };
+    expect(releaseOf({}, fails)).toBe('unreleased');
+    expect(releaseOf({}, () => 'abc123')).toBe('unreleased');
+    expect(() => releaseOf({ CI: 'true' }, fails)).toThrow(/cannot name its release/);
+    expect(() => releaseOf({ GITHUB_ACTIONS: 'true' }, fails)).toThrow(/cannot name its release/);
+    expect(releaseOf({ CI: 'false' }, fails)).toBe('unreleased');
+    expect(releaseOf({ CI: '0' }, fails)).toBe('unreleased');
+  });
+});
 
 describe('the worker bundle', () => {
   it('does not contain crawlee, the module behind the overview §11 production failure', () => {

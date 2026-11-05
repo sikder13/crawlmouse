@@ -1,7 +1,9 @@
 import type { IncomingHttpHeaders } from 'node:http';
 import { safeFetch, type DnsResolver } from '@crawlmouse/engine/worker';
+import type { RequestTiming } from '@crawlmouse/types/v2';
 import type { Clock } from '../clock.js';
 import type { Identity } from '../identities.js';
+import { timed } from './timing.js';
 
 /**
  * One request. Every request the worker makes to a target goes through the engine's safeFetch, and so
@@ -69,11 +71,15 @@ export interface FetchOutcome {
   /** The decoded body cap the request was made with; past it the request ends `too_large`. */
   maxBytes: number;
   error: FetchError | null;
+  /** How long the request's phases took (fetch/timing.ts). */
+  timing: RequestTiming;
 }
 
 export interface FetchLimits {
   /** Decoded body cap for this request. */
   maxBytes: number;
+  /** How much of the body to keep and read, when less than MAX_KEPT_BYTES. */
+  keepBytes?: number;
   /** Wall-clock cap for this request across its redirects. */
   deadlineMs: number;
 }
@@ -111,41 +117,29 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
     // Counted as it arrives, so a body cut off at its limit or deadline is still charged to the batch.
     let received = 0;
     const maxBytes = Math.min(MAX_BODY_BYTES, limits.maxBytes);
-    try {
-      const r = await safeFetch(url, {
-        onBodyBytes: (n) => {
-          received += n;
-        },
-        headers,
-        maxBytes,
-        keepBytes: MAX_KEPT_BYTES,
-        totalDeadlineMs: Math.min(MAX_REQUEST_MS, limits.deadlineMs),
-        timeoutMs: IDLE_TIMEOUT_MS,
-        followRedirects: false,
-        ...testTransport,
-      });
+    const { value, timing } = await timed(clock, async () => {
+      try {
+        const r = await safeFetch(url, {
+          onBodyBytes: (n) => {
+            received += n;
+          },
+          headers,
+          maxBytes,
+          keepBytes: Math.min(MAX_KEPT_BYTES, limits.keepBytes ?? MAX_KEPT_BYTES),
+          totalDeadlineMs: Math.min(MAX_REQUEST_MS, limits.deadlineMs),
+          timeoutMs: IDLE_TIMEOUT_MS,
+          followRedirects: false,
+          ...testTransport,
+        });
+        return { r, error: null };
+      } catch (e) {
+        return { r: null, error: classifyFetchError(e instanceof Error ? e.message : String(e)) };
+      }
+    });
+    const common = { url, identity, startedAt, ms: clock.now() - startedAt, maxBytes, timing };
+    if (value.r === null) {
       return {
-        url,
-        identity,
-        startedAt,
-        ms: clock.now() - startedAt,
-        status: r.status,
-        finalUrl: r.finalUrl,
-        headers: r.headers,
-        hops: [],
-        redirectStop: null,
-        body: r.body,
-        bodyCut: r.truncated === true,
-        bytes: received,
-        maxBytes,
-        error: null,
-      };
-    } catch (e) {
-      return {
-        url,
-        identity,
-        startedAt,
-        ms: clock.now() - startedAt,
+        ...common,
         status: null,
         finalUrl: null,
         headers: {},
@@ -154,9 +148,21 @@ export function createFetcher(clock: Clock, testTransport?: TestTransport): Fetc
         body: '',
         bodyCut: false,
         bytes: received,
-        maxBytes,
-        error: classifyFetchError(e instanceof Error ? e.message : String(e)),
+        error: value.error,
       };
     }
+    const r = value.r;
+    return {
+      ...common,
+      status: r.status,
+      finalUrl: r.finalUrl,
+      headers: r.headers,
+      hops: [],
+      redirectStop: null,
+      body: r.body,
+      bodyCut: r.truncated === true,
+      bytes: received,
+      error: null,
+    };
   };
 }

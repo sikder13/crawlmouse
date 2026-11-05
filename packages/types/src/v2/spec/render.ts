@@ -7,7 +7,14 @@
  */
 import type { z } from 'zod';
 import { ENTITIES } from '../entities.js';
-import { DERIVED_ENUMS, REGISTRY_ONLY_ENUMS, V1_PINNED_ENUMS, V2_FIXTURE_ENUMS } from '../enums.js';
+import { BatchPartialSchema, DeclarationFetchSchema } from '../declaration.js';
+import {
+  BATCH_RESULT_ENUMS,
+  DERIVED_ENUMS,
+  REGISTRY_ONLY_ENUMS,
+  V1_PINNED_ENUMS,
+  V2_FIXTURE_ENUMS,
+} from '../enums.js';
 import type { FixtureDataset } from '../fixture.js';
 import {
   arrayElement,
@@ -145,6 +152,7 @@ function enumSection(): string {
     ['pinned to v1 or the engine', V1_PINNED_ENUMS],
     ['registry seed only', REGISTRY_ONLY_ENUMS],
     ['computed by a function, every value from the fixtures', DERIVED_ENUMS],
+    ['worker batch result, pinned by the worker', BATCH_RESULT_ENUMS],
   ];
   const body = groups.flatMap(([group, enums]) =>
     Object.entries(enums).map(([name, schema]) => [
@@ -154,6 +162,16 @@ function enumSection(): string {
     ]),
   );
   return table(['Enum', 'Coverage', 'Values'], body);
+}
+
+/** A schema's fields, as an entity's are listed, for what is not an entity. */
+function fieldsTable(schema: Schema): string {
+  const body = rows(schema, '', '').map((r) => [
+    code(r.path),
+    code(r.type),
+    r.nullable ? 'yes' : 'no',
+  ]);
+  return table(['Field', 'Type', 'Null'], body);
 }
 
 function rulesSection(): string {
@@ -209,6 +227,14 @@ export function renderContractSpec(fixtures: Record<string, FixtureDataset>): st
       'or carried over from existing code the brief says to reuse). ' +
       'An empty cell means the field is an id or foreign key, or one the CC-11 brief names; the brief is quoted in the pull request that added this file.',
     ...ENTITIES.map(entitySection),
+    '## The worker batch result',
+    'What a batch result carries besides its rows, as fields the engine reads (`declaration.ts`; asked for in PR #54). ' +
+      'A crawl batch records each declaration file it requested as `DeclarationFetch`: status, media type and byte count, never the body.',
+    '### DeclarationFetch',
+    fieldsTable(DeclarationFetchSchema),
+    '### BatchPartial',
+    'Null when the batch did all it was asked.',
+    fieldsTable(BatchPartialSchema.unwrap()),
     '## Fields added beyond the brief',
     addedSection(),
     '## Rules',

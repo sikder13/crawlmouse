@@ -21,6 +21,7 @@ import {
   lineageViolations,
   MEASUREMENT_TABLES,
 } from './helpers/data-foundations';
+import { LEDGER_VALUES_NOT_STORED_YET, VALUES_NOT_STORED_YET } from './helpers/v2-contract-storage';
 import {
   applyAllMigrations,
   asRole,
@@ -154,7 +155,11 @@ describe('lineage: every measurement row names what produced it', () => {
       `select pg_get_constraintdef(oid) as def from pg_constraint
         where conrelid = 'public.page_results'::regclass and conname = 'page_results_source_ip_class_check'`,
     );
-    expect(enumSetOf(rows[0]!.def)).toEqual([...SourceIpClassSchema.options].sort());
+    // The column borrows AccessTest's shape, so its pending values are access_tests' (not stored yet).
+    const pending = VALUES_NOT_STORED_YET['access_tests.source_ip_class'] ?? [];
+    expect(enumSetOf(rows[0]!.def)).toEqual(
+      SourceIpClassSchema.options.filter((v) => !pending.includes(v)).sort(),
+    );
   });
 
   it('every signed-in user reads lineages; anon reads none', async () => {
@@ -918,8 +923,11 @@ describe('every ledger CHECK refuses a row on its own', () => {
       const set = enumSetOf(c.def);
       if (set === null) continue;
       const col = `${c.table}.${/^CHECK \(\(?"?(\w+)/.exec(c.def)![1]}`;
-      if (JSON.stringify(set) !== JSON.stringify([...LEDGER_ENUMS[col]!].sort()))
-        wrong.push(`${col}: [${set}]`);
+      const pending = LEDGER_VALUES_NOT_STORED_YET[col] ?? [];
+      const want = LEDGER_ENUMS[col]!.filter((v) => !pending.includes(v)).sort();
+      if (JSON.stringify(set) !== JSON.stringify(want)) wrong.push(`${col}: [${set}]`);
+      for (const v of pending)
+        if (set.includes(v)) wrong.push(`${col}: holds ${v}, declared not stored yet`);
     }
     expect(wrong).toEqual([]);
   });

@@ -17,6 +17,8 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   AccessTestSchema,
+  DeclarationFetchSchema,
+  PageTitleSchema,
   AccountSchema,
   AgencyBrandingSchema,
   AiReadabilitySchema,
@@ -116,6 +118,37 @@ const registryEntry = () => ({
   source_url: 'https://developers.openai.com/api/docs/bots',
   source_notes: [],
   as_of: '2026-10-27',
+  cloudflare_categories: ['training'],
+  cloudflare_as_of: '2026-11-03',
+});
+
+/** bad-site's access rows: GPTBot blocked on the homepage (its witness the canary), and the control. */
+const blockedRow = () => copy(bad.access_tests.find((t) => t.verdict === 'blocked_by_ua_rule')!);
+const controlRow = () => copy(bad.access_tests.find((t) => t.identity_role === 'control')!);
+const servedRow = () => copy(bad.access_tests.find((t) => t.verdict === 'allowed_thin')!);
+const otherEgressRow = () =>
+  copy(bad.access_tests.find((t) => t.source_ip_class === 'other_egress')!);
+const ownerLogRow = () =>
+  copy(challenged.access_tests.find((t) => t.evidence_class === 'observed')!);
+const answered = () => ({
+  origin: 'https://example-outfitter.com',
+  path: '/llms.txt',
+  state: 'answered',
+  status: 200,
+  media_type: 'text/plain',
+  bytes: 10,
+  bytes_complete: true,
+  not_requested: null,
+  from_cache: false,
+});
+const unanswered = (state: 'no_response' | 'not_requested') => ({
+  ...answered(),
+  state,
+  status: null,
+  media_type: null,
+  bytes: null,
+  bytes_complete: null,
+  not_requested: state === 'not_requested' ? 'budget' : null,
 });
 
 interface RuleCase {
@@ -281,6 +314,12 @@ const CASES: RuleCase[] = [
     breaks: 'a URL with no IP list method',
     schema: CrawlerRegistryEntrySchema,
     input: () => ({ ...registryEntry(), verification_method: ['reverse_dns'] }),
+  },
+  {
+    rule: 'cloudflare_unique',
+    breaks: 'a Cloudflare category listed twice',
+    schema: CrawlerRegistryEntrySchema,
+    input: () => ({ ...registryEntry(), cloudflare_categories: ['training', 'training'] }),
   },
   // ── Fix ─────────────────────────────────────────────────────────────────────────────────────
   {
@@ -959,13 +998,20 @@ const CASES: RuleCase[] = [
     rule: 'observed_owner_logs',
     breaks: 'observed, from our own egress',
     schema: AccessTestSchema,
-    input: () => ({ ...copy(bad.access_tests[0]!), evidence_class: 'observed' }),
+    // An owner-log line has none of the worker's request fields, so those go too.
+    input: () => ({
+      ...servedRow(),
+      evidence_class: 'observed',
+      request_signing: null,
+      signature_verified: null,
+      worker_release: null,
+    }),
   },
   {
     rule: 'observed_owner_logs',
     breaks: 'owner logs, classed as simulated',
     schema: AccessTestSchema,
-    input: () => ({ ...copy(bad.access_tests[0]!), source_ip_class: 'owner_logs' }),
+    input: () => ({ ...servedRow(), source_ip_class: 'owner_logs', fly_region: null }),
   },
   {
     rule: 'access_request_line',
@@ -978,6 +1024,147 @@ const CASES: RuleCase[] = [
     breaks: 'a version without a method',
     schema: AccessTestSchema,
     input: () => ({ ...copy(bad.access_tests[0]!), method: null }),
+  },
+  {
+    rule: 'access_identity_ua',
+    breaks: 'a crawler named on the control row',
+    schema: AccessTestSchema,
+    input: () => ({ ...blockedRow(), identity_role: 'control', tagged: false }),
+  },
+  {
+    rule: 'access_identity_ua',
+    breaks: 'a crawler row naming no crawler',
+    schema: AccessTestSchema,
+    input: () => ({ ...blockedRow(), ua: null }),
+  },
+  {
+    rule: 'control_untagged',
+    breaks: 'the control carrying our tag',
+    schema: AccessTestSchema,
+    input: () => ({ ...controlRow(), tagged: true }),
+  },
+  {
+    rule: 'access_witness',
+    breaks: 'a witness on a row that is not a user-agent block',
+    schema: AccessTestSchema,
+    input: () => ({ ...servedRow(), witness: { role: 'crawler', ua: 'ChatGPT-User' } }),
+  },
+  {
+    rule: 'access_witness',
+    breaks: 'a user-agent block with no witness',
+    schema: AccessTestSchema,
+    input: () => ({ ...blockedRow(), witness: null }),
+  },
+  {
+    rule: 'witness_other',
+    breaks: 'the refused crawler as its own witness',
+    schema: AccessTestSchema,
+    input: () => ({ ...blockedRow(), witness: { role: 'crawler', ua: 'GPTBot' } }),
+  },
+  {
+    rule: 'fly_region',
+    breaks: 'a Fly region on a request from elsewhere',
+    schema: AccessTestSchema,
+    input: () => ({ ...otherEgressRow(), fly_region: 'iad' }),
+  },
+  {
+    rule: 'fly_region',
+    breaks: 'a Fly request with no region',
+    schema: AccessTestSchema,
+    input: () => ({ ...blockedRow(), fly_region: null }),
+  },
+  {
+    rule: 'timing_order',
+    breaks: 'a connection ready before its address was looked up',
+    schema: AccessTestSchema,
+    input: () => ({
+      ...blockedRow(),
+      timing: { dns_ms: 50, connect_ms: 10, ttfb_ms: 60, total_ms: 70 },
+    }),
+  },
+  {
+    rule: 'worker_request',
+    breaks: "an owner-log line carrying the worker's request fields",
+    schema: AccessTestSchema,
+    input: () => ({
+      ...ownerLogRow(),
+      request_signing: 'unsigned',
+      signature_verified: 'not_observable',
+      worker_release: '0123456789ab',
+    }),
+  },
+  {
+    rule: 'worker_request',
+    breaks: 'a worker request with none of its fields',
+    schema: AccessTestSchema,
+    input: () => ({
+      ...blockedRow(),
+      request_signing: null,
+      signature_verified: null,
+      worker_release: null,
+    }),
+  },
+  {
+    rule: 'worker_request_whole',
+    breaks: 'a worker request with its release missing',
+    schema: AccessTestSchema,
+    input: () => ({ ...blockedRow(), worker_release: null }),
+  },
+  // ── DeclarationFetch ────────────────────────────────────────────────────────────────────────
+  {
+    rule: 'declaration_answer',
+    breaks: 'a status with no answer',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...unanswered('no_response'), status: 200 }),
+  },
+  {
+    rule: 'declaration_answer',
+    breaks: 'an answer with no status',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...answered(), status: null }),
+  },
+  {
+    rule: 'declaration_bytes',
+    breaks: 'a byte count with no answer',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...unanswered('no_response'), bytes: 3, bytes_complete: true }),
+  },
+  {
+    rule: 'declaration_bytes',
+    breaks: 'an answer with no byte count',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...answered(), bytes: null }),
+  },
+  {
+    rule: 'declaration_media_type',
+    breaks: 'a media type with no answer',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...unanswered('no_response'), media_type: 'text/plain' }),
+  },
+  {
+    rule: 'declaration_not_requested',
+    breaks: 'a reason not to request on a request that was answered',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...answered(), not_requested: 'budget' }),
+  },
+  {
+    rule: 'declaration_not_requested',
+    breaks: 'not requested, with no reason',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...unanswered('not_requested'), not_requested: null }),
+  },
+  {
+    rule: 'declaration_cache_answer',
+    breaks: 'a kept declaration that was never requested',
+    schema: DeclarationFetchSchema,
+    input: () => ({ ...unanswered('not_requested'), from_cache: true }),
+  },
+  // ── PageResult head text ────────────────────────────────────────────────────────────────────
+  {
+    rule: 'head_text_absent',
+    breaks: 'a length for a title the page does not declare',
+    schema: PageTitleSchema,
+    input: () => ({ text: null, chars: 3, cut: false }),
   },
   // ── UsageEvent ──────────────────────────────────────────────────────────────────────────────
   {
@@ -1299,6 +1486,8 @@ const CRAWLED_BUDGETS: Record<string, number> = {
   'LinkEdge.anchor_text': 2000,
   'PageResult.canonical_declared.href': 8192,
   'PageResult.hreflang.links[].hreflang': 256,
+  'PageResult.title.text': 512,
+  'PageResult.meta_description.text': 1024,
 };
 
 /** The most entries every capped array may hold, and the most characters every capped string. */
@@ -1311,6 +1500,7 @@ const CAPS: Record<string, number> = {
   'Change.cause.diff.added': 50,
   'PageResult.redirect.hops': 6,
   'PageResult.hreflang.links': 256,
+  'AccessTest.witness.ua': 64,
 };
 
 // Built inside each test, not at load, so a schema the walk refuses fails the walk test above by
@@ -1401,6 +1591,10 @@ const BOUNDS: Record<string, string> = {
   'Change.grade_deltas[].from_score': '[0, 100]',
   'Change.grade_deltas[].to_score': '[0, 100]',
   'AlertRule.threshold_points': '[0, 100]',
+  'AccessTest.timing.dns_ms': 'int [0, 120000]',
+  'AccessTest.timing.connect_ms': 'int [0, 120000]',
+  'AccessTest.timing.ttfb_ms': 'int [0, 120000]',
+  'AccessTest.timing.total_ms': 'int [0, 120000]',
 };
 const COUNT = 'int [0, inf)';
 

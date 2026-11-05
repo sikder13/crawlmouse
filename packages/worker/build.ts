@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { build, type Metafile } from 'esbuild';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,40 @@ export async function bundleReader(outfile: string): Promise<Metafile> {
   return bundleOne(READER_ENTRY, outfile);
 }
 
+/** A CI flag that is on: set to anything but empty, `false` or `0`. */
+const isSet = (v: string | undefined): boolean =>
+  v !== undefined && v !== '' && v !== 'false' && v !== '0';
+
+/** Runs `git rev-parse HEAD` beside the entry point; throws when git cannot say. */
+const gitHead = (): string =>
+  execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: dirname(ENTRY),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+
+/**
+ * The release written into the bundle (src/release.ts): the first 12 hex digits of the commit
+ * checked out. A local build git cannot place (no repository, a "dubious ownership" refusal) is
+ * `unreleased`; in CI (`CI` or `GITHUB_ACTIONS` set) that is an error, so a deployed bundle always
+ * names its commit.
+ */
+export function releaseOf(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  head: () => string = gitHead,
+): string {
+  let sha = '';
+  try {
+    sha = head();
+  } catch {
+    sha = '';
+  }
+  if (/^[0-9a-f]{40}$/.test(sha)) return sha.slice(0, 12);
+  if (isSet(env.CI) || isSet(env.GITHUB_ACTIONS))
+    throw new Error('build: the commit could not be read, so the bundle cannot name its release');
+  return 'unreleased';
+}
+
 async function bundleOne(entry: string, outfile: string): Promise<Metafile> {
   const result = await build({
     entryPoints: [entry],
@@ -36,6 +71,7 @@ async function bundleOne(entry: string, outfile: string): Promise<Metafile> {
     format: 'esm',
     metafile: true,
     legalComments: 'none',
+    define: { __WORKER_RELEASE__: JSON.stringify(releaseOf()) },
     logLevel: 'warning',
     // Some bundled CommonJS dependencies call require() on node built-ins.
     banner: {

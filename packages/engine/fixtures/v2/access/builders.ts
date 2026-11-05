@@ -56,7 +56,11 @@ export interface CellSpec {
 let next = 0;
 const id = () => `e0000000-0000-4000-8000-${String(++next).padStart(12, '0')}`;
 
-/** One crawler's row on one page; `ua` null is a method row (the control or the canary). */
+/**
+ * One crawler's row on one page; `ua` null is a method row, built as the tagged canary. A simulated
+ * blocked_by_ua_rule row names the canary as its witness, as the worker's would when the canary was
+ * served on the page.
+ */
 export function row(
   ua: string | null,
   path: string,
@@ -67,6 +71,7 @@ export function row(
   const status = s.status === undefined ? STATUS[s.verdict] : s.status;
   const declared = s.verdict === 'disallowed_by_robots';
   const cause = s.cause === undefined ? CAUSES[s.verdict][0]! : s.cause;
+  const evidence = s.evidence ?? (declared ? 'declared' : 'simulated');
   return AccessTestSchema.parse({
     id: id(),
     check_id: CHECK_ID,
@@ -75,7 +80,7 @@ export function row(
     template_key: template,
     tested_at: '2026-11-03T12:00:00.000Z',
     verdict: s.verdict,
-    evidence_class: s.evidence ?? (declared ? 'declared' : 'simulated'),
+    evidence_class: evidence,
     identity_sent: `${ua ?? 'Mozilla/5.0'} Crawlmouse/2.0 (+https://crawlmouse.com/bot)`,
     source_ip_class: 'fly_egress',
     limitations: [],
@@ -89,6 +94,17 @@ export function row(
     body_excerpt: null,
     method: status === null ? null : 'GET',
     http_version: status === null ? null : '1.1',
+    identity_role: ua === null ? 'canary' : 'crawler',
+    tagged: true,
+    witness:
+      s.verdict === 'blocked_by_ua_rule' && evidence === 'simulated'
+        ? { role: 'canary', ua: 'Googlebot' }
+        : null,
+    fly_region: 'iad',
+    request_signing: 'unsigned',
+    signature_verified: 'not_observable',
+    worker_release: 'unreleased',
+    timing: null,
   });
 }
 

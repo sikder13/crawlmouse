@@ -584,7 +584,17 @@
           "ua": "Bingbot",
           "verdict": "allowed"
         }
-      ]
+      ],
+      "title": {
+        "text": "Home | Trailhead",
+        "chars": 16,
+        "cut": false
+      },
+      "meta_description": {
+        "text": "Trailhead: gear for the outdoors.",
+        "chars": 33,
+        "cut": false
+      }
     },
     {
       "check_id": "c0000000-0000-4000-8000-000000000065",
@@ -636,7 +646,17 @@
           "ua": "Bingbot",
           "verdict": "allowed"
         }
-      ]
+      ],
+      "title": {
+        "text": "Basin Rain Shell | Trailhead",
+        "chars": 28,
+        "cut": false
+      },
+      "meta_description": {
+        "text": null,
+        "chars": 0,
+        "cut": false
+      }
     }
   ],
   "link_edges": [
@@ -707,7 +727,20 @@
       "word_count": 540,
       "body_excerpt": "<h1>Trail gear that earns its weight</h1>",
       "method": "GET",
-      "http_version": "1.1"
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": "ord",
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "acffef46aac5",
+      "timing": {
+        "dns_ms": 4,
+        "connect_ms": 31,
+        "ttfb_ms": 212,
+        "total_ms": 240
+      }
     },
     {
       "id": "d0000000-0000-4000-8000-000000000066",
@@ -758,7 +791,20 @@
       "word_count": 540,
       "body_excerpt": "<h1>Trail gear that earns its weight</h1>",
       "method": "GET",
-      "http_version": "1.1"
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": "ord",
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "acffef46aac5",
+      "timing": {
+        "dns_ms": 4,
+        "connect_ms": 31,
+        "ttfb_ms": 212,
+        "total_ms": 240
+      }
     }
   ],
   "fixes": [],
@@ -781,7 +827,7 @@
       "engine_sha": "5d165fa35d165fa35d165fa35d165fa35d165fa3",
       "detector_ruleset_version": "1.0.0",
       "crawler_registry_version": "a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7a3c7",
-      "worker_release": "registry.fly.io/crawlmouse-worker:fixture-3",
+      "worker_release": "acffef46aac5",
       "population_version": null,
       "created_at": "2026-10-20T00:00:00Z"
     }

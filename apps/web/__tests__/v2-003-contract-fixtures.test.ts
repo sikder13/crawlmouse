@@ -12,6 +12,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 import { insertRow, premakeTestMonths, signUp } from './helpers/v2-check-tables';
+import { NOT_STORED_YET, VALUES_NOT_STORED_YET } from './helpers/v2-contract-storage';
 
 /**
  * The contract's own fixture datasets (apps/web/lib/fixtures/v2) round-trip through the tables:
@@ -90,6 +91,29 @@ function parentsFirst(rows: Rec[], ref: string): Rec[] {
 
 const omit = (r: Rec, keys: string[]) =>
   Object.fromEntries(Object.entries(r).filter(([k]) => !keys.includes(k)));
+
+/**
+ * Contract fields no column holds yet (helpers/v2-contract-storage.ts, NOT_STORED_YET), by fixture
+ * collection: not written, so compared on what is stored. A row holding a value no CHECK accepts yet
+ * (VALUES_NOT_STORED_YET) cannot be written at all; the test names those rows and compares the rest.
+ */
+const TABLE_OF_COLLECTION: Record<string, string> = {
+  page_results: 'page_results',
+  access_tests: 'access_tests',
+};
+const deferred = (collection: string): string[] => {
+  const entity = ENTITIES.find((e) => e.collection === collection)?.name;
+  return Object.keys(NOT_STORED_YET)
+    .filter((at) => at.startsWith(`${entity}.`))
+    .map((at) => at.slice(`${entity}.`.length));
+};
+const pending = (collection: string, r: Rec): boolean =>
+  Object.entries(VALUES_NOT_STORED_YET).some(([at, values]) => {
+    const [table, column] = at.split('.') as [string, string];
+    return TABLE_OF_COLLECTION[collection] === table && values.includes(r[column] as string);
+  });
+const storable = (collection: string, rows: Rec[]): Rec[] =>
+  rows.filter((r) => !pending(collection, r)).map((r) => omit(r, deferred(collection)));
 
 /**
  * Database-only columns (06b), by table: not contract fields, so not in the fixtures. The loader
@@ -175,7 +199,7 @@ async function load(db: PGlite, d: FixtureDataset): Promise<void> {
     check_month: monthOf.get(r.check_id as string),
     lineage_id: fetching,
   });
-  for (const r of d.page_results)
+  for (const r of storable('page_results', d.page_results as Rec[]))
     await insertRow(db, 'page_results', {
       ...measured(r),
       identity_sent: CRAWL_UA,
@@ -184,7 +208,8 @@ async function load(db: PGlite, d: FixtureDataset): Promise<void> {
       headers: [],
     });
   for (const r of d.link_edges) await insertRow(db, 'link_edges', measured(r));
-  for (const r of d.access_tests) await insertRow(db, 'access_tests', measured(r));
+  for (const r of storable('access_tests', d.access_tests as Rec[]))
+    await insertRow(db, 'access_tests', measured(r));
   for (const r of d.fixes) await insertRow(db, 'site_fixes', r);
   for (const r of d.fix_events) await insertRow(db, 'fix_events', r);
   for (const r of d.changes) await insertRow(db, 'changes', r);
@@ -335,20 +360,29 @@ describe.each(FILES)('fixture %s round-trips through the tables', (file) => {
     const back = await project(db);
     for (const c of COLLECTIONS) {
       const key = KEY[c] ?? ((r: Rec) => String(r.id));
-      const original = byId(dataset[c] as Rec[], key);
+      const all = dataset[c] as Rec[];
+      const original = byId(storable(c, all), key);
       const stored = byId(back[c]!, key);
+      // What a deferred field holds comes only from the fixture: no column holds it yet.
+      const full = new Map(all.map((r) => [key(r), r]));
       for (const r of stored) {
+        const whole = {
+          ...r,
+          ...Object.fromEntries(deferred(c).map((f) => [f, full.get(key(r))![f]])),
+        };
         const parsed = (
           SCHEMA_OF[c] as unknown as {
             safeParse(x: unknown): { success: boolean; error?: unknown };
           }
-        ).safeParse(JSON.parse(JSON.stringify(r)));
+        ).safeParse(JSON.parse(JSON.stringify(whole)));
         expect(
           parsed.success,
           `${c} ${key(r)} does not parse: ${JSON.stringify(parsed.error)}`,
         ).toBe(true);
       }
       expect(normalize(stored), `${file}: ${c}`).toEqual(normalize(original));
+      // Only the rows a pending value keeps out are missing, and each holds one.
+      expect(all.length - stored.length).toBe(all.filter((r) => pending(c, r)).length);
     }
     // The generated statuses, on real data, are what the contract's functions give.
     const statuses = await rowsOf(db, 'checks');
@@ -358,7 +392,7 @@ describe.each(FILES)('fixture %s round-trips through the tables', (file) => {
       expect(s.ai_readability_status, c.id).toBe(aiReadabilityStatus(c));
     }
     const tests = await rowsOf(db, 'access_tests');
-    for (const t of dataset.access_tests)
+    for (const t of dataset.access_tests.filter((x) => !pending('access_tests', x as Rec)))
       expect(tests.find((r) => r.id === t.id)!.measurement_status, t.id).toBe(
         verdictStatus(t.verdict),
       );

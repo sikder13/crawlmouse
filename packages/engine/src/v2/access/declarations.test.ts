@@ -12,6 +12,10 @@ describe('the signal table', () => {
       mcp_server_card: { counts_toward_grade: false, recommendation_class: 'experimental' },
       markdown_negotiation: { counts_toward_grade: false, recommendation_class: 'experimental' },
       agent_skills_index: { counts_toward_grade: false, recommendation_class: 'experimental' },
+      ucp: { counts_toward_grade: false, recommendation_class: 'experimental' },
+      rsl: { counts_toward_grade: false, recommendation_class: 'experimental' },
+      agent_card: { counts_toward_grade: false, recommendation_class: 'experimental' },
+      llms_full: { counts_toward_grade: false, recommendation_class: 'experimental' },
     });
     expect(Object.keys(SIGNAL_TABLE).sort()).toEqual([...SignalKindSchema.options].sort());
   });

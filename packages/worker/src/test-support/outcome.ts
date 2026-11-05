@@ -20,6 +20,7 @@ export function outcome(over: Partial<FetchOutcome> & { identity?: Identity } = 
     bytes: Buffer.byteLength(body),
     maxBytes: MAX_BODY_BYTES,
     error: null,
+    timing: { dns_ms: null, connect_ms: 1, ttfb_ms: 5, total_ms: 10 },
     ...over,
   };
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { SignalKindSchema } from '@crawlmouse/types/v2';
 import { FIXTURE_NAMES, fixture } from '../../fixtures';
+import { SIGNAL_TABLE } from '../../../../../../packages/engine/src/v2/access/declarations';
+import { SCREEN_SIGNALS } from '../screen-signals';
 import { SIGNAL_CLASSES, signalsView } from './signals';
 import { asFirstSeen, edited } from './test-helpers';
 
@@ -10,9 +12,13 @@ const view = (name: (typeof FIXTURE_NAMES)[number], edit?: Parameters<typeof edi
 };
 
 describe('signalsView: the seven rows', () => {
-  it('lists every signal kind, in the contract’s order, whatever the check recorded', () => {
+  it('lists every signal the screens show, in the contract’s order, whatever the check recorded', () => {
+    const inOrder = SignalKindSchema.options.filter((k) =>
+      (SCREEN_SIGNALS as readonly string[]).includes(k),
+    );
+    expect([...SCREEN_SIGNALS]).toEqual(inOrder);
     for (const name of FIXTURE_NAMES) {
-      expect(view(name).rows.map((r) => r.signal)).toEqual(SignalKindSchema.options);
+      expect(view(name).rows.map((r) => r.signal)).toEqual(inOrder);
     }
   });
 
@@ -60,7 +66,7 @@ describe('signalsView: the seven rows', () => {
       ['markdown_negotiation', 'experimental'],
       ['agent_skills_index', 'experimental'],
     ]);
-    expect(Object.keys(SIGNAL_CLASSES)).toEqual(SignalKindSchema.options);
+    expect(Object.keys(SIGNAL_CLASSES)).toEqual([...SCREEN_SIGNALS]);
   });
 
   it('does not call Web Bot Auth a fix or claim a lift we could not measure (FACTS I10)', () => {
@@ -144,9 +150,24 @@ describe('SIGNAL_CLASSES against the data', () => {
     for (const name of FIXTURE_NAMES) {
       for (const c of fixture(name).checks) {
         for (const s of c.signals.filter((x) => x.counts_toward_grade)) {
-          expect(SIGNAL_CLASSES[s.signal], `${name} ${s.signal}`).not.toBe('experimental');
+          const shown = (SCREEN_SIGNALS as readonly string[]).includes(s.signal);
+          expect(shown, `${name} ${s.signal} counts but is not shown`).toBe(true);
+          expect(SIGNAL_CLASSES[s.signal as (typeof SCREEN_SIGNALS)[number]]).not.toBe(
+            'experimental',
+          );
         }
       }
     }
+  });
+});
+
+describe('the signals the screens do not show', () => {
+  it('carry no weight in the grade, so leaving them off a screen hides no part of it', () => {
+    const hidden = SignalKindSchema.options.filter(
+      (k) => !(SCREEN_SIGNALS as readonly string[]).includes(k),
+    );
+    expect(hidden.length).toBeGreaterThan(0);
+    for (const k of hidden)
+      expect(SIGNAL_TABLE[k], k).toMatchObject({ counts_toward_grade: false });
   });
 });

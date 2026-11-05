@@ -73,7 +73,7 @@ const REASONS: Readonly<Record<AccessIndeterminateReason, string>> = {
     'edge: no page where the crawler’s own request got an answer, and robots.txt disallows it on one or more pages, so the edge was not tested there',
   challenge_real_crawler_may_pass: `edge: neither detected nor clear; challenges and unverified refusals together are as many as the blocks and as the other answers (${list(OTHER_ANSWERS)}) or more, and challenges are as many as unverified refusals or more: the real crawler, from its own addresses, may pass a challenge`,
   refusal_unverified:
-    'edge: as the reason above, but unverified refusals outnumber challenges: the tagged Googlebot canary was not served on those pages, so IP verification is not ruled out',
+    'edge: as the reason above, but unverified refusals outnumber challenges: nothing we sent that claims to be a crawler, the tagged Googlebot canary included, was served on those pages, so IP verification is not ruled out',
   edge_answered_otherwise: `edge: neither detected nor clear; the other answers (${list(OTHER_ANSWERS)}) are as many as the blocks or more, and outnumber the challenges and unverified refusals together`,
   insufficient_sample: `edge: fewer than ${EDGE_MIN_ANSWERED} pages where the crawler's own request got an answer; the evidence is those pages' rows`,
   hysteresis_band:
@@ -182,7 +182,7 @@ diff's outcome. The tests that pin each rule below:
 The crawl worker (CC-12, \`packages/worker/src/verdict/table.ts\`, spec 12) decides each crawler's verdict
 and cause on each sampled page, and the engine does not decide them again. In the worker's table a robots.txt
 disallow is decided before any request, and a refusal, a block or a challenge only after the untagged browser
-control was served on that page; a refusal is \`blocked_by_ua_rule\` only when the tagged Googlebot canary was
+control was served on that page; a refusal is \`blocked_by_ua_rule\` when another tested crawler or the tagged Googlebot canary was
 served on the same page. The engine reads each crawler row as the worker wrote it and decides what the rows
 add up to.
 

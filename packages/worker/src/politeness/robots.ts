@@ -181,6 +181,7 @@ function evidenceOf(f: FetchOutcome): FetchOutcome {
     bytes: f.bytes,
     maxBytes: f.maxBytes,
     error: f.error,
+    timing: f.timing,
   };
 }
 

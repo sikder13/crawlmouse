@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import type { AddressInfo } from 'node:net';
+import { DECLARATION_PATHS } from '@crawlmouse/types/v2';
 import { afterEach, describe, expect, it } from 'vitest';
 import { inlineReader, type PageReader } from './reader/read.js';
 import { signBatch, signRead } from './auth/hmac.js';
@@ -482,8 +483,9 @@ describe('GET /metrics', () => {
     expect(mem.peak_rss_mb).toBeLessThanOrEqual(hwm());
     // Freed memory is not always handed back, so how far the peak sits above now varies; above it is.
     expect(mem.peak_rss_mb).toBeGreaterThan(mem.rss_mb);
-    // Two origins (www and bare), so two robots.txt reads, then the two pages: one site key.
-    expect(m.body.requests_per_site).toEqual({ 'example.com': 4 });
+    // Two origins (www and bare), so two robots.txt reads, then the two pages, then the seven
+    // declaration files: one site key.
+    expect(m.body.requests_per_site).toEqual({ 'example.com': 4 + DECLARATION_PATHS.length });
   });
 });
 

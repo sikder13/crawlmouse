@@ -82,4 +82,37 @@ describe('CRAWLER_REGISTRY_V2', () => {
       else expect(e.as_of, e.token).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
   });
+
+  /**
+   * Cloudflare's own categorisation (Search, Agent, Training), read by hand from each crawler's page
+   * in Cloudflare Radar's bots directory (https://radar.cloudflare.com/bots/directory/<slug>) on
+   * 2026-11-03. A crawler can be in more than one. PerplexityBot has no page there, so it has none.
+   */
+  const CLOUDFLARE: Record<string, string[] | null> = {
+    Googlebot: ['search', 'training'],
+    Bingbot: ['search', 'training'],
+    'OAI-SearchBot': ['search'],
+    'ChatGPT-User': ['agent'],
+    PerplexityBot: null,
+    'Claude-SearchBot': ['search'],
+    GPTBot: ['training'],
+    ClaudeBot: ['training'],
+  };
+
+  it("records Cloudflare's categories for each crawler, as Radar listed them, dated", () => {
+    expect(
+      Object.fromEntries(CRAWLER_REGISTRY_V2.map((e) => [e.token, e.cloudflare_categories])),
+    ).toEqual(CLOUDFLARE);
+    for (const e of CRAWLER_REGISTRY_V2) {
+      expect(e.cloudflare_as_of).toBe('2026-11-03');
+      const note = e.source_notes.join(' ');
+      if (e.cloudflare_categories === null) expect(note).toMatch(/Cloudflare Radar/);
+      else expect(note).toMatch(/https:\/\/radar\.cloudflare\.com\/bots\/directory\/[a-z-]+/);
+    }
+  });
+
+  it('ChatGPT-User is an agent for Cloudflare and ai_search for us: the two vocabularies are kept apart', () => {
+    const e = CRAWLER_REGISTRY_V2.find((x) => x.token === 'ChatGPT-User')!;
+    expect(e).toMatchObject({ group: 'ai_search', cloudflare_categories: ['agent'] });
+  });
 });

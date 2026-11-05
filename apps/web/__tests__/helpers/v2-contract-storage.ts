@@ -29,6 +29,45 @@ export const NOT_THIS_STEP: Record<string, string> = {
   CrawlerRegistryEntry: 'registry seed data; no table',
 };
 
+/**
+ * Contract fields no column holds yet, each with where it will be stored. CC-12d added them to the
+ * contract; their columns and CHECKs come with a migration the owner applies (CC-06c). The release
+ * is also the row's measurement lineage's, and the contract's fixture test holds the two equal.
+ * v2-contract-guard.test.ts leaves each out of its column checks, and fails once one is stored under
+ * its own name or as flattened columns, so an entry cannot outlive its reason.
+ */
+export const NOT_STORED_YET: Record<string, string> = {
+  'PageResult.title': 'stored by CC-06c',
+  'PageResult.meta_description': 'stored by CC-06c',
+  'AccessTest.identity_role': 'stored by CC-06c',
+  'AccessTest.tagged': 'stored by CC-06c',
+  'AccessTest.witness': 'stored by CC-06c',
+  'AccessTest.fly_region': 'stored by CC-06c',
+  'AccessTest.request_signing': 'stored by CC-06c',
+  'AccessTest.signature_verified': 'stored by CC-06c',
+  'AccessTest.timing': 'stored by CC-06c',
+  'AccessTest.worker_release': 'stored by CC-06c (the lineage names the same release)',
+};
+
+/**
+ * Values the contract added to an enum that a column's CHECK does not hold yet, by table.column:
+ * stored by CC-06c. The guard compares the CHECK with the enum less these, and fails once the CHECK
+ * holds one of them.
+ */
+export const VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {
+  'access_tests.source_ip_class': ['other_egress'],
+};
+
+/**
+ * The same, for the research ledger's enum CHECKs (06b), by table.column in schema `research`:
+ * SignalKind's four CC-12d values, stored by CC-06c. v2-006b-data-foundations.test.ts compares each
+ * CHECK with its enum less these, and fails once the CHECK holds one of them.
+ */
+export const LEDGER_VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {
+  'check_runs.signals_detected': ['ucp', 'rsl', 'agent_card', 'llms_full'],
+  'check_runs.signals_indeterminate': ['ucp', 'rsl', 'agent_card', 'llms_full'],
+};
+
 /** A contract object stored as `<field>_<key>` columns of the same table. */
 export const FLATTENED: Record<string, string> = { 'Site.schedule': 'sites' };
 /** A contract object stored as the columns of another table, one row per parent. */
@@ -233,6 +272,21 @@ export const RULES_AT_WRITE: Record<string, string> = {
 
 /** Rules of entities or primitives this step does not store. */
 export const RULES_NOT_THIS_STEP: Record<string, string> = {
+  cloudflare_unique: 'crawler registry (no table)',
+  access_identity_ua: 'AccessTest fields stored by CC-06c',
+  control_untagged: 'AccessTest fields stored by CC-06c',
+  access_witness: 'AccessTest fields stored by CC-06c',
+  witness_other: 'AccessTest fields stored by CC-06c',
+  fly_region: 'AccessTest fields stored by CC-06c',
+  timing_order: 'AccessTest fields stored by CC-06c',
+  worker_request: 'AccessTest fields stored by CC-06c',
+  worker_request_whole: 'AccessTest fields stored by CC-06c',
+  head_text_absent: 'PageResult fields stored by CC-06c',
+  declaration_answer: 'worker batch result (no table)',
+  declaration_bytes: 'worker batch result (no table)',
+  declaration_media_type: 'worker batch result (no table)',
+  declaration_cache_answer: 'worker batch result (no table)',
+  declaration_not_requested: 'worker batch result (no table)',
   billing_period: 'Account (CC-01)',
   history_current: 'Account (CC-01)',
   history_forward: 'Account (CC-01)',
@@ -281,6 +335,15 @@ export const NESTED: Record<string, string[]> = {
 
 /** Enums no table of this step holds, and where they live. */
 export const NOT_STORED_HERE: Record<string, string> = {
+  IdentityRole: 'AccessTest.identity_role, stored by CC-06c',
+  WitnessRole: 'AccessTest.witness, stored by CC-06c',
+  RequestSigning: 'AccessTest.request_signing, stored by CC-06c',
+  SignatureVerification: 'AccessTest.signature_verified, stored by CC-06c',
+  CloudflareCategory: 'crawler registry seed data',
+  BatchPartialReason: 'worker batch result (no table)',
+  DeclarationPath: 'worker batch result (no table)',
+  DeclarationState: 'worker batch result (no table)',
+  DeclarationNotRequested: 'worker batch result (no table)',
   AccountState: 'accounts.state (CC-01)',
   SeatRole: 'seats.role (CC-01)',
   Theme: 'seats.theme (CC-01)',

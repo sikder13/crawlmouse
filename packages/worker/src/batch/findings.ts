@@ -1,3 +1,4 @@
+import { BatchPartialReasonSchema, type BatchPartialReason } from '@crawlmouse/types/v2';
 import type { TooLargeReason, UnreachableReason } from '../politeness/robots.js';
 import type { SiteStop, StopReason } from '../politeness/sites.js';
 import { bounded, CAPS } from '../rows/bounded.js';
@@ -27,20 +28,10 @@ export type Finding =
   /** Responses fetched and not read, by why; none of them a fault of the site. Not a partial reason. */
   | { kind: 'not_read'; reason: NotReadReason; responses: number };
 
-export const PARTIAL_REASONS = [
-  'budget_requests',
-  'budget_bytes',
-  'budget_seconds',
-  'site_stopped',
-  'robots_unreachable',
-  'robots_too_large',
-  'site_refused',
-  'crawl_delay_over_limit',
-  'crawl_delay_10s_or_more',
-  'result_size',
-] as const;
+/** The contract's BatchPartialReason values: the engine reads them as fields of the batch result. */
+export const PARTIAL_REASONS = BatchPartialReasonSchema.options;
 
-export type PartialReason = (typeof PARTIAL_REASONS)[number];
+export type PartialReason = BatchPartialReason;
 
 export class Findings {
   private readonly items = new Map<string, Finding>();

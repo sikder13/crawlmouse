@@ -224,22 +224,58 @@ const CANARY_OUTCOME: Record<Observed, string> = {
   not_requested: 'was not requested',
 };
 
+/** The identity whose being served decided a refusal: a tested crawler's token, or the canary. */
+export interface WitnessName {
+  role: 'crawler' | 'canary';
+  ua: string;
+}
+
 /**
- * For a refusal: what the canary got, and which other tested crawlers were served on the same page.
- * The second half is what lets a reader call a refusal "likely a user-agent rule"; the verdict does
- * not claim it unless the canary was served.
+ * For a refusal: what decided it, and which other tested crawlers were served on the same page. With
+ * a witness, the refusal is aimed at the user agent (verdict/table.ts, the witness rule); with none,
+ * it cannot be told apart from a site that refuses unverified crawler addresses.
  */
-export function canaryReading(
+export function witnessReading(
+  witness: WitnessName | null,
   canary: Observed,
   canaryNote: string | null,
   othersServed: readonly string[],
+  /** A caveat follows (witnessCaveats), so the conclusion is stated as likely. */
+  hedged = false,
 ): string {
-  const head =
-    canary === 'served'
-      ? 'The tagged Googlebot request was served on this page, so the site does not check crawler IP addresses here and the refusal is aimed at this user agent.'
-      : `The tagged Googlebot request on this page ${canaryNote ?? CANARY_OUTCOME[canary]}, so this refusal cannot be told apart from IP verification.`;
   const tail = othersServed.length
     ? ` ${list(othersServed)} ${othersServed.length === 1 ? 'was' : 'were'} served on this page.`
     : ' No other tested crawler was served on this page.';
-  return head + tail;
+  if (witness === null)
+    return `No other tested crawler was served on this page, and the tagged Googlebot request ${canaryNote ?? CANARY_OUTCOME[canary]}, so this refusal cannot be told apart from IP verification.`;
+  const who = witness.role === 'canary' ? 'The tagged Googlebot request' : witness.ua;
+  const so = hedged
+    ? 'so this refusal is likely aimed at the user agent rather than at an unverified address'
+    : 'so this refusal is aimed at the user agent, not at an unverified address';
+  return `${who} was served on this page from the same address, ${so}.${tail}`;
+}
+
+/**
+ * What weakens a witness, each its own limitation: every identity served was requested before the
+ * refused one (a limit on requests per address looks the same), or the witness went as its bare
+ * token (its operator publishes no user agent for it).
+ */
+export function witnessCaveats(
+  witness: WitnessName | null,
+  allBefore: boolean,
+  witnessBareOf: string | null,
+): string[] {
+  if (witness === null) return [];
+  return [
+    ...(allBefore
+      ? [
+          'Every identity served on this page was requested before this one, so a limit on requests per address would look the same.',
+        ]
+      : []),
+    ...(witnessBareOf
+      ? [
+          `${witness.ua} was sent as its bare token, because ${witnessBareOf} publishes no user agent for it, so a rule keyed on the operator's full user agent may not have taken it for a crawler.`,
+        ]
+      : []),
+  ];
 }

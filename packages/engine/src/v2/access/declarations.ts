@@ -7,8 +7,9 @@
  * reported as present or absent, worth nothing either way, and never a defect. No fix type exists for
  * any of them, so none can open a fix.
  *
- * The worker does not request the declaration paths yet (a CC-20 follow-up), so `declarationSignal`
- * reads a probe: what one GET of the path answered. An HTML page at the path is not the file; another
+ * The worker requests the declaration paths and records each as a DeclarationFetch
+ * (packages/types/src/v2/declaration.ts); reading those into a probe is the pipeline's (CC-20).
+ * `declarationSignal` reads a probe: what one GET of the path answered. An HTML page at the path is not the file; another
  * media type the declaration is not served as leaves the question open.
  */
 import type { Check, RecommendationClass, SignalKind } from '@crawlmouse/types/v2';
@@ -24,6 +25,10 @@ export const SIGNAL_TABLE: Readonly<
   mcp_server_card: { counts_toward_grade: false, recommendation_class: 'experimental' },
   markdown_negotiation: { counts_toward_grade: false, recommendation_class: 'experimental' },
   agent_skills_index: { counts_toward_grade: false, recommendation_class: 'experimental' },
+  ucp: { counts_toward_grade: false, recommendation_class: 'experimental' },
+  rsl: { counts_toward_grade: false, recommendation_class: 'experimental' },
+  agent_card: { counts_toward_grade: false, recommendation_class: 'experimental' },
+  llms_full: { counts_toward_grade: false, recommendation_class: 'experimental' },
 };
 
 /** The declarations one GET can find: where, what the file is, and the media types it is served as. */
@@ -49,7 +54,10 @@ export interface DeclarationProbe {
   status: number | null;
   /** The Content-Type, as sent; null when none was sent. */
   media_type: string | null;
-  /** The body's length in bytes; null when not recorded. */
+  /**
+   * The body's length in bytes; null when not recorded. A DeclarationFetch whose `bytes_complete` is
+   * false gives null here: its count is what was read, not the file's length.
+   */
   bytes: number | null;
 }
 

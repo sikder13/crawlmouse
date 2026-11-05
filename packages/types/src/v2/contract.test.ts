@@ -20,6 +20,7 @@ import {
   EffectSchema,
   ENTITIES,
   FixtureDatasetSchema,
+  BATCH_RESULT_ENUMS,
   DERIVED_ENUMS,
   REGISTRY_ONLY_ENUMS,
   V1_PINNED_ENUMS,
@@ -240,6 +241,20 @@ for (const data of Object.values(parsed)) {
 }
 const reachable = nodes(FixtureDatasetSchema);
 
+describe("a worker row's release is its lineage's", () => {
+  it.each(FIXTURE_NAMES)(
+    '%s: every access row the worker made names the release of the lineage that fetched it',
+    (name) => {
+      const d = fixture(name);
+      const fetching = d.lineages.filter((l) => l.worker_release !== null);
+      expect(fetching).toHaveLength(1);
+      const ours = d.access_tests.filter((t) => t.worker_release !== null);
+      expect(ours.length).toBeGreaterThan(0);
+      for (const t of ours) expect(t.worker_release, t.id).toBe(fetching[0]!.worker_release);
+    },
+  );
+});
+
 describe('every enum value appears in at least one fixture', () => {
   it.each(Object.entries(V2_FIXTURE_ENUMS))('%s: every value appears', (_name, schema) => {
     const missing = enumValues(schema).filter((v) => !seenEnum.get(schema)?.has(v));
@@ -276,9 +291,13 @@ describe('every enum value appears in at least one fixture', () => {
   });
 
   it('every enum the module defines is in exactly one group, and every group entry is one of them', () => {
-    const groups = [V2_FIXTURE_ENUMS, V1_PINNED_ENUMS, REGISTRY_ONLY_ENUMS, DERIVED_ENUMS].map(
-      (g) => new Set<unknown>(Object.values(g)),
-    );
+    const groups = [
+      V2_FIXTURE_ENUMS,
+      V1_PINNED_ENUMS,
+      REGISTRY_ONLY_ENUMS,
+      DERIVED_ENUMS,
+      BATCH_RESULT_ENUMS,
+    ].map((g) => new Set<unknown>(Object.values(g)));
     expect(ALL_V2_ENUMS.length).toBeGreaterThan(30);
     const wrong = ALL_V2_ENUMS.filter((s) => groups.filter((g) => g.has(s)).length !== 1);
     expect(wrong.map((s) => v2Registry.get(s)?.id)).toEqual([]);
