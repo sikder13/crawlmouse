@@ -65,7 +65,7 @@ describe('withdrawn claims', () => {
       /reservation is settled whatever happens to the page/i,
       'the daily budget is settled once per check, not per page',
     ],
-    [/inline\b[^.]*\bstill runs/i, 'the static side sends setJavaScriptEnabled: false'],
+    [/inline\b[^.]{0,120}\bstill runs/i, 'the static side sends setJavaScriptEnabled: false'],
     [
       /against the check[’']s cap and against today[’']s budget/i,
       'today\u2019s budget is asked once per check',

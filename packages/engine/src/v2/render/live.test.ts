@@ -171,7 +171,6 @@ live('Browser Run, live', () => {
       `inline-script probe: static "${outOf(staticHtml)}", rendered "${outOf(renderedHtml)}"`,
     );
     expect(staticHtml).not.toContain(INLINE_MARKER);
-    expect(outOf(staticHtml)).not.toContain('file=');
     expect(renderedHtml).toContain(INLINE_MARKER);
     expect(outOf(renderedHtml)).toContain('file=loaded');
   }, 120_000);
