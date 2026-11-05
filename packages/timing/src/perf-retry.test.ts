@@ -284,17 +284,14 @@ describe('perf-retry.sh: attempt 1 is classified before any retry', () => {
     }
   });
 
-  it.each(NOT_BUDGET)(
-    '%s in attempt 1: fails without a retry, on a normal or a slow runner',
-    (o) => {
-      for (const probe of ['normal', 'slow'] as const) {
-        const r = run([o, 'pass'], probe);
-        expect(r.status, probe).toBe(1);
-        expect(r.args, probe).toEqual(['perf.spec.ts']);
-        expect(r.entry, probe).toBeNull();
-      }
-    },
-  );
+  it.each(NOT_BUDGET)('%s in attempt 1: fails without a retry, whatever the probe read', (o) => {
+    for (const probe of ['normal', 'slow', 'missing'] as const) {
+      const r = run([o, 'pass'], probe);
+      expect(r.status, probe).toBe(1);
+      expect(r.args, probe).toEqual(['perf.spec.ts']);
+      expect(r.entry, probe).toBeNull();
+    }
+  });
 
   it('a budget miss in attempt 1 whose ✘ line is coloured: is retried, as uncoloured', () => {
     const r = run(['coloured-budget', 'pass'], 'normal');
