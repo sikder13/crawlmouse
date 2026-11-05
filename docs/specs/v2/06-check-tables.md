@@ -3284,7 +3284,7 @@ alter table public.public_reports drop column if exists check_id;
 | File                                                                | sha256                                                             |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `infra/supabase/migrations/20261102000003_v2_007_storage.sql`       | `a42bcf4d1c2b292a27d6cdc60c138880162c5cefc224f550a61d6f1b585723f5` |
-| `infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql` | `61e23b10a1741c5d93a3cf19daf331d150098760e0fdb193454c2506883a0572` |
+| `infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql` | `f064cf9173087536291f328fb6a8afb9981a2ea0e908a89291e45225583fbfca` |
 
 <details><summary>Migration SQL</summary>
 
@@ -3477,10 +3477,29 @@ create policy evidence_crawl_worker_part_insert on storage.objects
 -- Revert of infra/supabase/migrations/20261102000003_v2_007_storage.sql.
 --
 -- Removes the crawl_worker role, its grants, functions and policies, and the evidence and reports
--- buckets. A bucket that still holds objects is not deleted: the delete fails and the revert stops,
--- so empty it through the Storage API first (Supabase refuses a direct delete of storage rows).
+-- buckets. While either bucket holds objects the first statement raises with the count per bucket
+-- and nothing runs, so the revert never orphans files: empty them through the Storage API first.
+--
+-- Run it as one transaction (scripts/db/rollback.ts does): `set local` below lasts only until the
+-- transaction ends.
 --
 -- Every statement is re-runnable (v2-007-storage.test.ts runs it twice).
+
+do $$
+declare
+  evidence_count bigint;
+  reports_count bigint;
+begin
+  select count(*) filter (where bucket_id = 'evidence'), count(*) filter (where bucket_id = 'reports')
+    into evidence_count, reports_count
+    from storage.objects
+   where bucket_id in ('evidence', 'reports');
+  if evidence_count + reports_count > 0 then
+    raise exception 'revert stopped: the buckets still hold objects (evidence: %, reports: %); empty them through the Storage API first',
+      evidence_count, reports_count;
+  end if;
+end;
+$$;
 
 drop policy if exists evidence_crawl_worker_part_insert on storage.objects;
 do $$
@@ -3498,6 +3517,8 @@ drop function if exists public.crawl_worker_check_month();
 drop function if exists public.crawl_worker_part_path_ok(text);
 drop function if exists public.crawl_worker_check_id();
 
+-- storage.protect_delete() refuses a direct delete from storage.buckets unless this is set.
+set local storage.allow_delete_query = 'true';
 delete from storage.buckets where id in ('evidence', 'reports');
 
 do $$
