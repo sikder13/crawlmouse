@@ -43,7 +43,10 @@ async function run(fixtures: ReplyFixture[], caps: RenderCaps, daily: DailyBudge
     daily,
     sleep: async () => {},
   });
-  const outcome = await Promise.race([check, later(4000).then(() => 'hung' as const)]);
+  // A check that hangs never finishes, so the guard can be generous: under a fully parallel run a
+  // check of twelve pages took over 4 s, which an earlier 4 s guard reported as a hang. A failing case
+  // is not shrunk (endOnFailure), so a real hang fails after one guard, not one per shrink step.
+  const outcome = await Promise.race([check, later(15_000).then(() => 'hung' as const)]);
   if (outcome === 'hung') throw new Error('the check did not finish');
   return outcome satisfies RenderOutcome;
 }
@@ -95,7 +98,7 @@ describe('the cost caps, under generated schedules', () => {
           if (out.pages.some((p) => p.rendered)) expect(settled).toBe(1);
         },
       ),
-      { numRuns: RUNS },
+      { numRuns: RUNS, endOnFailure: true },
     );
   }, 600_000);
 
@@ -133,7 +136,7 @@ describe('the cost caps, under generated schedules', () => {
           expect(day).toBe(expected === 'rendered' ? sum : 0);
         },
       ),
-      { numRuns: RUNS },
+      { numRuns: RUNS, endOnFailure: true },
     );
   }, 600_000);
 });
