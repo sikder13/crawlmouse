@@ -231,6 +231,7 @@ function aiChange(
   );
   if (unmeasured) waits.add('crawler_too_few_pages');
   for (const s of [start, a, b]) for (const r of s.ai.withheld_reasons) waits.add(r);
+  // a withheld grade names its reasons, so waits already holds them; the test narrows the types
   if (waits.size > 0 || a.ai.withheld || b.ai.withheld) return { waits: [...waits] };
   return { points: b.ai.total - a.ai.total };
 }

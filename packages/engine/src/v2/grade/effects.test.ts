@@ -379,6 +379,65 @@ describe('the structure counterfactuals, by hand', () => {
     });
   });
 
+  it('three defects on one page: neither of the first two would raise a grade alone, so neither is absorbed', () => {
+    const { grades } = blog(6, 0);
+    const [p1] = grades.inputs.seo.pages.filter((p) => p.url.includes('/blog/'));
+    const records = (['canonical_mismatch', 'hreflang_gap', 'redirect_chain'] as const).map(
+      (type) =>
+        ({
+          type,
+          state: 'detected',
+          fingerprint: type,
+          key: `${type}:x`,
+          affected_urls: [p1!.url],
+        }) as never,
+    );
+    const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, detections: records } };
+    const { byFix } = effectsOf(
+      inputs,
+      records.map((record) => ({ family: 'structure' as const, record })),
+    );
+    expect([...byFix.values()].map((x) => [x.effect.technical_seo, x.absorbed_by])).toEqual([
+      [0, null],
+      [0, null],
+      [5.72, null],
+    ]);
+  });
+
+  it('the absorber is the first fix above that takes the effect, not the first that names the page', () => {
+    // /old-1 is an orphan, so also deep, and a redirect record marks it: clearing the record ranks
+    // first and leaves the deep-page fix its effect; the orphan fix, second, takes it
+    const { grades } = blog(6, 0, {}, [{ path: '/old-1' }]);
+    const old = grades.inputs.seo.pages.find((p) => p.url.endsWith('/old-1'))!.url;
+    const redirect = {
+      type: 'redirect_chain',
+      state: 'detected',
+      fingerprint: 'r',
+      key: 'redirect:https://a.test/r',
+      affected_urls: [old],
+    } as never;
+    const detections = [...grades.inputs.seo.detections, redirect];
+    const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, detections } };
+    const fixes = detections
+      .filter((d) => d.state === 'detected')
+      .map((record) => ({ family: 'structure' as const, record }));
+    const { byFix } = effectsOf(inputs, fixes);
+    const ranked = [...byFix].sort((x, y) => x[1].rank - y[1].rank);
+    const type = (fp: string) => detections.find((d) => d.fingerprint === fp)!.type;
+    expect(ranked.map(([fp]) => type(fp))).toEqual([
+      'redirect_chain',
+      'orphan_pages',
+      'deep_pages',
+    ]);
+    const [, orphan, deep] = ranked as [
+      unknown,
+      [string, unknown],
+      [string, { absorbed_by: string | null; effect: { technical_seo: number | null } }],
+    ];
+    expect(deep[1].effect.technical_seo).toBeLessThanOrEqual(0);
+    expect(deep[1].absorbed_by).toBe(orphan[0]);
+  });
+
   it('a page carrying two defects counts once: clearing one moves nothing, clearing both 40/7', () => {
     const { grades } = blog(6, 0);
     const [p1] = grades.inputs.seo.pages.filter((p) => p.url.includes('/blog/'));

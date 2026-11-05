@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { fixWithHistory } from '../../../fixtures/v2/diff/builders.js';
 import { BAD_AI_READABILITY_POINTS, BAD_TECHNICAL_SEO_POINTS, severityOf } from './severity.js';
 
-const withEffect = (technical_seo: number, ai_readability: number | null): Fix => {
+const withEffect = (technical_seo: number | null, ai_readability: number | null): Fix => {
   const { fix } = fixWithHistory(1, 'open');
   return {
     ...fix,
@@ -11,7 +11,7 @@ const withEffect = (technical_seo: number, ai_readability: number | null): Fix =
       technical_seo,
       ai_readability,
       ai_readability_pending_on: ai_readability === null ? ['0000000000000001'] : [],
-      technical_seo_pending_on: [],
+      technical_seo_pending_on: technical_seo === null ? ['grade_refused'] : [],
       absorbed_by: null,
       estimate: true,
     },
@@ -68,5 +68,8 @@ describe('severityOf (ARCH-2 §4.5)', () => {
   it('gives no severity to a changed or baseline row, which ARCH-2 does not grade', () => {
     expect(severityOf(change('changed'), withEffect(50, 50))).toBeNull();
     expect(severityOf(change('baseline'), withEffect(50, 50))).toBeNull();
+  });
+  it('calls an opened fix with no Technical SEO effect (a refused grade) warn: not estimated is not large', () => {
+    expect(severityOf(change('opened'), withEffect(null, null))).toBe('warn');
   });
 });
