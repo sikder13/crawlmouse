@@ -219,6 +219,17 @@ describe("check 07: each partition holds its parent's triggers", () => {
   });
 });
 
+describe('check 07 does not require a statement trigger Postgres keeps on the parent', () => {
+  it('an INSERT statement trigger on a partitioned table is not required on its partitions', async () => {
+    const findings = await findingsAfter(
+      '07-',
+      `create trigger zz_stmt after insert on research.check_runs
+         for each statement execute function research.ledger_append_only()`,
+    );
+    expect(findings).toEqual([]);
+  });
+});
+
 describe("Supabase's own partitioned tables are left to Supabase", () => {
   it('a partition whose parent is outside public, research and partitions is not checked', async () => {
     const setup = `create schema zz_platform;

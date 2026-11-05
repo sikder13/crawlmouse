@@ -1,11 +1,11 @@
 -- Client roles hold exactly the declared privileges on the v2 tables.
--- anon holds nothing on any v2 table or partition. authenticated and crawl_worker hold exactly the
--- grants in this file's `declared` list, at the table or column level: a privilege held but not listed,
--- or listed on an existing table and column but not held, is a finding. The v2 tables are the ones
--- in its `v2_tables` list, every relation in the research and partitions schemas, and every
--- partition, in any schema, of a table in those schemas or public. A table, column or role that does not exist yet (a migration not
--- applied) is skipped; scripts/db/check.test.ts requires every listed table to exist once the
--- migrations have run.
+-- anon holds nothing on any v2 table or partition. authenticated and crawl_worker hold exactly
+-- the grants in this file's `declared` list, at the table or column level: a privilege held but
+-- not listed, or listed on an existing table and column but not held, is a finding. The v2 tables
+-- are the ones in its `v2_tables` list, every relation in the research and partitions schemas, and
+-- every partition, in any schema, of a table in those schemas or public. A table, column or role
+-- that does not exist yet (a migration not applied) is skipped; scripts/db/check.test.ts requires
+-- every listed table to exist once the migrations have run.
 --
 -- A migration that changes these grants changes this list in the same pull request.
 with

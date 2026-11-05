@@ -1,8 +1,9 @@
--- Every partition holds each trigger its parent table holds.
--- For each partition of a table in public, research or partitions, each trigger on its parent
--- must exist on the partition under the same name, calling the same function. Postgres copies row
--- triggers to a new partition, but not statement triggers: the append-only TRUNCATE guards are
--- created per partition by v2_premake_month_partitions. The fingerprint merges the lines of a
+-- Every partition holds each row and TRUNCATE trigger its parent table holds.
+-- For each partition of a table in public, research or partitions, each row trigger and each
+-- TRUNCATE trigger on its parent must exist on the partition under the same name, calling the
+-- same function. Postgres copies row triggers to a new partition; it copies no statement trigger,
+-- and v2_premake_month_partitions creates the TRUNCATE guards per partition. Other statement
+-- triggers stay on the parent and are not required here. The fingerprint merges the lines of a
 -- table's partitions, so a trigger missing from one partition shows only here.
 with parts as (
   select c.oid, n.nspname, c.relname, i.inhparent
@@ -18,6 +19,8 @@ select format('%s.%s', p.nspname, p.relname) as object,
          as problem
 from parts p
 join pg_trigger t on t.tgrelid = p.inhparent and not t.tgisinternal
+  -- tgtype bit 1: FOR EACH ROW; bit 32: TRUNCATE.
+  and ((t.tgtype & 1) <> 0 or (t.tgtype & 32) <> 0)
 where not exists (
   select 1 from pg_trigger pt
   where pt.tgrelid = p.oid and pt.tgname = t.tgname and pt.tgfoid = t.tgfoid

@@ -123,7 +123,7 @@ async function main(): Promise<void> {
     yesProduction: values['yes-production'],
   });
   try {
-    await revert(target.db, [migration]);
+    await revert(target.db, [migration], console.log, newestFirstGuard);
     const results = await runChecks(target.db);
     console.log(`checks on ${target.label}\n${formatResults(results)}`);
     if (failed(results)) process.exitCode = 1;
