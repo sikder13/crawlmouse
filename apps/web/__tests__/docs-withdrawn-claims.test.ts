@@ -69,6 +69,15 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'to a redirect chain marks every page that carries it',
+    withdrawnIn:
+      'docs/specs/v2/17-content-and-grade.md (Technical SEO), owner ruling of 2026-11-05 (second set)',
+    truth:
+      'A crawlability defect is counted on the URL that carries it: a redirect record marks the ' +
+      'redirecting URL, not the pages linking to it, so one site-wide link costs at most one URL.',
+    allowedIn: [],
+  },
+  {
     text: 'a robots.txt disallow therefore raises Access as an unblock does',
     withdrawnIn:
       'docs/specs/v2/17-content-and-grade.md (Access) and packages/engine/src/v2/grade/access.ts, CC-17 review round 6',

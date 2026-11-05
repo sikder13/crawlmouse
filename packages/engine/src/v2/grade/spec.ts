@@ -32,7 +32,7 @@ import labels from '../../../fixtures/v2/content/labels.json' with { type: 'json
 import { code, pct, table } from '../detectors/spec.js';
 import { STRUCTURE_CLASS } from './outcomes.js';
 import { CRAWLABILITY_DETECTORS } from './technical-seo.js';
-import { WITHHELD_REASON_MEANINGS } from './withheld.js';
+import { CONTENT_SCORE_WITHHELD_MEANINGS, WITHHELD_REASON_MEANINGS } from './withheld.js';
 import expected from './expected.json' with { type: 'json' };
 import {
   ACCESS_CELL_WEIGHT,
@@ -58,7 +58,8 @@ export const COUNTERFACTUALS: Readonly<Record<FixType, string>> = {
     'a link to the page from its `suggested_parent_url`, or from the homepage when it has none',
   deep_pages: `a link to the page from the deepest graded page within ${MAX_HEALTHY_DEPTH - 1} clicks of the homepage (the lowest URL among them), or from the homepage when none is`,
   generic_anchor_text: "the hub's outbound links get descriptive anchors",
-  redirect_chain: 'the record becomes `not_detected`, so it marks no page',
+  redirect_chain:
+    'the record becomes `not_detected`, and the redirecting URL leaves the crawl (the links point at the final URL)',
   canonical_mismatch: 'the record becomes `not_detected`, so it marks no page',
   duplicate_pagination: 'the record becomes `not_detected`, so it marks no page',
   hreflang_gap: 'the record becomes `not_detected`, so it marks no page',
@@ -67,8 +68,20 @@ export const COUNTERFACTUALS: Readonly<Record<FixType, string>> = {
   quotable_opening: "the template's failing pages pass the check, when the check counts",
   missing_author_date: "the template's failing pages pass the check, when the check counts",
   specs_as_images: "the template's failing pages pass the check, when the check counts",
+  missing_schema_description: "the template's failing pages pass the check, when the check counts",
+  no_question_headings: "the template's failing pages pass the check, when the check counts",
   client_rendered_template: 'none yet: the fix type needs rendered pages (CC-14)',
   js_only_navigation: 'none yet: the fix type needs rendered pages (CC-14)',
+};
+
+/** The URL each crawlability detector's record marks (technical-seo.ts defectUrls). */
+const CARRIES: Readonly<Record<(typeof CRAWLABILITY_DETECTORS)[number], string>> = {
+  redirect_chain:
+    'the redirecting URL (the pages linking to it are where the fix is made, and carry no defect)',
+  canonical_mismatch:
+    'the page whose canonical cannot be honoured, or that is linked under another URL',
+  duplicate_pagination: 'each later page found to repeat page 1',
+  hreflang_gap: 'each member of the cluster with a missing or broken annotation',
 };
 
 /** What each content check applies to and passes on, said with the constants it reads. */
@@ -87,8 +100,7 @@ const CHECK_RULES: Readonly<
     shell: 'unread',
   },
   schema_with_description: {
-    applies:
-      'every page read: a page with no JSON-LD fails (owner ruling, 2026-11-05; the ruling also opens its fix as `documented_requirement`, but the contract has no fix type for this check, so no fix opens: a reported gap)',
+    applies: 'every page read: a page with no JSON-LD fails (owner ruling, 2026-11-05)',
     passes:
       'a node of a type about the page itself (`…Page`, `…Article`, `BlogPosting`, `Product`, `Service`, `Event`, `TouristTrip` and the others in checks.ts) has a non-empty `description`',
     shell: 'unread',
@@ -302,21 +314,19 @@ function labelSet(): string {
   ].join('\n');
 }
 
-/** The example site whose one redirect record marks every page, from expected.json. */
+/** The example site whose every page links to a redirect chain, from expected.json. */
 function siteWideRedirect(): string {
-  const name = '14-page blog: a link on every page to a URL behind a redirect chain';
+  const name =
+    '14-page blog: a link on every page to a URL behind a redirect chain, crawled as a 301';
   const c = (
     expected.cases as Record<string, (typeof expected.cases)[keyof typeof expected.cases]>
   )[name];
   if (c === undefined) throw new Error(`expected.json has no case "${name}"`);
   const fix = c.fixes.find((f) => f.type === 'redirect_chain')!;
   const [score, structure] = [c.technical_seo.score!, c.technical_seo.site_structure_score!];
-  // crawlability from the grade as recorded: (score − 0.6 × structure) / 40, to the nearest 0.01
-  const crawl =
-    Math.round(
-      (100 * (score - (SEO_WEIGHTS.structure / 100) * structure)) / SEO_WEIGHTS.crawlability,
-    ) / 100;
-  return `On the example site "${name}", Technical SEO is ${score} with the record (${SEO_WEIGHTS.structure / 100} × ${structure} + ${SEO_WEIGHTS.crawlability} × ${crawl}), and the fix is worth +${fix.effect.technical_seo}.`;
+  // crawlability from the grade as recorded: (score − 0.6 × structure) / 40
+  const crawl = (score - (SEO_WEIGHTS.structure / 100) * structure) / SEO_WEIGHTS.crawlability;
+  return `On the example site "${name}", Technical SEO is ${score} (${SEO_WEIGHTS.structure / 100} × ${structure} + ${SEO_WEIGHTS.crawlability} × ${crawl.toFixed(4)}): the 301 is the one URL outside the numerator, with or without the record. The fix, linking to the final URL, takes it out of the crawl and is worth +${fix.effect.technical_seo}.`;
 }
 
 function exampleSites(): string {
@@ -407,7 +417,7 @@ export function renderGradeSpec(): string {
     '',
     `A scored crawler is measured with ${MIN_ACCESS_PAGES} pages or more in its denominator. One that robots.txt disallows on the pages whose rules were read (disallowed pages equal to pages read) is blocked by choice: left out of the mean, so the block is not scored as a block, and Access moves to the mean of the others (up when that crawler's share was below it, down when above) while enough crawlers stay measured; otherwise the rule below applies, and Access can be left with no score. With fewer than ${MIN_MEASURED_CRAWLERS} measured, Access has no score: \`blocked_by_choice\` when the scored crawlers are blocked by choice and none is measured or unmeasured; otherwise \`too_few_crawlers_measured\`, with the range [${AI_WEIGHTS.access} × Σshare / (m + u), ${AI_WEIGHTS.access} × (Σshare + u) / (m + u)] for m measured and u unmeasured crawlers.`,
     '',
-    `One exception (owner ruling, 2026-11-05): with fewer than ${MIN_MEASURED_CRAWLERS} measured but at least one, when every other scored crawler is blocked by choice and no scored crawler had a page \`refused_unverified\`, Access is scored from the measured ones, and \`scored_from_fewer_crawlers\` records how many. The ruling says "none refused_unverified"; reading it as "no page refused as unverified", on the measured crawler too, is this branch's, and the stricter reading. Disallowing a crawler whose share is below the others' mean therefore raises Access, as far as unblocking it would when the others' mean is 1: a disallow is the site's stated intent (R11 decision 5), left out rather than counted against the site. No fix opens for it, and no fix copy may recommend disallowing a crawler.`,
+    `One exception (owner ruling, 2026-11-05): with fewer than ${MIN_MEASURED_CRAWLERS} measured but at least one, when every scored crawler that is not measured is blocked by choice, none of them with a page \`refused_unverified\`, Access is scored from the measured ones, and \`scored_from_fewer_crawlers\` records how many. The measured crawlers' own pages follow the ordinary rules: a page of theirs refused as unverified is out of the denominator, as it is with two measured. Disallowing a crawler whose share is below the others' mean therefore raises Access, as far as unblocking it would when the others' mean is 1: a disallow is the site's stated intent (R11 decision 5), left out rather than counted against the site. No fix opens for it, and no fix copy may recommend disallowing a crawler.`,
     '',
     '### Readable',
     '',
@@ -443,31 +453,26 @@ export function renderGradeSpec(): string {
     '',
     '## Technical SEO',
     '',
-    `score = ${SEO_WEIGHTS.structure / 100} × structure + ${SEO_WEIGHTS.crawlability} × crawlability. Structure is v1's grade (packages/engine/src/grade.ts, its components and weights unchanged) of the link graph whose nodes are the crawled pages answering 200 (a 404 or a redirect is a crawl outcome, not a node: v1's SPEC 01 path), 0 to 100, also \`site_structure_score\`. Crawlability is the share of crawled URLs that answer 200 and carry no crawlability defect (owner ruling, 2026-11-05). A URL carries a defect when it is among the affected pages of a detected ${list(CRAWLABILITY_DETECTORS)} record; a URL counts once however many defects it carries. One affected page on a site of N crawled URLs therefore moves the score by ${SEO_WEIGHTS.crawlability}/N.
-
-Three readings of the ruling are this branch's, not the owner's words:
-
-- The denominator is every crawled URL. The ruling's "share of URLs answering 200 that carry no defect" also bears "of the URLs answering 200"; the reading taken keeps a URL that does not answer 200 as a defect (it was a measure of the old formula), and no fix here clears it.
-- A record that could not decide marks no page, so its pages count as clean; the old formula dropped a measure with nothing decided.
-- A record's pages are the detector's \`affected_urls\`, the pages where its fix is made:
+    `score = ${SEO_WEIGHTS.structure / 100} × structure + ${SEO_WEIGHTS.crawlability} × crawlability. Structure is v1's grade (packages/engine/src/grade.ts, its components and weights unchanged) of the link graph whose nodes are the crawled pages answering 200 (a 404 or a redirect is a crawl outcome, not a node: v1's SPEC 01 path), 0 to 100, also \`site_structure_score\`. Crawlability is the share of crawled URLs that answer 200 and carry no crawlability defect (owner rulings, 2026-11-05). A defect is counted on the URL that carries it, once however many it carries, so one defective URL on a site of N crawled URLs moves the score by ${SEO_WEIGHTS.crawlability}/N:
 
 ${table(
-  ['Detector', 'Pages a detected record marks'],
+  ['Defect', 'The URL that carries it'],
   [
+    ...CRAWLABILITY_DETECTORS.map((d) => [`a detected \`${d}\` record`, CARRIES[d]]),
     [
-      '`redirect_chain`',
-      'the crawled 200 pages that link to the redirecting URL, not the URL itself',
+      'no title, or no meta description (CC-12d page facts)',
+      'the page answering 200, read as HTML, that declares none',
     ],
     [
-      '`canonical_mismatch`',
-      'the page whose canonical cannot be honoured, or that is linked under another URL',
+      'an answer other than 200',
+      'the URL itself: the denominator is every crawled URL, so a linked 404 or 301 is outside the numerator',
     ],
-    ['`duplicate_pagination`', 'the later pages of the list found to repeat page 1'],
-    ['`hreflang_gap`', 'the members of the cluster with a missing or broken annotation'],
   ],
 )}
 
-So one link in a site-wide menu or footer to a redirect chain marks every page that carries it. ${siteWideRedirect()} Pages lacking a title or a meta description will be defects of the same kind once the crawl worker records them (CC-12d). The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
+A redirecting URL answers 3xx, so it is outside the numerator already and its record costs nothing extra: one site-wide link to a redirect costs at most one URL (a formula row in technical-seo.test.ts). The redirect fix's counterfactual takes the redirecting URL out of the crawl. No fix type clears a linked 404 or a single-hop 301 yet (CC-16b). A page whose title or description was not read (\`null\`) carries no defect of that kind. A record that could not decide marks no URL, so its URLs count as clean; that is this branch's reading (the old formula dropped a measure with nothing decided).
+
+${siteWideRedirect()} The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
     '',
     '## Content checks',
     '',
@@ -488,7 +493,12 @@ So one link in a site-wide menu or footer to a redirect chain marks every page t
     '',
     `A template's content fix is detected when ${T.TEMPLATE_RULE.DETECT_MIN_PAGES} or more of its decided pages fail and they are ${pct(T.TEMPLATE_RULE.DETECT_SHARE)} or more of them; clear at ${pct(T.TEMPLATE_RULE.CLEAR_SHARE)} or less; indeterminate between (hysteresis), or when a page of the template was not read. An opened content fix is \`info\` (diff/severity.ts).`,
     '',
-    `The Content section score (\`Check.content.score\`) is 100 × the mean pass rate of the counted checks, and each entry of \`content.checks\` says whether its check is \`counted\`. ${counted.length === 0 ? "No check counts yet, so there is no score, and the contract requires one: `Check.content` is null on every check, and the five checks' per-template results are not carried there. A reported contract gap: `ContentSummary.score` would have to be nullable for the section to report the checks before one counts." : `Counted: ${list(counted)}.`}`,
+    `The Content section (\`Check.content\`) reports the five checks per template, and each entry of \`content.checks\` says whether its check is \`counted\`. Its score is 100 × the mean pass rate of the counted checks; while there is none, \`score\` is null and \`score_withheld\` says why (owner ruling, 2026-11-05). ${counted.length === 0 ? 'No check counts yet, so the score is withheld as `no_check_counted` on every check.' : `Counted: ${list(counted)}.`}`,
+    '',
+    table(
+      ['Reason', 'Means'],
+      Object.entries(CONTENT_SCORE_WITHHELD_MEANINGS).map(([r, m]) => [code(r), m]),
+    ),
     '',
     '### The label set',
     '',

@@ -165,9 +165,9 @@ function outcomeOf(input: GradeInput, access: AccessDetection[] = []) {
 
 const blocked = every(2, 'blocked_by_ua_rule');
 
-/** The example site whose one redirect record marks every page; SPEC 17 renders its numbers. */
+/** The example site whose every page links to a redirect chain; SPEC 17 renders its numbers. */
 export const SITE_WIDE_REDIRECT =
-  '14-page blog: a link on every page to a URL behind a redirect chain';
+  '14-page blog: a link on every page to a URL behind a redirect chain, crawled as a 301';
 
 /** The example sites, by name, and what the engine makes of each. */
 export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
@@ -202,15 +202,17 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
       facts: { simhash: simhashAway(BASE, 3), canonical: { href: u('/blog/page/2') } },
     },
   ]);
-  // a menu link on every page to a URL behind a redirect chain: the record marks every linking page
-  const sitewide = blogSite(13, 0);
+  // a menu link on every page to a URL behind a redirect chain, which the crawl fetched (a 301): the
+  // record's affected pages are the 14 linking pages, and the defect is the redirecting URL's
+  const sitewide = blogSite(13, 0, {}, [{ path: '/old-menu-target', status: 301 }]);
+  const target = 'https://a.test/old-menu-target';
   const menuLink: Detection = {
     ...sitewide.input.structure[0]!,
     type: 'redirect_chain',
     state: 'detected',
-    key: 'redirect:https://a.test/old-menu-target',
-    fingerprint: fingerprintOf('redirect:https://a.test/old-menu-target'),
-    affected_urls: sitewide.input.pages.map((p) => p.url),
+    key: `redirect:${target}`,
+    fingerprint: fingerprintOf(`redirect:${target}`),
+    affected_urls: sitewide.input.pages.filter((p) => p.url !== target).map((p) => p.url),
   };
   // author and date and schema fail on posts, and question headings on every page: no check counts
   const thin = blogSite(13, 0);
