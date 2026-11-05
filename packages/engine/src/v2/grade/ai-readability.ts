@@ -42,6 +42,7 @@ export function aiReadability(c: AiComponents): AiReadability {
       grade: null,
       components,
       access_range: c.access.range,
+      scored_from_fewer_crawlers: c.access.scored_from,
     };
   }
   const total = round(c.access.score! + c.readable.score! + c.quotable.score! + c.signals.score!);
@@ -52,5 +53,6 @@ export function aiReadability(c: AiComponents): AiReadability {
     grade: scoreToLetter(total) as GradeLetter,
     components: components as Extract<AiReadability, { withheld: false }>['components'],
     access_range: null,
+    scored_from_fewer_crawlers: c.access.scored_from,
   };
 }

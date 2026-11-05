@@ -82,11 +82,13 @@ const crawlersArb = fc
   .map((cs) => cs.map((c, i) => tally(`c${i}`, c)));
 
 /** The rule, restated from SPEC 17 independently of access.ts: which crawlers count as measured. */
+function byChoiceByRule(c: CrawlerTally): boolean {
+  return c.extent.robots.read > 0 && c.extent.robots.disallowed === c.extent.robots.read;
+}
 function measuredByRule(c: CrawlerTally): boolean {
   const n = c.counts;
   const pages = (n.allowed ?? 0) + (n.allowed_thin ?? 0) + (n.blocked_by_ua_rule ?? 0);
-  const byChoice = c.extent.robots.read > 0 && c.extent.robots.disallowed === c.extent.robots.read;
-  return !byChoice && pages >= 2;
+  return !byChoiceByRule(c) && pages >= 2;
 }
 
 function within(m: Measure, max: number): boolean {
@@ -95,12 +97,17 @@ function within(m: Measure, max: number): boolean {
 }
 
 describe('Access', () => {
-  it('lies in 0..40, and has a score exactly when two or more crawlers are measured', () => {
+  it('lies in 0..40, and has a score exactly when two crawlers are measured, or one with the rest blocked by choice', () => {
     fc.assert(
       fc.property(crawlersArb, (cs) => {
         const a = accessScore(cs);
+        const measured = cs.filter(measuredByRule).length;
+        const restByChoice = cs.every((c) => measuredByRule(c) || byChoiceByRule(c));
+        const unverified = cs.some((c) => (c.counts.refused_unverified ?? 0) > 0);
+        const fewer = measured >= 1 && measured < 2 && restByChoice && !unverified;
         expect(within(a, 40)).toBe(true);
-        expect(a.score !== null).toBe(cs.filter(measuredByRule).length >= 2);
+        expect(a.score !== null).toBe(measured >= 2 || fewer);
+        expect(a.scored_from).toBe(fewer ? measured : null);
         expect(a.reason === null).toBe(a.score !== null);
       }),
       RUNS,

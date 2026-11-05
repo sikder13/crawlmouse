@@ -7,9 +7,15 @@
  *
  * A crawler is measured with MIN_ACCESS_PAGES pages or more in its denominator. One that robots.txt
  * disallows on every page whose rules were read is blocked by choice and left out, so a deliberate
- * block never lowers the score. With fewer than MIN_MEASURED_CRAWLERS measured, Access has no score:
- * every scored crawler blocked by choice is `blocked_by_choice`; otherwise `too_few_crawlers_measured`,
- * with the range the score could take when each unmeasured crawler is anything from 0 to 1.
+ * block never lowers the score. With fewer than MIN_MEASURED_CRAWLERS measured:
+ *   - when every other scored crawler is blocked by choice, and no scored crawler had a page refused
+ *     as unverified, Access is scored from the measured ones, and `scored_from` records how many
+ *     (owner ruling, 2026-11-05);
+ *   - when every scored crawler is blocked by choice, Access has no score: `blocked_by_choice`;
+ *   - otherwise it has no score: `too_few_crawlers_measured`, with the range the score could take
+ *     when each unmeasured crawler is anything from 0 to 1.
+ * A robots.txt disallow therefore raises Access as an unblock does: it is the site's stated intent
+ * (R11 decision 5), and no fix recommends it.
  *
  * Words served are compared with the browser control's words for the same static page (the worker's
  * `allowed_thin`, packages/worker/src/verdict/table.ts), so a page that needs JavaScript reads the same
@@ -41,6 +47,8 @@ export interface CrawlerShare {
 
 export type AccessMeasure = Measure & {
   reason: Extract<WithheldReason, 'too_few_crawlers_measured' | 'blocked_by_choice'> | null;
+  /** How many crawlers Access was scored from, when fewer than MIN_MEASURED_CRAWLERS; else null. */
+  scored_from: number | null;
 };
 
 export function crawlerShare(c: CrawlerTally): CrawlerShare {
@@ -59,14 +67,23 @@ export function crawlerShare(c: CrawlerTally): CrawlerShare {
 }
 
 export function accessScore(crawlers: readonly CrawlerTally[]): AccessMeasure {
-  const shares = crawlers.filter((c) => c.scored).map(crawlerShare);
+  const ours = crawlers.filter((c) => c.scored);
+  const shares = ours.map(crawlerShare);
   const measured = shares.flatMap((s) => (s.share === null ? [] : [s.share]));
   const unmeasured = shares.filter((s) => s.standing === 'unmeasured').length;
+  const unverified = ours.some((c) => (c.counts.refused_unverified ?? 0) > 0);
   if (measured.length >= MIN_MEASURED_CRAWLERS) {
-    return { ...scored(AI_WEIGHTS.access * mean(measured)), reason: null };
+    return { ...scored(AI_WEIGHTS.access * mean(measured)), reason: null, scored_from: null };
+  }
+  if (measured.length > 0 && unmeasured === 0 && !unverified) {
+    return {
+      ...scored(AI_WEIGHTS.access * mean(measured)),
+      reason: null,
+      scored_from: measured.length,
+    };
   }
   if (measured.length === 0 && unmeasured === 0 && shares.length > 0) {
-    return { ...ranged(0, AI_WEIGHTS.access), reason: 'blocked_by_choice' };
+    return { ...ranged(0, AI_WEIGHTS.access), reason: 'blocked_by_choice', scored_from: null };
   }
   const known = measured.reduce((a, b) => a + b, 0);
   const n = measured.length + unmeasured;
@@ -74,5 +91,5 @@ export function accessScore(crawlers: readonly CrawlerTally[]): AccessMeasure {
     n === 0
       ? ranged(0, AI_WEIGHTS.access)
       : ranged((AI_WEIGHTS.access * known) / n, (AI_WEIGHTS.access * (known + unmeasured)) / n);
-  return { ...range, reason: 'too_few_crawlers_measured' };
+  return { ...range, reason: 'too_few_crawlers_measured', scored_from: null };
 }

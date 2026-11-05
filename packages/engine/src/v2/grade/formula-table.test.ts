@@ -38,7 +38,7 @@ describe('Access (max 40)', () => {
     const a = accessScore(
       four({ allowed: 4 }, { allowed: 4 }, { blocked_by_ua_rule: 4 }, { blocked_by_ua_rule: 4 }),
     );
-    expect(a).toEqual({ score: 20, range: null, reason: null });
+    expect(a).toEqual({ score: 20, range: null, reason: null, scored_from: null });
   });
 
   it('A2: unblocking one of four crawlers fully is exactly +10.00: 40 × (1+1+1+0)/4 = 30', () => {
@@ -86,7 +86,41 @@ describe('Access (max 40)', () => {
       score: null,
       range: { min: 10, max: 40 },
       reason: 'too_few_crawlers_measured',
+      scored_from: null,
     });
+  });
+
+  it('A5b: one measured crawler and three disallowed by robots.txt: scored from the one, 40 × 1/1 = 40', () => {
+    const d = { disallowed_by_robots: 3 };
+    expect(accessScore(four({ allowed: 2 }, d, d, d))).toEqual({
+      score: 40,
+      range: null,
+      reason: null,
+      scored_from: 1,
+    });
+    // served thin on one of two pages: 40 × (1 + 0.5)/2 = 30
+    expect(accessScore(four({ allowed: 1, allowed_thin: 1 }, d, d, d)).score).toBe(30);
+  });
+
+  it('A5c: one measured, two disallowed, one unmeasured or refused unverified on a page: not scored from fewer', () => {
+    const d = { disallowed_by_robots: 3 };
+    for (const last of [{ allowed: 1 }, { refused_unverified: 2 }]) {
+      const a = accessScore(four({ allowed: 2 }, d, d, last));
+      expect(a.score, JSON.stringify(last)).toBe(null);
+      expect(a.reason).toBe('too_few_crawlers_measured');
+    }
+    // refused unverified on a page of the measured crawler itself
+    const a = accessScore(four({ allowed: 2, refused_unverified: 1 }, d, d, d));
+    expect([a.score, a.reason]).toEqual([null, 'too_few_crawlers_measured']);
+  });
+
+  it('A5d: a robots.txt disallow raises Access as an unblock does (respected intent): 20 → 40 either way', () => {
+    const u = { blocked_by_ua_rule: 2 };
+    const d = { disallowed_by_robots: 2 };
+    const before = accessScore(four({ allowed: 2 }, u, d, d));
+    expect([before.score, before.scored_from]).toEqual([20, null]);
+    expect(accessScore(four({ allowed: 2 }, { allowed: 2 }, d, d)).score).toBe(40);
+    expect(accessScore(four({ allowed: 2 }, d, d, d)).score).toBe(40);
   });
 
   it('A6: every scored crawler disallowed by robots.txt on every page: withheld, blocked by choice', () => {
@@ -95,6 +129,7 @@ describe('Access (max 40)', () => {
       score: null,
       range: { min: 0, max: 40 },
       reason: 'blocked_by_choice',
+      scored_from: null,
     });
   });
 
@@ -273,7 +308,7 @@ describe('Signals (max 10)', () => {
 describe('the AI readability grade', () => {
   it('T1: 20 + 14.70 + 12.69 + 10 = 57.39, on the engine letter scale (55 <= 57.39 < 60: C-)', () => {
     const g = aiReadability({
-      access: { score: 20, range: null, reason: null },
+      access: { score: 20, range: null, reason: null, scored_from: null },
       readable: { score: 14.7, range: null },
       quotable: { score: 12.69, range: null },
       signals: { score: 10, range: null },
@@ -285,7 +320,7 @@ describe('the AI readability grade', () => {
 
   it('T2: an unmeasured component withholds the grade, names why, and keeps the others', () => {
     const g = aiReadability({
-      access: { score: 30, range: null, reason: null },
+      access: { score: 30, range: null, reason: null, scored_from: null },
       readable: { score: null, range: { min: 0, max: 30 } },
       quotable: { score: 12.69, range: null },
       signals: { score: 10, range: null },
@@ -308,7 +343,12 @@ describe('the AI readability grade', () => {
 
   it('T3: Access withheld for too few crawlers mirrors its range into access_range', () => {
     const g = aiReadability({
-      access: { score: null, range: { min: 10, max: 40 }, reason: 'too_few_crawlers_measured' },
+      access: {
+        score: null,
+        range: { min: 10, max: 40 },
+        reason: 'too_few_crawlers_measured',
+        scored_from: null,
+      },
       readable: { score: 9.3, range: null },
       quotable: { score: 12.69, range: null },
       signals: { score: 10, range: null },
@@ -318,5 +358,16 @@ describe('the AI readability grade', () => {
       withheld_reasons: ['too_few_crawlers_measured'],
       access_range: { min: 10, max: 40 },
     });
+  });
+
+  it('T4: Access scored from one crawler (the rest disallowed by robots.txt) says so on the grade', () => {
+    const g = aiReadability({
+      access: { score: 40, range: null, reason: null, scored_from: 1 },
+      readable: { score: 9.3, range: null },
+      quotable: { score: 12.69, range: null },
+      signals: { score: 10, range: null },
+    });
+    // 40 + 9.30 + 12.69 + 10 = 71.99
+    expect(g).toMatchObject({ withheld: false, total: 71.99, scored_from_fewer_crawlers: 1 });
   });
 });
