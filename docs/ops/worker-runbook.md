@@ -282,7 +282,9 @@ and reads these from that process's environment:
 - `RENDER_MAX_BROWSER_SECONDS_PER_CHECK` and `RENDER_MAX_BROWSER_SECONDS_PER_DAY`: whole seconds.
   Unset or invalid reads as zero, and zero renders nothing. A page reserves 90 s (two renders at the
   45 s request timeout) from its check's allowance before it starts, so a cap under 90 renders
-  nothing, and a check has about `cap / 90` pages rendering at once, at most 5.
+  nothing, and a check has about `cap / 90` pages rendering at once, at most the in-flight limit.
+- `RENDER_MAX_IN_FLIGHT`: requests one check keeps open at once, a whole number from 1 to 10. Unset
+  or anything else reads as 2.
 
 A check asks the day's budget once, before any page, for its allowance: the per-check cap, or 90 s
 for each page it sampled, whichever is less. When the day has less than that left, the check renders
@@ -296,10 +298,17 @@ goes on; it does not fail. To stop rendering, unset the token or set either cap 
 
 Limits on Workers Paid, as Cloudflare's limits page stood on 2026-10-14 (read 2026-11-05): 30 Quick
 Actions requests per second per account, after which Browser Run answers 429; a browser closes after
-60 s without a command. The render step keeps at most 5 requests open per check (checks running at
-once each have their own 5). It retries a 429 after its `Retry-After` when that is a number of seconds
-up to 16, backs off from 1 s when it is not, and leaves the page `rate_limited` after 5 tries or when
-asked to wait longer.
+60 s without a command. The render step keeps at most 2 requests open per check unless set, up to 10
+(checks running at once each have their own). It retries a 429 no sooner than its `Retry-After`
+asks, in seconds or as a date, backs off from 2 s when it gives neither, and leaves the page
+`rate_limited` after 5 tries, or at once when asked to wait longer than 60 s.
+
+**Production rendering needs Workers Paid before CC-20 switches it on.** The account is on Workers
+Free (the owner's billing page, 2026-11-05). On Free, the same limits page gives one Quick Actions
+request every 10 s per account and 10 browser-minutes a day. Measured on 2026-11-05 with the live
+tests: a request sent at once after another was answered 429; one sent 10 s after a 429 was answered
+200; the 429s carried no `Retry-After` in seconds. A check with 2 requests in flight sends faster
+than that rate, so on Free its pages wait on 429s, and some end `rate_limited`.
 
 Cost: $0.09 per browser-hour after the 10 browser-hours a month Workers Paid includes. Each reply
 reports its browser time in the `x-browser-ms-used` header. The step counts that against its caps and

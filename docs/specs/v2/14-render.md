@@ -198,12 +198,13 @@ failed or came back challenged. A part above zero is printed as "<1 %" rather th
 
 ## Cost and limits
 
-| Variable                               | Meaning                                            |
-| -------------------------------------- | -------------------------------------------------- |
-| `CLOUDFLARE_ACCOUNT_ID`                | Cloudflare account id                              |
-| `CLOUDFLARE_BROWSER_RENDERING_TOKEN`   | API token with the `Browser Run - Edit` permission |
-| `RENDER_MAX_BROWSER_SECONDS_PER_CHECK` | browser-seconds one check may use                  |
-| `RENDER_MAX_BROWSER_SECONDS_PER_DAY`   | browser-seconds all checks may use in a day        |
+| Variable                               | Meaning                                                     |
+| -------------------------------------- | ----------------------------------------------------------- |
+| `CLOUDFLARE_ACCOUNT_ID`                | Cloudflare account id                                       |
+| `CLOUDFLARE_BROWSER_RENDERING_TOKEN`   | API token with the `Browser Run - Edit` permission          |
+| `RENDER_MAX_BROWSER_SECONDS_PER_CHECK` | browser-seconds one check may use                           |
+| `RENDER_MAX_BROWSER_SECONDS_PER_DAY`   | browser-seconds all checks may use in a day                 |
+| `RENDER_MAX_IN_FLIGHT`                 | requests one check keeps open at once, 1 to 10; otherwise 2 |
 
 Without both credentials nothing renders (`not_configured`). Each cap is a whole number of seconds;
 unset, empty or anything else reads as zero, and a cap that is not a positive finite number renders
@@ -230,11 +231,19 @@ assumption that no browser time was used. A render can report more than its rese
 a check can end above its cap by that excess on the pages in flight, and which pages a binding cap
 leaves unrendered depends on how long the earlier renders took.
 
-At most 5 requests are open at once in one check; checks running together each have
-their own 5. A 429 is retried after its `Retry-After` when that is a number of seconds, or
-after 1000 ms doubling to at most 16000 ms when it gives none (an HTTP date
-counts as none), up to 5 tries; a wait longer than 16000 ms is not
-taken. No reason below fails the check:
+One check keeps at most `RENDER_MAX_IN_FLIGHT` requests open at once, 2 unless set; checks
+running together each have their own. A 429 is retried no sooner than its `Retry-After` asks, as a
+number of seconds or as an HTTP date; when it gives neither, after 2000 ms doubling to at
+most 60000 ms; up to 5 tries. A page asked to wait longer than
+60000 ms is left `rate_limited` rather than retried sooner.
+
+On Workers Free, Cloudflare's limits page gives one Quick Actions request every
+10 s per account and 10 browser-minutes a day. The live run of
+2026-11-05, on such an account, was answered 429 on a request sent at once after another, and 200
+on one sent 10 s after a 429; the 429s carried no `Retry-After` in seconds.
+A check with more than one request in flight sends faster than that rate, so production rendering
+needs Workers Paid.
+No reason below fails the check:
 
 | Reason                     | Meaning                                                                                                                                     |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -244,7 +253,7 @@ taken. No reason below fails the check:
 | `check_cap`                | The check's allowance could not take a page's two renders with no page in flight; rendering stopped for this page and those after it.       |
 | `daily_cap`                | Today's budget refused the check's allowance, asked for once before any page; no page of the check rendered.                                |
 | `daily_budget_unavailable` | Today's budget threw when asked for the check's allowance; no page of the check rendered.                                                   |
-| `rate_limited`             | Browser Run answered 429 on each of 5 tries, or asked for a wait longer than 16000 ms.                                                      |
+| `rate_limited`             | Browser Run answered 429 on each of 5 tries, or its Retry-After asked for a wait longer than 60000 ms.                                      |
 | `timed_out`                | Browser Run did not answer, or did not finish its reply, within 45 s.                                                                       |
 | `page_failed`              | Browser Run answered 422, which its documentation gives for a page that timed out, crashed or errored.                                      |
 | `api_error`                | Browser Run answered another error status.                                                                                                  |

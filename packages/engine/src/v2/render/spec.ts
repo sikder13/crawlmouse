@@ -25,7 +25,14 @@ import {
   PATTERNS_SHOWN_LIVE,
   URL_RULES,
 } from './policy.js';
-import { NOT_RENDERED, RENDER_IN_FLIGHT, RENDER_RETRY, RESERVE_PER_RENDER_MS } from './run.js';
+import {
+  IN_FLIGHT_ENV,
+  NOT_RENDERED,
+  RENDER_IN_FLIGHT_DEFAULT,
+  RENDER_IN_FLIGHT_MAX,
+  RENDER_RETRY,
+  RESERVE_PER_RENDER_MS,
+} from './run.js';
 import { FREE_MAX_RENDERS, PAGES_PER_FIX_TEMPLATE } from './sample.js';
 import { EMPTY_SHELL_BELOW, EMPTY_SHELL_LEAVES_ABOVE, READABLE_FROM } from './state.js';
 import { BOUNDARY_ELEMENTS } from './words.js';
@@ -247,6 +254,10 @@ ${table(
     [code(ENV.token), 'API token with the `Browser Run - Edit` permission'],
     [code(CAP_ENV.perCheck), 'browser-seconds one check may use'],
     [code(CAP_ENV.perDay), 'browser-seconds all checks may use in a day'],
+    [
+      code(IN_FLIGHT_ENV),
+      `requests one check keeps open at once, 1 to ${RENDER_IN_FLIGHT_MAX}; otherwise ${RENDER_IN_FLIGHT_DEFAULT}`,
+    ],
   ],
 )}
 
@@ -275,11 +286,19 @@ assumption that no browser time was used. A render can report more than its rese
 a check can end above its cap by that excess on the pages in flight, and which pages a binding cap
 leaves unrendered depends on how long the earlier renders took.
 
-At most ${RENDER_IN_FLIGHT} requests are open at once in one check; checks running together each have
-their own ${RENDER_IN_FLIGHT}. A 429 is retried after its \`Retry-After\` when that is a number of seconds, or
-after ${RENDER_RETRY.base_ms} ms doubling to at most ${RENDER_RETRY.max_ms} ms when it gives none (an HTTP date
-counts as none), up to ${RENDER_RETRY.attempts} tries; a wait longer than ${RENDER_RETRY.max_ms} ms is not
-taken. No reason below fails the check:
+One check keeps at most \`${IN_FLIGHT_ENV}\` requests open at once, ${RENDER_IN_FLIGHT_DEFAULT} unless set; checks
+running together each have their own. A 429 is retried no sooner than its \`Retry-After\` asks, as a
+number of seconds or as an HTTP date; when it gives neither, after ${RENDER_RETRY.base_ms} ms doubling to at
+most ${RENDER_RETRY.max_ms} ms; up to ${RENDER_RETRY.attempts} tries. A page asked to wait longer than
+${RENDER_RETRY.max_ms} ms is left \`rate_limited\` rather than retried sooner.
+
+On Workers Free, Cloudflare's limits page gives one Quick Actions request every
+${BROWSER_RUN.free_request_every_s} s per account and ${BROWSER_RUN.free_browser_minutes_per_day} browser-minutes a day. The live run of
+2026-11-05, on such an account, was answered 429 on a request sent at once after another, and 200
+on one sent ${BROWSER_RUN.free_request_every_s} s after a 429; the 429s carried no \`Retry-After\` in seconds.
+A check with more than one request in flight sends faster than that rate, so production rendering
+needs Workers Paid.
+No reason below fails the check:
 
 ${table(
   ['Reason', 'Meaning'],

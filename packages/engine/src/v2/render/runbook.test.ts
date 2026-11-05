@@ -7,7 +7,13 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CAP_ENV } from './budget.js';
 import { BROWSER_RUN, ENV, REQUEST_TIMEOUT_MS } from './client.js';
-import { RENDER_IN_FLIGHT, RENDER_RETRY, RESERVE_PER_RENDER_MS } from './run.js';
+import {
+  IN_FLIGHT_ENV,
+  RENDER_IN_FLIGHT_DEFAULT,
+  RENDER_IN_FLIGHT_MAX,
+  RENDER_RETRY,
+  RESERVE_PER_RENDER_MS,
+} from './run.js';
 
 const RUNBOOK = readFileSync(
   new URL('../../../../../docs/ops/worker-runbook.md', import.meta.url),
@@ -38,8 +44,18 @@ describe('the runbook’s Browser Run section', () => {
     ['the price', `$${BROWSER_RUN.usd_per_browser_hour} per browser-hour`],
     ['the included hours', `${BROWSER_RUN.included_browser_hours_per_month} browser-hours a month`],
     ['the browser-time header', BROWSER_RUN.browser_ms_header],
-    ['the in-flight limit', `at most ${RENDER_IN_FLIGHT} requests open per check`],
-    ['the longest wait taken', `a number of seconds up to ${RENDER_RETRY.max_ms / 1000}`],
+    ['the in-flight variable', IN_FLIGHT_ENV],
+    [
+      'the in-flight limit',
+      `at most ${RENDER_IN_FLIGHT_DEFAULT} requests open per check unless set, up to ${RENDER_IN_FLIGHT_MAX}`,
+    ],
+    ['the longest wait taken', `asked to wait longer than ${RENDER_RETRY.max_ms / 1000} s`],
+    [
+      'the Free request rate',
+      `one Quick Actions request every ${BROWSER_RUN.free_request_every_s} s`,
+    ],
+    ['the Free browser time', `${BROWSER_RUN.free_browser_minutes_per_day} browser-minutes a day`],
+    ['the plan production needs', 'Production rendering needs Workers Paid'],
     ['the tries', `after ${RENDER_RETRY.attempts} tries`],
     ['the backoff start', `backs off from ${RENDER_RETRY.base_ms / 1000} s`],
     ['the request timeout', `the ${REQUEST_TIMEOUT_MS / 1000} s request timeout`],
