@@ -25,23 +25,29 @@ The scripts behind them are in `scripts/db`. Their tests:
    1. delete any branch of that name, create it again from production, and wait for it to build;
    2. compare the branch's fingerprint (`infra/supabase/checks/fingerprint.sql`) with
       production's, section by section, and fail on a difference;
-   3. read the branch's migration history: fail if it needs the repair in §5, or if a pending
-      file has no rollback;
+   3. read the branch's migration history: fail if it needs the repair in §5, if a pending file
+      has no rollback, or if the pull request changes a migration file that is already applied
+      (production would never receive the change: add a new migration instead);
    4. `supabase db push`, after checking that the CLI's list equals the pending files;
    5. run the checks in §6;
    6. run each pending file again in its own transaction, and fail if the fingerprint changes;
    7. run the rollbacks in reverse order, and fail unless the fingerprint equals production's;
-   8. `supabase db push` again, and fail unless the fingerprint equals the first push's.
+   8. `supabase db push` again, and fail unless the fingerprint equals the first push's;
+   9. if the pull request changes the rollback of an applied migration, revert the migrations
+      from that one on, newest first, push them again, and fail if the fingerprint changes.
 
    The branch is deleted at the end of the run, pass or fail, and again when the pull request
-   closes. The summary, with the sha256 of each file applied, is posted on the pull request and
-   kept as the `db-dry-run-summary` artifact for 90 days.
+   closes (`db-dry-run-cleanup.yml`). The summary, with the sha256 of each file applied and each
+   rollback run, is posted on the pull request and kept as the `db-dry-run-summary` artifact for
+   90 days. A pull request opened by Renovate gets no dry run (§7).
 
 3. **Merge.** The push to `main` starts `db-apply-prod.yml`. Its `plan` job needs no approval and
    reads production through the Management API's read-only endpoint. It finds the merged pull
-   request, downloads the summary of its passed dry run, and lists production's pending files.
-   It refuses when a pending file is not in that dry run, or when its sha256 differs from the
-   bytes the dry run applied.
+   request and its newest completed dry run, which must have passed, downloads that run's
+   summary, and lists production's pending files. It refuses when a pending file is not in that
+   dry run, when its sha256 differs from the bytes the dry run applied, or when production's
+   fingerprint differs from the one the dry run read
+   (`pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts`).
 4. **Approve.** The `apply` job waits on the `production` environment. Once approved, it checks
    that production's pending files still equal the manifest the `plan` job printed, runs
    `supabase db push`, runs the checks, and writes the fingerprint to the job summary. A failure
@@ -67,13 +73,22 @@ To check a hash against the repository yourself:
 
 The pull request comment names the failed step. The job log has the full output.
 
-- **The branch is a copy of production** failed. The branch Supabase built from production's
-  migration history does not match production. The comment names each differing section (columns,
-  functions, policies, constraints, indexes, triggers, rls, acls, roles, buckets, relations,
-  types) and lists the differing lines: `+` on the branch only, `-` on production only. The
-  cause is a change made to production outside a migration, or a history row whose statements do
-  not hold what production ran. Do not apply over it. Report the sections. Bringing them back in
-  line is a migration of its own, with its own pull request.
+- **Branch fingerprint equals the production fingerprint** failed. The branch Supabase built from
+  production's migration history does not match production in what `fingerprint.sql` reads (its
+  header lists that, and what it leaves out). The comment names each differing section and counts
+  its lines; the job log lists the lines, `+` on the branch only, `-` on production only, with
+  definitions shown as md5s. Likely causes:
+  - a change made to production outside a migration;
+  - a history row whose statements do not hold what production ran;
+  - something Supabase sets up differently on a new branch than on production (an owner, a
+    platform role's setting). This shows as the same lines on every pull request, whatever it
+    changes.
+
+  The months of the monthly partitions are not a cause: the fingerprint normalises them. Do not
+  apply over a difference. Report the sections. Bringing production back in line is a migration of
+  its own, with its own pull request; a platform difference is reported, and the fingerprint is
+  changed in a reviewed pull request only if the difference is shown to be the platform's.
+
 - **History is clean and each pending file has a rollback** failed. Either production's history
   needs the repair in §5, or a pending migration has no rollback file.
 - **supabase db push** failed. The CLI's error is in the log. A file that fails to apply leaves
@@ -81,7 +96,7 @@ The pull request comment names the failed step. The job log has the full output.
 - **Checks** failed. Each finding names an object and what is wrong with it (§6).
 - **Each file runs again and changes nothing** failed. A migration is not re-runnable: the second
   run errored, or it changed the catalog.
-- **Rollbacks in reverse order return the branch to production** failed. A rollback errored, or
+- **Rollbacks in reverse order restore the production fingerprint** failed. A rollback errored, or
   left a difference from production, named by section as above.
 
 A pull request from a fork gets no secrets, so its dry run fails at the first step that needs the
@@ -90,13 +105,20 @@ access token.
 ## 4. Rolling back on production
 
 Run **DB rollback on production** (`db-rollback-prod.yml`) from `main`, with the rollback's file
-name, for example `20261102000003_v2_007_storage.revert.sql`. It waits on the same `production`
-approval. In one transaction, it runs the file's bytes and deletes the migration's history row,
-then it runs the checks and writes the fingerprint to the job summary.
+name, for example `20261102000003_v2_007_storage.revert.sql`. Its `plan` job, before the
+approval, shows the rollback file's sha256 and its migration's, and refuses a rollback that is not
+of the newest migration production records. The `rollback` job waits on the same `production`
+approval, requires the planned sha256, runs the file's bytes and deletes the migration's history
+row in one transaction, then runs the checks and writes the fingerprint to the job summary.
 
 - It refuses a name that is not a file in `infra/supabase/rollbacks` with a matching migration,
-  and a migration the history does not record as applied.
-- Roll back one file per run, newest first.
+  a migration the history does not record as applied, and any but the newest recorded migration,
+  so rollbacks run newest first, one per run
+  (`pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts db/rollback.test.ts`).
+- A rollback changed in a pull request is run on the branch by the dry run's step 9 before it
+  merges. Check its comment before dispatching.
+- Rollback and apply runs queue in separate groups: a push that queues an apply does not cancel a
+  queued rollback.
 - 007's rollback refuses while the `evidence` or `reports` bucket holds objects, and gives the
   count per bucket. Empty them through the Storage API first. It sets
   `storage.allow_delete_query` for its own transaction, which `storage.protect_delete()` requires.
@@ -166,12 +188,12 @@ what it guards. The list below is rendered from the files' leading comments, and
 
 <!-- checks:start -->
 
-- **`01-client-table-privileges.sql`**: Client roles hold exactly the declared privileges on the v2 tables. anon holds nothing on any v2 table or partition. authenticated and crawl_worker hold exactly the grants in this file's `declared` list, at the table or column level: a privilege held but not listed, or listed on an existing table and column but not held, is a finding. The v2 tables are the ones in its `v2_tables` list, plus every relation in the research and partitions schemas. A table, column or role that does not exist yet (a migration not applied) is skipped. A migration that changes these grants changes this list in the same pull request.
-- **`02-partitions-rls-owner-only.sql`**: Every partition has row-level security on and an owner-only ACL. Every relation in the partitions schema must have RLS enabled, and its ACL may name only the table's owner: no client role, no PUBLIC, no other role.
-- **`03-worker-roles-no-login.sql`**: crawl_worker and research_retention cannot log in or bypass row-level security. Both roles are meant to be assumed through SET ROLE or a signed token. A role that does not exist yet (its migration not applied) is skipped.
+- **`01-client-table-privileges.sql`**: Client roles hold exactly the declared privileges on the v2 tables. anon holds nothing on any v2 table or partition. authenticated and crawl_worker hold exactly the grants in this file's `declared` list, at the table or column level: a privilege held but not listed, or listed on an existing table and column but not held, is a finding. The v2 tables are the ones in its `v2_tables` list, every relation in the research and partitions schemas, and every partition in any schema. A table, column or role that does not exist yet (a migration not applied) is skipped; scripts/db/check.test.ts requires every listed table to exist once the migrations have run. A migration that changes these grants changes this list in the same pull request.
+- **`02-partitions-rls-owner-only.sql`**: Every partition has row-level security on and an owner-only ACL. Every relation in the partitions schema, and every partition in any schema, must have RLS enabled, and its ACL may name only the table's owner: no client role, no PUBLIC, no other role.
+- **`03-worker-roles-no-login.sql`**: crawl_worker and research_retention cannot log in, bypass row-level security, or reach a role that can. Neither role may log in, bypass RLS, be a superuser, create roles or databases, or replicate, and neither may be a member (directly or through other roles) of a role that bypasses RLS or is a superuser. Both are meant to be assumed through SET ROLE or a signed token. A role that does not exist yet (its migration not applied) is skipped.
 - **`04-private-schemas.sql`**: The research and partitions schemas grant no USAGE or CREATE to client roles. anon and authenticated (and PUBLIC, which both inherit) may not use or create objects in either schema. A schema that does not exist yet is skipped.
 - **`05-private-buckets.sql`**: The evidence and reports buckets are private. A bucket that does not exist yet is skipped.
-- **`06-client-functions.sql`**: authenticated may execute exactly is_member, member_role, is_member_for_site and usage_counts. In the public, research and partitions schemas, anon may execute no function and authenticated only the four listed in `declared`. An existing listed function authenticated cannot execute is also a finding. Functions that belong to an extension are left out.
+- **`06-client-functions.sql`**: In public, research and partitions, authenticated may execute exactly is_member, member_role, is_member_for_site and usage_counts. In the public, research and partitions schemas, anon may execute no function and authenticated only the four listed in `declared`. An existing listed function authenticated cannot execute is also a finding. Functions that belong to an extension are left out.
 
 <!-- checks:end -->
 
@@ -190,10 +212,17 @@ A branch's database password comes from the Management API at run time and is ma
 before use. `production` has a required reviewer (the owner) and accepts deployments from `main`
 only.
 
-**What the access token can do.** A Supabase access token acts for the whole account. The dry run
-needs one to create branches, so any workflow change on a pull request branch could use it. This
-is accepted: the owner is the repository's only writer, and pull requests from forks receive no
-secrets.
+**What the access token can do.** A Supabase access token acts for the whole account, including
+writing to production through the Management API. The dry run needs one to create branches, so a
+workflow or script changed on a pull request branch runs with it. This is accepted: the owner is
+the repository's only writer, pull requests from forks receive no secrets, and the dry-run job
+does not run on pull requests opened by Renovate, which would otherwise run updated third-party
+code with the token before review.
+
+**What the dry-run summary proves.** It is written by the pull request's own workflow and scripts,
+so a pull request that changes them can write any summary. The gate in `db-apply-prod.yml` checks
+the bytes against that summary; review of the pull request and the `production` approval are what
+stand behind the summary itself.
 
 ## 8. What this replaced
 
