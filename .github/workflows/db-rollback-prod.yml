@@ -1,0 +1,63 @@
+name: DB rollback on production
+
+# Runs one tracked rollback file on production, after the owner approves: the file's bytes and the
+# deletion of its migration's history row, in one transaction, then the checks and the fingerprint.
+# Run from main only. db-apply-prod.yml never runs a rollback; this workflow is the only way one
+# reaches production. docs/ops/db-migrations.md is the runbook.
+
+on:
+  workflow_dispatch:
+    inputs:
+      file:
+        description: The rollback file in infra/supabase/rollbacks, e.g. 20261102000003_v2_007_storage.revert.sql
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-production
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Required reviewer: the owner. Deployment branches: main only.
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Run the rollback
+        working-directory: scripts
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          # Passed as data and checked against infra/supabase/rollbacks by the script.
+          FILE: ${{ inputs.file }}
+        run: pnpm exec tsx db/production.ts rollback --yes-production --file "$FILE"
+
+  report:
+    needs: rollback
+    if: ${{ failure() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          FILE: ${{ inputs.file }}
+        run: |
+          gh issue create --repo "$REPO" \
+            --title "Production rollback failed" \
+            --body "The rollback of \`$FILE\` on production failed: $RUN_URL. docs/ops/db-migrations.md says how to read the job summary."
