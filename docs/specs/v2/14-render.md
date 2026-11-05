@@ -71,8 +71,9 @@ sends the resource types above and the URL patterns below for Browser Run to enf
 documentation describes (`rejectResourceTypes`, `rejectRequestPattern`). **By design, sub-requests are
 filtered by these patterns, not by per-request interception in our process.** Each pattern is sent as
 the regular expression's source, with no slashes. The live policy probe (below) showed that form
-applied on 2026-11-05: the rules it covers (`ip_literal`, `download` and one host from each
-list) refused their requests while the twin requests loaded. The rules it does not cover are below. Sent
+applied on 2026-11-05: the rules it covers, `ip_literal`, `download`, `host_advertising`, `host_analytics`, `host_consent`, `host_chat`, each refused a request
+while the twin requests loaded. It does not cover `scheme`, `credentials`, `port`, `reserved_name`, and a host rule is
+shown for one host of its list, not each. Sent
 wrapped in slashes, as this build first did and as one of the documentation's examples shows, none
 was refused. `policy.test.ts` pins the form.
 
@@ -219,7 +220,7 @@ cap is below one page's 90 s does not ask, and each page is
 `check_cap`. When it grants, the budget is settled once, after the last page has finished, at the
 browser time the check counted; a settle that throws is returned as `settle_failed`, and the day
 may still count the whole allowance, depending on the store. So a day with room for some pages of a check but not its
-allowance renders none of that check. If a page throws out of the render (only the injected `sleep` or the previous-state lookup can), the other pages go on, taking and rendering the pages left in the queue; once all have finished, the budget is settled at what the check counted and the throw is passed on, so those pages' results are discarded.
+allowance renders none of that check. If a page throws out of the render, the other pages go on, taking and rendering the pages left in the queue; once all have finished, the budget is settled at what the check counted and the throw is passed on, so those pages' results are discarded.
 
 Within the check, before a page starts it reserves both of its renders at 45 s each
 from the allowance. When the allowance cannot take them while other pages of the check are in flight,

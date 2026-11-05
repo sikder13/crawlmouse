@@ -22,6 +22,7 @@ import {
   REJECTED_HOSTS_AS_OF,
   REJECTED_RESOURCE_TYPES,
   STATIC_REJECTED_RESOURCE_TYPES,
+  LIVE_PROBED_RULES,
   PATTERNS_SHOWN_LIVE,
   URL_RULES,
 } from './policy.js';
@@ -127,8 +128,9 @@ sends the resource types above and the URL patterns below for Browser Run to enf
 documentation describes (\`rejectResourceTypes\`, \`rejectRequestPattern\`). **By design, sub-requests are
 filtered by these patterns, not by per-request interception in our process.** Each pattern is sent as
 the regular expression's source, with no slashes. The live policy probe (below) showed that form
-applied on ${PATTERNS_SHOWN_LIVE}: the rules it covers (\`ip_literal\`, \`download\` and one host from each
-list) refused their requests while the twin requests loaded. The rules it does not cover are below. Sent
+applied on ${PATTERNS_SHOWN_LIVE}: the rules it covers, ${list(LIVE_PROBED_RULES)}, each refused a request
+while the twin requests loaded. It does not cover ${list(URL_RULES.map((r) => r.name).filter((n) => !(LIVE_PROBED_RULES as readonly string[]).includes(n)))}, and a host rule is
+shown for one host of its list, not each. Sent
 wrapped in slashes, as this build first did and as one of the documentation's examples shows, none
 was refused. \`policy.test.ts\` pins the form.
 
@@ -274,7 +276,7 @@ cap is below one page's ${seconds(2 * RESERVE_PER_RENDER_MS)} does not ask, and 
 \`check_cap\`. When it grants, the budget is settled once, after the last page has finished, at the
 browser time the check counted; a settle that throws is returned as \`settle_failed\`, and the day
 may still count the whole allowance, depending on the store. So a day with room for some pages of a check but not its
-allowance renders none of that check. If a page throws out of the render (only the injected \`sleep\` or the previous-state lookup can), the other pages go on, taking and rendering the pages left in the queue; once all have finished, the budget is settled at what the check counted and the throw is passed on, so those pages' results are discarded.
+allowance renders none of that check. If a page throws out of the render, the other pages go on, taking and rendering the pages left in the queue; once all have finished, the budget is settled at what the check counted and the throw is passed on, so those pages' results are discarded.
 
 Within the check, before a page starts it reserves both of its renders at ${seconds(RESERVE_PER_RENDER_MS)} each
 from the allowance. When the allowance cannot take them while other pages of the check are in flight,

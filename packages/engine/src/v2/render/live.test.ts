@@ -21,6 +21,7 @@ import {
   type BrowserRunClient,
   type RenderSide,
 } from './client.js';
+import { LIVE_PROBED_RULES } from './policy.js';
 import { PARITY_SPREAD, REPEAT_SPREAD, spread, within } from './parity.js';
 import { mainWords } from './words.js';
 
@@ -74,8 +75,9 @@ const REPEAT_PAGE = 'https://developers.cloudflare.com/browser-run/';
 const REPEAT_RENDERS = 5;
 
 /**
- * A 429 is waited out here more simply than the render step does it: its Retry-After in seconds, or
- * else a flat LIVE_RETRY_WAIT_MS (no HTTP date, no doubling), up to LIVE_TRIES tries. The account's request rate is not ours to set, and these
+ * A 429 is waited out here more simply than the render step does it, up to LIVE_TRIES tries, with no
+ * doubling: words() takes the client's wait (seconds or an HTTP date) held between LIVE_RETRY_WAIT_MS
+ * and a minute; renderHtml reads whole seconds only, else waits LIVE_RETRY_WAIT_MS. The account's request rate is not ours to set, and these
  * tests are about what a render returns, not how fast.
  */
 const LIVE_TRIES = 8;
@@ -247,14 +249,9 @@ live('Browser Run, live', () => {
       host_consent: 'https://cdn.cookielaw.org/scripttemplates/otSDKStub.js',
       host_chat: 'https://widget.intercom.io/widget/abc123',
     };
-    const refused = [
-      'ip_literal',
-      'download',
-      'host_analytics',
-      'host_advertising',
-      'host_consent',
-      'host_chat',
-    ];
+    // The attempts are named after the rules they test, so the spec's covered list is this one.
+    const refused: readonly string[] = LIVE_PROBED_RULES;
+    expect(refused.every((name) => name in attempts)).toBe(true);
     // Without the rules, each URL and the WebSocket must load: otherwise a refusal below shows nothing.
     const open = outOf(await renderHtml(probePage(attempts), 'rendered', false, false, PROBE_WAIT));
     const ruled = outOf(await renderHtml(probePage(attempts), 'rendered', true, false, PROBE_WAIT));

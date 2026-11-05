@@ -224,6 +224,15 @@ export const URL_RULES: readonly UrlRule[] = [
  */
 export const wirePattern = (re: RegExp): string => re.source;
 export const PATTERNS_SHOWN_LIVE = '2026-11-05';
+/** The rules the live policy probe sends a request for; live.test.ts expects each refused. */
+export const LIVE_PROBED_RULES = [
+  'ip_literal',
+  'download',
+  'host_advertising',
+  'host_analytics',
+  'host_consent',
+  'host_chat',
+] as const;
 
 /** The first rule that refuses `href` (a URL as the browser would request it), or null. */
 export function refusingRule(href: string): UrlRule | null {

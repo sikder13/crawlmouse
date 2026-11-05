@@ -10,6 +10,7 @@ import {
   URL_RULES,
   wirePattern,
   PATTERNS_SHOWN_LIVE,
+  LIVE_PROBED_RULES,
 } from './policy.js';
 
 const HOSTILE = readFileSync(
@@ -88,6 +89,11 @@ describe('a pattern on the wire', () => {
       expect(new RegExp(wire).source).toBe(r.pattern.source);
     }
     expect(PATTERNS_SHOWN_LIVE).toBe('2026-11-05');
+  });
+
+  it('names, among the probed rules, only rules that exist', () => {
+    const names = URL_RULES.map((r) => r.name);
+    expect(LIVE_PROBED_RULES.filter((n) => !names.includes(n))).toEqual([]);
   });
 
   it('carries no flag, since flags are not sent', () => {
