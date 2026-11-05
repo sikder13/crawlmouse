@@ -58,6 +58,14 @@ describe('withdrawn claims', () => {
     [/Fragments found only on challenge/i, 'a page quoting a marker is taken for a challenge'],
     [/It never throws for a page/i, 'replaced by what the code catches'],
     [
+      /regular expression between slashes/i,
+      'the live probe showed patterns applied as bare source, not wrapped in slashes',
+    ],
+    [
+      /the WebSocket must be refused/i,
+      'the live probe saw the WebSocket open with every rule sent',
+    ],
+    [
       /with no page of this check in flight/i,
       'the daily budget is asked once per check, not per page',
     ],

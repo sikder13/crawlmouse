@@ -253,7 +253,6 @@ live('Browser Run, live', () => {
       'host_advertising',
       'host_consent',
       'host_chat',
-      'websocket',
     ];
     // Without the rules, each URL and the WebSocket must load: otherwise a refusal below shows nothing.
     const open = outOf(await renderHtml(probePage(attempts), 'rendered', false, false, PROBE_WAIT));
@@ -266,5 +265,8 @@ live('Browser Run, live', () => {
     for (const name of ['control_ip', 'control_download'])
       expect(ruled).toContain(`${name}=loaded`);
     for (const name of refused) expect(ruled).toContain(`${name}=blocked`);
+    // A known limit, held here so a change is noticed: neither the websocket resource type nor the
+    // scheme rule, which matches wss:, stopped the WebSocket on 2026-11-05 (spec, known limits).
+    expect(ruled).toContain('websocket=loaded');
   }, 600_000);
 });

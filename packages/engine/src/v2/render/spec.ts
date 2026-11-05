@@ -22,6 +22,7 @@ import {
   REJECTED_HOSTS_AS_OF,
   REJECTED_RESOURCE_TYPES,
   STATIC_REJECTED_RESOURCE_TYPES,
+  PATTERNS_SHOWN_LIVE,
   URL_RULES,
 } from './policy.js';
 import { NOT_RENDERED, RENDER_IN_FLIGHT, RENDER_RETRY, RESERVE_PER_RENDER_MS } from './run.js';
@@ -117,9 +118,17 @@ ${table(
 The browser runs on Cloudflare, so our code is not asked about each request a page makes. Every render
 sends the resource types above and the URL patterns below for Browser Run to enforce, as its
 documentation describes (\`rejectResourceTypes\`, \`rejectRequestPattern\`). **By design, sub-requests are
-filtered by these patterns, not by per-request interception in our process.** Each pattern is sent as the regular
-expression between slashes; the documentation shows that form and also one without the closing slash.
-This build has not observed Browser Run reading or enforcing them: that is the live probe's job (below).
+filtered by these patterns, not by per-request interception in our process.** Each pattern is sent as
+the regular expression's source, with no slashes. The live policy probe (below) showed that form
+applied on ${PATTERNS_SHOWN_LIVE}: each rule refused its request while the twin requests loaded. Sent
+wrapped in slashes, as this build first did and as one of the documentation's examples shows, none
+was refused. \`policy.test.ts\` pins the form.
+
+**WebSockets are not stopped (known limit).** On ${PATTERNS_SHOWN_LIVE} the probe's WebSocket opened with
+the \`websocket\` resource type refused and with the \`scheme\` rule, which matches \`wss:\`, sent. No
+setting found here stops it. The browser runs on Cloudflare's network, not ours, so where a page
+opens one the connection leaves from Cloudflare. Text a page receives over one counts on the rendered
+side.
 
 ${table(
   ['Rule', 'Refuses'],
@@ -288,8 +297,8 @@ Upward, towards "readable":
 - **The wait cap.** A page still loading at ${seconds(RENDER_TIMEOUT_MS)} can come back with what had
   loaded, short on the rendered side. (One that fails instead, which Browser Run's documentation gives
   as a 422, leaves the sample: below.)
-- **Refused connections and hosts.** Text a page receives over a WebSocket or eventsource, or from a
-  reject-listed host, is missing from the rendered side.
+- **Refused connections and hosts.** Text a page receives from a reject-listed host, or over an
+  eventsource (refused by resource type, not observed live), is missing from the rendered side.
 - **The clamp.** Where the rendered side is counted short of the static side, the share is clamped
   and the page reads as share 1. Where a script really removed text, share 1 may be the right reading.
 - **Block pages the challenge rule does not recognise**, served to both sides, read as share 1.${
@@ -339,8 +348,9 @@ Offline, a replayed reply is identical every time, so the bounds below are held 
   settings on that input;
 - a probe page whose requests report whether they loaded, rendered twice, each render waiting
   (\`waitForSelector\`) until the page has reported every request: with the rules left out,
-  each request and a WebSocket must load; with them, rules \`ip_literal\` and \`download\`, one host
-  from each list and the WebSocket must be refused while two twin requests still load.
+  each request and a WebSocket must load; with them, rules \`ip_literal\` and \`download\` and one
+  host from each list must be refused while two twin requests still load, and the WebSocket is
+  expected to open (the known limit above), so a change in that is noticed;
 
 The probe does not cover \`scheme\`, \`credentials\`, \`reserved_name\` or \`port\`: a page's own browser
 refuses the first three requests itself, so a refusal would not show whose it was, and no endpoint was
