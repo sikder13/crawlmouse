@@ -49,9 +49,15 @@ The scripts behind them are in `scripts/db`. Their tests:
    fingerprint differs from the one the dry run read
    (`pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts`).
 4. **Approve.** The `apply` job waits on the `production` environment. Once approved, it checks
-   that production's pending files still equal the manifest the `plan` job printed, runs
+   that production's pending files still equal the manifest the `plan` job printed and that
+   production's fingerprint still equals the one the `plan` job read, runs
    `supabase db push`, runs the checks, and writes the fingerprint to the job summary. A failure
    opens an issue. The workflow does not retry, and it does not run a rollback.
+
+Migration files are append-only. The `migrations-append-only` job in `ci.yml` runs on every push
+and pull request and fails when a file under `infra/supabase/migrations` is modified, deleted or
+renamed, so it can be made a required check. The dry run refuses the same change on a pull request
+that touches the database.
 
 A merge that changes no migration file does not start `db-apply-prod.yml`. To apply files whose
 pull request was merged earlier, run the workflow by hand from `main` and give `dry_run_pr` the
@@ -113,12 +119,17 @@ row in one transaction, then runs the checks and writes the fingerprint to the j
 
 - It refuses a name that is not a file in `infra/supabase/rollbacks` with a matching migration,
   a migration the history does not record as applied, and any but the newest recorded migration,
-  so rollbacks run newest first, one per run
-  (`pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts db/rollback.test.ts`).
+  so rollbacks run newest first, one per run. The order is checked by the plan and again inside the
+  rollback's transaction, after it locks the history table, so an apply approved in between is
+  seen (`pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts db/rollback.test.ts`).
 - A rollback changed in a pull request is run on the branch by the dry run's step 9 before it
-  merges. Check its comment before dispatching.
+  merges. Check its comment before dispatching. Step 9 reverts every migration from the changed
+  one on, so it fails when one of them has no rollback file: adding a rollback for an old v1
+  migration needs rollbacks for the migrations after it too.
 - Rollback and apply runs queue in separate groups: a push that queues an apply does not cancel a
-  queued rollback.
+  queued rollback. The two can run at the same time. The rollback locks the history table, so a concurrent
+  `supabase db push` cannot record a migration until the rollback commits, and the rollback sees any
+  migration recorded before it took the lock.
 - 007's rollback refuses while the `evidence` or `reports` bucket holds objects, and gives the
   count per bucket. Empty them through the Storage API first. It sets
   `storage.allow_delete_query` for its own transaction, which `storage.protect_delete()` requires.
