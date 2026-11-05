@@ -1,7 +1,8 @@
 /**
  * The render step of one check: pick the pages, render each twice (static side, then rendered side),
- * measure, and estimate the site. It never throws for a page: a page that is not rendered carries the
- * reason, and the check goes on. Nothing is written to disk.
+ * measure, and estimate the site. A page that is not rendered carries the reason and the check goes on:
+ * a client that throws is read as `network_error`, and a word count that throws as `measure_failed`.
+ * The day's reservation is settled whatever happens to the page. Nothing is written to disk.
  *
  * COST. Before a page starts, it reserves both of its renders at the wait cap, against the check's cap
  * and against today's budget; when either cannot take them, rendering stops for the rest of the check.
@@ -19,6 +20,7 @@ import {
   MAX_REPLY_BYTES,
   RENDER_TIMEOUT_MS,
   type BrowserRunClient,
+  type RenderReply,
   type RenderSide,
 } from './client.js';
 import { siteEstimate, type SiteEstimate } from './estimate.js';
@@ -46,6 +48,7 @@ export const NOT_RENDERED = {
   oversize: `The reply passed ${MAX_REPLY_BYTES / 1024 / 1024} MiB and was not read further.`,
   network_error: 'The request to Browser Run failed before an answer.',
   challenged: 'A side of the render is a challenge or block page (challenge.ts).',
+  measure_failed: 'Counting the words of the two renders threw.',
   nothing_rendered: 'The rendered side has no words, so there is no share.',
 } as const;
 
@@ -110,7 +113,17 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
   /** One side of a page, retried on 429. Every reply's browser time is added to the page's `used`. */
   async function side(url: string, s: RenderSide, used: { ms: number }) {
     for (let attempt = 0; ; attempt += 1) {
-      const reply = await input.client!.content(url, s);
+      let reply: RenderReply;
+      try {
+        reply = await input.client!.content(url, s);
+      } catch {
+        reply = {
+          ok: false,
+          reason: 'network_error',
+          retryAfterMs: null,
+          browserMs: RENDER_TIMEOUT_MS,
+        };
+      }
       used.ms += reply.browserMs;
       if (reply.ok || reply.reason !== 'rate_limited' || attempt + 1 >= RENDER_RETRY.attempts) {
         return reply;
@@ -145,33 +158,37 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
     }
 
     const used = { ms: 0 };
-    let result: RenderedPage;
-    const staticSide = await side(p.url, 'static', used);
-    if (!staticSide.ok) {
-      result = notRendered(p, staticSide.reason);
-    } else {
-      const renderedSide = await side(p.url, 'rendered', used);
-      if (!renderedSide.ok) {
-        result = notRendered(p, renderedSide.reason);
-      } else {
-        const m = measurePage({
-          staticHtml: staticSide.html,
-          renderedHtml: renderedSide.html,
-          previous: input.previousStates.get(p.url) ?? null,
-        });
-        result = m.measured
-          ? { ...p, rendered: true, without_js: m.without_js }
-          : notRendered(p, m.reason);
+    try {
+      return await renderReserved(p, used);
+    } finally {
+      browserMs += used.ms;
+      checkHeld += used.ms - pageReserve;
+      try {
+        await input.daily.settle(pageReserve, used.ms);
+      } catch {
+        stopped ??= 'daily_budget_unavailable';
       }
     }
-    browserMs += used.ms;
-    checkHeld += used.ms - pageReserve;
+  }
+
+  async function renderReserved(p: Picked, used: { ms: number }): Promise<RenderedPage> {
+    const staticSide = await side(p.url, 'static', used);
+    if (!staticSide.ok) return notRendered(p, staticSide.reason);
+    const renderedSide = await side(p.url, 'rendered', used);
+    if (!renderedSide.ok) return notRendered(p, renderedSide.reason);
+    let m: ReturnType<typeof measurePage>;
     try {
-      await input.daily.settle(pageReserve, used.ms);
+      m = measurePage({
+        staticHtml: staticSide.html,
+        renderedHtml: renderedSide.html,
+        previous: input.previousStates.get(p.url) ?? null,
+      });
     } catch {
-      stopped ??= 'daily_budget_unavailable';
+      return notRendered(p, 'measure_failed');
     }
-    return result;
+    return m.measured
+      ? { ...p, rendered: true, without_js: m.without_js }
+      : notRendered(p, m.reason);
   }
 
   const results: RenderedPage[] = new Array(sample.length);

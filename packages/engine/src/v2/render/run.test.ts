@@ -286,6 +286,22 @@ describe('a 429 from Browser Run', () => {
   });
 });
 
+describe('a client that throws', () => {
+  it('is read as network_error, the check goes on, and the reservation is settled', async () => {
+    const daily = memoryDailyBudget(3_600_000);
+    const client = {
+      content: vi.fn(async () => {
+        throw new Error('client bug');
+      }),
+    };
+    const out = await renderCheck(input({ client, daily, candidates: [THREE[0]!] }));
+    expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'network_error' });
+    // Counted at the wait cap: the browser time of a request that threw is not known.
+    expect(out.browser_ms).toBe(RENDER_TIMEOUT_MS);
+    expect(daily.usedMs()).toBe(RENDER_TIMEOUT_MS);
+  });
+});
+
 describe('a render that fails', () => {
   it.each(['page_failed', 'api_error', 'bad_reply', 'oversize', 'network_error'] as const)(
     'is recorded as %s, and the check does not fail',
