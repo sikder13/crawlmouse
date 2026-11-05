@@ -39,14 +39,28 @@ describe('the request body', () => {
     });
   });
 
-  it('differs on the static side only by refusing scripts', () => {
+  it('differs on the static side only by refusing scripts and turning JavaScript off', () => {
     const rendered = renderRequestBody('https://site.example/', 'rendered');
     const staticSide = renderRequestBody('https://site.example/', 'static');
     expect(staticSide.rejectResourceTypes).toEqual([...rendered.rejectResourceTypes, 'script']);
-    expect({ ...staticSide, rejectResourceTypes: null }).toEqual({
+    expect(staticSide.setJavaScriptEnabled).toBe(false);
+    expect('setJavaScriptEnabled' in rendered).toBe(false);
+    expect({ ...staticSide, rejectResourceTypes: null, setJavaScriptEnabled: null }).toEqual({
       ...rendered,
       rejectResourceTypes: null,
+      setJavaScriptEnabled: null,
     });
+  });
+
+  it('sends JavaScript off on the wire for the static side', async () => {
+    const { spy, client } = clientWith(async () =>
+      reply(200, { success: true, result: '<p>x</p>' }),
+    );
+    await client.content('https://site.example/', 'static');
+    await client.content('https://site.example/', 'rendered');
+    const bodies = spy.mock.calls.map(([, init]) => JSON.parse(String(init.body)));
+    expect(bodies[0].setJavaScriptEnabled).toBe(false);
+    expect('setJavaScriptEnabled' in bodies[1]).toBe(false);
   });
 
   it('pins the viewport and the wait', () => {

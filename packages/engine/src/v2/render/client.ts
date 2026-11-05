@@ -3,11 +3,12 @@
  * HTML the browser holds when the page settles. Nothing here touches the disk: the reply is read into
  * memory, bounded by MAX_REPLY_BYTES, and handed back.
  *
- * The two sides of a page are the same request but for one field: the static side refuses the `script`
- * resource type. Both run in Browser Run, from the same network, with the same user agent, viewport and
- * wait. Refusing the resource type is documented to stop script files from loading (live.test.ts checks
- * it); a script written inline in the HTML is not a request and still runs on the static side, so text
- * such a script writes is counted on both sides.
+ * The two sides of a page are the same request but for two fields: the static side refuses the `script`
+ * resource type and sends `setJavaScriptEnabled: false`. Both run in Browser Run, from the same network,
+ * with the same user agent, viewport and wait. Refusing the resource type is documented to stop script
+ * files from loading. A script written inline in the HTML is not a request, so only turning JavaScript
+ * off can stop it running on the static side; Cloudflare documents that field for `/snapshot`, and
+ * STATIC_JS_OFF_SHOWN_LIVE records whether live.test.ts has shown `/content` honours it.
  */
 import {
   REJECTED_RESOURCE_TYPES,
@@ -64,9 +65,16 @@ export const ENV = {
 
 export type RenderSide = 'rendered' | 'static';
 
+/**
+ * The date the live inline-script probe showed `/content` honouring `setJavaScriptEnabled: false` on
+ * the static side, or null while it has not. The spec renders this, so it says "unproven" until then.
+ */
+export const STATIC_JS_OFF_SHOWN_LIVE: string | null = null;
+
 export function renderRequestBody(url: string, side: RenderSide) {
   return {
     url,
+    ...(side === 'static' ? { setJavaScriptEnabled: false as const } : {}),
     userAgent: RENDER_USER_AGENT,
     viewport: { ...RENDER_VIEWPORT },
     gotoOptions: { waitUntil: RENDER_WAIT_UNTIL, timeout: RENDER_TIMEOUT_MS },

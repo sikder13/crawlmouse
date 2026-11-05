@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+  <head><title>Inline script probe</title></head>
+  <body>
+    <main><p id="out">probe</p></main>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <script>
+      // The marker is assembled at run time, so it is in the HTML only where this script ran.
+      var out = document.getElementById('out');
+      out.append(' ' + 'inline' + 'scriptran');
+      out.append(typeof window.jQuery === 'undefined' ? ' file=blocked' : ' file=loaded');
+    </script>
+  </body>
+</html>
