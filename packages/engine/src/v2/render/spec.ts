@@ -75,7 +75,7 @@ Cloudflare documents that field for \`/snapshot\` (read ${BROWSER_RUN.read_on});
 does not name it. ${
       STATIC_JS_OFF_SHOWN_LIVE === null
         ? '**Whether `/content` honours it is unproven:** no passing run of the live inline-script probe (below) is recorded here. If it shows the setting ignored, the static side moves to `/snapshot`, where it is documented. If `/content` refuses the field instead, each static side comes back as a failure (`api_error`, `page_failed` or `bad_reply`, depending on the reply) and no page is measured; the probe fails on that too, since it expects a 200.'
-        : `The live inline-script probe (below) showed \`/content\` honouring it on ${STATIC_JS_OFF_SHOWN_LIVE}.`
+        : `The live inline-script probe (below) showed \`/content\` honouring it on ${STATIC_JS_OFF_SHOWN_LIVE}, with the page sent as \`html\`.`
     }
 
 The user agent is the one the v2 fixtures record on their \`identity_role: render\` rows. Browser Run's
@@ -329,7 +329,7 @@ Offline, a replayed reply is identical every time, so the bounds below are held 
 \`~/.config/crawlmouse/render.env\` (outside the repository) holds them, and is skipped otherwise:
 
 - five renders of one page within ${pct(REPEAT_SPREAD)} of each other in rendered words (I8);
-- the two sides of a static page within ${pct(PARITY_SPREAD)};
+- the two sides of a page served with no script (CERN's first web page) within ${pct(PARITY_SPREAD)};
 - the inline-script probe (\`fixtures/v2/render/inline-script.html\`): a page whose inline script
   writes a marker assembled at run time, and which loads a script file. The static side must not
   hold the marker; the rendered side must hold the marker and report the file loaded;
@@ -337,7 +337,8 @@ Offline, a replayed reply is identical every time, so the bounds below are held 
   can report the file: it must report the file blocked;
 - the probes send the page as \`html\`, where production sends \`url\`, so they show the request's
   settings on that input;
-- a probe page whose requests report whether they loaded, rendered twice: with the rules left out,
+- a probe page whose requests report whether they loaded, rendered twice, each render waiting
+  (\`waitForSelector\`) until the page has reported every request: with the rules left out,
   each request and a WebSocket must load; with them, rules \`ip_literal\` and \`download\`, one host
   from each list and the WebSocket must be refused while two twin requests still load.
 

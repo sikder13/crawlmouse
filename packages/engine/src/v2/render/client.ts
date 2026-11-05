@@ -69,7 +69,7 @@ export type RenderSide = 'rendered' | 'static';
  * The date the live inline-script probe showed `/content` honouring `setJavaScriptEnabled: false` on
  * the static side, or null while it has not. The spec renders this, so it says "unproven" until then.
  */
-export const STATIC_JS_OFF_SHOWN_LIVE: string | null = null;
+export const STATIC_JS_OFF_SHOWN_LIVE: string | null = '2026-11-05';
 
 export function renderRequestBody(url: string, side: RenderSide) {
   return {
