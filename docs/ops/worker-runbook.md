@@ -277,8 +277,8 @@ and reads these from that process's environment:
 
 - `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account's id.
 - `CLOUDFLARE_BROWSER_RENDERING_TOKEN`: an API token scoped to that account with the one permission
-  `Browser Run - Edit` (Cloudflare dashboard, My Profile, API Tokens, Create Custom Token). Nothing
-  else.
+  `Browser Run - Edit`, as Cloudflare's Quick Actions page named it on 2026-11-05 (Cloudflare
+  dashboard, My Profile, API Tokens, Create Custom Token). Nothing else.
 - `RENDER_MAX_BROWSER_SECONDS_PER_CHECK` and `RENDER_MAX_BROWSER_SECONDS_PER_DAY`: whole seconds.
   Unset or invalid reads as zero, and zero renders nothing.
 
@@ -287,12 +287,13 @@ goes on; it does not fail. To stop rendering, unset the token or set either cap 
 
 Limits on Workers Paid, as Cloudflare's limits page stood on 2026-10-14 (read 2026-11-05): 30 Quick
 Actions requests per second per account, after which Browser Run answers 429; a browser closes after
-60 s without a command. The render step keeps at most 5 requests open and retries a 429 after its
-`Retry-After`.
+60 s without a command. The render step keeps at most 5 requests open per check (checks running at
+once each have their own 5) and retries a 429 after its `Retry-After`.
 
 Cost: $0.09 per browser-hour after the 10 browser-hours a month Workers Paid includes. Each reply
 reports its browser time in the `x-browser-ms-used` header, and the step totals it per check as
-`browser_ms`. A check's cost is that total in hours times the price, so a check held to 200
+`browser_ms`; a reply without the header, or a request that timed out, is counted at the 45 s request
+timeout. A check's cost is that total in hours times the price, so a check held to 200
 browser-seconds costs about $0.005, though a check can end above its cap by the excess of the renders
 in flight. The dashboard's Browser Run page shows the account's usage.
 
