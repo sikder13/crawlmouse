@@ -11,14 +11,16 @@ import { describe, expect, it } from 'vitest';
 // deselect it; `test (engine)` runs it. It runs the real `test` script line with stand-ins for
 // vitest and pnpm, records the vitest command lines the script runs, and lists the files those
 // exact command lines select with the real vitest. Removing this file from the serial line would
-// switch it off, which no test here can see: that edit is to the line pinned below.
+// switch it off, which no test here can see: that edit is to the line pinned below. So would a
+// vitest.config.ts `exclude` of this file alone; a config edit that drops all three files fails,
+// because the serial line sets --passWithNoTests=false.
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const scripts = JSON.parse(readFileSync(join(ENGINE, 'package.json'), 'utf8')).scripts as Record<
   string,
   string
 >;
-/** The serial run: this guard, then the two timer-based fixtures. */
+/** The serial run's files, in command-line order (vitest picks the order it runs them in). */
 const SERIAL = [
   'src/test-timers-split.test.ts',
   'src/crawl-stall-retries.test.ts',
@@ -77,7 +79,12 @@ describe('the serial run of the timer-based crawl fixtures', () => {
   it('runs the rest of the suite, then this guard and the two fixtures one file at a time', () => {
     const { calls } = runTest([0, 0]);
     expect(calls[0]).toEqual(['run', ...SERIAL.flatMap((f) => ['--exclude', f])]);
-    expect(calls[1]).toEqual(['run', '--no-file-parallelism', ...SERIAL]);
+    expect(calls[1]).toEqual([
+      'run',
+      '--no-file-parallelism',
+      '--passWithNoTests=false',
+      ...SERIAL,
+    ]);
     expect(calls[2]).toBeNull();
     for (const f of SERIAL) expect(existsSync(join(ENGINE, f)), f).toBe(true);
   });
@@ -111,6 +118,11 @@ describe('the serial run of the timer-based crawl fixtures', () => {
     const r = runTest([0, 0], `"src/ssrf-guard.test.ts" "-t" "two words"`);
     expect(r.status).toBe(0);
     expect(r.calls[0]!.slice(-3)).toEqual(['src/ssrf-guard.test.ts', '-t', 'two words']);
-    expect(r.calls[1]).toEqual(['run', '--no-file-parallelism', ...SERIAL]);
+    expect(r.calls[1]).toEqual([
+      'run',
+      '--no-file-parallelism',
+      '--passWithNoTests=false',
+      ...SERIAL,
+    ]);
   });
 });
