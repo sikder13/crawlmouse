@@ -318,10 +318,7 @@ export const WithheldReasonSchema = named(
  * score for the fix to move. The engine says what it means (packages/engine/src/v2/grade/withheld.ts),
  * and its test pins the two lists to each other.
  */
-export const TechnicalSeoPendingSchema = named(
-  'TechnicalSeoPending',
-  z.enum(['grade_refused']),
-);
+export const TechnicalSeoPendingSchema = named('TechnicalSeoPending', z.enum(['grade_refused']));
 /** v1 `RefusalTrigger`. */
 export const RefusalTriggerSchema = named(
   'RefusalTrigger',
