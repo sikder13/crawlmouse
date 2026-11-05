@@ -42,7 +42,7 @@ describe('the check files', () => {
     expect(failed(results)).toBe(false);
   });
 
-  it('all pass on a database migrated through 001 only, as production is before the first apply', async () => {
+  it('all pass on a database migrated through 001 only, before any table they check exists', async () => {
     const early = await migratedDb((f) => f <= '20261101000001_v2_001_entitlement_tables.sql');
     const results = await runChecks(pgliteDb(early));
     expect(formatResults(results)).not.toContain('FAIL');

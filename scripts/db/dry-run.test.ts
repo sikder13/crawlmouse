@@ -9,7 +9,10 @@ import { HISTORY_TABLE, migratedDb, pgliteDb } from './test-support';
 const THROUGH_001 = (f: string) => f.slice(0, 14) <= '20261101000001';
 const files = listMigrations();
 
-/** A database at production's state: migrated through 001, with a clean history of those files. */
+/**
+ * A stand-in for production with migrations still to apply: migrated through 001, with a clean
+ * history of those files, so 003, 005, 007 and 006b are pending.
+ */
 async function productionLike(): Promise<PGlite> {
   const pg = await migratedDb(THROUGH_001);
   await pg.exec(HISTORY_TABLE);
@@ -117,17 +120,31 @@ describe('the dry run', () => {
     expect(h.deleted).toEqual(['branchref']);
   }, 300_000);
 
-  it("fails before any push while production's history needs the repair", async () => {
-    const h = await harness({
-      branchSetup: `insert into supabase_migrations.schema_migrations (version, name, statements)
-                    values ('20260601174823', 'harden_handle_new_user_grants', array['revoke ...'])`,
-    });
-    const summary = await dryRun(h.deps, { branch: 'pr-3', commit: 'abc' });
-    expect(summary.passed).toBe(false);
-    expect(summary.steps.at(-1)!.result).toContain('needs the repair');
-    expect(summary.steps.at(-1)!.result).toContain('20260601174823 harden_handle_new_user_grants');
-    expect(h.calls).toEqual(['create pr-3']);
-  }, 300_000);
+  it.each([
+    [
+      'a row with no file',
+      `insert into supabase_migrations.schema_migrations (version, name, statements)
+       values ('20260601174823', 'harden_handle_new_user_grants', array['revoke ...'])`,
+      '20260601174823 harden_handle_new_user_grants',
+    ],
+    [
+      'a row holding only a comment, as the owner inserted for 003 to 006b',
+      `insert into supabase_migrations.schema_migrations (version, name, statements)
+       values ('20261102000001', 'v2_003_sites_checks', array['-- applied by owner (sha256 9380c15d)'])`,
+      '20261102000001 v2_003_sites_checks',
+    ],
+  ])(
+    "fails before any push while production's history needs the repair: %s",
+    async (_label, setup, named) => {
+      const h = await harness({ branchSetup: setup });
+      const summary = await dryRun(h.deps, { branch: 'pr-3', commit: 'abc' });
+      expect(summary.passed).toBe(false);
+      expect(summary.steps.at(-1)!.result).toContain('needs the repair');
+      expect(summary.steps.at(-1)!.result).toContain(named);
+      expect(h.calls).toEqual(['create pr-3']);
+    },
+    300_000,
+  );
 
   it('fails when a pending migration has no rollback', async () => {
     const extra: MigrationFile = {

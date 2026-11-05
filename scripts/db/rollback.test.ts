@@ -8,7 +8,7 @@ const PENDING = ['20261102000001', '20261102000002', '20261102000003', '20261103
 const migrations = listMigrations();
 const pending = migrations.filter((m) => PENDING.includes(m.version));
 
-/** A database at production's state (through 001) and one with the four pending files applied. */
+/** A database migrated through 001, and one with 003, 005, 007 and 006b applied after it. */
 async function databases() {
   const before = await migratedDb((f) => f.slice(0, 14) <= '20261101000001');
   const after = await migratedDb();

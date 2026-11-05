@@ -28,8 +28,11 @@ export interface HistoryDiff {
   matched: number;
   /** Rows recorded under another version, paired with the one unrecorded file of their name. */
   misversioned: Array<{ row: HistoryRow; file: MigrationFile }>;
-  /** Rows paired with a file (by version or by name) whose statements are null or empty. */
-  emptyStatements: Array<{ row: HistoryRow; file: MigrationFile }>;
+  /**
+   * Rows paired with a file (by version or by name) with no executable statement: null, empty, or
+   * comments only. A branch is built by replaying `statements`, so such a row builds nothing.
+   */
+  withoutStatements: Array<{ row: HistoryRow; file: MigrationFile }>;
   /** Rows with no file. The CLI refuses to push while one exists. */
   orphans: HistoryRow[];
   /** Files with no row. */
@@ -51,7 +54,17 @@ export async function readHistory(db: Db): Promise<HistoryRow[]> {
   return db.query<HistoryRow & Record<string, unknown>>(READ_HISTORY);
 }
 
-const isEmpty = (row: HistoryRow) => !row.statements || row.statements.length === 0;
+/** True when the text holds something other than whitespace and SQL comments. */
+export function executable(statement: string): boolean {
+  return (
+    statement
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/--[^\n]*/g, '')
+      .trim().length > 0
+  );
+}
+
+const isEmpty = (row: HistoryRow) => !row.statements || !row.statements.some(executable);
 
 export function diffHistory(files: MigrationFile[], rows: HistoryRow[]): HistoryDiff {
   const fileByVersion = new Map(files.map((f) => [f.version, f]));
@@ -62,7 +75,7 @@ export function diffHistory(files: MigrationFile[], rows: HistoryRow[]): History
     rows: rows.length,
     matched: 0,
     misversioned: [],
-    emptyStatements: [],
+    withoutStatements: [],
     orphans: [],
     unrecorded: [],
   };
@@ -83,7 +96,7 @@ export function diffHistory(files: MigrationFile[], rows: HistoryRow[]): History
       diff.misversioned.push({ row, file });
     }
     claimed.add(file.version);
-    if (isEmpty(row)) diff.emptyStatements.push({ row, file });
+    if (isEmpty(row)) diff.withoutStatements.push({ row, file });
   }
 
   diff.unrecorded = files.filter(
@@ -98,8 +111,8 @@ export function formatDiff(diff: HistoryDiff): string {
     `recorded under the file's version, with statements: ${diff.matched}`,
     `recorded under another version (--repair renames): ${diff.misversioned.length}`,
     ...diff.misversioned.map(({ row, file }) => `  ${row.version} ${row.name} -> ${file.version}`),
-    `recorded with no statements (--repair fills from the file): ${diff.emptyStatements.length}`,
-    ...diff.emptyStatements.map(({ file }) => `  ${file.version} ${file.name}`),
+    `recorded with no executable statement (--repair adds the file's bytes): ${diff.withoutStatements.length}`,
+    ...diff.withoutStatements.map(({ file }) => `  ${file.version} ${file.name}`),
     `rows with no file (--repair --drop-orphan <version> deletes): ${diff.orphans.length}`,
     ...diff.orphans.flatMap((row) => [
       `  ${row.version} ${row.name}`,
@@ -121,7 +134,8 @@ export interface RepairOptions {
 export interface RepairPlan {
   drops: HistoryRow[];
   renames: Array<{ from: string; to: string }>;
-  fills: MigrationFile[];
+  /** Each file, with the comment-only statements its row already holds, kept in front of it. */
+  fills: Array<{ file: MigrationFile; keep: string[] }>;
   inserts: MigrationFile[];
   pending: MigrationFile[];
 }
@@ -155,7 +169,7 @@ export function planRepair(
   return {
     drops: diff.orphans,
     renames: diff.misversioned.map(({ row, file }) => ({ from: row.version, to: file.version })),
-    fills: diff.emptyStatements.map(({ file }) => file),
+    fills: diff.withoutStatements.map(({ row, file }) => ({ file, keep: row.statements ?? [] })),
     inserts: diff.unrecorded.filter((f) => f.version <= through),
     pending: diff.unrecorded.filter((f) => f.version > through),
   };
@@ -166,7 +180,9 @@ export async function applyRepair(db: Db, files: MigrationFile[], plan: RepairPl
   await db.transaction(async (tx) => {
     for (const row of plan.drops) await tx.query(REPAIR_STATEMENTS.drop, [row.version]);
     for (const r of plan.renames) await tx.query(REPAIR_STATEMENTS.rename, [r.to, r.from]);
-    for (const f of plan.fills) await tx.query(REPAIR_STATEMENTS.fill, [[f.sql], f.version]);
+    for (const { file, keep } of plan.fills) {
+      await tx.query(REPAIR_STATEMENTS.fill, [[...keep, file.sql], file.version]);
+    }
     for (const f of plan.inserts) {
       await tx.query(REPAIR_STATEMENTS.insert, [f.version, f.name, [f.sql]]);
     }
@@ -175,7 +191,7 @@ export async function applyRepair(db: Db, files: MigrationFile[], plan: RepairPl
     const ok =
       after.misversioned.length === 0 &&
       after.orphans.length === 0 &&
-      after.emptyStatements.length === 0 &&
+      after.withoutStatements.length === 0 &&
       after.unrecorded.map((f) => f.version).join(',') === pending;
     if (!ok) {
       throw new Error(

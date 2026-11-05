@@ -115,7 +115,7 @@ export async function dryRun(
       'History is clean and each pending file has a rollback',
       async () => {
         const diff = diffHistory(files, await readHistory(branchDb));
-        if (diff.misversioned.length + diff.orphans.length + diff.emptyStatements.length > 0) {
+        if (diff.misversioned.length + diff.orphans.length + diff.withoutStatements.length > 0) {
           throw new Error(
             `production's history needs the repair in docs/ops/db-migrations.md first\n${formatDiff(diff)}`,
           );

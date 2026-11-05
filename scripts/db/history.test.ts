@@ -8,6 +8,7 @@ import {
   REPAIR_STATEMENTS,
   applyRepair,
   diffHistory,
+  executable,
   formatDiff,
   planRepair,
   readHistory,
@@ -16,12 +17,16 @@ import {
 import { HISTORY_TABLE, pgliteDb, type RecordingDb } from './test-support';
 
 /**
- * Production's history table as read on 2026-11-05 through the Supabase MCP
- * (`select version, name, statements from supabase_migrations.schema_migrations`). Statements are
- * reduced to "present" or "empty"; the diff reads only which. This is the independent truth the
- * diff is pinned against: the categories below were counted by hand from that read, not by the code.
+ * Production's history table as read on 2026-11-05, after the owner applied 003, 005, 007 and 006b
+ * through the dashboard, through the Supabase MCP
+ * (`select version, name, statements from supabase_migrations.schema_migrations`): 36 rows.
+ * Statements are reduced to what the diff reads: present, empty, or a comment only (the four rows
+ * the owner inserted hold one comment naming the file and its sha256). This is the independent
+ * truth the diff is pinned against: the categories below were counted by hand from that read.
  */
-const PRODUCTION_ROWS: Array<[version: string, name: string, statements: 'present' | 'empty']> = [
+const PRODUCTION_ROWS: Array<
+  [version: string, name: string, statements: 'present' | 'empty' | 'comment']
+> = [
   ['20260524000001', 'init_users', 'present'],
   ['20260524000002', 'audits', 'present'],
   ['20260524000003', 'indexes', 'present'],
@@ -53,6 +58,10 @@ const PRODUCTION_ROWS: Array<[version: string, name: string, statements: 'presen
   ['20260707000003', 'spec04_column_privilege_hardening', 'empty'],
   ['20260707000004', 'public_reports_client_insert_revoke', 'empty'],
   ['20260707000005', 'domain_verifications_client_write_revoke', 'empty'],
+  ['20261102000001', 'v2_003_sites_checks', 'comment'],
+  ['20261102000002', 'v2_005_sharing_columns', 'comment'],
+  ['20261102000003', 'v2_007_storage', 'comment'],
+  ['20261103000001', 'v2_006b_ledger_usage', 'comment'],
   ['20261103220014', 'v2_001_entitlement_tables', 'present'],
 ];
 
@@ -60,12 +69,17 @@ const productionRows = (): HistoryRow[] =>
   PRODUCTION_ROWS.map(([version, name, s]) => ({
     version,
     name,
-    statements: s === 'present' ? ['recorded statement'] : null,
+    statements:
+      s === 'present'
+        ? ['recorded statement']
+        : s === 'comment'
+          ? [`-- applied by owner through the dashboard SQL editor on 2026-11-05 (${version})`]
+          : null,
   }));
 
 const versions = (files: { version: string }[]) => files.map((f) => f.version);
 
-describe('the history diff, against production as read on 2026-11-05', () => {
+describe('the history diff, against production as read on 2026-11-05 (36 rows)', () => {
   const files = listMigrations();
   const diff = diffHistory(files, productionRows());
 
@@ -97,17 +111,21 @@ describe('the history diff, against production as read on 2026-11-05', () => {
     expect(diff.orphans.map((r) => r.version)).toEqual(['20260601174823']);
   });
 
-  it('finds the five rows recorded with no statements', () => {
-    expect(versions(diff.emptyStatements.map((e) => e.file))).toEqual([
+  it('finds nine rows with no executable statement: five empty, four holding only a comment', () => {
+    expect(versions(diff.withoutStatements.map((e) => e.file))).toEqual([
       '20260707000001',
       '20260707000002',
       '20260707000003',
       '20260707000004',
       '20260707000005',
+      '20261102000001',
+      '20261102000002',
+      '20261102000003',
+      '20261103000001',
     ]);
   });
 
-  it('finds the twelve files with no row: eight applied by hand, and 003, 005, 007, 006b', () => {
+  it('finds the eight files applied by hand with no row', () => {
     expect(versions(diff.unrecorded)).toEqual([
       '20260629000001',
       '20260629000002',
@@ -117,28 +135,46 @@ describe('the history diff, against production as read on 2026-11-05', () => {
       '20260805000001',
       '20260806000001',
       '20260806000002',
-      '20261102000001',
-      '20261102000002',
-      '20261102000003',
-      '20261103000001',
     ]);
   });
 
-  it('with --applied-through 20261101000001 the repair inserts eight rows and leaves the four v2 files pending', () => {
+  it('with --applied-through 20261103000001 the repair inserts eight rows and leaves nothing pending', () => {
     const plan = planRepair(files, diff, {
-      appliedThrough: '20261101000001',
+      appliedThrough: '20261103000001',
       dropOrphans: ['20260601174823'],
     });
-    expect(versions(plan.inserts)).toEqual(versions(diff.unrecorded).slice(0, 8));
-    expect(versions(plan.pending)).toEqual([
-      '20261102000001',
-      '20261102000002',
-      '20261102000003',
-      '20261103000001',
-    ]);
+    expect(versions(plan.inserts)).toEqual(versions(diff.unrecorded));
+    expect(plan.pending).toEqual([]);
     expect(plan.renames).toHaveLength(19);
-    expect(plan.fills).toHaveLength(5);
+    expect(plan.fills).toHaveLength(9);
     expect(plan.drops.map((r) => r.version)).toEqual(['20260601174823']);
+  });
+
+  it('refuses the earlier --applied-through 20261101000001, now that 003 to 006b are recorded', () => {
+    expect(() =>
+      planRepair(files, diff, {
+        appliedThrough: '20261101000001',
+        dropOrphans: ['20260601174823'],
+      }),
+    ).toThrow(
+      /20261102000001, 20261102000002, 20261102000003, 20261103000001, after --applied-through/,
+    );
+  });
+});
+
+describe('executable', () => {
+  it.each([
+    ['', false],
+    ['   \n\t', false],
+    ['-- applied by hand (sha256 abc)', false],
+    ['-- one\n-- two\n', false],
+    ['/* block */', false],
+    ['/* a */ -- b', false],
+    ['select 1;', true],
+    ['-- note\nselect 1;', true],
+    ["select '--' as x;", true],
+  ])('%j is executable: %s', (text, expected) => {
+    expect(executable(text)).toBe(expected);
   });
 });
 
@@ -260,6 +296,7 @@ describe('applyRepair', () => {
       insert into supabase_migrations.schema_migrations (version, name, statements) values
         ('20260101000001', 'one', null),
         ('20260101093000', 'two', array['what production ran for two']),
+        ('20260101000003', 'three', array['-- applied by hand from 20260101000003_three.sql']),
         ('20260101094500', 'gone', array['revoke all on x from anon;']);
     `);
   });
@@ -280,20 +317,22 @@ describe('applyRepair', () => {
     const after = diffHistory(files, await readHistory(db));
     expect(after.misversioned).toEqual([]);
     expect(after.orphans).toEqual([]);
-    expect(after.emptyStatements).toEqual([]);
+    expect(after.withoutStatements).toEqual([]);
     expect(versions(after.unrecorded)).toEqual(versions(plan.pending));
     expect(versions(plan.pending)).toEqual(['20260101000004', '20260101000005']);
   });
 
-  it('inserts and fills with the file bytes, and a renamed row keeps what production ran', async () => {
+  it("fills an empty row with the file bytes, keeps a comment-only row's comment in front of them, and a renamed row keeps what production ran", async () => {
     await repair();
     const rows = await readHistory(db);
     const byVersion = new Map(rows.map((r) => [r.version, r]));
     const bytes = (v: string) => files.find((f) => f.version === v)!.sql;
     expect(byVersion.get('20260101000001')!.statements).toEqual([bytes('20260101000001')]);
     expect(byVersion.get('20260101000002')!.statements).toEqual(['what production ran for two']);
-    expect(byVersion.get('20260101000003')!.statements).toEqual([bytes('20260101000003')]);
-    expect(byVersion.get('20260101000003')!.name).toEqual('three');
+    expect(byVersion.get('20260101000003')!.statements).toEqual([
+      '-- applied by hand from 20260101000003_three.sql',
+      bytes('20260101000003'),
+    ]);
     expect(byVersion.has('20260101094500')).toBe(false);
   });
 
@@ -314,7 +353,7 @@ describe('applyRepair', () => {
       dropOrphans: ['20260101094500'],
     });
     const before = await readHistory(db);
-    await expect(applyRepair(db, files, { ...plan, inserts: [] })).rejects.toThrow(
+    await expect(applyRepair(db, files, { ...plan, fills: [] })).rejects.toThrow(
       /did not leave the history the plan promised/,
     );
     expect(await readHistory(db)).toEqual(before);
