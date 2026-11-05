@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { recordSample } from '../../packages/timing/src/samples';
+import { fmt, median } from '../../packages/timing/src/stats';
 import { BUDGET, EXPLORER, RUNS, WINDOW_MS } from './budgets';
 import { test, expect, type Browser, type Page, type TestInfo } from './pw';
 
@@ -44,9 +46,13 @@ import { test, expect, type Browser, type Page, type TestInfo } from './pw';
  *   ms, a stall a reader sees. These two were advisory while the spec ran on React's development
  *   build, where the crawl window crossed them with no regression (runs 40933573326 and
  *   40933566313 at 00fae50); on the production build they fail again.
- * - Best of three: a window is measured up to three times and judged on its best run, the one with
- *   the fewest budgets missed, so one slow run on a shared runner does not fail it; a page over
- *   budget on every run does. Each run's numbers are printed.
+ * - Median of five: a window is measured five times and each budget is judged on the median of its
+ *   five readings, the rule docs/ops/ci-timing.md sets for every timing check. Each run's numbers
+ *   and the medians are printed, and with PERF_SAMPLES_DIR set the samples are written there for
+ *   the nightly trend. What says a run measured anything at all (a main thread and its tasks in the
+ *   trace, enough frames, the window spanning its moment) must hold on every run. The visual job
+ *   retries a run of this spec once when every failure in it was a budget miss
+ *   (packages/timing/scripts/perf-retry.sh).
  * Each window opens at its moment (`?at=`), with the map laid out cold there, and plays from it.
  * A viewer who has watched from 0:00 has the map the warm layouts built, which move more pages at
  * each layout: these windows understate that work, a known gap of this spec, not measured here.
@@ -82,6 +88,13 @@ const WINDOWS = [
     spans: 'Fetching a sample of pages as each AI crawler',
   },
 ];
+
+/**
+ * The prefix of the assertions that say a run measured nothing, as opposed to a budget missed. On a
+ * slow runner packages/timing/scripts/perf-retry.sh excuses only the budget assertion's own error
+ * (`medians of ${RUNS} runs`), so it does not excuse these.
+ */
+const INVALID = 'MEASUREMENT INVALID';
 
 /** What the trace records: `toplevel` holds `RunTask`, `loading` holds `LayoutShift`. */
 const CATEGORIES = [
@@ -139,8 +152,10 @@ function fromTrace(path: string) {
 }
 
 test.describe('crawl screen performance', () => {
-  // Each window reports on its own: one over budget does not hide the others' numbers.
-  test.describe.configure({ timeout: 180_000 });
+  // Each window reports on its own: one over budget does not hide the others' numbers. The timeout
+  // grows with RUNS: a crawl window's run took about 31 s on CI (five took 154.8 s in run
+  // 41754514564), so 60 s a run leaves the same room at any run count.
+  test.describe.configure({ timeout: RUNS * 60_000 });
 
   test('the trace reading finds a long task and a layout shift planted in the page', async ({
     browser,
@@ -175,9 +190,7 @@ test.describe('crawl screen performance', () => {
         const run = await measure(browser, w, testInfo, i);
         console.log(`[perf] ${w.name}, run ${i + 1}: ${JSON.stringify(run.measured)}`);
         runs.push(run);
-        if (run.missed.length === 0) break;
       }
-      const best = runs.reduce((a, b) => (b.missed.length < a.missed.length ? b : a));
       await testInfo.attach('measured.json', {
         body: JSON.stringify(
           runs.map((r) => r.measured),
@@ -186,15 +199,39 @@ test.describe('crawl screen performance', () => {
         ),
         contentType: 'application/json',
       });
+      const missed = judge(
+        w.name,
+        runs.map((r) => r.measured),
+        [
+          { metric: 'longestTaskMs', unit: 'ms', limit: BUDGET.stallMs },
+          { metric: 'longTasks', unit: 'tasks', limit: w.longTasks },
+          { metric: 'layoutShift', unit: 'score', limit: BUDGET.layoutShift },
+          { metric: 'p95FrameMs', unit: 'ms', limit: BUDGET.p95FrameMs },
+          { metric: 'slowShare', unit: 'share', limit: BUDGET.slowShare },
+          { metric: 'maxFrameMs', unit: 'ms', limit: BUDGET.maxFrameMs },
+        ],
+      );
+      expect(
+        runs.flatMap((r) => r.broken),
+        INVALID,
+      ).toEqual([]);
       if ('spans' in w) {
-        expect(best.before?.trim(), `${w.spans} is still to come as the window opens`).toBe('next');
-        expect(best.after?.trim(), `${w.spans} has started by the window's end`).not.toBe('next');
+        for (const r of runs) {
+          expect(
+            r.before?.trim(),
+            `${INVALID}: ${w.spans} is still to come as the window opens`,
+          ).toBe('next');
+          expect(
+            r.after?.trim(),
+            `${INVALID}: ${w.spans} has started by the window's end`,
+          ).not.toBe('next');
+        }
       }
-      expect(best.missed, `best of ${runs.length}: ${JSON.stringify(best.measured)}`).toEqual([]);
+      expect(missed, `medians of ${RUNS} runs`).toEqual([]);
     });
   }
 
-  test('the explorer, 2,000 pages on the canvas: no frame over 50 ms as the selection moves', async ({
+  test('the explorer, 2,000 pages on the canvas: within the budget, no frame over 50 ms as the selection moves', async ({
     browser,
   }, testInfo) => {
     const runs = [];
@@ -202,12 +239,59 @@ test.describe('crawl screen performance', () => {
       const run = await measureExplorer(browser, testInfo, i);
       console.log(`[perf] the explorer, run ${i + 1}: ${JSON.stringify(run.measured)}`);
       runs.push(run);
-      if (run.missed.length === 0) break;
     }
-    const best = runs.reduce((a, b) => (b.missed.length < a.missed.length ? b : a));
-    expect(best.missed, `best of ${runs.length}: ${JSON.stringify(best.measured)}`).toEqual([]);
+    const missed = judge(
+      'the explorer',
+      runs.map((r) => r.measured),
+      [
+        { metric: 'longestTaskMs', unit: 'ms', limit: EXPLORER.frameMs },
+        { metric: 'maxFrameMs', unit: 'ms', limit: EXPLORER.frameMs },
+      ],
+    );
+    expect(
+      runs.flatMap((r) => r.broken),
+      INVALID,
+    ).toEqual([]);
+    expect(missed, `medians of ${RUNS} runs`).toEqual([]);
   });
 });
+
+/** A budget judged on the median of a metric across the runs: at most `limit`. */
+interface Budgeted {
+  metric: string;
+  unit: string;
+  limit: number;
+}
+
+/**
+ * The budgets the medians miss. Prints the medians, and records each metric's samples to
+ * PERF_SAMPLES_DIR when it is set.
+ */
+function judge(name: string, rows: Record<string, unknown>[], budgets: Budgeted[]): string[] {
+  const medians: Record<string, number> = {};
+  const missed: string[] = [];
+  for (const b of budgets) {
+    const samples = rows.map((row) => Number(row[b.metric]));
+    const mid = median(samples);
+    medians[b.metric] = Number(mid.toFixed(4));
+    const pass = mid <= b.limit;
+    recordSample(process.env.PERF_SAMPLES_DIR, {
+      metric: `${name}: ${b.metric}`,
+      unit: b.unit,
+      median: mid,
+      limit: b.limit,
+      pass,
+      samples,
+    });
+    if (!pass) {
+      missed.push(
+        `${b.metric}: median ${fmt(mid)} > ${fmt(b.limit)} (runs ${samples.map(fmt).join(', ')})`,
+      );
+    }
+  }
+  console.log(`[perf] ${name}, median of ${rows.length}: ${JSON.stringify(medians)}`);
+  return missed;
+}
 
 async function openExplorer(browser: Browser) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -277,22 +361,22 @@ async function measureExplorer(browser: Browser, testInfo: TestInfo, run: number
     moved: [last - first, plainLast - plainFirst],
     tasks: trace.tasks,
     longTasksMs: trace.long,
+    longestTaskMs: Math.max(0, ...trace.long),
     frames: gaps.length,
     maxFrameMs: Number(Math.max(0, ...gaps).toFixed(2)),
   };
-  const missed = [
+  // What says this run measured anything; it must hold on every run.
+  const broken = [
     measured.moved.every((n) => n >= EXPLORER.minSteps)
       ? null
-      : `the selection moved ${measured.moved.join(' and ')} steps, not ${EXPLORER.minSteps}`,
-    trace.tasks > 0 ? null : 'the trace holds no main-thread task',
-    trace.long.length === 0 ? null : `tasks over 50 ms: ${trace.long.join(', ')}`,
-    measured.frames > EXPLORER.ms / 20 ? null : `only ${measured.frames} frames`,
-    measured.maxFrameMs <= EXPLORER.frameMs ? null : `a frame of ${measured.maxFrameMs} ms`,
+      : `run ${run + 1}: the selection moved ${measured.moved.join(' and ')} steps, not ${EXPLORER.minSteps}`,
+    trace.tasks > 0 ? null : `run ${run + 1}: the trace holds no main-thread task`,
+    measured.frames > EXPLORER.ms / 20 ? null : `run ${run + 1}: only ${measured.frames} frames`,
   ].filter((x): x is string => x !== null);
-  return { measured, missed };
+  return { measured, broken };
 }
 
-/** One traced and one untraced pass over a window, and the budgets the run missed. */
+/** One traced and one untraced pass over a window, and what says the run measured nothing. */
 async function measure(
   browser: Browser,
   w: (typeof WINDOWS)[number],
@@ -343,6 +427,7 @@ async function measure(
     tasks: trace.tasks,
     longTasks: trace.long.length,
     longTasksMs: trace.long,
+    longestTaskMs: Math.max(0, ...trace.long),
     layoutShift: Number(trace.shift.toFixed(4)),
     frames: gaps.length,
     p95FrameMs: Number((gaps[Math.floor(gaps.length * 0.95)] ?? 0).toFixed(2)),
@@ -352,26 +437,15 @@ async function measure(
       (gaps.filter((g) => g > BUDGET.p95FrameMs).length / gaps.length).toFixed(4),
     ),
     slowFrames: gaps.filter((g) => g > BUDGET.slowFrameMs).length,
+    // Unrounded: the budget is a share of the intervals, and rounding would move its edge.
+    slowShare: gaps.filter((g) => g > BUDGET.slowFrameMs).length / gaps.length,
     maxFrameMs: Number((gaps.at(-1) ?? 0).toFixed(2)),
   };
-  const missed = [
-    trace.mainThreads > 0 ? null : 'the trace holds no main thread',
-    trace.tasks > 0 ? null : 'the trace holds no main-thread task',
-    measured.frames > WINDOW_MS / 20 ? null : `only ${measured.frames} frames`,
-    trace.long.some((ms) => ms > BUDGET.stallMs)
-      ? `tasks over ${BUDGET.stallMs} ms: ${trace.long.filter((ms) => ms > BUDGET.stallMs).join(', ')}`
-      : null,
-    measured.longTasks <= w.longTasks
-      ? null
-      : `${measured.longTasks} tasks over 50 ms (at most ${w.longTasks})`,
-    measured.layoutShift <= BUDGET.layoutShift ? null : `layout shift ${measured.layoutShift}`,
-    measured.p95FrameMs <= BUDGET.p95FrameMs
-      ? null
-      : `p95FrameMs ${measured.p95FrameMs} > ${BUDGET.p95FrameMs}`,
-    measured.slowFrames <= gaps.length * BUDGET.slowShare
-      ? null
-      : `slowFrames ${measured.slowFrames} > ${(gaps.length * BUDGET.slowShare).toFixed(1)}`,
-    measured.maxFrameMs <= BUDGET.maxFrameMs ? null : `a frame of ${measured.maxFrameMs} ms`,
+  // What says this run measured anything; it must hold on every run.
+  const broken = [
+    trace.mainThreads > 0 ? null : `run ${run + 1}: the trace holds no main thread`,
+    trace.tasks > 0 ? null : `run ${run + 1}: the trace holds no main-thread task`,
+    measured.frames > WINDOW_MS / 20 ? null : `run ${run + 1}: only ${measured.frames} frames`,
   ].filter((x): x is string => x !== null);
-  return { measured, missed, before, after };
+  return { measured, broken, before, after };
 }

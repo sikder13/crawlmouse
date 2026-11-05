@@ -1,3 +1,4 @@
+import { expectWithinBudget } from '@crawlmouse/timing';
 import { describe, expect, it } from 'vitest';
 import { MAX_KEPT_BYTES } from '../fetch/fetcher.js';
 import { outcome } from '../test-support/outcome.js';
@@ -104,11 +105,14 @@ describe('nesting depth', () => {
     // The slowest shape review round 6 found: every close tag searches the open elements, which the
     // limit holds to 511. 0.2 to 0.3 s on a workstation; the bound leaves room for a loaded runner.
     const page = `<body>${'<div>'.repeat(510)}${'</span>'.repeat(300_000)}`;
-    const t0 = performance.now();
-    const { $, note } = readHtml({ body: page, bodyCut: false });
+    const { values } = expectWithinBudget(
+      'readHtml, 2 MiB of stray close tags under 510 open elements',
+      (f: { body: string; bodyCut: boolean }) => readHtml(f),
+      { budgetMs: 3_000, setup: () => ({ body: page, bodyCut: false }) },
+    );
+    const { $, note } = values[0]!;
     expect($).not.toBeNull();
     expect(note).toBe(READ_IN_PART_TAGS);
-    expect(performance.now() - t0).toBeLessThan(3_000);
   });
 
   it('counts depth as domDepth does: script and style add no level', () => {

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import { runAudit } from './audit.js';
-import { MIN_COVERAGE_PAGES } from './constants.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // T1 (§0 bug, §1 node-eligibility): blocked/dead fetches must never become
@@ -31,12 +30,28 @@ describe('T1: blocked/dead fetches are not gradeable nodes (§0/§1)', () => {
         res.end(sitemap());
         return;
       }
-      if (path === '/robots.txt') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/robots.txt') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
 
       // Non-200 fetches, discoverable only via the sitemap (no inbound link).
-      if (path === '/dead') { res.statusCode = 404; res.end('not found'); return; }       // dead (4xx)
-      if (path === '/forbidden') { res.statusCode = 403; res.end('forbidden'); return; }   // blocked (4xx)
-      if (path === '/srverr') { res.statusCode = 500; res.end('server error'); return; }   // blocked (5xx → status 0)
+      if (path === '/dead') {
+        res.statusCode = 404;
+        res.end('not found');
+        return;
+      } // dead (4xx)
+      if (path === '/forbidden') {
+        res.statusCode = 403;
+        res.end('forbidden');
+        return;
+      } // blocked (4xx)
+      if (path === '/srverr') {
+        res.statusCode = 500;
+        res.end('server error');
+        return;
+      } // blocked (5xx → status 0)
 
       res.setHeader('content-type', 'text/html');
       const links: Record<string, string[]> = {
@@ -59,14 +74,17 @@ describe('T1: blocked/dead fetches are not gradeable nodes (§0/§1)', () => {
           `thin-content gate so it stays inside the gradeable population this test measures.</p>`;
         res.end(`<html><head><title>${key}</title></head><body>${as}${body}</body></html>`);
       } else {
-        res.statusCode = 404; res.end('');
+        res.statusCode = 404;
+        res.end('');
       }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   });
 
-  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+  afterAll(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
 
   it('does not flag non-200 fetches, and the orphan dimension is perfect', async () => {
     const result = await runAudit(
@@ -95,7 +113,9 @@ describe('T1: blocked/dead fetches are not gradeable nodes (§0/§1)', () => {
     // (control) The genuinely linked 200 pages are never flagged orphan/unreachable.
     for (const p of ['/a', '/b', '/c', '/d']) {
       const refs = result.findings.filter(
-        (f) => f.pageUrl === `${base}${p}` && (f.category === 'orphan' || f.category === 'unreachable_page'),
+        (f) =>
+          f.pageUrl === `${base}${p}` &&
+          (f.category === 'orphan' || f.category === 'unreachable_page'),
       );
       expect(refs, `linked 200 page ${p} must not be a false orphan/unreachable`).toHaveLength(0);
     }
@@ -114,24 +134,44 @@ describe('T2: determinism on a clean crawl, same cap (R1)', () => {
   beforeAll(async () => {
     server = http.createServer((req, res) => {
       const path = req.url ?? '/';
-      if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/robots.txt' || path === '/sitemap.xml') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
       res.setHeader('content-type', 'text/html');
       const links: Record<string, string[]> = {
-        '/': ['/a', '/b', '/c'], '/a': ['/b', '/c'], '/b': ['/a', '/c'], '/c': ['/a', '/b'],
+        '/': ['/a', '/b', '/c'],
+        '/a': ['/b', '/c'],
+        '/b': ['/a', '/c'],
+        '/c': ['/a', '/b'],
       };
       const key = path === '' ? '/' : path;
       if (links[key]) {
-        res.end(`<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">link ${h}</a>`).join('')}</body></html>`);
-      } else { res.statusCode = 404; res.end(''); }
+        res.end(
+          `<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">link ${h}</a>`).join('')}</body></html>`,
+        );
+      } else {
+        res.statusCode = 404;
+        res.end('');
+      }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   });
 
-  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+  afterAll(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
 
   it('produces an identical grade across two runs', async () => {
-    const opts = { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+    const opts = {
+      url: base,
+      pageCap: 100,
+      perHostConcurrency: 2,
+      staggerMs: 0,
+      pageTimeoutMs: 5000,
+    } as const;
     const a = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
     const b = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
 
@@ -157,7 +197,11 @@ describe('T3: cap-independence when the site fits, cap 500 vs 2000 (R2)', () => 
   beforeAll(async () => {
     server = http.createServer((req, res) => {
       const path = req.url ?? '/';
-      if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/robots.txt' || path === '/sitemap.xml') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
       res.setHeader('content-type', 'text/html');
       // SIX interlinked pages, each with real prose. The fixture used to be four bare link-lists, which
       // SPEC 5.1a Stage 4 refuses twice over: below MIN_GRADEABLE_PAGES, and thin-gated down to a
@@ -166,8 +210,11 @@ describe('T3: cap-independence when the site fits, cap 500 vs 2000 (R2)', () => 
       // the fixture grew rather than the assertion shrinking.
       const links: Record<string, string[]> = {
         '/': ['/a', '/b', '/c', '/d', '/e'],
-        '/a': ['/b', '/c'], '/b': ['/a', '/c'], '/c': ['/a', '/b'],
-        '/d': ['/a', '/e'], '/e': ['/b', '/d'],
+        '/a': ['/b', '/c'],
+        '/b': ['/a', '/c'],
+        '/c': ['/a', '/b'],
+        '/d': ['/a', '/e'],
+        '/e': ['/b', '/d'],
       };
       const key = path === '' ? '/' : path;
       if (links[key]) {
@@ -177,18 +224,29 @@ describe('T3: cap-independence when the site fits, cap 500 vs 2000 (R2)', () => 
           `prose so that it clears the thin-content gate comfortably and stays inside the gradeable ` +
           `population, because the assertion below is about the grade and not about exclusion.</p>`;
         res.end(`<html><head><title>${key}</title></head><body>${as}${body}</body></html>`);
-      } else { res.statusCode = 404; res.end(''); }
+      } else {
+        res.statusCode = 404;
+        res.end('');
+      }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   });
 
-  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+  afterAll(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
 
   it('grade is within ±2 across caps when the site fits', async () => {
     const common = { url: base, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
-    const at500 = await runAudit({ ...common, pageCap: 500 }, { allowPrivateIpsForTesting: true, engineV2: true });
-    const at2000 = await runAudit({ ...common, pageCap: 2000 }, { allowPrivateIpsForTesting: true, engineV2: true });
+    const at500 = await runAudit(
+      { ...common, pageCap: 500 },
+      { allowPrivateIpsForTesting: true, engineV2: true },
+    );
+    const at2000 = await runAudit(
+      { ...common, pageCap: 2000 },
+      { allowPrivateIpsForTesting: true, engineV2: true },
+    );
 
     // The whole site (4 pages) fits within both caps → identical sample → grade within ±2.
     // Both must actually HAVE a grade. A refused audit has a null score, and `null - null` is 0 in JS —
@@ -218,26 +276,45 @@ describe('§3: sitemap-only 200 page is an orphan (not deep_page); depth is home
         res.setHeader('content-type', 'application/xml');
         res.end(
           `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
-            ['/', '/a', '/b', '/c', '/lonely'].map((p) => `<url><loc>${base}${p === '/' ? '/' : p}</loc></url>`).join('') +
+            ['/', '/a', '/b', '/c', '/lonely']
+              .map((p) => `<url><loc>${base}${p === '/' ? '/' : p}</loc></url>`)
+              .join('') +
             `</urlset>`,
         );
         return;
       }
-      if (path === '/robots.txt') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/robots.txt') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
       res.setHeader('content-type', 'text/html');
       // A reachable chain from the homepage (depths 1,2,3 — none "too deep"), plus /lonely, which
       // is in the sitemap only and linked from nowhere.
-      const links: Record<string, string[]> = { '/': ['/a'], '/a': ['/b'], '/b': ['/c'], '/c': ['/'], '/lonely': [] };
+      const links: Record<string, string[]> = {
+        '/': ['/a'],
+        '/a': ['/b'],
+        '/b': ['/c'],
+        '/c': ['/'],
+        '/lonely': [],
+      };
       const key = path === '' ? '/' : path;
       if (links[key] !== undefined) {
-        res.end(`<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">${h}</a>`).join('')}<h1>${key}</h1><p>Real body text, so this is a CONTENT page under the SPEC 5.1a thin gate. The subject here is inbound links and BFS depth, not how much text a page has — an empty body would now classify as thin, leave the gradeable population, and silence the orphan finding.</p></body></html>`);
-      } else { res.statusCode = 404; res.end(''); }
+        res.end(
+          `<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">${h}</a>`).join('')}<h1>${key}</h1><p>Real body text, so this is a CONTENT page under the SPEC 5.1a thin gate. The subject here is inbound links and BFS depth, not how much text a page has — an empty body would now classify as thin, leave the gradeable population, and silence the orphan finding.</p></body></html>`,
+        );
+      } else {
+        res.statusCode = 404;
+        res.end('');
+      }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   });
 
-  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+  afterAll(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
 
   it('flags the sitemap-only page as orphan, never deep_page, with null depth', async () => {
     const result = await runAudit(
@@ -250,7 +327,9 @@ describe('§3: sitemap-only 200 page is an orphan (not deep_page); depth is home
     const lonelyFindings = result.findings.filter((f) => f.pageUrl === lonely);
     expect(lonelyFindings.map((f) => f.category)).toEqual(['orphan']);
     // Null BFS depth must NOT manufacture a deep_page finding (the spec's "orphan, not deep page").
-    expect(result.findings.some((f) => f.category === 'deep_page' && f.pageUrl === lonely)).toBe(false);
+    expect(result.findings.some((f) => f.category === 'deep_page' && f.pageUrl === lonely)).toBe(
+      false,
+    );
 
     // Depth is homepage-rooted: the orphan has no link path from home → null depth + isOrphan.
     const lonelyPage = result.pages.find((p) => p.url === lonely);
@@ -287,10 +366,16 @@ describe('§3: deterministic (URL-ordered) seed truncation when the sitemap exce
         const locs = ['/', ...[...PATHS].reverse()]
           .map((p) => `<url><loc>${base}${p === '/' ? '/' : p}</loc></url>`)
           .join('');
-        res.end(`<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${locs}</urlset>`);
+        res.end(
+          `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${locs}</urlset>`,
+        );
         return;
       }
-      if (path === '/robots.txt') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/robots.txt') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
       // Standalone pages (no inter-links): the only discovery path is the sitemap seed list, so the
       // page-cap truncation acts purely on the (sorted) seeds.
       res.setHeader('content-type', 'text/html');
@@ -300,10 +385,18 @@ describe('§3: deterministic (URL-ordered) seed truncation when the sitemap exce
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   });
 
-  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+  afterAll(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
 
   it('selects the same lexicographically-first subset on every run', async () => {
-    const opts = { url: base, pageCap: 4, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+    const opts = {
+      url: base,
+      pageCap: 4,
+      perHostConcurrency: 2,
+      staggerMs: 0,
+      pageTimeoutMs: 5000,
+    } as const;
     const run1 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
     const run2 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
 
@@ -332,29 +425,56 @@ describe('§6: crawl-health & confidence on the result (v2)', () => {
         res.setHeader('content-type', 'application/xml');
         res.end(
           `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
-            ['/', '/a', '/blocked', '/reset'].map((p) => `<url><loc>${base}${p === '/' ? '/' : p}</loc></url>`).join('') +
+            ['/', '/a', '/blocked', '/reset']
+              .map((p) => `<url><loc>${base}${p === '/' ? '/' : p}</loc></url>`)
+              .join('') +
             `</urlset>`,
         );
         return;
       }
-      if (path === '/robots.txt') { res.statusCode = 404; res.end(''); return; }
-      if (path === '/blocked') { res.statusCode = 429; res.end('slow down'); return; } // blocked
-      if (path === '/reset') { res.statusCode = 500; res.end('boom'); return; }        // 5xx → status 0 → blocked
+      if (path === '/robots.txt') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
+      if (path === '/blocked') {
+        res.statusCode = 429;
+        res.end('slow down');
+        return;
+      } // blocked
+      if (path === '/reset') {
+        res.statusCode = 500;
+        res.end('boom');
+        return;
+      } // 5xx → status 0 → blocked
       res.setHeader('content-type', 'text/html');
       const links: Record<string, string[]> = { '/': ['/a'], '/a': ['/'] };
       const key = path === '' ? '/' : path;
       if (links[key]) {
-        res.end(`<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">${h}</a>`).join('')}</body></html>`);
-      } else { res.statusCode = 404; res.end(''); }
+        res.end(
+          `<html><head><title>${key}</title></head><body>${links[key].map((h) => `<a href="${h}">${h}</a>`).join('')}</body></html>`,
+        );
+      } else {
+        res.statusCode = 404;
+        res.end('');
+      }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   });
 
-  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+  afterAll(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
 
   it('reports counts + low confidence under v2, and is absent under v1', async () => {
-    const opts = { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+    const opts = {
+      url: base,
+      pageCap: 100,
+      perHostConcurrency: 2,
+      staggerMs: 0,
+      pageTimeoutMs: 5000,
+    } as const;
 
     const v2 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
     expect(v2.crawlHealth).toBeDefined();
@@ -392,27 +512,50 @@ describe('§6/§2: low confidence keeps the true grade but caveats it with a ban
         res.setHeader('content-type', 'application/xml');
         res.end(
           `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
-            ['/', ...OK, '/b1', '/b2'].map((p) => `<url><loc>${base}${p === '/' ? '/' : p}</loc></url>`).join('') +
+            ['/', ...OK, '/b1', '/b2']
+              .map((p) => `<url><loc>${base}${p === '/' ? '/' : p}</loc></url>`)
+              .join('') +
             `</urlset>`,
         );
         return;
       }
-      if (path === '/robots.txt') { res.statusCode = 404; res.end(''); return; }
-      if (path === '/b1') { res.statusCode = 429; res.end('slow down'); return; }
-      if (path === '/b2') { res.statusCode = 500; res.end('boom'); return; }
+      if (path === '/robots.txt') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
+      if (path === '/b1') {
+        res.statusCode = 429;
+        res.end('slow down');
+        return;
+      }
+      if (path === '/b2') {
+        res.statusCode = 500;
+        res.end('boom');
+        return;
+      }
       res.setHeader('content-type', 'text/html');
       if (path === '/' || path === '') {
         // Homepage links to all five children (each thus has an inbound link → no orphans).
-        res.end(`<html><head><title>Home</title></head><body>${OK.map((h) => `<a href="${h}">${h}</a>`).join('')}</body></html>`);
+        res.end(
+          `<html><head><title>Home</title></head><body>${OK.map((h) => `<a href="${h}">${h}</a>`).join('')}</body></html>`,
+        );
       } else if (OK.includes(path)) {
-        res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
-      } else { res.statusCode = 404; res.end(''); }
+        res.end(
+          `<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`,
+        );
+      } else {
+        res.statusCode = 404;
+        res.end('');
+      }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   });
 
-  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+  afterAll(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
 
   it('keeps the true grade on low confidence but caveats it with a band + incomplete_crawl (§2)', async () => {
     const result = await runAudit(
@@ -463,7 +606,11 @@ describe('T5: URL identity & canonicalization (§2)', () => {
   beforeAll(async () => {
     server = http.createServer((req, res) => {
       const pathname = (req.url ?? '/').split('?')[0];
-      if (pathname === '/robots.txt' || pathname === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      if (pathname === '/robots.txt' || pathname === '/sitemap.xml') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
       res.setHeader('content-type', 'text/html');
       if (pathname === '/' || pathname === '') {
         // The homepage links to the SAME page three ways: bare, trailing-slash, and campaign-tagged.
@@ -473,23 +620,36 @@ describe('T5: URL identity & canonicalization (§2)', () => {
         );
       } else if (pathname === '/page' || pathname === '/page/') {
         res.end('<html><head><title>Page</title></head><body><a href="/">home</a></body></html>');
-      } else { res.statusCode = 404; res.end(''); }
+      } else {
+        res.statusCode = 404;
+        res.end('');
+      }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   });
 
-  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+  afterAll(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
 
   it('collapses trailing-slash + tracking-param URL identities under v2 (v1 keeps the tracking variant)', async () => {
-    const opts = { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+    const opts = {
+      url: base,
+      pageCap: 100,
+      perHostConcurrency: 2,
+      staggerMs: 0,
+      pageTimeoutMs: 5000,
+    } as const;
 
     const v2 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
     // One page node for the target (no /page/ or ?utm variant).
     expect(v2.pages.filter((p) => p.url.includes('/page')).length).toBe(1);
     expect(v2.pages.some((p) => p.url.includes('utm_source'))).toBe(false);
     // The IDENTITY layer is what §2 fixes: no link edge carries a trailing slash or a tracking param.
-    expect(v2.links.every((l) => !l.toUrl.includes('utm_source') && !l.toUrl.endsWith('/page/'))).toBe(true);
+    expect(
+      v2.links.every((l) => !l.toUrl.includes('utm_source') && !l.toUrl.endsWith('/page/')),
+    ).toBe(true);
 
     // v1 does not strip tracking params, so the campaign-tagged link target survives as a distinct
     // identity (a duplicate edge whose node is dropped — the double-counting §2 eliminates).
@@ -513,25 +673,44 @@ describe('T5: rel=canonical consolidation (§2)', () => {
   beforeAll(async () => {
     server = http.createServer((req, res) => {
       const pathname = (req.url ?? '/').split('?')[0];
-      if (pathname === '/robots.txt' || pathname === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      if (pathname === '/robots.txt' || pathname === '/sitemap.xml') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
       res.setHeader('content-type', 'text/html');
       if (pathname === '/' || pathname === '') {
-        res.end('<html><head><title>Home</title></head><body><a href="/main">m</a><a href="/variant">v</a></body></html>');
+        res.end(
+          '<html><head><title>Home</title></head><body><a href="/main">m</a><a href="/variant">v</a></body></html>',
+        );
       } else if (pathname === '/main') {
         res.end('<html><head><title>Main</title></head><body><a href="/">home</a></body></html>');
       } else if (pathname === '/variant') {
         // Declares /main as canonical → consolidates onto /main under v2.
-        res.end('<html><head><title>Variant</title><link rel="canonical" href="/main"></head><body><a href="/">home</a></body></html>');
-      } else { res.statusCode = 404; res.end(''); }
+        res.end(
+          '<html><head><title>Variant</title><link rel="canonical" href="/main"></head><body><a href="/">home</a></body></html>',
+        );
+      } else {
+        res.statusCode = 404;
+        res.end('');
+      }
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   });
 
-  afterAll(async () => { await new Promise<void>((r) => server.close(() => r())); });
+  afterAll(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
 
   it('consolidates the canonicalised-away page onto its canonical under v2 (v1 keeps it separate)', async () => {
-    const opts = { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+    const opts = {
+      url: base,
+      pageCap: 100,
+      perHostConcurrency: 2,
+      staggerMs: 0,
+      pageTimeoutMs: 5000,
+    } as const;
 
     const v2 = await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
     expect(v2.pages.some((p) => p.url.endsWith('/main'))).toBe(true);
@@ -555,10 +734,16 @@ describe('T6: politeness vs the 240s/300s budget (§5)', () => {
         res.end('User-agent: *\nCrawl-delay: 1');
         return;
       }
-      if (path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/sitemap.xml') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
       res.setHeader('content-type', 'text/html');
       if (path === '/' || path === '') {
-        res.end('<html><head><title>H</title></head><body><a href="/a">a</a><a href="/b">b</a></body></html>');
+        res.end(
+          '<html><head><title>H</title></head><body><a href="/a">a</a><a href="/b">b</a></body></html>',
+        );
         return;
       }
       res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
@@ -566,7 +751,13 @@ describe('T6: politeness vs the 240s/300s budget (§5)', () => {
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
     try {
-      const opts = { url: base, pageCap: 50, perHostConcurrency: 4, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+      const opts = {
+        url: base,
+        pageCap: 50,
+        perHostConcurrency: 4,
+        staggerMs: 0,
+        pageTimeoutMs: 5000,
+      } as const;
 
       const t0 = Date.now();
       await runAudit({ ...opts }, { allowPrivateIpsForTesting: true, engineV2: true });
@@ -590,7 +781,11 @@ describe('T6: politeness vs the 240s/300s budget (§5)', () => {
     const slowHits: number[] = [];
     const server = http.createServer((req, res) => {
       const path = req.url ?? '/';
-      if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/robots.txt' || path === '/sitemap.xml') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
       if (path === '/slow') {
         slowHits.push(Date.now());
         if (slowHits.length === 1) {
@@ -633,9 +828,16 @@ describe('T6: politeness vs the 240s/300s budget (§5)', () => {
     const N = 60;
     const server = http.createServer((req, res) => {
       const path = req.url ?? '/';
-      if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+      if (path === '/robots.txt' || path === '/sitemap.xml') {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
       if (path === '/' || path === '') {
-        const links = Array.from({ length: N }, (_, i) => `<a href="/p${i + 1}">p${i + 1}</a>`).join('');
+        const links = Array.from(
+          { length: N },
+          (_, i) => `<a href="/p${i + 1}">p${i + 1}</a>`,
+        ).join('');
         res.setHeader('content-type', 'text/html');
         res.end(`<html><head><title>H</title></head><body>${links}</body></html>`);
         return;
@@ -646,14 +848,24 @@ describe('T6: politeness vs the 240s/300s budget (§5)', () => {
         try {
           if (res.writableEnded) return;
           res.setHeader('content-type', 'text/html');
-          res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
-        } catch { /* socket torn down on budget exhaustion */ }
+          res.end(
+            `<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`,
+          );
+        } catch {
+          /* socket torn down on budget exhaustion */
+        }
       }, 150);
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
     try {
-      const opts = { url: base, pageCap: 100, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000 } as const;
+      const opts = {
+        url: base,
+        pageCap: 100,
+        perHostConcurrency: 2,
+        staggerMs: 0,
+        pageTimeoutMs: 5000,
+      } as const;
 
       const t0 = Date.now();
       const result = await runAudit(
@@ -677,60 +889,6 @@ describe('T6: politeness vs the 240s/300s budget (§5)', () => {
       await expect(
         runAudit({ ...opts }, { allowPrivateIpsForTesting: true, maxCrawlMsForTesting: 1500 }),
       ).rejects.toThrow(/timed out|timeout/i);
-    } finally {
-      server.closeAllConnections?.();
-      await new Promise<void>((r) => server.close(() => r()));
-    }
-  }, 30000);
-
-  it('certifies a budget-exhausted deep-chain crawl as low-confidence + caveated (high coverage is a mirage)', async () => {
-    // A deep CHAIN: each page links ONLY to the next, so the crawl is serial and the un-crawled tail
-    // is never DISCOVERED → coverage (fetchedOk/discovered) reads ~1.0 even though we saw a fraction of
-    // the site. Without budget→low-confidence this would be graded a confident A–F on a partial crawl.
-    const N = 80;
-    const server = http.createServer((req, res) => {
-      const path = req.url ?? '/';
-      if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
-      const n = path === '/' || path === '' ? 0 : (/^\/(\d+)$/.exec(path) ? Number(/^\/(\d+)$/.exec(path)![1]) : -1);
-      if (n < 0) { res.statusCode = 404; res.end(''); return; }
-      res.on('error', () => {});
-      setTimeout(() => {
-        try {
-          if (res.writableEnded) return;
-          res.setHeader('content-type', 'text/html');
-          res.end(
-            n + 1 <= N
-              ? `<html><head><title>${n}</title></head><body><a href="/${n + 1}">next</a></body></html>`
-              : `<html><head><title>${n}</title></head><body>end</body></html>`,
-          );
-        } catch { /* socket torn down on budget exhaustion */ }
-      }, 150);
-    });
-    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
-    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
-    try {
-      const result = await runAudit(
-        { url: base, pageCap: 200, perHostConcurrency: 4, staggerMs: 0, pageTimeoutMs: 5000 },
-        { allowPrivateIpsForTesting: true, engineV2: true, maxCrawlMsForTesting: 2000 },
-      );
-
-      // Enough pages to clear the thin-crawl floor, so budget exhaustion (not page count) is the thing
-      // forcing low confidence; and not the whole chain (it's partial).
-      const ok = result.pages.filter((p) => p.statusCode === 200).length;
-      expect(ok).toBeGreaterThanOrEqual(MIN_COVERAGE_PAGES);
-      expect(result.pages.length).toBeLessThan(N);
-
-      // The trust contract (§2): a budget-cut partial crawl is low-confidence, partial, and caveated by
-      // the band's estimate framing + the incomplete_crawl finding — never the old blunt score cap.
-      expect(result.crawlHealth?.partial).toBe(true);
-      expect(result.crawlHealth?.confidence).toBe('low');
-      expect(result.findings.some((f) => f.category === 'incomplete_crawl')).toBe(true);
-      // "High coverage is a mirage" is the claim, and it survives intact: the crawl is still marked
-      // partial and low-confidence, and the incomplete_crawl finding still explains why. What no longer
-      // survives is the band, because this fixture is refused — and a band exists to caveat a number
-      // that was asserted. There is none to caveat.
-      expect(result.confidenceBand, 'no band around a verdict we withheld').toBeUndefined();
-      expect(result.score, 'a refused audit asserts no score').toBeNull();
     } finally {
       server.closeAllConnections?.();
       await new Promise<void>((r) => server.close(() => r()));

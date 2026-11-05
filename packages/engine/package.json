@@ -20,7 +20,8 @@
     }
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "sh -c 'vitest run --exclude src/test-timers-split.test.ts --exclude src/crawl-stall-retries.test.ts --exclude src/crawl-round-budget.test.ts --exclude src/reproducibility-deep-chain.test.ts \"$@\"; main=$?; pnpm run test:timers && exit $main' --",
+    "test:timers": "vitest run --no-file-parallelism --passWithNoTests=false src/test-timers-split.test.ts src/crawl-stall-retries.test.ts src/crawl-round-budget.test.ts src/reproducibility-deep-chain.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
@@ -33,6 +34,7 @@
     "graphology-pagerank": "^1.1.0"
   },
   "devDependencies": {
+    "@crawlmouse/timing": "workspace:*",
     "@types/node": "^22.5.0",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"

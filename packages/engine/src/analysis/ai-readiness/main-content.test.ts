@@ -1,3 +1,4 @@
+import { expectWithinRelative } from '@crawlmouse/timing';
 import * as cheerio from 'cheerio';
 import { describe, it, expect } from 'vitest';
 import { extractMainContent } from './main-content.js';
@@ -78,7 +79,9 @@ describe('extractMainContent (§4.1)', () => {
     // link-dense, but the cards ARE the content; density stripping must not empty the main text.
     const card = (n: number) =>
       `<div class="card"><a href="/post-${n}"><h2>Post ${n} Title Here</h2><p>A meaningful blurb describing post ${n} for the reader.</p></a></div>`;
-    const $ = cheerio.load(`<body><main><div class="grid">${card(1)}${card(2)}${card(3)}</div></main></body>`);
+    const $ = cheerio.load(
+      `<body><main><div class="grid">${card(1)}${card(2)}${card(3)}</div></main></body>`,
+    );
     const { text, mainTextChars } = extractMainContent($);
     expect(mainTextChars).toBeGreaterThan(0);
     expect(text).toContain('Post 1 Title Here');
@@ -168,7 +171,9 @@ describe('extractMainContent — strip equivalence and complexity', () => {
 
   /** ITERATED from the constants, never sampled — the previous test hand-picked 2 of 9 tags, and the
    *  two it skipped were the two that were broken. */
-  const SELECTORS = [...AI_STRUCTURAL_STRIP.split(','), ...CMP_STRIP_SELECTORS.split(',')].map((x) => x.trim());
+  const SELECTORS = [...AI_STRUCTURAL_STRIP.split(','), ...CMP_STRIP_SELECTORS.split(',')].map(
+    (x) => x.trim(),
+  );
   const fixtureFor = (sel: string): string => {
     if (sel.startsWith('#')) return `<div id="${sel.slice(1)}">STRIPME</div>`;
     if (sel.startsWith('.')) return `<div class="pre ${sel.slice(1)} post">STRIPME</div>`;
@@ -184,7 +189,10 @@ describe('extractMainContent — strip equivalence and complexity', () => {
    */
   const assertFixtureMatches = (sel: string) => {
     const $ = cheerio.load(`<html><body>${fixtureFor(sel)}</body></html>`);
-    expect($(sel).length, `fixtureFor(${JSON.stringify(sel)}) built a NON-MATCHING fixture — this case would pass vacuously`).toBe(1);
+    expect(
+      $(sel).length,
+      `fixtureFor(${JSON.stringify(sel)}) built a NON-MATCHING fixture — this case would pass vacuously`,
+    ).toBe(1);
   };
 
   it('matches the CSS-engine oracle for EVERY selector in both constants', () => {
@@ -192,11 +200,25 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     for (const sel of SELECTORS) {
       assertFixtureMatches(sel);
       agree(`positive ${sel}`, `<html><body><p>KEEP</p>${fixtureFor(sel)}</body></html>`);
-      agree(`nested ${sel}`, `<html><body><main><p>KEEP</p><div>${fixtureFor(sel)}</div></main></body></html>`);
-      agree(`uppercase ${sel}`, `<html><body><p>KEEP</p>${fixtureFor(sel).toUpperCase()}</body></html>`);
+      agree(
+        `nested ${sel}`,
+        `<html><body><main><p>KEEP</p><div>${fixtureFor(sel)}</div></main></body></html>`,
+      );
+      agree(
+        `uppercase ${sel}`,
+        `<html><body><p>KEEP</p>${fixtureFor(sel).toUpperCase()}</body></html>`,
+      );
       agree(`sole content ${sel}`, `<html><body>${fixtureFor(sel)}</body></html>`);
-      if (sel.startsWith('#')) agree(`id near-miss ${sel}`, `<html><body><div id="${sel.slice(1)}-x">KEEPME</div></body></html>`);
-      if (sel.startsWith('.')) agree(`class near-miss ${sel}`, `<html><body><div class="${sel.slice(1)}-x">KEEPME</div></body></html>`);
+      if (sel.startsWith('#'))
+        agree(
+          `id near-miss ${sel}`,
+          `<html><body><div id="${sel.slice(1)}-x">KEEPME</div></body></html>`,
+        );
+      if (sel.startsWith('.'))
+        agree(
+          `class near-miss ${sel}`,
+          `<html><body><div class="${sel.slice(1)}-x">KEEPME</div></body></html>`,
+        );
     }
   });
 
@@ -211,13 +233,31 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     // A differential test can prove the implementation agrees with cheerio. It cannot prove the
     // constants are right. That needs a literal expectation, so here is one.
     const structural = AI_STRUCTURAL_STRIP.split(',').map((x) => x.trim());
-    for (const required of ['nav', 'footer', 'header', 'aside', 'script', 'style', 'noscript', 'template', 'svg',
-                            '[role="navigation"]', '[role="banner"]', '[role="contentinfo"]']) {
+    for (const required of [
+      'nav',
+      'footer',
+      'header',
+      'aside',
+      'script',
+      'style',
+      'noscript',
+      'template',
+      'svg',
+      '[role="navigation"]',
+      '[role="banner"]',
+      '[role="contentinfo"]',
+    ]) {
       expect(structural, `AI_STRUCTURAL_STRIP must strip ${required}`).toContain(required);
     }
     const cmp = CMP_STRIP_SELECTORS.split(',').map((x) => x.trim());
-    for (const required of ['#onetrust-consent-sdk', '#CybotCookiebotDialog', '.cc-window',
-                            '#usercentrics-root', '#cookiescript_injected', '#cookie-law-info-bar']) {
+    for (const required of [
+      '#onetrust-consent-sdk',
+      '#CybotCookiebotDialog',
+      '.cc-window',
+      '#usercentrics-root',
+      '#cookiescript_injected',
+      '#cookie-law-info-bar',
+    ]) {
       expect(cmp, `CMP_STRIP_SELECTORS must strip ${required}`).toContain(required);
     }
   });
@@ -227,7 +267,9 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     // deletion fails here even though the oracle would agree with it.
     for (const sel of SELECTORS) {
       assertFixtureMatches(sel);
-      const text = extractMainContent(cheerio.load(`<html><body><p>KEEP</p>${fixtureFor(sel)}</body></html>`)).text;
+      const text = extractMainContent(
+        cheerio.load(`<html><body><p>KEEP</p>${fixtureFor(sel)}</body></html>`),
+      ).text;
       expect(text, `${sel} must be stripped`).toBe('KEEP');
     }
   });
@@ -236,10 +278,19 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     // script/style: domhandler types them as 'script'/'style', not 'tag'.
     agree('inline script', '<html><body><p>KEEP</p><script>var SECRET=1;</script></body></html>');
     agree('inline style', '<html><body><style>.a{color:red}</style><p>KEEP</p></body></html>');
-    agree('next shell', '<html><body><div id="__next"></div><script id="__NEXT_DATA__">{"props":{"x":1}}</script></body></html>');
+    agree(
+      'next shell',
+      '<html><body><div id="__next"></div><script id="__NEXT_DATA__">{"props":{"x":1}}</script></body></html>',
+    );
     // <body> itself carrying a strip attribute: `.find()` searches DESCENDANTS ONLY and can never strip
     // the root, so neither may we — the hand-rolled version did, blanking the whole page.
-    for (const attr of ['role="banner"', 'role="navigation"', 'role="contentinfo"', 'class="cc-window"', 'id="usercentrics-root"'])
+    for (const attr of [
+      'role="banner"',
+      'role="navigation"',
+      'role="contentinfo"',
+      'class="cc-window"',
+      'id="usercentrics-root"',
+    ])
       agree(`body ${attr}`, `<html><body ${attr}><p>PROSE SURVIVES</p></body></html>`);
   });
 
@@ -260,16 +311,24 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     // discriminated machine state rather than time complexity, and it went red on correct code 1 run in 7.
     //
     // This compares two shapes with the SAME node count instead: flat siblings vs 100-per-parent. The
-    // ratio is self-relative, so machine speed cancels. Measured: quadratic 21.6x, linear 1.1x.
+    // ratio is self-relative, so machine speed cancels. Measured: quadratic 21.6x, linear 1.1x. Each
+    // side is the median of five interleaved runs (docs/ops/ci-timing.md), not one run, each on a
+    // document parsed for it off the clock.
     const N = 20_000;
     const flat = `<html><body><p>hi</p>${'<h1>x</h1>'.repeat(N)}</body></html>`;
     const nested = `<html><body><p>hi</p>${Array.from({ length: N / 100 }, () => `<div>${'<h1>x</h1>'.repeat(100)}</div>`).join('')}</body></html>`;
-    const $flat = cheerio.load(flat);
-    const $nested = cheerio.load(nested);
-    let t = performance.now(); extractMainContent($flat); const flatMs = performance.now() - t;
-    t = performance.now(); extractMainContent($nested); const nestedMs = performance.now() - t;
-    const ratio = flatMs / Math.max(nestedMs, 0.5);
-    expect(ratio, `flat ${flatMs.toFixed(0)}ms / nested ${nestedMs.toFixed(0)}ms = ${ratio.toFixed(1)}x`).toBeLessThan(5);
+    expectWithinRelative(
+      'main content, flat siblings against the same nodes nested',
+      {
+        measured: ($: cheerio.CheerioAPI) => extractMainContent($),
+        reference: ($: cheerio.CheerioAPI) => extractMainContent($),
+      },
+      {
+        limit: (nestedMs) => 5 * Math.max(nestedMs, 0.5),
+        rule: 'under 5x the nested shape',
+        setup: () => ({ measured: cheerio.load(flat), reference: cheerio.load(nested) }),
+      },
+    );
   }, 30_000);
 
   it('COMPLEXITY: on the DEPTH axis, extraction stays a small fraction of the parse', () => {
@@ -280,17 +339,26 @@ describe('extractMainContent — strip equivalence and complexity', () => {
     //
     // So the guard is the MARGINAL cost — extraction relative to the parse the page already pays.
     // Measured stable at 0.23x (depth 4 000) and 0.20x (depth 16 000); the bound is 1.0x, which a real
-    // depth regression in this walk would blow through while machine speed cancels out.
+    // depth regression in this walk would blow through while machine speed cancels out. Each side is
+    // the median of five interleaved runs (docs/ops/ci-timing.md), not one run; each extraction reads
+    // a document parsed for it off the clock.
     const html = `<html><body>${'<div>'.repeat(8_000)}prose${'</div>'.repeat(8_000)}</body></html>`;
-    let t = performance.now();
-    const $ = cheerio.load(html);
-    const parseMs = performance.now() - t;
-    t = performance.now();
-    const out = extractMainContent($);
-    const extractMs = performance.now() - t;
-    expect(out.mainTextChars, 'the prose must survive the depth').toBe(5);
-    const ratio = extractMs / Math.max(parseMs, 1);
-    expect(ratio, `extract ${extractMs.toFixed(0)}ms / parse ${parseMs.toFixed(0)}ms = ${ratio.toFixed(2)}x`).toBeLessThan(1);
+    expect(
+      extractMainContent(cheerio.load(html)).mainTextChars,
+      'the prose must survive the depth',
+    ).toBe(5);
+    expectWithinRelative(
+      'main content at depth 8,000, extraction against the parse',
+      {
+        measured: ($: cheerio.CheerioAPI) => extractMainContent($),
+        reference: () => cheerio.load(html),
+      },
+      {
+        limit: (parseMs) => Math.max(parseMs, 1),
+        rule: 'under the parse it follows',
+        setup: () => ({ measured: cheerio.load(html), reference: undefined }),
+      },
+    );
   }, 30_000);
 
   it('does NOT mutate the caller\u2019s DOM — nothing is cloned, so the walk must be read-only', () => {
