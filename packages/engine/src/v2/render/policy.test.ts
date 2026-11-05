@@ -180,8 +180,10 @@ describe('the reject-list', () => {
 describe('ordinary public pages', () => {
   // Labels that start with 0x are ordinary names when the last label is not numeric: a host matcher
   // keyed on digits must not take them for addresses.
+  // An `xn--` label is punycode, and a random one is usually not valid punycode, which the URL parser
+  // rejects before any rule is asked (seed 803787616 drew `xn--0`); such names are left out.
   const label = fc.oneof(
-    fc.stringMatching(/^[a-z][a-z0-9-]{0,14}[a-z0-9]$/),
+    fc.stringMatching(/^[a-z][a-z0-9-]{0,14}[a-z0-9]$/).filter((l) => !l.startsWith('xn--')),
     fc.stringMatching(/^0x[0-9a-f]{1,8}$/),
   );
   const tld = fc.constantFrom('com', 'org', 'net', 'io', 'co.uk', 'de', 'shop', 'zip');
