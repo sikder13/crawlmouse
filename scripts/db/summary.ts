@@ -11,8 +11,44 @@ export interface DryRunSummary {
   finishedAt: string;
   steps: Array<{ step: string; result: string }>;
   files: Array<{ file: string; sha256: string }>;
+  /** The rollback files the run executed, with their sha256. */
+  rollbacks: Array<{ file: string; sha256: string }>;
   /** Production's fingerprint as read at the start of the run, md5 per section. */
   production: Record<string, string>;
+}
+
+const FILE_ENTRY = /^\d{14}_[a-z0-9_]+(\.revert)?\.sql$/;
+const SHA256 = /^[0-9a-f]{64}$/;
+const MD5 = /^[0-9a-f]{32}$/;
+
+/**
+ * Reads a dry-run summary, refusing anything not shaped as `dryRun` writes it. The file comes from a
+ * workflow artifact, so it is data to check, not to trust: `passed` must be the boolean true or
+ * false, and every hash must look like one.
+ */
+export function parseSummary(text: string): DryRunSummary {
+  const s = JSON.parse(text) as Partial<DryRunSummary>;
+  const fileList = (v: unknown) =>
+    Array.isArray(v) &&
+    v.every(
+      (f: { file?: unknown; sha256?: unknown }) =>
+        typeof f?.file === 'string' &&
+        FILE_ENTRY.test(f.file) &&
+        typeof f.sha256 === 'string' &&
+        SHA256.test(f.sha256),
+    );
+  const ok =
+    typeof s.passed === 'boolean' &&
+    typeof s.commit === 'string' &&
+    typeof s.branch === 'string' &&
+    Array.isArray(s.steps) &&
+    fileList(s.files) &&
+    fileList(s.rollbacks) &&
+    typeof s.production === 'object' &&
+    s.production !== null &&
+    Object.values(s.production).every((v) => typeof v === 'string' && MD5.test(v));
+  if (!ok) throw new Error('the dry-run summary is not shaped as dry-run.ts writes it');
+  return s as DryRunSummary;
 }
 
 export function fileList(files: MigrationFile[]): DryRunSummary['files'] {
@@ -45,6 +81,10 @@ export function renderDryRun(s: DryRunSummary): string {
     'Files applied, with the sha256 of the bytes production will receive:',
     '',
     filesTable(s.files),
+    '',
+    'Rollback files run:',
+    '',
+    s.rollbacks.length > 0 ? filesTable(s.rollbacks) : '_No rollback file was run._',
   ].join('\n');
 }
 

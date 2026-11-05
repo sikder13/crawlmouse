@@ -1,11 +1,13 @@
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { failed, formatResults, runChecks } from './check';
 import { connect, readOnlyApi, type Db } from './db';
-import { listMigrations, type MigrationFile } from './files';
+import { listMigrations, rollbackPath, sha256, type MigrationFile } from './files';
 import {
   compareFingerprints,
+  formatDifferenceCounts,
   formatDifferences,
   readFingerprint,
   type Fingerprint,
@@ -21,19 +23,24 @@ import { PRODUCTION_REF } from './target';
  * The migration dry run, as db-dry-run.yml runs it for a pull request:
  *
  *   1. delete the PR's Supabase branch if one exists, create it again from production, wait for it
- *   2. the branch is a copy of production: its fingerprint equals production's, section by section
+ *   2. the branch fingerprint equals the production fingerprint, section by section
  *   3. its history is clean, and every pending file has a rollback
  *   4. `supabase db push` applies the pending files (the CLI's list must equal them)
  *   5. the catalog checks pass
  *   6. each pending file runs again in its own transaction, and the fingerprint does not change
  *   7. the rollbacks run in reverse order, and the fingerprint equals production's again
  *   8. `supabase db push` applies them once more; fingerprint and checks as after step 5
+ *   9. if the pull request changes the rollback of an applied migration: the migrations from that
+ *      one on are reverted, newest first, and pushed again, and the fingerprint must not change
+ *
+ * Step 3 also fails when the pull request changes a migration file that is already applied:
+ * production would never receive the change. Add a new migration instead.
  *
  * Any failed step stops the run, and the summary says which step and why. The branch is deleted
  * at the end, pass or fail.
  *
  *   SUPABASE_ACCESS_TOKEN=... tsx scripts/db/dry-run.ts --branch <name> --commit <sha> \
- *     --summary-json <path> [--summary-md <path>]
+ *     --summary-json <path> [--summary-md <path>] [--changed <file listing changed paths>]
  */
 
 export interface DryRunDeps {
@@ -54,7 +61,14 @@ export async function dryRun(
     branch,
     commit,
     files = listMigrations(),
-  }: { branch: string; commit: string; files?: MigrationFile[] },
+    changed = [],
+  }: {
+    branch: string;
+    commit: string;
+    files?: MigrationFile[];
+    /** Repository paths the pull request changes. */
+    changed?: string[];
+  },
 ): Promise<DryRunSummary> {
   const summary: DryRunSummary = {
     passed: false,
@@ -63,8 +77,10 @@ export async function dryRun(
     finishedAt: '',
     steps: [],
     files: [],
+    rollbacks: [],
     production: {},
   };
+  const changedNames = new Set(changed.map((p) => basename(p)));
   const step = async <T>(name: string, fn: () => Promise<[T, string]>): Promise<T> => {
     deps.log(`::group::${name}`);
     try {
@@ -88,8 +104,12 @@ export async function dryRun(
   ) => {
     const differences = compareFingerprints(expected, actual);
     if (differences.length > 0) {
-      const names = differences.map((d) => d.section).join(', ');
-      throw new Error(`sections differ: ${names}\n${formatDifferences(differences, labels)}`);
+      // The differing lines go to the job log; the summary, posted on the pull request, names the
+      // sections and counts the lines.
+      deps.log(formatDifferences(differences, labels));
+      throw new Error(
+        `sections differ: ${formatDifferenceCounts(differences, labels)}; the lines are in the job log`,
+      );
     }
   };
 
@@ -104,12 +124,18 @@ export async function dryRun(
     db = deps.connect(created.url);
     const branchDb = db;
 
-    const production = await step('The branch is a copy of production', async () => {
-      const prod = await readFingerprint(prodDb);
-      same(prod, await readFingerprint(branchDb), { expected: 'production', actual: 'the branch' });
-      summary.production = digests(prod);
-      return [prod, `fingerprint equal in all ${prod.size} sections`];
-    });
+    const production = await step(
+      'Branch fingerprint equals the production fingerprint',
+      async () => {
+        const prod = await readFingerprint(prodDb);
+        same(prod, await readFingerprint(branchDb), {
+          expected: 'production',
+          actual: 'the branch',
+        });
+        summary.production = digests(prod);
+        return [prod, `fingerprint equal in all ${prod.size} sections`];
+      },
+    );
 
     const pending = await step(
       'History is clean and each pending file has a rollback',
@@ -118,6 +144,15 @@ export async function dryRun(
         if (diff.misversioned.length + diff.orphans.length + diff.withoutStatements.length > 0) {
           throw new Error(
             `production's history needs the repair in docs/ops/db-migrations.md first\n${formatDiff(diff)}`,
+          );
+        }
+        const editedApplied = files.filter(
+          (f) => !diff.unrecorded.includes(f) && changedNames.has(f.file),
+        );
+        if (editedApplied.length > 0) {
+          throw new Error(
+            `${editedApplied.map((f) => f.file).join(', ')} is already applied; ` +
+              'production would never receive the change. Add a new migration instead',
           );
         }
         const missing = missingRollbacks(diff.unrecorded);
@@ -130,9 +165,9 @@ export async function dryRun(
       },
     );
 
-    const push = async () => {
+    const push = async (toPush: MigrationFile[]) => {
       const listed = await deps.push(created!.url, { dryRun: true });
-      const expected = pending.map((f) => f.file);
+      const expected = toPush.map((f) => f.file);
       if (listed.files.join(',') !== expected.join(',')) {
         throw new Error(
           `the CLI would push [${listed.files.join(', ')}], not [${expected.join(', ')}]`,
@@ -146,7 +181,20 @@ export async function dryRun(
       return `${results.length} checks pass`;
     };
 
-    await step('supabase db push', async () => [await push(), `applied ${pending.length} file(s)`]);
+    const revertAll = async (migrations: MigrationFile[]) => {
+      await revert(branchDb, migrations, deps.log);
+      for (const m of migrations) {
+        summary.rollbacks.push({
+          file: basename(rollbackPath(m)),
+          sha256: sha256(readFileSync(rollbackPath(m), 'utf8')),
+        });
+      }
+    };
+
+    await step('supabase db push', async () => [
+      await push(pending),
+      `applied ${pending.length} file(s)`,
+    ]);
     await step('Checks', async () => [undefined, await checks()]);
     const applied = await readFingerprint(branchDb);
 
@@ -159,8 +207,8 @@ export async function dryRun(
       return [undefined, 'fingerprint unchanged'];
     });
 
-    await step('Rollbacks in reverse order return the branch to production', async () => {
-      await revert(branchDb, [...pending].reverse(), deps.log);
+    await step('Rollbacks in reverse order restore the production fingerprint', async () => {
+      await revertAll([...pending].reverse());
       same(production, await readFingerprint(branchDb), {
         expected: 'production',
         actual: 'after the rollbacks',
@@ -169,13 +217,40 @@ export async function dryRun(
     });
 
     await step('supabase db push again', async () => {
-      await push();
+      await push(pending);
       same(applied, await readFingerprint(branchDb), {
         expected: 'the first push',
         actual: 'the second push',
       });
       return [undefined, `fingerprint equals the first push; ${await checks()}`];
     });
+
+    const appliedBefore = files.filter((f) => !pending.includes(f));
+    const changedRollbacks = appliedBefore.filter((m) =>
+      changedNames.has(basename(rollbackPath(m))),
+    );
+    if (changedRollbacks.length > 0) {
+      await step('Changed rollbacks of applied migrations revert and re-apply', async () => {
+        const oldest = changedRollbacks[0]!.version;
+        const range = files.filter((f) => f.version >= oldest);
+        const missing = missingRollbacks(range);
+        if (missing.length > 0) {
+          throw new Error(`no rollback for ${missing.map((m) => m.file).join(', ')}`);
+        }
+        const before = await readFingerprint(branchDb);
+        await revertAll([...range].reverse());
+        await push(range);
+        same(before, await readFingerprint(branchDb), {
+          expected: 'before the rollbacks',
+          actual: 'after the rollbacks and the push',
+        });
+        const names = range.map((f) => f.file).join(', ');
+        return [
+          undefined,
+          `reverted and re-applied ${names}; fingerprint unchanged; ${await checks()}`,
+        ];
+      });
+    }
 
     summary.passed = true;
   } catch (err) {
@@ -225,12 +300,20 @@ async function main(): Promise<void> {
       commit: { type: 'string', default: 'local' },
       'summary-json': { type: 'string' },
       'summary-md': { type: 'string' },
+      changed: { type: 'string' },
     },
   });
   const token = process.env.SUPABASE_ACCESS_TOKEN;
   if (!token) throw new Error('SUPABASE_ACCESS_TOKEN is not set');
   if (!values.branch) throw new Error('--branch <name> is required');
-  const summary = await dryRun(liveDeps(token), { branch: values.branch, commit: values.commit });
+  const changed = values.changed
+    ? readFileSync(values.changed, 'utf8').split('\n').filter(Boolean)
+    : [];
+  const summary = await dryRun(liveDeps(token), {
+    branch: values.branch,
+    commit: values.commit,
+    changed,
+  });
   if (values['summary-json'])
     writeFileSync(values['summary-json'], JSON.stringify(summary, null, 2));
   publish(renderDryRun(summary), values['summary-md']);

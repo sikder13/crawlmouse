@@ -3,11 +3,18 @@ import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { failed, formatResults, runChecks } from './check';
 import { connect, readOnlyApi } from './db';
-import { listMigrations, type MigrationFile } from './files';
+import { listMigrations, rollbackPath, sha256, type MigrationFile } from './files';
 import { formatFingerprint, readFingerprint } from './fingerprint';
 import { diffHistory, formatDiff, readHistory } from './history';
 import { migrationForRollback, revert } from './rollback';
-import { filesTable, publish, renderDryRun, type DryRunSummary } from './summary';
+import {
+  digests,
+  filesTable,
+  parseSummary,
+  publish,
+  renderDryRun,
+  type DryRunSummary,
+} from './summary';
 import { ManagementApi } from './supabase-api';
 import { dbPush } from './supabase-cli';
 import { PRODUCTION_REF, assertAllowed } from './target';
@@ -20,12 +27,15 @@ import { PRODUCTION_REF, assertAllowed } from './target';
  *             must match.
  *   apply     db-apply-prod.yml, after the approval: re-checks the manifest against the checked-out
  *             files and against production, runs `supabase db push`, the checks and the fingerprint.
- *   rollback  db-rollback-prod.yml, after the approval: runs one tracked rollback file, then the
- *             checks and the fingerprint.
+ *   rollback-plan  db-rollback-prod.yml, before the approval, read-only: the rollback file's sha256
+ *             and that production records its migration as applied.
+ *   rollback  db-rollback-prod.yml, after the approval: requires the planned sha256, runs the
+ *             rollback file, then the checks and the fingerprint.
  *
  *   tsx scripts/db/production.ts plan --yes-production --dry-run-summary <json> --manifest-out <json>
  *   tsx scripts/db/production.ts apply --yes-production --manifest <json>
- *   tsx scripts/db/production.ts rollback --yes-production --file <version>_<name>.revert.sql
+ *   tsx scripts/db/production.ts rollback-plan --yes-production --file <file> --sha-out <path>
+ *   tsx scripts/db/production.ts rollback --yes-production --file <file> --expect-sha256 <sha>
  */
 
 export type Manifest = Array<{ file: string; sha256: string }>;
@@ -33,10 +43,30 @@ export type Manifest = Array<{ file: string; sha256: string }>;
 const asManifest = (files: MigrationFile[]): Manifest =>
   files.map((f) => ({ file: f.file, sha256: f.sha256 }));
 
-/** Why the dry run does not cover the pending files; empty when it does. */
-export function gateProblems(pending: MigrationFile[], summary: DryRunSummary): string[] {
+/**
+ * Why the dry run does not cover the pending files; empty when it does. `productionNow` is
+ * production's fingerprint as read by the plan: a section that changed since the dry run read it
+ * means the dry run tested a different production.
+ */
+export function gateProblems(
+  pending: MigrationFile[],
+  summary: DryRunSummary,
+  productionNow: Record<string, string>,
+): string[] {
   const problems: string[] = [];
-  if (!summary.passed) problems.push('the dry run did not pass');
+  if (summary.passed !== true) problems.push('the dry run did not pass');
+  const sections = [
+    ...new Set([...Object.keys(summary.production), ...Object.keys(productionNow)]),
+  ];
+  if (Object.keys(summary.production).length === 0) {
+    problems.push('the dry run recorded no fingerprint of production');
+  } else {
+    for (const s of sections.sort()) {
+      if (summary.production[s] !== productionNow[s]) {
+        problems.push(`production's ${s} section changed since the dry run read it`);
+      }
+    }
+  }
   const tested = new Map(summary.files.map((f) => [f.file, f.sha256]));
   for (const f of pending) {
     const sha = tested.get(f.file);
@@ -72,8 +102,10 @@ async function pendingOnProduction(token: string): Promise<MigrationFile[]> {
 
 async function plan(token: string, summaryPath: string, manifestOut: string): Promise<void> {
   const pending = await pendingOnProduction(token);
-  const summary = JSON.parse(readFileSync(summaryPath, 'utf8')) as DryRunSummary;
-  const problems = pending.length > 0 ? gateProblems(pending, summary) : [];
+  const summary = parseSummary(readFileSync(summaryPath, 'utf8'));
+  const productionNow =
+    pending.length > 0 ? digests(await readFingerprint(readOnlyApi(PRODUCTION_REF, token))) : {};
+  const problems = pending.length > 0 ? gateProblems(pending, summary, productionNow) : [];
   writeFileSync(manifestOut, JSON.stringify(asManifest(pending)));
   publish(
     [
@@ -110,8 +142,58 @@ async function apply(token: string, password: string, manifestPath: string): Pro
   await report(url, `### Applied to production (${PRODUCTION_REF})\n\n${filesTable(manifest)}`);
 }
 
-async function rollback(token: string, password: string, file: string): Promise<void> {
+/**
+ * Why a rollback of `version` may not run now: production must record it, and it must be the
+ * newest version recorded, so rollbacks run newest first. Null when it may.
+ */
+export function rollbackOrderProblem(version: string, recorded: string[]): string | null {
+  if (!recorded.includes(version)) return `production does not record ${version} as applied`;
+  const newest = [...recorded].sort().at(-1)!;
+  if (newest !== version) {
+    return `${newest} is newer than ${version} and still applied: roll back newest first`;
+  }
+  return null;
+}
+
+/**
+ * Before the approval: the rollback file's sha256, and that production records its migration as
+ * applied. Writes the sha256 to `shaOut` for the rollback job to require.
+ */
+async function rollbackPlan(token: string, file: string, shaOut: string): Promise<void> {
   const migration = migrationForRollback(file);
+  const rows = await readHistory(readOnlyApi(PRODUCTION_REF, token));
+  const problem = rollbackOrderProblem(
+    migration.version,
+    rows.map((r) => r.version),
+  );
+  if (problem) throw new Error(problem);
+  const sha = sha256(readFileSync(rollbackPath(migration), 'utf8'));
+  writeFileSync(shaOut, sha);
+  publish(
+    [
+      `### Rollback requested on production (${PRODUCTION_REF})`,
+      '',
+      filesTable([
+        { file, sha256: sha },
+        { file: migration.file, sha256: migration.sha256 },
+      ]),
+      '',
+      `Approving runs \`${file}\` (first row) and deletes the history row of \`${migration.file}\`, in one transaction.`,
+    ].join('\n'),
+  );
+}
+
+async function rollback(
+  token: string,
+  password: string,
+  file: string,
+  expectedSha: string,
+): Promise<void> {
+  const migration = migrationForRollback(file);
+  const sha = sha256(readFileSync(rollbackPath(migration), 'utf8'));
+  if (sha !== expectedSha) {
+    throw new Error(`${file} has sha256 ${sha}, not the approved ${expectedSha}`);
+  }
   const url = await new ManagementApi(token).poolerUrl(PRODUCTION_REF, password);
   const db = connect(url);
   try {
@@ -161,6 +243,8 @@ async function main(): Promise<void> {
       'manifest-out': { type: 'string', default: '' },
       manifest: { type: 'string', default: '' },
       file: { type: 'string', default: '' },
+      'sha-out': { type: 'string', default: '' },
+      'expect-sha256': { type: 'string', default: '' },
     },
   });
   assertAllowed(PRODUCTION_REF, values['yes-production']);
@@ -169,13 +253,15 @@ async function main(): Promise<void> {
   const [command] = positionals;
   if (command === 'plan') {
     await plan(token, values['dry-run-summary'], values['manifest-out']);
+  } else if (command === 'rollback-plan') {
+    await rollbackPlan(token, values.file, values['sha-out']);
   } else if (command === 'apply' || command === 'rollback') {
     const password = process.env.SUPABASE_DB_PASSWORD;
     if (!password) throw new Error('SUPABASE_DB_PASSWORD is not set');
     if (command === 'apply') await apply(token, password, values.manifest);
-    else await rollback(token, password, values.file);
+    else await rollback(token, password, values.file, values['expect-sha256']);
   } else {
-    throw new Error('usage: production.ts plan|apply|rollback --yes-production ...');
+    throw new Error('usage: production.ts plan|apply|rollback-plan|rollback --yes-production ...');
   }
 }
 

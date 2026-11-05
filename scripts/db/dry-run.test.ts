@@ -29,6 +29,7 @@ interface Harness {
   deps: DryRunDeps;
   calls: string[];
   deleted: string[];
+  logged: string[];
 }
 
 async function harness(
@@ -43,6 +44,7 @@ async function harness(
   if (options.branchSetup) await branch.exec(options.branchSetup);
   const calls: string[] = [];
   const deleted: string[] = [];
+  const logged: string[] = [];
   const pendingOf = async () => {
     const diff = diffHistory(options.fileList ?? files, await readHistory(pgliteDb(branch)));
     return diff.unrecorded;
@@ -74,9 +76,11 @@ async function harness(
       }
       return { files: names };
     },
-    log: () => {},
+    log: (line) => {
+      logged.push(line);
+    },
   };
-  return { deps, calls, deleted };
+  return { deps, calls, deleted, logged };
 }
 
 describe('the dry run', () => {
@@ -87,12 +91,12 @@ describe('the dry run', () => {
     expect(summary.passed).toBe(true);
     expect(summary.steps.map((s) => s.step)).toEqual([
       'Create the branch from production',
-      'The branch is a copy of production',
+      'Branch fingerprint equals the production fingerprint',
       'History is clean and each pending file has a rollback',
       'supabase db push',
       'Checks',
       'Each file runs again and changes nothing',
-      'Rollbacks in reverse order return the branch to production',
+      'Rollbacks in reverse order restore the production fingerprint',
       'supabase db push again',
     ]);
     expect(summary.files).toEqual(
@@ -101,6 +105,9 @@ describe('the dry run', () => {
         .map((f) => ({ file: f.file, sha256: f.sha256 })),
     );
     expect(summary.files).toHaveLength(4);
+    expect(summary.rollbacks.map((r) => r.file)).toEqual(
+      [...summary.files].reverse().map((f) => f.file.replace(/\.sql$/, '.revert.sql')),
+    );
     expect(h.calls).toEqual(['create pr-1', 'push --dry-run', 'push', 'push --dry-run', 'push']);
     expect(h.deleted).toEqual(['branchref']);
     expect(renderDryRun(summary)).toContain(
@@ -113,9 +120,13 @@ describe('the dry run', () => {
     const summary = await dryRun(h.deps, { branch: 'pr-2', commit: 'abc' });
     expect(summary.passed).toBe(false);
     const failure = summary.steps.at(-1)!;
-    expect(failure.step).toBe('The branch is a copy of production');
-    expect(failure.result).toContain('sections differ: acls');
-    expect(failure.result).toContain('+ relation public.accounts anon SELECT');
+    expect(failure.step).toBe('Branch fingerprint equals the production fingerprint');
+    expect(failure.result).toContain(
+      'sections differ: acls (1 only on the branch, 0 only on production)',
+    );
+    // The lines go to the job log, not into the summary posted on the pull request.
+    expect(failure.result).not.toContain('relation public.accounts anon SELECT');
+    expect(h.logged.join('\n')).toContain('+ relation public.accounts anon SELECT');
     expect(h.calls).toEqual(['create pr-2']);
     expect(h.deleted).toEqual(['branchref']);
   }, 300_000);
@@ -145,6 +156,40 @@ describe('the dry run', () => {
     },
     300_000,
   );
+
+  it('fails when the pull request changes a migration that is already applied', async () => {
+    const h = await harness();
+    const summary = await dryRun(h.deps, {
+      branch: 'pr-6',
+      commit: 'abc',
+      changed: ['infra/supabase/migrations/20260524000001_init_users.sql'],
+    });
+    expect(summary.passed).toBe(false);
+    expect(summary.steps.at(-1)!.result).toContain(
+      '20260524000001_init_users.sql is already applied',
+    );
+    expect(h.calls).toEqual(['create pr-6']);
+  }, 300_000);
+
+  it('reverts and re-applies from an applied migration whose rollback the pull request changes', async () => {
+    const h = await harness();
+    const summary = await dryRun(h.deps, {
+      branch: 'pr-7',
+      commit: 'abc',
+      changed: ['infra/supabase/rollbacks/20261101000001_v2_001_entitlement_tables.revert.sql'],
+    });
+    expect(summary.steps.filter((s) => s.result.startsWith('FAILED'))).toEqual([]);
+    expect(summary.passed).toBe(true);
+    const last = summary.steps.at(-1)!;
+    expect(last.step).toBe('Changed rollbacks of applied migrations revert and re-apply');
+    expect(last.result).toContain(
+      'reverted and re-applied 20261101000001_v2_001_entitlement_tables.sql',
+    );
+    expect(summary.rollbacks.map((r) => r.file)).toContain(
+      '20261101000001_v2_001_entitlement_tables.revert.sql',
+    );
+    expect(h.calls.slice(-2)).toEqual(['push --dry-run', 'push']);
+  }, 300_000);
 
   it('fails when a pending migration has no rollback', async () => {
     const extra: MigrationFile = {
