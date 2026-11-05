@@ -48,6 +48,7 @@ export const RULES = {
   verification_alone: one('none_published stands alone'),
   verification_unique: one('verification methods are listed once each'),
   ip_list_url: two('ip_list_url is set exactly when an IP list is published'),
+  cloudflare_unique: one("Cloudflare's categories are listed once each"),
   // Fix
   effect_pending: two(
     'an AI effect is either estimated, or not yet estimated because of named fixes',
@@ -102,6 +103,32 @@ export const RULES = {
   // AccessTest
   observed_owner_logs: two('observed evidence comes from owner logs, and only it does'),
   access_request_line: two('the request method and HTTP version are recorded together'),
+  access_identity_ua: two('an access row names a crawler exactly when it is a crawler row'),
+  control_untagged: one('the browser control carries no Crawlmouse tag'),
+  access_witness: two(
+    'a witness is named exactly on a blocked_by_ua_rule row decided by our own requests',
+  ),
+  witness_other: one('a witness is another identity than the crawler refused'),
+  fly_region: two('a Fly region is recorded exactly when the request left from Fly'),
+  timing_order: one("a request's recorded phases are in order: DNS, connect, first byte, total"),
+  worker_request: two(
+    "signing, verification and the worker release are recorded exactly on the worker's own requests",
+  ),
+  worker_request_whole: one('signing, verification and the worker release are recorded together'),
+  declaration_answer: two('a declaration status is recorded exactly when the request was answered'),
+  declaration_bytes: two(
+    'a declaration byte count is recorded exactly when the request was answered',
+  ),
+  declaration_media_type: one('a declaration media type is recorded only from an answer'),
+  declaration_cache_answer: one(
+    'a declaration kept from an earlier batch is an answer or its absence',
+  ),
+  declaration_not_requested: two(
+    'why a declaration was not requested is recorded exactly when it was not requested',
+  ),
+  head_text_absent: one(
+    'a title or description the page does not declare has no length and no cut',
+  ),
   // UsageEvent
   usage_billable: one('only a delivered result is billable'),
   // Change

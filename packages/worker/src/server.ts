@@ -16,6 +16,7 @@ import { BatchRequestSchema, batchIdOf, urlsOf, type BatchRequest } from './batc
 import { runBatch } from './batch/run.js';
 import { inlineReader, type PageReader } from './reader/read.js';
 import { RobotsCache } from './batch/site-rules.js';
+import { DeclarationCache } from './batch/declarations.js';
 import { BatchStore } from './batch/store.js';
 import { systemClock, type Clock } from './clock.js';
 import type { WorkerConfig } from './config.js';
@@ -138,6 +139,8 @@ export function createWorker(deps: WorkerDeps): Worker {
     fetcher: deps.fetcher ?? createFetcher(clock),
     robotsCache: new RobotsCache(clock),
     reader: deps.reader ?? inlineReader,
+    vantage: deps.config.vantage,
+    declarationCache: new DeclarationCache(clock),
   };
   const store = new BatchStore(now);
   const nonces = new Nonces(now);

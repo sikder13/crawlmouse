@@ -3,12 +3,8 @@
  * long an unkept audit stays. The next link carries the next section's own figure, read from the
  * check, so it cannot disagree with that section's headline.
  */
-import {
-  SignalKindSchema,
-  type Check,
-  type FixSection,
-  type FixtureDataset,
-} from '@crawlmouse/types/v2';
+import type { Check, FixSection, FixtureDataset } from '@crawlmouse/types/v2';
+import { SCREEN_SIGNALS, screenSignals } from '../screen-signals';
 import { findCheck, siteOf } from '../../fixtures';
 import { dayTimeUtc, percent } from '../../format';
 import { keptUntilOf } from '../result';
@@ -114,8 +110,8 @@ function figureOf(check: Check, key: SegmentKey): string | null {
     case 'content':
       return check.content ? String(check.content.score) : 'not measured';
     case 'signals': {
-      const present = check.signals.filter((s) => s.state === 'detected').length;
-      return `${present} of ${SignalKindSchema.options.length}`;
+      const present = screenSignals(check).filter((s) => s.state === 'detected').length;
+      return `${present} of ${SCREEN_SIGNALS.length}`;
     }
     case 'access':
     case 'changes':

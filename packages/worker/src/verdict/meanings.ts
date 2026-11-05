@@ -20,8 +20,9 @@ export const VERDICT_MEANINGS: Record<Verdict, { means: string; evidence: string
   },
   blocked_by_ua_rule: {
     means:
-      'The crawler was refused while the tagged Googlebot canary was served on the same page: the site demonstrably does not verify crawler IPs there, so the refusal is aimed at the user agent.',
-    evidence: "The crawler's response; the canary's own row on the same page.",
+      'The crawler was refused while another tested crawler, or the tagged Googlebot canary, was served on the same page from the same address: a refusal of the address would have refused that one too, so this refusal is aimed at the user agent.',
+    evidence:
+      "The crawler's response; its `witness` names the identity served, and that identity's own row is on the same page.",
   },
   challenged_ua: {
     means:
@@ -31,9 +32,8 @@ export const VERDICT_MEANINGS: Record<Verdict, { means: string; evidence: string
   },
   refused_unverified: {
     means:
-      'The crawler was refused and the canary was not served, so a rule against the user agent cannot be told apart from IP verification. The real crawler may pass.',
-    evidence:
-      "The crawler's response; a limitation says what the canary got and which crawlers were served on the page.",
+      'The crawler was refused and nothing else we sent that claims to be a crawler, the canary included, was served on the page, so a rule against the user agent cannot be told apart from IP verification. The real crawler may pass.',
+    evidence: "The crawler's response; a limitation says what the canary got.",
   },
   rate_limited: {
     means: 'The crawler was answered with 429.',

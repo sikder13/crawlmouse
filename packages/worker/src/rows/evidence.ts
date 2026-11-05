@@ -4,7 +4,13 @@ import type { Identity } from '../identities.js';
 
 /** The parts of a request and its response that every evidence row carries, cut to the contract's budgets. */
 
-/** Response headers that bear on a verdict; no other header is recorded. */
+/**
+ * Response headers that bear on a verdict; no other header is recorded. The last seven say which
+ * CDN or proxy answered, each named by its vendor (sources in SPEC 12): Vercel (`x-vercel-id`),
+ * CloudFront (`x-amz-cf-id`), any proxy (`via`, RFC 9110 §7.6.3), Akamai (`akamai-grn`,
+ * `akamai-cache-status`, the default names of two headers a property can turn on) and Sucuri
+ * (`x-sucuri-id`, `x-sucuri-cache`).
+ */
 export const EVIDENCE_HEADERS = [
   'server',
   'content-type',
@@ -14,6 +20,13 @@ export const EVIDENCE_HEADERS = [
   'x-vercel-mitigated',
   'cf-ray',
   'crawler-price',
+  'x-vercel-id',
+  'x-amz-cf-id',
+  'via',
+  'akamai-grn',
+  'akamai-cache-status',
+  'x-sucuri-id',
+  'x-sucuri-cache',
 ] as const;
 
 export const BODY_EXCERPT_BYTES = CAPS.bodyExcerpt.bytes;

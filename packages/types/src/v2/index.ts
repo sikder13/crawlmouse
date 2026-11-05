@@ -19,6 +19,7 @@ export * from './page-facts.js';
 export * from './page-result.js';
 export * from './link-edge.js';
 export * from './access-test.js';
+export * from './declaration.js';
 export * from './fix.js';
 export * from './fix-event.js';
 export * from './change.js';

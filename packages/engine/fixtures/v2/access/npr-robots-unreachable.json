@@ -11,7 +11,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -45,7 +45,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     },
     {
       "id": "e0000000-0000-4000-8000-000000000002",
@@ -57,7 +70,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -91,7 +104,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     },
     {
       "id": "e0000000-0000-4000-8000-000000000003",
@@ -103,7 +129,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -137,7 +163,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     },
     {
       "id": "e0000000-0000-4000-8000-000000000004",
@@ -149,7 +188,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -183,7 +222,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     },
     {
       "id": "e0000000-0000-4000-8000-000000000005",
@@ -195,7 +247,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -229,7 +281,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     },
     {
       "id": "e0000000-0000-4000-8000-000000000006",
@@ -241,7 +306,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -275,7 +340,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     },
     {
       "id": "e0000000-0000-4000-8000-000000000007",
@@ -287,7 +365,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -321,7 +399,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     },
     {
       "id": "e0000000-0000-4000-8000-000000000008",
@@ -333,7 +424,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -367,7 +458,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     },
     {
       "id": "e0000000-0000-4000-8000-000000000009",
@@ -379,7 +483,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -413,7 +517,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     },
     {
       "id": "e0000000-0000-4000-8000-000000000010",
@@ -425,7 +542,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -459,7 +576,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     },
     {
       "id": "e0000000-0000-4000-8000-000000000011",
@@ -471,7 +601,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -505,7 +635,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     },
     {
       "id": "e0000000-0000-4000-8000-000000000012",
@@ -517,7 +660,7 @@
       "verdict": "not_measured",
       "evidence_class": "declared",
       "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
-      "source_ip_class": "fly_egress",
+      "source_ip_class": "other_egress",
       "limitations": [
         "robots.txt unreachable at https://www.npr.org: the request timed out. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read."
       ],
@@ -551,7 +694,20 @@
       "word_count": null,
       "body_excerpt": null,
       "method": null,
-      "http_version": null
+      "http_version": null,
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": null,
+        "total_ms": 0
+      }
     }
   ]
 }

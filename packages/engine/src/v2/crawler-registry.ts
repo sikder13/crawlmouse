@@ -16,6 +16,13 @@ import type { CrawlerGroup, CrawlerRegistryEntry } from '@crawlmouse/types/v2';
 import { AI_BOT_REGISTRY } from '../analysis/ai-readiness/constants.js';
 
 const AS_OF = '2026-10-27';
+/**
+ * Cloudflare's categories were read by hand from each crawler's page in Cloudflare Radar's bots
+ * directory on this date. The page's path is in each entry's source notes; PerplexityBot has none.
+ */
+const CLOUDFLARE_AS_OF = '2026-11-03';
+const radar = (slug: string): string =>
+  `Cloudflare categories from https://radar.cloudflare.com/bots/directory/${slug} (read ${CLOUDFLARE_AS_OF}).`;
 
 const OPENAI_SOURCE = 'https://developers.openai.com/api/docs/bots';
 const ANTHROPIC_SOURCE =
@@ -61,11 +68,14 @@ export const CRAWLER_REGISTRY_V2: readonly CrawlerRegistryEntry[] = [
     source_url:
       'https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers',
     source_notes: [
+      radar('google'),
       'The smartphone user agent is recorded; Google also documents a desktop one. W.X.Y.Z stands for the Chrome version, which Google says to match with a wildcard.',
       'Reverse DNS resolves to googlebot.com (verification page: developers.google.com/crawling/docs/crawlers-fetchers/verify-google-requests).',
       'Google moved these pages from /search/docs/crawling-indexing/ to /crawling/docs/crawlers-fetchers/.',
     ],
     as_of: AS_OF,
+    cloudflare_categories: ['search', 'training'],
+    cloudflare_as_of: CLOUDFLARE_AS_OF,
   },
   {
     token: 'Bingbot',
@@ -82,12 +92,15 @@ export const CRAWLER_REGISTRY_V2: readonly CrawlerRegistryEntry[] = [
     needs_owner_logs: true,
     source_url: 'https://www.bing.com/webmasters/help/which-crawlers-does-bing-use-8c184ec0',
     source_notes: [
+      radar('bing'),
       'The page names no robots.txt token; "bingbot" is the product token in the user agent, and robots.txt matching ignores case.',
       'The desktop user agent is recorded. W.X.Y.Z stands for the current Microsoft Edge version.',
       'Reverse DNS resolves to search.msn.com; Bing asks for the IP list to be refreshed daily.',
       'The article body is rendered in the browser; it was read from the content endpoint the page itself calls.',
     ],
     as_of: AS_OF,
+    cloudflare_categories: ['search', 'training'],
+    cloudflare_as_of: CLOUDFLARE_AS_OF,
   },
   fromV1('OAI-SearchBot', {
     robots_token: 'OAI-SearchBot',
@@ -99,10 +112,13 @@ export const CRAWLER_REGISTRY_V2: readonly CrawlerRegistryEntry[] = [
     needs_owner_logs: true,
     source_url: OPENAI_SOURCE,
     source_notes: [
+      radar('oai-searchbot'),
       'OpenAI labels the string an example whose version may change.',
       'OpenAI says a robots.txt change can take about 24 hours to apply to search.',
     ],
     as_of: AS_OF,
+    cloudflare_categories: ['search'],
+    cloudflare_as_of: CLOUDFLARE_AS_OF,
   }),
   fromV1('ChatGPT-User', {
     robots_token: 'ChatGPT-User',
@@ -114,9 +130,12 @@ export const CRAWLER_REGISTRY_V2: readonly CrawlerRegistryEntry[] = [
     needs_owner_logs: true,
     source_url: OPENAI_SOURCE,
     source_notes: [
+      radar('chatgpt-user'),
       'OpenAI says robots.txt rules may not apply to these user-initiated fetches, and points to OAI-SearchBot for search opt-outs.',
     ],
     as_of: AS_OF,
+    cloudflare_categories: ['agent'],
+    cloudflare_as_of: CLOUDFLARE_AS_OF,
   }),
   fromV1('PerplexityBot', {
     robots_token: 'PerplexityBot',
@@ -128,10 +147,13 @@ export const CRAWLER_REGISTRY_V2: readonly CrawlerRegistryEntry[] = [
     needs_owner_logs: true,
     source_url: 'https://docs.perplexity.ai/docs/resources/perplexity-crawlers',
     source_notes: [
+      "Cloudflare Radar's bots directory has no page for PerplexityBot (checked 2026-11-03), so no Cloudflare category is recorded.",
       'Perplexity says robots.txt changes may take up to 24 hours to apply.',
       'The documented IP list URL currently redirects to perplexity.ai.',
     ],
     as_of: AS_OF,
+    cloudflare_categories: null,
+    cloudflare_as_of: CLOUDFLARE_AS_OF,
   }),
   fromV1('Claude-SearchBot', {
     robots_token: 'Claude-SearchBot',
@@ -142,11 +164,14 @@ export const CRAWLER_REGISTRY_V2: readonly CrawlerRegistryEntry[] = [
     needs_owner_logs: true,
     source_url: ANTHROPIC_SOURCE,
     source_notes: [
+      radar('claude-searchbot'),
       "Anthropic's page prints no user-agent string for this crawler.",
       "The page names the bot but gives no robots.txt example for it; the token is the bot's name.",
       'The IP list is shared by all Anthropic crawlers and does not say which crawler uses which address.',
     ],
     as_of: AS_OF,
+    cloudflare_categories: ['search'],
+    cloudflare_as_of: CLOUDFLARE_AS_OF,
   }),
   fromV1('GPTBot', {
     robots_token: 'GPTBot',
@@ -157,8 +182,13 @@ export const CRAWLER_REGISTRY_V2: readonly CrawlerRegistryEntry[] = [
     testable: true,
     needs_owner_logs: true,
     source_url: OPENAI_SOURCE,
-    source_notes: ['OpenAI labels the string an example whose version may change.'],
+    source_notes: [
+      radar('gptbot'),
+      'OpenAI labels the string an example whose version may change.',
+    ],
     as_of: AS_OF,
+    cloudflare_categories: ['training'],
+    cloudflare_as_of: CLOUDFLARE_AS_OF,
   }),
   fromV1('ClaudeBot', {
     robots_token: 'ClaudeBot',
@@ -169,9 +199,12 @@ export const CRAWLER_REGISTRY_V2: readonly CrawlerRegistryEntry[] = [
     needs_owner_logs: true,
     source_url: ANTHROPIC_SOURCE,
     source_notes: [
+      radar('claude-anthropic'),
       "Anthropic's page prints no user-agent string for this crawler.",
       'The IP list is shared by all Anthropic crawlers and does not say which crawler uses which address.',
     ],
     as_of: AS_OF,
+    cloudflare_categories: ['training'],
+    cloudflare_as_of: CLOUDFLARE_AS_OF,
   }),
 ];

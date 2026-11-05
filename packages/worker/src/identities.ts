@@ -35,6 +35,13 @@ export interface Identity {
   /** The robots.txt group that binds this identity in addition to ours; null for crawl and control. */
   robotsToken: string | null;
   userAgent: string;
+  /** The user agent discloses Crawlmouse: every identity but the browser control. */
+  tagged: boolean;
+  /**
+   * For a crawler whose operator publishes no user agent, the operator: it is sent as its bare token,
+   * which a rule keyed on the operator's full user agent may not take for that crawler. Null otherwise.
+   */
+  bareTokenOf: string | null;
   /** Request headers in the order they are sent, with the names as written on the wire. */
   headers: ReadonlyArray<readonly [name: string, value: string]>;
 }
@@ -44,6 +51,7 @@ function identity(
   token: string | null,
   robotsToken: string | null,
   userAgent: string,
+  bareTokenOf: string | null = null,
 ): Identity {
   const headers: Array<readonly [string, string]> = [
     ['User-Agent', userAgent],
@@ -51,7 +59,7 @@ function identity(
     ['Accept-Encoding', ACCEPT_ENCODING],
   ];
   if (role !== 'control') headers.push(['From', FROM]);
-  return { role, token, robotsToken, userAgent, headers };
+  return { role, token, robotsToken, userAgent, tagged: role !== 'control', bareTokenOf, headers };
 }
 
 const tagged = (userAgent: string): string => `${userAgent} ${TAG}`;
@@ -60,7 +68,14 @@ export const CRAWL: Identity = identity('crawl', null, null, CRAWL_USER_AGENT);
 export const CONTROL: Identity = identity('control', null, null, BROWSER_USER_AGENT);
 
 export const CRAWLERS: readonly Identity[] = CRAWLER_REGISTRY_V2.filter((e) => e.testable).map(
-  (e) => identity('crawler', e.token, e.robots_token, tagged(e.ua_string ?? e.token)),
+  (e) =>
+    identity(
+      'crawler',
+      e.token,
+      e.robots_token,
+      tagged(e.ua_string ?? e.token),
+      e.ua_string === null ? e.operator : null,
+    ),
 );
 
 function canaryIdentity(): Identity {

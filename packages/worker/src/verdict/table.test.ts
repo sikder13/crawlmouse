@@ -21,7 +21,7 @@ const anyCell: fc.Arbitrary<Cell> = fc.record({
   oursAllowed: fc.boolean(),
   control: fc.constantFrom(...OBSERVED),
   crawler: fc.constantFrom(...OBSERVED),
-  canary: fc.constantFrom(...OBSERVED),
+  witnessed: fc.boolean(),
   words: fc.option(fc.integer({ min: 0, max: 5000 }), { nil: null }),
   controlWords: fc.option(fc.integer({ min: 0, max: 5000 }), { nil: null }),
   sameType: fc.boolean(),
@@ -34,7 +34,7 @@ const base: Cell = {
   oursAllowed: true,
   control: 'served',
   crawler: 'served',
-  canary: 'not_requested',
+  witnessed: false,
   words: 500,
   controlWords: 500,
   sameType: true,
@@ -66,8 +66,8 @@ describe('decision table: shape', () => {
   });
 });
 
-describe('decision table: the canary rule', () => {
-  it('blocked_by_ua_rule if and only if the crawler was refused and the canary was served (property)', () => {
+describe('decision table: the witness rule (ENGINE-GAP §3.5a)', () => {
+  it('blocked_by_ua_rule if and only if the crawler was refused and a witness was served (property)', () => {
     fc.assert(
       fc.property(anyCell, (cell) => {
         const blocked = decide(cell).verdict === 'blocked_by_ua_rule';
@@ -77,25 +77,46 @@ describe('decision table: the canary rule', () => {
           cell.oursAllowed &&
           cell.control === 'served' &&
           (cell.crawler === 'refused' || cell.crawler === 'gone') &&
-          cell.canary === 'served';
+          cell.witnessed;
         expect(blocked).toBe(expected);
       }),
       { numRuns: 5000 },
     );
   });
 
-  it.each(['refused', 'challenged', 'rate_limited', 'error', 'not_requested'] as const)(
-    'a refusal with the canary %s is refused_unverified, even when other crawlers were served',
-    (canary) => {
-      expect(decide({ ...base, crawler: 'refused', canary }).verdict).toBe('refused_unverified');
-    },
-  );
+  it('a refusal with no witness served is refused_unverified, the control served or not', () => {
+    expect(decide({ ...base, crawler: 'refused', witnessed: false })).toMatchObject({
+      id: 'refused',
+      verdict: 'refused_unverified',
+    });
+    expect(decide({ ...base, crawler: 'refused', witnessed: true })).toMatchObject({
+      id: 'refused_witnessed',
+      verdict: 'blocked_by_ua_rule',
+    });
+  });
+
+  it('a challenge is challenged_ua whether or not a witness was served (rows 6 and 7)', () => {
+    for (const witnessed of [true, false])
+      expect(decide({ ...base, crawler: 'challenged', witnessed }).verdict).toBe('challenged_ua');
+  });
+
+  it('only a refusal reads the witness: every other cell decides the same either way (property)', () => {
+    fc.assert(
+      fc.property(anyCell, (cell) => {
+        if (cell.crawler === 'refused' || cell.crawler === 'gone') return;
+        expect(decide({ ...cell, witnessed: true }).id).toBe(
+          decide({ ...cell, witnessed: false }).id,
+        );
+      }),
+      { numRuns: 5000 },
+    );
+  });
 
   it('treats a 404 or 410 to the crawler, while the control was served, as a refusal', () => {
-    expect(decide({ ...base, crawler: 'gone', canary: 'served' }).verdict).toBe(
+    expect(decide({ ...base, crawler: 'gone', witnessed: true }).verdict).toBe(
       'blocked_by_ua_rule',
     );
-    expect(decide({ ...base, crawler: 'gone', canary: 'refused' }).verdict).toBe(
+    expect(decide({ ...base, crawler: 'gone', witnessed: false }).verdict).toBe(
       'refused_unverified',
     );
   });

@@ -8,8 +8,9 @@ import { startServer, type FixtureServer } from './http.js';
  * carried over from the spike's fixtures: the status, headers and body signature each identity got,
  * not copies of the sites' pages. A fixture server answers as each site, keyed on the user agent.
  *
- * SITE_EXPECTATIONS is the classification under the canary rule (a refusal is blocked_by_ua_rule only
- * when the tagged Googlebot canary was served on that page), per crawler, over the 20 sampled pages.
+ * SITE_EXPECTATIONS is the classification under the witness rule (ENGINE-GAP §3.5a: a refusal is
+ * blocked_by_ua_rule when another tested crawler or the tagged Googlebot canary was served on that
+ * page; the browser control is not a witness), per crawler, over the 20 sampled pages.
  */
 
 export const SITES = [
@@ -121,14 +122,14 @@ const all = (c: Counts): Record<string, Counts> =>
 
 export const SITE_EXPECTATIONS: Record<Site, Record<string, Counts>> = {
   'nike.com': {
-    'OAI-SearchBot': { refused_unverified: 20 },
-    'ChatGPT-User': { refused_unverified: 20 },
-    PerplexityBot: { refused_unverified: 20 },
-    GPTBot: { refused_unverified: 20 },
+    'OAI-SearchBot': { blocked_by_ua_rule: 20 },
+    'ChatGPT-User': { blocked_by_ua_rule: 20 },
+    PerplexityBot: { blocked_by_ua_rule: 20 },
+    GPTBot: { blocked_by_ua_rule: 20 },
     'Claude-SearchBot': { allowed: 20 },
     ClaudeBot: { allowed: 20 },
   },
-  'en.wikipedia.org': { ...all({ allowed: 20 }), ClaudeBot: { refused_unverified: 20 } },
+  'en.wikipedia.org': { ...all({ allowed: 20 }), ClaudeBot: { blocked_by_ua_rule: 20 } },
   'css-tricks.com': all({ blocked_by_ua_rule: 20 }),
   'neilpatel.com': all({ challenged_ua: 17, allowed: 3 }),
   'cnn.com': all({ disallowed_by_robots: 20 }),

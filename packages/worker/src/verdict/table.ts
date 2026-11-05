@@ -4,15 +4,16 @@ import type { ResponseClass, ResponseReading } from './response.js';
 /**
  * The decision table: what one tested crawler's verdict is on one sampled page.
  *
- * Inputs are the page's robots reading, the browser control, the crawler's own request, and the
- * tagged Googlebot canary. Rows are evaluated top to bottom and the first whose conditions all hold
- * wins. The table is data: the spec (docs/specs/v2/12-crawl-worker.md) is rendered from these rows,
- * and table.test.ts checks every cell reaches exactly one of them.
+ * Inputs are the page's robots reading, the browser control, the crawler's own request, and whether
+ * a witness was served on the page. Rows are evaluated top to bottom and the first whose conditions
+ * all hold wins. The table is data: the spec (docs/specs/v2/12-crawl-worker.md) is rendered from these
+ * rows, and table.test.ts checks every cell reaches exactly one of them.
  *
- * The canary rule. A refusal is `blocked_by_ua_rule` only when the tagged Googlebot canary was served
- * on the same page: the site then demonstrably does not check crawler IP addresses, so the refusal
- * is aimed at the user agent. Otherwise it is `refused_unverified`. Whether other crawlers were served
- * on the page is recorded in the row's limitations, never used to claim a rule.
+ * The witness rule (ENGINE-GAP §3.5a). Every identity we send on a page leaves from the same address,
+ * so a refusal explained by "this address is not a verified crawler's" hits all of them. A refusal is
+ * `blocked_by_ua_rule` when a witness was served on the same page: another tested crawler, or the
+ * tagged Googlebot canary. Otherwise it is `refused_unverified`. The browser control is not a
+ * witness: it claims to be no crawler, so a site that verifies every crawler's address serves it.
  */
 
 /** A request that was not made appears as `not_requested`. */
@@ -27,7 +28,8 @@ export interface Cell {
   oursAllowed: boolean;
   control: Observed;
   crawler: Observed;
-  canary: Observed;
+  /** Another tested crawler, or the tagged Googlebot canary, was served on the page. */
+  witnessed: boolean;
   /** Words in the crawler's response and the control's: 0 for a response that is not HTML, null when it could not be read. */
   words: number | null;
   controlWords: number | null;
@@ -42,11 +44,7 @@ export interface Condition {
   holds(c: Cell): boolean;
 }
 
-const is = (
-  field: 'control' | 'crawler' | 'canary',
-  label: string,
-  ...values: Observed[]
-): Condition => ({
+const is = (field: 'control' | 'crawler', label: string, ...values: Observed[]): Condition => ({
   text: `${label} ${values.map((v) => v.replace(/_/g, ' ')).join(' or ')}`,
   holds: (c) => values.includes(c[field]),
 });
@@ -71,6 +69,10 @@ const uncounted: Condition = {
   text: "the crawler's or the control's words could not be counted, or the control had none and the crawler's response is of another type",
   holds: (c) =>
     c.words === null || c.controlWords === null || (c.controlWords === 0 && !c.sameType),
+};
+const witnessed: Condition = {
+  text: 'another tested crawler or the tagged Googlebot canary served on the page',
+  holds: (c) => c.witnessed,
 };
 const thin: Condition = {
   text: `crawler's words under ${THIN_RATIO * 100}% of the control's`,
@@ -208,8 +210,8 @@ export const DECISION_TABLE: readonly Row[] = [
     cause: fixed('automation_challenge'),
   },
   {
-    id: 'refused_canary_served',
-    when: [is('crawler', 'crawler', 'refused', 'gone'), is('canary', 'canary', 'served')],
+    id: 'refused_witnessed',
+    when: [is('crawler', 'crawler', 'refused', 'gone'), witnessed],
     verdict: 'blocked_by_ua_rule',
     evidence: 'simulated',
     cause: firewall1020('crawler'),
@@ -237,5 +239,5 @@ export function decide(cell: Cell): Row {
   return row;
 }
 
-/** Whether a crawler's response on a page is a refusal that the canary is needed to read. */
+/** Whether a crawler's response on a page is a refusal, which the witness decides. */
 export const isRefusal = (o: Observed): boolean => o === 'refused' || o === 'gone';

@@ -119,13 +119,16 @@ describe('crawlerRegistryVersion', () => {
     source_url: 'https://developers.openai.com/api/docs/bots',
     source_notes: [],
     as_of: '2026-10-27',
+    cloudflare_categories: ['training'],
+    cloudflare_as_of: '2026-11-03',
     ...patch,
   });
   const sha256 = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
 
   it('is the sha256 of the entry as JSON with its keys sorted, written out here by hand', async () => {
     const expected =
-      '{"as_of":"2026-10-27","group":"ai_training","ip_list_url":"https://openai.com/gptbot.json",' +
+      '{"as_of":"2026-10-27","cloudflare_as_of":"2026-11-03","cloudflare_categories":["training"],' +
+      '"group":"ai_training","ip_list_url":"https://openai.com/gptbot.json",' +
       '"needs_owner_logs":true,"operator":"OpenAI","purpose":"Collects pages for model training.",' +
       '"robots_token":"GPTBot","scored":false,"source_notes":[],' +
       '"source_url":"https://developers.openai.com/api/docs/bots","testable":true,"token":"GPTBot",' +

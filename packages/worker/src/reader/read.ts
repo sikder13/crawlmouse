@@ -2,6 +2,7 @@ import { simhashForDedup } from '@crawlmouse/engine/worker';
 import { bounded, CAPS } from '../rows/bounded.js';
 import { readLinks, type PageLinks } from '../rows/links.js';
 import { countWords, readHtml, servedText } from '../rows/text.js';
+import { headText, type HeadText } from '../rows/head-text.js';
 
 /**
  * Reading a page: parsing its HTML and taking its text, word count and links. It costs CPU in
@@ -31,9 +32,12 @@ export interface PageRead {
      * The page's links and declarations. The main text stays on the reader, which hashes it, and the
      * canonical the extractor adopts is cut to the URL cap here: null when it was over it.
      */
-    links: Omit<PageLinks, 'mainTextStart' | 'canonicalUrl'> & {
+    links: Omit<PageLinks, 'mainTextStart' | 'canonicalUrl' | 'titleText' | 'descriptionText'> & {
       canonicalUrl: string | null | undefined;
     };
+    /** The page's title and meta description, as a row stores them (rows/head-text.ts). */
+    title: HeadText | null;
+    description: HeadText | null;
     /** The served text, as a crawl row stores it. */
     rawText: string;
     words: number;
@@ -79,7 +83,10 @@ export function readWords(req: PageRequest): WordCount {
 export function readPage(req: PageRequest & { finalUrl: string }): PageRead {
   const { $, note } = readHtml(req);
   if (!$) return { note, read: null };
-  const { mainTextStart, canonicalUrl, ...rest } = readLinks($, req.finalUrl);
+  const { mainTextStart, canonicalUrl, titleText, descriptionText, ...rest } = readLinks(
+    $,
+    req.finalUrl,
+  );
   const links = {
     ...rest,
     canonicalUrl: canonicalUrl === undefined ? undefined : bounded(canonicalUrl, CAPS.url),
@@ -92,6 +99,8 @@ export function readPage(req: PageRequest & { finalUrl: string }): PageRead {
       rawText: bounded(text, CAPS.rawText),
       words: countWords(text),
       simhash: note === null && mainTextStart ? simhashForDedup(mainTextStart) : null,
+      title: headText(titleText, CAPS.title, note !== null),
+      description: headText(descriptionText, CAPS.description, note !== null),
     },
   };
 }

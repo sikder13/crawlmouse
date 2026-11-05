@@ -10,7 +10,7 @@
  */
 import { z } from 'zod';
 import { DateSchema, HttpUrlSchema } from './common.js';
-import { CrawlerGroupSchema, VerificationMethodSchema } from './enums.js';
+import { CloudflareCategorySchema, CrawlerGroupSchema, VerificationMethodSchema } from './enums.js';
 import { rules } from './rules.js';
 
 export const CrawlerRegistryEntrySchema = z
@@ -32,6 +32,13 @@ export const CrawlerRegistryEntrySchema = z
     /** Anything the source page leaves unstated or states with a caveat. */
     source_notes: z.array(z.string().min(1)),
     as_of: DateSchema.nullable(),
+    /**
+     * Cloudflare's own categories for the crawler, as its page in Cloudflare Radar's bots directory
+     * lists them on `cloudflare_as_of`; null when Radar has no page for it. Cloudflare's vocabulary,
+     * not ours: ChatGPT-User is an `agent` there and `ai_search` in `group`.
+     */
+    cloudflare_categories: z.array(CloudflareCategorySchema).min(1).nullable(),
+    cloudflare_as_of: DateSchema,
   })
   .check(
     rules((e, rule) => {
@@ -39,6 +46,8 @@ export const CrawlerRegistryEntrySchema = z
       if (methods.includes('none_published') && methods.length > 1) rule.fail('verification_alone');
       if (new Set(methods).size !== methods.length) rule.fail('verification_unique');
       rule.exactlyWhen('ip_list_url', methods.includes('ip_list'), e.ip_list_url !== null);
+      const cf = e.cloudflare_categories ?? [];
+      if (new Set(cf).size !== cf.length) rule.fail('cloudflare_unique');
     }),
   );
 

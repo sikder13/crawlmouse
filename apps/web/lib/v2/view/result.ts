@@ -5,7 +5,6 @@
  * __tests__/v2/perturbation.test.tsx.
  */
 import {
-  SignalKindSchema,
   instant,
   scoredCrawlersMeasured,
   type Check,
@@ -13,10 +12,10 @@ import {
   type Fix,
   type FixSection,
   type FixtureDataset,
-  type SignalKind,
 } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { isFreeFix } from './free-fixes';
+import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
 import type { LayoutNode, Point } from '../map-layout';
@@ -143,7 +142,7 @@ const SECTIONS: Record<string, FixSection> = {
   content: 'content',
 };
 
-const SIGNAL_NAMES: Record<SignalKind, string> = {
+const SIGNAL_NAMES: Record<ScreenSignal, string> = {
   schema_org: 'Schema',
   content_signals: 'Content Signals',
   web_bot_auth: 'Web Bot Auth',
@@ -509,16 +508,17 @@ function contentDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => bo
 }
 
 function signalsDoor(check: Check): DoorView {
-  const kinds = SignalKindSchema.options;
-  const by = (state: string) => check.signals.filter((s) => s.state === state);
+  const kinds = SCREEN_SIGNALS;
+  const shown = screenSignals(check);
+  const by = (state: string) => shown.filter((s) => s.state === state);
   const present = by('detected');
   const absent = by('not_detected');
   const unknown = by('indeterminate');
   // The pill counts what is known present. A signal the check could not determine, or did not
   // record, is not tested, and the coverage line says how many were.
   const label = `${present.length} of ${kinds.length} present`;
-  const names = (xs: { signal: SignalKind }[]) => xs.map((s) => SIGNAL_NAMES[s.signal]);
-  const counting = check.signals.filter((s) => s.counts_toward_grade);
+  const names = (xs: { signal: ScreenSignal }[]) => xs.map((s) => SIGNAL_NAMES[s.signal]);
+  const counting = shown.filter((s) => s.counts_toward_grade);
   // What could not be tested is said in the check's own words, grouped where the words agree.
   const untested = new Map<string, string[]>();
   for (const s of unknown)

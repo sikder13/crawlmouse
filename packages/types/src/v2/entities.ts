@@ -207,6 +207,8 @@ export const ENTITIES: readonly EntityDoc[] = [
       links_read: 'PR #47',
       is_html: 'brief',
       robots_search: 'PR #47',
+      title: 'CC-12d',
+      meta_description: 'CC-12d',
     },
   },
   {
@@ -245,6 +247,14 @@ export const ENTITIES: readonly EntityDoc[] = [
       body_excerpt: 'Final-Segment',
       method: 'PR #48',
       http_version: 'PR #48',
+      identity_role: 'PR #54',
+      tagged: 'PR #55',
+      witness: 'PR #54',
+      fly_region: 'PR #55',
+      request_signing: 'PR #55',
+      signature_verified: 'PR #55',
+      worker_release: 'PR #55',
+      timing: 'PR #55',
     },
   },
   {
@@ -368,6 +378,8 @@ export const ENTITIES: readonly EntityDoc[] = [
       operator: 'Final-Result',
       ip_list_url: 'brief',
       source_notes: 'brief',
+      cloudflare_categories: 'PR #54',
+      cloudflare_as_of: 'PR #54',
     },
   },
   {

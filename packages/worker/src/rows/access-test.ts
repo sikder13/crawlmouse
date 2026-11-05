@@ -4,6 +4,7 @@ import {
   type AccessCause,
   type AccessTest,
   type EvidenceClass,
+  type IdentityRole,
   type Verdict,
 } from '@crawlmouse/types/v2';
 import type { FetchOutcome } from '../fetch/fetcher.js';
@@ -19,6 +20,7 @@ import {
   userAgentOf,
 } from './evidence.js';
 import { bounded, CAPS } from './bounded.js';
+import { LOCAL_VANTAGE, type Vantage } from '../vantage.js';
 
 export interface AccessRowInput {
   checkId: string;
@@ -36,11 +38,25 @@ export interface AccessRowInput {
   identity: Identity;
   testedAt: number;
   words: number | null;
+  /** On a blocked_by_ua_rule row: the identity served on the page that decided it. */
+  witness?: AccessTest['witness'];
+  /** Where the requests leave from; off Fly and unreleased when not given, as in tests. */
+  vantage?: Vantage;
+}
+
+/** A row names a crawler (`crawler`), or is the method's own request: the control or the canary. */
+function roleOf(ua: string | null, identity: Identity): IdentityRole {
+  if (ua !== null) return 'crawler';
+  if (identity.role === 'control' || identity.role === 'canary') return identity.role;
+  throw new Error(
+    `access row: a row with no crawler is the control's or the canary's, not ${identity.role}`,
+  );
 }
 
 /** Builds one AccessTest and validates it against the CC-11 schema; an invalid row is a worker bug and throws. */
 export function accessTestRow(i: AccessRowInput): AccessTest {
   const f = i.fetch;
+  const v = i.vantage ?? LOCAL_VANTAGE;
   return AccessTestSchema.parse({
     id: randomUUID(),
     check_id: i.checkId,
@@ -52,7 +68,7 @@ export function accessTestRow(i: AccessRowInput): AccessTest {
     verdict: i.verdict,
     evidence_class: i.evidence,
     identity_sent: userAgentOf(f, i.identity),
-    source_ip_class: 'fly_egress',
+    source_ip_class: v.sourceIpClass,
     limitations: storedLimitations([...i.limitations, ...requestLimitations(f)]),
     cause: i.cause,
     request_headers: f ? requestHeaders(f) : [],
@@ -66,5 +82,14 @@ export function accessTestRow(i: AccessRowInput): AccessTest {
     // goes through safeFetch, which sends GET over HTTP/1.1.
     method: f && f.status !== null ? 'GET' : null,
     http_version: f && f.status !== null ? '1.1' : null,
+    identity_role: roleOf(i.ua, i.identity),
+    // Of the request the row shows: a crawler's robots.txt evidence was fetched as our crawler.
+    tagged: (f?.identity ?? i.identity).tagged,
+    witness: i.witness ? { role: i.witness.role, ua: bounded(i.witness.ua, CAPS.token) } : null,
+    fly_region: v.flyRegion,
+    request_signing: 'unsigned',
+    signature_verified: 'not_observable',
+    worker_release: v.release,
+    timing: f ? f.timing : null,
   });
 }
