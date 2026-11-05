@@ -1,4 +1,5 @@
 import { extractPage, toPersistableText } from '@crawlmouse/engine/worker';
+import { expectWithinBudget, expectWithinRelative } from '@crawlmouse/timing';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
@@ -152,14 +153,10 @@ describe('readLinks: pinned readings', () => {
   });
 });
 
-describe('readLinks: cost', () => {
-  const time = (html: string): number => {
-    const $ = parseHtml(html)!;
-    const t = performance.now();
-    readLinks($, BASE);
-    return performance.now() - t;
-  };
+/** A parsed document, as parseHtml gives it. */
+type Parsed = NonNullable<ReturnType<typeof parseHtml>>;
 
+describe('readLinks: cost', () => {
   // Review rounds 3 and 4: reading a link's text by walking what it holds costs links x text. The
   // subtree under the links varies what that cost keys on: nodes with no text, runs that never fill
   // a link's capture (whitespace, controls), and many one-character text nodes.
@@ -172,12 +169,22 @@ describe('readLinks: cost', () => {
     ['198,000 paragraphs of one letter', '<p>w'.repeat(198_000)],
   ])(
     'costs about the same for 500 links nested around %s as for one',
-    (_name, subtree) => {
-      const nested = time(
-        `<body>${'<a href="/x">'.repeat(500)}${subtree}${'</a>'.repeat(500)}</body>`,
+    (name, subtree) => {
+      const nested = `<body>${'<a href="/x">'.repeat(500)}${subtree}${'</a>'.repeat(500)}</body>`;
+      const single = `<body><a href="/x">${subtree}</a></body>`;
+      // Each pair reads documents parsed for it, off the clock.
+      expectWithinRelative(
+        `readLinks, 500 links nested around ${name} against one`,
+        {
+          measured: ($: Parsed) => readLinks($, BASE),
+          reference: ($: Parsed) => readLinks($, BASE),
+        },
+        {
+          limit: (singleMs) => singleMs * 3 + 150,
+          rule: '3x one link, plus 150 ms',
+          setup: () => ({ measured: parseHtml(nested)!, reference: parseHtml(single)! }),
+        },
       );
-      const single = time(`<body><a href="/x">${subtree}</a></body>`);
-      expect(nested).toBeLessThan(single * 3 + 150);
     },
     120_000,
   );
@@ -189,15 +196,30 @@ describe('readLinks: cost', () => {
       { length: 46_000 },
       (_, i) => `<p>item ${i} <a href="/p/${i}">link ${i}</a></p>\n`,
     ).join('');
-    const bare = time(inner);
-    const inBody = time(`<html><body>${inner}</body></html>`);
-    expect(bare).toBeLessThan(inBody * 3 + 150);
+    // Each pair reads documents parsed for it, off the clock.
+    expectWithinRelative(
+      'readLinks, 46,000 links with no body element against the same inside one',
+      { measured: ($: Parsed) => readLinks($, BASE), reference: ($: Parsed) => readLinks($, BASE) },
+      {
+        limit: (inBodyMs) => inBodyMs * 3 + 150,
+        rule: '3x inside a body, plus 150 ms',
+        setup: () => ({
+          measured: parseHtml(inner)!,
+          reference: parseHtml(`<html><body>${inner}</body></html>`)!,
+        }),
+      },
+    );
   }, 60_000);
 
   it('reads a small page of 2,000 nested links with full captures quickly', () => {
     // Review round 4: 4 x 500 nested links around 2,160 characters, so every link's capture is full.
     const group = `${'<a href="/x">'.repeat(500)}${'word '.repeat(432)}${'</a>'.repeat(500)}`;
-    expect(time(`<body>${group.repeat(4)}</body>`)).toBeLessThan(500);
+    // Each run reads a document parsed for it, off the clock.
+    expectWithinBudget(
+      'readLinks, 2,000 nested links with full captures',
+      ($: Parsed) => readLinks($, BASE),
+      { budgetMs: 500, setup: () => parseHtml(`<body>${group.repeat(4)}</body>`)! },
+    );
   });
 });
 

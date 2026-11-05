@@ -85,7 +85,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [engine, web, inngest, types, scripts, worker]
+        package: [engine, web, inngest, types, scripts, worker, timing]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -177,21 +177,56 @@ jobs:
           . ./.env.ci
           set +a
           pnpm exec next build
+      # A fixed CPU workload timed on this runner, against its time on a runner of normal speed
+      # (packages/timing/src/probe.ts). The budgets step reads it when deciding what a failure means.
+      - name: Runner probe
+        if: ${{ matrix.shard == 1 && !cancelled() }}
+        run: |
+          set -euo pipefail
+          pnpm --silent --filter @crawlmouse/timing exec tsx src/probe-cli.ts | tee "$RUNNER_TEMP/probe.json"
       # Alone and on one worker, so they measure the page and not the other specs. next start
       # serves the previews only with V2_PREVIEW_ON_NEXT_START=1, which playwright.config.ts sets
-      # for VISUAL_SERVER=start.
-      - name: Performance budgets and production checks, on next start
+      # for VISUAL_SERVER=start. perf-retry.sh runs the budgets and reads attempt 1 first: a failure
+      # that is not a budget miss fails the job at once; a budget-only failure is retried once,
+      # and the second attempt and the probe decide; docs/ops/ci-timing.md has the
+      # rule. This is the one retried step in the workflow.
+      - name: Performance budgets, on next start
         if: ${{ matrix.shard == 1 && !cancelled() }}
         working-directory: apps/web
         env:
           VISUAL_PERF: '1'
+          VISUAL_SERVER: start
+          # Relative to apps/web: the repository root, where the upload below finds it.
+          FLAKE_ENTRY: ../../flake-entry.md
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          ../../packages/timing/scripts/perf-retry.sh "$RUNNER_TEMP/probe.json" -- \
+            pnpm exec playwright test -c ../../tests/visual/playwright.config.ts perf.spec.ts --workers=1
+      - name: Production checks, on next start
+        if: ${{ matrix.shard == 1 && !cancelled() }}
+        working-directory: apps/web
+        env:
           VISUAL_SERVER: start
         run: |
           set -euo pipefail
           set -a
           . ./.env.ci
           set +a
-          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts perf.spec.ts production.spec.ts --workers=1
+          pnpm exec playwright test -c ../../tests/visual/playwright.config.ts production.spec.ts --workers=1
+      # A budget failure that passed on retry, or failed twice on a slow runner, leaves a row for
+      # the flake register in docs/ops/ci-timing.md. The PR author commits it.
+      - name: Upload the flake register row
+        if: ${{ matrix.shard == 1 && !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flake-entry-${{ github.run_id }}-${{ github.run_attempt }}
+          path: flake-entry.md
+          retention-days: 30
+          if-no-files-found: ignore
       - name: On any Vercel environment the previews are a 404
         if: ${{ matrix.shard == 1 && !cancelled() }}
         working-directory: apps/web

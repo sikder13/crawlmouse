@@ -1,9 +1,11 @@
+import { expectWithinBudget } from '@crawlmouse/timing';
 import { describe, it, expect } from 'vitest';
 import { parseLlmsTxt } from './llms-txt.js';
 
 describe('parseLlmsTxt (§8 — informational, ZERO weight)', () => {
   it('present + parseable for a well-formed llms.txt (H1 + link list)', () => {
-    const body = '# Example\n\n> A short summary.\n\n## Docs\n\n- [Guide](https://example.com/guide)\n- [API](https://example.com/api)\n';
+    const body =
+      '# Example\n\n> A short summary.\n\n## Docs\n\n- [Guide](https://example.com/guide)\n- [API](https://example.com/api)\n';
     const s = parseLlmsTxt(200, body);
     expect(s.present).toBe(true);
     expect(s.parseable).toBe(true);
@@ -17,7 +19,9 @@ describe('parseLlmsTxt (§8 — informational, ZERO weight)', () => {
   });
 
   it('requires an H1 (a doc that is only H2 + links is not the llms.txt shape)', () => {
-    expect(parseLlmsTxt(200, '## Docs\n- [Guide](https://example.com/guide)').parseable).toBe(false);
+    expect(parseLlmsTxt(200, '## Docs\n- [Guide](https://example.com/guide)').parseable).toBe(
+      false,
+    );
   });
 
   it('absent for a 404', () => {
@@ -32,10 +36,12 @@ describe('parseLlmsTxt (§8 — informational, ZERO weight)', () => {
 
   it('bounds cost on a hostile body — no ReDoS on a huge run of "[" (§12)', () => {
     const hostile = '['.repeat(500_000); // an unbounded [text](url) regex backtracks O(n^2) → seconds
-    const t0 = performance.now();
-    const s = parseLlmsTxt(200, hostile);
-    const ms = performance.now() - t0;
-    expect(s.parseable).toBe(false);
-    expect(ms).toBeLessThan(500); // bounded scan + bounded-quantifier regex → milliseconds
+    // A bounded scan and a bounded-quantifier regex: milliseconds.
+    const { values } = expectWithinBudget(
+      'llms.txt parse of 500,000 "["',
+      () => parseLlmsTxt(200, hostile),
+      { budgetMs: 500 },
+    );
+    expect(values[0]!.parseable).toBe(false);
   });
 });
