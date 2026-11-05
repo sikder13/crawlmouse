@@ -2,6 +2,7 @@ import type http from 'node:http';
 import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
+import { DECLARATION_PATHS } from '@crawlmouse/types/v2';
 import { createFetcher, MAX_BODY_BYTES } from '../fetch/fetcher.js';
 import { CANARY, CRAWL, CRAWLERS, type Identity } from '../identities.js';
 import { Sites } from '../politeness/sites.js';
@@ -98,7 +99,12 @@ async function run(
   return { result, clock };
 }
 
-const pagesRequested = (s: FixtureServer) => s.requests.filter((r) => r.url !== '/robots.txt');
+/** The declaration files a crawl batch requests after its pages (declarations.test.ts tests them). */
+const DECLARED = new Set<string>(DECLARATION_PATHS);
+const isDeclaration = (url: string) =>
+  DECLARED.has(URL.canParse(url) ? new URL(url).pathname : url);
+const pagesRequested = (s: FixtureServer) =>
+  s.requests.filter((r) => r.url !== '/robots.txt' && !isDeclaration(r.url));
 
 /** A batch through the fake fetcher, for sites with more than one origin (www and bare). */
 async function runFake(
@@ -118,7 +124,7 @@ async function runFake(
     robotsCache: new RobotsCache(clock),
     reader,
   });
-  return { result, requested: fetcher.calls.map((c) => c.url) };
+  return { result, requested: fetcher.calls.map((c) => c.url).filter((u) => !isDeclaration(u)) };
 }
 /** example.com/a redirects to www.example.com/t; `www` answers the rest. */
 const toWww =
@@ -257,12 +263,12 @@ describe('Crawl-delay', () => {
       },
       robotsCache: new RobotsCache(clock),
     });
-    expect(
-      starts
-        .slice(1)
-        .map((t, i) => t - starts[i]!)
-        .slice(1),
-    ).toEqual([12_000, 12_000]);
+    // The three pages, then the seven declaration files, every start 12 s after the one before.
+    const gaps = starts
+      .slice(1)
+      .map((t, i) => t - starts[i]!)
+      .slice(1);
+    expect(gaps).toEqual(Array.from({ length: 2 + DECLARATION_PATHS.length }, () => 12_000));
     expect(result.partial?.reasons).toEqual(['crawl_delay_10s_or_more']);
     expect(result.coverage).toEqual({ urls_requested: 3, urls_complete: 3 });
     expect(result.findings).toContainEqual(
@@ -1186,7 +1192,9 @@ describe('review round 2: behaviour the tests did not pin', () => {
     const s = await serve({
       page: (_p, ua, res) => {
         const who = whoSent(ua);
-        if (who === 'GPTBot') return void ((res.statusCode = 403), res.end());
+        // Every crawler refused, so no witness: the canary's own outcome is what the row says.
+        if (who !== 'control' && who !== 'crawl' && who !== 'canary')
+          return void ((res.statusCode = 403), res.end());
         if (who === 'canary') return void ((res.statusCode = 404), res.end());
         html(res, '<p>ok</p>');
       },
@@ -1197,7 +1205,7 @@ describe('review round 2: behaviour the tests did not pin', () => {
       verdict: 'refused_unverified',
     });
     expect(result.access_tests.find((r) => r.ua === 'GPTBot')!.limitations.join(' ')).toContain(
-      'The tagged Googlebot request on this page got 404 or 410',
+      'No other tested crawler was served on this page, and the tagged Googlebot request got 404 or 410',
     );
   });
 
@@ -1522,15 +1530,18 @@ describe('round 4: behaviour review round 3 found unpinned', () => {
 
   it('names the budget that kept the canary from being sent', async () => {
     const s = await serve({
-      page: (_p, ua, res) =>
-        whoSent(ua) === 'GPTBot'
-          ? void ((res.statusCode = 403), res.end())
-          : html(res, '<p>ok</p>'),
+      page: (_p, ua, res) => {
+        const who = whoSent(ua);
+        // Every crawler refused, so no witness: the canary's own outcome is what the row says.
+        if (who !== 'control' && who !== 'crawl' && who !== 'canary')
+          return void ((res.statusCode = 403), res.end());
+        html(res, '<p>ok</p>');
+      },
     });
     // robots.txt, the control and the six crawlers spend the eight requests.
     const { result } = await run(accessReq(s.base, ['/'], { ...roomy, max_requests: 8 }));
     expect(rowOf(result, 'GPTBot').limitations).toContain(
-      "The tagged Googlebot request on this page was not requested, because the batch's requests budget was spent, so this refusal cannot be told apart from IP verification. OAI-SearchBot, ChatGPT-User, PerplexityBot, Claude-SearchBot and ClaudeBot were served on this page.",
+      "No other tested crawler was served on this page, and the tagged Googlebot request was not requested, because the batch's requests budget was spent, so this refusal cannot be told apart from IP verification.",
     );
   });
 
@@ -1541,13 +1552,14 @@ describe('round 4: behaviour review round 3 found unpinned', () => {
         const who = whoSent(ua);
         if (who === 'canary')
           return void ((res.statusCode = 301), res.setHeader('location', '/blocked'), res.end());
-        if (who === 'GPTBot') return void ((res.statusCode = 403), res.end());
+        // Every crawler refused, so no witness: the canary's own outcome is what the row says.
+        if (who !== 'control' && who !== 'crawl') return void ((res.statusCode = 403), res.end());
         html(res, '<p>ok</p>');
       },
     });
     const { result } = await run(accessReq(s.base, ['/p']));
     expect(rowOf(result, 'GPTBot').limitations[1]).toMatch(
-      /^The tagged Googlebot request on this page ended on a redirect that was not followed, so this refusal cannot be told apart from IP verification\./,
+      /^No other tested crawler was served on this page, and the tagged Googlebot request ended on a redirect that was not followed, so this refusal cannot be told apart from IP verification\./,
     );
   });
 
@@ -1670,7 +1682,7 @@ describe('round 5: redirect targets', () => {
       robotsCache: new RobotsCache(c),
     });
     if (result.kind !== 'crawl') throw new Error('crawl');
-    return { result, requested: fetcher.calls.map((x) => x.url) };
+    return { result, requested: fetcher.calls.map((x) => x.url).filter((u) => !isDeclaration(u)) };
   }
   const LONG_TARGET = `https://example.com/${'p'.repeat(5000)}`;
 

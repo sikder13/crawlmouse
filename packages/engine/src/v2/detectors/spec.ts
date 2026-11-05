@@ -34,10 +34,10 @@ export const SPEC_URL = new URL(
   import.meta.url,
 );
 
-const code = (s: string) => `\`${s}\``;
-const pct = (x: number) => `${Math.round(x * 100)} %`;
+export const code = (s: string) => `\`${s}\``;
+export const pct = (x: number) => `${Math.round(x * 100)} %`;
 
-function table(head: string[], rows: string[][]): string {
+export function table(head: string[], rows: string[][]): string {
   const width = head.map((h, k) => Math.max(h.length, ...rows.map((r) => r[k]!.length)));
   const line = (cells: string[]) => `| ${cells.map((c, k) => c.padEnd(width[k]!)).join(' | ')} |`;
   return [line(head), line(width.map((w) => '-'.repeat(w))), ...rows.map(line)].join('\n');

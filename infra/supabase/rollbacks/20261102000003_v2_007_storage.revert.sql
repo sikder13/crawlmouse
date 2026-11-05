@@ -11,10 +11,14 @@ do $$
 begin
   if to_regclass('public.page_results') is not null then
     drop policy if exists page_results_crawl_worker_insert on public.page_results;
+    alter table public.page_results alter column check_month drop default;
+    alter table public.page_results alter column lineage_id drop default;
   end if;
 end;
 $$;
 
+drop function if exists public.crawl_worker_lineage_id();
+drop function if exists public.crawl_worker_check_month();
 drop function if exists public.crawl_worker_part_path_ok(text);
 drop function if exists public.crawl_worker_check_id();
 
@@ -33,7 +37,8 @@ begin
         public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
         public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
         public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
-        public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+        public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb),
+        public.v2_headers_shape_ok(jsonb)
         from crawl_worker;
     end if;
     revoke usage on schema public from crawl_worker;

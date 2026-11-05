@@ -13,9 +13,16 @@ import {
   IdSchema,
   MAX_HEADERS,
   RedirectChainSchema,
+  FlyRegionSchema,
+  MetaDescriptionSchema,
+  PageTitleSchema,
+  RequestSigningSchema,
+  RequestTimingSchema,
   SearchRobotsSchema,
+  SignatureVerificationSchema,
   SourceIpClassSchema,
   TimestampSchema,
+  WorkerReleaseSchema,
 } from '@crawlmouse/types/v2';
 
 /**
@@ -85,6 +92,16 @@ export const CrawlPageSchema = z.strictObject({
   is_html: z.boolean(),
   links_read: z.boolean(),
   robots_search: SearchRobotsSchema,
+  /** PageResult's title and meta description; null when the page was not read (see there). */
+  title: PageTitleSchema.nullable(),
+  meta_description: MetaDescriptionSchema.nullable(),
+  /** The vantage AccessTest records, with its shapes: region (null off Fly), signing, release. */
+  fly_region: FlyRegionSchema.nullable(),
+  request_signing: RequestSigningSchema,
+  signature_verified: SignatureVerificationSchema,
+  worker_release: WorkerReleaseSchema,
+  /** The request's timing (AccessTest's); null when no request was made. */
+  timing: RequestTimingSchema.nullable(),
 });
 
 export type CrawlPage = z.infer<typeof CrawlPageSchema>;

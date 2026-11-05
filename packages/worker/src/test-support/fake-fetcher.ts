@@ -38,6 +38,7 @@ export function fakeFetcher(
         body: '',
         maxBytes: limits.maxBytes,
         error,
+        timing: { dns_ms: null, connect_ms: null, ttfb_ms: null, total_ms: 0 },
       });
     return outcome({
       url,

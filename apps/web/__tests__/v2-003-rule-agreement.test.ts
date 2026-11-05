@@ -16,6 +16,7 @@ import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 import { constraints, enumSetOf } from './helpers/v2-check-tables';
 import {
   FLATTENED,
+  NOT_STORED_YET,
   RELOCATED,
   RULE_CHECKS,
   SHAPE_CHECKS,
@@ -621,6 +622,44 @@ const robotsDomain = (): unknown[] => [
     { numRuns: 100, seed: 20261102 },
   ),
 ];
+/** Crawled text within a UTF-8 byte budget: at, and one past, the budget in 1-, 2- and 4-byte characters. */
+const crawled = (budget: number): string[] => [
+  '',
+  'a',
+  'x'.repeat(budget),
+  'x'.repeat(budget + 1),
+  '\u00e9'.repeat(budget / 2),
+  '\u00e9'.repeat(budget / 2 + 1),
+  '\u{1f600}'.repeat(budget / 4),
+  '\u{1f600}'.repeat(budget / 4 + 1),
+];
+// No null and no number: identity_sent is NOT NULL text, which the contract guard compares.
+const identityDomain = (): unknown[] => sample(fc.string({ maxLength: 520 }), crawled(512));
+const header = (name: unknown = 'server', value: unknown = 'cloudflare') => ({ name, value });
+// No null: both header columns are NOT NULL, which the contract guard compares.
+const headersDomain = (): unknown[] => [
+  [],
+  {},
+  'server',
+  [null],
+  [header(), header('cf-ray', '8d9f2c1a7b3e4f01-IAD')],
+  Array.from({ length: 32 }, () => header()),
+  Array.from({ length: 33 }, () => header()),
+  ...around(header(), {
+    name: [...crawled(128), 5, null],
+    value: [...crawled(1024), 5, null],
+  }).map((h) => [h]),
+  ...fc.sample(
+    fc.array(
+      fc.record({
+        name: fc.constantFrom('server', 'cf-ray', '', 'x'.repeat(129)),
+        value: fc.constantFrom('', 'cloudflare', 'x'.repeat(1025)),
+      }),
+      { maxLength: 34 },
+    ),
+    { numRuns: 100, seed: 20261103 },
+  ),
+];
 /** The URL strings inside a value of `field`, where the contract's HttpUrl applies. */
 const URL_LEAVES: Record<string, (v: unknown) => unknown[]> = {
   url: (v) => [v],
@@ -685,6 +724,9 @@ const DOMAINS: Record<string, () => unknown[]> = {
       ['0123456789abcdef', '0123456789ABCDEF', '0123456789abcde', '0123456789abcdef0', ''],
     ),
   robots_search: robotsDomain,
+  identity_sent: identityDomain,
+  request_headers: headersDomain,
+  headers: headersDomain,
   // Valid values only: the enum CHECK, not this one, refuses an unknown check.
   content_failures: () => [
     null,
@@ -750,8 +792,15 @@ describe('each page_results shape CHECK refuses the values the contract’s Page
     expect(unlisted, 'CHECKs not in SHAPE_CHECKS').toEqual([]);
     expect([...declared], 'SHAPE_CHECKS naming no CHECK').toEqual([]);
     const shape = def(entity('PageResult').schema).shape!;
-    const fields = Object.keys(shape);
-    for (const { field } of Object.values(SHAPE_CHECKS)) expect(fields).toContain(field);
+    // A field no column holds yet has no CHECK yet either (NOT_STORED_YET).
+    const fields = Object.keys(shape).filter((f) => !NOT_STORED_YET[`PageResult.${f}`]);
+    // A borrowed shape is a database-only column: the field is the other entity's, never PageResult's.
+    for (const { field, shapeOf } of Object.values(SHAPE_CHECKS)) {
+      if (shapeOf) {
+        expect(fields).not.toContain(field);
+        expect(Object.keys(def(entity(shapeOf).schema).shape!)).toContain(field);
+      } else expect(fields).toContain(field);
+    }
     // From the contract: every PageResult field but a boolean, an enum and a uuid (the column type
     // and its enum CHECK hold those) states a bound, so each has a shape CHECK.
     const bounded = fields.filter((f) => {
@@ -766,6 +815,7 @@ describe('each page_results shape CHECK refuses the values the contract’s Page
     expect(bounded.length, 'anti-vacuity').toBeGreaterThan(15);
     expect(
       Object.values(SHAPE_CHECKS)
+        .filter((x) => !x.shapeOf)
         .map((x) => x.field)
         .sort(),
     ).toEqual(bounded.sort());
@@ -776,21 +826,23 @@ describe('each page_results shape CHECK refuses the values the contract’s Page
     );
   });
 
-  for (const [constraint, { table, field, exact }] of Object.entries(SHAPE_CHECKS)) {
+  for (const [constraint, { table, field, exact, shapeOf }] of Object.entries(SHAPE_CHECKS)) {
     it(`${constraint} (${exact === true ? 'exact' : exact})`, async () => {
-      const schema = entity('PageResult').schema as unknown as {
+      const owner = shapeOf ?? 'PageResult';
+      const schema = entity(owner).schema as unknown as {
         safeParse(v: unknown): {
           success: boolean;
           error?: { issues: { path: PropertyKey[]; params?: { rule?: string } }[] };
         };
       };
-      const base = recordsOf('PageResult')[0]!;
+      const base = recordsOf(owner)[0]!;
       expect(schema.safeParse(base).success, 'the base fixture parses').toBe(true);
+      const row = recordsOf('PageResult')[0]!;
       const values = DOMAINS[field]!();
       const database = await refusedByEach(
         table,
         constraint,
-        values.map((v) => ({ ...base, [field]: v })),
+        values.map((v) => ({ ...row, [field]: v })),
       );
       const disagreements: string[] = [];
       const seen = new Set<boolean>();

@@ -7,15 +7,14 @@ import {
   before,
   insertRow,
   seedWorld,
-  through,
   type NewTable,
   type Scope,
   type World,
 } from './helpers/v2-check-tables';
 
 /**
- * Who can read and write which rows of every table migration 003 creates. The table list is read
- * from the catalog (what 003 adds), never written out, so a table added later is covered without
+ * Who can read and write which rows of every public table migrations 003 and 006b create. The table
+ * list is read from the catalog (what they add), never written out, so a table added later is covered without
  * anyone remembering to add it. What each table SHOULD expose is declared once, in READ_SCOPE, and the
  * first test fails when that declaration and the catalog disagree.
  *
@@ -29,10 +28,13 @@ import {
  * - `site_or_account`: as `site`, plus account-wide rows (site_id null) for any member.
  * - `account_managers`: owners and account managers of the account read every row; others none.
  * - `account`: every member of the account reads every row (is_member).
+ * - `signed_in`: every signed-in user reads every row, whatever account (measurement_lineages names
+ *   Crawlmouse's own builds, nothing of an account's).
  * - `none`: no client privilege at all.
  */
-type ReadScope = 'site' | 'site_or_account' | 'account_managers' | 'account' | 'none';
+type ReadScope = 'site' | 'site_or_account' | 'account_managers' | 'account' | 'signed_in' | 'none';
 const READ_SCOPE: Record<string, ReadScope> = {
+  measurement_lineages: 'signed_in',
   sites: 'site',
   checks: 'site',
   page_results: 'site',
@@ -50,6 +52,9 @@ const READ_SCOPE: Record<string, ReadScope> = {
   api_keys: 'account_managers',
   deploy_hooks: 'site',
   seat_sites: 'account',
+  check_ledger_links: 'none',
+  // Members read counts through usage_counts() (v2-006b-data-foundations.test.ts), never a row.
+  usage_events: 'none',
 };
 
 let db: PGlite;
@@ -70,10 +75,8 @@ beforeAll(async () => {
   );
   db = await freshDb();
   await applyAllMigrations(db);
-  const post = await freshDb();
-  await applyAllMigrations(post, undefined, through(MIGRATION_003));
   tables = (
-    await post.query<{ n: string }>(
+    await db.query<{ n: string }>(
       `select tablename as n from pg_tables where schemaname = 'public' order by 1`,
     )
   ).rows
@@ -91,8 +94,13 @@ beforeAll(async () => {
   B = await seedWorld(db, 'B');
 }, 240_000);
 
+/** A date column (the partition key check_month) reads back as a Date; seeded keys hold YYYY-MM-DD. */
 const keyOf = (row: Record<string, unknown>, cols: string[]) =>
-  JSON.stringify(cols.map((c) => row[c]));
+  JSON.stringify(
+    cols.map((c) =>
+      row[c] instanceof Date ? (row[c] as Date).toISOString().slice(0, 10) : row[c],
+    ),
+  );
 
 /** The seeded keys of `world` in `table` whose scope is in `scopes`. */
 function seededKeys(world: World, table: NewTable, scopes: Scope[]): string[] {
@@ -109,9 +117,10 @@ function expected(
   sameAccount: boolean,
   owner: World,
 ): string[] {
-  if (!sameAccount) return [];
   const scope = READ_SCOPE[table]!;
   const all: Scope[] = ['site1', 'site2', 'account'];
+  if (scope === 'signed_in') return seededKeys(owner, table, all);
+  if (!sameAccount) return [];
   switch (scope) {
     case 'none':
       return [];
@@ -152,7 +161,7 @@ describe('the cross-account test covers what 003 creates', () => {
   });
   it('each account holds rows of both its sites in every site table, and account rows in the others', async () => {
     for (const t of tables) {
-      const siteScoped = READ_SCOPE[t] !== 'account' && READ_SCOPE[t] !== 'account_managers';
+      const siteScoped = !['account', 'account_managers', 'signed_in'].includes(READ_SCOPE[t]!);
       for (const w of [A, B]) {
         const scopes = new Set(w.seeded[t].map((r) => r.scope));
         if (siteScoped) {
@@ -196,8 +205,8 @@ describe('reads: every new table, every actor', () => {
         return;
       }
       expect(await visibleKeys(A.ownerId, t, A)).toEqual(expected(t, 'owner', true, A));
-      expect(await visibleKeys(A.ownerId, t, B)).toEqual([]);
-      expect(await visibleKeys(B.ownerId, t, A)).toEqual([]);
+      expect(await visibleKeys(A.ownerId, t, B)).toEqual(expected(t, 'owner', false, B));
+      expect(await visibleKeys(B.ownerId, t, A)).toEqual(expected(t, 'owner', false, A));
     },
   );
 
@@ -210,7 +219,7 @@ describe('reads: every new table, every actor', () => {
       expect(seen).toEqual(expected(t, 'scoped', true, A));
       if (READ_SCOPE[t] === 'site' || READ_SCOPE[t] === 'site_or_account')
         for (const k of seededKeys(A, t, ['site2'])) expect(seen).not.toContain(k);
-      expect(await visibleKeys(A.scopedUserId, t, B)).toEqual([]);
+      expect(await visibleKeys(A.scopedUserId, t, B)).toEqual(expected(t, 'scoped', false, B));
     },
   );
 

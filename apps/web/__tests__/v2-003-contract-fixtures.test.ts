@@ -2,10 +2,17 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PGlite } from '@electric-sql/pglite';
-import { ENTITIES, type FixtureDataset } from '@crawlmouse/types/v2';
+import {
+  aiReadabilityStatus,
+  ENTITIES,
+  technicalSeoStatus,
+  verdictStatus,
+  type FixtureDataset,
+} from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
-import { insertRow, signUp } from './helpers/v2-check-tables';
+import { insertRow, premakeTestMonths, signUp } from './helpers/v2-check-tables';
+import { NOT_STORED_YET, VALUES_NOT_STORED_YET } from './helpers/v2-contract-storage';
 
 /**
  * The contract's own fixture datasets (apps/web/lib/fixtures/v2) round-trip through the tables:
@@ -85,7 +92,56 @@ function parentsFirst(rows: Rec[], ref: string): Rec[] {
 const omit = (r: Rec, keys: string[]) =>
   Object.fromEntries(Object.entries(r).filter(([k]) => !keys.includes(k)));
 
+/**
+ * Contract fields no column holds yet (helpers/v2-contract-storage.ts, NOT_STORED_YET), by fixture
+ * collection: not written, so compared on what is stored. A row holding a value no CHECK accepts yet
+ * (VALUES_NOT_STORED_YET) cannot be written at all; the test names those rows and compares the rest.
+ */
+const TABLE_OF_COLLECTION: Record<string, string> = {
+  page_results: 'page_results',
+  access_tests: 'access_tests',
+};
+const deferred = (collection: string): string[] => {
+  const entity = ENTITIES.find((e) => e.collection === collection)?.name;
+  return Object.keys(NOT_STORED_YET)
+    .filter((at) => at.startsWith(`${entity}.`))
+    .map((at) => at.slice(`${entity}.`.length));
+};
+const pending = (collection: string, r: Rec): boolean =>
+  Object.entries(VALUES_NOT_STORED_YET).some(([at, values]) => {
+    const [table, column] = at.split('.') as [string, string];
+    return TABLE_OF_COLLECTION[collection] === table && values.includes(r[column] as string);
+  });
+const storable = (collection: string, rows: Rec[]): Rec[] =>
+  rows.filter((r) => !pending(collection, r)).map((r) => omit(r, deferred(collection)));
+
+/**
+ * Database-only columns (06b), by table: not contract fields, so not in the fixtures. The loader
+ * writes the fixture's lineages into them and the vantage the worker sends, and the projection drops
+ * them, with the generated statuses, which are compared with the contract's functions on their own.
+ */
+const DATABASE_ONLY: Record<string, string[]> = {
+  checks: ['lineage_id', 'check_month', 'technical_seo_status', 'ai_readability_status'],
+  page_results: [
+    'url_hash',
+    'check_month',
+    'lineage_id',
+    'identity_sent',
+    'source_ip_class',
+    'request_headers',
+    'headers',
+  ],
+  link_edges: ['from_hash', 'to_hash', 'check_month', 'lineage_id'],
+  access_tests: ['check_month', 'lineage_id', 'measurement_status'],
+};
+const CRAWL_UA = 'Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)';
+
 async function load(db: PGlite, d: FixtureDataset): Promise<void> {
+  await premakeTestMonths(db);
+  for (const l of d.lineages) await insertRow(db, 'measurement_lineages', l);
+  // A fixture's grading lineage has no worker; its fetching lineage has one.
+  const grading = d.lineages.find((l) => l.worker_release === null)?.id;
+  const fetching = d.lineages.find((l) => l.worker_release !== null)?.id;
   for (const [i, a] of d.accounts.entries())
     await insertRow(db, 'accounts', accountRow(a as Rec, i));
   for (const s of d.seats) {
@@ -129,10 +185,31 @@ async function load(db: PGlite, d: FixtureDataset): Promise<void> {
       await insertRow(db, 'seat_sites', { seat_id: s.id, site_id: site, account_id: s.account_id });
   }
   for (const c of parentsFirst(d.checks as Rec[], 'previous_check_id'))
-    await insertRow(db, 'checks', c);
-  for (const r of d.page_results) await insertRow(db, 'page_results', r);
-  for (const r of d.link_edges) await insertRow(db, 'link_edges', r);
-  for (const r of d.access_tests) await insertRow(db, 'access_tests', r);
+    await insertRow(db, 'checks', {
+      ...c,
+      lineage_id: c.status === 'finished' || c.status === 'partial' ? grading : null,
+    });
+  // The partition key is database only: the month the row's check was queued.
+  const { rows: months } = await db.query<{ id: string; month: string }>(
+    `select id::text, check_month::text as month from public.checks`,
+  );
+  const monthOf = new Map(months.map((m) => [m.id, m.month]));
+  const measured = (r: Rec) => ({
+    ...r,
+    check_month: monthOf.get(r.check_id as string),
+    lineage_id: fetching,
+  });
+  for (const r of storable('page_results', d.page_results as Rec[]))
+    await insertRow(db, 'page_results', {
+      ...measured(r),
+      identity_sent: CRAWL_UA,
+      source_ip_class: 'fly_egress',
+      request_headers: [{ name: 'User-Agent', value: CRAWL_UA }],
+      headers: [],
+    });
+  for (const r of d.link_edges) await insertRow(db, 'link_edges', measured(r));
+  for (const r of storable('access_tests', d.access_tests as Rec[]))
+    await insertRow(db, 'access_tests', measured(r));
   for (const r of d.fixes) await insertRow(db, 'site_fixes', r);
   for (const r of d.fix_events) await insertRow(db, 'fix_events', r);
   for (const r of d.changes) await insertRow(db, 'changes', r);
@@ -142,6 +219,8 @@ async function load(db: PGlite, d: FixtureDataset): Promise<void> {
   for (const r of d.alert_rules) await insertRow(db, 'alert_rules', r);
   await db.exec('alter table public.alert_rules enable trigger alert_rules_entitlement_check');
   for (const r of d.reports) await insertRow(db, 'reports', r);
+  for (const u of d.usage_events)
+    await insertRow(db, 'usage_events', { ...u, idempotency_key: `fixture:${u.id}` });
 }
 
 /** A timestamptz column comes back as `…+00:00`; the contract writes instants with a trailing Z. */
@@ -210,10 +289,14 @@ async function project(db: PGlite): Promise<Record<string, Rec[]>> {
           : null,
       };
     }),
-    checks: await rowsOf(db, 'checks'),
-    page_results: (await rowsOf(db, 'page_results')).map((r) => omit(r, ['url_hash'])),
-    link_edges: (await rowsOf(db, 'link_edges')).map((r) => omit(r, ['from_hash', 'to_hash'])),
-    access_tests: await rowsOf(db, 'access_tests'),
+    checks: (await rowsOf(db, 'checks')).map((r) => omit(r, DATABASE_ONLY.checks!)),
+    page_results: (await rowsOf(db, 'page_results')).map((r) =>
+      omit(r, DATABASE_ONLY.page_results!),
+    ),
+    link_edges: (await rowsOf(db, 'link_edges')).map((r) => omit(r, DATABASE_ONLY.link_edges!)),
+    access_tests: (await rowsOf(db, 'access_tests')).map((r) =>
+      omit(r, DATABASE_ONLY.access_tests!),
+    ),
     fixes: await rowsOf(db, 'site_fixes'),
     // A FixEvent carries only its kind's fields; the table holds the union of them.
     fix_events: (await rowsOf(db, 'fix_events')).map((r) =>
@@ -222,6 +305,10 @@ async function project(db: PGlite): Promise<Record<string, Rec[]>> {
     changes: await rowsOf(db, 'changes'),
     alert_rules: await rowsOf(db, 'alert_rules'),
     reports: (await rowsOf(db, 'reports')).map((r) => omit(r, ['storage_path'])),
+    lineages: await rowsOf(db, 'measurement_lineages'),
+    usage_events: (await rowsOf(db, 'usage_events')).map((r) =>
+      omit(r, ['api_key_id', 'idempotency_key']),
+    ),
   };
 }
 
@@ -258,6 +345,8 @@ const COLLECTIONS = [
   'changes',
   'alert_rules',
   'reports',
+  'lineages',
+  'usage_events',
 ] as const;
 
 describe.each(FILES)('fixture %s round-trips through the tables', (file) => {
@@ -271,20 +360,41 @@ describe.each(FILES)('fixture %s round-trips through the tables', (file) => {
     const back = await project(db);
     for (const c of COLLECTIONS) {
       const key = KEY[c] ?? ((r: Rec) => String(r.id));
-      const original = byId(dataset[c] as Rec[], key);
+      const all = dataset[c] as Rec[];
+      const original = byId(storable(c, all), key);
       const stored = byId(back[c]!, key);
+      // What a deferred field holds comes only from the fixture: no column holds it yet.
+      const full = new Map(all.map((r) => [key(r), r]));
       for (const r of stored) {
+        const whole = {
+          ...r,
+          ...Object.fromEntries(deferred(c).map((f) => [f, full.get(key(r))![f]])),
+        };
         const parsed = (
           SCHEMA_OF[c] as unknown as {
             safeParse(x: unknown): { success: boolean; error?: unknown };
           }
-        ).safeParse(JSON.parse(JSON.stringify(r)));
+        ).safeParse(JSON.parse(JSON.stringify(whole)));
         expect(
           parsed.success,
           `${c} ${key(r)} does not parse: ${JSON.stringify(parsed.error)}`,
         ).toBe(true);
       }
       expect(normalize(stored), `${file}: ${c}`).toEqual(normalize(original));
+      // Only the rows a pending value keeps out are missing, and each holds one.
+      expect(all.length - stored.length).toBe(all.filter((r) => pending(c, r)).length);
     }
+    // The generated statuses, on real data, are what the contract's functions give.
+    const statuses = await rowsOf(db, 'checks');
+    for (const c of dataset.checks) {
+      const s = statuses.find((r) => r.id === c.id)!;
+      expect(s.technical_seo_status, c.id).toBe(technicalSeoStatus(c));
+      expect(s.ai_readability_status, c.id).toBe(aiReadabilityStatus(c));
+    }
+    const tests = await rowsOf(db, 'access_tests');
+    for (const t of dataset.access_tests.filter((x) => !pending('access_tests', x as Rec)))
+      expect(tests.find((r) => r.id === t.id)!.measurement_status, t.id).toBe(
+        verdictStatus(t.verdict),
+      );
   }, 120_000);
 });

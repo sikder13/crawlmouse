@@ -8,7 +8,9 @@ Three migrations, applied by the owner (OPERATING-RULES §7), in this order:
 - **005 `v2_sharing_columns`**: nullable columns on v1's sharing and ledger tables (listed under "Columns added to existing tables"). Nothing dropped, renamed or re-granted.
 - **007 `v2_storage`**: the private `evidence` and `reports` buckets and the `crawl_worker` role.
 
-Nothing in `apps/web`, `inngest` or `packages` reads or writes the new tables through a Supabase client yet: `grep -rnE 'from\(.(access_tests|alert_events|alert_rules|api_keys|changes|checks|deploy_hooks|evidence_blobs|fix_events|link_edges|page_results|report_schedules|reports|seat_sites|share_links|site_fixes|sites)\b' apps/web/app apps/web/lib inngest packages` finds none. Backfills are later steps (004, and the 005 columns' values).
+CC-06b changed 003 and 007 before either was applied: every measurement row names its lineage (`measurement_lineages`), `checks` and `access_tests` carry their measurement status as generated columns, `page_results`, `link_edges` and `access_tests` are partitioned by the month their check was queued, and `page_results` records the vantage of its fetch. Those decisions, and 006b (the research ledger and usage metering, applied after 007), are `docs/specs/v2/06b-data-foundations.md`.
+
+Nothing in `apps/web`, `inngest` or `packages` reads or writes the new tables through a Supabase client yet: `grep -rnE 'from\(.(access_tests|alert_events|alert_rules|api_keys|changes|checks|deploy_hooks|evidence_blobs|fix_events|link_edges|measurement_lineages|page_results|report_schedules|reports|seat_sites|share_links|site_fixes|sites)\b' apps/web/app apps/web/lib inngest packages` finds none. Backfills are later steps (004, and the 005 columns' values).
 
 ## How access works
 
@@ -17,49 +19,58 @@ Nothing in `apps/web`, `inngest` or `packages` reads or writes the new tables th
 - **Client scope.** `is_member_for_site` is true when the caller has an active seat on the site's live (not soft-deleted) account and that seat covers the site. A seat covers a site when `seats.client_scope_all` is true (the contract's `client_scope: 'all'`; the default, so the seats 001 created keep full access) or when `seat_sites` pairs the seat with the site or with the production site it stages. An owner seat cannot be scoped (`seats_owner_unscoped`).
 - `site_fixes` (the packet is Pro content), `fix_events` and `share_links` have no client grant: reading `site_fixes.packet` as `authenticated` is a permission error, not an empty result. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-cross-account.test.ts -t "packet"`.
 - `alert_rules` is the one client-written table: a site rule by the seats that cover the site, an account-wide rule by the owner. The trigger `alert_rules_entitlement_check` refuses a write that adds Slack while the account's effective tier is Free; it runs after the row's RLS check and for the service role too. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-check-tables.test.ts -t "alert_rules"`.
+- `measurement_lineages` is readable by every signed-in user: it names Crawlmouse's own builds, nothing of an account's. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-cross-account.test.ts -t "measurement_lineages"`.
+- A partition is reached only through its parent: partitions live in the schema `partitions`, which no client role may use, with RLS on and every role's privileges revoked. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "monthly partitions"`.
 - An anonymous site (`account_id is null`) is not readable through RLS (`is_member_for_site` joins the site's account); `/audit/[id]` reads it with the service role, as v1 does. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-cross-account.test.ts -t "anonymous sites"`.
 
 ## Tables
 
 ### `access_tests`
 
-| Column            | Type                     | Null | Default             | `authenticated` |
-| ----------------- | ------------------------ | ---- | ------------------- | --------------- |
-| `id`              | uuid                     | no   | `gen_random_uuid()` | SELECT          |
-| `check_id`        | uuid                     | no   |                     | SELECT          |
-| `ua`              | text                     | yes  |                     | SELECT          |
-| `page_url`        | text                     | no   |                     | SELECT          |
-| `template_key`    | text                     | no   |                     | SELECT          |
-| `tested_at`       | timestamp with time zone | no   |                     | SELECT          |
-| `verdict`         | text                     | no   |                     | SELECT          |
-| `evidence_class`  | text                     | no   |                     | SELECT          |
-| `identity_sent`   | text                     | no   |                     | SELECT          |
-| `source_ip_class` | text                     | no   |                     | SELECT          |
-| `limitations`     | text[]                   | no   | `'{}'::text[]`      | SELECT          |
-| `cause`           | text                     | yes  |                     | SELECT          |
-| `request_headers` | jsonb                    | no   | `'[]'::jsonb`       | SELECT          |
-| `raw_status`      | smallint                 | yes  |                     | SELECT          |
-| `final_url`       | text                     | yes  |                     | SELECT          |
-| `headers`         | jsonb                    | no   | `'[]'::jsonb`       | SELECT          |
-| `byte_count`      | bigint                   | yes  |                     | SELECT          |
-| `word_count`      | integer                  | yes  |                     | SELECT          |
-| `body_excerpt`    | text                     | yes  |                     | SELECT          |
-| `method`          | text                     | yes  |                     | SELECT          |
-| `http_version`    | text                     | yes  |                     | SELECT          |
+Partitioned by `RANGE (check_month)`, one partition a month in the schema `partitions` (06b).
+
+| Column               | Type                     | Null | Default                                                                                                                                                                             | `authenticated` |
+| -------------------- | ------------------------ | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `id`                 | uuid                     | no   | `gen_random_uuid()`                                                                                                                                                                 | SELECT          |
+| `check_id`           | uuid                     | no   |                                                                                                                                                                                     | SELECT          |
+| `check_month`        | date                     | no   |                                                                                                                                                                                     | SELECT          |
+| `lineage_id`         | uuid                     | no   |                                                                                                                                                                                     | SELECT          |
+| `ua`                 | text                     | yes  |                                                                                                                                                                                     | SELECT          |
+| `page_url`           | text                     | no   |                                                                                                                                                                                     | SELECT          |
+| `template_key`       | text                     | no   |                                                                                                                                                                                     | SELECT          |
+| `tested_at`          | timestamp with time zone | no   |                                                                                                                                                                                     | SELECT          |
+| `verdict`            | text                     | no   |                                                                                                                                                                                     | SELECT          |
+| `evidence_class`     | text                     | no   |                                                                                                                                                                                     | SELECT          |
+| `identity_sent`      | text                     | no   |                                                                                                                                                                                     | SELECT          |
+| `source_ip_class`    | text                     | no   |                                                                                                                                                                                     | SELECT          |
+| `limitations`        | text[]                   | no   | `'{}'::text[]`                                                                                                                                                                      | SELECT          |
+| `cause`              | text                     | yes  |                                                                                                                                                                                     | SELECT          |
+| `request_headers`    | jsonb                    | no   | `'[]'::jsonb`                                                                                                                                                                       | SELECT          |
+| `raw_status`         | smallint                 | yes  |                                                                                                                                                                                     | SELECT          |
+| `final_url`          | text                     | yes  |                                                                                                                                                                                     | SELECT          |
+| `headers`            | jsonb                    | no   | `'[]'::jsonb`                                                                                                                                                                       | SELECT          |
+| `byte_count`         | bigint                   | yes  |                                                                                                                                                                                     | SELECT          |
+| `word_count`         | integer                  | yes  |                                                                                                                                                                                     | SELECT          |
+| `body_excerpt`       | text                     | yes  |                                                                                                                                                                                     | SELECT          |
+| `method`             | text                     | yes  |                                                                                                                                                                                     | SELECT          |
+| `http_version`       | text                     | yes  |                                                                                                                                                                                     | SELECT          |
+| `measurement_status` | text                     | no   | generated: ` CASE verdict     WHEN 'not_measured'::text THEN 'unevaluable'::text     WHEN 'edge_blocks_automation'::text THEN 'not_measurable'::text     ELSE 'measured'::text END` | SELECT          |
 
 Primary key:
 
-- `access_tests_pkey`: `PRIMARY KEY (id)`
+- `access_tests_pkey`: `PRIMARY KEY (id, check_month)`
 
 Foreign keys:
 
-- `access_tests_check_id_fkey`: `FOREIGN KEY (check_id) REFERENCES checks(id) ON DELETE CASCADE`
+- `access_tests_check_fkey`: `FOREIGN KEY (check_id, check_month) REFERENCES checks(id, check_month) ON DELETE CASCADE`
+- `access_tests_lineage_id_fkey`: `FOREIGN KEY (lineage_id) REFERENCES measurement_lineages(id)`
 
 CHECKs:
 
 - `access_tests_cause_check`: `CHECK ((cause = ANY (ARRAY['cloudflare_1020'::text, 'bot_fight_mode'::text, 'client_rendered_template'::text, 'robots_txt_disallow'::text, 'automation_challenge'::text, 'rate_limit_429'::text, 'pay_per_crawl_402'::text, 'cross_host_redirect'::text, 'verified_bot_only'::text])))`
 - `access_tests_evidence_class_check`: `CHECK ((evidence_class = ANY (ARRAY['declared'::text, 'simulated'::text, 'observed'::text])))`
 - `access_tests_http_version_check`: `CHECK ((http_version = '1.1'::text))`
+- `access_tests_measurement_status_check`: `CHECK ((measurement_status = ANY (ARRAY['measured'::text, 'not_measurable'::text, 'unevaluable'::text, 'withheld'::text])))`
 - `access_tests_method_check`: `CHECK ((method = 'GET'::text))`
 - `access_tests_observed_owner_logs`: `CHECK (((evidence_class = 'observed'::text) = (source_ip_class = 'owner_logs'::text)))`
 - `access_tests_request_line`: `CHECK (((method IS NULL) = (http_version IS NULL)))`
@@ -68,8 +79,8 @@ CHECKs:
 
 Indexes:
 
-- `CREATE INDEX access_tests_check_idx ON public.access_tests USING btree (check_id)`
-- `CREATE UNIQUE INDEX access_tests_pkey ON public.access_tests USING btree (id)`
+- `CREATE INDEX access_tests_check_idx ON ONLY public.access_tests USING btree (check_id)`
+- `CREATE UNIQUE INDEX access_tests_pkey ON ONLY public.access_tests USING btree (id, check_month)`
 
 Policies:
 
@@ -292,33 +303,37 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
 ### `checks`
 
-| Column              | Type                     | Null | Default             | `authenticated` |
-| ------------------- | ------------------------ | ---- | ------------------- | --------------- |
-| `id`                | uuid                     | no   | `gen_random_uuid()` | SELECT          |
-| `site_id`           | uuid                     | no   |                     | SELECT          |
-| `previous_check_id` | uuid                     | yes  |                     | SELECT          |
-| `status`            | text                     | no   |                     | SELECT          |
-| `trigger`           | text                     | no   |                     | SELECT          |
-| `grade_version`     | text                     | no   |                     | SELECT          |
-| `queued_at`         | timestamp with time zone | no   | `now()`             | SELECT          |
-| `started_at`        | timestamp with time zone | yes  |                     | SELECT          |
-| `finished_at`       | timestamp with time zone | yes  |                     | SELECT          |
-| `tested_at`         | timestamp with time zone | yes  |                     | SELECT          |
-| `expires_at`        | timestamp with time zone | yes  |                     | SELECT          |
-| `deferred_until`    | timestamp with time zone | yes  |                     | SELECT          |
-| `failure_reason`    | text                     | yes  |                     | SELECT          |
-| `result_email`      | jsonb                    | yes  |                     | SELECT          |
-| `coverage`          | jsonb                    | yes  |                     | SELECT          |
-| `technical_seo`     | jsonb                    | yes  |                     | SELECT          |
-| `ai_readability`    | jsonb                    | yes  |                     | SELECT          |
-| `structure`         | jsonb                    | yes  |                     | SELECT          |
-| `without_js`        | jsonb                    | yes  |                     | SELECT          |
-| `content`           | jsonb                    | yes  |                     | SELECT          |
-| `signals`           | jsonb                    | no   | `'[]'::jsonb`       | SELECT          |
-| `crawlers`          | jsonb                    | no   | `'[]'::jsonb`       | SELECT          |
-| `stack`             | jsonb                    | yes  |                     | SELECT          |
-| `competitors`       | jsonb                    | no   | `'[]'::jsonb`       | SELECT          |
-| `progress`          | jsonb                    | yes  |                     | SELECT          |
+| Column                  | Type                     | Null | Default                                                                                                                                                                                                                                                                                                                                                         | `authenticated` |
+| ----------------------- | ------------------------ | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `id`                    | uuid                     | no   | `gen_random_uuid()`                                                                                                                                                                                                                                                                                                                                             | SELECT          |
+| `site_id`               | uuid                     | no   |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `previous_check_id`     | uuid                     | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `status`                | text                     | no   |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `trigger`               | text                     | no   |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `grade_version`         | text                     | no   |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `queued_at`             | timestamp with time zone | no   | `now()`                                                                                                                                                                                                                                                                                                                                                         | SELECT          |
+| `started_at`            | timestamp with time zone | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `finished_at`           | timestamp with time zone | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `tested_at`             | timestamp with time zone | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `expires_at`            | timestamp with time zone | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `deferred_until`        | timestamp with time zone | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `failure_reason`        | text                     | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `result_email`          | jsonb                    | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `coverage`              | jsonb                    | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `technical_seo`         | jsonb                    | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `ai_readability`        | jsonb                    | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `structure`             | jsonb                    | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `without_js`            | jsonb                    | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `content`               | jsonb                    | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `signals`               | jsonb                    | no   | `'[]'::jsonb`                                                                                                                                                                                                                                                                                                                                                   | SELECT          |
+| `crawlers`              | jsonb                    | no   | `'[]'::jsonb`                                                                                                                                                                                                                                                                                                                                                   | SELECT          |
+| `stack`                 | jsonb                    | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `competitors`           | jsonb                    | no   | `'[]'::jsonb`                                                                                                                                                                                                                                                                                                                                                   | SELECT          |
+| `progress`              | jsonb                    | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `lineage_id`            | uuid                     | yes  |                                                                                                                                                                                                                                                                                                                                                                 | SELECT          |
+| `check_month`           | date                     | yes  | generated: `(date_trunc('month'::text, (queued_at AT TIME ZONE 'UTC'::text)))::date`                                                                                                                                                                                                                                                                            | SELECT          |
+| `technical_seo_status`  | text                     | yes  | generated: ` CASE     WHEN (status <> ALL (ARRAY['finished'::text, 'partial'::text, 'failed'::text])) THEN NULL::text     WHEN ((technical_seo IS NULL) OR (technical_seo = 'null'::jsonb)) THEN 'not_measurable'::text     WHEN (((technical_seo -> 'refusal'::text) -> 'refused'::text) = 'true'::jsonb) THEN 'withheld'::text     ELSE 'measured'::text END` | SELECT          |
+| `ai_readability_status` | text                     | yes  | generated: ` CASE     WHEN (status <> ALL (ARRAY['finished'::text, 'partial'::text, 'failed'::text])) THEN NULL::text     WHEN ((ai_readability IS NULL) OR (ai_readability = 'null'::jsonb)) THEN 'not_measurable'::text     WHEN ((ai_readability -> 'withheld'::text) = 'true'::jsonb) THEN 'withheld'::text     ELSE 'measured'::text END`                  | SELECT          |
 
 Primary key:
 
@@ -326,15 +341,19 @@ Primary key:
 
 Unique:
 
+- `checks_id_month_uq`: `UNIQUE (id, check_month)`
 - `checks_id_site_uq`: `UNIQUE (id, site_id)`
 
 Foreign keys:
 
+- `checks_lineage_id_fkey`: `FOREIGN KEY (lineage_id) REFERENCES measurement_lineages(id)`
 - `checks_previous_check_site_fkey`: `FOREIGN KEY (previous_check_id, site_id) REFERENCES checks(id, site_id) ON DELETE SET NULL (previous_check_id)`
 - `checks_site_id_fkey`: `FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE`
 
 CHECKs:
 
+- `checks_ai_readability_status_check`: `CHECK ((ai_readability_status = ANY (ARRAY['measured'::text, 'not_measurable'::text, 'unevaluable'::text, 'withheld'::text])))`
+- `checks_ai_readability_withheld`: `CHECK (((ai_readability IS NULL) OR (ai_readability = 'null'::jsonb) OR COALESCE((jsonb_typeof((ai_readability -> 'withheld'::text)) = 'boolean'::text), false)))`
 - `checks_both_grades`: `CHECK (((status <> 'finished'::text) OR ((technical_seo IS NOT NULL) AND (ai_readability IS NOT NULL))))`
 - `checks_coverage`: `CHECK (((status = ANY (ARRAY['finished'::text, 'partial'::text])) = (coverage IS NOT NULL)))`
 - `checks_deferred_until`: `CHECK (((status = 'deferred'::text) = (deferred_until IS NOT NULL)))`
@@ -342,17 +361,22 @@ CHECKs:
 - `checks_finished_at`: `CHECK (((status = ANY (ARRAY['finished'::text, 'partial'::text, 'failed'::text])) = (finished_at IS NOT NULL)))`
 - `checks_grade_version`: `CHECK ((grade_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'::text))`
 - `checks_grades_when_ended`: `CHECK (((status = ANY (ARRAY['finished'::text, 'partial'::text])) OR ((technical_seo IS NULL) AND (ai_readability IS NULL))))`
+- `checks_lineage`: `CHECK (((status = ANY (ARRAY['finished'::text, 'partial'::text])) = (lineage_id IS NOT NULL)))`
 - `checks_not_started`: `CHECK (((status <> ALL (ARRAY['queued'::text, 'deferred'::text])) OR (started_at IS NULL)))`
 - `checks_progress`: `CHECK (((status = 'running'::text) = (progress IS NOT NULL)))`
 - `checks_started`: `CHECK (((status <> ALL (ARRAY['running'::text, 'finished'::text, 'partial'::text, 'failed'::text])) OR (started_at IS NOT NULL)))`
 - `checks_status_check`: `CHECK ((status = ANY (ARRAY['queued'::text, 'running'::text, 'finished'::text, 'partial'::text, 'failed'::text, 'deferred'::text])))`
+- `checks_technical_seo_refused`: `CHECK (((technical_seo IS NULL) OR (technical_seo = 'null'::jsonb) OR COALESCE((jsonb_typeof(((technical_seo -> 'refusal'::text) -> 'refused'::text)) = 'boolean'::text), false)))`
+- `checks_technical_seo_status_check`: `CHECK ((technical_seo_status = ANY (ARRAY['measured'::text, 'not_measurable'::text, 'unevaluable'::text, 'withheld'::text])))`
 - `checks_trigger_check`: `CHECK ((trigger = ANY (ARRAY['first_audit'::text, 'manual'::text, 'scheduled'::text, 'deploy'::text, 'fix_recheck'::text])))`
 
 Indexes:
 
 - `CREATE INDEX checks_active_idx ON public.checks USING btree (status) WHERE (status = ANY (ARRAY['queued'::text, 'running'::text]))`
 - `CREATE INDEX checks_expires_idx ON public.checks USING btree (expires_at) WHERE (expires_at IS NOT NULL)`
+- `CREATE UNIQUE INDEX checks_id_month_uq ON public.checks USING btree (id, check_month)`
 - `CREATE UNIQUE INDEX checks_id_site_uq ON public.checks USING btree (id, site_id)`
+- `CREATE INDEX checks_lineage_idx ON public.checks USING btree (lineage_id)`
 - `CREATE UNIQUE INDEX checks_pkey ON public.checks USING btree (id)`
 - `CREATE INDEX checks_previous_idx ON public.checks USING btree (previous_check_id)`
 - `CREATE INDEX checks_site_queued_idx ON public.checks USING btree (site_id, queued_at DESC)`
@@ -493,9 +517,13 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
 ### `link_edges`
 
+Partitioned by `RANGE (check_month)`, one partition a month in the schema `partitions` (06b).
+
 | Column              | Type    | Null | Default | `authenticated` |
 | ------------------- | ------- | ---- | ------- | --------------- |
 | `check_id`          | uuid    | no   |         | SELECT          |
+| `check_month`       | date    | no   |         | SELECT          |
+| `lineage_id`        | uuid    | no   |         | SELECT          |
 | `from_url`          | text    | no   |         | SELECT          |
 | `to_url`            | text    | no   |         | SELECT          |
 | `from_hash`         | text    | no   |         | SELECT          |
@@ -506,16 +534,17 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
 Primary key:
 
-- `link_edges_pkey`: `PRIMARY KEY (check_id, from_hash, to_hash)`
+- `link_edges_pkey`: `PRIMARY KEY (check_id, from_hash, to_hash, check_month)`
 
 Foreign keys:
 
-- `link_edges_check_id_fkey`: `FOREIGN KEY (check_id) REFERENCES checks(id) ON DELETE CASCADE`
+- `link_edges_check_fkey`: `FOREIGN KEY (check_id, check_month) REFERENCES checks(id, check_month) ON DELETE CASCADE`
+- `link_edges_lineage_id_fkey`: `FOREIGN KEY (lineage_id) REFERENCES measurement_lineages(id)`
 
 Indexes:
 
-- `CREATE UNIQUE INDEX link_edges_pkey ON public.link_edges USING btree (check_id, from_hash, to_hash)`
-- `CREATE INDEX link_edges_to_idx ON public.link_edges USING btree (check_id, to_hash)`
+- `CREATE UNIQUE INDEX link_edges_pkey ON ONLY public.link_edges USING btree (check_id, from_hash, to_hash, check_month)`
+- `CREATE INDEX link_edges_to_idx ON ONLY public.link_edges USING btree (check_id, to_hash)`
 
 Policies:
 
@@ -525,46 +554,94 @@ WHERE ((c.id = link_edges.check_id) AND is_member_for_site(c.site_id))))`
 
 Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
-### `page_results`
+### `measurement_lineages`
 
-| Column                  | Type             | Null | Default | `authenticated` |
-| ----------------------- | ---------------- | ---- | ------- | --------------- |
-| `check_id`              | uuid             | no   |         | SELECT          |
-| `url`                   | text             | no   |         | SELECT          |
-| `url_hash`              | text             | no   |         | SELECT          |
-| `template_key`          | text             | no   |         | SELECT          |
-| `kind`                  | text             | no   |         | SELECT          |
-| `status_code`           | smallint         | no   |         | SELECT          |
-| `depth`                 | integer          | yes  |         | SELECT          |
-| `links_in`              | integer          | no   |         | SELECT          |
-| `links_out`             | integer          | no   |         | SELECT          |
-| `pagerank_share`        | double precision | yes  |         | SELECT          |
-| `is_orphan`             | boolean          | no   |         | SELECT          |
-| `js_only`               | boolean          | no   |         | SELECT          |
-| `found_via`             | text             | no   |         | SELECT          |
-| `sitemap_lastmod`       | date             | yes  |         | SELECT          |
-| `suggested_parent_url`  | text             | yes  |         | SELECT          |
-| `sampled`               | boolean          | no   |         | SELECT          |
-| `without_js`            | jsonb            | yes  |         | SELECT          |
-| `crawlers_reached`      | integer          | yes  |         | SELECT          |
-| `crawlers_reading_text` | integer          | yes  |         | SELECT          |
-| `content_failures`      | text[]           | yes  |         | SELECT          |
-| `final_url`             | text             | yes  |         | SELECT          |
-| `redirect`              | jsonb            | yes  |         | SELECT          |
-| `canonical_declared`    | jsonb            | yes  |         | SELECT          |
-| `hreflang`              | jsonb            | yes  |         | SELECT          |
-| `content_simhash`       | text             | yes  |         | SELECT          |
-| `is_html`               | boolean          | no   |         | SELECT          |
-| `links_read`            | boolean          | no   |         | SELECT          |
-| `robots_search`         | jsonb            | no   |         | SELECT          |
+| Column                     | Type                     | Null | Default             | `authenticated` |
+| -------------------------- | ------------------------ | ---- | ------------------- | --------------- |
+| `id`                       | uuid                     | no   | `gen_random_uuid()` | SELECT          |
+| `engine_sha`               | text                     | no   |                     | SELECT          |
+| `detector_ruleset_version` | text                     | no   |                     | SELECT          |
+| `crawler_registry_version` | text                     | no   |                     | SELECT          |
+| `worker_release`           | text                     | yes  |                     | SELECT          |
+| `population_version`       | text                     | yes  |                     | SELECT          |
+| `created_at`               | timestamp with time zone | no   | `now()`             | SELECT          |
 
 Primary key:
 
-- `page_results_pkey`: `PRIMARY KEY (check_id, url_hash)`
+- `measurement_lineages_pkey`: `PRIMARY KEY (id)`
+
+Unique:
+
+- `measurement_lineages_uq`: `UNIQUE NULLS NOT DISTINCT (engine_sha, detector_ruleset_version, crawler_registry_version, worker_release, population_version)`
+
+CHECKs:
+
+- `measurement_lineages_crawler_registry_version`: `CHECK ((crawler_registry_version ~ '^[0-9a-f]{64}$'::text))`
+- `measurement_lineages_detector_ruleset_version`: `CHECK ((detector_ruleset_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'::text))`
+- `measurement_lineages_engine_sha`: `CHECK ((engine_sha ~ '^[0-9a-f]{40}$'::text))`
+- `measurement_lineages_population_version`: `CHECK ((population_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'::text))`
+- `measurement_lineages_worker_release`: `CHECK ((worker_release ~ '^[!-~]{1,200}$'::text))`
+
+Indexes:
+
+- `CREATE UNIQUE INDEX measurement_lineages_pkey ON public.measurement_lineages USING btree (id)`
+- `CREATE UNIQUE INDEX measurement_lineages_uq ON public.measurement_lineages USING btree (engine_sha, detector_ruleset_version, crawler_registry_version, worker_release, population_version) NULLS NOT DISTINCT`
+
+Policies:
+
+- `measurement_lineages_read`: SELECT to authenticated, using `true`
+
+Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
+
+### `page_results`
+
+Partitioned by `RANGE (check_month)`, one partition a month in the schema `partitions` (06b).
+
+| Column                  | Type             | Null | Default                      | `authenticated` |
+| ----------------------- | ---------------- | ---- | ---------------------------- | --------------- |
+| `check_id`              | uuid             | no   |                              | SELECT          |
+| `check_month`           | date             | no   | `crawl_worker_check_month()` | SELECT          |
+| `lineage_id`            | uuid             | no   | `crawl_worker_lineage_id()`  | SELECT          |
+| `url`                   | text             | no   |                              | SELECT          |
+| `url_hash`              | text             | no   |                              | SELECT          |
+| `template_key`          | text             | no   |                              | SELECT          |
+| `kind`                  | text             | no   |                              | SELECT          |
+| `status_code`           | smallint         | no   |                              | SELECT          |
+| `depth`                 | integer          | yes  |                              | SELECT          |
+| `links_in`              | integer          | no   |                              | SELECT          |
+| `links_out`             | integer          | no   |                              | SELECT          |
+| `pagerank_share`        | double precision | yes  |                              | SELECT          |
+| `is_orphan`             | boolean          | no   |                              | SELECT          |
+| `js_only`               | boolean          | no   |                              | SELECT          |
+| `found_via`             | text             | no   |                              | SELECT          |
+| `sitemap_lastmod`       | date             | yes  |                              | SELECT          |
+| `suggested_parent_url`  | text             | yes  |                              | SELECT          |
+| `sampled`               | boolean          | no   |                              | SELECT          |
+| `without_js`            | jsonb            | yes  |                              | SELECT          |
+| `crawlers_reached`      | integer          | yes  |                              | SELECT          |
+| `crawlers_reading_text` | integer          | yes  |                              | SELECT          |
+| `content_failures`      | text[]           | yes  |                              | SELECT          |
+| `final_url`             | text             | yes  |                              | SELECT          |
+| `redirect`              | jsonb            | yes  |                              | SELECT          |
+| `canonical_declared`    | jsonb            | yes  |                              | SELECT          |
+| `hreflang`              | jsonb            | yes  |                              | SELECT          |
+| `content_simhash`       | text             | yes  |                              | SELECT          |
+| `is_html`               | boolean          | no   |                              | SELECT          |
+| `links_read`            | boolean          | no   |                              | SELECT          |
+| `robots_search`         | jsonb            | no   |                              | SELECT          |
+| `identity_sent`         | text             | no   |                              | SELECT          |
+| `source_ip_class`       | text             | no   |                              | SELECT          |
+| `request_headers`       | jsonb            | no   | `'[]'::jsonb`                | SELECT          |
+| `headers`               | jsonb            | no   | `'[]'::jsonb`                | SELECT          |
+
+Primary key:
+
+- `page_results_pkey`: `PRIMARY KEY (check_id, url_hash, check_month)`
 
 Foreign keys:
 
-- `page_results_check_id_fkey`: `FOREIGN KEY (check_id) REFERENCES checks(id) ON DELETE CASCADE`
+- `page_results_check_fkey`: `FOREIGN KEY (check_id, check_month) REFERENCES checks(id, check_month) ON DELETE CASCADE`
+- `page_results_lineage_id_fkey`: `FOREIGN KEY (lineage_id) REFERENCES measurement_lineages(id)`
 
 CHECKs:
 
@@ -578,7 +655,9 @@ CHECKs:
 - `page_results_depth`: `CHECK ((depth >= 0))`
 - `page_results_final_url`: `CHECK (v2_http_url_ok(final_url))`
 - `page_results_found_via_check`: `CHECK ((found_via = ANY (ARRAY['link'::text, 'sitemap'::text, 'javascript'::text])))`
+- `page_results_headers`: `CHECK (v2_headers_shape_ok(headers))`
 - `page_results_hreflang`: `CHECK (v2_hreflang_shape_ok(hreflang))`
+- `page_results_identity_sent`: `CHECK (((identity_sent <> ''::text) AND (octet_length(identity_sent) <= 512)))`
 - `page_results_kind_check`: `CHECK ((kind = ANY (ARRAY['content'::text, 'auth'::text, 'search'::text, 'pagination'::text, 'archive'::text, 'feed'::text, 'status'::text, 'utility'::text, 'duplicate'::text, 'thin'::text])))`
 - `page_results_links_in`: `CHECK ((links_in >= 0))`
 - `page_results_links_out`: `CHECK ((links_out >= 0))`
@@ -591,10 +670,12 @@ CASE
     ELSE true
 END))`
 - `page_results_redirect_status`: `CHECK (v2_redirect_statuses_ok(redirect))`
+- `page_results_request_headers`: `CHECK (v2_headers_shape_ok(request_headers))`
 - `page_results_robots_search`: `CHECK (v2_search_robots_shape_ok(robots_search))`
 - `page_results_robots_ua_unique`: `CHECK (v2_search_robots_ua_unique(robots_search))`
 - `page_results_robots_verdict`: `CHECK (v2_search_robots_verdicts_ok(robots_search))`
 - `page_results_sitemap_lastmod`: `CHECK (((sitemap_lastmod >= '0001-01-01'::date) AND (sitemap_lastmod <= '9999-12-31'::date)))`
+- `page_results_source_ip_class_check`: `CHECK ((source_ip_class = ANY (ARRAY['fly_egress'::text, 'browser_rendering'::text, 'owner_logs'::text])))`
 - `page_results_status_code`: `CHECK (((status_code >= 100) AND (status_code <= 599)))`
 - `page_results_suggested_parent_url`: `CHECK (v2_http_url_ok(suggested_parent_url))`
 - `page_results_template_key`: `CHECK (starts_with(template_key, '/'::text))`
@@ -623,13 +704,13 @@ END))`
 
 Indexes:
 
-- `CREATE INDEX page_results_orphan_idx ON public.page_results USING btree (check_id) WHERE is_orphan`
-- `CREATE UNIQUE INDEX page_results_pkey ON public.page_results USING btree (check_id, url_hash)`
-- `CREATE INDEX page_results_template_idx ON public.page_results USING btree (check_id, template_key)`
+- `CREATE INDEX page_results_orphan_idx ON ONLY public.page_results USING btree (check_id) WHERE is_orphan`
+- `CREATE UNIQUE INDEX page_results_pkey ON ONLY public.page_results USING btree (check_id, url_hash, check_month)`
+- `CREATE INDEX page_results_template_idx ON ONLY public.page_results USING btree (check_id, template_key)`
 
 Policies:
 
-- `page_results_crawl_worker_insert`: INSERT to crawl_worker, with check `(check_id = crawl_worker_check_id())`
+- `page_results_crawl_worker_insert`: INSERT to crawl_worker, with check `((check_id = crawl_worker_check_id()) AND (lineage_id = crawl_worker_lineage_id()))`
 - `page_results_member_read`: SELECT to authenticated, using `(EXISTS ( SELECT 1
  FROM checks c
 WHERE ((c.id = page_results.check_id) AND is_member_for_site(c.site_id))))`
@@ -985,6 +1066,8 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 | `alert_rules_fired_check_scope()`                                                                                                                                                                                                                                  | new      | definer  | none of these roles                                       |
 | `apply_entitlement_transition(uuid, integer, text, text, text, timestamp with time zone, text, timestamp with time zone, timestamp with time zone, timestamp with time zone, integer, integer, integer, timestamp with time zone, text, timestamp with time zone)` | replaced | definer  | service_role                                              |
 | `crawl_worker_check_id()`                                                                                                                                                                                                                                          | new      | definer  | crawl_worker                                              |
+| `crawl_worker_check_month()`                                                                                                                                                                                                                                       | new      | definer  | crawl_worker                                              |
+| `crawl_worker_lineage_id()`                                                                                                                                                                                                                                        | new      | definer  | crawl_worker                                              |
 | `crawl_worker_part_path_ok(text)`                                                                                                                                                                                                                                  | new      | definer  | crawl_worker                                              |
 | `embed_badges_account_guard()`                                                                                                                                                                                                                                     | new      | invoker  | none of these roles                                       |
 | `fix_events_append_only()`                                                                                                                                                                                                                                         | new      | definer  | none of these roles                                       |
@@ -994,9 +1077,11 @@ Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 | `page_results_url_hash()`                                                                                                                                                                                                                                          | new      | invoker  | none of these roles                                       |
 | `v2_canonical_shape_ok(jsonb)`                                                                                                                                                                                                                                     | new      | invoker  | service_role, crawl_worker                                |
 | `v2_crawled_text_ok(jsonb, integer, integer)`                                                                                                                                                                                                                      | new      | invoker  | service_role, crawl_worker                                |
+| `v2_headers_shape_ok(jsonb)`                                                                                                                                                                                                                                       | new      | invoker  | service_role, crawl_worker                                |
 | `v2_hreflang_shape_ok(jsonb)`                                                                                                                                                                                                                                      | new      | invoker  | service_role, crawl_worker                                |
 | `v2_http_url_ok(text)`                                                                                                                                                                                                                                             | new      | invoker  | service_role, crawl_worker                                |
 | `v2_nullable_url_ok(jsonb)`                                                                                                                                                                                                                                        | new      | invoker  | service_role, crawl_worker                                |
+| `v2_premake_month_partitions(date, date)`                                                                                                                                                                                                                          | new      | definer  | service_role                                              |
 | `v2_redirect_shape_ok(jsonb)`                                                                                                                                                                                                                                      | new      | invoker  | service_role, crawl_worker                                |
 | `v2_redirect_statuses_ok(jsonb)`                                                                                                                                                                                                                                   | new      | invoker  | service_role, crawl_worker                                |
 | `v2_search_robots_shape_ok(jsonb)`                                                                                                                                                                                                                                 | new      | invoker  | service_role, crawl_worker                                |
@@ -1026,8 +1111,9 @@ Buckets:
 The Fly worker is meant to reach Supabase with this token and nothing else. It never holds the project's JWT signing key: whoever holds a signing key can mint a `service_role` token too.
 
 - **Who mints it.** The server, in the Inngest step that posts a batch to the worker, one token per check (or per batch). It is signed with a project JWT signing key the server holds: the legacy JWT secret, or a key imported into the project's JWT signing keys (Supabase supports importing a private key or setting a shared secret for this). That key is server-side, at the same tier as the service-role key.
-- **Claims.** `role: "crawl_worker"`, `check_id` (a lowercase uuid), `iat` and `exp` as numbers, `exp − iat` at most 900 seconds. No `sub`: the token is not a user.
+- **Claims.** `role: "crawl_worker"`, `check_id` (a lowercase uuid), `lineage_id` (the lowercase uuid of the `measurement_lineages` row the server registered for the batch), `iat` and `exp` as numbers, `exp − iat` at most 900 seconds. No `sub`: the token is not a user.
 - **What the database checks.** `crawl_worker_check_id()` reads the verified claims (`auth.jwt()`) and returns the check only when the role claim is `crawl_worker`, `check_id` is a well-formed uuid naming a check in status `running`, `exp` has not passed, `iat` is at most 60 seconds ahead of the database clock, and the lifetime is at most 900 seconds. Both policies hold only for that check, so a token minted with a longer life, for another check, or for a finished one is refused by the database, not only by the minter. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-007-storage.test.ts`.
+- **Lineage and month.** A `page_results` row must name the token's `lineage_id`. A row that leaves out `check_month` or `lineage_id` takes them from the token (column defaults that call `crawl_worker_check_month()` and `crawl_worker_lineage_id()`), so the worker's row needs no partition key of its own. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-007-storage.test.ts -t "from the token"`.
 - **What it may do.** Insert `page_results` rows for its check, without RETURNING (`Prefer: return=minimal`), and upload `evidence` parts under `{account_id | anon}/{site_id}/{check_id}.part{n}.json.gz`. It cannot read, update or delete either, and holds no grant on `frontier` until `frontier.audit_id` stops being NOT NULL. A leaked token can still write any number of rows and parts for its check within its 15 minutes; nothing in the database caps volume.
 - **For the step that wires the worker.** Whether the server can mint today depends on the project's key setup, which this step does not read. If the project signs only with Supabase-managed asymmetric keys, the server has no private key to sign with, and a key must be imported (or a shared secret set) before the worker can run. That is a blocker for the wiring step, not for these migrations.
 
@@ -1071,32 +1157,36 @@ The Fly worker is meant to reach Supabase with this token and nothing else. It n
 | `canonical_href`          | `page_results`.`page_results_canonical_href`                |
 | `robots_verdict`          | `page_results`.`page_results_robots_verdict`                |
 | `robots_ua_unique`        | `page_results`.`page_results_robots_ua_unique`              |
+| `usage_billable`          | `usage_events`.`usage_events_billable`                      |
 
 ### Field bounds of `PageResult` held as CHECKs (owner ruling 1)
 
 `crawl_worker` writes `page_results` straight from the worker, so the database holds the bounds the contract states for these fields and the column type does not. Verify: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-003-rule-agreement.test.ts -t "shape"`.
 
-| Constraint                                          | Field                   | Agreement with the contract                                                                                                                |
-| --------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `page_results`.`page_results_url`                   | `url`                   | the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract |
-| `page_results`.`page_results_template_key`          | `template_key`          | exact                                                                                                                                      |
-| `page_results`.`page_results_status_code`           | `status_code`           | exact                                                                                                                                      |
-| `page_results`.`page_results_depth`                 | `depth`                 | exact                                                                                                                                      |
-| `page_results`.`page_results_links_in`              | `links_in`              | exact                                                                                                                                      |
-| `page_results`.`page_results_links_out`             | `links_out`             | exact                                                                                                                                      |
-| `page_results`.`page_results_pagerank_share`        | `pagerank_share`        | exact                                                                                                                                      |
-| `page_results`.`page_results_sitemap_lastmod`       | `sitemap_lastmod`       | exact                                                                                                                                      |
-| `page_results`.`page_results_suggested_parent_url`  | `suggested_parent_url`  | the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract |
-| `page_results`.`page_results_without_js`            | `without_js`            | exact                                                                                                                                      |
-| `page_results`.`page_results_crawlers_reached`      | `crawlers_reached`      | exact                                                                                                                                      |
-| `page_results`.`page_results_crawlers_reading_text` | `crawlers_reading_text` | exact                                                                                                                                      |
-| `page_results`.`page_results_final_url`             | `final_url`             | the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract |
-| `page_results`.`page_results_redirect`              | `redirect`              | the URLs inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract                      |
-| `page_results`.`page_results_canonical_declared`    | `canonical_declared`    | the URL inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract                       |
-| `page_results`.`page_results_hreflang`              | `hreflang`              | the URLs inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract                      |
-| `page_results`.`page_results_content_simhash`       | `content_simhash`       | exact                                                                                                                                      |
-| `page_results`.`page_results_robots_search`         | `robots_search`         | exact                                                                                                                                      |
-| `page_results`.`page_results_content_failures`      | `content_failures`      | with the column’s enum CHECK, which refuses an unknown value; exact over known values                                                      |
+| Constraint                                          | Field                                                        | Agreement with the contract                                                                                                                |
+| --------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `page_results`.`page_results_url`                   | `url`                                                        | the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract |
+| `page_results`.`page_results_template_key`          | `template_key`                                               | exact                                                                                                                                      |
+| `page_results`.`page_results_status_code`           | `status_code`                                                | exact                                                                                                                                      |
+| `page_results`.`page_results_depth`                 | `depth`                                                      | exact                                                                                                                                      |
+| `page_results`.`page_results_links_in`              | `links_in`                                                   | exact                                                                                                                                      |
+| `page_results`.`page_results_links_out`             | `links_out`                                                  | exact                                                                                                                                      |
+| `page_results`.`page_results_pagerank_share`        | `pagerank_share`                                             | exact                                                                                                                                      |
+| `page_results`.`page_results_identity_sent`         | `identity_sent` (database only; the shape of AccessTest’s)   | exact                                                                                                                                      |
+| `page_results`.`page_results_request_headers`       | `request_headers` (database only; the shape of AccessTest’s) | exact                                                                                                                                      |
+| `page_results`.`page_results_headers`               | `headers` (database only; the shape of AccessTest’s)         | exact                                                                                                                                      |
+| `page_results`.`page_results_sitemap_lastmod`       | `sitemap_lastmod`                                            | exact                                                                                                                                      |
+| `page_results`.`page_results_suggested_parent_url`  | `suggested_parent_url`                                       | the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract |
+| `page_results`.`page_results_without_js`            | `without_js`                                                 | exact                                                                                                                                      |
+| `page_results`.`page_results_crawlers_reached`      | `crawlers_reached`                                           | exact                                                                                                                                      |
+| `page_results`.`page_results_crawlers_reading_text` | `crawlers_reading_text`                                      | exact                                                                                                                                      |
+| `page_results`.`page_results_final_url`             | `final_url`                                                  | the scheme only: the contract also parses the URL, which Postgres cannot; exact where its URLs parse, and never stricter than the contract |
+| `page_results`.`page_results_redirect`              | `redirect`                                                   | the URLs inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract                      |
+| `page_results`.`page_results_canonical_declared`    | `canonical_declared`                                         | the URL inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract                       |
+| `page_results`.`page_results_hreflang`              | `hreflang`                                                   | the URLs inside by scheme only, as page_results_url; exact where its URLs parse, and never stricter than the contract                      |
+| `page_results`.`page_results_content_simhash`       | `content_simhash`                                            | exact                                                                                                                                      |
+| `page_results`.`page_results_robots_search`         | `robots_search`                                              | exact                                                                                                                                      |
+| `page_results`.`page_results_content_failures`      | `content_failures`                                           | with the column’s enum CHECK, which refuses an unknown value; exact over known values                                                      |
 
 ### Contract rules the database does not check
 
@@ -1162,7 +1252,7 @@ The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree;
 - **Per-seat client scoping is in the database** (`is_member_for_site`), not only in route handlers: a signed-in user can call PostgREST directly.
 - **No client write on `sites`.** ARCH-2 §2.2 rule 3 grants a client update on the schedule columns behind an entitlement trigger; the brief keeps `alert_rules` the only client-written table, so schedule changes go through a route.
 - **`checks` has no `account_id`.** ARCH-2 copies it for RLS speed; here a check reaches its account through `sites`, so no copy can drift from the site's. Its listing index is `(site_id, queued_at desc)` (ARCH-2: `finished_at`), because a queued or running check has no `finished_at`. ARCH-2 says a check is immutable once finished; nothing enforces it here (the contract clears `expires_at` when an account keeps a finished check).
-- **`page_results` and `link_edges` are keyed by URL hashes** (sha256 of the UTF-8 URL, as `frontier.url_hash`), set by a trigger: the contract identifies them by URL, and a URL can exceed a btree key.
+- **`page_results` and `link_edges` are keyed by URL hashes** (sha256 of the UTF-8 URL, as `frontier.url_hash`), set by a trigger: the contract identifies them by URL, and a URL can exceed a btree key. Their keys, and `access_tests`', also hold `check_month`, because a partitioned table's unique keys must include its partition key; a writer's `on conflict` target names it too.
 - **The `changes` idempotency index** is `(check_id, kind, subject, "where", ua, fix_id)` with `nulls not distinct`. ARCH-2's `(check_id, kind, subject)` assumed a fine-grained subject (`crawler:claude-searchbot`); the contract's is a category (`ChangeSubject`). The owner approved the key without `fix_id`; review showed two fixes opened in one check can share subject, place and crawler, so `fix_id` is part of it (owner ruling 4: confirmed).
 - **`alert_events`** is unique on `(rule_id, check_id, channel)`: one rule sends on each of its channels. ARCH-2 says `(rule_id, check_id)`.
 - **`alert_rules_entitlement_check`** (ARCH-2's name) refuses only a write that adds Slack, and runs after RLS. A rule that already sends to Slack stays updatable after a downgrade, so the owner can switch it off and alertFn can stamp `last_fired_*`; alertFn decides at send time whether the plan still includes Slack.
@@ -1202,13 +1292,15 @@ The merged contract (`packages/types/src/v2`) wins where it and ARCH-2 disagree;
 
 Database-only columns (not a field of the contract entity the table holds):
 
-| Table              | Entity             | Columns                                                                           |
-| ------------------ | ------------------ | --------------------------------------------------------------------------------- |
-| `link_edges`       | LinkEdge           | `from_hash`, `to_hash`                                                            |
-| `page_results`     | PageResult         | `url_hash`                                                                        |
-| `report_schedules` | Site.client_report | `site_id`, `account_id`, `next_run_at`, `last_run_at`, `created_at`, `updated_at` |
-| `reports`          | Report             | `storage_path`                                                                    |
-| `sites`            | Site               | `paused_reason`, `updated_at`, `removed_at`                                       |
+| Table              | Entity             | Columns                                                                                                   |
+| ------------------ | ------------------ | --------------------------------------------------------------------------------------------------------- |
+| `access_tests`     | AccessTest         | `check_month`, `lineage_id`, `measurement_status`                                                         |
+| `checks`           | Check              | `lineage_id`, `check_month`, `technical_seo_status`, `ai_readability_status`                              |
+| `link_edges`       | LinkEdge           | `check_month`, `lineage_id`, `from_hash`, `to_hash`                                                       |
+| `page_results`     | PageResult         | `check_month`, `lineage_id`, `url_hash`, `identity_sent`, `source_ip_class`, `request_headers`, `headers` |
+| `report_schedules` | Site.client_report | `site_id`, `account_id`, `next_run_at`, `last_run_at`, `created_at`, `updated_at`                         |
+| `reports`          | Report             | `storage_path`                                                                                            |
+| `sites`            | Site               | `paused_reason`, `updated_at`, `removed_at`                                                               |
 
 v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts`, `domain_verifications`, `email_events`, `embed_badges`, `findings`, `links`, `pages`, `public_reports`, `rate_limits`, `sessions`, `stripe_events`, `takedown_requests`, `users`.
 
@@ -1223,25 +1315,25 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
    - `select r, has_schema_privilege(r, 'public', 'CREATE') from unnest(array['anon', 'authenticated', 'service_role', 'crawl_worker']) r`: false for each. The SECURITY DEFINER functions resolve names through `public` before `pg_catalog`, so no client role may create objects in `public`.
    - If the Storage upload is refused for want of SELECT (an upload that reads its row back), stop and report it. Do not widen the grant without review.
    - Revert 007, 005 and 003 in that order, then apply all three again.
-3. **Apply window.** One transaction per file, 003 then 005 then 007, at a quiet hour. Each `alter table` on an existing table (listed under "Columns added to existing tables") takes a brief exclusive lock on it.
+3. **Apply window.** One transaction per file, 003 then 005 then 007, then 006b (its own runbook, in 06b), at a quiet hour. Each `alter table` on an existing table (listed under "Columns added to existing tables") takes a brief exclusive lock on it.
 4. **Verify on production.**
    - `get_advisors` (security): no new finding on the tables or functions these migrations create or change.
    - Grants, rendered above, against the catalog:
      ```sql
      select table_name, column_name, grantee, privilege_type from information_schema.column_privileges
       where table_schema = 'public' and grantee in ('anon', 'authenticated', 'crawl_worker')
-        and table_name in ('access_tests', 'alert_events', 'alert_rules', 'api_keys', 'changes', 'checks', 'deploy_hooks', 'evidence_blobs', 'fix_events', 'link_edges', 'page_results', 'report_schedules', 'reports', 'seat_sites', 'share_links', 'site_fixes', 'sites') order by 1, 2, 3, 4;
+        and table_name in ('access_tests', 'alert_events', 'alert_rules', 'api_keys', 'changes', 'checks', 'deploy_hooks', 'evidence_blobs', 'fix_events', 'link_edges', 'measurement_lineages', 'page_results', 'report_schedules', 'reports', 'seat_sites', 'share_links', 'site_fixes', 'sites') order by 1, 2, 3, 4;
      select c.relname, c.relrowsecurity, c.relacl::text from pg_class c
        join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public' and c.relname in ('access_tests', 'alert_events', 'alert_rules', 'api_keys', 'changes', 'checks', 'deploy_hooks', 'evidence_blobs', 'fix_events', 'link_edges', 'page_results', 'report_schedules', 'reports', 'seat_sites', 'share_links', 'site_fixes', 'sites') order by 1;
+      where n.nspname = 'public' and c.relname in ('access_tests', 'alert_events', 'alert_rules', 'api_keys', 'changes', 'checks', 'deploy_hooks', 'evidence_blobs', 'fix_events', 'link_edges', 'measurement_lineages', 'page_results', 'report_schedules', 'reports', 'seat_sites', 'share_links', 'site_fixes', 'sites') order by 1;
      select schemaname, tablename, policyname, cmd, roles, qual, with_check from pg_policies
-      where (schemaname = 'public' and tablename in ('access_tests', 'alert_events', 'alert_rules', 'api_keys', 'changes', 'checks', 'deploy_hooks', 'evidence_blobs', 'fix_events', 'link_edges', 'page_results', 'report_schedules', 'reports', 'seat_sites', 'share_links', 'site_fixes', 'sites')) or schemaname = 'storage' order by 1, 2, 3;
+      where (schemaname = 'public' and tablename in ('access_tests', 'alert_events', 'alert_rules', 'api_keys', 'changes', 'checks', 'deploy_hooks', 'evidence_blobs', 'fix_events', 'link_edges', 'measurement_lineages', 'page_results', 'report_schedules', 'reports', 'seat_sites', 'share_links', 'site_fixes', 'sites')) or schemaname = 'storage' order by 1, 2, 3;
      ```
      Expect no `anon` entry, and `authenticated` and `crawl_worker` holding what the tables above show.
    - The name-free routine check of `docs/deploy/spec51a-stage6-frontier-functions-runbook.md` returns `is_member`, `is_member_for_site` and `member_role`, each with `anon = false` and `authed = true` (PGlite: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-001-entitlement-tables.test.ts -t "routines"`). Any other row is a finding.
    - `select id, public from storage.buckets where id in ('evidence', 'reports');`: two rows, `public = false`.
    - `select rolname, rolcanlogin, rolbypassrls from pg_roles where rolname = 'crawl_worker';`: one row, `false`, `false`.
-5. **Revert, if needed:** 007, then 005, then 003, each file twice-safe and tested on PGlite and in step 2. 003's revert drops its tables with their rows; take the dump first. 007's revert stops at a bucket that still holds objects: empty it through the Storage API first (Supabase refuses a direct delete of storage rows).
+5. **Revert, if needed:** 006b, then 007, then 005, then 003, each file twice-safe and tested on PGlite and in step 2. 003's revert drops its tables with their rows; take the dump first. 007's revert stops at a bucket that still holds objects: empty it through the Storage API first (Supabase refuses a direct delete of storage rows).
 
 ## The SQL for approval
 
@@ -1249,20 +1341,26 @@ v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts
 
 | File                                                                     | sha256                                                             |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `b1be85b65c90928db51fc01b978c745f0d4316b0de4741805ffbcf61ea8870ee` |
-| `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `f04f8435a68d2d88f8fbc4e58e267223d3a7814f2d7f9255f3ebbfe4d0bfd5bb` |
+| `infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`       | `9380c15d6610440d69a5ac39832fd671387b12fac6eb3c92105a579030a870a6` |
+| `infra/supabase/rollbacks/20261102000001_v2_003_sites_checks.revert.sql` | `650aae0c4fc09c6111bb67e7a1879ea73b5b817683f0b7dffb9c9b5a25ba48b6` |
 
 <details><summary>Migration SQL</summary>
 
 ```sql
 -- v2 migration 003 (ARCH-2 §6.1): the check-data tables.
 --
--- Additive only. It creates sites, checks, page_results, link_edges, access_tests, site_fixes,
--- fix_events, changes, evidence_blobs, alert_rules, alert_events, reports, report_schedules,
--- share_links, api_keys, deploy_hooks and seat_sites; adds seats.client_scope_all and
--- frontier.check_id / frontier_politeness.check_id; creates is_member_for_site(); and replaces
+-- Additive only. It creates measurement_lineages, sites, checks, page_results, link_edges,
+-- access_tests, site_fixes, fix_events, changes, evidence_blobs, alert_rules, alert_events, reports,
+-- report_schedules, share_links, api_keys, deploy_hooks and seat_sites; adds seats.client_scope_all
+-- and frontier.check_id / frontier_politeness.check_id; creates is_member_for_site(); and replaces
 -- apply_entitlement_transition() with a body that also applies the site effects. No existing table,
 -- column, policy or grant is dropped or renamed. v1 reads none of the new objects.
+--
+-- Data foundations (CC-06b, docs/specs/v2/06b-data-foundations.md). Each measurement row names the
+-- lineage that produced it (measurement_lineages). page_results, link_edges and access_tests are
+-- partitioned by the month their check was queued (checks.check_month), with the partitions in the
+-- schema `partitions`, which no client role can use; v2_premake_month_partitions() creates them.
+-- checks and access_tests carry their measurement status as generated columns.
 --
 -- Columns follow the v2 contract (packages/types/src/v2): one column per contract field, of the same
 -- name, with nested objects as jsonb. Site.schedule is flattened into schedule_* columns,
@@ -1301,6 +1399,33 @@ $$;
 
 -- Lets a table pair a seat with the account it belongs to (seat_sites, sites, reports).
 create unique index if not exists seats_id_account_uq on public.seats (id, account_id);
+
+-- ─── measurement_lineages ─────────────────────────────────────────────────────────────────────────
+-- What produced a measurement: the engine build, the detector rules, the crawler registry, the worker
+-- release when a worker took part, and the graded-population definition where one applies. One row
+-- per distinct combination, shared by every row it produced, so a time series can be split wherever
+-- any of them changed.
+
+create table if not exists public.measurement_lineages (
+  id uuid primary key default gen_random_uuid(),
+  engine_sha text not null,
+  detector_ruleset_version text not null,
+  -- sha256 of the registry's serialised entries (crawlerRegistryVersion in packages/types/src/v2).
+  crawler_registry_version text not null,
+  worker_release text,
+  population_version text,
+  created_at timestamptz not null default now(),
+  constraint measurement_lineages_engine_sha check (engine_sha ~ '^[0-9a-f]{40}$'),
+  constraint measurement_lineages_detector_ruleset_version check (
+    detector_ruleset_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
+  constraint measurement_lineages_crawler_registry_version check (
+    crawler_registry_version ~ '^[0-9a-f]{64}$'),
+  constraint measurement_lineages_worker_release check (worker_release ~ '^[!-~]{1,200}$'),
+  constraint measurement_lineages_population_version check (
+    population_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
+  constraint measurement_lineages_uq unique nulls not distinct (
+    engine_sha, detector_ruleset_version, crawler_registry_version, worker_release, population_version)
+);
 
 -- ─── sites ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -1380,7 +1505,26 @@ create table if not exists public.checks (
   stack jsonb,
   competitors jsonb not null default '[]',
   progress jsonb,
+  -- The lineage the grading ran under; per-row lineages are on the measurement tables.
+  lineage_id uuid references public.measurement_lineages (id),
+  -- Database only: the UTC month the check was queued, the partition key of its measurement rows.
+  check_month date generated always as ((date_trunc('month', queued_at at time zone 'UTC'))::date) stored,
+  -- The contract's MeasurementStatus of each grade (technicalSeoStatus and aiReadabilityStatus in
+  -- packages/types/src/v2/measurement.ts): null until the check has ended.
+  technical_seo_status text generated always as (case
+    when status not in ('finished', 'partial', 'failed') then null
+    when technical_seo is null or technical_seo = 'null'::jsonb then 'not_measurable'
+    when technical_seo -> 'refusal' -> 'refused' = 'true'::jsonb then 'withheld'
+    else 'measured' end) stored
+    check (technical_seo_status in ('measured', 'not_measurable', 'unevaluable', 'withheld')),
+  ai_readability_status text generated always as (case
+    when status not in ('finished', 'partial', 'failed') then null
+    when ai_readability is null or ai_readability = 'null'::jsonb then 'not_measurable'
+    when ai_readability -> 'withheld' = 'true'::jsonb then 'withheld'
+    else 'measured' end) stored
+    check (ai_readability_status in ('measured', 'not_measurable', 'unevaluable', 'withheld')),
   constraint checks_id_site_uq unique (id, site_id),
+  constraint checks_id_month_uq unique (id, check_month),
   constraint checks_previous_check_site_fkey foreign key (previous_check_id, site_id)
     references public.checks (id, site_id) on delete set null (previous_check_id),
   constraint checks_grade_version check (grade_version ~ '^[0-9]+\.[0-9]+\.[0-9]+$'),
@@ -1397,10 +1541,21 @@ create table if not exists public.checks (
   constraint checks_both_grades check (
     status <> 'finished' or (technical_seo is not null and ai_readability is not null)),
   constraint checks_grades_when_ended check (
-    status in ('finished', 'partial') or (technical_seo is null and ai_readability is null))
+    status in ('finished', 'partial') or (technical_seo is null and ai_readability is null)),
+  constraint checks_lineage check ((status in ('finished', 'partial')) = (lineage_id is not null)),
+  -- The two values the generated statuses read are present and boolean (coalesce: a CHECK passes a
+  -- null), so the database and the contract's functions read every stored grade the same way. The
+  -- rest of each grade is the writer's to parse.
+  constraint checks_technical_seo_refused check (
+    technical_seo is null or technical_seo = 'null'::jsonb
+    or coalesce(jsonb_typeof(technical_seo -> 'refusal' -> 'refused') = 'boolean', false)),
+  constraint checks_ai_readability_withheld check (
+    ai_readability is null or ai_readability = 'null'::jsonb
+    or coalesce(jsonb_typeof(ai_readability -> 'withheld') = 'boolean', false))
 );
 
 create index if not exists checks_site_queued_idx on public.checks (site_id, queued_at desc);
+create index if not exists checks_lineage_idx on public.checks (lineage_id);
 create index if not exists checks_previous_idx on public.checks (previous_check_id);
 create index if not exists checks_active_idx on public.checks (status) where status in ('queued', 'running');
 create index if not exists checks_expires_idx on public.checks (expires_at) where expires_at is not null;
@@ -1566,25 +1721,54 @@ as $f$
               else true end
 $f$;
 
+-- The contract's Header list: an array of at most 32 (MAX_HEADERS), each exactly name (crawled text,
+-- 1 to 128 UTF-8 bytes) and value (crawled text, at most 1,024 UTF-8 bytes).
+create or replace function public.v2_headers_shape_ok(p_headers jsonb)
+returns boolean language plpgsql immutable strict set search_path = pg_catalog
+as $f$
+declare
+  v_header jsonb;
+begin
+  -- One test per statement, as v2_redirect_shape_ok.
+  if jsonb_typeof(p_headers) <> 'array' then return false; end if;
+  if jsonb_array_length(p_headers) > 32 then return false; end if;
+  for v_header in select e from jsonb_array_elements(p_headers) e loop
+    if jsonb_typeof(v_header) <> 'object' then return false; end if;
+    if v_header - array['name', 'value'] <> '{}'::jsonb then return false; end if;
+    if not coalesce(public.v2_crawled_text_ok(v_header -> 'name', 128, 1), false) then return false; end if;
+    if not coalesce(public.v2_crawled_text_ok(v_header -> 'value', 1024, 0), false) then return false; end if;
+  end loop;
+  return true;
+end;
+$f$;
+
 revoke all on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
   public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
   public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
   public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
-  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb),
+  public.v2_headers_shape_ok(jsonb)
   from public, anon, authenticated;
 grant execute on function public.v2_http_url_ok(text), public.v2_crawled_text_ok(jsonb, integer, integer),
   public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
   public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
   public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
-  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb),
+  public.v2_headers_shape_ok(jsonb)
   to service_role;
 
 -- ─── page_results and link_edges ──────────────────────────────────────────────────────────────────
 -- Keyed by sha256 hex of the UTF-8 URL, as frontier.url_hash, set by a trigger because the
 -- text-to-bytes conversion is not immutable and so cannot be a generated column.
+--
+-- Partitioned by check_month. The foreign key (check_id, check_month) to checks keeps every row of a
+-- check in the partition of the month the check was queued, so dropping a partition never splits a
+-- check. A key that names a row includes check_month, as a partitioned table requires.
 
 create table if not exists public.page_results (
-  check_id uuid not null references public.checks (id) on delete cascade,
+  check_id uuid not null,
+  check_month date not null,
+  lineage_id uuid not null references public.measurement_lineages (id),
   url text not null,
   url_hash text not null,
   template_key text not null,
@@ -1614,7 +1798,14 @@ create table if not exists public.page_results (
   is_html boolean not null,
   links_read boolean not null,
   robots_search jsonb not null,
-  primary key (check_id, url_hash),
+  -- The vantage of the fetch, as the worker returns it on its crawl row.
+  identity_sent text not null,
+  source_ip_class text not null check (source_ip_class in ('fly_egress', 'browser_rendering', 'owner_logs')),
+  request_headers jsonb not null default '[]',
+  headers jsonb not null default '[]',
+  primary key (check_id, url_hash, check_month),
+  constraint page_results_check_fkey foreign key (check_id, check_month)
+    references public.checks (id, check_month) on delete cascade,
   -- The bounds of the contract's PageResult that the column types do not hold. crawl_worker writes
   -- this table straight from the worker, so the database checks them (owner ruling 1). A URL's
   -- scheme only: the contract also parses the URL (v2_http_url_ok).
@@ -1678,14 +1869,20 @@ create table if not exists public.page_results (
     or coalesce(canonical_declared -> 'url', 'null'::jsonb) = 'null'::jsonb
     or canonical_declared -> 'href' is distinct from 'null'::jsonb),
   constraint page_results_robots_verdict check (public.v2_search_robots_verdicts_ok(robots_search)),
-  constraint page_results_robots_ua_unique check (public.v2_search_robots_ua_unique(robots_search))
-);
+  constraint page_results_robots_ua_unique check (public.v2_search_robots_ua_unique(robots_search)),
+  -- The contract's crawledText(512, 1), and its Header lists.
+  constraint page_results_identity_sent check (identity_sent <> '' and octet_length(identity_sent) <= 512),
+  constraint page_results_request_headers check (public.v2_headers_shape_ok(request_headers)),
+  constraint page_results_headers check (public.v2_headers_shape_ok(headers))
+) partition by range (check_month);
 
 create index if not exists page_results_template_idx on public.page_results (check_id, template_key);
 create index if not exists page_results_orphan_idx on public.page_results (check_id) where is_orphan;
 
 create table if not exists public.link_edges (
-  check_id uuid not null references public.checks (id) on delete cascade,
+  check_id uuid not null,
+  check_month date not null,
+  lineage_id uuid not null references public.measurement_lineages (id),
   from_url text not null,
   to_url text not null,
   from_hash text not null,
@@ -1693,8 +1890,10 @@ create table if not exists public.link_edges (
   anchor_text text not null,
   is_generic_anchor boolean not null,
   js_only boolean not null,
-  primary key (check_id, from_hash, to_hash)
-);
+  primary key (check_id, from_hash, to_hash, check_month),
+  constraint link_edges_check_fkey foreign key (check_id, check_month)
+    references public.checks (id, check_month) on delete cascade
+) partition by range (check_month);
 
 create index if not exists link_edges_to_idx on public.link_edges (check_id, to_hash);
 
@@ -1733,9 +1932,12 @@ create trigger link_edges_url_hash before insert or update on public.link_edges
 
 -- ─── access_tests ─────────────────────────────────────────────────────────────────────────────────
 
+-- Partitioned by check_month, as page_results.
 create table if not exists public.access_tests (
-  id uuid primary key default gen_random_uuid(),
-  check_id uuid not null references public.checks (id) on delete cascade,
+  id uuid not null default gen_random_uuid(),
+  check_id uuid not null,
+  check_month date not null,
+  lineage_id uuid not null references public.measurement_lineages (id),
   ua text,
   page_url text not null,
   template_key text not null,
@@ -1760,10 +1962,20 @@ create table if not exists public.access_tests (
   body_excerpt text,
   method text check (method in ('GET')),
   http_version text check (http_version in ('1.1')),
+  -- The contract's MeasurementStatus of the verdict (verdictStatus in
+  -- packages/types/src/v2/measurement.ts).
+  measurement_status text generated always as (case verdict
+    when 'not_measured' then 'unevaluable'
+    when 'edge_blocks_automation' then 'not_measurable'
+    else 'measured' end) stored not null
+    check (measurement_status in ('measured', 'not_measurable', 'unevaluable', 'withheld')),
+  primary key (id, check_month),
+  constraint access_tests_check_fkey foreign key (check_id, check_month)
+    references public.checks (id, check_month) on delete cascade,
   constraint access_tests_observed_owner_logs check (
     (evidence_class = 'observed') = (source_ip_class = 'owner_logs')),
   constraint access_tests_request_line check ((method is null) = (http_version is null))
-);
+) partition by range (check_month);
 
 create index if not exists access_tests_check_idx on public.access_tests (check_id);
 
@@ -2282,8 +2494,101 @@ $$;
 revoke all on function public.is_member_for_site(uuid) from public, anon, authenticated;
 grant execute on function public.is_member_for_site(uuid) to authenticated, service_role;
 
+-- ─── Monthly partitions ───────────────────────────────────────────────────────────────────────────
+-- A partition is a table of its own, and on production a new table in `public` would arrive with
+-- every privilege for anon and authenticated (pg_default_acl). Partitions are therefore created in
+-- the schema `partitions`, which no client role may use, each with RLS on and every role's
+-- privileges revoked. A row is read and written through its parent, whose grants and policies apply.
+--
+-- v2_premake_month_partitions(from, through) creates each missing month from the month of `from` to
+-- the month of `through` (inclusive, at most 37 months) for every table in `public` or `research` that is range-partitioned
+-- on one date column named check_month or observed_month, found from the catalog, so a table
+-- partitioned later is covered without editing this function. It returns how many it created. There
+-- is no default partition: a row for a month that has no partition is refused, not misfiled. Postgres
+-- clones a parent's row triggers onto a new partition but not its statement triggers, so each of the
+-- parent's TRUNCATE triggers (the ledger's append-only rule) is created on the partition too. Run
+-- daily by the owner's pg_cron job (docs/specs/v2/06b-data-foundations.md, runbook).
+
+create schema if not exists partitions;
+revoke all on schema partitions from public, anon, authenticated;
+
+create or replace function public.v2_premake_month_partitions(p_from date, p_through date)
+returns integer
+language plpgsql
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  v_parent record;
+  v_trigger record;
+  v_first date;
+  v_last date;
+  v_month date;
+  v_name text;
+  v_role text;
+  v_made integer := 0;
+begin
+  if p_from is null or p_through is null then
+    raise exception 'partitions: from and through are required' using errcode = '22004';
+  end if;
+  v_first := date_trunc('month', p_from)::date;
+  v_last := date_trunc('month', p_through)::date;
+  if v_last < v_first or v_last >= v_first + interval '37 months' then
+    raise exception 'partitions: % to % is not a range of at most 37 months', p_from, p_through
+      using errcode = '22023';
+  end if;
+  for v_parent in
+    select c.oid as parent_oid, n.nspname as schema_name, c.relname
+      from pg_partitioned_table pt
+      join pg_class c on c.oid = pt.partrelid
+      join pg_namespace n on n.oid = c.relnamespace
+      join pg_attribute a on a.attrelid = c.oid and a.attnum = pt.partattrs[0]
+     where n.nspname in ('public', 'research')
+       and pt.partstrat = 'r'
+       and pt.partnatts = 1
+       and a.attname in ('check_month', 'observed_month')
+       and a.atttypid = 'date'::regtype
+     order by 1, 2
+  loop
+    v_month := v_first;
+    while v_month <= v_last loop
+      v_name := format('%s_%s_%s', v_parent.schema_name, v_parent.relname, to_char(v_month, 'YYYY_MM'));
+      if to_regclass(format('partitions.%I', v_name)) is null then
+        execute format('create table partitions.%I partition of %I.%I for values from (%L) to (%L)',
+                       v_name, v_parent.schema_name, v_parent.relname,
+                       v_month, (v_month + interval '1 month')::date);
+        execute format('alter table partitions.%I enable row level security', v_name);
+        execute format('revoke all on table partitions.%I from public', v_name);
+        for v_role in
+          select rolname from pg_roles
+           where rolname in ('anon', 'authenticated', 'service_role', 'crawl_worker', 'research_retention')
+        loop
+          execute format('revoke all on table partitions.%I from %I', v_name, v_role);
+        end loop;
+        for v_trigger in
+          select t.tgname, t.tgfoid::regproc::text as fn
+            from pg_trigger t
+           where t.tgrelid = v_parent.parent_oid and not t.tgisinternal
+             and (t.tgtype & 32) <> 0  -- TRUNCATE
+        loop
+          execute format('create trigger %I before truncate on partitions.%I for each statement execute function %s()',
+                         v_trigger.tgname, v_name, v_trigger.fn);
+        end loop;
+        v_made := v_made + 1;
+      end if;
+      v_month := (v_month + interval '1 month')::date;
+    end loop;
+  end loop;
+  return v_made;
+end;
+$$;
+
+revoke all on function public.v2_premake_month_partitions(date, date) from public, anon, authenticated;
+grant execute on function public.v2_premake_month_partitions(date, date) to service_role;
+
 -- ─── RLS ──────────────────────────────────────────────────────────────────────────────────────────
 
+alter table public.measurement_lineages enable row level security;
 alter table public.sites enable row level security;
 alter table public.checks enable row level security;
 alter table public.page_results enable row level security;
@@ -2301,6 +2606,13 @@ alter table public.share_links enable row level security;
 alter table public.api_keys enable row level security;
 alter table public.deploy_hooks enable row level security;
 alter table public.seat_sites enable row level security;
+
+-- A lineage's columns are build and version identifiers the server writes (06b §1); the database
+-- checks their shape, not their meaning. It is shared by every row it produced and names no account
+-- column, so any signed-in user may read it.
+drop policy if exists measurement_lineages_read on public.measurement_lineages;
+create policy measurement_lineages_read on public.measurement_lineages
+  for select to authenticated using (true);
 
 drop policy if exists sites_member_read on public.sites;
 create policy sites_member_read on public.sites
@@ -2390,19 +2702,24 @@ create policy alert_rules_member_delete on public.alert_rules
 -- changes.fix_id and changes.subject (J10), reports.storage_path, api_keys.key_hash and
 -- deploy_hooks.token_hash.
 
-revoke all on table public.sites, public.checks, public.page_results, public.link_edges,
-  public.access_tests, public.site_fixes, public.fix_events, public.changes, public.evidence_blobs,
-  public.alert_rules, public.alert_events, public.reports, public.report_schedules, public.share_links,
-  public.api_keys, public.deploy_hooks, public.seat_sites
+revoke all on table public.measurement_lineages, public.sites, public.checks, public.page_results,
+  public.link_edges, public.access_tests, public.site_fixes, public.fix_events, public.changes,
+  public.evidence_blobs, public.alert_rules, public.alert_events, public.reports,
+  public.report_schedules, public.share_links, public.api_keys, public.deploy_hooks, public.seat_sites
   from public, anon, authenticated;
 
-grant all on table public.sites, public.checks, public.page_results, public.link_edges,
-  public.access_tests, public.site_fixes, public.fix_events, public.changes, public.evidence_blobs,
-  public.alert_rules, public.alert_events, public.reports, public.report_schedules, public.share_links,
-  public.api_keys, public.deploy_hooks, public.seat_sites
+grant all on table public.measurement_lineages, public.sites, public.checks, public.page_results,
+  public.link_edges, public.access_tests, public.site_fixes, public.fix_events, public.changes,
+  public.evidence_blobs, public.alert_rules, public.alert_events, public.reports,
+  public.report_schedules, public.share_links, public.api_keys, public.deploy_hooks, public.seat_sites
   to service_role;
 
 grant select (client_scope_all) on public.seats to authenticated;
+
+grant select (
+  id, engine_sha, detector_ruleset_version, crawler_registry_version, worker_release,
+  population_version, created_at
+) on public.measurement_lineages to authenticated;
 
 grant select (
   id, account_id, host, staging_of_site_id, client_name, client_contact_name, client_contact_email,
@@ -2412,21 +2729,24 @@ grant select (
 grant select (
   id, site_id, previous_check_id, status, trigger, grade_version, queued_at, started_at, finished_at,
   tested_at, expires_at, deferred_until, failure_reason, result_email, coverage, technical_seo,
-  ai_readability, structure, without_js, content, signals, crawlers, stack, competitors, progress
+  ai_readability, structure, without_js, content, signals, crawlers, stack, competitors, progress,
+  lineage_id, check_month, technical_seo_status, ai_readability_status
 ) on public.checks to authenticated;
 grant select (
-  check_id, url, url_hash, template_key, kind, status_code, depth, links_in, links_out, pagerank_share,
-  is_orphan, js_only, found_via, sitemap_lastmod, suggested_parent_url, sampled, without_js,
-  crawlers_reached, crawlers_reading_text, content_failures, final_url, redirect, canonical_declared,
-  hreflang, content_simhash, is_html, links_read, robots_search
+  check_id, check_month, lineage_id, url, url_hash, template_key, kind, status_code, depth, links_in,
+  links_out, pagerank_share, is_orphan, js_only, found_via, sitemap_lastmod, suggested_parent_url,
+  sampled, without_js, crawlers_reached, crawlers_reading_text, content_failures, final_url, redirect,
+  canonical_declared, hreflang, content_simhash, is_html, links_read, robots_search, identity_sent,
+  source_ip_class, request_headers, headers
 ) on public.page_results to authenticated;
 grant select (
-  check_id, from_url, to_url, from_hash, to_hash, anchor_text, is_generic_anchor, js_only
+  check_id, check_month, lineage_id, from_url, to_url, from_hash, to_hash, anchor_text,
+  is_generic_anchor, js_only
 ) on public.link_edges to authenticated;
 grant select (
-  id, check_id, ua, page_url, template_key, tested_at, verdict, evidence_class, identity_sent,
-  source_ip_class, limitations, cause, request_headers, raw_status, final_url, headers, byte_count,
-  word_count, body_excerpt, method, http_version
+  id, check_id, check_month, lineage_id, ua, page_url, template_key, tested_at, verdict,
+  evidence_class, identity_sent, source_ip_class, limitations, cause, request_headers, raw_status,
+  final_url, headers, byte_count, word_count, body_excerpt, method, http_version, measurement_status
 ) on public.access_tests to authenticated;
 grant select (
   id, site_id, check_id, previous_check_id, detected_at, kind, severity, summary, "where",
@@ -2651,6 +2971,13 @@ revoke all on function public.apply_entitlement_transition(
 grant execute on function public.apply_entitlement_transition(
   uuid, integer, text, text, text, timestamptz, text, timestamptz, timestamptz, timestamptz,
   integer, integer, integer, timestamptz, text, timestamptz) to service_role;
+
+-- ─── The first partitions ─────────────────────────────────────────────────────────────────────────
+-- The month this runs in and the three after it. Rows for an earlier month (004's backfill of
+-- migrated audits) need their months created first, by the same function.
+
+select public.v2_premake_month_partitions(
+  date_trunc('month', now())::date, (date_trunc('month', now()) + interval '3 months')::date);
 ```
 
 </details>
@@ -2660,10 +2987,10 @@ grant execute on function public.apply_entitlement_transition(
 ```sql
 -- Revert of infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql.
 --
--- ⚠ Drops the tables 003 creates, with their rows, and frontier.check_id /
--- frontier_politeness.check_id. Take a dump first. Revert 007 and 005 before this file: their
--- objects reference these tables, and this file drops nothing with CASCADE, so it fails rather than
--- take them along.
+-- ⚠ Drops the tables 003 creates, with their rows (partitions included), the `partitions` schema,
+-- and frontier.check_id / frontier_politeness.check_id. Take a dump first. Revert 006b, 007 and 005
+-- before this file: their objects reference these tables, and this file drops nothing with CASCADE,
+-- so it fails rather than take them along.
 --
 -- Every statement is re-runnable (v2-003-check-tables.test.ts, "the revert runs twice").
 -- apply_entitlement_transition is restored to its body in
@@ -2795,7 +3122,12 @@ alter table public.frontier drop column if exists check_id;
 
 drop table if exists public.checks;
 drop table if exists public.sites;
+drop table if exists public.measurement_lineages;
+-- The partitions went with their parents; the schema is empty unless 006b's are still there, and
+-- then the drop fails rather than take them (revert 006b first).
+drop schema if exists partitions;
 
+drop function if exists public.v2_premake_month_partitions(date, date);
 drop function if exists public.is_member_for_site(uuid);
 drop function if exists public.alert_events_rule_scope();
 drop function if exists public.alert_rules_fired_check_scope();
@@ -2805,6 +3137,7 @@ drop function if exists public.fix_events_append_only();
 drop function if exists public.link_edges_url_hash();
 drop function if exists public.page_results_url_hash();
 -- page_results' CHECK functions, after the table whose CHECKs call them; the ones the others call last.
+drop function if exists public.v2_headers_shape_ok(jsonb);
 drop function if exists public.v2_search_robots_ua_unique(jsonb);
 drop function if exists public.v2_search_robots_verdicts_ok(jsonb);
 drop function if exists public.v2_search_robots_shape_ok(jsonb);
@@ -2950,8 +3283,8 @@ alter table public.public_reports drop column if exists check_id;
 
 | File                                                                | sha256                                                             |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261102000003_v2_007_storage.sql`       | `8acea9a8eae59dd74a073f5c4903a8296562d1edb252d1231164b5aad74b480e` |
-| `infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql` | `1b6051f62c5d2f69ab21aaacbcc8832ba2f4b3b0c8b31be6e87b2baae488d264` |
+| `infra/supabase/migrations/20261102000003_v2_007_storage.sql`       | `a42bcf4d1c2b292a27d6cdc60c138880162c5cefc224f550a61d6f1b585723f5` |
+| `infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql` | `61e23b10a1741c5d93a3cf19daf331d150098760e0fdb193454c2506883a0572` |
 
 <details><summary>Migration SQL</summary>
 
@@ -2969,7 +3302,9 @@ alter table public.public_reports drop column if exists check_id;
 -- check_id names a check in status 'running', whose exp has not passed, whose iat is no more than a
 -- minute ahead of the database clock, and whose lifetime (exp − iat) is at most 15 minutes. These
 -- are read from the verified claims (auth.jwt()), so they hold whichever way the token was minted.
--- How it is minted is docs/specs/v2/06-check-tables.md, "The crawl_worker token".
+-- How it is minted is docs/specs/v2/06-check-tables.md, "The crawl_worker token". A page_results row
+-- is also bound to the token's lineage_id claim, and takes its check_month and lineage_id from the
+-- token when the worker sends neither, so the worker's row needs no partition key of its own.
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql.
@@ -3058,13 +3393,51 @@ begin
 end;
 $$;
 
+-- The month of the token's check, the partition key of its rows; null when the token does not qualify.
+create or replace function public.crawl_worker_check_month()
+returns date
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+  select c.check_month from public.checks c where c.id = public.crawl_worker_check_id();
+$$;
+
+-- The token's lineage_id claim, the lineage the server registered for this batch; null when the token
+-- does not qualify or the claim is not a lowercase uuid.
+create or replace function public.crawl_worker_lineage_id()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_claim text := auth.jwt() ->> 'lineage_id';
+begin
+  if public.crawl_worker_check_id() is null
+     or coalesce(v_claim, '') !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    return null;
+  end if;
+  return v_claim::uuid;
+end;
+$$;
+
 revoke all on function public.crawl_worker_check_id() from public, anon, authenticated, service_role;
 revoke all on function public.crawl_worker_part_path_ok(text) from public, anon, authenticated, service_role;
+revoke all on function public.crawl_worker_check_month() from public, anon, authenticated, service_role;
+revoke all on function public.crawl_worker_lineage_id() from public, anon, authenticated, service_role;
 grant execute on function public.crawl_worker_check_id() to crawl_worker;
 grant execute on function public.crawl_worker_part_path_ok(text) to crawl_worker;
+grant execute on function public.crawl_worker_check_month() to crawl_worker;
+grant execute on function public.crawl_worker_lineage_id() to crawl_worker;
 
 -- ─── page_results: insert only, for the token's check ─────────────────────────────────────────────
 -- No SELECT, so the worker inserts without RETURNING (PostgREST `Prefer: return=minimal`).
+-- A default is evaluated before a row is routed to its partition, so a worker row that leaves out
+-- check_month lands in its check's month. Any other writer sends both columns: the defaults call
+-- functions only crawl_worker may execute, so a row that leaves either out is refused.
 
 grant insert on public.page_results to crawl_worker;
 -- page_results' CHECKs call these (003); a CHECK's function needs EXECUTE for the role that inserts.
@@ -3072,12 +3445,17 @@ grant execute on function public.v2_http_url_ok(text), public.v2_crawled_text_ok
   public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
   public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
   public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
-  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb),
+  public.v2_headers_shape_ok(jsonb)
   to crawl_worker;
+
+alter table public.page_results alter column check_month set default public.crawl_worker_check_month();
+alter table public.page_results alter column lineage_id set default public.crawl_worker_lineage_id();
 
 drop policy if exists page_results_crawl_worker_insert on public.page_results;
 create policy page_results_crawl_worker_insert on public.page_results
-  for insert to crawl_worker with check (check_id = public.crawl_worker_check_id());
+  for insert to crawl_worker
+  with check (check_id = public.crawl_worker_check_id() and lineage_id = public.crawl_worker_lineage_id());
 
 -- ─── evidence parts: insert only, under the token's check's path ──────────────────────────────────
 -- No SELECT, UPDATE or DELETE on storage.objects, so the worker cannot read, overwrite or remove an
@@ -3109,10 +3487,14 @@ do $$
 begin
   if to_regclass('public.page_results') is not null then
     drop policy if exists page_results_crawl_worker_insert on public.page_results;
+    alter table public.page_results alter column check_month drop default;
+    alter table public.page_results alter column lineage_id drop default;
   end if;
 end;
 $$;
 
+drop function if exists public.crawl_worker_lineage_id();
+drop function if exists public.crawl_worker_check_month();
 drop function if exists public.crawl_worker_part_path_ok(text);
 drop function if exists public.crawl_worker_check_id();
 
@@ -3131,7 +3513,8 @@ begin
         public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
         public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
         public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
-        public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+        public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb),
+        public.v2_headers_shape_ok(jsonb)
         from crawl_worker;
     end if;
     revoke usage on schema public from crawl_worker;

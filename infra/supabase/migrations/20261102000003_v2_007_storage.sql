@@ -11,7 +11,9 @@
 -- check_id names a check in status 'running', whose exp has not passed, whose iat is no more than a
 -- minute ahead of the database clock, and whose lifetime (exp − iat) is at most 15 minutes. These
 -- are read from the verified claims (auth.jwt()), so they hold whichever way the token was minted.
--- How it is minted is docs/specs/v2/06-check-tables.md, "The crawl_worker token".
+-- How it is minted is docs/specs/v2/06-check-tables.md, "The crawl_worker token". A page_results row
+-- is also bound to the token's lineage_id claim, and takes its check_month and lineage_id from the
+-- token when the worker sends neither, so the worker's row needs no partition key of its own.
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql.
@@ -100,13 +102,51 @@ begin
 end;
 $$;
 
+-- The month of the token's check, the partition key of its rows; null when the token does not qualify.
+create or replace function public.crawl_worker_check_month()
+returns date
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+  select c.check_month from public.checks c where c.id = public.crawl_worker_check_id();
+$$;
+
+-- The token's lineage_id claim, the lineage the server registered for this batch; null when the token
+-- does not qualify or the claim is not a lowercase uuid.
+create or replace function public.crawl_worker_lineage_id()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_claim text := auth.jwt() ->> 'lineage_id';
+begin
+  if public.crawl_worker_check_id() is null
+     or coalesce(v_claim, '') !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    return null;
+  end if;
+  return v_claim::uuid;
+end;
+$$;
+
 revoke all on function public.crawl_worker_check_id() from public, anon, authenticated, service_role;
 revoke all on function public.crawl_worker_part_path_ok(text) from public, anon, authenticated, service_role;
+revoke all on function public.crawl_worker_check_month() from public, anon, authenticated, service_role;
+revoke all on function public.crawl_worker_lineage_id() from public, anon, authenticated, service_role;
 grant execute on function public.crawl_worker_check_id() to crawl_worker;
 grant execute on function public.crawl_worker_part_path_ok(text) to crawl_worker;
+grant execute on function public.crawl_worker_check_month() to crawl_worker;
+grant execute on function public.crawl_worker_lineage_id() to crawl_worker;
 
 -- ─── page_results: insert only, for the token's check ─────────────────────────────────────────────
 -- No SELECT, so the worker inserts without RETURNING (PostgREST `Prefer: return=minimal`).
+-- A default is evaluated before a row is routed to its partition, so a worker row that leaves out
+-- check_month lands in its check's month. Any other writer sends both columns: the defaults call
+-- functions only crawl_worker may execute, so a row that leaves either out is refused.
 
 grant insert on public.page_results to crawl_worker;
 -- page_results' CHECKs call these (003); a CHECK's function needs EXECUTE for the role that inserts.
@@ -114,12 +154,17 @@ grant execute on function public.v2_http_url_ok(text), public.v2_crawled_text_ok
   public.v2_nullable_url_ok(jsonb), public.v2_redirect_shape_ok(jsonb),
   public.v2_redirect_statuses_ok(jsonb), public.v2_canonical_shape_ok(jsonb),
   public.v2_hreflang_shape_ok(jsonb), public.v2_search_robots_shape_ok(jsonb),
-  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb)
+  public.v2_search_robots_verdicts_ok(jsonb), public.v2_search_robots_ua_unique(jsonb),
+  public.v2_headers_shape_ok(jsonb)
   to crawl_worker;
+
+alter table public.page_results alter column check_month set default public.crawl_worker_check_month();
+alter table public.page_results alter column lineage_id set default public.crawl_worker_lineage_id();
 
 drop policy if exists page_results_crawl_worker_insert on public.page_results;
 create policy page_results_crawl_worker_insert on public.page_results
-  for insert to crawl_worker with check (check_id = public.crawl_worker_check_id());
+  for insert to crawl_worker
+  with check (check_id = public.crawl_worker_check_id() and lineage_id = public.crawl_worker_lineage_id());
 
 -- ─── evidence parts: insert only, under the token's check's path ──────────────────────────────────
 -- No SELECT, UPDATE or DELETE on storage.objects, so the worker cannot read, overwrite or remove an

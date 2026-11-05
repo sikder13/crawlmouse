@@ -387,6 +387,14 @@ Fixture collection: `page_results`.
 | `robots_search`             | `object[]`       | no   | PR #47              |
 | `robots_search[].ua`        | `string`         | no   |                     |
 | `robots_search[].verdict`   | `Verdict`        | no   |                     |
+| `title`                     | `object`         | yes  | CC-12d              |
+| `title.text`                | `string`         | yes  |                     |
+| `title.chars`               | `integer`        | no   |                     |
+| `title.cut`                 | `boolean`        | no   |                     |
+| `meta_description`          | `object`         | yes  | CC-12d              |
+| `meta_description.text`     | `string`         | yes  |                     |
+| `meta_description.chars`    | `integer`        | no   |                     |
+| `meta_description.cut`      | `boolean`        | no   |                     |
 
 ### LinkEdge
 
@@ -416,33 +424,47 @@ Fixture collection: `access_tests`.
 | Final-Seg-JS  | "what the server sent"  |
 | Final-Reports | "Every response as CSV" |
 
-| Field                     | Type            | Null | Added for     |
-| ------------------------- | --------------- | ---- | ------------- |
-| `id`                      | `uuid`          | no   |               |
-| `check_id`                | `uuid`          | no   |               |
-| `ua`                      | `string`        | yes  | FACTS         |
-| `page_url`                | `url`           | no   | Final-Segment |
-| `template_key`            | `string`        | no   | Final-Segment |
-| `tested_at`               | `timestamp`     | no   | Final-Segment |
-| `verdict`                 | `Verdict`       | no   | FACTS         |
-| `evidence_class`          | `EvidenceClass` | no   |               |
-| `identity_sent`           | `string`        | no   |               |
-| `source_ip_class`         | `SourceIpClass` | no   |               |
-| `limitations`             | `string[]`      | no   |               |
-| `cause`                   | `AccessCause`   | yes  | FACTS         |
-| `request_headers`         | `object[]`      | no   | Final-Segment |
-| `request_headers[].name`  | `string`        | no   |               |
-| `request_headers[].value` | `string`        | no   |               |
-| `raw_status`              | `integer`       | yes  |               |
-| `final_url`               | `url`           | yes  |               |
-| `headers`                 | `object[]`      | no   |               |
-| `headers[].name`          | `string`        | no   |               |
-| `headers[].value`         | `string`        | no   |               |
-| `byte_count`              | `integer`       | yes  |               |
-| `word_count`              | `integer`       | yes  |               |
-| `body_excerpt`            | `string`        | yes  | Final-Segment |
-| `method`                  | `"GET"`         | yes  | PR #48        |
-| `http_version`            | `"1.1"`         | yes  | PR #48        |
+| Field                     | Type                    | Null | Added for     |
+| ------------------------- | ----------------------- | ---- | ------------- |
+| `id`                      | `uuid`                  | no   |               |
+| `check_id`                | `uuid`                  | no   |               |
+| `ua`                      | `string`                | yes  | FACTS         |
+| `page_url`                | `url`                   | no   | Final-Segment |
+| `template_key`            | `string`                | no   | Final-Segment |
+| `tested_at`               | `timestamp`             | no   | Final-Segment |
+| `verdict`                 | `Verdict`               | no   | FACTS         |
+| `evidence_class`          | `EvidenceClass`         | no   |               |
+| `identity_sent`           | `string`                | no   |               |
+| `source_ip_class`         | `SourceIpClass`         | no   |               |
+| `limitations`             | `string[]`              | no   |               |
+| `cause`                   | `AccessCause`           | yes  | FACTS         |
+| `request_headers`         | `object[]`              | no   | Final-Segment |
+| `request_headers[].name`  | `string`                | no   |               |
+| `request_headers[].value` | `string`                | no   |               |
+| `raw_status`              | `integer`               | yes  |               |
+| `final_url`               | `url`                   | yes  |               |
+| `headers`                 | `object[]`              | no   |               |
+| `headers[].name`          | `string`                | no   |               |
+| `headers[].value`         | `string`                | no   |               |
+| `byte_count`              | `integer`               | yes  |               |
+| `word_count`              | `integer`               | yes  |               |
+| `body_excerpt`            | `string`                | yes  | Final-Segment |
+| `method`                  | `"GET"`                 | yes  | PR #48        |
+| `http_version`            | `"1.1"`                 | yes  | PR #48        |
+| `identity_role`           | `IdentityRole`          | no   | PR #54        |
+| `tagged`                  | `boolean`               | no   | PR #55        |
+| `witness`                 | `object`                | yes  | PR #54        |
+| `witness.role`            | `WitnessRole`           | no   |               |
+| `witness.ua`              | `string`                | no   |               |
+| `fly_region`              | `string`                | yes  | PR #55        |
+| `request_signing`         | `RequestSigning`        | yes  | PR #55        |
+| `signature_verified`      | `SignatureVerification` | yes  | PR #55        |
+| `worker_release`          | `string`                | yes  | PR #55        |
+| `timing`                  | `object`                | yes  | PR #55        |
+| `timing.dns_ms`           | `integer`               | yes  |               |
+| `timing.connect_ms`       | `integer`               | yes  |               |
+| `timing.ttfb_ms`          | `integer`               | yes  |               |
+| `timing.total_ms`         | `integer`               | no   |               |
 
 ### Fix
 
@@ -655,22 +677,87 @@ Seed data: `packages/engine/src/v2/crawler-registry.ts`.
 | Final-Pricing | "Every plan audits as the same six crawlers" |
 | Final-Crawl   | "Googlebot and Bingbot render JavaScript"    |
 
-| Field                 | Type                   | Null | Added for    |
-| --------------------- | ---------------------- | ---- | ------------ |
-| `token`               | `string`               | no   |              |
-| `group`               | `CrawlerGroup`         | no   |              |
-| `scored`              | `boolean`              | no   | FACTS        |
-| `operator`            | `string`               | no   | Final-Result |
-| `purpose`             | `string`               | no   |              |
-| `robots_token`        | `string`               | no   |              |
-| `ua_string`           | `string`               | yes  |              |
-| `verification_method` | `VerificationMethod[]` | no   |              |
-| `ip_list_url`         | `url`                  | yes  | brief        |
-| `testable`            | `boolean`              | no   |              |
-| `needs_owner_logs`    | `boolean`              | no   |              |
-| `source_url`          | `url`                  | no   |              |
-| `source_notes`        | `string[]`             | no   | brief        |
-| `as_of`               | `date`                 | yes  |              |
+| Field                   | Type                   | Null | Added for    |
+| ----------------------- | ---------------------- | ---- | ------------ |
+| `token`                 | `string`               | no   |              |
+| `group`                 | `CrawlerGroup`         | no   |              |
+| `scored`                | `boolean`              | no   | FACTS        |
+| `operator`              | `string`               | no   | Final-Result |
+| `purpose`               | `string`               | no   |              |
+| `robots_token`          | `string`               | no   |              |
+| `ua_string`             | `string`               | yes  |              |
+| `verification_method`   | `VerificationMethod[]` | no   |              |
+| `ip_list_url`           | `url`                  | yes  | brief        |
+| `testable`              | `boolean`              | no   |              |
+| `needs_owner_logs`      | `boolean`              | no   |              |
+| `source_url`            | `url`                  | no   |              |
+| `source_notes`          | `string[]`             | no   | brief        |
+| `as_of`                 | `date`                 | yes  |              |
+| `cloudflare_categories` | `CloudflareCategory[]` | yes  | PR #54       |
+| `cloudflare_as_of`      | `date`                 | no   | PR #54       |
+
+### MeasurementLineage
+
+Fixture collection: `lineages`.
+
+| Screen | Shows |
+| ------ | ----- |
+
+| Field                      | Type        | Null | Added for |
+| -------------------------- | ----------- | ---- | --------- |
+| `id`                       | `uuid`      | no   |           |
+| `engine_sha`               | `string`    | no   | CC-06b    |
+| `detector_ruleset_version` | `string`    | no   | CC-06b    |
+| `crawler_registry_version` | `string`    | no   | CC-06b    |
+| `worker_release`           | `string`    | yes  | CC-06b    |
+| `population_version`       | `string`    | yes  | CC-06b    |
+| `created_at`               | `timestamp` | no   | CC-06b    |
+
+### UsageEvent
+
+Fixture collection: `usage_events`.
+
+| Screen | Shows |
+| ------ | ----- |
+
+| Field             | Type          | Null | Added for |
+| ----------------- | ------------- | ---- | --------- |
+| `id`              | `uuid`        | no   |           |
+| `account_id`      | `uuid`        | no   |           |
+| `kind`            | `UsageKind`   | no   | CC-06b    |
+| `check_id`        | `uuid`        | yes  |           |
+| `report_id`       | `uuid`        | yes  |           |
+| `result`          | `UsageResult` | no   | CC-06b    |
+| `billable`        | `boolean`     | no   | CC-06b    |
+| `compute_seconds` | `number`      | no   | CC-06b    |
+| `request_count`   | `integer`     | no   | CC-06b    |
+| `occurred_at`     | `timestamp`   | no   | CC-06b    |
+
+## The worker batch result
+
+What a batch result carries besides its rows, as fields the engine reads (`declaration.ts`; asked for in PR #54). A crawl batch records each declaration file it requested as `DeclarationFetch`: status, media type and byte count, never the body.
+
+### DeclarationFetch
+
+| Field            | Type                      | Null |
+| ---------------- | ------------------------- | ---- |
+| `origin`         | `url`                     | no   |
+| `path`           | `DeclarationPath`         | no   |
+| `state`          | `DeclarationState`        | no   |
+| `status`         | `integer`                 | yes  |
+| `media_type`     | `string`                  | yes  |
+| `bytes`          | `integer`                 | yes  |
+| `bytes_complete` | `boolean`                 | yes  |
+| `not_requested`  | `DeclarationNotRequested` | yes  |
+| `from_cache`     | `boolean`                 | no   |
+
+### BatchPartial
+
+Null when the batch did all it was asked.
+
+| Field     | Type                   | Null |
+| --------- | ---------------------- | ---- |
+| `reasons` | `BatchPartialReason[]` | no   |
 
 ## Fields added beyond the brief
 
@@ -762,6 +849,8 @@ Seed data: `packages/engine/src/v2/crawler-registry.ts`.
 | PageResult           | `links_read`                           | PR #47               |
 | PageResult           | `is_html`                              | brief                |
 | PageResult           | `robots_search`                        | PR #47               |
+| PageResult           | `title`                                | CC-12d               |
+| PageResult           | `meta_description`                     | CC-12d               |
 | LinkEdge             | `from_url`                             | Final-LinkMap        |
 | LinkEdge             | `to_url`                               | Final-LinkMap        |
 | LinkEdge             | `anchor_text`                          | Final-LinkMap        |
@@ -777,6 +866,14 @@ Seed data: `packages/engine/src/v2/crawler-registry.ts`.
 | AccessTest           | `body_excerpt`                         | Final-Segment        |
 | AccessTest           | `method`                               | PR #48               |
 | AccessTest           | `http_version`                         | PR #48               |
+| AccessTest           | `identity_role`                        | PR #54               |
+| AccessTest           | `tagged`                               | PR #55               |
+| AccessTest           | `witness`                              | PR #54               |
+| AccessTest           | `fly_region`                           | PR #55               |
+| AccessTest           | `request_signing`                      | PR #55               |
+| AccessTest           | `signature_verified`                   | PR #55               |
+| AccessTest           | `worker_release`                       | PR #55               |
+| AccessTest           | `timing`                               | PR #55               |
 | Fix                  | `number`                               | Final-Site           |
 | Fix                  | `section`                              | Final-Site           |
 | Fix                  | `title`                                | Final-Fix            |
@@ -827,125 +924,167 @@ Seed data: `packages/engine/src/v2/crawler-registry.ts`.
 | CrawlerRegistryEntry | `operator`                             | Final-Result         |
 | CrawlerRegistryEntry | `ip_list_url`                          | brief                |
 | CrawlerRegistryEntry | `source_notes`                         | brief                |
+| CrawlerRegistryEntry | `cloudflare_categories`                | PR #54               |
+| CrawlerRegistryEntry | `cloudflare_as_of`                     | PR #54               |
+| MeasurementLineage   | `engine_sha`                           | CC-06b               |
+| MeasurementLineage   | `detector_ruleset_version`             | CC-06b               |
+| MeasurementLineage   | `crawler_registry_version`             | CC-06b               |
+| MeasurementLineage   | `worker_release`                       | CC-06b               |
+| MeasurementLineage   | `population_version`                   | CC-06b               |
+| MeasurementLineage   | `created_at`                           | CC-06b               |
+| UsageEvent           | `kind`                                 | CC-06b               |
+| UsageEvent           | `result`                               | CC-06b               |
+| UsageEvent           | `billable`                             | CC-06b               |
+| UsageEvent           | `compute_seconds`                      | CC-06b               |
+| UsageEvent           | `request_count`                        | CC-06b               |
+| UsageEvent           | `occurred_at`                          | CC-06b               |
 
 ## Rules
 
 Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X exactly when Y") can break in either direction, and has test cases that break it each way.
 
-| Rule                      | Message                                                                           | Breaks    |
-| ------------------------- | --------------------------------------------------------------------------------- | --------- |
-| `billing_period`          | billing is monthly (1) or annual (12)                                             | one way   |
-| `history_current`         | the last state_history entry must be the current state                            | one way   |
-| `history_forward`         | state_history must move forward in time                                           | one way   |
-| `trial_consent`           | trial consent is recorded exactly when the account has had an Agency trial        | both ways |
-| `trial_ends`              | trial_ends_at is set exactly while on a trial                                     | both ways |
-| `branding_dns`            | dns status exists exactly when a report domain is set                             | both ways |
-| `branding_email_auth`     | email checks exist exactly when a sender is set                                   | both ways |
-| `branding_postal`         | a sender address needs a postal address for the footer                            | one way   |
-| `time_zone`               | not an IANA time zone                                                             | one way   |
-| `crawled_text_budget`     | crawled text is over its UTF-8 byte budget                                        | one way   |
-| `crawled_text_surrogate`  | crawled text has a lone surrogate, which cannot be stored                         | one way   |
-| `verification_alone`      | none_published stands alone                                                       | one way   |
-| `verification_unique`     | verification methods are listed once each                                         | one way   |
-| `ip_list_url`             | ip_list_url is set exactly when an IP list is published                           | both ways |
-| `effect_pending`          | an AI effect is either estimated, or not yet estimated because of named fixes     | both ways |
-| `fix_last_state`          | last_state does not fit the status                                                | one way   |
-| `fix_rank`                | every live fix has a rank and a resolved fix has none                             | both ways |
-| `packet_framework`        | the packet framework must be one of its switch options                            | one way   |
-| `packet_bodies`           | each further packet body is for another framework of the switch, once             | one way   |
-| `page_gone_status`        | a gone page answered 404 or 410                                                   | one way   |
-| `fix_gone`                | a fix whose page is gone was last measured indeterminate                          | one way   |
-| `coverage_gradeable`      | gradeable and excluded pages cannot exceed the pages crawled                      | one way   |
-| `coverage_crawled`        | pages_crawled cannot exceed pages_discovered                                      | one way   |
-| `coverage_sampled`        | pages_sampled cannot exceed the crawl or the sample cap                           | one way   |
-| `coverage_robots`         | pages crawled and pages excluded by robots.txt cannot exceed the pages discovered | one way   |
-| `crawler_scored`          | exactly the ai_search crawlers are scored (FACTS I6)                              | both ways |
-| `check_progress`          | progress is present exactly while running                                         | both ways |
-| `check_not_started`       | not started yet                                                                   | one way   |
-| `check_started`           | started_at is required                                                            | one way   |
-| `check_finished_at`       | finished_at is set exactly when the check has ended                               | both ways |
-| `check_deferred_until`    | deferred_until is set exactly when deferred                                       | both ways |
-| `check_failure_reason`    | failure_reason is set exactly when failed                                         | both ways |
-| `check_coverage`          | coverage is set exactly when the crawl has finished                               | both ways |
-| `check_both_grades`       | a finished check carries both grades                                              | one way   |
-| `check_grades_when_ended` | only a finished or partial check carries grades                                   | one way   |
-| `check_result_link`       | the result link expires after it is sent                                          | one way   |
-| `i4_withheld`             | AI readability is withheld when fewer than two scored crawlers were measured (I4) | one way   |
-| `i4_given`                | AI readability is given when two or more scored crawlers were measured (I4)       | one way   |
-| `score_grade_pair`        | score and grade are both present or both null                                     | both ways |
-| `refusal_score`           | a refused grade has no score; a given one has                                     | both ways |
-| `access_range_order`      | access_range.min must not exceed max                                              | one way   |
-| `total_sum`               | total is not the sum of its components                                            | one way   |
-| `schedule_timed`          | a timed schedule has a weekday; on_deploy has none                                | both ways |
-| `schedule_pair`           | a schedule sets its weekday and its hour together                                 | both ways |
-| `unkept_audit`            | an unkept audit has no schedule, client report or owner                           | one way   |
-| `client_report_cadence`   | client reports go out weekly or monthly                                           | one way   |
-| `alert_threshold`         | only the text-drop rule has a threshold, and it always has one                    | both ways |
-| `alert_fired_pair`        | a firing records both when and which check                                        | both ways |
-| `report_sent`             | sent_at is set exactly when sent                                                  | both ways |
-| `report_send_time`        | a scheduled or held report has a send time                                        | one way   |
-| `report_slug`             | only a public link has a slug                                                     | both ways |
-| `report_open_tracking`    | an open is known only with tracking on                                            | one way   |
-| `observed_owner_logs`     | observed evidence comes from owner logs, and only it does                         | both ways |
-| `access_request_line`     | the request method and HTTP version are recorded together                         | both ways |
-| `change_severity`         | severity is set exactly on an opened or resolved change                           | both ways |
-| `change_resolved_info`    | a resolved change is info                                                         | one way   |
-| `change_baseline`         | a baseline row is about the grade, compares no scores and names no fix            | one way   |
-| `redirect_status`         | a redirect hop answers 301, 302, 303, 307 or 308                                  | one way   |
-| `redirect_loop`           | a redirect loop has at least one hop                                              | one way   |
-| `canonical_href`          | a resolved canonical needs the href it was resolved from                          | one way   |
-| `robots_verdict`          | a robots.txt verdict is allowed, disallowed_by_robots or not_measured             | one way   |
-| `robots_ua_unique`        | each search engine has one robots.txt verdict                                     | one way   |
-| `links_read_html`         | only an HTML response has its links read                                          | one way   |
+| Rule                        | Message                                                                                        | Breaks    |
+| --------------------------- | ---------------------------------------------------------------------------------------------- | --------- |
+| `billing_period`            | billing is monthly (1) or annual (12)                                                          | one way   |
+| `history_current`           | the last state_history entry must be the current state                                         | one way   |
+| `history_forward`           | state_history must move forward in time                                                        | one way   |
+| `trial_consent`             | trial consent is recorded exactly when the account has had an Agency trial                     | both ways |
+| `trial_ends`                | trial_ends_at is set exactly while on a trial                                                  | both ways |
+| `branding_dns`              | dns status exists exactly when a report domain is set                                          | both ways |
+| `branding_email_auth`       | email checks exist exactly when a sender is set                                                | both ways |
+| `branding_postal`           | a sender address needs a postal address for the footer                                         | one way   |
+| `time_zone`                 | not an IANA time zone                                                                          | one way   |
+| `crawled_text_budget`       | crawled text is over its UTF-8 byte budget                                                     | one way   |
+| `crawled_text_surrogate`    | crawled text has a lone surrogate, which cannot be stored                                      | one way   |
+| `verification_alone`        | none_published stands alone                                                                    | one way   |
+| `verification_unique`       | verification methods are listed once each                                                      | one way   |
+| `ip_list_url`               | ip_list_url is set exactly when an IP list is published                                        | both ways |
+| `cloudflare_unique`         | Cloudflare's categories are listed once each                                                   | one way   |
+| `effect_pending`            | an AI effect is either estimated, or not yet estimated because of named fixes                  | both ways |
+| `fix_last_state`            | last_state does not fit the status                                                             | one way   |
+| `fix_rank`                  | every live fix has a rank and a resolved fix has none                                          | both ways |
+| `packet_framework`          | the packet framework must be one of its switch options                                         | one way   |
+| `packet_bodies`             | each further packet body is for another framework of the switch, once                          | one way   |
+| `page_gone_status`          | a gone page answered 404 or 410                                                                | one way   |
+| `fix_gone`                  | a fix whose page is gone was last measured indeterminate                                       | one way   |
+| `coverage_gradeable`        | gradeable and excluded pages cannot exceed the pages crawled                                   | one way   |
+| `coverage_crawled`          | pages_crawled cannot exceed pages_discovered                                                   | one way   |
+| `coverage_sampled`          | pages_sampled cannot exceed the crawl or the sample cap                                        | one way   |
+| `coverage_robots`           | pages crawled and pages excluded by robots.txt cannot exceed the pages discovered              | one way   |
+| `crawler_scored`            | exactly the ai_search crawlers are scored (FACTS I6)                                           | both ways |
+| `check_progress`            | progress is present exactly while running                                                      | both ways |
+| `check_not_started`         | not started yet                                                                                | one way   |
+| `check_started`             | started_at is required                                                                         | one way   |
+| `check_finished_at`         | finished_at is set exactly when the check has ended                                            | both ways |
+| `check_deferred_until`      | deferred_until is set exactly when deferred                                                    | both ways |
+| `check_failure_reason`      | failure_reason is set exactly when failed                                                      | both ways |
+| `check_coverage`            | coverage is set exactly when the crawl has finished                                            | both ways |
+| `check_both_grades`         | a finished check carries both grades                                                           | one way   |
+| `check_grades_when_ended`   | only a finished or partial check carries grades                                                | one way   |
+| `check_result_link`         | the result link expires after it is sent                                                       | one way   |
+| `i4_withheld`               | AI readability is withheld when fewer than two scored crawlers were measured (I4)              | one way   |
+| `i4_given`                  | AI readability is given when two or more scored crawlers were measured (I4)                    | one way   |
+| `score_grade_pair`          | score and grade are both present or both null                                                  | both ways |
+| `refusal_score`             | a refused grade has no score; a given one has                                                  | both ways |
+| `access_range_order`        | access_range.min must not exceed max                                                           | one way   |
+| `total_sum`                 | total is not the sum of its components                                                         | one way   |
+| `schedule_timed`            | a timed schedule has a weekday; on_deploy has none                                             | both ways |
+| `schedule_pair`             | a schedule sets its weekday and its hour together                                              | both ways |
+| `unkept_audit`              | an unkept audit has no schedule, client report or owner                                        | one way   |
+| `client_report_cadence`     | client reports go out weekly or monthly                                                        | one way   |
+| `alert_threshold`           | only the text-drop rule has a threshold, and it always has one                                 | both ways |
+| `alert_fired_pair`          | a firing records both when and which check                                                     | both ways |
+| `report_sent`               | sent_at is set exactly when sent                                                               | both ways |
+| `report_send_time`          | a scheduled or held report has a send time                                                     | one way   |
+| `report_slug`               | only a public link has a slug                                                                  | both ways |
+| `report_open_tracking`      | an open is known only with tracking on                                                         | one way   |
+| `observed_owner_logs`       | observed evidence comes from owner logs, and only it does                                      | both ways |
+| `access_request_line`       | the request method and HTTP version are recorded together                                      | both ways |
+| `access_identity_ua`        | an access row names a crawler exactly when it is a crawler row                                 | both ways |
+| `control_untagged`          | the browser control carries no Crawlmouse tag                                                  | one way   |
+| `access_witness`            | a witness is named exactly on a blocked_by_ua_rule row decided by our own requests             | both ways |
+| `witness_other`             | a witness is another identity than the crawler refused                                         | one way   |
+| `fly_region`                | a Fly region is recorded exactly when the request left from Fly                                | both ways |
+| `timing_order`              | a request's recorded phases are in order: DNS, connect, first byte, total                      | one way   |
+| `worker_request`            | signing, verification and the worker release are recorded exactly on the worker's own requests | both ways |
+| `worker_request_whole`      | signing, verification and the worker release are recorded together                             | one way   |
+| `declaration_answer`        | a declaration status is recorded exactly when the request was answered                         | both ways |
+| `declaration_bytes`         | a declaration byte count is recorded exactly when the request was answered                     | both ways |
+| `declaration_media_type`    | a declaration media type is recorded only from an answer                                       | one way   |
+| `declaration_cache_answer`  | a declaration kept from an earlier batch is an answer or its absence                           | one way   |
+| `declaration_not_requested` | why a declaration was not requested is recorded exactly when it was not requested              | both ways |
+| `head_text_absent`          | a title or description the page does not declare has no length and no cut                      | one way   |
+| `usage_billable`            | only a delivered result is billable                                                            | one way   |
+| `change_severity`           | severity is set exactly on an opened or resolved change                                        | both ways |
+| `change_resolved_info`      | a resolved change is info                                                                      | one way   |
+| `change_baseline`           | a baseline row is about the grade, compares no scores and names no fix                         | one way   |
+| `redirect_status`           | a redirect hop answers 301, 302, 303, 307 or 308                                               | one way   |
+| `redirect_loop`             | a redirect loop has at least one hop                                                           | one way   |
+| `canonical_href`            | a resolved canonical needs the href it was resolved from                                       | one way   |
+| `robots_verdict`            | a robots.txt verdict is allowed, disallowed_by_robots or not_measured                          | one way   |
+| `robots_ua_unique`          | each search engine has one robots.txt verdict                                                  | one way   |
+| `links_read_html`           | only an HTML response has its links read                                                       | one way   |
 
 ## Enums
 
-| Enum                  | Coverage                   | Values                                                                                                                                                                                                                                                                           |
-| --------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Verdict`             | every value in a fixture   | allowed, allowed_thin, disallowed_by_robots, blocked_by_ua_rule, challenged_ua, refused_unverified, rate_limited, payment_required, edge_blocks_automation, redirected_away, not_measured                                                                                        |
-| `EvidenceClass`       | every value in a fixture   | declared, simulated, observed                                                                                                                                                                                                                                                    |
-| `CrawlerGroup`        | every value in a fixture   | search_engine, ai_search, ai_training                                                                                                                                                                                                                                            |
-| `DetectionState`      | every value in a fixture   | detected, not_detected, indeterminate                                                                                                                                                                                                                                            |
-| `FixStatus`           | every value in a fixture   | open, marked_done, verified_resolved, unable_to_verify, reopened                                                                                                                                                                                                                 |
-| `RecommendationClass` | every value in a fixture   | confirmed_defect, documented_requirement, best_practice, experimental                                                                                                                                                                                                            |
-| `CheckStatus`         | every value in a fixture   | queued, running, finished, partial, failed, deferred                                                                                                                                                                                                                             |
-| `AccountState`        | every value in a fixture   | free, pro_trial, pro, agency_trial, agency, past_due                                                                                                                                                                                                                             |
-| `Confidence`          | every value in a fixture   | confirmed, likely, inconclusive                                                                                                                                                                                                                                                  |
-| `SourceIpClass`       | every value in a fixture   | fly_egress, browser_rendering, owner_logs                                                                                                                                                                                                                                        |
-| `GradeName`           | every value in a fixture   | technical_seo, ai_readability                                                                                                                                                                                                                                                    |
-| `FixSection`          | every value in a fixture   | crawler_access, without_js, structure, content                                                                                                                                                                                                                                   |
-| `FixType`             | every value in a fixture   | robots_txt_blocks_crawler, edge_rule_blocks_crawler, client_rendered_template, orphan_pages, quotable_opening, generic_anchor_text, deep_pages, specs_as_images, missing_author_date, js_only_navigation, redirect_chain, duplicate_pagination, canonical_mismatch, hreflang_gap |
-| `FixMeasure`          | every value in a fixture   | words_without_js, crawlers_reading_text, quotable_opening, text_share                                                                                                                                                                                                            |
-| `EstimateBound`       | every value in a fixture   | exact, approx, at_least                                                                                                                                                                                                                                                          |
-| `PacketFramework`     | every value in a fixture   | nextjs, shopify_liquid, shopify_hydrogen, wordpress, webflow, generic                                                                                                                                                                                                            |
-| `CheckTrigger`        | every value in a fixture   | first_audit, manual, scheduled, deploy, fix_recheck                                                                                                                                                                                                                              |
-| `CheckPhase`          | every value in a fixture   | robots_and_sitemap, homepage, crawl, crawler_tests, without_js, grading                                                                                                                                                                                                          |
-| `StepState`           | every value in a fixture   | done, now, next                                                                                                                                                                                                                                                                  |
-| `SampleMethod`        | every value in a fixture   | stratified_by_template, census                                                                                                                                                                                                                                                   |
-| `AccessCause`         | every value in a fixture   | cloudflare_1020, bot_fight_mode, client_rendered_template, robots_txt_disallow, automation_challenge, rate_limit_429, pay_per_crawl_402, cross_host_redirect, verified_bot_only                                                                                                  |
-| `SignalKind`          | every value in a fixture   | schema_org, content_signals, web_bot_auth, llms_txt, mcp_server_card, markdown_negotiation, agent_skills_index                                                                                                                                                                   |
-| `ContentCheck`        | every value in a fixture   | direct_answer_150, question_headings, schema_with_description, author_and_date, specs_as_text                                                                                                                                                                                    |
-| `JsTextState`         | every value in a fixture   | readable, partial, empty_shell                                                                                                                                                                                                                                                   |
-| `FoundVia`            | every value in a fixture   | link, sitemap, javascript                                                                                                                                                                                                                                                        |
-| `Cadence`             | every value in a fixture   | weekly, monthly, on_deploy                                                                                                                                                                                                                                                       |
-| `ChangeKind`          | every value in a fixture   | opened, resolved, changed, baseline                                                                                                                                                                                                                                              |
-| `ChangeSubject`       | every value in a fixture   | crawler_access, text_without_js, grade, orphans, content, structure, deploy                                                                                                                                                                                                      |
-| `Severity`            | every value in a fixture   | bad, warn, info                                                                                                                                                                                                                                                                  |
-| `Channel`             | every value in a fixture   | email, slack                                                                                                                                                                                                                                                                     |
-| `AlertRuleKind`       | every value in a fixture   | crawler_blocked, text_drop, grade_letter_moved, new_orphans, fix_regressed, any_change                                                                                                                                                                                           |
-| `ReportKind`          | every value in a fixture   | audit_pdf, compare, raw_export, public_link, client_report, prospect_one_pager                                                                                                                                                                                                   |
-| `ReportFormat`        | every value in a fixture   | pdf, csv, json, edge_list, html                                                                                                                                                                                                                                                  |
-| `ReportStatus`        | every value in a fixture   | ready, scheduled, held, sent                                                                                                                                                                                                                                                     |
-| `ReportMaker`         | every value in a fixture   | user, scheduled_check, report_schedule                                                                                                                                                                                                                                           |
-| `SeatRole`            | every value in a fixture   | owner, account_manager, developer                                                                                                                                                                                                                                                |
-| `Theme`               | every value in a fixture   | system, light, dark                                                                                                                                                                                                                                                              |
-| `IntegrationKind`     | every value in a fixture   | slack, search_console, vercel, cloudflare_analytics, vercel_drain                                                                                                                                                                                                                |
-| `WithheldCollection`  | every value in a fixture   | page_results, link_edges, access_tests                                                                                                                                                                                                                                           |
-| `GradeLetter`         | pinned to v1 or the engine | A, A-, B+, B, B-, C+, C, C-, D+, D, D-, F                                                                                                                                                                                                                                        |
-| `PageKind`            | pinned to v1 or the engine | content, auth, search, pagination, archive, feed, status, utility, duplicate, thin                                                                                                                                                                                               |
-| `CmsName`             | pinned to v1 or the engine | shopify, wordpress, webflow, wix, squarespace, framer, ghost, custom                                                                                                                                                                                                             |
-| `RefusalTrigger`      | pinned to v1 or the engine | too_few_gradeable_pages, site_too_small_to_measure, too_few_gradeable_after_exclusion, nothing_read, no_observed_links                                                                                                                                                           |
-| `VerificationMethod`  | registry seed only         | ip_list, reverse_dns, none_published                                                                                                                                                                                                                                             |
+| Enum                      | Coverage                                              | Values                                                                                                                                                                                                                                                                           |
+| ------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Verdict`                 | every value in a fixture                              | allowed, allowed_thin, disallowed_by_robots, blocked_by_ua_rule, challenged_ua, refused_unverified, rate_limited, payment_required, edge_blocks_automation, redirected_away, not_measured                                                                                        |
+| `EvidenceClass`           | every value in a fixture                              | declared, simulated, observed                                                                                                                                                                                                                                                    |
+| `CrawlerGroup`            | every value in a fixture                              | search_engine, ai_search, ai_training                                                                                                                                                                                                                                            |
+| `DetectionState`          | every value in a fixture                              | detected, not_detected, indeterminate                                                                                                                                                                                                                                            |
+| `FixStatus`               | every value in a fixture                              | open, marked_done, verified_resolved, unable_to_verify, reopened                                                                                                                                                                                                                 |
+| `RecommendationClass`     | every value in a fixture                              | confirmed_defect, documented_requirement, best_practice, experimental                                                                                                                                                                                                            |
+| `CheckStatus`             | every value in a fixture                              | queued, running, finished, partial, failed, deferred                                                                                                                                                                                                                             |
+| `AccountState`            | every value in a fixture                              | free, pro_trial, pro, agency_trial, agency, past_due                                                                                                                                                                                                                             |
+| `Confidence`              | every value in a fixture                              | confirmed, likely, inconclusive                                                                                                                                                                                                                                                  |
+| `SourceIpClass`           | every value in a fixture                              | fly_egress, browser_rendering, owner_logs, other_egress                                                                                                                                                                                                                          |
+| `GradeName`               | every value in a fixture                              | technical_seo, ai_readability                                                                                                                                                                                                                                                    |
+| `FixSection`              | every value in a fixture                              | crawler_access, without_js, structure, content                                                                                                                                                                                                                                   |
+| `FixType`                 | every value in a fixture                              | robots_txt_blocks_crawler, edge_rule_blocks_crawler, client_rendered_template, orphan_pages, quotable_opening, generic_anchor_text, deep_pages, specs_as_images, missing_author_date, js_only_navigation, redirect_chain, duplicate_pagination, canonical_mismatch, hreflang_gap |
+| `FixMeasure`              | every value in a fixture                              | words_without_js, crawlers_reading_text, quotable_opening, text_share                                                                                                                                                                                                            |
+| `EstimateBound`           | every value in a fixture                              | exact, approx, at_least                                                                                                                                                                                                                                                          |
+| `PacketFramework`         | every value in a fixture                              | nextjs, shopify_liquid, shopify_hydrogen, wordpress, webflow, generic                                                                                                                                                                                                            |
+| `CheckTrigger`            | every value in a fixture                              | first_audit, manual, scheduled, deploy, fix_recheck                                                                                                                                                                                                                              |
+| `CheckPhase`              | every value in a fixture                              | robots_and_sitemap, homepage, crawl, crawler_tests, without_js, grading                                                                                                                                                                                                          |
+| `StepState`               | every value in a fixture                              | done, now, next                                                                                                                                                                                                                                                                  |
+| `SampleMethod`            | every value in a fixture                              | stratified_by_template, census                                                                                                                                                                                                                                                   |
+| `AccessCause`             | every value in a fixture                              | cloudflare_1020, bot_fight_mode, client_rendered_template, robots_txt_disallow, automation_challenge, rate_limit_429, pay_per_crawl_402, cross_host_redirect, verified_bot_only                                                                                                  |
+| `SignalKind`              | every value in a fixture                              | schema_org, content_signals, web_bot_auth, llms_txt, mcp_server_card, markdown_negotiation, agent_skills_index, ucp, rsl, agent_card, llms_full                                                                                                                                  |
+| `ContentCheck`            | every value in a fixture                              | direct_answer_150, question_headings, schema_with_description, author_and_date, specs_as_text                                                                                                                                                                                    |
+| `JsTextState`             | every value in a fixture                              | readable, partial, empty_shell                                                                                                                                                                                                                                                   |
+| `FoundVia`                | every value in a fixture                              | link, sitemap, javascript                                                                                                                                                                                                                                                        |
+| `Cadence`                 | every value in a fixture                              | weekly, monthly, on_deploy                                                                                                                                                                                                                                                       |
+| `ChangeKind`              | every value in a fixture                              | opened, resolved, changed, baseline                                                                                                                                                                                                                                              |
+| `ChangeSubject`           | every value in a fixture                              | crawler_access, text_without_js, grade, orphans, content, structure, deploy                                                                                                                                                                                                      |
+| `Severity`                | every value in a fixture                              | bad, warn, info                                                                                                                                                                                                                                                                  |
+| `Channel`                 | every value in a fixture                              | email, slack                                                                                                                                                                                                                                                                     |
+| `AlertRuleKind`           | every value in a fixture                              | crawler_blocked, text_drop, grade_letter_moved, new_orphans, fix_regressed, any_change                                                                                                                                                                                           |
+| `ReportKind`              | every value in a fixture                              | audit_pdf, compare, raw_export, public_link, client_report, prospect_one_pager                                                                                                                                                                                                   |
+| `ReportFormat`            | every value in a fixture                              | pdf, csv, json, edge_list, html                                                                                                                                                                                                                                                  |
+| `ReportStatus`            | every value in a fixture                              | ready, scheduled, held, sent                                                                                                                                                                                                                                                     |
+| `ReportMaker`             | every value in a fixture                              | user, scheduled_check, report_schedule                                                                                                                                                                                                                                           |
+| `SeatRole`                | every value in a fixture                              | owner, account_manager, developer                                                                                                                                                                                                                                                |
+| `Theme`                   | every value in a fixture                              | system, light, dark                                                                                                                                                                                                                                                              |
+| `IntegrationKind`         | every value in a fixture                              | slack, search_console, vercel, cloudflare_analytics, vercel_drain                                                                                                                                                                                                                |
+| `WithheldCollection`      | every value in a fixture                              | page_results, link_edges, access_tests                                                                                                                                                                                                                                           |
+| `UsageKind`               | every value in a fixture                              | check_finished, export, api_call                                                                                                                                                                                                                                                 |
+| `UsageResult`             | every value in a fixture                              | delivered, refused, withheld, failed                                                                                                                                                                                                                                             |
+| `IdentityRole`            | every value in a fixture                              | control, crawler, canary, render                                                                                                                                                                                                                                                 |
+| `WitnessRole`             | every value in a fixture                              | crawler, canary                                                                                                                                                                                                                                                                  |
+| `RequestSigning`          | every value in a fixture                              | unsigned                                                                                                                                                                                                                                                                         |
+| `SignatureVerification`   | every value in a fixture                              | not_observable                                                                                                                                                                                                                                                                   |
+| `GradeLetter`             | pinned to v1 or the engine                            | A, A-, B+, B, B-, C+, C, C-, D+, D, D-, F                                                                                                                                                                                                                                        |
+| `PageKind`                | pinned to v1 or the engine                            | content, auth, search, pagination, archive, feed, status, utility, duplicate, thin                                                                                                                                                                                               |
+| `CmsName`                 | pinned to v1 or the engine                            | shopify, wordpress, webflow, wix, squarespace, framer, ghost, custom                                                                                                                                                                                                             |
+| `RefusalTrigger`          | pinned to v1 or the engine                            | too_few_gradeable_pages, site_too_small_to_measure, too_few_gradeable_after_exclusion, nothing_read, no_observed_links                                                                                                                                                           |
+| `VerificationMethod`      | registry seed only                                    | ip_list, reverse_dns, none_published                                                                                                                                                                                                                                             |
+| `CloudflareCategory`      | registry seed only                                    | search, agent, training                                                                                                                                                                                                                                                          |
+| `MeasurementStatus`       | computed by a function, every value from the fixtures | measured, not_measurable, unevaluable, withheld                                                                                                                                                                                                                                  |
+| `BatchPartialReason`      | worker batch result, pinned by the worker             | budget_requests, budget_bytes, budget_seconds, site_stopped, robots_unreachable, robots_too_large, site_refused, crawl_delay_over_limit, crawl_delay_10s_or_more, result_size                                                                                                    |
+| `DeclarationPath`         | worker batch result, pinned by the worker             | /llms.txt, /llms-full.txt, /.well-known/ucp, /.well-known/mcp, /.well-known/agent-card.json, /rsl.xml, /sitemap.xml                                                                                                                                                              |
+| `DeclarationState`        | worker batch result, pinned by the worker             | answered, no_response, not_requested                                                                                                                                                                                                                                             |
+| `DeclarationNotRequested` | worker batch result, pinned by the worker             | robots_disallowed, budget, site_stopped, site_blocked                                                                                                                                                                                                                            |
 
 ## Open items for the engine stream
 
@@ -961,6 +1100,6 @@ Records per collection in each frozen fixture under `apps/web/lib/fixtures/v2/`.
 
 | Fixture                | as_of                | accounts | seats | sites | checks | page_results | link_edges | access_tests | fixes | fix_events | changes | alert_rules | reports | engine_derived |
 | ---------------------- | -------------------- | -------- | ----- | ----- | ------ | ------------ | ---------- | ------------ | ----- | ---------- | ------- | ----------- | ------- | -------------- |
-| `bad-site.json`        | 2026-10-30T10:05:00Z | 1        | 1     | 5     | 15     | 16           | 11         | 10           | 15    | 4          | 8       | 6           | 4       | 185            |
+| `bad-site.json`        | 2026-10-30T10:05:00Z | 1        | 1     | 5     | 15     | 16           | 11         | 13           | 15    | 4          | 8       | 6           | 4       | 185            |
 | `clean-site.json`      | 2026-10-27T15:42:00Z | 0        | 0     | 1     | 2      | 2            | 2          | 2            | 0     | 0          | 0       | 0           | 0       | 6              |
 | `challenged-site.json` | 2026-11-02T12:00:00Z | 2        | 5     | 3     | 7      | 1            | 0          | 9            | 2     | 3          | 1       | 2           | 6       | 10             |

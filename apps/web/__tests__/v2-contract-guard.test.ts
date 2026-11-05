@@ -7,12 +7,15 @@ import {
   FLATTENED,
   NESTED,
   NOT_STORED_HERE,
+  NOT_STORED_YET,
   NOT_THIS_STEP,
   RELOCATED,
   RULE_CHECKS,
+  GENERATED_STATUS,
   RULES_AT_WRITE,
   RULES_NOT_THIS_STEP,
   TABLE_OF,
+  VALUES_NOT_STORED_YET,
 } from './helpers/v2-contract-storage';
 
 /**
@@ -212,6 +215,7 @@ function bindings(): Binding[] {
     if (!table) continue;
     for (const [field, f] of fieldsOf(entity.schema)) {
       const at = `${entity.name}.${field}`;
+      if (NOT_STORED_YET[at]) continue;
       if (FLATTENED[at] || RELOCATED[at]) {
         const t = FLATTENED[at] ?? RELOCATED[at]!;
         for (const [sub, g] of fieldsOf(f.schema)) {
@@ -245,7 +249,7 @@ beforeAll(async () => {
   const { rows } = await db.query<{ t: string; c: string; notnull: boolean; type: string }>(
     `select c.relname as t, a.attname as c, a.attnotnull as notnull, format_type(a.atttypid, a.atttypmod) as type
        from pg_attribute a join pg_class c on c.oid = a.attrelid join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public' and c.relkind = 'r' and a.attnum > 0 and not a.attisdropped`,
+      where n.nspname = 'public' and c.relkind in ('r', 'p') and a.attnum > 0 and not a.attisdropped`,
   );
   for (const r of rows) columns.set(`${r.t}.${r.c}`, { notnull: r.notnull, type: r.type });
   const tables = new Set([...Object.values(TABLE_OF), ...Object.values(RELOCATED)]);
@@ -326,7 +330,9 @@ describe('every value set the contract places at a column has CHECKs with exactl
       if (!want) continue;
       checkedColumns++;
       const got = enumChecks.get(`${b.table}.${b.column}`) ?? [];
-      if (got.length === 0 || got.some((g) => JSON.stringify(g) !== JSON.stringify(want)))
+      const pending = VALUES_NOT_STORED_YET[`${b.table}.${b.column}`] ?? [];
+      const now = want.filter((v) => !pending.includes(v));
+      if (got.length === 0 || got.some((g) => JSON.stringify(g) !== JSON.stringify(now)))
         wrong.push(
           `${b.at} → ${b.table}.${b.column}: CHECKs ${JSON.stringify(got)}, contract ${JSON.stringify(want)}`,
         );
@@ -379,12 +385,61 @@ describe('every value set the contract places at a column has CHECKs with exactl
   });
 });
 
+describe('fields and values declared as not stored yet', () => {
+  it('each is a field of its entity, and none has a column yet, under its name or flattened', () => {
+    const wrong = Object.keys(NOT_STORED_YET).flatMap((at) => {
+      const [name, field] = at.split('.') as [string, string];
+      const entity = ENTITIES.find((e) => e.name === name);
+      if (!entity || !fieldsOf(entity.schema).has(field)) return [`${at}: not a contract field`];
+      const table = TABLE_OF[name];
+      if (FLATTENED[at] || RELOCATED[at]) return [`${at}: declared flattened or relocated`];
+      if (!table) return [];
+      // Stored under its own name, or flattened into `<field>_<key>` columns as Site.schedule is.
+      const stored = [...columns.keys()].filter(
+        (c) => c === `${table}.${field}` || c.startsWith(`${table}.${field}_`),
+      );
+      return stored.map((c) => `${at}: ${c} exists`);
+    });
+    expect(wrong).toEqual([]);
+  });
+
+  it("each value is the contract's at that column, and its CHECK does not hold it yet", () => {
+    const wrong: string[] = [];
+    for (const [at, values] of Object.entries(VALUES_NOT_STORED_YET)) {
+      const b = bindings().find((x) => `${x.table}.${x.column}` === at);
+      const want = b ? valueSet(b.schema) : undefined;
+      for (const v of values) {
+        if (!want?.includes(v)) wrong.push(`${at}: ${v} is not a contract value there`);
+        if ((enumChecks.get(at) ?? []).some((g) => g.includes(v)))
+          wrong.push(`${at}: the CHECK already holds ${v}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+});
+
 describe('every rule declared as a CHECK is one', () => {
   it('the constraint is a CHECK on the declared table', async () => {
     const missing: string[] = [];
     for (const [rule, { table, constraint }] of Object.entries(RULE_CHECKS)) {
       if (!(await constraints(db, table)).some((c) => c.name === constraint))
         missing.push(`${rule} → ${table}.${constraint}`);
+    }
+    expect(missing).toEqual([]);
+  });
+});
+
+describe('every status declared as generated is a generated column', () => {
+  it('generated, on the declared table', async () => {
+    const missing: string[] = [];
+    for (const at of Object.keys(GENERATED_STATUS)) {
+      const [table, column] = at.split('.') as [string, string];
+      const { rows } = await db.query<{ g: string }>(
+        `select attgenerated as g from pg_attribute
+          where attrelid = ('public.' || $1)::regclass and attname = $2`,
+        [table, column],
+      );
+      if (rows[0]?.g !== 's') missing.push(at);
     }
     expect(missing).toEqual([]);
   });
