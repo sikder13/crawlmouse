@@ -211,6 +211,19 @@ describe('the history diff matches a row to a file by exact name, never by prefi
     expect(diff.misversioned).toEqual([]);
   });
 
+  it.each([
+    ['a row whose name extends the one file name', 'sites_v2', 'sites'],
+    ['a row whose name is a prefix of the one file name', 'site', 'sites'],
+  ])('treats %s as an orphan, with one candidate file', (_label, rowName, fileName) => {
+    const [file] = fixtureDir([`20260101000001_${fileName}`]);
+    const diff = diffHistory(
+      [file!],
+      [{ version: '20260105000001', name: rowName, statements: ['x'] }],
+    );
+    expect(diff.misversioned).toEqual([]);
+    expect(diff.orphans.map((r) => r.name)).toEqual([rowName]);
+  });
+
   it('does not rename a row onto a file whose version is already recorded', () => {
     const diff = diffHistory(files, [
       { version: '20260101000002', name: 'audits_ttl', statements: ['x'] },
