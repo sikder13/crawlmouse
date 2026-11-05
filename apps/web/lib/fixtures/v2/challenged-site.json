@@ -364,7 +364,10 @@
             "score": null,
             "max": 40,
             "heuristic": false,
-            "range": { "min": 0, "max": 30 }
+            "range": {
+              "min": 0,
+              "max": 30
+            }
           },
           "readable": {
             "score": 18,
@@ -388,7 +391,8 @@
         "access_range": {
           "min": 0,
           "max": 30
-        }
+        },
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 512,
@@ -747,7 +751,10 @@
             "score": null,
             "max": 40,
             "heuristic": false,
-            "range": { "min": 0, "max": 30 }
+            "range": {
+              "min": 0,
+              "max": 30
+            }
           },
           "readable": {
             "score": 15,
@@ -771,7 +778,8 @@
         "access_range": {
           "min": 0,
           "max": 30
-        }
+        },
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 512,
@@ -1200,7 +1208,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -1408,7 +1417,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -2070,8 +2080,10 @@
       "rank": 1,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": null,
         "ai_readability_pending_on": ["too_few_crawlers_measured"],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -2128,8 +2140,10 @@
       "rank": 2,
       "effect": {
         "technical_seo": 2,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,

@@ -9,7 +9,9 @@
  * Signals 10) and a total. It is withheld when a component could not be measured (FACTS I4 for Access):
  * the grade then names why in `withheld_reasons`, and each component without a score carries the
  * range its score could take. `access_range` repeats the Access component's range for the screens that
- * read it. The engine scores letters on v1's scale; the contract does not pin AI letters to scores.
+ * read it. `scored_from_fewer_crawlers` says when Access was scored from fewer than two crawlers
+ * because the rest are disallowed by robots.txt. The engine scores letters on v1's scale; the
+ * contract does not pin AI letters to scores.
  */
 import { z } from 'zod';
 import { ScoreSchema, ShareSchema } from './common.js';
@@ -80,6 +82,12 @@ function maybeScored<Max extends number, H extends boolean>(max: Max, heuristic:
 
 const reasons = z.array(WithheldReasonSchema);
 
+/**
+ * How many scored crawlers Access was scored from, when that is fewer than two (FACTS I4): every
+ * other scored crawler is disallowed by robots.txt, the site's stated choice. Null otherwise.
+ */
+const fewer = z.int().min(1).nullable();
+
 const measured = z.strictObject({
   withheld: z.literal(false),
   withheld_reasons: reasons,
@@ -92,6 +100,7 @@ const measured = z.strictObject({
     signals: component(10, false),
   }),
   access_range: z.null(),
+  scored_from_fewer_crawlers: fewer,
 });
 
 const withheld = z
@@ -107,6 +116,7 @@ const withheld = z
       signals: maybeScored(10, false),
     }),
     access_range: rangeOf(40).nullable(),
+    scored_from_fewer_crawlers: fewer,
   })
   .check(
     rules((g, rule) => {
@@ -142,6 +152,10 @@ const withheld = z
 export const AiReadabilitySchema = z.discriminatedUnion('withheld', [measured, withheld]).check(
   rules((g, rule) => {
     rule.exactlyWhen('withheld_reasons', g.withheld, (g.withheld_reasons ?? []).length > 0);
+    const fewerThan = g.scored_from_fewer_crawlers ?? null;
+    if (fewerThan !== null && (fewerThan >= 2 || g.components?.access?.score === null)) {
+      rule.fail('fewer_crawlers');
+    }
     if (g.withheld) return;
     const c = g.components;
     const sum = c.access.score + c.readable.score + c.quotable.score + c.signals.score;

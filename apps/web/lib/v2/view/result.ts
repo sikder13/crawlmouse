@@ -618,9 +618,8 @@ function allClear(
 
 /** "+24 AI" when the fix moves AI readability, otherwise "+4 SEO". */
 export function points(f: Pick<Fix, 'effect'>): string {
-  return f.effect.ai_readability
-    ? `+${f.effect.ai_readability} AI`
-    : `+${f.effect.technical_seo} SEO`;
+  if (f.effect.ai_readability) return `+${f.effect.ai_readability} AI`;
+  return f.effect.technical_seo === null ? 'SEO not estimated' : `+${f.effect.technical_seo} SEO`;
 }
 
 /** What changes, from the causes behind the fix's crawlers: "A firewall rule and one bot setting". */
@@ -655,7 +654,7 @@ function fixFirstBody(check: Check, f: Fix): string {
       : `AI readability ${ai.total} → ${Math.min(100, ai.total + f.effect.ai_readability)}, estimated.`
     : seo === null
       ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
-      : `Technical SEO ${seo} → ${Math.min(100, seo + f.effect.technical_seo)}, estimated.`;
+      : `Technical SEO ${seo} → ${Math.min(100, seo + (f.effect.technical_seo ?? 0))}, estimated.`;
   return `${what ? `${capitalise(what)}. ` : ''}${effect} The steps and the evidence are open, free.`;
 }
 
@@ -694,7 +693,7 @@ function fixRows(
       key: 'rest',
       title: `${capitalise(numberWord(rest.length))} more, grouped by type`,
       scope: null,
-      points: `+${rest.reduce((n, f) => n + f.effect.technical_seo, 0)} SEO`,
+      points: `+${rest.reduce((n, f) => n + (f.effect.technical_seo ?? 0), 0)} SEO`,
       open: false,
       count: rest.length,
       href: '#pro',

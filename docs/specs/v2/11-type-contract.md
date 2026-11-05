@@ -234,6 +234,7 @@ Fixture collection: `checks`.
 | `ai_readability.components.signals.heuristic`  | `false`               | no   | `withheld = false` |                     |
 | `ai_readability.components.signals.range`      | `null`                | no   | `withheld = false` |                     |
 | `ai_readability.access_range`                  | `null`                | no   | `withheld = false` |                     |
+| `ai_readability.scored_from_fewer_crawlers`    | `integer`             | yes  | `withheld = false` |                     |
 | `ai_readability.withheld`                      | `true`                | no   | `withheld = true`  |                     |
 | `ai_readability.withheld_reasons`              | `WithheldReason[]`    | no   | `withheld = true`  |                     |
 | `ai_readability.total`                         | `null`                | no   | `withheld = true`  |                     |
@@ -270,6 +271,7 @@ Fixture collection: `checks`.
 | `ai_readability.access_range`                  | `object`              | yes  | `withheld = true`  |                     |
 | `ai_readability.access_range.min`              | `number`              | no   | `withheld = true`  |                     |
 | `ai_readability.access_range.max`              | `number`              | no   | `withheld = true`  |                     |
+| `ai_readability.scored_from_fewer_crawlers`    | `integer`             | yes  | `withheld = true`  |                     |
 | `structure`                                    | `object`              | yes  |                    | Final-Seg-Structure |
 | `structure.internal_links`                     | `integer`             | no   |                    |                     |
 | `structure.orphan_pages`                       | `integer`             | no   |                    |                     |
@@ -285,6 +287,7 @@ Fixture collection: `checks`.
 | `content.score`                                | `number`              | no   |                    |                     |
 | `content.checks`                               | `object[]`            | no   |                    |                     |
 | `content.checks[].check`                       | `ContentCheck`        | no   |                    |                     |
+| `content.checks[].counted`                     | `boolean`             | no   |                    |                     |
 | `content.checks[].by_template`                 | `object[]`            | no   |                    |                     |
 | `content.checks[].by_template[].template_key`  | `string`              | no   |                    |                     |
 | `content.checks[].by_template[].passing`       | `integer`             | no   |                    |                     |
@@ -496,9 +499,11 @@ Fixture collection: `fixes`.
 | `crawler_uas`                      | `string[]`                   | no   |                    | Final-Segment        |
 | `rank`                             | `integer`                    | yes  |                    | Final-Dashboard-Day0 |
 | `effect`                           | `object`                     | no   |                    |                      |
-| `effect.technical_seo`             | `number`                     | no   |                    |                      |
+| `effect.technical_seo`             | `number`                     | yes  |                    |                      |
+| `effect.technical_seo_pending_on`  | `TechnicalSeoPending[]`      | no   |                    |                      |
 | `effect.ai_readability`            | `number`                     | yes  |                    |                      |
 | `effect.ai_readability_pending_on` | `string or WithheldReason[]` | no   |                    |                      |
+| `effect.absorbed_by`               | `integer`                    | yes  |                    |                      |
 | `effect.estimate`                  | `true`                       | no   |                    |                      |
 | `effort`                           | `one of 2 variants`          | yes  |                    | Final-Public         |
 | `effort.kind`                      | `"minutes"`                  | no   | `kind = minutes`   |                      |
@@ -916,6 +921,8 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `verification_unique`     | verification methods are listed once each                                                                                                                 | one way   |
 | `ip_list_url`             | ip_list_url is set exactly when an IP list is published                                                                                                   | both ways |
 | `effect_pending`          | an AI effect is either estimated, or not yet estimated because of named fixes or reasons                                                                  | both ways |
+| `effect_seo_pending`      | a Technical SEO effect is either estimated, or not estimated because the grade is refused                                                                 | both ways |
+| `effect_absorbed`         | a fix absorbed by a higher-ranked one has no positive effect left                                                                                         | one way   |
 | `fix_last_state`          | last_state does not fit the status                                                                                                                        | one way   |
 | `fix_rank`                | every live fix has a rank and a resolved fix has none                                                                                                     | both ways |
 | `packet_framework`        | the packet framework must be one of its switch options                                                                                                    | one way   |
@@ -947,6 +954,7 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `access_range_mirror`     | access_range is the Access component's range                                                                                                              | one way   |
 | `withheld_unmeasured`     | a withheld grade has at least one component without a score                                                                                               | one way   |
 | `withheld_reasons_match`  | withheld_reasons names each unscored component once: one Access reason, and readable_unmeasured, quotable_unmeasured or signals_unmeasured for the others | one way   |
+| `fewer_crawlers`          | scored_from_fewer_crawlers is set only when Access has a score, and counts fewer than two crawlers (I4)                                                   | one way   |
 | `schedule_timed`          | a timed schedule has a weekday; on_deploy has none                                                                                                        | both ways |
 | `schedule_pair`           | a schedule sets its weekday and its hour together                                                                                                         | both ways |
 | `unkept_audit`            | an unkept audit has no schedule, client report or owner                                                                                                   | one way   |
@@ -1020,6 +1028,7 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `CmsName`             | pinned to v1 or the engine                            | shopify, wordpress, webflow, wix, squarespace, framer, ghost, custom                                                                                                                                                                                                             |
 | `RefusalTrigger`      | pinned to v1 or the engine                            | too_few_gradeable_pages, site_too_small_to_measure, too_few_gradeable_after_exclusion, nothing_read, no_observed_links                                                                                                                                                           |
 | `WithheldReason`      | pinned to v1 or the engine                            | too_few_crawlers_measured, blocked_by_choice, readable_unmeasured, quotable_unmeasured, signals_unmeasured, crawler_too_few_pages, check_not_scored                                                                                                                              |
+| `TechnicalSeoPending` | pinned to v1 or the engine                            | grade_refused                                                                                                                                                                                                                                                                    |
 | `VerificationMethod`  | registry seed only                                    | ip_list, reverse_dns, none_published                                                                                                                                                                                                                                             |
 | `MeasurementStatus`   | computed by a function, every value from the fixtures | measured, not_measurable, unevaluable, withheld                                                                                                                                                                                                                                  |
 

@@ -116,6 +116,7 @@ const STREAM: ProgressEvent[] = [
         signals: { score: 5, max: 10, heuristic: false, range: null },
       },
       access_range: null,
+      scored_from_fewer_crawlers: null,
     },
   },
   { type: 'ended', at_ms: 4000, status: 'finished' },

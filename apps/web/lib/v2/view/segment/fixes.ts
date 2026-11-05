@@ -128,7 +128,7 @@ function tally(fixes: readonly Fix[]): ProFixView['recommendations'] {
  * effect not yet estimated, so no part of the group's effect is left out.
  */
 function groupPoints(fixes: readonly Fix[]): string {
-  const seo = fixes.reduce((n, f) => n + f.effect.technical_seo, 0);
+  const seo = fixes.reduce((n, f) => n + (f.effect.technical_seo ?? 0), 0);
   const ai = fixes.reduce((n, f) => n + (f.effect.ai_readability ?? 0), 0);
   const pending = fixes.filter((f) => f.effect.ai_readability === null).length;
   const parts = [`+${seo} Technical SEO`, ai ? `+${ai} AI readability` : null].filter(Boolean);
@@ -141,8 +141,9 @@ function groupPoints(fixes: readonly Fix[]): string {
  */
 export function effectOf(f: Pick<Fix, 'effect'>): { points: string; unit: string } {
   const ai = f.effect.ai_readability;
-  return ai
-    ? { points: `+${ai}`, unit: 'AI readability, estimated' }
+  if (ai) return { points: `+${ai}`, unit: 'AI readability, estimated' };
+  return f.effect.technical_seo === null
+    ? { points: '—', unit: 'Technical SEO, not estimated' }
     : { points: `+${f.effect.technical_seo}`, unit: 'Technical SEO, estimated' };
 }
 

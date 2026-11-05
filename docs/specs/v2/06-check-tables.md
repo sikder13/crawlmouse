@@ -1209,6 +1209,9 @@ Where a rule reads inside jsonb on a table only the server writes, it is the wri
 | `access_range_mirror`    | compares two objects inside checks.ai_readability                                                                                                                                                  |
 | `withheld_unmeasured`    | reads every component inside checks.ai_readability                                                                                                                                                 |
 | `withheld_reasons_match` | compares the reasons with the components inside checks.ai_readability                                                                                                                              |
+| `fewer_crawlers`         | reads the Access component inside checks.ai_readability                                                                                                                                            |
+| `effect_seo_pending`     | inside site_fixes.effect; added by CC-17 after the v2-003 migration, and a CHECK like site_fixes_effect_pending needs a migration, which the owner applies                                         |
+| `effect_absorbed`        | sums two numbers inside site_fixes.effect; added by CC-17 after the v2-003 migration, which the owner applies                                                                                      |
 | `time_zone`              | a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses                                                                        |
 | `coverage_robots`        | compares counts inside checks.coverage                                                                                                                                                             |
 | `packet_bodies`          | per element of site_fixes.packet.packets                                                                                                                                                           |
@@ -1244,6 +1247,7 @@ The writer parses these with the contract schema (owner default 1). A column a f
 | `SampleMethod`        | `checks.coverage`                                                                             |
 | `SignalKind`          | `checks.signals`                                                                              |
 | `StepState`           | `checks.progress`                                                                             |
+| `TechnicalSeoPending` | `site_fixes.effect`                                                                           |
 | `Verdict`             | `checks.crawlers`, `page_results.robots_search` (CHECK `page_results_robots_search`)          |
 | `WithheldReason`      | `checks.ai_readability`, `site_fixes.effect`                                                  |
 

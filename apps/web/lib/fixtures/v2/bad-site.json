@@ -453,7 +453,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -473,6 +474,7 @@
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -498,6 +500,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -523,6 +526,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -548,6 +552,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -558,6 +563,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -1027,7 +1033,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -1047,6 +1054,7 @@
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1072,6 +1080,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1097,6 +1106,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1122,6 +1132,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -1132,6 +1143,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -1584,7 +1596,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -1604,6 +1617,7 @@
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1629,6 +1643,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1654,6 +1669,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1679,6 +1695,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -1689,6 +1706,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -2141,7 +2159,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -2161,6 +2180,7 @@
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2186,6 +2206,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2211,6 +2232,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2236,6 +2258,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -2246,6 +2269,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -2698,7 +2722,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -2718,6 +2743,7 @@
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2743,6 +2769,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2768,6 +2795,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2793,6 +2821,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -2803,6 +2832,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -3255,7 +3285,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -3275,6 +3306,7 @@
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -3300,6 +3332,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -3325,6 +3358,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -3350,6 +3384,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -3360,6 +3395,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -3824,7 +3860,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -4032,7 +4069,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -4240,7 +4278,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -4448,7 +4487,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -4656,7 +4696,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -4864,7 +4905,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -5104,7 +5146,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -5317,7 +5360,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -6819,8 +6863,10 @@
       "rank": 3,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 19,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -6875,8 +6921,10 @@
       "rank": 1,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 24,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -6935,8 +6983,10 @@
       "rank": 2,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 22,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -7029,8 +7079,10 @@
       "rank": 4,
       "effect": {
         "technical_seo": 4,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -7087,8 +7139,10 @@
       "rank": 6,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": null,
         "ai_readability_pending_on": ["0f1e000000000001", "0f1e000000000002"],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -7144,8 +7198,10 @@
       "rank": 5,
       "effect": {
         "technical_seo": 2,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7198,8 +7254,10 @@
       "rank": 7,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7247,8 +7305,10 @@
       "rank": 8,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": null,
         "ai_readability_pending_on": ["0f1e000000000001", "0f1e000000000002"],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7298,8 +7358,10 @@
       "rank": 9,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": null,
         "ai_readability_pending_on": ["0f1e000000000001", "0f1e000000000002"],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7351,8 +7413,10 @@
       "rank": 10,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7402,8 +7466,10 @@
       "rank": 11,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7455,8 +7521,10 @@
       "rank": 12,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7504,8 +7572,10 @@
       "rank": 13,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7553,8 +7623,10 @@
       "rank": 14,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7602,8 +7674,10 @@
       "rank": null,
       "effect": {
         "technical_seo": 3,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {

@@ -308,6 +308,33 @@ const CASES: RuleCase[] = [
     }),
   },
   {
+    rule: 'effect_seo_pending',
+    breaks: 'Technical SEO not estimated, and waiting on nothing',
+    schema: EffectSchema,
+    input: () => ({ ...fixNumbered(bad, 'open').effect, technical_seo: null }),
+  },
+  {
+    rule: 'effect_seo_pending',
+    breaks: 'Technical SEO estimated, and also waiting on a refused grade',
+    schema: EffectSchema,
+    input: () => ({
+      ...fixNumbered(bad, 'open').effect,
+      technical_seo_pending_on: ['grade_refused'],
+    }),
+  },
+  {
+    rule: 'effect_absorbed',
+    breaks: 'absorbed by another fix, with points of its own left',
+    schema: EffectSchema,
+    input: () => ({
+      ...fixNumbered(bad, 'open').effect,
+      technical_seo: 0.5,
+      ai_readability: 0,
+      ai_readability_pending_on: [],
+      absorbed_by: 1,
+    }),
+  },
+  {
     rule: 'fix_last_state',
     breaks: 'open, but last found absent',
     schema: FixSchema,
@@ -762,6 +789,18 @@ const CASES: RuleCase[] = [
       ...withheldAi()!,
       withheld_reasons: ['too_few_crawlers_measured', 'check_not_scored'],
     }),
+  },
+  {
+    rule: 'fewer_crawlers',
+    breaks: 'scored from fewer crawlers, with Access unscored',
+    schema: AiReadabilitySchema,
+    input: () => ({ ...withheldAi()!, scored_from_fewer_crawlers: 1 }),
+  },
+  {
+    rule: 'fewer_crawlers',
+    breaks: 'scored from "fewer" crawlers that are two',
+    schema: AiReadabilitySchema,
+    input: () => ({ ...finished().ai_readability!, scored_from_fewer_crawlers: 2 }),
   },
   {
     rule: 'total_sum',
@@ -1354,6 +1393,8 @@ const BOUNDS: Record<string, string> = {
   'Fix.before_after[].after': '[0, inf)',
   'Fix.effect.technical_seo': '[-100, 100]',
   'Fix.effect.ai_readability': '[-100, 100]',
+  'Fix.effect.absorbed_by': 'int [1, inf)',
+  'Check.ai_readability.scored_from_fewer_crawlers': 'int [1, inf)',
   'Fix.effort.minutes': 'int [1, inf)',
   'Fix.effort.templates': 'int [1, inf)',
   'Fix.effort.deploys': 'int [1, inf)',
@@ -1785,8 +1826,10 @@ describe('CC-17 contract additions', () => {
 
   const waiting = (pending: unknown[]) => ({
     technical_seo: 0,
+    technical_seo_pending_on: [],
     ai_readability: null,
     ai_readability_pending_on: pending,
+    absorbed_by: null,
     estimate: true,
   });
 
@@ -1798,6 +1841,44 @@ describe('CC-17 contract additions', () => {
     ]) {
       expect(EffectSchema.safeParse(waiting(pending)).success, String(pending)).toBe(true);
     }
+  });
+
+  it('a refused grade: Technical SEO not estimated, waiting on grade_refused, with the AI effect as it is', () => {
+    const e = {
+      ...waiting(['readable_unmeasured']),
+      technical_seo: null,
+      technical_seo_pending_on: ['grade_refused'],
+    };
+    expect(EffectSchema.safeParse(e).success).toBe(true);
+    expect(
+      EffectSchema.safeParse({ ...e, technical_seo_pending_on: ['readable_unmeasured'] }).success,
+    ).toBe(false);
+  });
+
+  it('an absorbed fix names the number of the fix that took its effect, at zero or below', () => {
+    for (const technical_seo of [0, -0.26]) {
+      const e = { ...waiting(['readable_unmeasured']), technical_seo, absorbed_by: 3 };
+      expect(EffectSchema.safeParse(e).success, String(technical_seo)).toBe(true);
+    }
+    expect(
+      EffectSchema.safeParse({ ...waiting(['readable_unmeasured']), absorbed_by: 0 }).success,
+    ).toBe(false);
+  });
+
+  it('Access scored from one crawler, the rest disallowed by robots.txt, is a scored component', () => {
+    const g = withheldAi() as { components: Record<string, object> };
+    const one = {
+      ...g,
+      withheld_reasons: ['readable_unmeasured'],
+      access_range: null,
+      scored_from_fewer_crawlers: 1,
+      components: {
+        ...g.components,
+        access: { score: 40, max: 40, heuristic: false, range: null },
+        readable: { score: null, max: 30, heuristic: false, range: { min: 0, max: 30 } },
+      },
+    };
+    expect(AiReadabilitySchema.safeParse(one).success).toBe(true);
   });
 
   it('a waiting entry that is neither a fingerprint nor a reason is refused', () => {

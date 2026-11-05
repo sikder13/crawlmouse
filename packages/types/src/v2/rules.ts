@@ -52,6 +52,10 @@ export const RULES = {
   effect_pending: two(
     'an AI effect is either estimated, or not yet estimated because of named fixes or reasons',
   ),
+  effect_seo_pending: two(
+    'a Technical SEO effect is either estimated, or not estimated because the grade is refused',
+  ),
+  effect_absorbed: one('a fix absorbed by a higher-ranked one has no positive effect left'),
   fix_last_state: one('last_state does not fit the status'),
   fix_rank: two('every live fix has a rank and a resolved fix has none'),
   packet_framework: one('the packet framework must be one of its switch options'),
@@ -93,6 +97,9 @@ export const RULES = {
   withheld_unmeasured: one('a withheld grade has at least one component without a score'),
   withheld_reasons_match: one(
     'withheld_reasons names each unscored component once: one Access reason, and readable_unmeasured, quotable_unmeasured or signals_unmeasured for the others',
+  ),
+  fewer_crawlers: one(
+    'scored_from_fewer_crawlers is set only when Access has a score, and counts fewer than two crawlers (I4)',
   ),
   // Site
   schedule_timed: two('a timed schedule has a weekday; on_deploy has none'),

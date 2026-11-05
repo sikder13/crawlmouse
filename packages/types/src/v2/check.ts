@@ -137,11 +137,13 @@ export const StructureSchema = z.strictObject({
 });
 
 export const ContentSummarySchema = z.strictObject({
-  /** "Content an answer engine can quote", 0..100. */
+  /** "Content an answer engine can quote", 0..100, over the checks marked `counted`. */
   score: ScoreSchema,
   checks: z.array(
     z.strictObject({
       check: ContentCheckSchema,
+      /** The check counts toward `score`; a check that does not is reported and scores nothing. */
+      counted: z.boolean(),
       /** Templates the check does not apply to are absent ("—" on the screen). */
       by_template: z.array(
         z.strictObject({

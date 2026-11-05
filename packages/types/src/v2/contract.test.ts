@@ -723,9 +723,9 @@ describe('bad-site.json carries the FACTS numbers', () => {
 
   it('the free three are the three largest open fixes of the latest check (FACTS), so fix 0 joins fixes 1 and 2', () => {
     expect(FACTS).toContain('Free shows the three largest open fixes of the latest check');
-    // "Largest" read as estimated points on both grades; an AI effect not yet estimated counts as 0.
-    const size = (f: { effect: { technical_seo: number; ai_readability: number | null } }) =>
-      f.effect.technical_seo + (f.effect.ai_readability ?? 0);
+    // "Largest" read as estimated points on both grades; an effect not yet estimated counts as 0.
+    const size = (f: { effect: { technical_seo: number | null; ai_readability: number | null } }) =>
+      (f.effect.technical_seo ?? 0) + (f.effect.ai_readability ?? 0);
     const live = data()
       .fixes.filter((f) => f.site_id === site().id && f.rank !== null)
       .sort((a, b) => a.rank! - b.rank!);
@@ -743,7 +743,7 @@ describe('bad-site.json carries the FACTS numbers', () => {
     const m = FACTS.match(/must sum to the overview's \+(\d+) \/ \+(\d+) \/ \+(\d+) SEO/)!;
     const target = Number(m[1]) + Number(m[2]) + Number(m[3]);
     const pro = data().fixes.filter((f) => f.first_seen_check_id === first().id && f.number > 3);
-    expect(pro.reduce((sum, f) => sum + f.effect.technical_seo, 0)).toBe(target);
+    expect(pro.reduce((sum, f) => sum + (f.effect.technical_seo ?? 0), 0)).toBe(target);
   });
 
   it('Claude-SearchBot, which is scored, carries the 41 to 22 drop; ClaudeBot stays visible and unscored', () => {

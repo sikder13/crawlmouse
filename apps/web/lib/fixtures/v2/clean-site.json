@@ -126,7 +126,8 @@
             "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 412,
@@ -146,6 +147,7 @@
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -166,6 +168,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",

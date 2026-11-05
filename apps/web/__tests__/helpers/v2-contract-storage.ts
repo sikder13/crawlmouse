@@ -214,6 +214,11 @@ export const RULES_AT_WRITE: Record<string, string> = {
   access_range_mirror: 'compares two objects inside checks.ai_readability',
   withheld_unmeasured: 'reads every component inside checks.ai_readability',
   withheld_reasons_match: 'compares the reasons with the components inside checks.ai_readability',
+  fewer_crawlers: 'reads the Access component inside checks.ai_readability',
+  effect_seo_pending:
+    'inside site_fixes.effect; added by CC-17 after the v2-003 migration, and a CHECK like site_fixes_effect_pending needs a migration, which the owner applies',
+  effect_absorbed:
+    'sums two numbers inside site_fixes.effect; added by CC-17 after the v2-003 migration, which the owner applies',
   time_zone:
     'a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses',
   coverage_robots: 'compares counts inside checks.coverage',
@@ -269,6 +274,7 @@ export const NESTED: Record<string, string[]> = {
   SampleMethod: ['checks.coverage'],
   SignalKind: ['checks.signals'],
   StepState: ['checks.progress'],
+  TechnicalSeoPending: ['site_fixes.effect'],
   Verdict: ['checks.crawlers', 'page_results.robots_search'],
   WithheldReason: ['checks.ai_readability', 'site_fixes.effect'],
 };

@@ -313,6 +313,15 @@ export const WithheldReasonSchema = named(
     'check_not_scored',
   ]),
 );
+/**
+ * Why a fix's Technical SEO effect is not estimated: the grade is refused (SPEC 5.1a), so there is no
+ * score for the fix to move. The engine says what it means (packages/engine/src/v2/grade/withheld.ts),
+ * and its test pins the two lists to each other.
+ */
+export const TechnicalSeoPendingSchema = named(
+  'TechnicalSeoPending',
+  z.enum(['grade_refused']),
+);
 /** v1 `RefusalTrigger`. */
 export const RefusalTriggerSchema = named(
   'RefusalTrigger',
@@ -375,6 +384,7 @@ export const V1_PINNED_ENUMS = {
   CmsName: CmsNameSchema,
   RefusalTrigger: RefusalTriggerSchema,
   WithheldReason: WithheldReasonSchema,
+  TechnicalSeoPending: TechnicalSeoPendingSchema,
 } as const;
 
 export const REGISTRY_ONLY_ENUMS = {
@@ -408,6 +418,7 @@ export type ReportKind = z.infer<typeof ReportKindSchema>;
 export type SeatRole = z.infer<typeof SeatRoleSchema>;
 export type ChangeKind = z.infer<typeof ChangeKindSchema>;
 export type WithheldReason = z.infer<typeof WithheldReasonSchema>;
+export type TechnicalSeoPending = z.infer<typeof TechnicalSeoPendingSchema>;
 export type Severity = z.infer<typeof SeveritySchema>;
 export type MeasurementStatus = z.infer<typeof MeasurementStatusSchema>;
 export type UsageKind = z.infer<typeof UsageKindSchema>;
