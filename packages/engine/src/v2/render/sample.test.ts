@@ -76,6 +76,23 @@ describe('the order of the picks', () => {
   });
 });
 
+describe('a URL the crawl lists twice', () => {
+  it('is taken once, so an open-fix template still gets its two pages', () => {
+    const pages = [page('/u1', '/f', 0.9), page('/u1', '/f', 0.9), page('/u2', '/f', 0.5)];
+    expect(selectRenders(pages, ['/f'], 25).map((p) => [p.url.slice(20), p.picked_for])).toEqual([
+      ['/u1', 'open_fix'],
+      ['/u2', 'open_fix'],
+    ]);
+  });
+
+  it('is taken under the template key that sorts first, whatever the order', () => {
+    const a = [page('/u1', '/g', 0.9), page('/u1', '/f', 0.9)];
+    const b = [...a].reverse();
+    expect(selectRenders(a, [], 25)).toEqual(selectRenders(b, [], 25));
+    expect(selectRenders(a, [], 25).map((p) => p.template_key)).toEqual(['/f']);
+  });
+});
+
 describe('a page the render may not take', () => {
   it.each([
     ['one robots.txt disallows to our crawler', { fetched_under_our_robots: false }],
@@ -93,24 +110,46 @@ describe('a page the render may not take', () => {
 
 const TEMPLATES = ['/', '/a/{slug}', '/b/{slug}', '/c/{slug}', '/d/{slug}', '/e', '/f/{id}'];
 
+// Mostly renderable pages, so the properties have crawls to bite on; the rest vary each attribute
+// `renderable` reads.
+const row = fc.oneof(
+  {
+    weight: 4,
+    arbitrary: fc.constant({
+      kind: 'content',
+      status_code: 200,
+      is_html: true,
+      fetched_under_our_robots: true,
+    }),
+  },
+  {
+    weight: 1,
+    arbitrary: fc.record({
+      kind: fc.constantFrom('content', 'pagination', 'tag'),
+      status_code: fc.constantFrom(200, 301, 404),
+      is_html: fc.boolean(),
+      fetched_under_our_robots: fc.boolean(),
+    }),
+  },
+);
 const crawl = fc
   .array(
     fc.record({
       template_key: fc.constantFrom(...TEMPLATES),
-      kind: fc.constantFrom('content', 'content', 'content', 'pagination', 'tag'),
-      status_code: fc.constantFrom(200, 200, 200, 301, 404),
-      is_html: fc.constantFrom(true, true, true, false),
-      pagerank_share: fc.option(fc.double({ min: 0, max: 1, noNaN: true }), { nil: null }),
-      fetched_under_our_robots: fc.boolean(),
+      pagerank_share: fc.option(fc.double({ min: 0, max: 1, noNaN: true }), { nil: null, freq: 6 }),
+      gate: row,
     }),
-    { maxLength: 60 },
+    { minLength: 15, maxLength: 60, size: 'max' },
   )
   .map((rows) =>
-    rows.map((r, i) => ({ ...r, url: `https://site.example/p${i}` }) as RenderCandidate),
+    rows.map(
+      ({ gate, ...r }, i) =>
+        ({ ...r, ...gate, url: `https://site.example/p${i}` }) as RenderCandidate,
+    ),
   );
 
 const fixTemplates = fc.subarray([...TEMPLATES, '/not-crawled/{slug}']);
-const cap = fc.integer({ min: 0, max: 40 });
+const cap = fc.integer({ min: 0, max: 30 });
 
 function byTemplate(pages: readonly RenderCandidate[]): Map<string, number> {
   const m = new Map<string, number>();
