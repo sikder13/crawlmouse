@@ -202,9 +202,10 @@ describe('crawlability', () => {
     expect(crawlability(input)).toBe(1);
   });
 
-  it('a page read that declares no title, or no meta description, carries a defect (CC-12d)', () => {
+  it('a page read that declares no title, or an empty one, carries a defect (CC-12d)', () => {
     const declares = { text: 'x', chars: 1, cut: false };
     const none = { text: null, chars: 0, cut: false };
+    const empty = { text: '', chars: 0, cut: false };
     const at = (i: number, edit: object) => ({
       ...base,
       detections: [],
@@ -213,11 +214,29 @@ describe('crawlability', () => {
       ),
     });
     expect(crawlability(at(1, { title: none }))).toBe(4 / 5);
-    expect(crawlability(at(1, { meta_description: none }))).toBe(4 / 5);
+    // `<title></title>`, or one of spaces only, is stored as declared and empty (head-text.ts)
+    expect(crawlability(at(1, { title: empty }))).toBe(4 / 5);
     expect(crawlability(at(1, {}))).toBe(1);
     // not read (null), or not a page answering 200 as HTML: no defect of this kind
-    expect(crawlability(at(1, { title: null, meta_description: null }))).toBe(1);
+    expect(crawlability(at(1, { title: null }))).toBe(1);
     expect(crawlability(at(1, { title: none, is_html: false }))).toBe(1);
+    expect(crawlability(at(1, { title: none, status_code: 301 }))).toBe(4 / 5);
+  });
+
+  it('a missing or empty meta description is not a crawlability defect (owner ruling, 2026-11-05)', () => {
+    const declares = { text: 'x', chars: 1, cut: false };
+    for (const meta_description of [
+      { text: null, chars: 0, cut: false },
+      { text: '', chars: 0, cut: false },
+      null,
+    ]) {
+      const input = {
+        ...base,
+        detections: [],
+        pages: base.pages.map((p) => ({ ...p, title: declares, meta_description })),
+      };
+      expect(crawlability(input), JSON.stringify(meta_description)).toBe(1);
+    }
   });
 });
 

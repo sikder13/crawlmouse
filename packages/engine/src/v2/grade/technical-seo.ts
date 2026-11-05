@@ -14,8 +14,9 @@
  *     annotate back; an alternate that redirects or is gone on the member naming it). The pages
  *     linking to a redirect stay in the record's `affected_urls` for the fix, but carry no defect,
  *     so one site-wide link to a redirect costs at most one URL;
- *   - a page answering 200 that was read and declares no title, or no meta description (CC-12d's
- *     page facts), carries a defect;
+ *   - a page answering 200 that was read as HTML and declares no title, or an empty one (CC-12d's
+ *     page fact), carries a defect. A missing meta description is not a crawlability defect (owner
+ *     ruling, 2026-11-05): it stays a page fact;
  *   - a URL that does not answer 200 is outside the numerator: the denominator is every crawled URL.
  * A URL counts once however many defects it carries, so one defective URL on a 45-page site moves the
  * score by 40/45. A record that could not decide marks no URL, so its URLs count clean (this module's
@@ -84,19 +85,20 @@ export function defectUrls(d: Pick<Detection, 'type' | 'key' | 'affected_urls'>)
   }
 }
 
-/** A page answering 200 that was read and declares no title or no meta description (CC-12d). */
-export const lacksTitleOrDescription = (
-  p: Pick<PageResult, 'status_code' | 'is_html' | 'title' | 'meta_description'>,
-): boolean =>
+/**
+ * A page answering 200, read as HTML, whose title was read and is missing or empty (CC-12d): the
+ * worker stores `<title></title>`, or one of spaces only, as `text: ''`.
+ */
+export const lacksTitle = (p: Pick<PageResult, 'status_code' | 'is_html' | 'title'>): boolean =>
   p.status_code === 200 &&
   p.is_html &&
-  ((p.title !== null && p.title.text === null) ||
-    (p.meta_description !== null && p.meta_description.text === null));
+  p.title !== null &&
+  (p.title.text === null || p.title.text === '');
 
 /** The crawled URLs that carry a crawlability defect, each once, sorted. */
 export function defectivePages(input: TechnicalSeoInput): string[] {
   const types: readonly string[] = CRAWLABILITY_DETECTORS;
-  const marked = new Set(input.pages.filter(lacksTitleOrDescription).map((p) => p.url));
+  const marked = new Set(input.pages.filter(lacksTitle).map((p) => p.url));
   for (const d of input.detections) {
     if (d.state === 'detected' && types.includes(d.type))
       for (const u of defectUrls(d)) marked.add(u);

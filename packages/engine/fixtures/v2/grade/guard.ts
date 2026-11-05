@@ -176,6 +176,9 @@ export const SITE_WIDE_REDIRECT_FOLLOWED =
 /** The example site whose pages declare a title and no meta description; SPEC 17 renders it. */
 export const NO_DESCRIPTION = '14-page blog: every page declares a title and no meta description';
 
+/** The example site where no page declares a title, so every page is defective; SPEC 17 renders it. */
+export const NO_TITLE = '14-page blog: no page declares a title';
+
 /** The example sites, by name, and what the engine makes of each. */
 export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
   const blog = blogSite(
@@ -280,6 +283,17 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
           ...p,
           title: { text: 'A post', chars: 6, cut: false },
           meta_description: { text: null, chars: 0, cut: false },
+        })),
+      },
+      undescribed.access,
+    ),
+    [NO_TITLE]: outcomeOf(
+      {
+        ...undescribed.input,
+        pages: undescribed.input.pages.map((p) => ({
+          ...p,
+          title: { text: null, chars: 0, cut: false },
+          meta_description: { text: 'A post', chars: 6, cut: false },
         })),
       },
       undescribed.access,

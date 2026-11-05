@@ -102,6 +102,15 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     allowedIn: [],
   },
   {
+    text: 'no title, or no meta description',
+    withdrawnIn:
+      'docs/specs/v2/17-content-and-grade.md (Technical SEO) and packages/engine/src/v2/grade/technical-seo.ts, CC-17 third rulings',
+    truth:
+      'A missing or empty title is a crawlability defect on its URL; a missing meta description is ' +
+      'not (owner ruling, 2026-11-05) and stays a page fact (lacksTitle, technical-seo.test.ts).',
+    allowedIn: [],
+  },
+  {
     text: 'An alternate does not annotate back, or redirects or is gone.',
     withdrawnIn: 'docs/specs/v2/16-structure-detectors.md (conditions), CC-17 third rulings',
     truth:

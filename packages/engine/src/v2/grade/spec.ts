@@ -337,16 +337,24 @@ function siteWideRedirect(): string {
   )}.`;
 }
 
-/** The example site whose pages declare no meta description, from expected.json. */
-function noDescription(): string {
-  const name = '14-page blog: every page declares a title and no meta description';
-  const c = (
-    expected.cases as Record<string, (typeof expected.cases)[keyof typeof expected.cases]>
-  )[name];
-  if (c === undefined) throw new Error(`expected.json has no case "${name}"`);
-  const [score, structure] = [c.technical_seo.score!, c.technical_seo.site_structure_score!];
-  const crawl = (score - (SEO_WEIGHTS.structure / 100) * structure) / SEO_WEIGHTS.crawlability;
-  return `No fix type opens for a missing title or meta description yet, so nothing recovers what it costs: on the example site "${name}", Technical SEO is ${score} ${c.technical_seo.grade} (${SEO_WEIGHTS.structure / 100} × ${structure} + ${SEO_WEIGHTS.crawlability} × crawlability ≈ ${crawl.toFixed(3)}, from the grade as recorded), with ${c.fixes.length} ${c.fixes.length === 1 ? 'fix' : 'fixes'}: a site missing one on every page loses all ${SEO_WEIGHTS.crawlability} crawlability points (an owner question).`;
+/** The example sites with no title and with no meta description, from expected.json. */
+function titleAndDescription(): string {
+  const at = (name: string) => {
+    const c = (
+      expected.cases as Record<string, (typeof expected.cases)[keyof typeof expected.cases]>
+    )[name];
+    if (c === undefined) throw new Error(`expected.json has no case "${name}"`);
+    const [score, structure] = [c.technical_seo.score!, c.technical_seo.site_structure_score!];
+    const crawl = (score - (SEO_WEIGHTS.structure / 100) * structure) / SEO_WEIGHTS.crawlability;
+    const fixes = `${c.fixes.length} ${c.fixes.length === 1 ? 'fix' : 'fixes'}`;
+    return { text: `${score} ${c.technical_seo.grade}`, crawl: crawl.toFixed(3), fixes };
+  };
+  const untitled = at('14-page blog: no page declares a title');
+  // the sentence below says every page is defective: hold it to the grade as recorded
+  if (Number(untitled.crawl) !== 0)
+    throw new Error(`no-title example: crawlability ${untitled.crawl}`);
+  const undescribed = at('14-page blog: every page declares a title and no meta description');
+  return `A missing meta description is not a crawlability defect (owner ruling, 2026-11-05): it stays a page fact, to become a \`best_practice\` content item when CC-16b adds its fix type. On the example site "14-page blog: every page declares a title and no meta description", Technical SEO is ${undescribed.text} (crawlability ${undescribed.crawl}). A missing or empty title is a defect on its URL. On the example site "14-page blog: no page declares a title", every page is defective, as intended, and Technical SEO is ${untitled.text} (crawlability ${untitled.crawl}, from the grade as recorded), with ${untitled.fixes}: no fix type opens for a missing title until CC-16b, so nothing recovers what it costs yet.`;
 }
 
 function exampleSites(): string {
@@ -480,8 +488,8 @@ ${table(
   [
     ...CRAWLABILITY_DETECTORS.map((d) => [`a detected \`${d}\` record`, CARRIES[d]]),
     [
-      'no title, or no meta description (CC-12d page facts)',
-      'the page answering 200, read as HTML, that declares none',
+      'no title, or an empty one (CC-12d page fact)',
+      'the page answering 200, read as HTML, whose title was read',
     ],
     [
       'an answer other than 200',
@@ -490,7 +498,7 @@ ${table(
   ],
 )}
 
-The worker stores a requested URL with its final response's status. A chain the crawl stopped is a 3xx row, outside the numerator already, so its record costs nothing extra; a chain followed to a page answering 200 is a 200 row, and its record takes that URL out of the numerator. In both, one site-wide link to a redirect costs at most one URL (formula rows in technical-seo.test.ts, one per shape). The redirect fix's counterfactual is the fix: links to the redirecting URL point at the final URL, and the redirecting row goes (a stopped chain's row goes and its links stay, since they are not graph edges; a final URL that was not crawled takes the row's place). No fix type clears a linked 404 or a single-hop 301 yet (CC-16b). A page whose title or description was not read (\`null\`) carries no defect of that kind. ${noDescription()} A record that could not decide marks no URL, so its URLs count as clean; that is this branch's reading (the old formula dropped a measure with nothing decided).
+The worker stores a requested URL with its final response's status. A chain the crawl stopped is a 3xx row, outside the numerator already, so its record costs nothing extra; a chain followed to a page answering 200 is a 200 row, and its record takes that URL out of the numerator. In both, one site-wide link to a redirect costs at most one URL (formula rows in technical-seo.test.ts, one per shape). The redirect fix's counterfactual is the fix: links to the redirecting URL point at the final URL, and the redirecting row goes (a stopped chain's row goes and its links stay, since they are not graph edges; a final URL that was not crawled takes the row's place). No fix type clears a linked 404 or a single-hop 301 yet (CC-16b). A page whose title was not read (\`null\`) carries no defect of that kind. ${titleAndDescription()} A record that could not decide marks no URL, so its URLs count as clean; that is this branch's reading (the old formula dropped a measure with nothing decided).
 
 ${siteWideRedirect()} The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
     '',
