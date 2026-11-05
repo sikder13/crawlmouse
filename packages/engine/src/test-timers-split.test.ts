@@ -6,17 +6,24 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 // The two timer-based crawl fixtures run in a vitest run of their own, one file at a time, after
-// the rest of this suite (docs/ops/ci-timing.md). This file pins that split from inside the main
-// run, so it is checked by `test (engine)`. It runs the real `test` script line with stand-ins for
+// the rest of this suite (docs/ops/ci-timing.md). This file pins that split, and runs in the
+// serial run itself, named on its command line, so an edit that narrows the main run cannot
+// deselect it; `test (engine)` runs it. It runs the real `test` script line with stand-ins for
 // vitest and pnpm, records the vitest command lines the script runs, and lists the files those
-// exact command lines select with the real vitest.
+// exact command lines select with the real vitest. Removing this file from the serial line would
+// switch it off, which no test here can see: that edit is to the line pinned below.
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const scripts = JSON.parse(readFileSync(join(ENGINE, 'package.json'), 'utf8')).scripts as Record<
   string,
   string
 >;
-const TIMERS = ['src/crawl-stall-retries.test.ts', 'src/crawl-round-budget.test.ts'];
+/** The serial run: this guard, then the two timer-based fixtures. */
+const SERIAL = [
+  'src/test-timers-split.test.ts',
+  'src/crawl-stall-retries.test.ts',
+  'src/crawl-round-budget.test.ts',
+];
 
 /**
  * Runs `test` as pnpm would, `appended` added after it the way `pnpm test -- <args>` adds it. The
@@ -67,12 +74,12 @@ function listFiles(runArgs: string[]) {
 }
 
 describe('the serial run of the timer-based crawl fixtures', () => {
-  it('runs the rest of the suite, then the two fixtures one file at a time, and nothing else', () => {
+  it('runs the rest of the suite, then this guard and the two fixtures one file at a time', () => {
     const { calls } = runTest([0, 0]);
-    expect(calls[0]).toEqual(['run', ...TIMERS.flatMap((f) => ['--exclude', f])]);
-    expect(calls[1]).toEqual(['run', '--no-file-parallelism', ...TIMERS]);
+    expect(calls[0]).toEqual(['run', ...SERIAL.flatMap((f) => ['--exclude', f])]);
+    expect(calls[1]).toEqual(['run', '--no-file-parallelism', ...SERIAL]);
     expect(calls[2]).toBeNull();
-    for (const f of TIMERS) expect(existsSync(join(ENGINE, f)), f).toBe(true);
+    for (const f of SERIAL) expect(existsSync(join(ENGINE, f)), f).toBe(true);
   });
 
   it('between them, the two command lines select every engine test file once', () => {
@@ -80,7 +87,7 @@ describe('the serial run of the timer-based crawl fixtures', () => {
     const all = listFiles(['run']);
     const main = listFiles(calls[0]!);
     const serial = listFiles(calls[1]!);
-    expect(serial).toEqual([...TIMERS].sort());
+    expect(serial).toEqual([...SERIAL].sort());
     expect(main.filter((f) => serial.includes(f))).toEqual([]);
     expect([...main, ...serial].sort()).toEqual(all);
   }, 60_000);
@@ -100,9 +107,10 @@ describe('the serial run of the timer-based crawl fixtures', () => {
   );
 
   it('passes the arguments of `pnpm test -- <args>` to the main run', () => {
-    const r = runTest([0, 0], 'src/ssrf-guard.test.ts');
+    // pnpm quotes each argument it appends; one holding a space must arrive as one argument.
+    const r = runTest([0, 0], `"src/ssrf-guard.test.ts" "-t" "two words"`);
     expect(r.status).toBe(0);
-    expect(r.calls[0]!.at(-1)).toBe('src/ssrf-guard.test.ts');
-    expect(r.calls[1]).toEqual(['run', '--no-file-parallelism', ...TIMERS]);
+    expect(r.calls[0]!.slice(-3)).toEqual(['src/ssrf-guard.test.ts', '-t', 'two words']);
+    expect(r.calls[1]).toEqual(['run', '--no-file-parallelism', ...SERIAL]);
   });
 });

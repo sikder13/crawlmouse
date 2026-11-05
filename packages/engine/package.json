@@ -20,8 +20,8 @@
     }
   },
   "scripts": {
-    "test": "sh -c 'vitest run --exclude src/crawl-stall-retries.test.ts --exclude src/crawl-round-budget.test.ts \"$@\"; main=$?; pnpm run test:timers && exit $main' --",
-    "test:timers": "vitest run --no-file-parallelism src/crawl-stall-retries.test.ts src/crawl-round-budget.test.ts",
+    "test": "sh -c 'vitest run --exclude src/test-timers-split.test.ts --exclude src/crawl-stall-retries.test.ts --exclude src/crawl-round-budget.test.ts \"$@\"; main=$?; pnpm run test:timers && exit $main' --",
+    "test:timers": "vitest run --no-file-parallelism src/test-timers-split.test.ts src/crawl-stall-retries.test.ts src/crawl-round-budget.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
