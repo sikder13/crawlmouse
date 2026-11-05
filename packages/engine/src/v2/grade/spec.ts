@@ -302,6 +302,18 @@ function labelSet(): string {
   ].join('\n');
 }
 
+/** The example site whose one redirect record marks every page, from expected.json. */
+function siteWideRedirect(): string {
+  const name = '14-page blog: a link on every page to a URL behind a redirect chain';
+  const c = (
+    expected.cases as Record<string, (typeof expected.cases)[keyof typeof expected.cases]>
+  )[name];
+  if (c === undefined) throw new Error(`expected.json has no case "${name}"`);
+  const fix = c.fixes.find((f) => f.type === 'redirect_chain')!;
+  const [score, structure] = [c.technical_seo.score!, c.technical_seo.site_structure_score!];
+  return `On the example site "${name}", Technical SEO is ${score} with the record (${SEO_WEIGHTS.structure / 100} × ${structure} + ${SEO_WEIGHTS.crawlability} × 0: no crawled URL is clean), and the fix is worth +${fix.effect.technical_seo}.`;
+}
+
 function exampleSites(): string {
   const rows = Object.entries(expected.cases).map(([name, c]) => {
     const ai = c.ai_readability as {
@@ -388,7 +400,7 @@ export function renderGradeSpec(): string {
     '',
     `Out of the denominator: ${list(outOfDenominator())}. Words served are compared with the browser control's words for the same static page, so a page that needs JavaScript reads the same for both and counts in Readable, once.`,
     '',
-    `A scored crawler is measured with ${MIN_ACCESS_PAGES} pages or more in its denominator. One that robots.txt disallows on the pages whose rules were read (disallowed pages equal to pages read) is blocked by choice: left out of the mean, so the block is not scored as a block, and Access moves to the mean of the others (up when that crawler's share was below it, down when above). With fewer than ${MIN_MEASURED_CRAWLERS} measured, Access has no score: \`blocked_by_choice\` when the scored crawlers are blocked by choice and none is measured or unmeasured; otherwise \`too_few_crawlers_measured\`, with the range [${AI_WEIGHTS.access} × Σshare / (m + u), ${AI_WEIGHTS.access} × (Σshare + u) / (m + u)] for m measured and u unmeasured crawlers.`,
+    `A scored crawler is measured with ${MIN_ACCESS_PAGES} pages or more in its denominator. One that robots.txt disallows on the pages whose rules were read (disallowed pages equal to pages read) is blocked by choice: left out of the mean, so the block is not scored as a block, and Access moves to the mean of the others (up when that crawler's share was below it, down when above) while enough crawlers stay measured; otherwise the rule below applies, and Access can be left with no score. With fewer than ${MIN_MEASURED_CRAWLERS} measured, Access has no score: \`blocked_by_choice\` when the scored crawlers are blocked by choice and none is measured or unmeasured; otherwise \`too_few_crawlers_measured\`, with the range [${AI_WEIGHTS.access} × Σshare / (m + u), ${AI_WEIGHTS.access} × (Σshare + u) / (m + u)] for m measured and u unmeasured crawlers.`,
     '',
     `One exception (owner ruling, 2026-11-05): with fewer than ${MIN_MEASURED_CRAWLERS} measured but at least one, when every other scored crawler is blocked by choice and no scored crawler had a page \`refused_unverified\`, Access is scored from the measured ones, and \`scored_from_fewer_crawlers\` records how many. The ruling says "none refused_unverified"; reading it as "no page refused as unverified", on the measured crawler too, is this branch's, and the stricter reading. Disallowing a crawler whose share is below the others' mean therefore raises Access, as far as unblocking it would when the others' mean is 1: a disallow is the site's stated intent (R11 decision 5), left out rather than counted against the site. No fix opens for it, and no fix copy may recommend disallowing a crawler.`,
     '',
@@ -450,7 +462,7 @@ ${table(
   ],
 )}
 
-So one link in a site-wide menu or footer to a redirect chain marks every page that carries it: on the 14-page blog of the example sites, Technical SEO goes from 87.42 to 47.42 (0.6 × 79.03 + 40 × 0/14) and the fix is worth +40 (effects.test.ts). The old formula, a mean of two measures, gave 67.42 (0.6 × 79.03 + 40 × (1 + 0)/2). Pages lacking a title or a meta description will be defects of the same kind once the crawl worker records them (CC-12d). The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
+So one link in a site-wide menu or footer to a redirect chain marks every page that carries it. ${siteWideRedirect()} Pages lacking a title or a meta description will be defects of the same kind once the crawl worker records them (CC-12d). The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
     '',
     '## Content checks',
     '',
@@ -479,7 +491,7 @@ So one link in a site-wide menu or footer to a redirect chain marks every page t
     '',
     '## Fix effects',
     '',
-    'Each effect is a counterfactual recompute. Fixes whose AI effect applied alone can be stated rank first, then the fixes whose AI effect waits on a reason; within each group by the effect applied alone (Technical SEO plus AI readability, larger first; an effect not estimated counts 0); ties by fingerprint. While AI readability is withheld every fix is in the second group, so rank, and the free fix, follow Technical SEO. In that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade less the current one.',
+    'Each effect is a counterfactual recompute. Fixes whose AI effect applied alone can be stated rank first, then the fixes whose AI effect waits on a reason; within each group by the effect applied alone (Technical SEO plus AI readability, larger first; an effect not estimated counts 0); ties by fingerprint. While AI readability is withheld every fix is in the second group, so rank, and with it which fixes are free, follow Technical SEO. In that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade less the current one.',
     '',
     'An effect can be 0 or negative: a counterfactual can lower a grade, as a link added for a deep page can lower the concentration of PageRank on hubs, and two fixes can change the same thing. The computed value is kept, so the effects still add up (owner ruling, 2026-11-05). When a fix would raise a grade alone and its effect in the order is 0 or less, `absorbed_by` names the higher-ranked fix that took it: of the fixes above it that name a page, crawler or template it names, the one whose application takes its effect from above 0 to 0 or less. When the effect is already gone before any such fix, a fix naming nothing it names took it (through the link graph, say), and \`absorbed_by\` is null; it is null too when none is found. The effect is kept as computed either way. The engine records the fix by fingerprint and the diff writes its `number`. The copy that says so ("covered by fix #k") is UI work.',
     '',

@@ -8,7 +8,8 @@
  * A crawler is measured with MIN_ACCESS_PAGES pages or more in its denominator. One that robots.txt
  * disallows on every page whose rules were read is blocked by choice and left out of the mean: the
  * block is not scored as a block, so Access moves to the mean of the others, up when the crawler's
- * share was below it and down when above. With fewer than MIN_MEASURED_CRAWLERS measured:
+ * share was below it and down when above, while enough crawlers stay measured. With fewer than
+ * MIN_MEASURED_CRAWLERS measured:
  *   - when every other scored crawler is blocked by choice, and no scored crawler had a page refused
  *     as unverified, Access is scored from the measured ones, and `scored_from` records how many
  *     (owner ruling, 2026-11-05; "no page refused as unverified" is this module's reading of the

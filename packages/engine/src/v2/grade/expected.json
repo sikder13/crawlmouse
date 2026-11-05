@@ -1,6 +1,6 @@
 {
   "grade_version": "2.0.0",
-  "source_digest": "1952ad10bd9e47ac0b507854d1ab677e7618f44762d7dcbf833480747d1bf1a0",
+  "source_digest": "90c2f52dcfe1d26fa15da80eb30bdd0dd24f7d9e0501bb84ecc694b32a1d7837",
   "cases": {
     "blog: no post names its author, 6 of 13 lack a page description, no question headings": {
       "technical_seo": {
@@ -432,6 +432,73 @@
       "fixes": [],
       "overview": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["quotable_unmeasured"],
+        "absorbed_by": null,
+        "estimate": true
+      }
+    },
+    "14-page blog: a link on every page to a URL behind a redirect chain": {
+      "technical_seo": {
+        "score": 47.42,
+        "grade": "D",
+        "breakdown": {
+          "orphanRatioScore": 1,
+          "depthScore": 1,
+          "anchorDiversityScore": 0,
+          "structureScore": 0.9513552329445705
+        },
+        "refusal": {
+          "refused": false,
+          "triggers": [],
+          "confidenceCapped": false,
+          "unevaluable": []
+        },
+        "site_structure_score": 79.03
+      },
+      "ai_readability": {
+        "withheld": true,
+        "withheld_reasons": ["quotable_unmeasured"],
+        "total": null,
+        "grade": null,
+        "components": {
+          "access": { "score": 40, "max": 40, "heuristic": false, "range": null },
+          "readable": { "score": 30, "max": 30, "heuristic": false, "range": null },
+          "quotable": {
+            "score": null,
+            "max": 20,
+            "heuristic": true,
+            "range": { "min": 0, "max": 20 }
+          },
+          "signals": { "score": 5, "max": 10, "heuristic": false, "range": null }
+        },
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
+      },
+      "content": null,
+      "signals": [
+        { "signal": "schema_org", "state": "detected" },
+        { "signal": "content_signals", "state": "not_detected" }
+      ],
+      "fixes": [
+        {
+          "type": "redirect_chain",
+          "fingerprint": "99f063f0267f8831",
+          "rank": 1,
+          "effect": {
+            "technical_seo": 40,
+            "technical_seo_pending_on": [],
+            "ai_readability": null,
+            "ai_readability_pending_on": ["quotable_unmeasured"],
+            "absorbed_by": null,
+            "estimate": true
+          },
+          "absorbed_by": null
+        }
+      ],
+      "overview": {
+        "technical_seo": 40,
         "technical_seo_pending_on": [],
         "ai_readability": null,
         "ai_readability_pending_on": ["quotable_unmeasured"],

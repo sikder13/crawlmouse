@@ -13,6 +13,8 @@ import { simhashAway, u } from '../detectors/builders.js';
 import { detectorOutcomes } from '../../../src/v2/grade/outcomes.js';
 import { gradeCheck, type GradeInput } from '../../../src/v2/grade/index.js';
 import type { AccessDetection } from '../../../src/v2/access/types.js';
+import { fingerprintOf } from '../../../src/v2/detectors/fingerprint.js';
+import type { Detection } from '../../../src/v2/detectors/types.js';
 import { blogSite, csrSite } from './sites.js';
 
 const SRC = new URL('../../../src/', import.meta.url);
@@ -163,6 +165,10 @@ function outcomeOf(input: GradeInput, access: AccessDetection[] = []) {
 
 const blocked = every(2, 'blocked_by_ua_rule');
 
+/** The example site whose one redirect record marks every page; SPEC 17 renders its numbers. */
+export const SITE_WIDE_REDIRECT =
+  '14-page blog: a link on every page to a URL behind a redirect chain';
+
 /** The example sites, by name, and what the engine makes of each. */
 export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
   const blog = blogSite(
@@ -196,6 +202,16 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
       facts: { simhash: simhashAway(BASE, 3), canonical: { href: u('/blog/page/2') } },
     },
   ]);
+  // a menu link on every page to a URL behind a redirect chain: the record marks every linking page
+  const sitewide = blogSite(13, 0);
+  const menuLink: Detection = {
+    ...sitewide.input.structure[0]!,
+    type: 'redirect_chain',
+    state: 'detected',
+    key: 'redirect:https://a.test/old-menu-target',
+    fingerprint: fingerprintOf('redirect:https://a.test/old-menu-target'),
+    affected_urls: sitewide.input.pages.map((p) => p.url),
+  };
   // author and date and schema fail on posts, and question headings on every page: no check counts
   const thin = blogSite(13, 0);
   const posts = [...thin.input.content.keys()].filter((u) => u.includes('/blog/'));
@@ -232,6 +248,10 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
     'blog: one scored crawler measured, the other three disallowed by robots.txt': outcomeOf(
       byChoice.input,
       byChoice.access,
+    ),
+    [SITE_WIDE_REDIRECT]: outcomeOf(
+      { ...sitewide.input, structure: [...sitewide.input.structure, menuLink] },
+      sitewide.access,
     ),
     '45 pages: the second page of a paginated archive repeats the first': outcomeOf(
       paginated.input,

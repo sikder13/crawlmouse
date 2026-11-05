@@ -132,9 +132,12 @@ function groupPoints(fixes: readonly Fix[]): string {
   const ai = fixes.reduce((n, f) => n + (f.effect.ai_readability ?? 0), 0);
   const pending = fixes.filter((f) => f.effect.ai_readability === null).length;
   const seoPending = fixes.filter((f) => f.effect.technical_seo === null).length;
+  const seoShown = seoPending < fixes.length;
+  // an AI effect estimated at 0 is still an estimate, shown when no Technical SEO points are
+  const aiShown = ai !== 0 || (!seoShown && pending < fixes.length);
   const parts = [
-    seoPending === fixes.length ? null : `+${seo} Technical SEO`,
-    ai ? `+${ai} AI readability` : null,
+    seoShown ? `+${seo} Technical SEO` : null,
+    aiShown ? `+${ai} AI readability` : null,
   ].filter(Boolean);
   const waits = [
     seoPending ? `Technical SEO effect not estimated for ${seoPending}` : null,
