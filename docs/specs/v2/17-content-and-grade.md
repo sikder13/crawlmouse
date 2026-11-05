@@ -102,7 +102,7 @@ Three readings of the ruling are this branch's, not the owner's words:
 | `duplicate_pagination` | the later pages of the list found to repeat page 1                               |
 | `hreflang_gap`         | the members of the cluster with a missing or broken annotation                   |
 
-So one link in a site-wide menu or footer to a redirect chain marks every page that carries it. On the example site "14-page blog: a link on every page to a URL behind a redirect chain", Technical SEO is 47.42 with the record (0.6 × 79.03 + 40 × 0: no crawled URL is clean), and the fix is worth +40. Pages lacking a title or a meta description will be defects of the same kind once the crawl worker records them (CC-12d). The refusal is v1's `decideRefusal` (SPEC 5.1a), with 5 graded pages as its floor: a refused grade has no score.
+So one link in a site-wide menu or footer to a redirect chain marks every page that carries it. On the example site "14-page blog: a link on every page to a URL behind a redirect chain", Technical SEO is 47.42 with the record (0.6 × 79.03 + 40 × 0), and the fix is worth +40. Pages lacking a title or a meta description will be defects of the same kind once the crawl worker records them (CC-12d). The refusal is v1's `decideRefusal` (SPEC 5.1a), with 5 graded pages as its floor: a refused grade has no score.
 
 ## Content checks
 

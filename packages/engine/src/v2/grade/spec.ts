@@ -311,7 +311,12 @@ function siteWideRedirect(): string {
   if (c === undefined) throw new Error(`expected.json has no case "${name}"`);
   const fix = c.fixes.find((f) => f.type === 'redirect_chain')!;
   const [score, structure] = [c.technical_seo.score!, c.technical_seo.site_structure_score!];
-  return `On the example site "${name}", Technical SEO is ${score} with the record (${SEO_WEIGHTS.structure / 100} × ${structure} + ${SEO_WEIGHTS.crawlability} × 0: no crawled URL is clean), and the fix is worth +${fix.effect.technical_seo}.`;
+  // crawlability from the grade as recorded: (score − 0.6 × structure) / 40, to the nearest 0.01
+  const crawl =
+    Math.round(
+      (100 * (score - (SEO_WEIGHTS.structure / 100) * structure)) / SEO_WEIGHTS.crawlability,
+    ) / 100;
+  return `On the example site "${name}", Technical SEO is ${score} with the record (${SEO_WEIGHTS.structure / 100} × ${structure} + ${SEO_WEIGHTS.crawlability} × ${crawl}), and the fix is worth +${fix.effect.technical_seo}.`;
 }
 
 function exampleSites(): string {
