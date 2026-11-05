@@ -4,12 +4,13 @@
  * a client that throws is read as `network_error`, and a word count that throws as `measure_failed`.
  * The day's reservation is settled whatever happens to the page. Nothing is written to disk.
  *
- * COST. Before a page starts, it reserves both of its renders at the wait cap, against the check's cap
- * and against today's budget. When either cannot take them while other pages of the check are in
- * flight, the page waits for one to settle and tries again; when nothing is in flight, rendering stops
- * for the rest of the check. A render settles at the browser time Browser Run reports for it. A render
- * can report more than the wait cap, so a check can end above its cap by that excess on the pages in
- * flight. Which pages a binding cap leaves unrendered depends on how long the earlier renders took.
+ * COST. Before a page starts, it reserves both of its renders at RESERVE_PER_RENDER_MS each, against
+ * the check's cap and against today's budget. When either cannot take them while other pages of the
+ * check are in flight, the page waits for one to settle and tries again; when nothing is in flight,
+ * rendering stops for the rest of the check. A render settles at the browser time Browser Run reports
+ * for it, or, when that is not known, at the request timeout, which is also its reservation. A render
+ * can report more than its reservation, so a check can end above its cap by that excess on the pages
+ * in flight. Which pages a binding cap leaves unrendered depends on how long the earlier renders took.
  *
  * RATE LIMITS. At most RENDER_IN_FLIGHT requests are open at once. A 429 is retried after the wait it
  * asks for in seconds, or with exponential backoff when it gives none, up to RENDER_RETRY.attempts
@@ -19,7 +20,6 @@ import { defaultAdmit, NotAdmitted, type Admit } from './admission.js';
 import { usableCap, type DailyBudget, type RenderCaps } from './budget.js';
 import {
   MAX_REPLY_BYTES,
-  RENDER_TIMEOUT_MS,
   REQUEST_TIMEOUT_MS,
   type BrowserRunClient,
   type RenderReply,
@@ -27,13 +27,16 @@ import {
 } from './client.js';
 import { siteEstimate, type SiteEstimate } from './estimate.js';
 import { measurePage, type WithoutJs } from './page.js';
-import { selectRenders, type PickedFor, type RenderCandidate } from './sample.js';
+import { oncePerUrl, selectRenders, type PickedFor, type RenderCandidate } from './sample.js';
 import type { JsTextState } from './state.js';
 
 export const RENDER_IN_FLIGHT = 5;
 export const RENDER_RETRY = { attempts: 5, base_ms: 1000, max_ms: 16_000 } as const;
-/** What one render reserves before it runs: the wait cap. */
-export const RESERVE_PER_RENDER_MS = RENDER_TIMEOUT_MS;
+/**
+ * What one render reserves before it runs: the request timeout, which is also what a render of unknown
+ * browser time is counted at, so such a render never settles above its reservation.
+ */
+export const RESERVE_PER_RENDER_MS = REQUEST_TIMEOUT_MS;
 
 /** Why a sampled page has no `without_js`, and what each reason means (the spec renders this). */
 export const NOT_RENDERED = {
@@ -76,7 +79,10 @@ export type RenderedPage =
 export interface RenderOutcome {
   /** The sampled pages, in the order they were picked. */
   pages: RenderedPage[];
-  /** Browser time spent by this check, both sides of every page, as Browser Run reported it. */
+  /**
+   * Browser time counted against this check's caps, both sides of each rendered page: what Browser Run
+   * reported, or the request timeout where that is not known.
+   */
   browser_ms: number;
   estimate: SiteEstimate;
 }
@@ -159,8 +165,9 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
   /**
    * Reserve a page's two renders against the check's cap and today's budget. When the check's cap
    * cannot take them while another page is asking or rendering, wait for room and try again. When
-   * today's budget refuses them while another page is rendering, wait for that page to settle and try
-   * again. When there is nothing to wait for, rendering stops for the rest of the check.
+   * today's budget refuses them while another page is asking or rendering, wait for a page to settle
+   * and try again: an answer can arrive before an earlier question's. When there is nothing to wait
+   * for, rendering stops for the rest of the check.
    */
   async function reserve(): Promise<NotRenderedReason | null> {
     for (;;) {
@@ -176,7 +183,7 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
       try {
         reserved = await input.daily.reserve(pageReserve, input.caps.perDayMs);
       } catch {
-        stopped = 'daily_budget_unavailable';
+        stopped ??= 'daily_budget_unavailable';
         reserved = false;
       } finally {
         asking -= 1;
@@ -191,7 +198,11 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
         wake(forDayRoom);
         return stopped;
       }
-      if (rendering === 0) return (stopped = 'daily_cap');
+      if (rendering + asking === 0) {
+        stopped = 'daily_cap';
+        wake(forDayRoom);
+        return stopped;
+      }
       await until(forDayRoom);
     }
   }
@@ -257,9 +268,10 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
     results.flatMap((r) => (r.rendered ? [[r.url, r.without_js.text_share] as const] : [])),
   );
   const estimate = siteEstimate(
-    input.candidates
-      .filter(graded)
-      .map((c) => ({ template_key: c.template_key, text_share: shares.get(c.url) ?? null })),
+    oncePerUrl(input.candidates.filter(graded)).map((c) => ({
+      template_key: c.template_key,
+      text_share: shares.get(c.url) ?? null,
+    })),
   );
   return { pages: results, browser_ms: browserMs, estimate };
 }

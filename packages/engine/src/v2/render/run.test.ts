@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RenderReply } from './client.js';
-import { RENDER_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from './client.js';
+import { REQUEST_TIMEOUT_MS } from './client.js';
 import { fakeClient, memoryDailyBudget, replyFixtures, type ReplyFixture } from './fakes.js';
 import { NotAdmitted } from './admission.js';
 import { RENDER_FAILURES } from './client.js';
 import {
   NOT_RENDERED,
   RENDER_IN_FLIGHT,
+  RESERVE_PER_RENDER_MS,
   RENDER_RETRY,
   renderCheck,
   type RenderCheckInput,
@@ -105,7 +106,7 @@ describe('a check whose renders all succeed', () => {
     // By hand: three templates of one graded page each, shares 1, 0 and 0.5.
     expect(out.estimate.site_text_share).toBeCloseTo(0.5, 12);
     expect(out.estimate.label).toBe(
-      'estimated from 3 rendered pages across 3 of 3 templates; 100 % of the estimate rests on one rendered page per template',
+      "estimated from 3 rendered pages across 3 of 3 templates; 100 % of the estimate's weight rests on one measured page per template",
     );
   });
 
@@ -182,7 +183,10 @@ describe('the per-check cap', () => {
     const client = fakeClient(FIXTURES.values());
     // Room for one page's two reservations and a second's only if the first used under a second.
     const out = await renderCheck(
-      input({ client, caps: { perCheckMs: 2 * RENDER_TIMEOUT_MS + 1000, perDayMs: 3_600_000 } }),
+      input({
+        client,
+        caps: { perCheckMs: 2 * RESERVE_PER_RENDER_MS + 1000, perDayMs: 3_600_000 },
+      }),
     );
     expect(out.pages.map((p) => (p.rendered ? 'rendered' : p.reason))).toEqual([
       'rendered',
@@ -190,6 +194,27 @@ describe('the per-check cap', () => {
       'check_cap',
     ]);
     expect(client.calls).toHaveLength(2);
+  });
+});
+
+describe('a render whose browser time is not known', () => {
+  it('settles at its reservation, so a check held to one page’s reservation stays within it', async () => {
+    const unknown: RenderReply = {
+      ok: true,
+      html: '<body><main><p>a b</p></main></body>',
+      browserMs: REQUEST_TIMEOUT_MS,
+    };
+    const client = fakeClient(FIXTURES.values(), { before: () => unknown });
+    const out = await renderCheck(
+      input({ client, caps: { perCheckMs: 2 * RESERVE_PER_RENDER_MS, perDayMs: 3_600_000 } }),
+    );
+    expect(RESERVE_PER_RENDER_MS).toBe(REQUEST_TIMEOUT_MS);
+    expect(out.browser_ms).toBeLessThanOrEqual(2 * RESERVE_PER_RENDER_MS);
+    expect(out.pages.map((p) => (p.rendered ? 'rendered' : p.reason))).toEqual([
+      'rendered',
+      'check_cap',
+      'check_cap',
+    ]);
   });
 });
 
@@ -203,12 +228,12 @@ describe('a cap that binds while pages are in flight', () => {
   const candidates = many.map((f, i) => candidate(f, `/m${i}`));
 
   it('lets a page wait for another to settle, so a cap with room for one reservation renders them all', async () => {
-    // One reservation (two renders at the wait cap) plus what eight pages use, 1 s each.
+    // One page's reservation plus what eight pages use, 1 s each.
     const out = await renderCheck(
       input({
         client: fakeClient(many, { delayMs: 2 }),
         candidates,
-        caps: { perCheckMs: 2 * RENDER_TIMEOUT_MS + 8 * 1000, perDayMs: 3_600_000 },
+        caps: { perCheckMs: 2 * RESERVE_PER_RENDER_MS + 8 * 1000, perDayMs: 3_600_000 },
       }),
     );
     expect(out.pages.map((p) => p.rendered)).toEqual(many.map(() => true));
@@ -222,7 +247,7 @@ describe('a cap that binds while pages are in flight', () => {
       input({
         client: fakeClient(many, { delayMs: 2 }),
         candidates,
-        caps: { perCheckMs: 600_000, perDayMs: 2 * RENDER_TIMEOUT_MS + 8 * 1000 },
+        caps: { perCheckMs: 600_000, perDayMs: 2 * RESERVE_PER_RENDER_MS + 8 * 1000 },
       }),
     );
     expect(out.pages.every((p) => p.rendered)).toBe(true);
@@ -231,7 +256,7 @@ describe('a cap that binds while pages are in flight', () => {
       input({
         client: fakeClient(many, { delayMs: 2 }),
         candidates,
-        caps: { perCheckMs: 600_000, perDayMs: 2 * RENDER_TIMEOUT_MS + 7 * 1000 - 1 },
+        caps: { perCheckMs: 600_000, perDayMs: 2 * RESERVE_PER_RENDER_MS + 7 * 1000 - 1 },
       }),
     );
     expect(short.pages.map((p) => p.rendered)).toEqual([...Array(7).fill(true), false]);
@@ -239,6 +264,15 @@ describe('a cap that binds while pages are in flight', () => {
 });
 
 describe('the estimate behind a check', () => {
+  it('counts a URL the crawl lists under two templates once', async () => {
+    const f = fixture('server-rendered');
+    const out = await renderCheck(
+      input({ candidates: [candidate(f, '/g', 0.5), candidate(f, '/f', 0.5)] }),
+    );
+    expect(out.estimate.rendered_pages).toBe(1);
+    expect(out.estimate.templates_total).toBe(1);
+  });
+
   it('weights by every graded page, including one robots.txt kept from the render', async () => {
     const kept = {
       ...candidate({ url: 'https://site.example/kept' }, '/kept'),
@@ -258,7 +292,7 @@ describe('the per-day cap', () => {
       input({
         client,
         caps: { perCheckMs: 600_000, perDayMs },
-        daily: memoryDailyBudget(perDayMs - 2 * RENDER_TIMEOUT_MS),
+        daily: memoryDailyBudget(perDayMs - 2 * RESERVE_PER_RENDER_MS),
       }),
     );
     expect(out.pages.map((p) => (p.rendered ? 'rendered' : p.reason))).toEqual([
@@ -292,7 +326,7 @@ describe('the per-day cap', () => {
         daily: { reserve, settle: async () => {} },
       }),
     );
-    expect(reserve.mock.calls).toEqual([[2 * RENDER_TIMEOUT_MS, 123_000]]);
+    expect(reserve.mock.calls).toEqual([[2 * RESERVE_PER_RENDER_MS, 123_000]]);
   });
 
   // More pages than in-flight slots: the first wave asks together, before any answer; after a refusal
@@ -332,7 +366,7 @@ describe('the per-day cap', () => {
       input({
         candidates: eight,
         // Room for one page's reservation at a time, so the others wait while the first renders.
-        caps: { perCheckMs: 2 * RENDER_TIMEOUT_MS, perDayMs: 3_600_000 },
+        caps: { perCheckMs: 2 * RESERVE_PER_RENDER_MS, perDayMs: 3_600_000 },
         daily: { reserve, settle },
       }),
     );
@@ -342,6 +376,66 @@ describe('the per-day cap', () => {
       Array(7).fill('daily_budget_unavailable'),
     );
     expect(reserve).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for an earlier question still unanswered, not stopping on a later answer that came first', async () => {
+    // Room for one page's reservation plus what eight pages use. The first question is answered late
+    // and yes; the second early and no. The second must wait for the first, not stop the check.
+    const perDayMs = 2 * RESERVE_PER_RENDER_MS + 8 * 1000;
+    let used = 0;
+    let n = 0;
+    const daily = {
+      async reserve(ms: number, limitMs: number) {
+        n += 1;
+        if (n === 1) {
+          // Asked first, answered last: yes.
+          await new Promise((r) => setTimeout(r, 20));
+          used += ms;
+          return true;
+        }
+        // Asked second, answered at once: no, as the store already counts the first.
+        if (n === 2) return false;
+        if (used + ms > limitMs) return false;
+        used += ms;
+        return true;
+      },
+      async settle(reservedMs: number, usedMs: number) {
+        used += usedMs - reservedMs;
+      },
+    };
+    const many = Array.from({ length: 8 }, (_, i) => ({
+      provenance: 'test',
+      url: `https://site.example/o${i}`,
+      static: { html: '<body><main><p>a b</p></main></body>', browser_ms: 500 },
+      rendered: { html: '<body><main><p>a b c d</p></main></body>', browser_ms: 500 },
+    }));
+    const out = await renderCheck(
+      input({
+        client: fakeClient(many, { delayMs: 2 }),
+        candidates: many.map((f, i) => candidate(f, `/o${i}`)),
+        caps: { perCheckMs: 600_000, perDayMs },
+        daily,
+      }),
+    );
+    expect(out.pages.every((p) => p.rendered)).toBe(true);
+  });
+
+  it('wakes the pages waiting for the check’s room when a page is refused, so the check ends', async () => {
+    const reserve = vi.fn(async (_ms: number, _limitMs: number) => false);
+    const run = renderCheck(
+      input({
+        candidates: eight,
+        // Room for one reservation: the other pages wait for it while the first is refused.
+        caps: { perCheckMs: 2 * RESERVE_PER_RENDER_MS, perDayMs: 3_600_000 },
+        daily: { reserve, settle: async () => {} },
+      }),
+    );
+    const outcome = await Promise.race([
+      run,
+      new Promise<'hung'>((r) => setTimeout(() => r('hung'), 2000)),
+    ]);
+    expect(outcome).not.toBe('hung');
+    expect((await run).pages.every((p) => !p.rendered && p.reason === 'daily_cap')).toBe(true);
   });
 
   it('gives back what a render did not use', async () => {
