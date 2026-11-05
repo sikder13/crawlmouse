@@ -270,6 +270,23 @@ pages, measured in the probe's child process (which is why a search of the test 
 read a 4,538 ms stall once, in the uncached run at turbo's default concurrency beside other
 sessions' load, and passed at concurrency 2.
 
+**New on `main` at the merge of `ab34589` (CC-12d, the worker's batch and access facts).** Its new
+worker tests run on a fake clock (`InstantClock`), with three exceptions on the real one:
+
+- `packages/worker/src/fetch/timing.test.ts` › "keeps concurrent requests apart: each gets its own
+  first-byte time" asserts a request answered at once has its first byte inside 150 ms, beside one
+  held for 250 ms. A single-run wall-clock upper bound, left as it is: it checks that the two
+  requests' timings are kept apart, not how fast the code is, so the CPU rule does not fit it.
+  Measured on `ab34589` with a log line added and removed, ten runs each: 7 to 19 ms at a
+  one-minute load average of 6 to 8, and 4 to 35 ms beside twelve CPU busy loops (load 11 to 30),
+  so 4.3 times headroom at worst, under the 10 times that keeps a budget single-run. Every run passed: the ten at
+  the lower load ran that test alone, and the ten beside the loops ran the whole file of seven
+  tests. It is a candidate for the serial treatment if it fails; no ruling
+  covers it yet.
+- `packages/worker/src/server.test.ts`: the 3 s deadline in `partialPost` is a hang bound around a
+  refusal answered before the body is read, and "gives a signed-looking body … to arrive" waits for
+  the server's own body deadline with 5 s of test timeout beyond it. Both are hang bounds.
+
 **Single-run bounds, measured.** These were measured on the wall clock, before the CPU rule, and
 the ones kept stay single wall-clock readings. The time each assertion's own clock read, with log lines added
 for the measurement and removed after it: three runs of each file with no extra load, and three
