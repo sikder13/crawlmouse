@@ -73,12 +73,78 @@ describe('the boundary split', () => {
       2,
     ],
     ['a textarea', 'Notes<textarea>none</textarea>', 2],
+    ['a select whose options are not closed', '<select><option>Small<option>Large</select>Qty', 3],
   ])('separates %s', (_name, inner, words) => {
     expect(mainWords(`<body><main>${inner}</main></body>`)).toBe(words);
   });
 
   it('does not split on a tag whose name only starts like a boundary element', () => {
     expect(mainWords('<body><main><p>co<pre-x>op</pre-x></p></main></body>')).toBe(1);
+  });
+
+  // Every listed element, so removing one from the list fails here. Void elements take no content;
+  // those the extractor strips leave only the words either side.
+  const VOID = new Set(['br', 'hr', 'img', 'input']);
+  const STRIPPED = new Set(['nav', 'footer', 'header', 'aside']);
+  // Written out here, not taken from BOUNDARY_ELEMENTS, so dropping an element from the code fails.
+  const MUST_SPLIT = [
+    'address',
+    'article',
+    'aside',
+    'blockquote',
+    'br',
+    'button',
+    'dd',
+    'details',
+    'dialog',
+    'div',
+    'dl',
+    'dt',
+    'fieldset',
+    'figcaption',
+    'figure',
+    'footer',
+    'form',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'header',
+    'hr',
+    'img',
+    'input',
+    'legend',
+    'li',
+    'main',
+    'nav',
+    'ol',
+    'option',
+    'p',
+    'pre',
+    'section',
+    'select',
+    'summary',
+    'table',
+    'tbody',
+    'td',
+    'textarea',
+    'tfoot',
+    'th',
+    'thead',
+    'tr',
+    'ul',
+  ];
+
+  it('has a case for each element the code splits on, and the code splits on each of them', () => {
+    expect([...BOUNDARY_ELEMENTS].sort()).toEqual([...MUST_SPLIT].sort());
+  });
+
+  it.each(MUST_SPLIT)('splits words at <%s>', (el) => {
+    const inner = VOID.has(el) ? `a<${el}>c` : `a<${el}>b</${el}>c`;
+    const expected = VOID.has(el) || STRIPPED.has(el) ? 2 : 3;
+    expect(mainWords(`<body><main><div>${inner}</div></main></body>`)).toBe(expected);
   });
 
   it('lists each element once', () => {

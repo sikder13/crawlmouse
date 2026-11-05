@@ -56,6 +56,7 @@ export const BOUNDARY_ELEMENTS = [
   'p',
   'pre',
   'section',
+  'select',
   'summary',
   'table',
   'tbody',
