@@ -128,6 +128,7 @@ export function aggregateContent(pages: readonly ContentPage[]): ContentResult {
 
   const by_template = CHECKS.map((check) => ({
     check,
+    counted: CONTENT_CHECKS[check].scored,
     by_template: templates.flatMap((template_key) => {
       const passing = of(check, template_key, 'pass').length;
       const total = passing + of(check, template_key, 'fail').length;

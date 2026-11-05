@@ -56,8 +56,11 @@ function questionHeadings(p: ContentFeatures): PageVerdict {
   return p.headings.questions > 0 ? 'pass' : 'fail';
 }
 
+/**
+ * A node about the page's own subject has a description. A page with no JSON-LD at all fails: it
+ * describes nothing (owner ruling, 2026-11-05).
+ */
 function schemaWithDescription(p: ContentFeatures): PageVerdict {
-  if (p.json_ld.length === 0) return 'not_applicable';
   return typed(p.json_ld, PAGE_SUBJECT).some((n) => n.has_description) ? 'pass' : 'fail';
 }
 
@@ -95,20 +98,15 @@ export interface CheckDefinition {
   recommendation_class: RecommendationClass;
   /**
    * How sure a fix the check opens is, set by hand: `likely` for a counted check and `inconclusive`
-   * for the others (checks.test.ts pins the pairing).
+   * for the others (labels.test.ts pins the pairing).
    */
   confidence: Confidence;
   /**
-   * The check counts in Quotable. labels.test.ts holds each counted check to the bar in label-set.ts
-   * (`validated`: MIN_PRECISION on its firings, MIN_PASS_ACCURACY on its passes, on the label set); a
-   * check that does not clear it is reported and does not count.
+   * The check counts in Quotable. A check counts only once it clears the bar in label-set.ts on an
+   * independent, held-out label set (`counts`); the label set in fixtures/v2/content is neither, so
+   * labels.test.ts fails while any check here is `scored`.
    */
   scored: boolean;
-  /**
-   * Why a check that clears the bar is not counted; null otherwise. labels.test.ts requires it of
-   * every such check, so a hold is always stated.
-   */
-  held: string | null;
 }
 
 const unread = (): PageVerdict => 'unread';
@@ -126,7 +124,6 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
     recommendation_class: 'experimental',
     confidence: 'inconclusive',
     scored: false,
-    held: null,
   },
   question_headings: {
     judge: questionHeadings,
@@ -136,17 +133,16 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
     recommendation_class: 'experimental',
     confidence: 'inconclusive',
     scored: false,
-    held: 'whether a call-to-action question is a content heading, which the pages labelled unsure on this check turn on, is for the owner to rule',
   },
   schema_with_description: {
     judge: schemaWithDescription,
     onShell: unread,
+    // no fix type in the contract for this check yet (reported), so a failing template opens no fix
     fix: null,
     key: null,
-    recommendation_class: 'best_practice',
-    confidence: 'likely',
-    scored: true,
-    held: null,
+    recommendation_class: 'documented_requirement',
+    confidence: 'inconclusive',
+    scored: false,
   },
   author_and_date: {
     judge: authorAndDate,
@@ -156,9 +152,8 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
     fix: 'missing_author_date',
     key: 'byline',
     recommendation_class: 'best_practice',
-    confidence: 'likely',
-    scored: true,
-    held: null,
+    confidence: 'inconclusive',
+    scored: false,
   },
   specs_as_text: {
     judge: specsAsText,
@@ -168,7 +163,6 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
     recommendation_class: 'best_practice',
     confidence: 'inconclusive',
     scored: false,
-    held: null,
   },
 };
 

@@ -130,8 +130,16 @@ describe('schema_with_description', () => {
     }
   });
 
-  it('does not apply without JSON-LD', () => {
-    expect(judge([])).toBe('not_applicable');
+  it('fails without JSON-LD: the page describes nothing (owner ruling, 2026-11-05)', () => {
+    expect(judge([])).toBe('fail');
+  });
+
+  it('on a page served for JavaScript to fill in, it is unread, JSON-LD or not', () => {
+    for (const json_ld of [[], [node(['WebPage'], { has_description: true })]]) {
+      expect(judgePage(features({ json_ld, client_rendered: true })).schema_with_description).toBe(
+        'unread',
+      );
+    }
   });
 });
 

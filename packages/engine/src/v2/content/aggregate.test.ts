@@ -111,27 +111,15 @@ describe('page failures and the Quotable input', () => {
   it('each page lists the checks it fails; an unread page lists none (null)', () => {
     const ps = pages('/h', [prose(false), prose(true), shell, null]);
     const r = aggregateContent(ps);
+    // neither prose page carries JSON-LD, so both fail schema_with_description
     expect(ps.map((p) => r.content_failures.get(p.url))).toEqual([
-      ['direct_answer_150'],
-      [],
+      ['direct_answer_150', 'schema_with_description'],
+      ['schema_with_description'],
       null,
       null,
     ]);
-    // only the counted checks enter Quotable, each with its own unread pages
-    expect(Object.keys(r.quotable.checks).sort()).toEqual([
-      'author_and_date',
-      'schema_with_description',
-    ]);
-    expect(r.quotable.checks.direct_answer_150).toBeUndefined();
-    expect(r.quotable.checks.question_headings).toBeUndefined();
-    // the shell is unread for schema; for author/date, its JSON-LD (no Article node here) makes the
-    // check not apply, so only the page not fetched at all is unread
-    expect(r.quotable.checks.schema_with_description).toEqual({
-      passing: 0,
-      decided: 0,
-      unread: 2,
-    });
-    expect(r.quotable.checks.author_and_date).toEqual({ passing: 0, decided: 0, unread: 1 });
+    // no check counts in Quotable (checks.ts `scored`), so Quotable reads no check
+    expect(r.quotable.checks).toEqual({});
   });
 
   it('the summary lists, per check, the templates it was decided on', () => {

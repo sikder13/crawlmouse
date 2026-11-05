@@ -4,6 +4,9 @@
  * `fail`. Pass accuracy is the share of the pages it judges `pass` that the label also judges `pass`.
  * Pages labelled `unsure`, and pages not labelled for the check, are left out.
  *
+ * No check counts in Quotable on this set: it was labelled by the session that implemented the checks
+ * and used to choose their rules, so it is neither independent nor held out (`PROVENANCE`).
+ *
  * `tallies()` counts the labels as they stand; `tallies(true)` counts them as first read, before the
  * corrections the label set records, so both can be shown. `variantTallies()` counts two rules that
  * were measured on the set and not kept, so the choice between them can be shown.
@@ -13,9 +16,15 @@ import labels from '../../../fixtures/v2/content/labels.json' with { type: 'json
 import { CONTENT_CHECKS, judgePage, type PageVerdict } from './checks.js';
 import type { ContentFeatures } from './read.js';
 
-/** A counted check must be right on at least this share of its firings and of its passes. */
-export const MIN_PRECISION = 0.95;
-export const MIN_PASS_ACCURACY = 0.95;
+/**
+ * The bar a check must clear to count in Quotable (owner ruling, 2026-11-05): at least
+ * MIN_CONFIRMED_FIRINGS firings the labels confirm, and a one-sided 95 % lower bound of at least
+ * MIN_LOWER_BOUND on its precision and on its pass accuracy, measured on a label set that is
+ * independent (labelled by someone other than the session that implemented the checks) and held out
+ * (labels frozen before the check runs on it). `counts` applies all of it.
+ */
+export const MIN_CONFIRMED_FIRINGS = 14;
+export const MIN_LOWER_BOUND = 0.8;
 
 export interface Tally {
   /** Pages labelled for the check, `unsure` left out. */
@@ -80,11 +89,12 @@ export const tallies = (first = false): Record<ContentCheck, Tally> =>
   tally(judgePage, (p, c) => labelOf(p, c, first));
 
 /**
- * The rulings the labels leave open, each with the label it gives the pages that turn on it, which are
- * labelled `unsure` until the owner rules. Under the second, a page left with fewer than three content
- * headings would be `na` rather than `fail`; this counts it `fail`, which can raise "applies" and
- * "failing" but not precision or pass accuracy, since such a page is one the check judges not
- * applicable.
+ * The two ways of reading the pages whose question headings are all calls to action, each with the
+ * label it gives them; the pages stay labelled `unsure` until CC-18 relabels the set. The owner ruled
+ * the second (2026-11-05: a call to action is not a content heading), so `ruled` marks it. Under it, a
+ * page left with fewer than three content headings would be `na` rather than `fail`; this counts it
+ * `fail`, which can raise "applies" and "failing" but not precision or pass accuracy, since such a
+ * page is one the check judges not applicable.
  */
 export const RULINGS = {
   cta_is_content: {
@@ -92,19 +102,42 @@ export const RULINGS = {
     check: 'question_headings',
     ruling: 'a call-to-action question is a content heading',
     label: 'pass',
+    ruled: false,
   },
   cta_is_not: {
     cause: 'criteria_silent_on_cta',
     check: 'question_headings',
     ruling: 'a call-to-action question is not a content heading',
     label: 'fail',
+    ruled: true,
   },
 } as const satisfies Record<
   string,
-  { cause: string; check: ContentCheck; ruling: string; label: string }
+  { cause: string; check: ContentCheck; ruling: string; label: string; ruled: boolean }
 >;
 
 export type Ruling = keyof typeof RULINGS;
+
+/**
+ * Each check's firings on pages labelled `na`, and how many of those pages carry no JSON-LD: the
+ * pages a rule made since the labelling turns from not applicable to failing.
+ */
+export function naFirings(): Record<ContentCheck, { fires: number; without_json_ld: number }> {
+  const out = {} as Record<ContentCheck, { fires: number; without_json_ld: number }>;
+  for (const check of Object.keys(CONTENT_CHECKS) as ContentCheck[]) {
+    out[check] = { fires: 0, without_json_ld: 0 };
+  }
+  for (const page of labels.pages) {
+    const f = page.features as ContentFeatures;
+    const verdicts = judgePage(f);
+    for (const check of Object.keys(CONTENT_CHECKS) as ContentCheck[]) {
+      if (labelOf(page, check, false) !== 'na' || verdicts[check] !== 'fail') continue;
+      out[check].fires += 1;
+      if (f.json_ld.length === 0) out[check].without_json_ld += 1;
+    }
+  }
+  return out;
+}
 
 /** Each ruling's tally of the check it decides, on the labels as they stand otherwise. */
 export function rulingTallies(): Record<Ruling, Tally> {
@@ -150,15 +183,27 @@ export function variantTallies(): Record<Variant, Tally> {
   return out;
 }
 
-/** Whether a tally clears the bar for counting in Quotable: the check fires and passes, right enough. */
-export function validated(t: Tally): boolean {
+/** Whether a tally clears the bar's numbers: enough confirmed firings, and both lower bounds. */
+export function clearsBar(t: Tally): boolean {
   return (
-    t.fires > 0 &&
-    t.passes > 0 &&
-    t.confirmed >= MIN_PRECISION * t.fires &&
-    t.passes_confirmed >= MIN_PASS_ACCURACY * t.passes
+    t.confirmed >= MIN_CONFIRMED_FIRINGS &&
+    (lowerBound(t.confirmed, t.fires) ?? 0) >= MIN_LOWER_BOUND &&
+    (lowerBound(t.passes_confirmed, t.passes) ?? 0) >= MIN_LOWER_BOUND
   );
 }
+
+/** Who made a label set and how it was used: what the bar asks of the set itself. */
+export interface Provenance {
+  independent: boolean;
+  held_out: boolean;
+}
+
+/** Whether a check with this tally, on a set with this provenance, may count in Quotable. */
+export const counts = (t: Tally, set: Provenance): boolean =>
+  set.independent && set.held_out && clearsBar(t);
+
+/** The label set in fixtures/v2/content, as labels.json records it. */
+export const PROVENANCE: Provenance = labels.provenance;
 
 /** P(X ≥ x) for X ~ Binomial(n, p), 0 < p < 1. */
 function binomialTail(x: number, n: number, p: number): number {

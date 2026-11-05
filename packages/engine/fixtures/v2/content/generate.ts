@@ -63,6 +63,8 @@ const pages = labelled
 const out = new URL('./labels.json', import.meta.url);
 const json = JSON.stringify({
   criteria: readFileSync(`${dir}/labels/criteria.md`, 'utf8').trim().split('\n'),
+  // labelled by the session that implemented the checks, and used to choose their rules
+  provenance: { independent: false, held_out: false },
   causes: CAUSES,
   reader_sha256: readerDigest(),
   pages,

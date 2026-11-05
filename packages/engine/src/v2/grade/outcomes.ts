@@ -9,6 +9,7 @@
  */
 import type { Confidence, Effect, FixType, RecommendationClass } from '@crawlmouse/types/v2';
 import type { AccessDetection } from '../access/types.js';
+import { CONTENT_CHECKS } from '../content/checks.js';
 import { FIX_SECTION } from '../diff/subjects.js';
 import type { DetectorOutcome, FixDraft } from '../diff/types.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
@@ -29,7 +30,7 @@ export const STRUCTURE_CLASS: Readonly<Partial<Record<FixType, RecommendationCla
   hreflang_gap: 'documented_requirement',
 };
 
-/** The structure and content detectors read our own crawl, so a finding is likely, not confirmed. */
+/** The structure detectors read our own crawl, so a finding is likely, not confirmed. */
 const CRAWL_CONFIDENCE: Confidence = 'likely';
 
 /** A fix's title, from its record. */
@@ -71,7 +72,8 @@ function draft(f: FixRecord, effect: Effect, rank: number): FixDraft {
       section: FIX_SECTION[r.type],
       title: TITLES[r.type]!(r.template_key),
       recommendation_class: r.recommendation_class,
-      confidence: CRAWL_CONFIDENCE,
+      // set per check by hand (checks.ts): inconclusive while the check does not count in Quotable
+      confidence: CONTENT_CHECKS[r.check].confidence,
       affected_pages: r.affected_urls.length,
       template_key: r.template_key,
       crawler_uas: [],
