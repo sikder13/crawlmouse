@@ -1,10 +1,11 @@
 /**
- * The site-wide share of words served without JavaScript, estimated from the rendered pages.
+ * The site-wide share of words served without JavaScript, estimated from the measured pages: those
+ * rendered whose two sides gave a share. A page rendered as a challenge, or with no words, is not one.
  *
- *   ratio(t)        = median text_share of template t's rendered pages
- *   site_text_share = Σ_t pages(t) × ratio(t) / Σ_t pages(t), over the templates with a rendered page
+ *   ratio(t)        = median text_share of template t's measured pages
+ *   site_text_share = Σ_t pages(t) × ratio(t) / Σ_t pages(t), over the templates with a measured page
  *
- * `pages(t)` is t's graded pages, the weight CC-17's Readable uses. A template with no rendered page
+ * `pages(t)` is t's graded pages, the weight CC-17's Readable uses. A template with no measured page
  * has no ratio, so it is left out of the share rather than guessed at, and `unrendered_share` says how
  * much of the graded site that leaves out. From the two, Readable's range follows:
  *
@@ -21,18 +22,18 @@ export interface GradedPageShare {
 
 export interface SiteEstimate {
   site_text_share: number | null;
-  rendered_pages: number;
-  templates_rendered: number;
+  measured_pages: number;
+  templates_measured: number;
   templates_total: number;
-  /** Graded pages in a template with no rendered page, over all graded pages; 1 when none is graded. */
+  /** Graded pages in a template with no measured page, over all graded pages; 1 when none is graded. */
   unrendered_share: number;
   /**
-   * Of the weight behind site_text_share, the part resting on templates with a single rendered page:
+   * Of the weight behind site_text_share, the part resting on templates with a single measured page:
    * their ratio is one page's share. 0 when nothing was rendered.
    */
   single_render_weight: number;
   /**
-   * "estimated from N rendered pages across K of T templates", then, where they are above zero, the
+   * "estimated from N measured pages across K of T templates", then, where they are above zero, the
    * percentage of graded pages in templates with no measured page and the percentage of the estimate's
    * weight resting on a single measured page per template. Null when nothing was measured.
    */
@@ -63,15 +64,15 @@ export function siteEstimate(pages: readonly GradedPageShare[]): SiteEstimate {
   }
   let weighted = 0;
   let renderedWeight = 0;
-  let renderedPages = 0;
-  let templatesRendered = 0;
+  let measuredPages = 0;
+  let templatesMeasured = 0;
   let singleWeight = 0;
   for (const t of templates.values()) {
     if (t.shares.length === 0) continue;
     weighted += t.pages * median(t.shares);
     renderedWeight += t.pages;
-    renderedPages += t.shares.length;
-    templatesRendered += 1;
+    measuredPages += t.shares.length;
+    templatesMeasured += 1;
     if (t.shares.length === 1) singleWeight += t.pages;
   }
   const total = templates.size;
@@ -79,7 +80,7 @@ export function siteEstimate(pages: readonly GradedPageShare[]): SiteEstimate {
   const unrendered_share = pages.length === 0 ? 1 : (pages.length - renderedWeight) / pages.length;
   const single_render_weight = renderedWeight === 0 ? 0 : singleWeight / renderedWeight;
   const clauses = [
-    `estimated from ${plural(renderedPages, 'rendered page')} across ${templatesRendered} of ${plural(total, 'template')}`,
+    `estimated from ${plural(measuredPages, 'measured page')} across ${templatesMeasured} of ${plural(total, 'template')}`,
     ...(unrendered_share > 0
       ? [`${percent(unrendered_share)} of graded pages are in templates with no measured page`]
       : []),
@@ -91,8 +92,8 @@ export function siteEstimate(pages: readonly GradedPageShare[]): SiteEstimate {
   ];
   return {
     site_text_share,
-    rendered_pages: renderedPages,
-    templates_rendered: templatesRendered,
+    measured_pages: measuredPages,
+    templates_measured: templatesMeasured,
     templates_total: total,
     unrendered_share,
     single_render_weight,

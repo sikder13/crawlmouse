@@ -14,25 +14,25 @@ describe('the site estimate', () => {
     ...pages('/c/{slug}', Array(10).fill(null)),
   ];
 
-  it('weights each rendered template’s median by its graded pages, over rendered templates only', () => {
+  it('weights each measured template’s median by its graded pages, over measured templates only', () => {
     // By hand: (6 × 0.4 + 4 × 1.0) / (6 + 4) = 6.4 / 10.
     expect(siteEstimate(input).site_text_share).toBeCloseTo(0.64, 12);
   });
 
   it('counts what it was estimated from, and says so', () => {
     expect(siteEstimate(input)).toMatchObject({
-      rendered_pages: 4,
-      templates_rendered: 2,
+      measured_pages: 4,
+      templates_measured: 2,
       templates_total: 3,
       single_render_weight: 0.4,
       label:
-        "estimated from 4 rendered pages across 2 of 3 templates; 50 % of graded pages are in templates with no measured page; 40 % of the estimate's weight rests on one measured page per template",
+        "estimated from 4 measured pages across 2 of 3 templates; 50 % of graded pages are in templates with no measured page; 40 % of the estimate's weight rests on one measured page per template",
     });
   });
 
   it('exposes the unrendered share, from which Readable’s range follows', () => {
     const e = siteEstimate(input);
-    // By hand: ten of twenty graded pages sit in a template with no rendered page.
+    // By hand: ten of twenty graded pages sit in a template with no measured page.
     expect(e.unrendered_share).toBe(0.5);
     // Readable over these pages, computed by hand from its formula (30 × Σ pages(t) × ratio(t) / Σ pages),
     // with the unrendered template at 0 and at 1: 30 × 6.4 / 20 = 9.6 and 30 × 16.4 / 20 = 24.6.
@@ -48,15 +48,15 @@ describe('the site estimate', () => {
 
   it('says one page and one template in the singular', () => {
     expect(siteEstimate(pages('/t', [0.5])).label).toBe(
-      "estimated from 1 rendered page across 1 of 1 template; 100 % of the estimate's weight rests on one measured page per template",
+      "estimated from 1 measured page across 1 of 1 template; 100 % of the estimate's weight rests on one measured page per template",
     );
   });
 
   it('has no share and no label when nothing was rendered, and counts every page unrendered', () => {
     expect(siteEstimate(pages('/t', [null, null]))).toEqual({
       site_text_share: null,
-      rendered_pages: 0,
-      templates_rendered: 0,
+      measured_pages: 0,
+      templates_measured: 0,
       templates_total: 1,
       unrendered_share: 1,
       single_render_weight: 0,
@@ -67,8 +67,8 @@ describe('the site estimate', () => {
   it('counts nothing graded as entirely unrendered, so Readable’s range is the whole scale', () => {
     expect(siteEstimate([])).toEqual({
       site_text_share: null,
-      rendered_pages: 0,
-      templates_rendered: 0,
+      measured_pages: 0,
+      templates_measured: 0,
       templates_total: 0,
       unrendered_share: 1,
       single_render_weight: 0,
@@ -78,11 +78,11 @@ describe('the site estimate', () => {
 });
 
 describe('a site whose estimate rests on little', () => {
-  it('says so when one rendered page stands for a site whose graded pages are almost all unrendered', () => {
+  it('says so when one measured page stands for a site whose graded pages are almost all unrendered', () => {
     const e = siteEstimate([...pages('/', [1]), ...pages('/p/{slug}', Array(1000).fill(null))]);
     expect(e.site_text_share).toBe(1);
     expect(e.label).toBe(
-      "estimated from 1 rendered page across 1 of 2 templates; >99 % of graded pages are in templates with no measured page; 100 % of the estimate's weight rests on one measured page per template",
+      "estimated from 1 measured page across 1 of 2 templates; >99 % of graded pages are in templates with no measured page; 100 % of the estimate's weight rests on one measured page per template",
     );
   });
 
@@ -149,17 +149,17 @@ describe('the site estimate, over any graded pages', () => {
     );
   });
 
-  it('names exactly the rendered pages and templates the input holds', () => {
+  it('names exactly the measured pages and templates the input holds', () => {
     fc.assert(
       fc.property(graded, (ps) => {
         const e = siteEstimate(ps);
         const rendered = ps.filter((p) => p.text_share !== null);
-        expect(e.rendered_pages).toBe(rendered.length);
-        expect(e.templates_rendered).toBe(new Set(rendered.map((p) => p.template_key)).size);
+        expect(e.measured_pages).toBe(rendered.length);
+        expect(e.templates_measured).toBe(new Set(rendered.map((p) => p.template_key)).size);
         expect(e.templates_total).toBe(new Set(ps.map((p) => p.template_key)).size);
         if (e.label !== null) {
-          expect(e.label).toContain(`${e.rendered_pages} rendered page`);
-          expect(e.label).toContain(`${e.templates_rendered} of ${e.templates_total} template`);
+          expect(e.label).toContain(`${e.measured_pages} measured page`);
+          expect(e.label).toContain(`${e.templates_measured} of ${e.templates_total} template`);
         }
       }),
     );
