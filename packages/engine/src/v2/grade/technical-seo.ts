@@ -10,7 +10,11 @@
  * A URL carries a crawlability defect when it is among the affected pages of a detected record of
  * CC-16's redirect, canonical, pagination or hreflang detectors. A URL counts once however many it
  * carries, so one affected page on a 45-page site moves the score by 40/45 (owner ruling, 2026-11-05).
- * A record that is not detected, or could not decide, marks no page. Pages lacking a title or a meta
+ * Three readings of the ruling are this module's, and SPEC 17 states them: the denominator is every
+ * crawled URL, so a URL that does not answer 200 is a defect no fix here clears; a record that could
+ * not decide marks no page, so its pages count clean (the old mean dropped such a measure); and a
+ * record's pages are its `affected_urls`, which for a redirect chain are the pages linking to the
+ * redirecting URL, so one site-wide link to a chain marks every page. Pages lacking a title or a meta
  * description will be defects of the same kind once the crawl worker records them (CC-12d).
  *
  * The 5.1a refusal is v1's `decideRefusal`, on the same evidence: a refused grade has no score.

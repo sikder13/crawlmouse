@@ -137,7 +137,8 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
   schema_with_description: {
     judge: schemaWithDescription,
     onShell: unread,
-    // no fix type in the contract for this check yet (reported), so a failing template opens no fix
+    // no fix type in the contract for this check yet (a gap SPEC 17 states), so a failing template
+    // opens no fix
     fix: null,
     key: null,
     recommendation_class: 'documented_requirement',

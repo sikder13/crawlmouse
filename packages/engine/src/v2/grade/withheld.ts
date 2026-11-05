@@ -13,13 +13,13 @@ export const WITHHELD_REASON_MEANINGS: Readonly<Record<WithheldReason, string>> 
   readable_unmeasured:
     'A template of the graded pages has no page rendered in a browser, so the share of text served without JavaScript is not known.',
   quotable_unmeasured:
-    'Some graded pages could not be read for the content checks, or no content check applied to any page.',
+    'No content check counts in Quotable (a check counts once it clears the bar on an independent, held-out label set), or a counted check could not be read on some graded pages, or applied to no page.',
   signals_unmeasured:
     'Whether schema.org markup or Content Signals are present could not be decided.',
   crawler_too_few_pages:
     "For a fix's effect only: the fix's crawler has fewer than two pages that decide its share, so how much Access it adds is not known.",
   check_not_scored:
-    "For a fix's effect only: the fix's content check is reported but not counted in Quotable (it has not cleared the bar on the label set, or it is held), so it adds no points yet.",
+    "For a fix's effect only: the fix's content check is reported but not counted in Quotable (it has not cleared the bar on an independent, held-out label set), so it adds no points yet.",
 };
 
 /** Why a fix's Technical SEO effect is not estimated. contract-pins.test.ts pins this to the contract. */

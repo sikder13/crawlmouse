@@ -87,7 +87,8 @@ const CHECK_RULES: Readonly<
     shell: 'unread',
   },
   schema_with_description: {
-    applies: 'every page read: a page with no JSON-LD fails (owner ruling, 2026-11-05)',
+    applies:
+      'every page read: a page with no JSON-LD fails (owner ruling, 2026-11-05; the ruling also opens its fix as `documented_requirement`, but the contract has no fix type for this check, so no fix opens: a reported gap)',
     passes:
       'a node of a type about the page itself (`…Page`, `…Article`, `BlogPosting`, `Product`, `Service`, `Event`, `TouristTrip` and the others in checks.ts) has a non-empty `description`',
     shell: 'unread',
@@ -387,9 +388,9 @@ export function renderGradeSpec(): string {
     '',
     `Out of the denominator: ${list(outOfDenominator())}. Words served are compared with the browser control's words for the same static page, so a page that needs JavaScript reads the same for both and counts in Readable, once.`,
     '',
-    `A scored crawler is measured with ${MIN_ACCESS_PAGES} pages or more in its denominator. One that robots.txt disallows on the pages whose rules were read (disallowed pages equal to pages read) is blocked by choice: left out of the mean, so a deliberate block lowers nothing. With fewer than ${MIN_MEASURED_CRAWLERS} measured, Access has no score: \`blocked_by_choice\` when the scored crawlers are blocked by choice and none is measured or unmeasured; otherwise \`too_few_crawlers_measured\`, with the range [${AI_WEIGHTS.access} × Σshare / (m + u), ${AI_WEIGHTS.access} × (Σshare + u) / (m + u)] for m measured and u unmeasured crawlers.`,
+    `A scored crawler is measured with ${MIN_ACCESS_PAGES} pages or more in its denominator. One that robots.txt disallows on the pages whose rules were read (disallowed pages equal to pages read) is blocked by choice: left out of the mean, so the block is not scored as a block, and Access moves to the mean of the others (up when that crawler's share was below it, down when above). With fewer than ${MIN_MEASURED_CRAWLERS} measured, Access has no score: \`blocked_by_choice\` when the scored crawlers are blocked by choice and none is measured or unmeasured; otherwise \`too_few_crawlers_measured\`, with the range [${AI_WEIGHTS.access} × Σshare / (m + u), ${AI_WEIGHTS.access} × (Σshare + u) / (m + u)] for m measured and u unmeasured crawlers.`,
     '',
-    `One exception (owner ruling, 2026-11-05): with fewer than ${MIN_MEASURED_CRAWLERS} measured but at least one, when every other scored crawler is blocked by choice and no scored crawler had a page \`refused_unverified\`, Access is scored from the measured ones, and \`scored_from_fewer_crawlers\` records how many. A robots.txt disallow therefore raises Access as an unblock does: it is the site's stated intent (R11 decision 5), left out rather than counted against the site. No fix opens for it, and no fix copy may recommend disallowing a crawler.`,
+    `One exception (owner ruling, 2026-11-05): with fewer than ${MIN_MEASURED_CRAWLERS} measured but at least one, when every other scored crawler is blocked by choice and no scored crawler had a page \`refused_unverified\`, Access is scored from the measured ones, and \`scored_from_fewer_crawlers\` records how many. The ruling says "none refused_unverified"; reading it as "no page refused as unverified", on the measured crawler too, is this branch's, and the stricter reading. Disallowing a crawler whose share is below the others' mean therefore raises Access, as far as unblocking it would when the others' mean is 1: a disallow is the site's stated intent (R11 decision 5), left out rather than counted against the site. No fix opens for it, and no fix copy may recommend disallowing a crawler.`,
     '',
     '### Readable',
     '',
@@ -414,7 +415,7 @@ export function renderGradeSpec(): string {
     '',
     '### The grade and withholding',
     '',
-    'The total is the sum of the four components, given when the four have a score; its letter is the engine scale (v1 `scoreToLetter`). Otherwise the grade is withheld, `withheld_reasons` names each component without a score, and each such component carries its range. AI readability is graded whether or not Technical SEO is refused: the refusal covers the structure grade only, and the copy beside it says so (owner ruling, 2026-11-05).',
+    'The total is the sum of the four components, given when the four have a score; its letter is the engine scale (v1 `scoreToLetter`). Otherwise the grade is withheld, `withheld_reasons` names each component without a score, and each such component carries its range. AI readability is graded whether or not Technical SEO is refused: the refusal covers the structure grade only, and the copy beside a refused grade must say so (owner ruling, 2026-11-05; UI work, not written yet).',
     '',
     table(['Letter', 'From'], letterScale()),
     '',
@@ -425,7 +426,31 @@ export function renderGradeSpec(): string {
     '',
     '## Technical SEO',
     '',
-    `score = ${SEO_WEIGHTS.structure / 100} × structure + ${SEO_WEIGHTS.crawlability} × crawlability. Structure is v1's grade (packages/engine/src/grade.ts, its components and weights unchanged) of the link graph whose nodes are the crawled pages answering 200 (a 404 or a redirect is a crawl outcome, not a node: v1's SPEC 01 path), 0 to 100, also \`site_structure_score\`. Crawlability is the share of crawled URLs that answer 200 and carry no crawlability defect (owner ruling, 2026-11-05). A URL carries a defect when it is among the affected pages of a detected ${list(CRAWLABILITY_DETECTORS)} record; a record not detected, or undecided, marks no page; a URL counts once however many defects it carries. One affected page on a site of N crawled URLs therefore moves the score by ${SEO_WEIGHTS.crawlability}/N. Pages lacking a title or a meta description will be defects of the same kind once the crawl worker records them (CC-12d). The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
+    `score = ${SEO_WEIGHTS.structure / 100} × structure + ${SEO_WEIGHTS.crawlability} × crawlability. Structure is v1's grade (packages/engine/src/grade.ts, its components and weights unchanged) of the link graph whose nodes are the crawled pages answering 200 (a 404 or a redirect is a crawl outcome, not a node: v1's SPEC 01 path), 0 to 100, also \`site_structure_score\`. Crawlability is the share of crawled URLs that answer 200 and carry no crawlability defect (owner ruling, 2026-11-05). A URL carries a defect when it is among the affected pages of a detected ${list(CRAWLABILITY_DETECTORS)} record; a URL counts once however many defects it carries. One affected page on a site of N crawled URLs therefore moves the score by ${SEO_WEIGHTS.crawlability}/N.
+
+Three readings of the ruling are this branch's, not the owner's words:
+
+- The denominator is every crawled URL. The ruling's "share of URLs answering 200 that carry no defect" also bears "of the URLs answering 200"; the reading taken keeps a URL that does not answer 200 as a defect (it was a measure of the old formula), and no fix here clears it.
+- A record that could not decide marks no page, so its pages count as clean; the old formula dropped a measure with nothing decided.
+- A record's pages are the detector's \`affected_urls\`, the pages where its fix is made:
+
+${table(
+  ['Detector', 'Pages a detected record marks'],
+  [
+    [
+      '`redirect_chain`',
+      'the crawled 200 pages that link to the redirecting URL, not the URL itself',
+    ],
+    [
+      '`canonical_mismatch`',
+      'the page whose canonical cannot be honoured, or that is linked under another URL',
+    ],
+    ['`duplicate_pagination`', 'the later pages of the list found to repeat page 1'],
+    ['`hreflang_gap`', 'the members of the cluster with a missing or broken annotation'],
+  ],
+)}
+
+So one link in a site-wide menu or footer to a redirect chain marks every page that carries it: on the 14-page blog of the example sites, Technical SEO goes from 87.42 to 47.42 (0.6 × 79.03 + 40 × 0/14) and the fix is worth +40 (effects.test.ts). The old formula, a mean of two measures, gave 67.42 (0.6 × 79.03 + 40 × (1 + 0)/2). Pages lacking a title or a meta description will be defects of the same kind once the crawl worker records them (CC-12d). The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
     '',
     '## Content checks',
     '',
@@ -446,7 +471,7 @@ export function renderGradeSpec(): string {
     '',
     `A template's content fix is detected when ${T.TEMPLATE_RULE.DETECT_MIN_PAGES} or more of its decided pages fail and they are ${pct(T.TEMPLATE_RULE.DETECT_SHARE)} or more of them; clear at ${pct(T.TEMPLATE_RULE.CLEAR_SHARE)} or less; indeterminate between (hysteresis), or when a page of the template was not read. An opened content fix is \`info\` (diff/severity.ts).`,
     '',
-    `The Content section score (\`Check.content.score\`) is 100 × the mean pass rate of the counted checks, and each entry of \`content.checks\` says whether its check is \`counted\`. ${counted.length === 0 ? 'No check counts yet, so there is no score, and the contract requires one: `Check.content` is null on every check, and the five checks\' per-template results are not carried there. A reported contract gap: `ContentSummary.score` would have to be nullable for the section to report the checks before one counts.' : `Counted: ${list(counted)}.`}`,
+    `The Content section score (\`Check.content.score\`) is 100 × the mean pass rate of the counted checks, and each entry of \`content.checks\` says whether its check is \`counted\`. ${counted.length === 0 ? "No check counts yet, so there is no score, and the contract requires one: `Check.content` is null on every check, and the five checks' per-template results are not carried there. A reported contract gap: `ContentSummary.score` would have to be nullable for the section to report the checks before one counts." : `Counted: ${list(counted)}.`}`,
     '',
     '### The label set',
     '',
@@ -454,7 +479,7 @@ export function renderGradeSpec(): string {
     '',
     '## Fix effects',
     '',
-    "Each effect is a counterfactual recompute. Fixes whose AI effect applied alone can be stated rank first, by that effect (Technical SEO plus AI readability, larger first; an effect not estimated counts 0); then the fixes whose AI effect waits on a reason; ties by fingerprint. In that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade less the current one.",
+    'Each effect is a counterfactual recompute. Fixes whose AI effect applied alone can be stated rank first, then the fixes whose AI effect waits on a reason; within each group by the effect applied alone (Technical SEO plus AI readability, larger first; an effect not estimated counts 0); ties by fingerprint. While AI readability is withheld every fix is in the second group, so rank, and the free fix, follow Technical SEO. In that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade less the current one.',
     '',
     'An effect can be 0 or negative: a counterfactual can lower a grade, as a link added for a deep page can lower the concentration of PageRank on hubs, and two fixes can change the same thing. The computed value is kept, so the effects still add up (owner ruling, 2026-11-05). When a fix would raise a grade alone and its effect in the order is 0 or less, `absorbed_by` names the higher-ranked fix that took it: the first, in rank order, of the fixes above it that name a page, crawler or template it names, by whose application its effect is 0 or less. None found leaves `absorbed_by` null with the effect as computed. The engine records the fix by fingerprint and the diff writes its `number`. The copy that says so ("covered by fix #k") is UI work.',
     '',
@@ -483,7 +508,7 @@ export function renderGradeSpec(): string {
     '## Verify',
     '',
     '```bash',
-    'pnpm --filter @crawlmouse/engine exec vitest run src/v2/grade src/v2/content src/v2/diff/severity.test.ts',
+    'pnpm --filter @crawlmouse/engine exec vitest run src/v2/grade src/v2/content src/v2/diff',
     '```',
   ].join('\n')}\n`;
 }

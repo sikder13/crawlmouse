@@ -95,8 +95,9 @@ export const tallies = (first = false): Record<ContentCheck, Tally> =>
  * label it gives them; the pages stay labelled `unsure` until CC-18 relabels the set. The owner ruled
  * the second (2026-11-05: a call to action is not a content heading), so `ruled` marks it. Under it, a
  * page left with fewer than three content headings would be `na` rather than `fail`; this counts it
- * `fail`, which can raise "applies" and "failing" but not precision or pass accuracy, since such a
- * page is one the check judges not applicable.
+ * `fail`. That can raise "applies" and "failing", and changes neither share: the check fires on none
+ * of these pages (both rulings' tallies have the same firings, labels.test.ts), and where it passes
+ * one, `na` and `fail` both count against the pass.
  */
 export const RULINGS = {
   cta_is_content: {
