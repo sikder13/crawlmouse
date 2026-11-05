@@ -1210,6 +1210,7 @@ Where a rule reads inside jsonb on a table only the server writes, it is the wri
 | `withheld_unmeasured`    | reads every component inside checks.ai_readability                                                                                                                                                 |
 | `withheld_reasons_match` | compares the reasons with the components inside checks.ai_readability                                                                                                                              |
 | `fewer_crawlers`         | reads the Access component inside checks.ai_readability                                                                                                                                            |
+| `content_score_withheld` | compares two fields inside checks.content                                                                                                                                                          |
 | `effect_seo_pending`     | inside site_fixes.effect; added by CC-17 after the v2-003 migration, and a CHECK like site_fixes_effect_pending needs a migration, which the owner applies                                         |
 | `effect_absorbed`        | sums two numbers inside site_fixes.effect; added by CC-17 after the v2-003 migration, which the owner applies                                                                                      |
 | `time_zone`              | a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses                                                                        |
@@ -1224,32 +1225,33 @@ Where a rule reads inside jsonb on a table only the server writes, it is the wri
 
 The writer parses these with the contract schema (owner default 1). A column a field-bound CHECK above covers is marked with that CHECK.
 
-| Enum                  | Columns                                                                                       |
-| --------------------- | --------------------------------------------------------------------------------------------- |
-| `AccessCause`         | `checks.crawlers`                                                                             |
-| `CheckPhase`          | `checks.progress`                                                                             |
-| `Channel`             | `changes.notified`                                                                            |
-| `CmsName`             | `checks.stack`                                                                                |
-| `Confidence`          | `checks.crawlers`                                                                             |
-| `ContentCheck`        | `checks.content`                                                                              |
-| `CrawlerGroup`        | `checks.crawlers`                                                                             |
-| `DetectionState`      | `checks.signals`                                                                              |
-| `EstimateBound`       | `site_fixes.before_after`                                                                     |
-| `EvidenceClass`       | `checks.crawlers`                                                                             |
-| `FixMeasure`          | `site_fixes.before_after`                                                                     |
-| `GradeLetter`         | `changes.grade_deltas`, `checks.ai_readability`, `checks.competitors`, `checks.technical_seo` |
-| `GradeName`           | `changes.grade_deltas`                                                                        |
-| `JsTextState`         | `page_results.without_js` (CHECK `page_results_without_js`)                                   |
-| `PacketFramework`     | `checks.stack`, `site_fixes.packet`                                                           |
-| `PageKind`            | `checks.coverage`                                                                             |
-| `RecommendationClass` | `checks.signals`                                                                              |
-| `RefusalTrigger`      | `checks.technical_seo`                                                                        |
-| `SampleMethod`        | `checks.coverage`                                                                             |
-| `SignalKind`          | `checks.signals`                                                                              |
-| `StepState`           | `checks.progress`                                                                             |
-| `TechnicalSeoPending` | `site_fixes.effect`                                                                           |
-| `Verdict`             | `checks.crawlers`, `page_results.robots_search` (CHECK `page_results_robots_search`)          |
-| `WithheldReason`      | `checks.ai_readability`, `site_fixes.effect`                                                  |
+| Enum                   | Columns                                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------------------- |
+| `AccessCause`          | `checks.crawlers`                                                                             |
+| `CheckPhase`           | `checks.progress`                                                                             |
+| `Channel`              | `changes.notified`                                                                            |
+| `CmsName`              | `checks.stack`                                                                                |
+| `Confidence`           | `checks.crawlers`                                                                             |
+| `ContentCheck`         | `checks.content`                                                                              |
+| `ContentScoreWithheld` | `checks.content`                                                                              |
+| `CrawlerGroup`         | `checks.crawlers`                                                                             |
+| `DetectionState`       | `checks.signals`                                                                              |
+| `EstimateBound`        | `site_fixes.before_after`                                                                     |
+| `EvidenceClass`        | `checks.crawlers`                                                                             |
+| `FixMeasure`           | `site_fixes.before_after`                                                                     |
+| `GradeLetter`          | `changes.grade_deltas`, `checks.ai_readability`, `checks.competitors`, `checks.technical_seo` |
+| `GradeName`            | `changes.grade_deltas`                                                                        |
+| `JsTextState`          | `page_results.without_js` (CHECK `page_results_without_js`)                                   |
+| `PacketFramework`      | `checks.stack`, `site_fixes.packet`                                                           |
+| `PageKind`             | `checks.coverage`                                                                             |
+| `RecommendationClass`  | `checks.signals`                                                                              |
+| `RefusalTrigger`       | `checks.technical_seo`                                                                        |
+| `SampleMethod`         | `checks.coverage`                                                                             |
+| `SignalKind`           | `checks.signals`                                                                              |
+| `StepState`            | `checks.progress`                                                                             |
+| `TechnicalSeoPending`  | `site_fixes.effect`                                                                           |
+| `Verdict`              | `checks.crawlers`, `page_results.robots_search` (CHECK `page_results_robots_search`)          |
+| `WithheldReason`       | `checks.ai_readability`, `site_fixes.effect`                                                  |
 
 ## Where this differs from the design documents
 

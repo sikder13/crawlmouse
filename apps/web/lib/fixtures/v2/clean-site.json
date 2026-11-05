@@ -144,6 +144,7 @@
       },
       "content": {
         "score": 88,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",

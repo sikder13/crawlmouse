@@ -26,6 +26,7 @@ import {
   CmsNameSchema,
   ConfidenceSchema,
   ContentCheckSchema,
+  ContentScoreWithheldSchema,
   CrawlerGroupSchema,
   DetectionStateSchema,
   EvidenceClassSchema,
@@ -136,25 +137,39 @@ export const StructureSchema = z.strictObject({
   generic_anchor_share: ShareSchema,
 });
 
-export const ContentSummarySchema = z.strictObject({
-  /** "Content an answer engine can quote", 0..100, over the checks marked `counted`. */
-  score: ScoreSchema,
-  checks: z.array(
-    z.strictObject({
-      check: ContentCheckSchema,
-      /** The check counts toward `score`; a check that does not is reported and scores nothing. */
-      counted: z.boolean(),
-      /** Templates the check does not apply to are absent ("—" on the screen). */
-      by_template: z.array(
-        z.strictObject({
-          template_key: TemplateKeySchema,
-          passing: CountSchema,
-          total: CountSchema,
-        }),
-      ),
+export const ContentSummarySchema = z
+  .strictObject({
+    /**
+     * "Content an answer engine can quote", 0..100, over the checks marked `counted`; null while it
+     * cannot be given, and then `score_withheld` says why. The checks are reported either way.
+     */
+    score: ScoreSchema.nullable(),
+    score_withheld: ContentScoreWithheldSchema.nullable(),
+    checks: z.array(
+      z.strictObject({
+        check: ContentCheckSchema,
+        /** The check counts toward `score`; a check that does not is reported and scores nothing. */
+        counted: z.boolean(),
+        /** Templates the check does not apply to are absent ("—" on the screen). */
+        by_template: z.array(
+          z.strictObject({
+            template_key: TemplateKeySchema,
+            passing: CountSchema,
+            total: CountSchema,
+          }),
+        ),
+      }),
+    ),
+  })
+  .check(
+    rules((c, rule) => {
+      rule.exactlyWhen(
+        'content_score_withheld',
+        c.score === null,
+        (c.score_withheld ?? null) !== null,
+      );
     }),
-  ),
-});
+  );
 
 export const SignalResultSchema = z.strictObject({
   signal: SignalKindSchema,

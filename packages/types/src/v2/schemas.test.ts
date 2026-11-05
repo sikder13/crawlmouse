@@ -30,6 +30,7 @@ import {
   crawledText,
   CrawlerRegistryEntrySchema,
   CrawlerResultSchema,
+  ContentSummarySchema,
   EffectSchema,
   ENTITIES,
   FixEventSchema,
@@ -828,6 +829,18 @@ const CASES: RuleCase[] = [
       ...withheldAi()!,
       withheld_reasons: ['too_few_crawlers_measured', 'check_not_scored'],
     }),
+  },
+  {
+    rule: 'content_score_withheld',
+    breaks: 'no score, and no reason',
+    schema: ContentSummarySchema,
+    input: () => ({ ...finished().content!, score: null, score_withheld: null }),
+  },
+  {
+    rule: 'content_score_withheld',
+    breaks: 'a score, and a reason it has none',
+    schema: ContentSummarySchema,
+    input: () => ({ ...finished().content!, score_withheld: 'no_check_counted' }),
   },
   {
     rule: 'fewer_crawlers',

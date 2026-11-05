@@ -56,6 +56,8 @@ export const NOT_STORED_YET: Record<string, string> = {
  */
 export const VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {
   'access_tests.source_ip_class': ['other_egress'],
+  // CC-17's two content fix types (owner ruling, 2026-11-05): written only after CC-06c's CHECK
+  'site_fixes.type': ['missing_schema_description', 'no_question_headings'],
 };
 
 /**
@@ -254,6 +256,7 @@ export const RULES_AT_WRITE: Record<string, string> = {
   withheld_unmeasured: 'reads every component inside checks.ai_readability',
   withheld_reasons_match: 'compares the reasons with the components inside checks.ai_readability',
   fewer_crawlers: 'reads the Access component inside checks.ai_readability',
+  content_score_withheld: 'compares two fields inside checks.content',
   effect_seo_pending:
     'inside site_fixes.effect; added by CC-17 after the v2-003 migration, and a CHECK like site_fixes_effect_pending needs a migration, which the owner applies',
   effect_absorbed:
@@ -308,6 +311,7 @@ export const NESTED: Record<string, string[]> = {
   CmsName: ['checks.stack'],
   Confidence: ['checks.crawlers'],
   ContentCheck: ['checks.content'],
+  ContentScoreWithheld: ['checks.content'],
   CrawlerGroup: ['checks.crawlers'],
   DetectionState: ['checks.signals'],
   EstimateBound: ['site_fixes.before_after'],

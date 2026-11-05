@@ -57,6 +57,9 @@ export const RULES = {
     'a Technical SEO effect is either estimated, or not estimated because the grade is refused',
   ),
   effect_absorbed: one('a fix absorbed by a higher-ranked one has no positive effect left'),
+  content_score_withheld: two(
+    'the Content section has a score, or no score and the reason it has none',
+  ),
   fix_last_state: one('last_state does not fit the status'),
   fix_rank: two('every live fix has a rank and a resolved fix has none'),
   packet_framework: one('the packet framework must be one of its switch options'),

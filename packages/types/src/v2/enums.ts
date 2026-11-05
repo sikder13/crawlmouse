@@ -117,6 +117,8 @@ export const FixTypeSchema = named(
     'duplicate_pagination',
     'canonical_mismatch',
     'hreflang_gap',
+    'missing_schema_description',
+    'no_question_headings',
   ]),
 );
 /** The before/after rows on the fix page. */
@@ -394,6 +396,15 @@ export const WithheldReasonSchema = named(
  * and its test pins the two lists to each other.
  */
 export const TechnicalSeoPendingSchema = named('TechnicalSeoPending', z.enum(['grade_refused']));
+/**
+ * Why the Content section has no score: no check counts toward it yet, a counted check could not be
+ * read on some graded pages, or no counted check applied to any graded page. The engine says what
+ * each means (packages/engine/src/v2/grade/withheld.ts), and its test pins the two lists.
+ */
+export const ContentScoreWithheldSchema = named(
+  'ContentScoreWithheld',
+  z.enum(['no_check_counted', 'pages_not_read', 'no_check_applied']),
+);
 /** v1 `RefusalTrigger`. */
 export const RefusalTriggerSchema = named(
   'RefusalTrigger',
@@ -461,6 +472,7 @@ export const V1_PINNED_ENUMS = {
   RefusalTrigger: RefusalTriggerSchema,
   WithheldReason: WithheldReasonSchema,
   TechnicalSeoPending: TechnicalSeoPendingSchema,
+  ContentScoreWithheld: ContentScoreWithheldSchema,
 } as const;
 
 export const REGISTRY_ONLY_ENUMS = {
@@ -512,6 +524,7 @@ export type SeatRole = z.infer<typeof SeatRoleSchema>;
 export type ChangeKind = z.infer<typeof ChangeKindSchema>;
 export type WithheldReason = z.infer<typeof WithheldReasonSchema>;
 export type TechnicalSeoPending = z.infer<typeof TechnicalSeoPendingSchema>;
+export type ContentScoreWithheld = z.infer<typeof ContentScoreWithheldSchema>;
 export type Severity = z.infer<typeof SeveritySchema>;
 export type MeasurementStatus = z.infer<typeof MeasurementStatusSchema>;
 export type UsageKind = z.infer<typeof UsageKindSchema>;

@@ -471,6 +471,7 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
@@ -1051,6 +1052,7 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
@@ -1614,6 +1616,7 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
@@ -2205,6 +2208,7 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
@@ -2768,6 +2772,7 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
@@ -3331,6 +3336,7 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
@@ -8160,6 +8166,78 @@
         },
         "packets": []
       },
+      "gone": null
+    },
+    {
+      "id": "f0000000-0000-4000-8000-00000000001e",
+      "site_id": "50000000-0000-4000-8000-000000000001",
+      "fingerprint": "0f1e00000000001e",
+      "number": 14,
+      "type": "missing_schema_description",
+      "section": "content",
+      "title": "Describe each product page in its schema.org markup",
+      "detail": "template change: a description on the Product node, from the existing summary",
+      "recommendation_class": "documented_requirement",
+      "status": "open",
+      "last_state": "detected",
+      "last_measured_check_id": "c0000000-0000-4000-8000-000000000006",
+      "first_seen_check_id": "c0000000-0000-4000-8000-000000000006",
+      "confidence": "inconclusive",
+      "affected_pages": 158,
+      "template_key": "/products/{slug}",
+      "crawler_uas": [],
+      "rank": 15,
+      "effect": {
+        "technical_seo": 0,
+        "technical_seo_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["check_not_scored"],
+        "absorbed_by": null,
+        "estimate": true
+      },
+      "effort": {
+        "kind": "templates",
+        "templates": 1,
+        "deploys": 1
+      },
+      "before_after": [],
+      "packet": null,
+      "gone": null
+    },
+    {
+      "id": "f0000000-0000-4000-8000-00000000001f",
+      "site_id": "50000000-0000-4000-8000-000000000001",
+      "fingerprint": "0f1e00000000001f",
+      "number": 15,
+      "type": "no_question_headings",
+      "section": "content",
+      "title": "Phrase a section heading on blog posts as the question it answers",
+      "detail": "content change: one h2 per post worded as a question",
+      "recommendation_class": "experimental",
+      "status": "open",
+      "last_state": "detected",
+      "last_measured_check_id": "c0000000-0000-4000-8000-000000000006",
+      "first_seen_check_id": "c0000000-0000-4000-8000-000000000006",
+      "confidence": "inconclusive",
+      "affected_pages": 7,
+      "template_key": "/blog/{slug}",
+      "crawler_uas": [],
+      "rank": 16,
+      "effect": {
+        "technical_seo": 0,
+        "technical_seo_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["check_not_scored"],
+        "absorbed_by": null,
+        "estimate": true
+      },
+      "effort": {
+        "kind": "templates",
+        "templates": 1,
+        "deploys": 1
+      },
+      "before_after": [],
+      "packet": null,
       "gone": null
     },
     {
