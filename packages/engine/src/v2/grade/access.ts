@@ -10,10 +10,9 @@
  * block is not scored as a block, so Access moves to the mean of the others, up when the crawler's
  * share was below it and down when above, while enough crawlers stay measured. With fewer than
  * MIN_MEASURED_CRAWLERS measured:
- *   - when every other scored crawler is blocked by choice, and no scored crawler had a page refused
+ *   - when every scored crawler that is not measured is blocked by choice, none with a page refused
  *     as unverified, Access is scored from the measured ones, and `scored_from` records how many
- *     (owner ruling, 2026-11-05; "no page refused as unverified" is this module's reading of the
- *     ruling's "none refused_unverified", the stricter of the two);
+ *     (owner ruling, 2026-11-05); the measured crawlers' own pages follow the ordinary rules;
  *   - when every scored crawler is blocked by choice, Access has no score: `blocked_by_choice`;
  *   - otherwise it has no score: `too_few_crawlers_measured`, with the range the score could take
  *     when each unmeasured crawler is anything from 0 to 1.
@@ -75,7 +74,11 @@ export function accessScore(crawlers: readonly CrawlerTally[]): AccessMeasure {
   const shares = ours.map(crawlerShare);
   const measured = shares.flatMap((s) => (s.share === null ? [] : [s.share]));
   const unmeasured = shares.filter((s) => s.standing === 'unmeasured').length;
-  const unverified = ours.some((c) => (c.counts.refused_unverified ?? 0) > 0);
+  // the crawlers that are not measured must each be blocked by choice, none with a page refused as
+  // unverified; the measured ones' own pages follow the ordinary rules (owner ruling, 2026-11-05)
+  const unverified = ours.some(
+    (c, i) => shares[i]!.standing !== 'measured' && (c.counts.refused_unverified ?? 0) > 0,
+  );
   if (measured.length >= MIN_MEASURED_CRAWLERS) {
     return { ...scored(AI_WEIGHTS.access * mean(measured)), reason: null, scored_from: null };
   }

@@ -102,16 +102,22 @@ describe('Access (max 40)', () => {
     expect(accessScore(four({ allowed: 1, allowed_thin: 1 }, d, d, d)).score).toBe(30);
   });
 
-  it('A5c: one measured, two disallowed, one unmeasured or refused unverified on a page: not scored from fewer', () => {
+  it('A5c: one measured and two disallowed: not scored from fewer when the fourth is unmeasured or refused unverified, and scored when only the measured one has a refused page', () => {
     const d = { disallowed_by_robots: 3 };
     for (const last of [{ allowed: 1 }, { refused_unverified: 2 }]) {
       const a = accessScore(four({ allowed: 2 }, d, d, last));
       expect(a.score, JSON.stringify(last)).toBe(null);
       expect(a.reason).toBe('too_few_crawlers_measured');
     }
-    // refused unverified on a page of the measured crawler itself
+    // refused unverified on a page of the measured crawler itself: its own pages follow the ordinary
+    // rules (that page is out of its denominator), so Access is scored from it, 40 × 2/2
     const a = accessScore(four({ allowed: 2, refused_unverified: 1 }, d, d, d));
-    expect([a.score, a.reason]).toEqual([null, 'too_few_crawlers_measured']);
+    expect([a.score, a.reason, a.scored_from]).toEqual([40, null, 1]);
+    // as two measured crawlers with refused pages score: 40 × (1 + 0.5)/2 = 30
+    const two = accessScore(
+      four({ allowed: 2, refused_unverified: 1 }, { allowed_thin: 2, refused_unverified: 3 }, d, d),
+    );
+    expect([two.score, two.scored_from]).toEqual([30, null]);
   });
 
   it('A5d: with the other measured crawler served in full, disallowing the blocked one raises Access as far as unblocking it: 20 → 40 either way', () => {

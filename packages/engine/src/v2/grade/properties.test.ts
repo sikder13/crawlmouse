@@ -97,13 +97,15 @@ function within(m: Measure, max: number): boolean {
 }
 
 describe('Access', () => {
-  it('lies in 0..40, and has a score exactly when two crawlers are measured, or one with the rest blocked by choice and no page refused unverified', () => {
+  it('lies in 0..40, and has a score exactly when two crawlers are measured, or one with the rest blocked by choice and none of them refused unverified', () => {
     fc.assert(
       fc.property(crawlersArb, (cs) => {
         const a = accessScore(cs);
         const measured = cs.filter(measuredByRule).length;
         const restByChoice = cs.every((c) => measuredByRule(c) || byChoiceByRule(c));
-        const unverified = cs.some((c) => (c.counts.refused_unverified ?? 0) > 0);
+        const unverified = cs.some(
+          (c) => !measuredByRule(c) && (c.counts.refused_unverified ?? 0) > 0,
+        );
         const fewer = measured >= 1 && measured < 2 && restByChoice && !unverified;
         expect(within(a, 40)).toBe(true);
         expect(a.score !== null).toBe(measured >= 2 || fewer);
@@ -114,7 +116,7 @@ describe('Access', () => {
     );
   });
 
-  it('one measured and three blocked by choice: scored from the one exactly when no page is refused unverified', () => {
+  it('one measured and three blocked by choice: scored from the one unless one of the three has a page refused unverified', () => {
     const shape = fc.tuple(
       measuredCounts,
       fc.array(byChoiceCounts, { minLength: 3, maxLength: 3 }),
@@ -130,9 +132,11 @@ describe('Access', () => {
         const share =
           (m.allowed + 0.5 * m.allowed_thin) / (m.allowed + m.allowed_thin + m.blocked_by_ua_rule);
         // a refused page on a crawler blocked by choice leaves it disallowed on fewer pages than were
-        // read, so unmeasured; on the measured crawler it is the refused page itself: either stops it
-        expect(a.score === null).toBe(refused > 0);
-        if (refused === 0) {
+        // read, so unmeasured, and stops the score; on the measured crawler it is out of the
+        // denominator and changes nothing
+        const stopped = refused > 0 && at > 0;
+        expect(a.score === null).toBe(stopped);
+        if (!stopped) {
           expect(a.score).toBeCloseTo(40 * share, 2);
           expect(a.scored_from).toBe(1);
         }
