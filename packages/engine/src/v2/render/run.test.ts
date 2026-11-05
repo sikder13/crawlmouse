@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RenderReply } from './client.js';
-import { RENDER_TIMEOUT_MS } from './client.js';
+import { RENDER_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from './client.js';
 import { fakeClient, memoryDailyBudget, replyFixtures, type ReplyFixture } from './fakes.js';
 import { NotAdmitted } from './admission.js';
 import { RENDER_FAILURES } from './client.js';
@@ -48,7 +48,7 @@ function input(over: Partial<RenderCheckInput> = {}): RenderCheckInput {
     client: fakeClient(FIXTURES.values()),
     admit: admitAll,
     caps: { perCheckMs: 600_000, perDayMs: 3_600_000 },
-    daily: memoryDailyBudget(3_600_000),
+    daily: memoryDailyBudget(),
     sleep: noSleep,
     ...over,
   };
@@ -104,7 +104,9 @@ describe('a check whose renders all succeed', () => {
     const out = await renderCheck(input());
     // By hand: three templates of one graded page each, shares 1, 0 and 0.5.
     expect(out.estimate.site_text_share).toBeCloseTo(0.5, 12);
-    expect(out.estimate.label).toBe('estimated from 3 rendered pages across 3 of 3 templates');
+    expect(out.estimate.label).toBe(
+      'estimated from 3 rendered pages across 3 of 3 templates; 100 % of the estimate rests on one rendered page per template',
+    );
   });
 
   it('uses each page’s previous state for the hysteresis', async () => {
@@ -139,8 +141,14 @@ describe('a check that renders nothing, and does not fail', () => {
     expect(out.estimate.site_text_share).toBeNull();
   });
 
-  it.each([[{ perCheckMs: 0, perDayMs: 3_600_000 }], [{ perCheckMs: 600_000, perDayMs: 0 }]])(
-    'is caps_not_configured when a cap is zero (%j), with no request made',
+  it.each([
+    [{ perCheckMs: 0, perDayMs: 3_600_000 }],
+    [{ perCheckMs: 600_000, perDayMs: 0 }],
+    [{ perCheckMs: NaN, perDayMs: 3_600_000 }],
+    [{ perCheckMs: 600_000, perDayMs: Infinity }],
+    [{ perCheckMs: -1, perDayMs: 3_600_000 }],
+  ])(
+    'is caps_not_configured when a cap is not a positive finite number (%j), with no request made',
     async (caps) => {
       const client = fakeClient(FIXTURES.values());
       const out = await renderCheck(input({ client, caps }));
@@ -172,9 +180,9 @@ describe('a page refused at admission', () => {
 describe('the per-check cap', () => {
   it('stops rendering once a further render would pass it, and records why', async () => {
     const client = fakeClient(FIXTURES.values());
-    // Room for exactly two renders' reservations: one page, both sides.
+    // Room for one page's two reservations and a second's only if the first used under a second.
     const out = await renderCheck(
-      input({ client, caps: { perCheckMs: 2 * RENDER_TIMEOUT_MS, perDayMs: 3_600_000 } }),
+      input({ client, caps: { perCheckMs: 2 * RENDER_TIMEOUT_MS + 1000, perDayMs: 3_600_000 } }),
     );
     expect(out.pages.map((p) => (p.rendered ? 'rendered' : p.reason))).toEqual([
       'rendered',
@@ -185,11 +193,73 @@ describe('the per-check cap', () => {
   });
 });
 
-describe('the per-day cap', () => {
-  it('stops rendering when today’s budget refuses a reservation', async () => {
-    const client = fakeClient(FIXTURES.values());
+describe('a cap that binds while pages are in flight', () => {
+  const many = Array.from({ length: 8 }, (_, i) => ({
+    provenance: 'test',
+    url: `https://site.example/m${i}`,
+    static: { html: '<body><main><p>a b</p></main></body>', browser_ms: 500 },
+    rendered: { html: '<body><main><p>a b c d</p></main></body>', browser_ms: 500 },
+  }));
+  const candidates = many.map((f, i) => candidate(f, `/m${i}`));
+
+  it('lets a page wait for another to settle, so a cap with room for one reservation renders them all', async () => {
+    // One reservation (two renders at the wait cap) plus what eight pages use, 1 s each.
     const out = await renderCheck(
-      input({ client, daily: memoryDailyBudget(2 * RENDER_TIMEOUT_MS) }),
+      input({
+        client: fakeClient(many, { delayMs: 2 }),
+        candidates,
+        caps: { perCheckMs: 2 * RENDER_TIMEOUT_MS + 8 * 1000, perDayMs: 3_600_000 },
+      }),
+    );
+    expect(out.pages.map((p) => p.rendered)).toEqual(many.map(() => true));
+    expect(out.browser_ms).toBe(8 * 1000);
+  });
+
+  it('frees what a page did not use for the pages after it', async () => {
+    // Today's room is one reservation plus what eight pages use: each page gives back the 29 s it held
+    // and did not use, so the next can reserve.
+    const out = await renderCheck(
+      input({
+        client: fakeClient(many, { delayMs: 2 }),
+        candidates,
+        caps: { perCheckMs: 600_000, perDayMs: 2 * RENDER_TIMEOUT_MS + 8 * 1000 },
+      }),
+    );
+    expect(out.pages.every((p) => p.rendered)).toBe(true);
+    // A millisecond short of the eighth page's reservation once seven have used theirs: it is refused.
+    const short = await renderCheck(
+      input({
+        client: fakeClient(many, { delayMs: 2 }),
+        candidates,
+        caps: { perCheckMs: 600_000, perDayMs: 2 * RENDER_TIMEOUT_MS + 7 * 1000 - 1 },
+      }),
+    );
+    expect(short.pages.map((p) => p.rendered)).toEqual([...Array(7).fill(true), false]);
+  });
+});
+
+describe('the estimate behind a check', () => {
+  it('weights by every graded page, including one robots.txt kept from the render', async () => {
+    const kept = {
+      ...candidate({ url: 'https://site.example/kept' }, '/kept'),
+      fetched_under_our_robots: false,
+    };
+    const out = await renderCheck(input({ candidates: [...THREE, kept] }));
+    expect(out.estimate.templates_total).toBe(4);
+    expect(out.estimate.unrendered_share).toBe(0.25);
+  });
+});
+
+describe('the per-day cap', () => {
+  it('stops rendering when today’s budget, with other checks’ use in it, refuses a reservation', async () => {
+    const client = fakeClient(FIXTURES.values());
+    const perDayMs = 3_600_000;
+    const out = await renderCheck(
+      input({
+        client,
+        caps: { perCheckMs: 600_000, perDayMs },
+        daily: memoryDailyBudget(perDayMs - 2 * RENDER_TIMEOUT_MS),
+      }),
     );
     expect(out.pages.map((p) => (p.rendered ? 'rendered' : p.reason))).toEqual([
       'rendered',
@@ -213,8 +283,69 @@ describe('the per-day cap', () => {
     expect(client.calls).toEqual([]);
   });
 
+  it('hands the budget the per-day cap from the caps, so the environment value is the limit', async () => {
+    const reserve = vi.fn(async (_ms: number, _limitMs: number) => true);
+    await renderCheck(
+      input({
+        candidates: [THREE[0]!],
+        caps: { perCheckMs: 600_000, perDayMs: 123_000 },
+        daily: { reserve, settle: async () => {} },
+      }),
+    );
+    expect(reserve.mock.calls).toEqual([[2 * RENDER_TIMEOUT_MS, 123_000]]);
+  });
+
+  // More pages than in-flight slots: the first wave asks together, before any answer; after a refusal
+  // with nothing rendering, the pages that start later do not ask.
+  const eight = Array.from({ length: 8 }, (_, i) =>
+    candidate({ url: `https://site.example/e${i}` }, `/e${i}`),
+  );
+
+  it('is not asked again once it refuses with nothing rendering', async () => {
+    const reserve = vi.fn(async (_ms: number, _limitMs: number) => false);
+    const out = await renderCheck(
+      input({ candidates: eight, daily: { reserve, settle: async () => {} } }),
+    );
+    expect(out.pages.every((p) => !p.rendered && p.reason === 'daily_cap')).toBe(true);
+    expect(reserve).toHaveBeenCalledTimes(RENDER_IN_FLIGHT);
+  });
+
+  it('is not asked again once it throws', async () => {
+    const reserve = vi.fn(async (_ms: number, _limitMs: number): Promise<boolean> => {
+      throw new Error('store down');
+    });
+    const out = await renderCheck(
+      input({ candidates: eight, daily: { reserve, settle: async () => {} } }),
+    );
+    expect(out.pages.every((p) => !p.rendered && p.reason === 'daily_budget_unavailable')).toBe(
+      true,
+    );
+    expect(reserve).toHaveBeenCalledTimes(RENDER_IN_FLIGHT);
+  });
+
+  it('stops the pages waiting for room when settling fails, instead of letting them render', async () => {
+    const reserve = vi.fn(async (_ms: number, _limitMs: number) => true);
+    const settle = vi.fn(async (): Promise<void> => {
+      throw new Error('store down');
+    });
+    const out = await renderCheck(
+      input({
+        candidates: eight,
+        // Room for one page's reservation at a time, so the others wait while the first renders.
+        caps: { perCheckMs: 2 * RENDER_TIMEOUT_MS, perDayMs: 3_600_000 },
+        daily: { reserve, settle },
+      }),
+    );
+    // The first page reserves and is answered (page_failed: the fake has no reply for it); its settle
+    // throws, and the seven waiting for room stop rather than reserve.
+    expect(out.pages.slice(1).map((p) => !p.rendered && p.reason)).toEqual(
+      Array(7).fill('daily_budget_unavailable'),
+    );
+    expect(reserve).toHaveBeenCalledTimes(1);
+  });
+
   it('gives back what a render did not use', async () => {
-    const daily = memoryDailyBudget(3_600_000);
+    const daily = memoryDailyBudget();
     const out = await renderCheck(input({ daily }));
     expect(daily.usedMs()).toBe(out.browser_ms);
   });
@@ -246,6 +377,16 @@ describe('a 429 from Browser Run', () => {
       RENDER_RETRY.base_ms * 2,
       RENDER_RETRY.base_ms * 4,
     ]);
+  });
+
+  it('does not wait longer than the backoff cap: a longer Retry-After leaves the page rate_limited', async () => {
+    const sleep = vi.fn(async (_ms: number) => {});
+    const longWait: RenderReply = { ...tooMany, retryAfterMs: RENDER_RETRY.max_ms + 1 };
+    const client = fakeClient(FIXTURES.values(), { before: () => longWait });
+    const out = await renderCheck(input({ client, sleep, candidates: [THREE[0]!] }));
+    expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'rate_limited' });
+    expect(sleep).not.toHaveBeenCalled();
+    expect(client.calls).toHaveLength(1);
   });
 
   it('leaves the page rate_limited once the attempts run out, and the check does not fail', async () => {
@@ -288,7 +429,7 @@ describe('a 429 from Browser Run', () => {
 
 describe('a client that throws', () => {
   it('is read as network_error, the check goes on, and the reservation is settled', async () => {
-    const daily = memoryDailyBudget(3_600_000);
+    const daily = memoryDailyBudget();
     const client = {
       content: vi.fn(async () => {
         throw new Error('client bug');
@@ -296,9 +437,9 @@ describe('a client that throws', () => {
     };
     const out = await renderCheck(input({ client, daily, candidates: [THREE[0]!] }));
     expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'network_error' });
-    // Counted at the wait cap: the browser time of a request that threw is not known.
-    expect(out.browser_ms).toBe(RENDER_TIMEOUT_MS);
-    expect(daily.usedMs()).toBe(RENDER_TIMEOUT_MS);
+    // Counted at the request timeout: the browser time of a request that threw is not known.
+    expect(out.browser_ms).toBe(REQUEST_TIMEOUT_MS);
+    expect(daily.usedMs()).toBe(REQUEST_TIMEOUT_MS);
   });
 });
 

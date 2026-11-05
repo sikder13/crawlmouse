@@ -30,6 +30,12 @@ describe('the render caps', () => {
     },
   );
 
+  it('are zero for a value too large to be a number of seconds', () => {
+    expect(capsFromEnv({ RENDER_MAX_BROWSER_SECONDS_PER_CHECK: '9'.repeat(400) }).perCheckMs).toBe(
+      0,
+    );
+  });
+
   it('are read each on its own', () => {
     expect(capsFromEnv({ RENDER_MAX_BROWSER_SECONDS_PER_CHECK: '100' })).toEqual({
       perCheckMs: 100_000,

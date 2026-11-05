@@ -5,20 +5,22 @@
  * The day's reservation is settled whatever happens to the page. Nothing is written to disk.
  *
  * COST. Before a page starts, it reserves both of its renders at the wait cap, against the check's cap
- * and against today's budget; when either cannot take them, rendering stops for the rest of the check.
- * A render then settles at the browser time Browser Run reports for it. A render can report more than
- * the wait cap, so a check can end above its cap by that excess on the pages in flight. Which pages a
- * binding cap leaves unrendered depends on how long the earlier renders took.
+ * and against today's budget. When either cannot take them while other pages of the check are in
+ * flight, the page waits for one to settle and tries again; when nothing is in flight, rendering stops
+ * for the rest of the check. A render settles at the browser time Browser Run reports for it. A render
+ * can report more than the wait cap, so a check can end above its cap by that excess on the pages in
+ * flight. Which pages a binding cap leaves unrendered depends on how long the earlier renders took.
  *
  * RATE LIMITS. At most RENDER_IN_FLIGHT requests are open at once. A 429 is retried after the wait it
- * asks for, or with exponential backoff when it gives none, up to RENDER_RETRY.attempts tries; a page
- * still refused after that is `rate_limited`.
+ * asks for in seconds, or with exponential backoff when it gives none, up to RENDER_RETRY.attempts
+ * tries; a wait longer than RENDER_RETRY.max_ms is not taken. A page still refused is `rate_limited`.
  */
 import { defaultAdmit, NotAdmitted, type Admit } from './admission.js';
-import type { DailyBudget, RenderCaps } from './budget.js';
+import { usableCap, type DailyBudget, type RenderCaps } from './budget.js';
 import {
   MAX_REPLY_BYTES,
   RENDER_TIMEOUT_MS,
+  REQUEST_TIMEOUT_MS,
   type BrowserRunClient,
   type RenderReply,
   type RenderSide,
@@ -36,20 +38,27 @@ export const RESERVE_PER_RENDER_MS = RENDER_TIMEOUT_MS;
 /** Why a sampled page has no `without_js`, and what each reason means (the spec renders this). */
 export const NOT_RENDERED = {
   not_configured: 'The environment holds no Browser Run account or token.',
-  caps_not_configured: 'A cost cap is unset, invalid or zero, so nothing renders.',
-  not_admitted: 'Admission refused the URL; `detail` names the rule, or `resolution`.',
-  check_cap: "The check's cap could not take this page's two renders; rendering stopped.",
-  daily_cap: "Today's budget could not take this page's two renders; rendering stopped.",
-  daily_budget_unavailable: "Today's budget could not be read or written; rendering stopped.",
-  rate_limited: `Browser Run answered 429 on every try (${RENDER_RETRY.attempts}).`,
-  page_failed: 'Browser Run answered 422: the page timed out, crashed or errored while loading.',
+  caps_not_configured: 'A cost cap is not a positive whole number of seconds, so nothing renders.',
+  not_admitted:
+    'Admission refused the URL. `detail` is the policy rule, `resolution`, `unparseable`, or `error` for an admission that threw something else.',
+  check_cap:
+    "The check's cap could not take a page's two renders with no page in flight; rendering stopped for this page and those after it.",
+  daily_cap:
+    "Today's budget could not take a page's two renders with no page of this check in flight; rendering stopped for this page and those after it.",
+  daily_budget_unavailable:
+    "Today's budget threw when asked to reserve or settle; rendering stopped for this page and those after it.",
+  rate_limited: `Browser Run answered 429 on each of ${RENDER_RETRY.attempts} tries, or asked for a wait longer than ${RENDER_RETRY.max_ms} ms.`,
+  timed_out: `Browser Run did not answer, or did not finish its reply, within ${REQUEST_TIMEOUT_MS / 1000} s.`,
+  page_failed:
+    'Browser Run answered 422, which its documentation gives for a page that timed out, crashed or errored.',
   api_error: 'Browser Run answered another error status.',
   bad_reply: 'The reply was not the documented `{success: true, result: "<html>"}`.',
   oversize: `The reply passed ${MAX_REPLY_BYTES / 1024 / 1024} MiB and was not read further.`,
-  network_error: 'The request to Browser Run failed before an answer.',
-  challenged: 'A side of the render is a challenge or block page (challenge.ts).',
-  measure_failed: 'Counting the words of the two renders threw.',
+  network_error:
+    'The request failed or its reply could not be read, for a reason other than the timeout, or the client threw.',
+  challenged: 'A side of the render matches a challenge title or marker listed in challenge.ts.',
   nothing_rendered: 'The rendered side has no words, so there is no share.',
+  measure_failed: 'Counting the words of the two renders threw.',
 } as const;
 
 export type NotRenderedReason = keyof typeof NOT_RENDERED;
@@ -101,7 +110,7 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
   let stopped: NotRenderedReason | null =
     input.client === null
       ? 'not_configured'
-      : input.caps.perCheckMs === 0 || input.caps.perDayMs === 0
+      : !usableCap(input.caps.perCheckMs) || !usableCap(input.caps.perDayMs)
         ? 'caps_not_configured'
         : null;
 
@@ -121,16 +130,69 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
           ok: false,
           reason: 'network_error',
           retryAfterMs: null,
-          browserMs: RENDER_TIMEOUT_MS,
+          browserMs: REQUEST_TIMEOUT_MS,
         };
       }
       used.ms += reply.browserMs;
       if (reply.ok || reply.reason !== 'rate_limited' || attempt + 1 >= RENDER_RETRY.attempts) {
         return reply;
       }
-      await sleep(
-        reply.retryAfterMs ?? Math.min(RENDER_RETRY.base_ms * 2 ** attempt, RENDER_RETRY.max_ms),
-      );
+      const waitMs =
+        reply.retryAfterMs ?? Math.min(RENDER_RETRY.base_ms * 2 ** attempt, RENDER_RETRY.max_ms);
+      if (waitMs > RENDER_RETRY.max_ms) return reply;
+      await sleep(waitMs);
+    }
+  }
+
+  /**
+   * Pages asking today's budget for a reservation now, and pages rendering on one. A page that cannot
+   * reserve waits in one of two queues: for room under the check's cap, which any page frees when it
+   * is refused or settles; or for room in today's budget, which only a page that settles frees.
+   */
+  let asking = 0;
+  let rendering = 0;
+  const forCheckRoom: (() => void)[] = [];
+  const forDayRoom: (() => void)[] = [];
+  const until = (queue: (() => void)[]) => new Promise<void>((resolve) => queue.push(resolve));
+  const wake = (queue: (() => void)[]) => queue.splice(0).forEach((resolve) => resolve());
+
+  /**
+   * Reserve a page's two renders against the check's cap and today's budget. When the check's cap
+   * cannot take them while another page is asking or rendering, wait for room and try again. When
+   * today's budget refuses them while another page is rendering, wait for that page to settle and try
+   * again. When there is nothing to wait for, rendering stops for the rest of the check.
+   */
+  async function reserve(): Promise<NotRenderedReason | null> {
+    for (;;) {
+      if (stopped) return stopped;
+      if (checkHeld + pageReserve > input.caps.perCheckMs) {
+        if (asking + rendering === 0) return (stopped = 'check_cap');
+        await until(forCheckRoom);
+        continue;
+      }
+      checkHeld += pageReserve;
+      asking += 1;
+      let reserved: boolean;
+      try {
+        reserved = await input.daily.reserve(pageReserve, input.caps.perDayMs);
+      } catch {
+        stopped = 'daily_budget_unavailable';
+        reserved = false;
+      } finally {
+        asking -= 1;
+      }
+      if (reserved) {
+        rendering += 1;
+        return null;
+      }
+      checkHeld -= pageReserve;
+      wake(forCheckRoom);
+      if (stopped) {
+        wake(forDayRoom);
+        return stopped;
+      }
+      if (rendering === 0) return (stopped = 'daily_cap');
+      await until(forDayRoom);
     }
   }
 
@@ -141,21 +203,8 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
     } catch (e) {
       return notRendered(p, 'not_admitted', e instanceof NotAdmitted ? e.rule : 'error');
     }
-    if (stopped) return notRendered(p, stopped);
-    if (checkHeld + pageReserve > input.caps.perCheckMs)
-      return notRendered(p, (stopped = 'check_cap'));
-    checkHeld += pageReserve;
-    let reserved: boolean;
-    try {
-      reserved = await input.daily.reserve(pageReserve);
-    } catch {
-      reserved = false;
-      stopped = 'daily_budget_unavailable';
-    }
-    if (!reserved) {
-      checkHeld -= pageReserve;
-      return notRendered(p, (stopped ??= 'daily_cap'));
-    }
+    const refused = await reserve();
+    if (refused) return notRendered(p, refused);
 
     const used = { ms: 0 };
     try {
@@ -168,6 +217,9 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
       } catch {
         stopped ??= 'daily_budget_unavailable';
       }
+      rendering -= 1;
+      wake(forCheckRoom);
+      wake(forDayRoom);
     }
   }
 

@@ -68,11 +68,12 @@ export function fakeClient(
   return fake;
 }
 
-export function memoryDailyBudget(limitMs: number): DailyBudget & { usedMs: () => number } {
-  let used = 0;
+/** Today's budget in memory; `alreadyUsedMs` stands for what other checks have used today. */
+export function memoryDailyBudget(alreadyUsedMs = 0): DailyBudget & { usedMs: () => number } {
+  let used = alreadyUsedMs;
   return {
-    usedMs: () => used,
-    async reserve(ms) {
+    usedMs: () => used - alreadyUsedMs,
+    async reserve(ms, limitMs) {
       if (used + ms > limitMs) return false;
       used += ms;
       return true;

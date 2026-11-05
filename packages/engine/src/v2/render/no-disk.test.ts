@@ -81,7 +81,7 @@ describe('a render step', () => {
       client: fakeClient(fixtures),
       admit: async () => {},
       caps: { perCheckMs: 600_000, perDayMs: 600_000 },
-      daily: memoryDailyBudget(600_000),
+      daily: memoryDailyBudget(),
     });
     expect(out.pages.every((p) => p.rendered)).toBe(true);
     expect(writes).toEqual([]);

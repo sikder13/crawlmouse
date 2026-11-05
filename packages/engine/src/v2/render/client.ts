@@ -49,6 +49,11 @@ export const RENDER_WAIT_UNTIL = 'networkidle0';
 export const RENDER_TIMEOUT_MS = 15_000;
 /** The most reply bytes read; a longer reply is not a page this measures. */
 export const MAX_REPLY_BYTES = 10 * 1024 * 1024;
+/**
+ * How long one request to Browser Run may stay open, body included: the wait cap and a margin for the
+ * browser to start and the reply to arrive. Our choice, not a documented figure.
+ */
+export const REQUEST_TIMEOUT_MS = RENDER_TIMEOUT_MS + 30_000;
 
 export const ENV = {
   account: 'CLOUDFLARE_ACCOUNT_ID',
@@ -72,6 +77,7 @@ export function renderRequestBody(url: string, side: RenderSide) {
 
 export const RENDER_FAILURES = [
   'rate_limited',
+  'timed_out',
   'page_failed',
   'api_error',
   'bad_reply',
@@ -94,16 +100,24 @@ export interface ClientOptions {
   accountId: string;
   token: string;
   fetch?: Fetch;
+  requestTimeoutMs?: number;
 }
 
 /**
- * The browser time a reply reports. A reply that reports none is counted at the wait cap, so the cost
- * caps are never under-counted; a 429 is counted at zero, as no browser was started for it.
+ * The browser time a reply reports. When it reports none, or no reply came, the time is not known and
+ * is counted at the request timeout, the longest the request could have been open; the browser's own
+ * time could still be longer. A 429 is counted at zero, as no browser was started for it.
  */
-function browserMsOf(res: Response): number {
+function browserMsOf(res: Response, unknownMs: number): number {
   const raw = res.headers.get(BROWSER_RUN.browser_ms_header);
   const ms = raw === null ? NaN : Number(raw);
-  return Number.isFinite(ms) && ms >= 0 ? ms : RENDER_TIMEOUT_MS;
+  return Number.isFinite(ms) && ms >= 0 ? ms : unknownMs;
+}
+
+/** Retry-After in seconds as milliseconds; null when absent, empty, an HTTP date or anything else. */
+function retryAfterMsOf(res: Response): number | null {
+  const raw = res.headers.get('retry-after')?.trim() ?? '';
+  return /^[0-9]+$/.test(raw) ? Number(raw) * 1000 : null;
 }
 
 /** The reply body as text, or null once it passes MAX_REPLY_BYTES (the stream is then cancelled). */
@@ -132,33 +146,37 @@ function failure(reason: RenderFailure, browserMs: number, retryAfterMs: number 
 export function browserRunClient(opts: ClientOptions): BrowserRunClient {
   const doFetch: Fetch = opts.fetch ?? ((url, init) => fetch(url, init));
   const endpoint = BROWSER_RUN.endpoint.replace('{account_id}', encodeURIComponent(opts.accountId));
+  const timeoutMs = opts.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
   return {
     async content(url, side) {
+      const signal = AbortSignal.timeout(timeoutMs);
+      const lost = () => failure(signal.aborted ? 'timed_out' : 'network_error', timeoutMs);
       let res: Response;
       try {
         res = await doFetch(endpoint, {
           method: 'POST',
           headers: { authorization: `Bearer ${opts.token}`, 'content-type': 'application/json' },
           body: JSON.stringify(renderRequestBody(url, side)),
+          signal,
         });
       } catch {
-        return failure('network_error', RENDER_TIMEOUT_MS);
+        return lost();
       }
       if (res.status === 429) {
-        const seconds = Number(res.headers.get('retry-after'));
-        await res.body?.cancel();
-        return failure(
-          'rate_limited',
-          0,
-          Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null,
-        );
+        await res.body?.cancel().catch(() => {});
+        return failure('rate_limited', 0, retryAfterMsOf(res));
       }
-      const browserMs = browserMsOf(res);
+      const browserMs = browserMsOf(res, timeoutMs);
       if (!res.ok) {
-        await res.body?.cancel();
+        await res.body?.cancel().catch(() => {});
         return failure(res.status === 422 ? 'page_failed' : 'api_error', browserMs);
       }
-      const text = await boundedText(res);
+      let text: string | null;
+      try {
+        text = await boundedText(res);
+      } catch {
+        return { ...lost(), browserMs };
+      }
       if (text === null) return failure('oversize', browserMs);
       let parsed: unknown;
       try {

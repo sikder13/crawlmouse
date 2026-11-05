@@ -16,7 +16,7 @@ const { fakeClient, memoryDailyBudget, replyFixtures } = await import('./fakes.j
 describe('a render whose word count throws', () => {
   it('is measure_failed, the check goes on, and the budget is settled at what was used', async () => {
     const f = replyFixtures().get('server-rendered')!;
-    const daily = memoryDailyBudget(600_000);
+    const daily = memoryDailyBudget();
     const out = await renderCheck({
       candidates: [
         {

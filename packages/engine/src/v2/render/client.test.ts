@@ -5,6 +5,7 @@ import {
   clientFromEnv,
   MAX_REPLY_BYTES,
   RENDER_TIMEOUT_MS,
+  REQUEST_TIMEOUT_MS,
   RENDER_USER_AGENT,
   RENDER_VIEWPORT,
   renderRequestBody,
@@ -95,10 +96,10 @@ describe('a reply', () => {
     });
   });
 
-  it('counts a render whose browser time is not reported at the wait cap, never at zero', async () => {
+  it('counts a render whose browser time is not reported at the request timeout, not at zero', async () => {
     const { client } = clientWith(async () => reply(200, { success: true, result: '<p>x</p>' }));
     const r = await client.content('https://site.example/', 'rendered');
-    expect(r.browserMs).toBe(RENDER_TIMEOUT_MS);
+    expect(r.browserMs).toBe(REQUEST_TIMEOUT_MS);
   });
 
   it('is rate_limited on a 429, with Retry-After in milliseconds and no browser time', async () => {
@@ -111,6 +112,64 @@ describe('a reply', () => {
       retryAfterMs: 3000,
       browserMs: 0,
     });
+  });
+
+  it.each([null, '', '  ', 'soon', '-1'])(
+    'is rate_limited with no wait of its own when Retry-After is %j, so the caller backs off',
+    async (header) => {
+      const { client } = clientWith(async () =>
+        reply(429, { success: false }, header === null ? {} : { 'retry-after': header }),
+      );
+      expect(await client.content('https://site.example/', 'rendered')).toMatchObject({
+        reason: 'rate_limited',
+        retryAfterMs: null,
+      });
+    },
+  );
+
+  it('is timed_out when Browser Run does not answer in time, counted at the request timeout', async () => {
+    const fetchNever = (_url: string, init: RequestInit) =>
+      new Promise<Response>((_resolve, reject) =>
+        init.signal!.addEventListener('abort', () => reject(init.signal!.reason)),
+      );
+    const client = browserRunClient({
+      accountId: ACCOUNT,
+      token: TOKEN,
+      fetch: fetchNever,
+      requestTimeoutMs: 30,
+    });
+    expect(await client.content('https://site.example/', 'rendered')).toEqual({
+      ok: false,
+      reason: 'timed_out',
+      retryAfterMs: null,
+      browserMs: 30,
+    });
+  });
+
+  it('is timed_out when the reply body stops arriving', async () => {
+    const fetchTrickle = async (_url: string, init: RequestInit) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(new TextEncoder().encode('{"success":true,"result":"'));
+          init.signal!.addEventListener('abort', () => c.error(init.signal!.reason));
+        },
+      });
+      return new Response(body, { status: 200, headers: { 'x-browser-ms-used': '40' } });
+    };
+    const client = browserRunClient({
+      accountId: ACCOUNT,
+      token: TOKEN,
+      fetch: fetchTrickle,
+      requestTimeoutMs: 30,
+    });
+    expect(await client.content('https://site.example/', 'rendered')).toMatchObject({
+      ok: false,
+      reason: 'timed_out',
+    });
+  });
+
+  it('times a request out after the wait cap plus a margin by default', () => {
+    expect(REQUEST_TIMEOUT_MS).toBe(RENDER_TIMEOUT_MS + 30_000);
   });
 
   it.each([
@@ -149,7 +208,7 @@ describe('a reply', () => {
       ok: false,
       reason: 'network_error',
       retryAfterMs: null,
-      browserMs: RENDER_TIMEOUT_MS,
+      browserMs: REQUEST_TIMEOUT_MS,
     });
     expect(JSON.stringify(r)).not.toContain(TOKEN);
   });
