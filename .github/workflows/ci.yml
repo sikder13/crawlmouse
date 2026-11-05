@@ -344,7 +344,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: No migration file is modified, deleted or renamed
+      - name: Migration files are only ever added
         env:
           EVENT_NAME: ${{ github.event_name }}
           PUSH_BEFORE: ${{ github.event.before }}
@@ -359,15 +359,18 @@ jobs:
             base="$(git merge-base origin/main HEAD)"
           fi
           if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
-            base="$(git rev-parse HEAD^)"
-          fi
-          changed=$(git diff --name-status --diff-filter=MDR "$base" HEAD -- infra/supabase/migrations)
-          if [ -n "$changed" ]; then
-            echo "$changed"
-            echo "::error::a migration file was modified, deleted or renamed; add a new migration instead"
+            echo "::error::cannot find the commit to compare against ($base)"
             exit 1
           fi
-          echo "no migration file modified, deleted or renamed since $base"
+          # Anything but an added file: modified, deleted, renamed, changed in type (a file swapped
+          # for a symlink), copied over.
+          changed=$(git diff --name-status --diff-filter=a "$base" HEAD -- infra/supabase/migrations)
+          if [ -n "$changed" ]; then
+            echo "$changed"
+            echo "::error::an existing migration file changed; add a new migration instead"
+            exit 1
+          fi
+          echo "only added migration files since $base"
 
   # actionlint over the workflows, with shellcheck on their run blocks (both are in the image).
   # Pinned by image digest. nightly.yml runs on its own with two findings ignored that predate this

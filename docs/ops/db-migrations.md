@@ -55,9 +55,10 @@ The scripts behind them are in `scripts/db`. Their tests:
    opens an issue. The workflow does not retry, and it does not run a rollback.
 
 Migration files are append-only. The `migrations-append-only` job in `ci.yml` runs on every push
-and pull request and fails when a file under `infra/supabase/migrations` is modified, deleted or
-renamed, so it can be made a required check. The dry run refuses the same change on a pull request
-that touches the database.
+and pull request and fails on any change under `infra/supabase/migrations` other than an added
+file (a modification, deletion, rename or a file swapped for a symlink), so it can be made a
+required check. On a pull request that touches the database, the dry run also refuses an edit to
+an applied migration.
 
 A merge that changes no migration file does not start `db-apply-prod.yml`. To apply files whose
 pull request was merged earlier, run the workflow by hand from `main` and give `dry_run_pr` the
@@ -127,9 +128,9 @@ row in one transaction, then runs the checks and writes the fingerprint to the j
   one on, so it fails when one of them has no rollback file: adding a rollback for an old v1
   migration needs rollbacks for the migrations after it too.
 - Rollback and apply runs queue in separate groups: a push that queues an apply does not cancel a
-  queued rollback. The two can run at the same time. The rollback locks the history table, so a concurrent
-  `supabase db push` cannot record a migration until the rollback commits, and the rollback sees any
-  migration recorded before it took the lock.
+  queued rollback. The two can run at the same time, but not overlap: the apply holds an advisory lock for the
+  whole of `supabase db push`, and the rollback waits for it before it locks the history table and
+  checks the order, so it sees any migration the push recorded.
 - 007's rollback refuses while the `evidence` or `reports` bucket holds objects, and gives the
   count per bucket. Empty them through the Storage API first. It sets
   `storage.allow_delete_query` for its own transaction, which `storage.protect_delete()` requires.
