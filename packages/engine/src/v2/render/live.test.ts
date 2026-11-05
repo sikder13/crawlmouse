@@ -1,11 +1,13 @@
 /**
  * Against Browser Run itself. Runs only when the environment holds CLOUDFLARE_ACCOUNT_ID and
  * CLOUDFLARE_BROWSER_RENDERING_TOKEN, or when RENDER_LIVE=1 and the owner's file outside the repo,
- * ~/.config/crawlmouse/render.env, holds them; otherwise every case is skipped, not failed. Their
- * values are not printed. A run costs a few
- * browser-seconds and fetches a handful of public URLs. These are the only tests that can show the
- * determinism bounds, that the static side really loads no script file, and that Browser Run reads and
- * enforces the patterns we send: offline, a replayed reply is identical every time.
+ * ~/.config/crawlmouse/render.env, holds them; otherwise every case is skipped, not failed. The
+ * console lines print word counts and probe output, not the credentials:
+ * `grep -n console.info src/v2/render/live.test.ts`. A run costs a few browser-seconds and fetches a
+ * handful of public URLs. These are the only tests that can show the determinism bounds, that the
+ * static side refuses script files and runs no inline script, and that Browser Run reads and enforces
+ * the patterns we send: offline, a replayed reply is identical every time. The probes send the page
+ * as `html`; production sends `url`.
  */
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -73,20 +75,29 @@ async function words(c: BrowserRunClient, url: string, side: RenderSide) {
  * Renders `html` with the request a page's `side` gets, and returns the HTML Browser Run holds. With
  * `rules: false` the refusal lists are sent empty, for a control render.
  */
-async function renderHtml(html: string, side: RenderSide, rules = true): Promise<string> {
+async function renderHtml(
+  html: string,
+  side: RenderSide,
+  rules = true,
+  javaScriptOn = false,
+): Promise<string> {
   const body: Record<string, unknown> = { ...renderRequestBody(STATIC_PAGE, side), html };
   if (!rules) Object.assign(body, { rejectResourceTypes: [], rejectRequestPattern: [] });
+  if (javaScriptOn) delete body.setJavaScriptEnabled;
   delete body.url;
   let res: Response;
   try {
-    res = await fetch(BROWSER_RUN.endpoint.replace('{account_id}', env[ENV.account]!.trim()), {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${env[ENV.token]!.trim()}`,
-        'content-type': 'application/json',
+    res = await fetch(
+      BROWSER_RUN.endpoint.replace('{account_id}', encodeURIComponent(env[ENV.account]!.trim())),
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${env[ENV.token]!.trim()}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+    );
   } catch {
     // The error could carry the URL, which holds the account id.
     throw new Error('the request to Browser Run failed');
@@ -159,6 +170,15 @@ live('Browser Run, live', () => {
     expect(outOf(staticHtml)).not.toContain('file=');
     expect(renderedHtml).toContain(INLINE_MARKER);
     expect(outOf(renderedHtml)).toContain('file=loaded');
+  }, 120_000);
+
+  it('refuses script files on the static side, seen with JavaScript left on so the page can report it', async () => {
+    // JavaScript off hides whether the file loaded, so this render keeps the static side's resource
+    // list and turns JavaScript back on: the inline script then reports the file.
+    const staticOut = outOf(await renderHtml(INLINE_SCRIPT_PAGE, 'static', true, true));
+    console.info(`script-file probe, static side with JavaScript on: "${staticOut}"`);
+    expect(staticOut).toContain(INLINE_MARKER);
+    expect(staticOut).toContain('file=blocked');
   }, 120_000);
 
   it('refuses what the rules refuse, each of which loads when the rules are left out', async () => {
