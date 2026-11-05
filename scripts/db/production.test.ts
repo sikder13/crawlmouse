@@ -195,4 +195,29 @@ describe('the production apply holds the lock across every check and the push', 
     expect(calls).not.toContain('push');
     expect(calls.at(-1)).toBe('release');
   });
+
+  it('a failed release after a failed push reports the push failure, and logs the release', async () => {
+    const logged: string[] = [];
+    const { s: st } = steps({
+      lock: async () => async () => {
+        throw new Error('the lock was lost');
+      },
+      push: async () => {
+        throw new Error('supabase db push exited with 1');
+      },
+    });
+    await expect(applyUnderLock(manifest, PRODUCTION, st, (l) => logged.push(l))).rejects.toThrow(
+      'supabase db push exited with 1',
+    );
+    expect(logged).toEqual(['releasing the lock also failed: Error: the lock was lost']);
+  });
+
+  it('a failed release after a successful push fails the apply', async () => {
+    const { s: st } = steps({
+      lock: async () => async () => {
+        throw new Error('the advisory lock was not held at the end of the push');
+      },
+    });
+    await expect(applyUnderLock(manifest, PRODUCTION, st)).rejects.toThrow(/was not held/);
+  });
 });

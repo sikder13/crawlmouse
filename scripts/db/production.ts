@@ -143,7 +143,10 @@ async function plan(
 
 /** The steps of a production apply, injected so their order can be tested. */
 export interface ApplySteps {
-  /** Takes the advisory lock a production rollback waits for; returns its release. */
+  /**
+   * Takes the advisory lock a production rollback waits for; returns its release, which throws if
+   * the lock was no longer held.
+   */
   lock(): Promise<() => Promise<void>>;
   pending(): Promise<MigrationFile[]>;
   fingerprint(): Promise<Record<string, string>>;
@@ -161,25 +164,41 @@ export async function applyUnderLock(
   manifest: Manifest,
   planned: Record<string, string>,
   steps: ApplySteps,
+  log: (line: string) => void = console.error,
 ): Promise<boolean> {
   const release = await steps.lock();
+  let applied: boolean;
   try {
-    const problems = manifestProblems(manifest, await steps.pending());
-    if (problems.length > 0) throw new Error(problems.join('\n'));
-    if (manifest.length === 0) return false;
-    // The approval may come days after the plan: production must still be what the plan read.
-    const drift = driftProblems(planned, await steps.fingerprint(), 'the plan');
-    if (drift.length > 0) throw new Error(drift.join('\n'));
-    const listed = await steps.listed();
-    const expected = manifest.map((m) => m.file);
-    if (listed.join(',') !== expected.join(',')) {
-      throw new Error(`the CLI would push [${listed.join(', ')}], not [${expected.join(', ')}]`);
-    }
-    await steps.push();
-    return true;
-  } finally {
-    await release();
+    applied = await checkAndPush(manifest, planned, steps);
+  } catch (err) {
+    // The refusal or the push failure is the error to report; a failed release is logged.
+    await release().catch((releaseErr: unknown) =>
+      log(`releasing the lock also failed: ${String(releaseErr)}`),
+    );
+    throw err;
   }
+  await release();
+  return applied;
+}
+
+async function checkAndPush(
+  manifest: Manifest,
+  planned: Record<string, string>,
+  steps: ApplySteps,
+): Promise<boolean> {
+  const problems = manifestProblems(manifest, await steps.pending());
+  if (problems.length > 0) throw new Error(problems.join('\n'));
+  if (manifest.length === 0) return false;
+  // The approval may come days after the plan: production must still be what the plan read.
+  const drift = driftProblems(planned, await steps.fingerprint(), 'the plan');
+  if (drift.length > 0) throw new Error(drift.join('\n'));
+  const listed = await steps.listed();
+  const expected = manifest.map((m) => m.file);
+  if (listed.join(',') !== expected.join(',')) {
+    throw new Error(`the CLI would push [${listed.join(', ')}], not [${expected.join(', ')}]`);
+  }
+  await steps.push();
+  return true;
 }
 
 async function apply(
@@ -199,7 +218,15 @@ async function apply(
       await conn.query('select pg_advisory_lock($1)', [DB_OPS_LOCK_KEY]);
       return async () => {
         try {
-          await conn.query('select pg_advisory_unlock($1)', [DB_OPS_LOCK_KEY]);
+          const [row] = await conn.query<{ released: boolean }>(
+            'select pg_advisory_unlock($1) as released',
+            [DB_OPS_LOCK_KEY],
+          );
+          if (row?.released !== true) {
+            throw new Error(
+              'the advisory lock was not held at the end of the push; a rollback may have run during it',
+            );
+          }
         } finally {
           await conn.close();
         }
