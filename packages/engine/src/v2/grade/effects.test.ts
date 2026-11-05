@@ -15,6 +15,7 @@ import type { PageSpec } from '../../../fixtures/v2/detectors/builders.js';
 import type { ContentFeatures } from '../content/read.js';
 import type { Detection } from '../detectors/types.js';
 import { applyFix, effectsOf } from './effects.js';
+import { round } from './numbers.js';
 import { crawlability, technicalSeo } from './technical-seo.js';
 import { aiFrom, gradeCheck, type Grades } from './index.js';
 import { detectorOutcomes } from './outcomes.js';
@@ -571,6 +572,29 @@ describe('the structure counterfactuals, by hand', () => {
     expect(after.seo.edges.filter((e) => e.to_url === post0)).toEqual(
       seo.edges.filter((e) => e.to_url === post0),
     );
+  });
+
+  it('the redirect fix grades as the site built with its menu link on the final URL, same text', () => {
+    const extra: PageSpec[] = [
+      {
+        path: '/old-menu-target',
+        links: ['/'],
+        facts: { final_url: 'https://a.test/blog/post-0', redirect: { hops: 2, loop: false } },
+      },
+    ];
+    const { input, access } = blogSite(13, 0, {}, extra, ['/old-menu-target']);
+    const grades = gradeCheck(input);
+    const record = input.structure.find(
+      (d) => d.type === 'redirect_chain' && d.state === 'detected',
+    )!;
+    const after = applyFix(grades.inputs, { family: 'structure', record });
+    // the fixed site, built independently: the same menu, pointing at post-0, with its text
+    const menu = [{ to: '/blog/post-0', anchor: 'About /old-menu-target' }];
+    const fixed = gradeCheck(blogSite(13, 0, {}, [], menu).input).technical_seo;
+    expect(technicalSeo(after.seo).score).toBe(fixed.score);
+    expect(technicalSeo(after.seo).breakdown).toEqual(fixed.breakdown);
+    const { overview } = detectorOutcomes(grades, access, input.structure);
+    expect(overview.technical_seo).toBe(round(fixed.score! - grades.technical_seo.score!));
   });
 
   it('a followed chain whose final URL was not crawled: the row becomes the final URL, links and all', () => {

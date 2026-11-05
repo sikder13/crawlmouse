@@ -85,11 +85,13 @@ export function blogSite(
   unanswered: number,
   cells: Cells = {},
   extra: PageSpec[] = [],
+  /** Links every page carries besides its own (a site-wide menu). */
+  menu: PageSpec['links'] = [],
 ): { input: GradeInput; access: AccessDetection[] } {
   const posts = Array.from({ length: n }, (_, i) => `/blog/post-${i}`);
   const s = site([
-    { path: '/', links: posts },
-    ...posts.map((path) => ({ path, template: '/blog/{slug}', links: ['/'] })),
+    { path: '/', links: [...posts, ...(menu ?? [])] },
+    ...posts.map((path) => ({ path, template: '/blog/{slug}', links: ['/', ...(menu ?? [])] })),
     ...extra,
   ]);
   const content = new Map<string, ContentFeatures>(

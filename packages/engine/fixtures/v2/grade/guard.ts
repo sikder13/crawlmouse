@@ -221,13 +221,20 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
     fingerprint: fingerprintOf(`redirect:${target}`),
     affected_urls: sitewide.input.pages.filter((p) => p.url !== target).map((p) => p.url),
   };
-  const followed = blogSite(13, 0, {}, [
-    {
-      path: '/old-menu-target',
-      links: ['/'],
-      facts: { final_url: 'https://a.test/blog/post-0', redirect: { hops: 2, loop: false } },
-    },
-  ]);
+  // the menu link is on every page, so the structure detectors see it
+  const followed = blogSite(
+    13,
+    0,
+    {},
+    [
+      {
+        path: '/old-menu-target',
+        links: ['/'],
+        facts: { final_url: 'https://a.test/blog/post-0', redirect: { hops: 2, loop: false } },
+      },
+    ],
+    ['/old-menu-target'],
+  );
   const undescribed = blogSite(13, 0);
   // author and date and schema fail on posts, and question headings on every page: no check counts
   const thin = blogSite(13, 0);
@@ -277,22 +284,8 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
       },
       undescribed.access,
     ),
-    [SITE_WIDE_REDIRECT_FOLLOWED]: outcomeOf(
-      {
-        ...followed.input,
-        edges: [
-          ...followed.input.edges,
-          ...followed.input.pages
-            .filter((p) => p.url !== target)
-            .map((p) => ({ ...followed.input.edges[0]!, from_url: p.url, to_url: target })),
-        ],
-        structure: [
-          ...followed.input.structure,
-          { ...menuLink, fingerprint: fingerprintOf('followed') },
-        ],
-      },
-      followed.access,
-    ),
+    // the detectors find the chain themselves here: the records are theirs
+    [SITE_WIDE_REDIRECT_FOLLOWED]: outcomeOf(followed.input, followed.access),
     [SITE_WIDE_REDIRECT]: outcomeOf(
       { ...sitewide.input, structure: [...sitewide.input.structure, menuLink] },
       sitewide.access,

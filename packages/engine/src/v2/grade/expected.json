@@ -866,38 +866,10 @@
       "fixes": [
         {
           "type": "redirect_chain",
-          "fingerprint": "17b669561c95d3ac",
+          "fingerprint": "99f063f0267f8831",
           "rank": 1,
           "effect": {
-            "technical_seo": 2.66,
-            "technical_seo_pending_on": [],
-            "ai_readability": null,
-            "ai_readability_pending_on": ["quotable_unmeasured"],
-            "absorbed_by": null,
-            "estimate": true
-          },
-          "absorbed_by": null
-        },
-        {
-          "type": "orphan_pages",
-          "fingerprint": "49bcb9edee125de8",
-          "rank": 2,
-          "effect": {
-            "technical_seo": 0,
-            "technical_seo_pending_on": [],
-            "ai_readability": null,
-            "ai_readability_pending_on": ["quotable_unmeasured"],
-            "absorbed_by": null,
-            "estimate": true
-          },
-          "absorbed_by": null
-        },
-        {
-          "type": "deep_pages",
-          "fingerprint": "ab28cf04c85d16e8",
-          "rank": 3,
-          "effect": {
-            "technical_seo": 0,
+            "technical_seo": 3.52,
             "technical_seo_pending_on": [],
             "ai_readability": null,
             "ai_readability_pending_on": ["quotable_unmeasured"],
@@ -908,7 +880,7 @@
         }
       ],
       "overview": {
-        "technical_seo": 2.66,
+        "technical_seo": 3.52,
         "technical_seo_pending_on": [],
         "ai_readability": null,
         "ai_readability_pending_on": ["quotable_unmeasured"],

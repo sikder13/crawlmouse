@@ -330,7 +330,7 @@ function siteWideRedirect(): string {
   };
   return `On the example sites: ${one(
     '14-page blog: a link on every page to a URL behind a redirect chain, crawled as a 301',
-    'where the 301 is the one URL outside the numerator with or without the record',
+    'where the 301 is the one URL outside the numerator with or without the record (the example carries the record without the menu links, which a 3xx row, not being a graph node, would not change)',
   )}; ${one(
     '14-page blog: a link on every page to a URL behind a redirect chain that ends at a post',
     'where the record takes the 200 row out of the numerator',
