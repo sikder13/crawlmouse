@@ -15,9 +15,10 @@
  * the last page, the budget is settled once, at what the check counted. Which pages a binding cap
  * leaves unrendered depends on how long the earlier renders took.
  *
- * RATE LIMITS. At most RENDER_IN_FLIGHT requests are open at once. A 429 is retried after the wait it
- * asks for in seconds, or with exponential backoff when it gives none, up to RENDER_RETRY.attempts
- * tries; a wait longer than RENDER_RETRY.max_ms is not taken. A page still refused is `rate_limited`.
+ * RATE LIMITS. At most `inFlight` requests are open at once (RENDER_MAX_IN_FLIGHT in the environment,
+ * read by inFlightFromEnv). A 429 is retried no sooner than its Retry-After asks, in seconds or as a
+ * date, or with exponential backoff when it gives neither, up to RENDER_RETRY.attempts tries; a page
+ * asked to wait longer than RENDER_RETRY.max_ms is left `rate_limited` without retrying sooner.
  */
 import { defaultAdmit, NotAdmitted, type Admit } from './admission.js';
 import { usableCap, type DailyBudget, type RenderCaps } from './budget.js';
@@ -33,8 +34,21 @@ import { measurePage, type WithoutJs } from './page.js';
 import { oncePerUrl, selectRenders, type PickedFor, type RenderCandidate } from './sample.js';
 import type { JsTextState } from './state.js';
 
-export const RENDER_IN_FLIGHT = 5;
-export const RENDER_RETRY = { attempts: 5, base_ms: 1000, max_ms: 16_000 } as const;
+/** The environment variable that sets how many requests one check keeps open at once. */
+export const IN_FLIGHT_ENV = 'RENDER_MAX_IN_FLIGHT';
+/** Requests open at once in one check when the environment does not set a valid number. */
+export const RENDER_IN_FLIGHT_DEFAULT = 2;
+/** The most the environment may set; our choice. */
+export const RENDER_IN_FLIGHT_MAX = 10;
+/** A whole number from 1 to RENDER_IN_FLIGHT_MAX, or RENDER_IN_FLIGHT_DEFAULT. */
+const validInFlight = (n: number): number =>
+  Number.isInteger(n) && n >= 1 && n <= RENDER_IN_FLIGHT_MAX ? n : RENDER_IN_FLIGHT_DEFAULT;
+/** RENDER_MAX_IN_FLIGHT as digits from 1 to RENDER_IN_FLIGHT_MAX; anything else is the default. */
+export function inFlightFromEnv(env: Record<string, string | undefined>): number {
+  const v = env[IN_FLIGHT_ENV]?.trim() ?? '';
+  return /^[0-9]+$/.test(v) ? validInFlight(Number(v)) : RENDER_IN_FLIGHT_DEFAULT;
+}
+export const RENDER_RETRY = { attempts: 5, base_ms: 2000, max_ms: 60_000 } as const;
 /**
  * What one render reserves from the check's allowance before it runs: the request timeout, which is also
  * what a render of unknown browser time is counted at, so such a render never counts above it.
@@ -53,7 +67,7 @@ export const NOT_RENDERED = {
     "Today's budget refused the check's allowance, asked for once before any page; no page of the check rendered.",
   daily_budget_unavailable:
     "Today's budget threw when asked for the check's allowance; no page of the check rendered.",
-  rate_limited: `Browser Run answered 429 on each of ${RENDER_RETRY.attempts} tries, or asked for a wait longer than ${RENDER_RETRY.max_ms} ms.`,
+  rate_limited: `Browser Run answered 429 on each of ${RENDER_RETRY.attempts} tries, or its Retry-After asked for a wait longer than ${RENDER_RETRY.max_ms} ms.`,
   timed_out: `Browser Run did not answer, or did not finish its reply, within ${REQUEST_TIMEOUT_MS / 1000} s.`,
   page_failed:
     'Browser Run answered 422, which its documentation gives for a page that timed out, crashed or errored.',
@@ -108,6 +122,8 @@ export interface RenderCheckInput {
   admit?: Admit;
   caps: RenderCaps;
   daily: DailyBudget;
+  /** Requests open at once; from inFlightFromEnv. An invalid number is read as the default. */
+  inFlight?: number;
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -251,7 +267,12 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
   // Every worker is waited for, even after one throws, so no request is still open when the budget
   // is settled; a throw is passed on only after the settle.
   const ran = await Promise.allSettled(
-    Array.from({ length: Math.min(RENDER_IN_FLIGHT, sample.length) }, worker),
+    Array.from(
+      {
+        length: Math.min(validInFlight(input.inFlight ?? RENDER_IN_FLIGHT_DEFAULT), sample.length),
+      },
+      worker,
+    ),
   );
 
   if (reserved) {

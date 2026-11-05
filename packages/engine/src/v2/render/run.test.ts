@@ -6,7 +6,10 @@ import { NotAdmitted } from './admission.js';
 import { RENDER_FAILURES } from './client.js';
 import {
   NOT_RENDERED,
-  RENDER_IN_FLIGHT,
+  IN_FLIGHT_ENV,
+  inFlightFromEnv,
+  RENDER_IN_FLIGHT_DEFAULT,
+  RENDER_IN_FLIGHT_MAX,
   RESERVE_PER_RENDER_MS,
   RENDER_RETRY,
   renderCheck,
@@ -493,6 +496,23 @@ describe('a page that throws out of the render', () => {
   });
 });
 
+describe('the in-flight limit from the environment', () => {
+  it.each([
+    [undefined, RENDER_IN_FLIGHT_DEFAULT],
+    ['', RENDER_IN_FLIGHT_DEFAULT],
+    ['3', 3],
+    [' 4 ', 4],
+    [String(RENDER_IN_FLIGHT_MAX), RENDER_IN_FLIGHT_MAX],
+    [String(RENDER_IN_FLIGHT_MAX + 1), RENDER_IN_FLIGHT_DEFAULT],
+    ['0', RENDER_IN_FLIGHT_DEFAULT],
+    ['-1', RENDER_IN_FLIGHT_DEFAULT],
+    ['2.5', RENDER_IN_FLIGHT_DEFAULT],
+    ['five', RENDER_IN_FLIGHT_DEFAULT],
+  ])('reads %j as %d', (value, expected) => {
+    expect(inFlightFromEnv({ [IN_FLIGHT_ENV]: value })).toBe(expected);
+  });
+});
+
 describe('a 429 from Browser Run', () => {
   const tooMany: RenderReply = {
     ok: false,
@@ -545,7 +565,13 @@ describe('a 429 from Browser Run', () => {
     expect(client.calls.every((c) => c.side === 'static')).toBe(true);
   });
 
-  it('is queued under the in-flight limit', async () => {
+  it.each([
+    ['the default', undefined, RENDER_IN_FLIGHT_DEFAULT],
+    ['a set limit', 5, 5],
+    ['zero, read as the default', 0, RENDER_IN_FLIGHT_DEFAULT],
+    ['above the most, read as the default', RENDER_IN_FLIGHT_MAX + 1, RENDER_IN_FLIGHT_DEFAULT],
+    ['a fraction, read as the default', 2.5, RENDER_IN_FLIGHT_DEFAULT],
+  ] as const)('is queued under the in-flight limit: %s', async (_name, inFlight, expected) => {
     const many = Array.from({ length: 14 }, (_, i) => ({
       provenance: 'test',
       url: `https://site.example/p${i}`,
@@ -561,10 +587,11 @@ describe('a 429 from Browser Run', () => {
         client,
         candidates: many.map((f, i) => candidate(f, `/t${i}`)),
         maxRenders: 14,
+        inFlight,
       }),
     );
-    expect(RENDER_IN_FLIGHT).toBe(5);
-    expect(client.maxInFlight).toBe(RENDER_IN_FLIGHT);
+    expect(RENDER_IN_FLIGHT_DEFAULT).toBe(2);
+    expect(client.maxInFlight).toBe(expected);
     expect(out.pages.every((p) => p.rendered)).toBe(true);
   });
 });

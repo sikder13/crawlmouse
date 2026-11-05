@@ -130,6 +130,25 @@ describe('a reply', () => {
     });
   });
 
+  it('is rate_limited with the time until a Retry-After date, and zero for a date passed', async () => {
+    const at = (ms: number) => new Date(Date.now() + ms).toUTCString();
+    const ahead = clientWith(async () =>
+      reply(429, { success: false }, { 'retry-after': at(30_000) }),
+    ).client;
+    const r = await ahead.content('https://site.example/', 'rendered');
+    expect(r.ok).toBe(false);
+    const wait = (r as { retryAfterMs: number | null }).retryAfterMs!;
+    // The header carries whole seconds, so up to a second is lost to rounding down.
+    expect(wait).toBeGreaterThan(28_000);
+    expect(wait).toBeLessThanOrEqual(30_000);
+    const passed = clientWith(async () =>
+      reply(429, { success: false }, { 'retry-after': at(-60_000) }),
+    ).client;
+    expect(await passed.content('https://site.example/', 'rendered')).toMatchObject({
+      retryAfterMs: 0,
+    });
+  });
+
   it.each([null, '', '  ', 'soon', '-1'])(
     'is rate_limited with no wait of its own when Retry-After is %j, so the caller backs off',
     async (header) => {

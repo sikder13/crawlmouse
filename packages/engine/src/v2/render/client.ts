@@ -34,6 +34,10 @@ export const BROWSER_RUN = {
   max_goto_timeout_s: 60,
   usd_per_browser_hour: 0.09,
   included_browser_hours_per_month: 10,
+  /** Workers Free: one Quick Actions request every this many seconds, per account. */
+  free_request_every_s: 10,
+  /** Workers Free: browser minutes a day. */
+  free_browser_minutes_per_day: 10,
   /** The reply header carrying the browser time a request used, in milliseconds. */
   browser_ms_header: 'x-browser-ms-used',
 } as const;
@@ -126,9 +130,15 @@ function browserMsOf(res: Response, unknownMs: number): number {
 }
 
 /** Retry-After in seconds as milliseconds; null when absent, empty, an HTTP date or anything else. */
-function retryAfterMsOf(res: Response): number | null {
+/**
+ * The wait a 429 asks for: Retry-After as whole seconds, or as an HTTP date (the time until it, at
+ * least zero). Null when it is absent or neither form, and the caller backs off.
+ */
+function retryAfterMsOf(res: Response, now = Date.now()): number | null {
   const raw = res.headers.get('retry-after')?.trim() ?? '';
-  return /^[0-9]+$/.test(raw) ? Number(raw) * 1000 : null;
+  if (/^[0-9]+$/.test(raw)) return Number(raw) * 1000;
+  const at = /[a-z]/i.test(raw) ? Date.parse(raw) : NaN;
+  return Number.isFinite(at) ? Math.max(0, at - now) : null;
 }
 
 /** The reply body as text, or null once it passes MAX_REPLY_BYTES (the stream is then cancelled). */
