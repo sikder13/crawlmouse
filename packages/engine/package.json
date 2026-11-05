@@ -20,7 +20,7 @@
     }
   },
   "scripts": {
-    "test": "vitest run --exclude src/crawl-stall-retries.test.ts --exclude src/crawl-round-budget.test.ts; main=$?; pnpm run test:timers && exit $main",
+    "test": "sh -c 'vitest run --exclude src/crawl-stall-retries.test.ts --exclude src/crawl-round-budget.test.ts \"$@\"; main=$?; pnpm run test:timers && exit $main' --",
     "test:timers": "vitest run --no-file-parallelism src/crawl-stall-retries.test.ts src/crawl-round-budget.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
