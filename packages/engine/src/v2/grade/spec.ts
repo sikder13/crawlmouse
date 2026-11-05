@@ -82,7 +82,7 @@ const CARRIES: Readonly<Record<(typeof CRAWLABILITY_DETECTORS)[number], string>>
     'the page whose canonical cannot be honoured, or that is linked under another URL',
   duplicate_pagination: 'each later page found to repeat page 1',
   hreflang_gap:
-    'each URL the detector marks: a member missing its self-reference or its x-default, or with an invalid code; for a missing return, the alternate that was read and does not annotate back; for an alternate that redirects or is gone, the member that names it (the record says which: `hreflang_missing_return`, `hreflang_alternate_redirects`, `hreflang_alternate_gone`)',
+    'each URL the detector marks: a member missing its self-reference or its x-default, or with an invalid code; for a missing return, the alternate that was read and does not annotate back; for an alternate that redirects or is gone, the member that names it (its conditions name the cases that occur, not which URL carries which: `hreflang_missing_return`, `hreflang_alternate_redirects`, `hreflang_alternate_gone`; the reading of the ruling is an owner question, SPEC 16)',
 };
 
 /** What each content check applies to and passes on, said with the constants it reads. */
@@ -347,12 +347,19 @@ function titleAndDescription(): string {
     const [score, structure] = [c.technical_seo.score!, c.technical_seo.site_structure_score!];
     const crawl = (score - (SEO_WEIGHTS.structure / 100) * structure) / SEO_WEIGHTS.crawlability;
     const fixes = `${c.fixes.length} ${c.fixes.length === 1 ? 'fix' : 'fixes'}`;
-    return { text: `${score} ${c.technical_seo.grade}`, crawl: crawl.toFixed(3), fixes };
+    return {
+      text: `${score} ${c.technical_seo.grade}`,
+      crawl: crawl.toFixed(3),
+      fixes,
+      count: c.fixes.length,
+    };
   };
   const untitled = at('14-page blog: no page declares a title');
   // the sentence below says every page is defective: hold it to the grade as recorded
   if (Number(untitled.crawl) !== 0)
     throw new Error(`no-title example: crawlability ${untitled.crawl}`);
+  // and that no fix recovers it
+  if (untitled.count !== 0) throw new Error(`no-title example: ${untitled.fixes}`);
   const undescribed = at('14-page blog: every page declares a title and no meta description');
   return `A missing meta description is not a crawlability defect (owner ruling, 2026-11-05): it stays a page fact, to become a \`best_practice\` content item when CC-16b adds its fix type. On the example site "14-page blog: every page declares a title and no meta description", Technical SEO is ${undescribed.text} (crawlability ${undescribed.crawl}). A missing or empty title is a defect on its URL. On the example site "14-page blog: no page declares a title", every page is defective, as intended, and Technical SEO is ${untitled.text} (crawlability ${untitled.crawl}, from the grade as recorded), with ${untitled.fixes}: no fix type opens for a missing title until CC-16b, so nothing recovers what it costs yet.`;
 }

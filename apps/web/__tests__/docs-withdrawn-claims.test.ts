@@ -111,6 +111,21 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     allowedIn: [],
   },
   {
+    text: 'the defect counted on the member that names it',
+    withdrawnIn: 'docs/specs/v2/17-content-and-grade.md (Technical SEO), CC-17 third rulings',
+    truth:
+      'A missing hreflang return is counted on the alternate that was read and does not annotate ' +
+      'back; the member naming an alternate carries the defect only when that alternate redirects ' +
+      'or is gone (hreflang-gaps.ts).',
+    allowedIn: [],
+  },
+  {
+    text: 'a member naming an alternate that does not annotate it back is flagged',
+    withdrawnIn: 'packages/engine/src/v2/grade/technical-seo.ts (header), CC-17 third rulings',
+    truth: 'Same proposition, in the grade module header.',
+    allowedIn: [],
+  },
+  {
     text: 'An alternate does not annotate back, or redirects or is gone.',
     withdrawnIn: 'docs/specs/v2/16-structure-detectors.md (conditions), CC-17 third rulings',
     truth:

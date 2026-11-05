@@ -406,6 +406,8 @@ ${table(
   CONDITIONS.map((c) => [code(c), code(CONDITION_TEXT[c][0]), CONDITION_TEXT[c][1]]),
 )}
 
+The owner ruled (2026-11-05) that a missing hreflang return goes on the alternate that fails to annotate back when that alternate is in the crawl, and on the member that names it when it is not. \`hreflang-gaps.ts\` reads "in the crawl" as "its annotations were read at its own URL", which is an owner question. An alternate that was crawled and redirects or is gone is in the crawl by the letter of the ruling; it carries no annotations to fix, so the member naming it carries the defect (\`hreflang_alternate_redirects\`, \`hreflang_alternate_gone\`). An alternate that was not crawled, or that answered a status keeping its content from us, is unknown, not a defect on the member: read literally, the ruling would make one of every member naming an alternate on another host (a ccTLD cluster) or past the page cap. A record's conditions name the cases that occur in its cluster; they do not say which affected URL carries which.
+
 ## Inputs
 
 \`PageFacts\` is the detectors' view of what one request showed, read from \`PageResult\` (\`pageFacts\`,

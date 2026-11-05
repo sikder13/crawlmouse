@@ -220,7 +220,7 @@ describe('crawlability', () => {
     // not read (null), or not a page answering 200 as HTML: no defect of this kind
     expect(crawlability(at(1, { title: null }))).toBe(1);
     expect(crawlability(at(1, { title: none, is_html: false }))).toBe(1);
-    expect(crawlability(at(1, { title: none, status_code: 301 }))).toBe(4 / 5);
+    expect(defectivePages(at(1, { title: none, status_code: 301 }))).toEqual([]);
   });
 
   it('a missing or empty meta description is not a crawlability defect (owner ruling, 2026-11-05)', () => {
