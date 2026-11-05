@@ -1,13 +1,34 @@
 -- Schema fingerprint. One row per section: an md5 over the section's lines, the line count, and
 -- the lines themselves, so two targets can be compared section by section and a difference named.
 --
--- Scope: the schemas the migrations own (public, research, partitions), the policies on storage
--- tables, the storage bucket rows, and the roles the migrations create. Relations, functions and
--- types that belong to an extension, and Supabase's own roles, are left out.
+-- What it reads:
+--   - in the schemas the migrations own (public, research, partitions): columns (with collation),
+--     relations (kind, owner, partition key and bound, options, replica identity, view md5), RLS,
+--     functions (md5 of the definition, which includes SET search_path), policies, constraints,
+--     indexes, triggers, types, and the ACLs of relations, columns, functions and the schemas;
+--   - on storage and auth tables: RLS, policies, the triggers whose function is in those three
+--     schemas, and the grants to the roles below and to PUBLIC;
+--   - the roles the migrations create and the client roles (anon, authenticated, service_role,
+--     authenticator): attributes, settings, and memberships with their admin, inherit and set
+--     options;
+--   - default privileges, schema names, extension names, publications and storage bucket rows.
+-- What it does not read: comments, event triggers, pg_cron jobs, extension versions, function
+-- bodies outside the three schemas, and relations, functions and types that belong to an extension.
+--
+-- Monthly partitions are created relative to now(), so a branch built in a later month holds other
+-- months than production. In each line that names a partition, the _YYYY_MM suffix and the bound's
+-- dates are normalised (inside a trigger's md5 too) and identical lines are merged: one line per
+-- kind of partition, so a grant on one partition still shows. Constraints Postgres derives from a
+-- parent's, one per partition, are left out; the parent's is listed. Which months exist is check
+-- 02's and the partition job's concern.
 --
 -- Lines are sorted with the "C" collation and ACLs are exploded into one line per grantee and
 -- privilege, so neither collation nor the order of aclitems can change a digest. The grantor is
 -- left out: it names whoever ran the GRANT, which differs between a branch and production.
+--
+-- Function, view and trigger definitions appear as md5s: a trigger's arguments can hold a key (a
+-- dashboard database webhook stores its Authorization header there), and the lines of a differing
+-- section are printed in a public job log.
 --
 -- search_path is set to pg_catalog for this statement only (set_config is_local, evaluated before
 -- the lateral subquery that reads it), so every deparsed expression names its schema whichever
@@ -20,20 +41,27 @@ cross join lateral (
     select oid, nspname from pg_namespace
     where nspname in ('public', 'research', 'partitions') and cfg.sp is not null
   ),
+  platform as (
+    select oid, nspname from pg_namespace where nspname in ('storage', 'auth')
+  ),
   extension_members as (select objid from pg_depend where deptype = 'e'),
-  app_roles as (
+  watched_roles as (
     select oid, rolname from pg_roles
-    where rolname !~ '^(pg_|supabase_|cli_login_)'
-      and rolname not in ('postgres', 'anon', 'authenticated', 'service_role', 'authenticator',
-                          'dashboard_user', 'pgbouncer', 'pgsodium_keyholder',
-                          'pgsodium_keyiduser', 'pgsodium_keymaker')
+    where (rolname !~ '^(pg_|supabase_|cli_login_)'
+           and rolname not in ('postgres', 'dashboard_user', 'pgbouncer', 'pgsodium_keyholder',
+                               'pgsodium_keyiduser', 'pgsodium_keymaker'))
   ),
   rels as (
-    select c.oid, n.nspname, c.relname, c.relkind, c.relowner, c.relacl,
+    select c.oid, n.nspname, c.relname, c.relkind, c.relowner, c.relacl, c.relreplident,
            c.relrowsecurity, c.relforcerowsecurity, c.relpartbound, c.reloptions
     from pg_class c join scope n on n.oid = c.relnamespace
     where c.relkind in ('r', 'p', 'v', 'm', 'S', 'f')
       and c.oid not in (select objid from extension_members)
+  ),
+  platform_rels as (
+    select c.oid, n.nspname, c.relname, c.relacl, c.relrowsecurity, c.relforcerowsecurity
+    from pg_class c join platform n on n.oid = c.relnamespace
+    where c.relkind in ('r', 'p')
   ),
   funcs as (
     select p.oid, n.nspname, p.proname, p.prokind, p.proowner, p.proacl, p.prosecdef
@@ -43,22 +71,26 @@ cross join lateral (
   grantee_name as (select 0::oid as oid, 'PUBLIC'::text as name
                    union all select oid, rolname::text from pg_roles),
   items(section, line) as (
-    select 'columns', format('%s.%s.%s %s%s%s%s%s', r.nspname, r.relname, a.attname,
+    select 'columns', format('%s.%s.%s %s%s%s%s%s%s', r.nspname, r.relname, a.attname,
              format_type(a.atttypid, a.atttypmod),
+             case when a.attcollation <> 0 and a.attcollation <> t.typcollation
+                  then ' collate ' || a.attcollation::regcollation::text else '' end,
              case when a.attnotnull then ' not null' else '' end,
              coalesce(' default ' || pg_get_expr(d.adbin, d.adrelid), ''),
              case when a.attidentity <> '' then ' identity ' || a.attidentity::text else '' end,
              case when a.attgenerated <> '' then ' generated ' || a.attgenerated::text else '' end)
     from rels r
     join pg_attribute a on a.attrelid = r.oid and a.attnum > 0 and not a.attisdropped
+    join pg_type t on t.oid = a.atttypid
     left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
 
     union all
-    select 'relations', format('%s.%s kind=%s owner=%s partition_key=%s bound=%s options=%s view=%s',
+    select 'relations', format(
+             '%s.%s kind=%s owner=%s partition_key=%s bound=%s options=%s replica_identity=%s view=%s',
              r.nspname, r.relname, r.relkind, pg_get_userbyid(r.relowner),
              case when r.relkind = 'p' then pg_get_partkeydef(r.oid) else '' end,
              coalesce(pg_get_expr(r.relpartbound, r.oid), ''),
-             coalesce(r.reloptions::text, ''),
+             coalesce(r.reloptions::text, ''), r.relreplident,
              case when r.relkind in ('v', 'm') then md5(pg_get_viewdef(r.oid)) else '' end)
     from rels r
 
@@ -66,6 +98,11 @@ cross join lateral (
     select 'rls', format('%s.%s enabled=%s forced=%s', r.nspname, r.relname,
              r.relrowsecurity, r.relforcerowsecurity)
     from rels r where r.relkind in ('r', 'p')
+
+    union all
+    select 'rls', format('%s.%s enabled=%s forced=%s', r.nspname, r.relname,
+             r.relrowsecurity, r.relforcerowsecurity)
+    from platform_rels r
 
     union all
     select 'functions', format('%s.%s(%s) kind=%s owner=%s security_definer=%s definition=%s',
@@ -80,7 +117,8 @@ cross join lateral (
              (select string_agg(x, ',' order by x collate "C") from unnest(p.roles) x),
              coalesce(p.qual, ''), coalesce(p.with_check, ''))
     from pg_policies p
-    where p.schemaname in (select nspname from scope) or p.schemaname = 'storage'
+    where p.schemaname in (select nspname from scope)
+       or p.schemaname in (select nspname from platform)
 
     union all
     select 'constraints', format('%s.%s %s %s', n.nspname,
@@ -89,17 +127,31 @@ cross join lateral (
     join scope n on n.oid = con.connamespace
     left join pg_class c on c.oid = con.conrelid
     left join pg_type t on t.oid = con.contypid
-    where con.conrelid in (select oid from rels) or con.contypid <> 0
+    where (con.conrelid in (select oid from rels) or con.contypid <> 0)
+      -- A constraint Postgres derives from a parent's, one per partition (a foreign key to a
+      -- partitioned table gets one per referenced partition): the parent's constraint is listed.
+      and con.conparentid = 0
 
     union all
     select 'indexes', format('%s.%s %s', i.schemaname, i.indexname, i.indexdef)
     from pg_indexes i where i.schemaname in (select nspname from scope)
 
     union all
-    select 'triggers', format('%s.%s enabled=%s %s', r.nspname, r.relname, t.tgenabled,
-             pg_get_triggerdef(t.oid))
+    select 'triggers', format('%s.%s %s enabled=%s definition=%s', r.nspname, r.relname,
+             t.tgname, t.tgenabled,
+             md5(case when r.nspname = 'partitions'
+                      then regexp_replace(pg_get_triggerdef(t.oid), '_[0-9]{4}_[0-9]{2}', '_YYYY_MM', 'g')
+                      else pg_get_triggerdef(t.oid) end))
     from pg_trigger t join rels r on r.oid = t.tgrelid
     where not t.tgisinternal
+
+    union all
+    select 'triggers', format('%s.%s %s enabled=%s definition=%s', r.nspname, r.relname,
+             t.tgname, t.tgenabled, md5(pg_get_triggerdef(t.oid)))
+    from pg_trigger t
+    join platform_rels r on r.oid = t.tgrelid
+    join pg_proc p on p.oid = t.tgfoid
+    where not t.tgisinternal and p.pronamespace in (select oid from scope)
 
     union all
     select 'types', format('%s.%s kind=%s base=%s labels=%s', n.nspname, t.typname, t.typtype,
@@ -142,27 +194,55 @@ cross join lateral (
     cross join lateral aclexplode(coalesce(n.nspacl, acldefault('n', n.nspowner))) x
     join grantee_name g on g.oid = x.grantee
     where n.oid in (select oid from scope)
-       or (n.nspname = 'storage' and x.grantee in (select oid from app_roles))
+       or (n.oid in (select oid from platform)
+           and (x.grantee = 0 or x.grantee in (select oid from watched_roles)))
 
     union all
-    select 'acls', format('relation storage.%s %s %s', c.relname, g.name, x.privilege_type)
-    from pg_class c
-    join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'storage'
-    cross join lateral aclexplode(c.relacl) x
+    select 'acls', format('relation %s.%s %s %s', r.nspname, r.relname, g.name, x.privilege_type)
+    from platform_rels r
+    cross join lateral aclexplode(r.relacl) x
     join grantee_name g on g.oid = x.grantee
-    where c.relacl is not null and x.grantee in (select oid from app_roles)
+    where r.relacl is not null and (x.grantee = 0 or x.grantee in (select oid from watched_roles))
 
     union all
-    select 'roles', format('%s login=%s bypassrls=%s superuser=%s createrole=%s createdb=%s inherit=%s',
+    select 'default_acls', format('%s in %s on %s: %s %s%s', pg_get_userbyid(d.defaclrole),
+             coalesce(n.nspname, '*'), d.defaclobjtype, g.name, x.privilege_type,
+             case when x.is_grantable then ' with grant option' else '' end)
+    from pg_default_acl d
+    left join pg_namespace n on n.oid = d.defaclnamespace
+    cross join lateral aclexplode(d.defaclacl) x
+    join grantee_name g on g.oid = x.grantee
+
+    union all
+    select 'roles', format(
+             '%s login=%s bypassrls=%s superuser=%s createrole=%s createdb=%s inherit=%s replication=%s connection_limit=%s config=%s',
              r.rolname, r.rolcanlogin, r.rolbypassrls, r.rolsuper, r.rolcreaterole,
-             r.rolcreatedb, r.rolinherit)
-    from pg_roles r where r.oid in (select oid from app_roles)
+             r.rolcreatedb, r.rolinherit, r.rolreplication, r.rolconnlimit,
+             coalesce((select string_agg(c, ',' order by c collate "C")
+                       from unnest(r.rolconfig) c), ''))
+    from pg_roles r where r.oid in (select oid from watched_roles)
 
     union all
-    select 'roles', format('%s member of %s admin=%s', pg_get_userbyid(m.member),
-             pg_get_userbyid(m.roleid), m.admin_option)
+    select 'roles', format('%s member of %s admin=%s inherit=%s set=%s',
+             pg_get_userbyid(m.member), pg_get_userbyid(m.roleid), m.admin_option,
+             m.inherit_option, m.set_option)
     from pg_auth_members m
-    where m.roleid in (select oid from app_roles) or m.member in (select oid from app_roles)
+    where m.roleid in (select oid from watched_roles) or m.member in (select oid from watched_roles)
+
+    union all
+    select 'schemas', n.nspname::text
+    from pg_namespace n
+    where n.nspname !~ '^pg_(toast|temp_|toast_temp_)' and n.nspname <> 'information_schema'
+
+    union all
+    select 'extensions', e.extname::text from pg_extension e
+
+    union all
+    select 'publications', format('%s %s', p.pubname,
+             coalesce(t.schemaname || '.' || t.tablename, ''))
+    from pg_publication p
+    left join pg_publication_tables t
+      on t.pubname = p.pubname and t.schemaname in (select nspname from scope)
 
     union all
     select 'buckets', format('%s name=%s public=%s file_size_limit=%s allowed_mime_types=%s',
@@ -170,16 +250,26 @@ cross join lateral (
              to_jsonb(b) ->> 'allowed_mime_types')
     from storage.buckets b
   ),
+  normalised as (
+    select distinct section,
+           case when line ~ '(^|[ (])partitions\.'
+                then regexp_replace(
+                       regexp_replace(line, '_[0-9]{4}_[0-9]{2}', '_YYYY_MM', 'g'),
+                       '''[0-9]{4}-[0-9]{2}-[0-9]{2}''', '''YYYY-MM-DD''', 'g')
+                else line end as line
+    from items
+  ),
   sections(section) as (
-    values ('acls'), ('buckets'), ('columns'), ('constraints'), ('functions'), ('indexes'),
-           ('policies'), ('relations'), ('rls'), ('roles'), ('triggers'), ('types')
+    values ('acls'), ('buckets'), ('columns'), ('constraints'), ('default_acls'), ('extensions'),
+           ('functions'), ('indexes'), ('policies'), ('publications'), ('relations'), ('rls'),
+           ('roles'), ('schemas'), ('triggers'), ('types')
   )
   select s.section,
          string_agg(i.line, E'\n' order by i.line collate "C") as body,
          count(i.line)::int as items,
          coalesce(array_agg(i.line order by i.line collate "C") filter (where i.line is not null),
                   '{}') as lines
-  from sections s left join items i on i.section = s.section
+  from sections s left join normalised i on i.section = s.section
   group by s.section
 ) f
 order by f.section collate "C";

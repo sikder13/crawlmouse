@@ -74,6 +74,19 @@ export function formatDifferences(
     .join('\n');
 }
 
+/** Section names and counts only: what a public pull request comment may carry. */
+export function formatDifferenceCounts(
+  differences: SectionDifference[],
+  labels: { expected: string; actual: string },
+): string {
+  return differences
+    .map(
+      (d) =>
+        `${d.section} (${d.added.length} only on ${labels.actual}, ${d.removed.length} only on ${labels.expected})`,
+    )
+    .join(', ');
+}
+
 export function formatFingerprint(fp: Fingerprint): string {
   return [...fp.entries()]
     .map(([s, v]) => `  ${s.padEnd(12)} ${v.md5}  ${v.items} items`)

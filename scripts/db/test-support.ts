@@ -67,3 +67,18 @@ export const HISTORY_TABLE = `
     rollback text[]
   );
 `;
+
+/**
+ * The name of one existing partition of a table (`public_page_results`, `research_check_runs`, ...).
+ * Partitions are created for the months around now(), so a test names none of them literally.
+ */
+export async function partitionOf(pglite: PGlite, parent: string): Promise<string> {
+  const { rows } = await pglite.query<{ relname: string }>(
+    `select relname from pg_class
+      where relnamespace = 'partitions'::regnamespace and relname ~ $1
+      order by relname limit 1`,
+    [`^${parent}_[0-9]{4}_[0-9]{2}$`],
+  );
+  if (!rows[0]) throw new Error(`no partition of ${parent}`);
+  return rows[0].relname;
+}

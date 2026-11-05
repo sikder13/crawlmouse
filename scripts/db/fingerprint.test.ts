@@ -7,19 +7,23 @@ import {
   readFingerprint,
   type Fingerprint,
 } from './fingerprint';
-import { migratedDb, pgliteDb, withRollback } from './test-support';
+import { migratedDb, partitionOf, pgliteDb, withRollback } from './test-support';
 
 const SECTIONS = [
   'acls',
   'buckets',
   'columns',
   'constraints',
+  'default_acls',
+  'extensions',
   'functions',
   'indexes',
   'policies',
+  'publications',
   'relations',
   'rls',
   'roles',
+  'schemas',
   'triggers',
   'types',
 ];
@@ -107,12 +111,81 @@ describe('each section detects a change of its own kind, and names it', () => {
     ['revoke crawl_worker from authenticator', ['roles']],
     ["update storage.buckets set public = true where id = 'reports'", ['buckets']],
     ["create type public.zz as enum ('a')", ['types']],
+    // The reviewers' list of what an earlier version could not see.
+    ['drop trigger on_auth_user_created on auth.users', ['triggers']],
+    ['alter table storage.objects disable row level security', ['rls']],
+    ['alter default privileges in schema public grant all on sequences to anon', ['default_acls']],
+    [
+      'alter default privileges in schema public revoke all on tables from authenticated',
+      ['default_acls'],
+    ],
+    ['grant service_role to authenticated', ['roles']],
+    ['grant authenticated to anon', ['roles']],
+    ['alter role authenticated bypassrls', ['roles']],
+    ['alter role anon set statement_timeout = 0', ['roles']],
+    [
+      'revoke crawl_worker from authenticator; grant crawl_worker to authenticator with set false',
+      ['roles'],
+    ],
+    ['alter role crawl_worker set search_path = public', ['roles']],
+    ['alter role crawl_worker connection limit 3', ['roles']],
+    ['grant all on storage.objects to public', ['acls']],
+    ['revoke all on storage.buckets from authenticated', ['acls']],
+    ['create schema zz', ['schemas']],
+    ['create publication zz for table public.sites', ['publications']],
+    ['alter table public.sites alter column client_name type text collate "C"', ['columns']],
+    ['alter table public.sites replica identity full', ['relations']],
   ])('%s', async (mutation, sections) => {
     const after = await withRollback(db, async (tx) => {
       await tx.exec(mutation);
       return readFingerprint(tx);
     });
     expect(differingSections(base, after)).toEqual(sections);
+  });
+
+  it('a trigger argument changes the triggers section and never appears in its lines', async () => {
+    const after = await withRollback(db, async (tx) => {
+      await tx.exec(`create trigger zz_hook after insert on public.sites for each statement
+        execute function public.accounts_keep_first_history_entry('Bearer sk_test_secret_value')`);
+      return readFingerprint(tx);
+    });
+    expect(differingSections(base, after)).toEqual(['triggers']);
+    const lines = [...after.values()].flatMap((s) => s.lines).join('\n');
+    expect(lines).toContain('public.sites zz_hook enabled=O definition=');
+    expect(lines).not.toContain('sk_test_secret_value');
+  });
+
+  it('a grant on one partition changes the acls section', async () => {
+    const name = await partitionOf(db, 'public_page_results');
+    const after = await withRollback(db, async (tx) => {
+      await tx.exec(`grant select on partitions.${name} to anon`);
+      return readFingerprint(tx);
+    });
+    expect(differingSections(base, after)).toEqual(['acls']);
+  });
+
+  it('more or other months of partitions do not change it', async () => {
+    const after = await withRollback(db, async (tx) => {
+      const [before] = await tx.query<{ n: number }>(
+        `select count(*)::int as n from pg_class where relnamespace = 'partitions'::regnamespace`,
+      );
+      await tx.exec(`select public.v2_premake_month_partitions('2031-01-01', '2031-04-01')`);
+      const [later] = await tx.query<{ n: number }>(
+        `select count(*)::int as n from pg_class where relnamespace = 'partitions'::regnamespace`,
+      );
+      expect(later!.n).toBeGreaterThan(before!.n);
+      return readFingerprint(tx);
+    });
+    expect(compareFingerprints(base, after)).toEqual([]);
+  });
+
+  it('a database without the earliest month, as a branch built a month later is, matches', async () => {
+    const earliest = await partitionOf(db, 'public_page_results');
+    const after = await withRollback(db, async (tx) => {
+      await tx.exec(`drop table partitions.${earliest}`);
+      return readFingerprint(tx);
+    });
+    expect(compareFingerprints(base, after)).toEqual([]);
   });
 
   it('a new view changes the relations section', async () => {
