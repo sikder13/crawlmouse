@@ -85,11 +85,28 @@ describe('a URL the crawl lists twice', () => {
     ]);
   });
 
+  it('is taken at its higher PageRank, whatever the order', () => {
+    const a = [page('/x', '/t', 0.9), page('/x', '/t', 0.1), page('/y', '/t', 0.5)];
+    const b = [page('/x', '/t', 0.1), page('/x', '/t', 0.9), page('/y', '/t', 0.5)];
+    expect(selectRenders(a, [], 1)).toEqual(selectRenders(b, [], 1));
+    expect(selectRenders(a, [], 1).map((p) => p.url.slice(20))).toEqual(['/x']);
+  });
+
   it('is taken under the template key that sorts first, whatever the order', () => {
     const a = [page('/u1', '/g', 0.9), page('/u1', '/f', 0.9)];
     const b = [...a].reverse();
     expect(selectRenders(a, [], 25)).toEqual(selectRenders(b, [], 25));
     expect(selectRenders(a, [], 25).map((p) => p.template_key)).toEqual(['/f']);
+  });
+});
+
+describe('a URL with a listing the render may not take', () => {
+  it('is not rendered, even under its other listing', () => {
+    const pages = [
+      page('/u', '/f', 0.9, { fetched_under_our_robots: false }),
+      page('/u', '/g', 0.1),
+    ];
+    expect(selectRenders(pages, [], 25)).toEqual([]);
   });
 });
 
