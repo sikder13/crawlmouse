@@ -15,7 +15,6 @@ const SECTIONS = [
   'columns',
   'constraints',
   'default_acls',
-  'extensions',
   'functions',
   'indexes',
   'policies',
@@ -197,6 +196,28 @@ describe('each section detects a change of its own kind, and names it', () => {
     const lines = [...after.values()].flatMap((s) => s.lines).join('\n');
     expect(lines).toContain('app.webhook_key=md5:');
     expect(lines).not.toContain('sk_test_role_secret');
+  });
+
+  it.each([
+    ['create schema realtime', 'a schema of Supabase'],
+    [
+      'create table auth.zz_new (id int); alter table auth.zz_new enable row level security',
+      'a new auth table',
+    ],
+    [
+      'create table public.zz_pub (id int); create publication zz for table public.zz_pub; drop table public.zz_pub',
+      'a publication holding no app table',
+    ],
+    [
+      'alter default privileges in schema auth grant all on tables to anon',
+      'default privileges in a schema of Supabase',
+    ],
+  ])('ignores what Supabase manages: %s (%s)', async (mutation) => {
+    const after = await withRollback(db, async (tx) => {
+      await tx.exec(mutation);
+      return readFingerprint(tx);
+    });
+    expect(compareFingerprints(base, after)).toEqual([]);
   });
 
   it('a new view changes the relations section', async () => {

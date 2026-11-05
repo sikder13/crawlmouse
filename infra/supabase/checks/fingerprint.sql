@@ -1,26 +1,32 @@
 -- Schema fingerprint. One row per section: an md5 over the section's lines, the line count, and
 -- the lines themselves, so two targets can be compared section by section and a difference named.
 --
--- What it reads:
+-- What it reads is what the migrations produce:
 --   - in the schemas the migrations own (public, research, partitions): columns (with collation),
 --     relations (kind, owner, partition key and bound, options, replica identity, view md5), RLS,
 --     functions (md5 of the definition, which includes SET search_path), policies, constraints,
 --     indexes, triggers, types, and the ACLs of relations, columns, functions and the schemas;
---   - on storage and auth tables: RLS, policies, the triggers whose function is in those three
---     schemas, and the grants to the roles below and to PUBLIC;
+--   - on auth.users, storage.objects and storage.buckets: RLS, policies, the triggers whose
+--     function is in those three schemas, and the grants to the roles below and to PUBLIC;
 --   - the roles the migrations create and the client roles (anon, authenticated, service_role,
---     authenticator): attributes, settings, and memberships with their admin, inherit and set
---     options;
---   - default privileges, schema names, extension names, publications and storage bucket rows.
--- What it does not read: comments, event triggers, pg_cron jobs, extension versions, function
--- bodies outside the three schemas, and relations, functions and types that belong to an extension.
+--     authenticator): attributes, settings (values as md5s), and memberships with their admin,
+--     inherit and set options;
+--   - default privileges for all schemas or for the three above; the names of schemas other than
+--     Supabase's own and those an extension creates; the tables of the three schemas in each
+--     publication; and storage bucket rows.
+-- What it does not read, because Supabase or the owner manages it outside the migrations and a new
+-- branch would not have it as production does: extensions (pg_cron is enabled by hand, 06b's
+-- runbook), the other auth and storage tables, Supabase's schemas and their default privileges.
+-- Nor comments, event triggers, pg_cron jobs, function bodies outside the three schemas, and
+-- relations, functions and types that belong to an extension.
 --
 -- Monthly partitions are created relative to now(), so a branch built in a later month holds other
 -- months than production. In each line that names a partition, the _YYYY_MM suffix and the bound's
 -- dates are normalised (inside a trigger's md5 too) and identical lines are merged: one line per
--- kind of partition, so a grant on one partition still shows. Constraints Postgres derives from a
--- parent's, one per partition, are left out; the parent's is listed. Which months exist is check
--- 02's and the partition job's concern.
+-- kind of partition. A line one partition has and the others lack (a grant, say) still shows; a
+-- line one partition lacks and the others have does not, so check 07 requires each partition to
+-- hold its parent's triggers. Constraints Postgres derives from a parent's, one per partition, are
+-- left out; the parent's is listed. Which months exist is the partition job's concern.
 --
 -- Lines are sorted with the "C" collation and ACLs are exploded into one line per grantee and
 -- privilege, so neither collation nor the order of aclitems can change a digest. The grantor is
@@ -42,6 +48,11 @@ cross join lateral (
     select oid, nspname from pg_namespace
     where nspname in ('public', 'research', 'partitions') and cfg.sp is not null
   ),
+  -- Supabase versions the storage and auth schemas and adds tables to them; only the tables the
+  -- app relies on are read, so a newer platform version on a branch is not a difference.
+  platform_tables(schema_name, table_name) as (
+    values ('auth', 'users'), ('storage', 'objects'), ('storage', 'buckets')
+  ),
   platform as (
     select oid, nspname from pg_namespace where nspname in ('storage', 'auth')
   ),
@@ -62,7 +73,7 @@ cross join lateral (
   platform_rels as (
     select c.oid, n.nspname, c.relname, c.relacl, c.relrowsecurity, c.relforcerowsecurity
     from pg_class c join platform n on n.oid = c.relnamespace
-    where c.relkind in ('r', 'p')
+    join platform_tables pt on pt.schema_name = n.nspname and pt.table_name = c.relname
   ),
   funcs as (
     select p.oid, n.nspname, p.proname, p.prokind, p.proowner, p.proacl, p.prosecdef
@@ -119,7 +130,7 @@ cross join lateral (
              coalesce(p.qual, ''), coalesce(p.with_check, ''))
     from pg_policies p
     where p.schemaname in (select nspname from scope)
-       or p.schemaname in (select nspname from platform)
+       or (p.schemaname, p.tablename) in (select schema_name, table_name from platform_tables)
 
     union all
     select 'constraints', format('%s.%s %s %s', n.nspname,
@@ -213,6 +224,7 @@ cross join lateral (
     left join pg_namespace n on n.oid = d.defaclnamespace
     cross join lateral aclexplode(d.defaclacl) x
     join grantee_name g on g.oid = x.grantee
+    where d.defaclnamespace = 0 or d.defaclnamespace in (select oid from scope)
 
     union all
     select 'roles', format(
@@ -235,17 +247,16 @@ cross join lateral (
     union all
     select 'schemas', n.nspname::text
     from pg_namespace n
-    where n.nspname !~ '^pg_(toast|temp_|toast_temp_)' and n.nspname <> 'information_schema'
+    where n.nspname !~ '^pg_'
+      and n.nspname not in ('information_schema', 'auth', 'storage', 'realtime', 'graphql',
+                            'graphql_public', 'vault', 'extensions', 'pgbouncer', 'cron', 'net',
+                            'supabase_migrations', 'supabase_functions')
+      and n.oid not in (select objid from extension_members)
 
     union all
-    select 'extensions', e.extname::text from pg_extension e
-
-    union all
-    select 'publications', format('%s %s', p.pubname,
-             coalesce(t.schemaname || '.' || t.tablename, ''))
-    from pg_publication p
-    left join pg_publication_tables t
-      on t.pubname = p.pubname and t.schemaname in (select nspname from scope)
+    select 'publications', format('%s %s.%s', t.pubname, t.schemaname, t.tablename)
+    from pg_publication_tables t
+    where t.schemaname in (select nspname from scope)
 
     union all
     select 'buckets', format('%s name=%s public=%s file_size_limit=%s allowed_mime_types=%s',
@@ -263,9 +274,9 @@ cross join lateral (
     from items
   ),
   sections(section) as (
-    values ('acls'), ('buckets'), ('columns'), ('constraints'), ('default_acls'), ('extensions'),
-           ('functions'), ('indexes'), ('policies'), ('publications'), ('relations'), ('rls'),
-           ('roles'), ('schemas'), ('triggers'), ('types')
+    values ('acls'), ('buckets'), ('columns'), ('constraints'), ('default_acls'), ('functions'),
+           ('indexes'), ('policies'), ('publications'), ('relations'), ('rls'), ('roles'),
+           ('schemas'), ('triggers'), ('types')
   )
   select s.section,
          string_agg(i.line, E'\n' order by i.line collate "C") as body,
