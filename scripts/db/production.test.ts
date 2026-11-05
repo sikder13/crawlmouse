@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { listMigrations } from './files';
-import { gateProblems, manifestProblems, rollbackOrderProblem } from './production';
+import { driftProblems, gateProblems, manifestProblems } from './production';
+import { rollbackOrderProblem } from './rollback';
 import { parseSummary, type DryRunSummary } from './summary';
 
 const pending = listMigrations().filter((f) => f.version > '20261101000001');
@@ -120,5 +121,23 @@ describe('a production rollback runs newest first', () => {
 
   it('refuses one production does not record', () => {
     expect(rollbackOrderProblem('20261104000001', recorded)).toMatch(/does not record/);
+  });
+});
+
+describe('the fingerprint check after the owner approves', () => {
+  it('passes when production is still what the plan read', () => {
+    expect(driftProblems(PRODUCTION, { ...PRODUCTION }, 'the plan')).toEqual([]);
+  });
+
+  it('refuses when a section changed between the plan and the approval', () => {
+    expect(
+      driftProblems(PRODUCTION, { ...PRODUCTION, columns: 'e'.repeat(32) }, 'the plan'),
+    ).toEqual(["production's columns section changed since the plan read it"]);
+  });
+
+  it('refuses when the plan recorded nothing', () => {
+    expect(driftProblems({}, PRODUCTION, 'the plan')).toEqual([
+      'the plan recorded no fingerprint of production',
+    ]);
   });
 });

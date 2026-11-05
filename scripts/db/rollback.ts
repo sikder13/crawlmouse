@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { failed, formatResults, runChecks } from './check';
 import type { Db } from './db';
 import { hasRollback, listMigrations, rollbackPath, type MigrationFile } from './files';
+import { readHistory } from './history';
 import { openTarget } from './target';
 
 /**
@@ -30,11 +31,13 @@ export async function revert(
   db: Db,
   migrations: MigrationFile[],
   log = console.log,
+  guard?: (tx: Db, migration: MigrationFile) => Promise<void>,
 ): Promise<void> {
   for (const m of migrations) {
     const path = rollbackPath(m);
     const sql = readFileSync(path, 'utf8');
     await db.transaction(async (tx) => {
+      if (guard) await guard(tx, m);
       await tx.exec(sql);
       const forgotten = await tx.query(FORGET_VERSION, [m.version]);
       if (forgotten.length !== 1) {
@@ -53,6 +56,37 @@ export async function rerun(db: Db, migrations: MigrationFile[], log = console.l
     await db.transaction((tx) => tx.exec(m.sql));
     log(`re-ran ${m.file}`);
   }
+}
+
+/**
+ * Why a rollback of `version` may not run now: production must record it, and it must be the
+ * newest version recorded, so rollbacks run newest first. Null when it may.
+ */
+export function rollbackOrderProblem(version: string, recorded: string[]): string | null {
+  if (!recorded.includes(version)) return `production does not record ${version} as applied`;
+  const newest = [...recorded].sort().at(-1)!;
+  if (newest !== version) {
+    return `${newest} is newer than ${version} and still applied: roll back newest first`;
+  }
+  return null;
+}
+
+export const LOCK_HISTORY = 'lock table supabase_migrations.schema_migrations in exclusive mode';
+
+/**
+ * For `revert` on production: inside the rollback's transaction, locks the history table (a
+ * `supabase db push` records its files there, so it waits) and requires the migration to be the
+ * newest one recorded. The plan checked this before the approval; this checks it again at the
+ * moment the rollback runs.
+ */
+export async function newestFirstGuard(tx: Db, migration: MigrationFile): Promise<void> {
+  await tx.query(LOCK_HISTORY);
+  const rows = await readHistory(tx);
+  const problem = rollbackOrderProblem(
+    migration.version,
+    rows.map((r) => r.version),
+  );
+  if (problem) throw new Error(problem);
 }
 
 const REVERT_FILE = /^(\d{14})_([a-z0-9_]+)\.revert\.sql$/;

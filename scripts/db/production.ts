@@ -6,7 +6,7 @@ import { connect, readOnlyApi } from './db';
 import { listMigrations, rollbackPath, sha256, type MigrationFile } from './files';
 import { formatFingerprint, readFingerprint } from './fingerprint';
 import { diffHistory, formatDiff, readHistory } from './history';
-import { migrationForRollback, revert } from './rollback';
+import { migrationForRollback, newestFirstGuard, revert, rollbackOrderProblem } from './rollback';
 import {
   digests,
   filesTable,
@@ -26,14 +26,16 @@ import { PRODUCTION_REF, assertAllowed } from './target';
  *             checked against the passed dry run of the pull request; writes the manifest the apply
  *             must match.
  *   apply     db-apply-prod.yml, after the approval: re-checks the manifest against the checked-out
- *             files and against production, runs `supabase db push`, the checks and the fingerprint.
+ *             files and against production, and production's fingerprint against the plan's; runs
+ *             `supabase db push`, the checks and the fingerprint.
  *   rollback-plan  db-rollback-prod.yml, before the approval, read-only: the rollback file's sha256
  *             and that production records its migration as applied.
  *   rollback  db-rollback-prod.yml, after the approval: requires the planned sha256, runs the
  *             rollback file, then the checks and the fingerprint.
  *
- *   tsx scripts/db/production.ts plan --yes-production --dry-run-summary <json> --manifest-out <json>
- *   tsx scripts/db/production.ts apply --yes-production --manifest <json>
+ *   tsx scripts/db/production.ts plan --yes-production --dry-run-summary <json> \
+ *     --manifest-out <json> --production-out <json>
+ *   tsx scripts/db/production.ts apply --yes-production --manifest <json> --expect-production <json>
  *   tsx scripts/db/production.ts rollback-plan --yes-production --file <file> --sha-out <path>
  *   tsx scripts/db/production.ts rollback --yes-production --file <file> --expect-sha256 <sha>
  */
@@ -42,6 +44,22 @@ export type Manifest = Array<{ file: string; sha256: string }>;
 
 const asManifest = (files: MigrationFile[]): Manifest =>
   files.map((f) => ({ file: f.file, sha256: f.sha256 }));
+
+/**
+ * Why production's fingerprint `now` is not the one `who` read (`expected`, md5 per section);
+ * empty when it is.
+ */
+export function driftProblems(
+  expected: Record<string, string>,
+  now: Record<string, string>,
+  who: string,
+): string[] {
+  if (Object.keys(expected).length === 0) return [`${who} recorded no fingerprint of production`];
+  const sections = [...new Set([...Object.keys(expected), ...Object.keys(now)])].sort();
+  return sections
+    .filter((s) => expected[s] !== now[s])
+    .map((s) => `production's ${s} section changed since ${who} read it`);
+}
 
 /**
  * Why the dry run does not cover the pending files; empty when it does. `productionNow` is
@@ -55,18 +73,7 @@ export function gateProblems(
 ): string[] {
   const problems: string[] = [];
   if (summary.passed !== true) problems.push('the dry run did not pass');
-  const sections = [
-    ...new Set([...Object.keys(summary.production), ...Object.keys(productionNow)]),
-  ];
-  if (Object.keys(summary.production).length === 0) {
-    problems.push('the dry run recorded no fingerprint of production');
-  } else {
-    for (const s of sections.sort()) {
-      if (summary.production[s] !== productionNow[s]) {
-        problems.push(`production's ${s} section changed since the dry run read it`);
-      }
-    }
-  }
+  problems.push(...driftProblems(summary.production, productionNow, 'the dry run'));
   const tested = new Map(summary.files.map((f) => [f.file, f.sha256]));
   for (const f of pending) {
     const sha = tested.get(f.file);
@@ -100,13 +107,19 @@ async function pendingOnProduction(token: string): Promise<MigrationFile[]> {
   return diff.unrecorded;
 }
 
-async function plan(token: string, summaryPath: string, manifestOut: string): Promise<void> {
+async function plan(
+  token: string,
+  summaryPath: string,
+  manifestOut: string,
+  productionOut: string,
+): Promise<void> {
   const pending = await pendingOnProduction(token);
   const summary = parseSummary(readFileSync(summaryPath, 'utf8'));
   const productionNow =
     pending.length > 0 ? digests(await readFingerprint(readOnlyApi(PRODUCTION_REF, token))) : {};
   const problems = pending.length > 0 ? gateProblems(pending, summary, productionNow) : [];
   writeFileSync(manifestOut, JSON.stringify(asManifest(pending)));
+  writeFileSync(productionOut, JSON.stringify(productionNow));
   publish(
     [
       `### Pending on production (${PRODUCTION_REF})`,
@@ -122,7 +135,12 @@ async function plan(token: string, summaryPath: string, manifestOut: string): Pr
   if (problems.length > 0) throw new Error(`the gate refuses:\n${problems.join('\n')}`);
 }
 
-async function apply(token: string, password: string, manifestPath: string): Promise<void> {
+async function apply(
+  token: string,
+  password: string,
+  manifestPath: string,
+  productionPath: string,
+): Promise<void> {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Manifest;
   const problems = manifestProblems(manifest, await pendingOnProduction(token));
   if (problems.length > 0) throw new Error(problems.join('\n'));
@@ -130,6 +148,11 @@ async function apply(token: string, password: string, manifestPath: string): Pro
     publish('### Nothing to apply\n\nProduction has no pending migration files.');
     return;
   }
+  // The approval may come days after the plan: production must still be what the plan read.
+  const planned = JSON.parse(readFileSync(productionPath, 'utf8')) as Record<string, string>;
+  const now = digests(await readFingerprint(readOnlyApi(PRODUCTION_REF, token)));
+  const drift = driftProblems(planned, now, 'the plan');
+  if (drift.length > 0) throw new Error(drift.join('\n'));
   const url = await new ManagementApi(token).poolerUrl(PRODUCTION_REF, password);
   const listed = await dbPush(url, { dryRun: true });
   const expected = manifest.map((m) => m.file);
@@ -140,19 +163,6 @@ async function apply(token: string, password: string, manifestPath: string): Pro
   }
   await dbPush(url, { dryRun: false });
   await report(url, `### Applied to production (${PRODUCTION_REF})\n\n${filesTable(manifest)}`);
-}
-
-/**
- * Why a rollback of `version` may not run now: production must record it, and it must be the
- * newest version recorded, so rollbacks run newest first. Null when it may.
- */
-export function rollbackOrderProblem(version: string, recorded: string[]): string | null {
-  if (!recorded.includes(version)) return `production does not record ${version} as applied`;
-  const newest = [...recorded].sort().at(-1)!;
-  if (newest !== version) {
-    return `${newest} is newer than ${version} and still applied: roll back newest first`;
-  }
-  return null;
 }
 
 /**
@@ -197,7 +207,7 @@ async function rollback(
   const url = await new ManagementApi(token).poolerUrl(PRODUCTION_REF, password);
   const db = connect(url);
   try {
-    await revert(db, [migration]);
+    await revert(db, [migration], console.log, newestFirstGuard);
   } finally {
     await db.close();
   }
@@ -241,6 +251,8 @@ async function main(): Promise<void> {
       'yes-production': { type: 'boolean', default: false },
       'dry-run-summary': { type: 'string', default: '' },
       'manifest-out': { type: 'string', default: '' },
+      'production-out': { type: 'string', default: '' },
+      'expect-production': { type: 'string', default: '' },
       manifest: { type: 'string', default: '' },
       file: { type: 'string', default: '' },
       'sha-out': { type: 'string', default: '' },
@@ -252,13 +264,14 @@ async function main(): Promise<void> {
   if (!token) throw new Error('SUPABASE_ACCESS_TOKEN is not set');
   const [command] = positionals;
   if (command === 'plan') {
-    await plan(token, values['dry-run-summary'], values['manifest-out']);
+    await plan(token, values['dry-run-summary'], values['manifest-out'], values['production-out']);
   } else if (command === 'rollback-plan') {
     await rollbackPlan(token, values.file, values['sha-out']);
   } else if (command === 'apply' || command === 'rollback') {
     const password = process.env.SUPABASE_DB_PASSWORD;
     if (!password) throw new Error('SUPABASE_DB_PASSWORD is not set');
-    if (command === 'apply') await apply(token, password, values.manifest);
+    if (command === 'apply')
+      await apply(token, password, values.manifest, values['expect-production']);
     else await rollback(token, password, values.file, values['expect-sha256']);
   } else {
     throw new Error('usage: production.ts plan|apply|rollback-plan|rollback --yes-production ...');

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { compareFingerprints, readFingerprint } from './fingerprint';
 import { listMigrations } from './files';
-import { FORGET_VERSION, migrationForRollback, missingRollbacks, rerun, revert } from './rollback';
+import {
+  FORGET_VERSION,
+  migrationForRollback,
+  missingRollbacks,
+  newestFirstGuard,
+  rerun,
+  revert,
+} from './rollback';
 import { HISTORY_TABLE, migratedDb, pgliteDb } from './test-support';
 
 const PENDING = ['20261102000001', '20261102000002', '20261102000003', '20261103000001'];
@@ -76,6 +83,29 @@ describe('revert and rerun', () => {
     await expect(revert(before, [m005], () => {})).rejects.toThrow(/is not recorded as applied/);
     expect(compareFingerprints(fp, await readFingerprint(before))).toEqual([]);
     expect(FORGET_VERSION).toContain('returning version');
+  }, 240_000);
+});
+
+describe('newestFirstGuard, inside the rollback transaction', () => {
+  it('refuses a migration that is no longer the newest recorded, and changes nothing', async () => {
+    const { after } = await databases();
+    const fp = await readFingerprint(after);
+    const m007 = pending.find((m) => m.version === '20261102000003')!;
+    await expect(revert(after, [m007], () => {}, newestFirstGuard)).rejects.toThrow(
+      '20261103000001 is newer than 20261102000003 and still applied: roll back newest first',
+    );
+    expect(compareFingerprints(fp, await readFingerprint(after))).toEqual([]);
+  }, 240_000);
+
+  it('lets the newest recorded migration revert', async () => {
+    const { after } = await databases();
+    const m006b = pending.find((m) => m.version === '20261103000001')!;
+    await revert(after, [m006b], () => {}, newestFirstGuard);
+    const rows = await after.query<{ version: string }>(
+      'select version from supabase_migrations.schema_migrations where version = $1',
+      [m006b.version],
+    );
+    expect(rows).toEqual([]);
   }, 240_000);
 });
 
