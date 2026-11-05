@@ -332,9 +332,10 @@ jobs:
           entrypoint: /root/osv-scanner
           args: scan source --config=osv-scanner.toml --lockfile=pnpm-lock.yaml
 
-  # actionlint over every workflow, with shellcheck on their run blocks (both are in the image).
-  # Pinned by image digest. The two ignored messages are nightly.yml's, which predate this job: the
-  # skipped Lighthouse placeholder (`if: false`) and an `ls` in its run block (SC2012, info).
+  # actionlint over the workflows, with shellcheck on their run blocks (both are in the image).
+  # Pinned by image digest. nightly.yml runs on its own with two findings ignored that predate this
+  # job: the skipped Lighthouse placeholder (`if: false`) and an `ls` in its run block (SC2012,
+  # info). The other workflows run with no ignores.
   actionlint:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -347,8 +348,12 @@ jobs:
           persist-credentials: false
       - name: actionlint
         run: |
+          set -euo pipefail
+          mapfile -t files < <(find .github/workflows -name '*.yml' ! -name nightly.yml | sort)
+          docker run --rm -v "$PWD:/repo" -w /repo "$ACTIONLINT_IMAGE" -color "${files[@]}"
           docker run --rm -v "$PWD:/repo" -w /repo "$ACTIONLINT_IMAGE" -color \
-            -ignore 'constant expression "false" in condition' -ignore 'SC2012:'
+            -ignore 'constant expression "false" in condition' -ignore 'SC2012:' \
+            .github/workflows/nightly.yml
 
   # The real Supabase CLI, against an empty Postgres, lists exactly the files of
   # infra/supabase/migrations (scripts/db/verify-cli-files.ts). The unit test pins the wrapper's

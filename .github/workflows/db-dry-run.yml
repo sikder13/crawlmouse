@@ -8,7 +8,7 @@ name: DB dry run
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
     paths:
       - 'infra/supabase/**'
       - 'scripts/db/**'
@@ -26,7 +26,9 @@ concurrency:
 
 jobs:
   dry-run:
-    if: github.event.action != 'closed'
+    # Renovate's pull requests would run updated third-party code with the access token before
+    # review (docs/ops/db-migrations.md §7).
+    if: github.event.pull_request.user.login != 'renovate[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     # Holds SUPABASE_ACCESS_TOKEN. A pull request from a fork receives no secrets, so its run fails
@@ -38,9 +40,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # The merge commit and its first parent, the base it merged against.
+          fetch-depth: 2
           persist-credentials: false
       - uses: ./.github/actions/setup
       - uses: ./.github/actions/supabase-cli
+      - name: Files the pull request changes
+        run: |
+          set -euo pipefail
+          git diff --name-only HEAD^1 HEAD -- infra/supabase > "$RUNNER_TEMP/changed.txt"
+          cat "$RUNNER_TEMP/changed.txt"
       - name: Dry run on a branch of production
         working-directory: scripts
         env:
@@ -51,7 +60,8 @@ jobs:
           set -euo pipefail
           pnpm exec tsx db/dry-run.ts --branch "$BRANCH" --commit "$COMMIT" \
             --summary-json "$RUNNER_TEMP/db-dry-run-summary.json" \
-            --summary-md "$RUNNER_TEMP/db-dry-run-summary.md"
+            --summary-md "$RUNNER_TEMP/db-dry-run-summary.md" \
+            --changed "$RUNNER_TEMP/changed.txt"
       - name: Keep the summary for the production apply
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -67,26 +77,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
+        # One comment per pull request, found by its marker line and edited in place.
         run: |
           set -euo pipefail
-          if [ -f "$RUNNER_TEMP/db-dry-run-summary.md" ]; then
-            gh pr comment "$PR" --repo "$REPO" --body-file "$RUNNER_TEMP/db-dry-run-summary.md" \
-              --edit-last --create-if-none
+          body="$RUNNER_TEMP/db-dry-run-summary.md"
+          [ -f "$body" ] || exit 0
+          printf '\n<!-- db-dry-run -->\n' >> "$body"
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- db-dry-run -->")))][0].id // empty' | head -n 1)
+          if [ -n "$id" ]; then
+            jq -n --rawfile body "$body" '{body: $body}' \
+              | gh api --method PATCH "repos/$REPO/issues/comments/$id" --input - > /dev/null
+          else
+            gh pr comment "$PR" --repo "$REPO" --body-file "$body"
           fi
-
-  delete-branch:
-    if: github.event.action == 'closed'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    environment: db-dry-run
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup
-      - name: Delete the pull request's Supabase branch
-        working-directory: scripts
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          BRANCH: pr-${{ github.event.pull_request.number }}
-        run: pnpm exec tsx db/delete-branch.ts --name "$BRANCH"

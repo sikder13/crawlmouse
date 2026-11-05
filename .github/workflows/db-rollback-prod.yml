@@ -16,12 +16,41 @@ on:
 permissions:
   contents: read
 
+# A group of its own: GitHub replaces a pending run in a group when a newer one queues, so sharing
+# db-apply-prod.yml's group would let a push drop a queued rollback.
 concurrency:
-  group: db-production
+  group: db-production-rollback
   cancel-in-progress: false
 
 jobs:
+  plan:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Holds SUPABASE_ACCESS_TOKEN, used here only through the read-only query endpoint.
+    environment: db-dry-run
+    outputs:
+      sha256: ${{ steps.plan.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: The file, its sha256, and that it is the newest applied migration
+        id: plan
+        working-directory: scripts
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          FILE: ${{ inputs.file }}
+        run: |
+          set -euo pipefail
+          pnpm exec tsx db/production.ts rollback-plan --yes-production --file "$FILE" \
+            --sha-out "$RUNNER_TEMP/sha256"
+          sha=$(cat "$RUNNER_TEMP/sha256")
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+
   rollback:
+    needs: plan
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -41,10 +70,13 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           # Passed as data and checked against infra/supabase/rollbacks by the script.
           FILE: ${{ inputs.file }}
-        run: pnpm exec tsx db/production.ts rollback --yes-production --file "$FILE"
+          SHA256: ${{ needs.plan.outputs.sha256 }}
+        run: |
+          pnpm exec tsx db/production.ts rollback --yes-production --file "$FILE" \
+            --expect-sha256 "$SHA256"
 
   report:
-    needs: rollback
+    needs: [plan, rollback]
     if: ${{ failure() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5

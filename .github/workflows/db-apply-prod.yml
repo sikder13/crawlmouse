@@ -74,10 +74,14 @@ jobs:
             echo "::error::pull request #$pr is $state, not merged"
             exit 1
           fi
-          run=$(gh run list --repo "$REPO" --workflow db-dry-run.yml --commit "$head" \
-            --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
-          if [ -z "$run" ]; then
-            echo "::error::no passed dry run for pull request #$pr at $head"
+          # The newest completed dry run at the pull request's head must be the one that passed.
+          latest=$(gh run list --repo "$REPO" --workflow db-dry-run.yml --commit "$head" \
+            --event pull_request --status completed --limit 1 --json databaseId,conclusion \
+            --jq '.[0] // empty | "\(.databaseId) \(.conclusion)"')
+          run="${latest%% *}"
+          conclusion="${latest#* }"
+          if [ -z "$latest" ] || [ "$conclusion" != "success" ]; then
+            echo "::error::the newest dry run for pull request #$pr at $head did not pass (${latest:-none})"
             exit 1
           fi
           echo "pull request #$pr, dry run https://github.com/$REPO/actions/runs/$run"
@@ -92,8 +96,10 @@ jobs:
           pnpm exec tsx db/production.ts plan --yes-production \
             --dry-run-summary "$RUNNER_TEMP/dry-run/db-dry-run-summary.json" \
             --manifest-out "$RUNNER_TEMP/manifest.json"
-          echo "manifest=$(cat "$RUNNER_TEMP/manifest.json")" >> "$GITHUB_OUTPUT"
-          echo "pending=$(jq length "$RUNNER_TEMP/manifest.json")" >> "$GITHUB_OUTPUT"
+          manifest=$(cat "$RUNNER_TEMP/manifest.json")
+          pending=$(jq length "$RUNNER_TEMP/manifest.json")
+          echo "manifest=$manifest" >> "$GITHUB_OUTPUT"
+          echo "pending=$pending" >> "$GITHUB_OUTPUT"
 
   apply:
     needs: plan
