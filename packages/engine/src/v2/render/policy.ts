@@ -2,20 +2,24 @@
  * What the browser may request while it renders a page.
  *
  * Browser Run's REST `/content` endpoint runs the browser on Cloudflare, so our code is not asked about
- * each request the page makes. What we can do is send two lists with every render, which Cloudflare
- * enforces: resource types to refuse, and URL patterns to refuse. Sub-requests are filtered by these
- * patterns, not by a check that runs in our process. The navigation URL itself is checked in our
- * process too (admission.ts), against these same patterns and a DNS resolution.
+ * each request the page makes. What we can do is send two lists with every render for Browser Run to
+ * apply, as its documentation describes: resource types to refuse, and URL patterns to refuse. By
+ * design, sub-requests are filtered by these patterns and not by a check in our process; whether
+ * Browser Run applies them is what live.test.ts shows. The navigation URL itself is also checked in
+ * our process (admission.ts), against these same patterns and a DNS resolution.
  *
  * WHY HOSTS ARE A REJECT-LIST, NOT AN ALLOW-LIST. `text_share` is static words over rendered words. A
- * script the browser is not allowed to load cannot add words, so every script blocked by mistake makes
- * the rendered side smaller and the share larger: a page that needs JavaScript reads as one that does
- * not. An allow-list of script origins does exactly that to every site whose own JavaScript is served
- * from a CDN under another name (a Shopify store, a site on CloudFront). So only hosts whose scripts are
- * not the page's content are refused: advertising, analytics, consent banners and chat widgets.
+ * script the browser is not allowed to load cannot add words, so a script blocked by mistake that
+ * would have written text makes the rendered side smaller and the share larger. An allow-list of
+ * script origins does that to sites whose own JavaScript is served from a CDN under another name (a
+ * Shopify store, a site on CloudFront). So the hosts refused are those whose scripts are usually not
+ * the page's content: advertising, analytics, consent banners and chat widgets.
  */
 
-/** Resource types refused on both sides: they add no text, and WebSocket and eventsource stay open. */
+/**
+ * Resource types refused on both sides. WebSocket and eventsource connections stay open, which keeps
+ * the network from going idle; a page whose text arrives over one loses that text on the rendered side.
+ */
 export const REJECTED_RESOURCE_TYPES = ['websocket', 'eventsource', 'media'] as const;
 
 /**

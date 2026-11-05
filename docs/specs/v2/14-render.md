@@ -25,7 +25,8 @@ network, with the same request but for one field:
 | Request timeout, reply included | 45 s                                                                                                    |
 | Largest reply read              | 10 MiB                                                                                                  |
 
-Refusing the `script` resource type stops script files from loading. A script written inline in the
+Refusing the `script` resource type is documented to stop script files from loading; the live script
+probe (below) is what shows it. A script written inline in the
 HTML still runs on the static side, so text such a script writes is counted on both sides and does not
 lower the share.
 
@@ -35,7 +36,7 @@ cannot remove that name it as Browser Run's (`cf-brapi-request-id`, `Signature-a
 agent does not hide what the request is.
 
 Both sides are counted by one function: `extractMainContent` on the HTML, then runs of non-space
-characters. Before that, a space is written before each opening and closing tag of 49 elements a
+characters. Before that, a space is written before each opening and closing tag of 46 elements a
 browser lays out as their own block, line or box (`p`, `div`, `li`, `td`, `button`, `br` and the
 rest in `words.ts`), because the extractor joins text nodes as they are and markup a script builds
 usually has no whitespace between its tags. Text in adjacent inline elements with nothing between them
@@ -64,8 +65,8 @@ renamed Browser Rendering to Browser Run on 2026-04-15; the token variable keeps
 
 The browser runs on Cloudflare, so our code is not asked about each request a page makes. Every render
 sends the resource types above and the URL patterns below for Browser Run to enforce, as its
-documentation describes (`rejectResourceTypes`, `rejectRequestPattern`). **Sub-requests are filtered by
-these patterns, not by per-request interception in our process.** Each pattern is sent as the regular
+documentation describes (`rejectResourceTypes`, `rejectRequestPattern`). **By design, sub-requests are
+filtered by these patterns, not by per-request interception in our process.** Each pattern is sent as the regular
 expression between slashes; the documentation shows that form and also one without the closing slash.
 This build has not observed Browser Run reading or enforcing them: that is the live probe's job (below).
 
@@ -104,8 +105,8 @@ are those whose scripts are usually not the page's content. Usually: a tag manag
 its words are then missing from the rendered side.
 
 **Downloads** are refused by path ending, in any case. A download a server signals with
-`Content-Disposition` on an ordinary path is not refused by a pattern; Browser Run returns the page's
-HTML and nothing else, and nothing is written to our disk.
+`Content-Disposition` on an ordinary path is not refused by a pattern; the `/content` reply is
+documented to carry the page's HTML only, and nothing is written to our disk.
 
 **Admission.** The navigation URL is checked in our process before anything is sent: it is refused
 when a pattern above matches it, since Browser Run would block it anyway (so a page on a listed host
@@ -175,11 +176,13 @@ Readable range  = 30 × site_text_share × (1 − unrendered)  to  that + 30 × 
 the render count in it. A template with no rendered page is left out of the share, not guessed at;
 `unrendered` says how much of the graded site that leaves out. When nothing was rendered there is no
 share, `unrendered` is 1 and the range is 0 to 30. `single_render_weight` is the part of the share's
-weight resting on templates with one rendered page, whose ratio is one page's share.
+weight resting on templates with one measured page, whose ratio is one page's share.
 
 The label reads "estimated from N rendered pages across K of T templates", then, where each is above
-zero, "X % of graded pages are in templates not rendered" and "Y % of the estimate rests on one rendered
-page per template". A part above zero is never printed as 0 %.
+zero, "X % of graded pages are in templates with no measured page" and "Y % of the estimate's weight
+rests on one measured page per template". A template with no measured page includes one whose renders
+failed or came back challenged. A part above zero is printed as "<1 %" rather than "0 %"
+(`estimate.test.ts`).
 
 ## Cost and limits
 
@@ -195,14 +198,15 @@ unset, empty or anything else reads as zero, and a cap that is not a positive fi
 nothing (`caps_not_configured`). The per-day value is handed to the caller's budget with each
 reservation; the count of what today has used lives in the caller's store.
 
-Before a page starts it reserves both of its renders at 15 s each, against the
+Before a page starts it reserves both of its renders at 45 s each, against the
 check's cap and against today's budget. When either cannot take them while other pages of the check are
 in flight, the page waits for one to settle and tries again; when nothing is in flight, rendering stops
 for the rest of the check. A render settles at the browser time Browser Run reports. A reply that
 reports none, and a request that timed out or failed, is counted at the request timeout, the longest it
-could have been open; the browser's own time could still be longer. A 429 is counted at zero. A render
-can report more than the wait cap, so a check can end above its cap by that excess on the pages in
-flight, and which pages a binding cap leaves unrendered depends on how long the earlier renders took.
+could have been open and the same as its reservation; the browser's own time could still be longer. A
+429 reports no browser time and is counted at zero. A render can report more than its reservation, so
+a check can end above its cap by that excess on the pages in flight, and which pages a binding cap
+leaves unrendered depends on how long the earlier renders took.
 
 At most 5 requests are open at once in one check; checks running together each have
 their own 5. A 429 is retried after its `Retry-After` when that is a number of seconds, or
@@ -231,21 +235,30 @@ taken. No reason below fails the check:
 
 ## Known biases
 
-Each of these moves the measured share up, towards "readable":
+What is known to move the measured share, with the direction where it is known.
+
+Upward, towards "readable", because the rendered side comes back short:
 
 - **No scrolling.** DECISION-LOG I8 named scroll steps; this build does not scroll. Content a page
   loads as it is scrolled is missing from the rendered side.
 - **The wait cap.** A page still loading at 15 s either fails (Browser Run's
-  documentation gives 422 for a page that timed out; not observed here) and leaves the sample, or comes
-  back with what had loaded, short on the rendered side.
-- **Renders that fail leave the sample.** Pages heavy enough to time out or crash are the ones most
-  likely to need JavaScript; their template is then estimated from the pages that rendered, or not at
-  all.
+  documentation gives 422 for a page that timed out; not observed here) or comes back with what had
+  loaded, short on the rendered side.
+- **Refused connections and hosts.** Text a page receives over a WebSocket or eventsource, or from a
+  reject-listed host, is missing from the rendered side.
+- **A short-counted rendered side.** Where the rendered side is counted short of the static side, the
+  clamp reads the page as share 1. Where a script really removed text, share 1 may be the right reading.
+- **Block pages the challenge rule does not recognise**, served to both sides, read as share 1.
+
+Downward, towards "empty shell":
+
+- **Third-party widgets not on the reject-list** add their words to the rendered side only.
+
+Direction not known:
+
+- **Renders that fail leave the sample**, and their template is then estimated from the pages that
+  rendered, or moves into the unrendered share.
 - **The sample within a template is its highest-PageRank pages**, not a random draw.
-- **Reject-listed hosts** that serve content, and **block pages the challenge rule does not recognise**
-  (above).
-- **The clamp.** A static side with more words than the rendered side reads as share 1, whether a
-  script removed text or the rendered side was counted short.
 
 ## Contract gaps
 
@@ -256,8 +269,9 @@ The contract carries none of these, and each goes into the next contract revisio
 - why a sampled page has no `without_js`; the engine returns it as each page's `reason`;
 - what `Check.without_js.site_text_share` was estimated from: the rendered pages and templates, the
   unrendered share and `single_render_weight`. A reader of that field alone sees a share with no sign
-  of how much of the site stands behind it; the counts can be recomputed from `PageResult.without_js`,
-  the shares cannot.
+  of how much of the site stands behind it. All of them can be recomputed from the check's
+  `PageResult` rows (`template_key`, the graded fields and `without_js`), which that reader may not
+  have.
 
 ## Determinism and the live tests
 
@@ -267,8 +281,9 @@ Offline, a replayed reply is identical every time, so the bounds below are held 
 - five renders of one page within 2 % of each other in rendered words (I8);
 - the two sides of a static page within 5 %;
 - a page with an external script file loads it on the rendered side and not on the static side;
-- a probe page whose requests report whether they loaded: rules `ip_literal` and `download` and one
-  host from each list must be refused while a twin of each loads, and a WebSocket must not open.
+- a probe page whose requests report whether they loaded, rendered twice: with the rules left out,
+  each request and a WebSocket must load; with them, rules `ip_literal` and `download`, one host
+  from each list and the WebSocket must be refused while two twin requests still load.
 
 The probe does not cover `scheme`, `credentials`, `reserved_name` or `port`: a page's own browser
 refuses the first three requests itself, so a refusal would not show whose it was, and no endpoint was

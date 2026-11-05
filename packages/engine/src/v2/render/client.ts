@@ -38,8 +38,9 @@ export const BROWSER_RUN = {
 
 /**
  * The render identity's user agent: the string the v2 fixtures' `identity_role: render` rows record.
- * Browser Run also adds headers that cannot be removed and name the request as its own
- * (`cf-brapi-request-id`, `Signature-agent`), so this string does not hide what the request is.
+ * Browser Run's documentation (automatic request headers, read 2026-11-05) says it adds headers a
+ * request cannot remove that name it as its own (`cf-brapi-request-id`, `Signature-agent`), so this
+ * string does not hide what the request is.
  */
 export const RENDER_USER_AGENT =
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -106,7 +107,7 @@ export interface ClientOptions {
 /**
  * The browser time a reply reports. When it reports none, or no reply came, the time is not known and
  * is counted at the request timeout, the longest the request could have been open; the browser's own
- * time could still be longer. A 429 is counted at zero, as no browser was started for it.
+ * time could still be longer. A 429 is counted at zero: it reports no browser time, and this assumes it used none.
  */
 function browserMsOf(res: Response, unknownMs: number): number {
   const raw = res.headers.get(BROWSER_RUN.browser_ms_header);

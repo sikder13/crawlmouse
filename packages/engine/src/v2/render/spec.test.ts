@@ -8,6 +8,12 @@ describe('docs/specs/v2/14-render.md', () => {
   });
 });
 
+/**
+ * Text as a sentence reads, with line breaks, comment markers and indentation folded to one space, so a
+ * claim split across two comment lines is still found.
+ */
+const flat = (text: string) => text.replace(/\s*\n\s*(?:\*(?!\/)\s?|\/\/\s?)?/g, ' ');
+
 describe('the claim that sub-requests are checked one by one in our process', () => {
   // Browser Run's REST endpoint cannot call our code per request (ruling R1). The spec says so once;
   // nothing in the module or the spec may say the opposite.
@@ -17,17 +23,18 @@ describe('the claim that sub-requests are checked one by one in our process', ()
   const files = ['admission.ts', 'client.ts', 'policy.ts', 'run.ts', 'spec.ts'];
 
   it.each(files)('is not made in %s', (f) => {
-    expect(readFileSync(new URL(f, DIR), 'utf8')).not.toMatch(CLAIM);
+    expect(flat(readFileSync(new URL(f, DIR), 'utf8'))).not.toMatch(CLAIM);
   });
 
   it('is not made in the spec, which says the opposite', () => {
-    const spec = renderRenderSpec();
+    const spec = flat(renderRenderSpec());
     expect(spec).not.toMatch(CLAIM);
     expect(spec).toContain('not by per-request interception in our process');
   });
 
   it('would be caught', () => {
     expect('Every sub-request goes through admitTargetUrl.').toMatch(CLAIM);
+    expect(flat(' * every sub-request goes\n * through admitTargetUrl')).toMatch(CLAIM);
   });
 });
 
@@ -52,16 +59,25 @@ describe('withdrawn claims', () => {
   const texts = [
     ...readdirSync(DIR)
       .filter((f) => f.endsWith('.ts') && f !== 'spec.test.ts')
-      .map((f) => [f, readFileSync(new URL(f, DIR), 'utf8')] as const),
-    ['14-render.md', readFileSync(SPEC_URL, 'utf8')] as const,
+      .map((f) => [f, flat(readFileSync(new URL(f, DIR), 'utf8'))] as const),
+    ['14-render.md', flat(readFileSync(SPEC_URL, 'utf8'))] as const,
     [
       'worker-runbook.md',
-      readFileSync(new URL('../../../../../docs/ops/worker-runbook.md', import.meta.url), 'utf8'),
+      flat(
+        readFileSync(new URL('../../../../../docs/ops/worker-runbook.md', import.meta.url), 'utf8'),
+      ),
     ] as const,
   ];
 
   it.each(WITHDRAWN)('%s is gone (%s)', (text) => {
     expect(texts.filter(([, t]) => text.test(t)).map(([f]) => f)).toEqual([]);
+  });
+
+  it('finds a withdrawn sentence split across comment lines', () => {
+    expect(flat(' * send two lists, which Cloudflare\n * enforces: resource types')).toMatch(
+      WITHDRAWN.find(([re]) => re.source.includes('Cloudflare enforces'))![0],
+    );
+    expect(flat('A claim, which Cloudflare\n// enforces.')).toMatch(/which Cloudflare enforces/i);
   });
 
   it('reads the files it says it reads', () => {

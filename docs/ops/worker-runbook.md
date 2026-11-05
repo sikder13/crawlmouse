@@ -288,14 +288,16 @@ goes on; it does not fail. To stop rendering, unset the token or set either cap 
 Limits on Workers Paid, as Cloudflare's limits page stood on 2026-10-14 (read 2026-11-05): 30 Quick
 Actions requests per second per account, after which Browser Run answers 429; a browser closes after
 60 s without a command. The render step keeps at most 5 requests open per check (checks running at
-once each have their own 5) and retries a 429 after its `Retry-After`.
+once each have their own 5). It retries a 429 after its `Retry-After` when that is a number of seconds
+up to 16, backs off from 1 s when it is not, and leaves the page `rate_limited` after 5 tries or when
+asked to wait longer.
 
 Cost: $0.09 per browser-hour after the 10 browser-hours a month Workers Paid includes. Each reply
-reports its browser time in the `x-browser-ms-used` header, and the step totals it per check as
-`browser_ms`; a reply without the header, or a request that timed out, is counted at the 45 s request
-timeout. A check's cost is that total in hours times the price, so a check held to 200
-browser-seconds costs about $0.005, though a check can end above its cap by the excess of the renders
-in flight. The dashboard's Browser Run page shows the account's usage.
+reports its browser time in the `x-browser-ms-used` header. The step counts that against its caps and
+totals it per check as `browser_ms`, using the 45 s request timeout where a reply reports none or a
+request timed out; Cloudflare bills its own measure, shown on the dashboard's Browser Run page. Beyond
+the included hours, 200 counted browser-seconds is about $0.005. A check can end above its cap by
+what renders in flight report beyond their reservation.
 
 To rotate the token: create the new one, set it where the old one is set, redeploy that process, then
 delete the old one in the dashboard.
