@@ -342,25 +342,28 @@ const FOLLOW_UPS = `## 9. Follow-ups
 **For the engine and the pipeline:** produce \`engine_sha\`, \`detector_ruleset_version\` and \`population_version\`, and call \`crawlerRegistryVersion(CRAWLER_REGISTRY_V2)\`; register the lineage before a batch and put its id in the \`crawl_worker\` token; write the ledger rows in a transaction of their own; the partition-drop and opt-out erasure jobs; the nightly export (after CC-20).
 `;
 
-const RUNBOOK = `## 10. Runbook (owner-applied, OPERATING-RULES §7)
+const RUNBOOK = `## 10. Runbook (OPERATING-RULES §7)
 
-1. **Order.** 003, 005, 007, then 006b, one transaction each (06's runbook for the first three). The revert order is the reverse: 006b, 007, 005, 003.
-2. **Dry run on a fresh Supabase branch**, after 06's steps: apply 006b twice (the second changes nothing), then check:
-   - \`select nspname, has_schema_privilege('anon', oid, 'USAGE'), has_schema_privilege('authenticated', oid, 'USAGE') from pg_namespace where nspname in ('research', 'partitions');\`: false everywhere.
+The owner applied 003, 005, 007 and then 006b to production on 2026-11-05. A later change goes through the migration workflows in \`docs/ops/db-migrations.md\`: the pull request's dry run on a Supabase branch made from production, then \`supabase db push\` after the owner approves it. A rollback is a separate workflow run behind the same approval. The revert order is the reverse of the apply order: 006b, 007, 005, 003.
+
+1. **Checks.** The dry run runs these on the branch, and the apply runs them on production afterwards. They live in \`infra/supabase/checks\`, and \`pnpm --filter @crawlmouse/scripts exec vitest run db/check.test.ts\` shows each one failing on what it guards.
+   - \`04-private-schemas.sql\`: \`research\` and \`partitions\` grant no USAGE or CREATE to \`anon\` or \`authenticated\`.
+   - \`02-partitions-rls-owner-only.sql\`: each partition has RLS on, and its ACL names its owner alone.
+   - \`03-worker-roles-no-login.sql\`: \`research_retention\` cannot log in or bypass RLS.
+   - \`06-client-functions.sql\`: \`authenticated\` may execute \`is_member\`, \`is_member_for_site\`, \`member_role\` and \`usage_counts\` (PGlite: ${V('v2-001-entitlement-tables.test.ts', 'routines')}).
+2. **By hand, once per project.** The workflows do not do these:
    - \`select defaclrole::regrole, defaclnamespace::regnamespace, defaclobjtype, defaclacl from pg_default_acl;\`: an entry with \`defaclnamespace = 0\` (all schemas) that grants to \`anon\` or \`authenticated\` would reach new partitions and ledger tables; the migrations revoke explicitly, so this is a check, not a dependency. Record what it shows.
-   - Every partition: \`select c.relname, c.relrowsecurity, c.relacl from pg_inherits i join pg_class c on c.oid = i.inhrelid where c.relnamespace = 'partitions'::regnamespace;\`: RLS on, and the owner alone in the ACL.
-   - \`create role research_retention\` is accepted from the migration role, and the owner can \`set role research_retention\` (the erasure job will run as it).
-   - Revert 006b, then apply it again.
-3. **\`RESEARCH_SITE_KEY\`.** Generate it once (\`openssl rand -hex 32\`), set it in the server environment as a sensitive variable, never in the database, a file in the repository or a build variable. Record its version as 1.
-4. **The daily partition job.** In the SQL editor, as the owner:
-   \`\`\`sql
-   create extension if not exists pg_cron;
-   select cron.schedule('v2-premake-month-partitions', '17 3 * * *',
-     $$select public.v2_premake_month_partitions(date_trunc('month', now())::date,
-                                                 (date_trunc('month', now()) + interval '3 months')::date)$$);
-   \`\`\`
-   Before relying on \`pg_partman\` for anything, verify on the project that it is available (\`select * from pg_available_extensions where name = 'pg_partman';\`); this function stays the primary mechanism either way.
-5. **Verify on production.** \`get_advisors\` (security): no new finding. The name-free routine check of \`docs/deploy/spec51a-stage6-frontier-functions-runbook.md\` now returns \`is_member\`, \`is_member_for_site\`, \`member_role\` and \`usage_counts\`, each with \`anon = false\` and \`authed = true\` (PGlite: ${V('v2-001-entitlement-tables.test.ts', 'routines')}); any other row is a finding. The two queries of step 2 on the schemas and partitions. \`select partrelid::regclass, pg_get_partkeydef(partrelid) from pg_partitioned_table;\`: the five tables of §4.
+   - The owner can \`set role research_retention\` (the erasure job will run as it).
+   - **\`RESEARCH_SITE_KEY\`.** Generate it once (\`openssl rand -hex 32\`), set it in the server environment as a sensitive variable, never in the database, a file in the repository or a build variable. Record its version as 1.
+   - **The daily partition job.** In the SQL editor, as the owner:
+     \`\`\`sql
+     create extension if not exists pg_cron;
+     select cron.schedule('v2-premake-month-partitions', '17 3 * * *',
+       $$select public.v2_premake_month_partitions(date_trunc('month', now())::date,
+                                                   (date_trunc('month', now()) + interval '3 months')::date)$$);
+     \`\`\`
+     Before relying on \`pg_partman\` for anything, verify on the project that it is available (\`select * from pg_available_extensions where name = 'pg_partman';\`); this function stays the primary mechanism either way.
+3. **On production, after an apply.** \`get_advisors\` (security): no new finding. \`select partrelid::regclass, pg_get_partkeydef(partrelid) from pg_partitioned_table;\`: the five tables of §4.
 `;
 
 function sqlSection(): string {
