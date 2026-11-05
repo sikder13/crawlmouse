@@ -242,22 +242,14 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
 
   const results: RenderedPage[] = new Array(sample.length);
   let next = 0;
-  /** Set when a page throws: the check will throw, so no further page is started. */
-  let threw = false;
   const worker = async () => {
-    while (!threw && next < sample.length) {
+    while (next < sample.length) {
       const i = next++;
-      try {
-        results[i] = await renderPage(sample[i]!, allowanceMs);
-      } catch (e) {
-        threw = true;
-        throw e;
-      }
+      results[i] = await renderPage(sample[i]!, allowanceMs);
     }
   };
   // Every worker is waited for, even after one throws, so no request is still open when the budget
-  // is settled; pages already started finish, none starts after the throw, and the throw is passed on
-  // only after the settle.
+  // is settled; a throw is passed on only after the settle.
   const ran = await Promise.allSettled(
     Array.from({ length: Math.min(RENDER_IN_FLIGHT, sample.length) }, worker),
   );

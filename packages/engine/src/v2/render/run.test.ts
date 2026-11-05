@@ -493,41 +493,6 @@ describe('a page that throws out of the render', () => {
   });
 });
 
-describe('a page that throws while other pages wait to start', () => {
-  it('starts no further page', async () => {
-    const pages = Array.from({ length: 8 }, (_, i) => ({
-      provenance: 'test',
-      url: `https://site.example/t${i}`,
-      static: { html: '<body><main><p>a b</p></main></body>', browser_ms: 500 },
-      rendered: { html: '<body><main><p>a b c d</p></main></body>', browser_ms: 500 },
-    }));
-    const tooMany: RenderReply = {
-      ok: false,
-      reason: 'rate_limited',
-      retryAfterMs: 1000,
-      browserMs: 0,
-    };
-    const client = fakeClient(pages, {
-      delayMs: 2,
-      before: (_n, url) => (url === pages[0]!.url ? tooMany : undefined),
-    });
-    const run = renderCheck(
-      input({
-        client,
-        candidates: pages.map((f, i) => candidate(f, `/t${i}`, 0.9 - i / 100)),
-        sleep: async () => {
-          throw new Error('sleep failed');
-        },
-      }),
-    );
-    await expect(run).rejects.toThrow('sleep failed');
-    const started = new Set(client.calls.map((c) => c.url));
-    // The first five pages start together; the three after them do not start.
-    expect(started.size).toBe(RENDER_IN_FLIGHT);
-    expect(pages.slice(RENDER_IN_FLIGHT).some((f) => started.has(f.url))).toBe(false);
-  });
-});
-
 describe('a 429 from Browser Run', () => {
   const tooMany: RenderReply = {
     ok: false,
