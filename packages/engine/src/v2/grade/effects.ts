@@ -24,8 +24,9 @@
  * Absorbed. A fix that alone would raise a grade (Technical SEO plus AI readability above 0) and whose
  * effect in the order is 0 or less was absorbed by a fix ranked above it. That fix is looked for among
  * the higher-ranked fixes that name a page, crawler or template the fix names (`touches`), in rank
- * order: the first one by whose application the fix's effect is 0 or less. None found leaves
- * `absorbed_by` empty.
+ * order: the one whose application takes the effect from above 0 to 0 or less. When the effect is
+ * gone before any such fix, a fix naming nothing it names took it (through the link graph, say), and
+ * `absorbed_by` is left empty; it is also empty when none is found.
  */
 import type {
   AiReadability,
@@ -326,12 +327,19 @@ export function effectsOf(
   alone.forEach(({ f, size }, i) => {
     let absorbed_by: string | null = null;
     if (size > 0 && sizeOf(effects[i]!) <= 0) {
-      for (let j = 0; j < i && absorbed_by === null; j++) {
+      // f's effect with the first k fixes applied, k ≤ i
+      const at = (k: number) =>
+        sizeOf(effect(scores[k]!, scoresOf(apply(states[k]!, f)), [f], states[k]!));
+      for (let j = 0; j < i; j++) {
         const g = alone[j]!.f;
         if (!touches(f, g)) continue;
-        const after = scoresOf(apply(states[j + 1]!, f));
-        const e = effect(scores[j + 1]!, after, [f], states[j + 1]!);
-        if (sizeOf(e) <= 0) absorbed_by = fingerprintOf(g);
+        // g took the effect when f still had some before g and none after it; an effect already gone
+        // before g went to a fix that names nothing f names, which is left unattributed
+        if (at(j) <= 0) break;
+        if (at(j + 1) <= 0) {
+          absorbed_by = fingerprintOf(g);
+          break;
+        }
       }
     }
     byFix.set(fingerprintOf(f), { effect: effects[i]!, rank: i + 1, absorbed_by });

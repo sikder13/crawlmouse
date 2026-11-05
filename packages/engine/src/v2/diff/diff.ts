@@ -133,7 +133,11 @@ export function diffCheck(input: DiffInput): DiffResult {
   }
 
   // A fix's effect names the fix that absorbed it by that fix's number, known once every fix is placed.
-  const numberOf = new Map([...input.fixes, ...fixes].map((f) => [f.fingerprint, f.number]));
+  // Only a fix this check found can be named: one it left as it was (the owner acted on it after the
+  // check finished) is ranked after the found ones, so it is not the higher-ranked fix.
+  const numberOf = new Map(
+    [...input.fixes, ...fixes].filter((f) => found.has(f.id)).map((f) => [f.fingerprint, f.number]),
+  );
   for (const f of fixes) {
     if (!found.has(f.id)) continue;
     const outcome = outcomes.get(f.fingerprint);

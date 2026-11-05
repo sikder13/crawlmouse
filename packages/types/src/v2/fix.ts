@@ -50,8 +50,9 @@ export const EffectSchema = z
     ai_readability_pending_on: z.array(z.union([FingerprintSchema, WithheldReasonSchema])),
     /**
      * The `number` of the higher-ranked fix that took this fix's effect: set when the effect, taken
-     * after the fixes ranked above it, is zero or less, though the fix alone would raise a grade (the
-     * two change the same thing). Null otherwise.
+     * after the fixes ranked above it, is zero or less though the fix alone would raise a grade, and
+     * the engine finds the fix that took it among those naming a page, crawler or template this one
+     * names. Null when no such fix is found, or the fix's effect is not of that kind.
      */
     absorbed_by: z.int().min(1).nullable(),
     estimate: z.literal(true),

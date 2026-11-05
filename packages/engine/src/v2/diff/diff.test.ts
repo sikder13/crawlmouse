@@ -457,6 +457,28 @@ describe('a fix the owner touched after this check finished', () => {
     expect(result).toEqual({ fixes: [], events: [], changes: [] });
   });
 
+  it('a fix it absorbed names no absorber: the absorber is not ranked above it', () => {
+    const f = fixWithHistory(1, 'open');
+    const absorbed: DetectorOutcome = {
+      fingerprint: fingerprint(2),
+      state: 'detected',
+      fix: draft('deep_pages', {
+        rank: 2,
+        effect: { ...draft('deep_pages').effect, technical_seo: -0.26, ai_readability: 0 },
+        absorbed_by_fingerprint: fingerprint(1),
+      }),
+    };
+    const result = diff({
+      previous: side(1),
+      current: side(2),
+      fixes: [{ ...f.fix, status: 'marked_done' }],
+      events: [...f.events, lateMark(f.fix)],
+      outcomes: [detected(1, 'orphan_pages', 1), absorbed],
+    });
+    const deep = result.fixes.find((x) => x.fingerprint === fingerprint(2))!;
+    expect(deep.effect.absorbed_by).toBe(null);
+  });
+
   it('still acts on a mark made before the check finished', () => {
     const f = fixWithHistory(1, 'open');
     const early = { ...lateMark(f.fix), at: '2026-10-04T05:59:00Z' };
