@@ -1,8 +1,9 @@
 /**
  * Against Browser Run itself. Runs only when the environment holds CLOUDFLARE_ACCOUNT_ID and
- * CLOUDFLARE_BROWSER_RENDERING_TOKEN; otherwise every case is skipped, not failed. Each run costs a few
- * browser-seconds. These are the only tests that can show the two determinism bounds and that
- * Cloudflare enforces the request policy: offline, a replayed reply is identical every time.
+ * CLOUDFLARE_BROWSER_RENDERING_TOKEN; otherwise every case is skipped, not failed. A run costs a few
+ * browser-seconds and fetches a handful of public URLs. These are the only tests that can show the
+ * determinism bounds, that the static side really loads no script file, and that Browser Run reads and
+ * enforces the patterns we send: offline, a replayed reply is identical every time.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -11,6 +12,7 @@ import {
   ENV,
   renderRequestBody,
   type BrowserRunClient,
+  type RenderSide,
 } from './client.js';
 import { PARITY_SPREAD, REPEAT_SPREAD, spread, within } from './parity.js';
 import { mainWords } from './words.js';
@@ -20,14 +22,63 @@ const live = describe.skipIf(client === null);
 
 /** A page served whole as HTML, with no script: its two sides should agree. */
 const STATIC_PAGE = 'https://example.com/';
-/** A long page with scripts, for the spread between two renders. */
+/** A long page with scripts, for the spread between renders. */
 const REPEAT_PAGE = 'https://developers.cloudflare.com/browser-run/';
+/** DECISION-LOG I8: the spread is taken over five renders. */
+const REPEAT_RENDERS = 5;
 
-async function words(c: BrowserRunClient, url: string, side: 'static' | 'rendered') {
+async function words(c: BrowserRunClient, url: string, side: RenderSide) {
   const r = await c.content(url, side);
   if (!r.ok) throw new Error(`${side} render of ${url} failed: ${r.reason}`);
   return mainWords(r.html);
 }
+
+/** Renders `html` with the request a page's `side` gets, and returns the HTML Browser Run holds. */
+async function renderHtml(html: string, side: RenderSide): Promise<string> {
+  const body: Record<string, unknown> = { ...renderRequestBody(STATIC_PAGE, side), html };
+  delete body.url;
+  const res = await fetch(
+    BROWSER_RUN.endpoint.replace('{account_id}', process.env[ENV.account]!.trim()),
+    {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${process.env[ENV.token]!.trim()}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  expect(res.status).toBe(200);
+  expect(Number(res.headers.get(BROWSER_RUN.browser_ms_header))).toBeGreaterThan(0);
+  return ((await res.json()) as { result: string }).result;
+}
+
+/** A page that requests each URL and writes `name=loaded` or `name=blocked` into #out. */
+function probePage(attempts: Record<string, string>): string {
+  const calls = Object.entries(attempts)
+    .map(([name, url]) => `attempt(${JSON.stringify(name)}, ${JSON.stringify(url)});`)
+    .join('\n');
+  return `<html><body><main><p id="out">probe</p></main><script>
+    const out = document.getElementById('out');
+    const mark = (name, outcome) => out.append(' ' + name + '=' + outcome);
+    function attempt(name, url) {
+      fetch(url, { mode: 'no-cors', cache: 'no-store' }).then(
+        () => mark(name, 'loaded'),
+        () => mark(name, 'blocked'),
+      );
+    }
+    ${calls}
+    try {
+      const ws = new WebSocket('wss://ws.postman-echo.com/raw');
+      ws.onopen = () => mark('websocket', 'loaded');
+      ws.onerror = () => mark('websocket', 'blocked');
+    } catch {
+      mark('websocket', 'blocked');
+    }
+  </script></body></html>`;
+}
+
+const outOf = (html: string) => /<p id="out">([^<]*)/.exec(html)?.[1] ?? '';
 
 live('Browser Run, live', () => {
   it(`renders a static page to within ${PARITY_SPREAD * 100} % of its static side`, async () => {
@@ -38,54 +89,67 @@ live('Browser Run, live', () => {
     );
     expect(raw).toBeGreaterThan(0);
     expect(within(raw, rendered, PARITY_SPREAD)).toBe(true);
-  }, 60_000);
+  }, 120_000);
 
-  it(`renders one page twice to within ${REPEAT_SPREAD * 100} % of itself`, async () => {
-    const first = await words(client!, REPEAT_PAGE, 'rendered');
-    const second = await words(client!, REPEAT_PAGE, 'rendered');
-    console.info(`repeat ${REPEAT_PAGE}: ${first} and ${second}, spread ${spread(first, second)}`);
-    expect(first).toBeGreaterThan(0);
-    expect(within(first, second, REPEAT_SPREAD)).toBe(true);
-  }, 60_000);
+  it(`renders one page ${REPEAT_RENDERS} times to within ${REPEAT_SPREAD * 100} % of itself`, async () => {
+    const counts: number[] = [];
+    for (let i = 0; i < REPEAT_RENDERS; i += 1) {
+      counts.push(await words(client!, REPEAT_PAGE, 'rendered'));
+    }
+    const [lo, hi] = [Math.min(...counts), Math.max(...counts)];
+    console.info(`repeat ${REPEAT_PAGE}: ${counts.join(', ')}, spread ${spread(lo, hi)}`);
+    expect(lo).toBeGreaterThan(0);
+    expect(within(lo, hi, REPEAT_SPREAD)).toBe(true);
+  }, 300_000);
 
-  it('enforces the request policy we send, while letting an ordinary request through', async () => {
-    // The probe reports each request's fate into the page; the HTML that comes back carries it.
-    const probe = `<html><body><main><p id="out">probe</p></main><script>
-        const out = document.getElementById('out');
-        const mark = (k, v) => out.append(' ' + k + '=' + v);
-        const tryFetch = (k, u) => fetch(u, { mode: 'no-cors' }).then(() => mark(k, 'loaded'), () => mark(k, 'blocked'));
-        tryFetch('analytics', 'https://www.google-analytics.com/g/collect');
-        tryFetch('port', 'https://example.com:8080/');
-        tryFetch('control', 'https://example.com/');
-        try {
-          const ws = new WebSocket('wss://example.com/socket');
-          ws.onopen = () => mark('ws', 'loaded');
-          ws.onerror = () => mark('ws', 'blocked');
-        } catch { mark('ws', 'blocked'); }
-      </script></body></html>`;
-    const body: Record<string, unknown> = {
-      ...renderRequestBody(STATIC_PAGE, 'rendered'),
-      html: probe,
-    };
-    delete body.url;
-    const res = await fetch(
-      BROWSER_RUN.endpoint.replace('{account_id}', process.env[ENV.account]!.trim()),
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${process.env[ENV.token]!.trim()}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      },
+  it('loads no script file on the static side, and loads it on the rendered side', async () => {
+    // The inline script runs on both sides (it is not a request) and reports whether the file loaded.
+    const page = `<html><body><main><p id="out">probe</p></main>
+        <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+        <script>
+          document.getElementById('out').append(
+            typeof window.jQuery === 'undefined' ? ' script=blocked' : ' script=loaded',
+          );
+        </script></body></html>`;
+    const staticOut = outOf(await renderHtml(page, 'static'));
+    const renderedOut = outOf(await renderHtml(page, 'rendered'));
+    console.info(`script probe: static "${staticOut}", rendered "${renderedOut}"`);
+    expect(staticOut).toContain('script=blocked');
+    expect(renderedOut).toContain('script=loaded');
+  }, 120_000);
+
+  it('refuses what the patterns refuse, while the same kind of request elsewhere loads', async () => {
+    // Each refused URL loads when nothing refuses it; each control is a twin that must load.
+    const out = outOf(
+      await renderHtml(
+        probePage({
+          control_ip: 'https://one.one.one.one/cdn-cgi/trace',
+          ip_literal: 'https://1.1.1.1/cdn-cgi/trace',
+          control_download: 'https://registry.npmjs.org/left-pad',
+          download: 'https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz',
+          control_cdn: 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/package.json',
+          host_analytics: 'https://www.googletagmanager.com/gtm.js?id=GTM-K9J7',
+          host_advertising: 'https://securepubads.g.doubleclick.net/tag/js/gpt.js',
+          host_consent: 'https://cdn.cookielaw.org/scripttemplates/otSDKStub.js',
+          host_chat: 'https://widget.intercom.io/widget/abc123',
+        }),
+        'rendered',
+      ),
     );
-    expect(res.status).toBe(200);
-    expect(Number(res.headers.get(BROWSER_RUN.browser_ms_header))).toBeGreaterThan(0);
-    const html = ((await res.json()) as { result: string }).result;
-    console.info(`policy probe: ${/<p id="out">([^<]*)/.exec(html)?.[1]}`);
-    expect(html).toContain('control=loaded');
-    expect(html).toContain('analytics=blocked');
-    expect(html).toContain('ws=blocked');
-    expect(html).not.toContain('port=loaded');
-  }, 60_000);
+    console.info(`policy probe: ${out}`);
+    for (const control of ['control_ip', 'control_download', 'control_cdn']) {
+      expect(out).toContain(`${control}=loaded`);
+    }
+    for (const refused of [
+      'ip_literal',
+      'download',
+      'host_analytics',
+      'host_advertising',
+      'host_consent',
+      'host_chat',
+    ]) {
+      expect(out).toContain(`${refused}=blocked`);
+    }
+    expect(out).not.toContain('websocket=loaded');
+  }, 120_000);
 });

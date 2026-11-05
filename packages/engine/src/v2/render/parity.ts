@@ -1,8 +1,8 @@
 /**
- * The two determinism bounds the live tests hold real renders to (DECISION-LOG I8): two renders of one
+ * The two determinism bounds the live tests hold real renders to (DECISION-LOG I8): five renders of one
  * page within REPEAT_SPREAD of each other in rendered words, and, on a page served whole without
- * JavaScript, its two sides within PARITY_SPREAD. Neither can be shown offline: a replayed reply is
- * identical every time. They are checked against Browser Run when a token is present.
+ * JavaScript, its two sides within PARITY_SPREAD. Offline, a replayed reply is identical every time, so
+ * neither bound is shown there; they are checked against Browser Run when a token is present.
  */
 export const REPEAT_SPREAD = 0.02;
 export const PARITY_SPREAD = 0.05;
