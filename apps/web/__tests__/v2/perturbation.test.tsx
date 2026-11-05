@@ -550,7 +550,9 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
           [five.rank, six.rank] = [6, 5];
         },
         expect: {
-          Result: ['two-sentence answer +1 SEO See with Pro Replace the generic anchor text'],
+          Result: [
+            'two-sentence answer AI after fixes 1 and 2 See with Pro Replace the generic anchor text',
+          ],
         },
       },
     ],

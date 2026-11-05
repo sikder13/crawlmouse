@@ -15,6 +15,7 @@ import {
 import { fixesAsOf } from '../../fixtures';
 import { listOf } from '../../format';
 import { numberWord, plural } from '../../words';
+import { effectHeadline } from '../effect-headline';
 import { freeFixes } from '../free-fixes';
 
 /** A fix's packet; the contract names the schema, not the type. */
@@ -148,15 +149,19 @@ function groupPoints(fixes: readonly Fix[]): string {
 }
 
 /**
- * A fix's estimated effect as the open fix and the fix page head it: its AI readability points when
- * it has some, otherwise its Technical SEO points, with "estimated" in the unit (FACTS A5).
+ * A fix's estimated effect as the open fix and the fix page head it, by `effectHeadline`'s rule: its
+ * points with "estimated" in the unit (FACTS A5), or a dash and why its AI effect waits.
  */
-export function effectOf(f: Pick<Fix, 'effect'>): { points: string; unit: string } {
-  const ai = f.effect.ai_readability;
-  if (ai) return { points: `+${ai}`, unit: 'AI readability, estimated' };
-  return f.effect.technical_seo === null
-    ? { points: '—', unit: 'Technical SEO, not estimated' }
-    : { points: `+${f.effect.technical_seo}`, unit: 'Technical SEO, estimated' };
+export function effectOf(
+  f: Pick<Fix, 'effect' | 'section'>,
+  siteFixes: readonly Pick<Fix, 'fingerprint' | 'number'>[],
+): { points: string; unit: string } {
+  const h = effectHeadline(f, siteFixes);
+  if (h.kind === 'ai') return { points: `+${h.points}`, unit: 'AI readability, estimated' };
+  if (h.kind === 'seo') return { points: `+${h.points}`, unit: 'Technical SEO, estimated' };
+  return h.kind === 'waiting'
+    ? { points: '—', unit: h.sentence }
+    : { points: '—', unit: 'Technical SEO, not estimated' };
 }
 
 /** The packet's problem lines: its context without the line naming the site and audit. */
@@ -187,8 +192,8 @@ export function packetPrompt(f: Pick<Fix, 'title'>, p: FixPacket): string {
   ].join('\n');
 }
 
-export function openFix(f: Fix): OpenFixView {
-  const { points, unit } = effectOf(f);
+export function openFix(f: Fix, siteFixes: readonly Fix[]): OpenFixView {
+  const { points, unit } = effectOf(f, siteFixes);
   const p = f.packet;
   const paragraph = p ? packetParagraph(p) : [];
   const verify = p ? verifyLines(p) : [];
@@ -252,7 +257,7 @@ export function sectionFixes(
           .filter(Boolean)
           .join(' · ')
       : 'nothing to fix',
-    open: open.map(openFix),
+    open: open.map((f) => openFix(f, siteFixes)),
     pro: rows,
     proCount: pro.length,
     openElsewhere: free

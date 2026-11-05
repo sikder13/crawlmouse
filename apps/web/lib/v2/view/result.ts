@@ -14,6 +14,7 @@ import {
   type FixtureDataset,
 } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
+import { AI_WAITING, effectHeadline } from './effect-headline';
 import { isFreeFix } from './free-fixes';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
@@ -627,10 +628,15 @@ function allClear(
   };
 }
 
-/** "+24 AI" when the fix moves AI readability, otherwise "+4 SEO". */
-export function points(f: Pick<Fix, 'effect'>): string {
-  if (f.effect.ai_readability) return `+${f.effect.ai_readability} AI`;
-  return f.effect.technical_seo === null ? 'SEO not estimated' : `+${f.effect.technical_seo} SEO`;
+/**
+ * A fix's points as the fixes table gives them, by `effectHeadline`'s rule: "+24 AI", "+4 SEO",
+ * "SEO not estimated", or why its AI effect waits ("AI not yet estimated", "AI after fix 1").
+ */
+export function points(f: Pick<Fix, 'effect' | 'section'>, siteFixes: readonly Fix[]): string {
+  const h = effectHeadline(f, siteFixes);
+  if (h.kind === 'ai') return `+${h.points} AI`;
+  if (h.kind === 'seo') return `+${h.points} SEO`;
+  return h.kind === 'waiting' ? h.short : 'SEO not estimated';
 }
 
 /** What changes, from the causes behind the fix's crawlers: "A firewall rule and one bot setting". */
@@ -642,7 +648,7 @@ const CHANGE_FOR_CAUSE: Partial<Record<NonNullable<CrawlerResult['cause']>, stri
   verified_bot_only: 'one edge setting',
 };
 
-function fixFirstBody(check: Check, f: Fix): string {
+function fixFirstBody(check: Check, f: Fix, siteFixes: readonly Fix[]): string {
   const causes = [
     ...new Set(
       f.crawler_uas
@@ -659,13 +665,18 @@ function fixFirstBody(check: Check, f: Fix): string {
   const what = [causes.length ? listOf(causes) : null, effort].filter(Boolean).join(', ');
   const ai = check.ai_readability!;
   const seo = check.technical_seo!.score;
-  const effect = f.effect.ai_readability
-    ? ai.withheld
-      ? `AI readability is graded once two scored crawlers can be measured.`
-      : `AI readability ${ai.total} → ${Math.min(100, ai.total + f.effect.ai_readability)}, estimated.`
-    : seo === null
-      ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
-      : `Technical SEO ${seo} → ${Math.min(100, seo + (f.effect.technical_seo ?? 0))}, estimated.`;
+  const h = effectHeadline(f, siteFixes);
+  const withheldBy = ai.withheld_reasons[0];
+  const effect =
+    h.kind === 'ai'
+      ? ai.withheld
+        ? `${withheldBy ? AI_WAITING[withheldBy] : 'AI readability is not graded yet'}.`
+        : `AI readability ${ai.total} → ${Math.min(100, ai.total + h.points)}, estimated.`
+      : h.kind === 'waiting'
+        ? `${h.sentence}.`
+        : seo === null || h.kind === 'seo_not_estimated'
+          ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
+          : `Technical SEO ${seo} → ${Math.min(100, seo + h.points)}, estimated.`;
   return `${what ? `${capitalise(what)}. ` : ''}${effect} The steps and the evidence are open, free.`;
 }
 
@@ -677,6 +688,7 @@ function statesCount(title: string, n: number): boolean {
 
 function fixRows(
   fixes: readonly Fix[],
+  siteFixes: readonly Fix[],
   isOpen: (f: Fix) => boolean,
   fixHref: (fixId: string) => string,
 ): FixRowView[] {
@@ -692,7 +704,7 @@ function fixRows(
       f.template_key && !statesCount(f.title, f.affected_pages)
         ? `${count(f.affected_pages)} ${plural(f.affected_pages, 'page', 'pages')}`
         : null,
-    points: points(f),
+    points: points(f, siteFixes),
     open: isOpen,
     count: 1,
     href: isOpen ? fixHref(f.id) : '#pro',
@@ -800,6 +812,8 @@ export function resultView(
   }
   const site = siteOf(d, check);
   const fixes = fixesAsOf(d, check);
+  // a pending AI effect names fixes of this site by fingerprint, resolved or not
+  const siteFixes = d.fixes.filter((x) => x.site_id === check.site_id);
   const isOpen = (f: Fix) => isFreeFix(d, check, f);
   const grades = grade(check, fixes, isOpen);
   const coverage = check.coverage!;
@@ -826,7 +840,7 @@ export function resultView(
       ? {
           kind: 'fix',
           title: fixes[0].title,
-          body: fixFirstBody(check, fixes[0]),
+          body: fixFirstBody(check, fixes[0], siteFixes),
           href: fixHref(fixes[0].id),
         }
       : allClear(check, kept, cadence),
@@ -846,7 +860,7 @@ export function resultView(
           total: fixes.length,
           open: fixes.filter(isOpen).length,
           pro: fixes.filter((f) => !isOpen(f)).length,
-          rows: fixRows(fixes, isOpen, fixHref),
+          rows: fixRows(fixes, siteFixes, isOpen, fixHref),
         }
       : null,
     crawlers: clean || withheld ? crawlerRows(check) : null,

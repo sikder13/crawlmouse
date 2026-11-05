@@ -360,7 +360,9 @@ describe('the tables’ labels', () => {
   });
 
   it('a fix whose Technical SEO effect is not estimated (a refused grade) shows no +0, alone or grouped', () => {
+    let section: Record<string, string> = {};
     const v = view('bad-site', (_, d) => {
+      section = Object.fromEntries(d.fixes.map((f) => [f.id, f.section]));
       for (const f of d.fixes) {
         f.effect.ai_readability = null;
         f.effect.ai_readability_pending_on = ['readable_unmeasured'];
@@ -368,9 +370,14 @@ describe('the tables’ labels', () => {
         f.effect.technical_seo_pending_on = ['grade_refused'];
       }
     });
-    const points = v.fixes!.rows.map((r) => r.points);
-    expect(points.length).toBeGreaterThan(0);
-    expect(points.every((p) => p === 'SEO not estimated')).toBe(true);
+    const rows = v.fixes!.rows;
+    // a structure fix is headed by its Technical SEO effect; the others by their waiting AI effect
+    const want = (key: string) =>
+      key === 'rest' || section[key] === 'structure' ? 'SEO not estimated' : 'AI not yet estimated';
+    expect(new Set(rows.map((r) => want(r.key)))).toEqual(
+      new Set(['SEO not estimated', 'AI not yet estimated']),
+    );
+    expect(rows.map((r) => r.points)).toEqual(rows.map((r) => want(r.key)));
   });
 });
 
