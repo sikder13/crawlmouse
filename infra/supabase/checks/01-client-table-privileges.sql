@@ -1,8 +1,8 @@
 -- Client roles hold exactly the declared privileges on the v2 tables.
 -- anon holds nothing on any v2 table or partition. authenticated and crawl_worker hold exactly the
--- grants listed in `declared` below, at the table or column level: a privilege held but not listed,
+-- grants in this file's `declared` list, at the table or column level: a privilege held but not listed,
 -- or listed on an existing table and column but not held, is a finding. The v2 tables are the ones
--- listed in `v2_tables`, plus every relation in the research and partitions schemas. A table, column
+-- in its `v2_tables` list, plus every relation in the research and partitions schemas. A table, column
 -- or role that does not exist yet (a migration not applied) is skipped.
 --
 -- A migration that changes these grants changes this list in the same pull request.

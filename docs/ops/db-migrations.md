@@ -1,0 +1,215 @@
+# Database migrations: from pull request to production
+
+A migration reaches production through three GitHub Actions workflows. The owner approves each
+production change in GitHub after seeing the exact files and their sha256. The bytes that run are
+the tracked files: `supabase db push` reads `infra/supabase/migrations` in place
+(`--workdir infra`), and a rollback runs a file from `infra/supabase/rollbacks`. Nothing is pasted
+into the SQL editor.
+
+| Workflow               | Runs when                                                           | Touches                         |
+| ---------------------- | ------------------------------------------------------------------- | ------------------------------- |
+| `db-dry-run.yml`       | a pull request changes `infra/supabase/**` or the tooling           | a Supabase branch of production |
+| `db-apply-prod.yml`    | a push to `main` changes `infra/supabase/migrations/**`, or by hand | production, after approval      |
+| `db-rollback-prod.yml` | by hand only, with a rollback file name                             | production, after approval      |
+
+The scripts behind them are in `scripts/db`. Their tests:
+`pnpm --filter @crawlmouse/scripts exec vitest run db`.
+
+## 1. A migration, from pull request to production
+
+1. **Write the migration and its rollback.** `infra/supabase/migrations/<version>_<name>.sql` and
+   `infra/supabase/rollbacks/<version>_<name>.revert.sql`. The dry run fails on a pending migration
+   with no rollback file.
+2. **Open the pull request.** `db-dry-run.yml` runs `scripts/db/dry-run.ts` on a Supabase branch
+   named `pr-<number>`. The steps, in order:
+   1. delete any branch of that name, create it again from production, and wait for it to build;
+   2. compare the branch's fingerprint (`infra/supabase/checks/fingerprint.sql`) with
+      production's, section by section, and fail on a difference;
+   3. read the branch's migration history: fail if it needs the repair in §5, or if a pending
+      file has no rollback;
+   4. `supabase db push`, after checking that the CLI's list equals the pending files;
+   5. run the checks in §6;
+   6. run each pending file again in its own transaction, and fail if the fingerprint changes;
+   7. run the rollbacks in reverse order, and fail unless the fingerprint equals production's;
+   8. `supabase db push` again, and fail unless the fingerprint equals the first push's.
+
+   The branch is deleted at the end of the run, pass or fail, and again when the pull request
+   closes. The summary, with the sha256 of each file applied, is posted on the pull request and
+   kept as the `db-dry-run-summary` artifact for 90 days.
+
+3. **Merge.** The push to `main` starts `db-apply-prod.yml`. Its `plan` job needs no approval and
+   reads production through the Management API's read-only endpoint. It finds the merged pull
+   request, downloads the summary of its passed dry run, and lists production's pending files.
+   It refuses when a pending file is not in that dry run, or when its sha256 differs from the
+   bytes the dry run applied.
+4. **Approve.** The `apply` job waits on the `production` environment. Once approved, it checks
+   that production's pending files still equal the manifest the `plan` job printed, runs
+   `supabase db push`, runs the checks, and writes the fingerprint to the job summary. A failure
+   opens an issue. The workflow does not retry, and it does not run a rollback.
+
+A merge that changes no migration file does not start `db-apply-prod.yml`. To apply files whose
+pull request was merged earlier, run the workflow by hand from `main` and give `dry_run_pr` the
+number of a merged pull request whose passed dry run applied those files.
+
+## 2. What the owner sees before approving
+
+In the run of `db-apply-prod.yml`, before the **Review deployments** button:
+
+- the `plan` job's summary: a table of the pending files with the sha256 of each, then the dry
+  run's own summary: its steps, its commit, and the sha256 of each file it applied. Matching
+  hashes in both tables are what the gate already checked.
+- the link to the dry run, in the `plan` job's log (`pull request #N, dry run <url>`).
+
+To check a hash against the repository yourself:
+`git show <commit>:infra/supabase/migrations/<file> | sha256sum`.
+
+## 3. Reading a failed dry run
+
+The pull request comment names the failed step. The job log has the full output.
+
+- **The branch is a copy of production** failed. The branch Supabase built from production's
+  migration history does not match production. The comment names each differing section (columns,
+  functions, policies, constraints, indexes, triggers, rls, acls, roles, buckets, relations,
+  types) and lists the differing lines: `+` on the branch only, `-` on production only. The
+  cause is a change made to production outside a migration, or a history row whose statements do
+  not hold what production ran. Do not apply over it. Report the sections. Bringing them back in
+  line is a migration of its own, with its own pull request.
+- **History is clean and each pending file has a rollback** failed. Either production's history
+  needs the repair in §5, or a pending migration has no rollback file.
+- **supabase db push** failed. The CLI's error is in the log. A file that fails to apply leaves
+  the files before it applied on the branch, which is discarded.
+- **Checks** failed. Each finding names an object and what is wrong with it (§6).
+- **Each file runs again and changes nothing** failed. A migration is not re-runnable: the second
+  run errored, or it changed the catalog.
+- **Rollbacks in reverse order return the branch to production** failed. A rollback errored, or
+  left a difference from production, named by section as above.
+
+A pull request from a fork gets no secrets, so its dry run fails at the first step that needs the
+access token.
+
+## 4. Rolling back on production
+
+Run **DB rollback on production** (`db-rollback-prod.yml`) from `main`, with the rollback's file
+name, for example `20261102000003_v2_007_storage.revert.sql`. It waits on the same `production`
+approval. In one transaction, it runs the file's bytes and deletes the migration's history row,
+then it runs the checks and writes the fingerprint to the job summary.
+
+- It refuses a name that is not a file in `infra/supabase/rollbacks` with a matching migration,
+  and a migration the history does not record as applied.
+- Roll back one file per run, newest first.
+- 007's rollback refuses while the `evidence` or `reports` bucket holds objects, and gives the
+  count per bucket. Empty them through the Storage API first. It sets
+  `storage.allow_delete_query` for its own transaction, which `storage.protect_delete()` requires.
+- 003's rollback drops its tables with their rows. Take a `pg_dump` of `public` first.
+
+## 5. Repairing the migration history (once, before the first automated apply)
+
+Supabase builds a branch by replaying the `statements` recorded in production's
+`supabase_migrations.schema_migrations`, and `supabase db push` refuses to run while a history row
+names a version with no file. Production's history was written by hand and does not meet either
+need, so the dry run fails at its "history" step until the owner runs the repair once.
+
+`scripts/db/history.ts` prints the difference between the files and the history:
+
+- rows recorded under another version (the time they were applied): `--repair` renames them to
+  their file's version and keeps their statements, which are what production ran;
+- rows with no executable statement (empty, or only a comment): `--repair` adds the file's bytes,
+  after any comment the row holds;
+- rows with no file: each must be named with `--drop-orphan <version>`, which deletes it;
+- files with no row: `--repair` inserts each one up to `--applied-through` with the file's bytes.
+  Files after it stay unrecorded, for `supabase db push`.
+
+The repair writes only to the history table, through four fixed statements with the file bytes as
+bound parameters, in one transaction that re-reads the history and rolls back unless the result is
+what the plan promised (`pnpm --filter @crawlmouse/scripts exec vitest run db/history.test.ts`).
+It refuses production without `--yes-production`.
+
+**Read production first.** With a Supabase access token (Account → Access Tokens) in the
+environment:
+
+```bash
+cd scripts
+read -rs SUPABASE_ACCESS_TOKEN && export SUPABASE_ACCESS_TOKEN
+pnpm exec tsx db/history.ts --project-ref ezspnfeyzwsisymytssm --yes-production
+```
+
+<!-- history:start -->
+<!-- history:end -->
+
+The row with no file, `20260601174823 harden_handle_new_user_grants`, holds one statement:
+`revoke all on function public.handle_new_user() from public, anon, authenticated;`. The same line
+is in `infra/supabase/migrations/20260601000004_user_provisioning.sql` and in
+`infra/supabase/migrations/20261101000001_v2_001_entitlement_tables.sql`
+(`grep -n 'revoke all on function public.handle_new_user' infra/supabase/migrations/*.sql`), so
+deleting the row loses nothing a replay needs.
+
+**Then repair.** The connection string is the session pooler's, from the dashboard's **Connect**
+dialog, with the database password:
+
+```bash
+cd scripts
+read -rs DB_URL && export DB_URL
+pnpm exec tsx db/history.ts --db-url-env DB_URL --yes-production \
+  --repair --applied-through 20261103000001 --drop-orphan 20260601174823
+```
+
+Afterwards the read above prints no renamed, empty or orphan rows, and no files without a row.
+Then re-run the pull request's dry run.
+
+## 6. The checks
+
+Each file in `infra/supabase/checks` named `NN-<name>.sql` returns rows only when something is
+wrong; no rows is a pass. `scripts/db/check.ts` runs them against a target and fails on any row.
+`pnpm --filter @crawlmouse/scripts exec vitest run db/check.test.ts` shows each one failing on
+what it guards. The list below is rendered from the files' leading comments, and
+`scripts/db/docs.test.ts` fails when it differs from them.
+
+<!-- checks:start -->
+
+- **`01-client-table-privileges.sql`**: Client roles hold exactly the declared privileges on the v2 tables. anon holds nothing on any v2 table or partition. authenticated and crawl_worker hold exactly the grants in this file's `declared` list, at the table or column level: a privilege held but not listed, or listed on an existing table and column but not held, is a finding. The v2 tables are the ones in its `v2_tables` list, plus every relation in the research and partitions schemas. A table, column or role that does not exist yet (a migration not applied) is skipped. A migration that changes these grants changes this list in the same pull request.
+- **`02-partitions-rls-owner-only.sql`**: Every partition has row-level security on and an owner-only ACL. Every relation in the partitions schema must have RLS enabled, and its ACL may name only the table's owner: no client role, no PUBLIC, no other role.
+- **`03-worker-roles-no-login.sql`**: crawl_worker and research_retention cannot log in or bypass row-level security. Both roles are meant to be assumed through SET ROLE or a signed token. A role that does not exist yet (its migration not applied) is skipped.
+- **`04-private-schemas.sql`**: The research and partitions schemas grant no USAGE or CREATE to client roles. anon and authenticated (and PUBLIC, which both inherit) may not use or create objects in either schema. A schema that does not exist yet is skipped.
+- **`05-private-buckets.sql`**: The evidence and reports buckets are private. A bucket that does not exist yet is skipped.
+- **`06-client-functions.sql`**: authenticated may execute exactly is_member, member_role, is_member_for_site and usage_counts. In the public, research and partitions schemas, anon may execute no function and authenticated only the four listed in `declared`. An existing listed function authenticated cannot execute is also a finding. Functions that belong to an extension are left out.
+
+<!-- checks:end -->
+
+`fingerprint.sql` is not a check: it returns an md5, a count and the lines of each catalog section,
+so two databases can be compared section by section.
+
+## 7. Secrets and environments
+
+| Where                           | Name                    | Used by                                                        |
+| ------------------------------- | ----------------------- | -------------------------------------------------------------- |
+| GitHub environment `db-dry-run` | `SUPABASE_ACCESS_TOKEN` | the dry run, the branch clean-up, and the read-only `plan` job |
+| GitHub environment `production` | `SUPABASE_ACCESS_TOKEN` | the `apply` and `rollback` jobs (pooler lookup, read-only)     |
+| GitHub environment `production` | `SUPABASE_DB_PASSWORD`  | the `apply` and `rollback` jobs                                |
+
+A branch's database password comes from the Management API at run time and is masked in the log
+before use. `production` has a required reviewer (the owner) and accepts deployments from `main`
+only.
+
+**What the access token can do.** A Supabase access token acts for the whole account. The dry run
+needs one to create branches, so any workflow change on a pull request branch could use it. This
+is accepted: the owner is the repository's only writer, and pull requests from forks receive no
+secrets.
+
+## 8. What this replaced
+
+Until 2026-11-05 the owner applied each v2 migration by pasting it into the SQL editor, while a
+reviewer ran catalog checks by eye. On 2026-11-04 that process found three defects:
+
+1. **The dry-run branch was not a copy of production.** Supabase builds a branch from production's
+   recorded history, which lacked migrations: read on 2026-11-05, eight files had no row and five
+   rows had no statements. The dry run now compares fingerprints first and stops on a difference.
+2. **The 007 rollback could not run on current Supabase.** `storage.protect_delete()` refuses
+   `delete from storage.buckets` unless `storage.allow_delete_query` is set. The rollback now sets
+   it for its own transaction, and refuses while a bucket holds objects.
+3. **Production recorded 001 under a version that is not its file name.** Eighteen v1 migrations
+   were recorded the same way. The repair in §5 renames them.
+
+On 2026-11-05 a fourth turned up. The rows recorded for 003, 005, 007 and 006b after the owner
+applied them hold only a comment naming each file and its sha256, so a branch would replay none of
+them. The diff counts such a row as having no statements, and the repair adds the file's bytes
+after the comment.

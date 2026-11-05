@@ -1,6 +1,6 @@
 -- crawl_worker and research_retention cannot log in or bypass row-level security.
--- Both roles are assumed through SET ROLE or a signed token, never logged into. A role that does
--- not exist yet (its migration not applied) is skipped.
+-- Both roles are meant to be assumed through SET ROLE or a signed token. A role that does not
+-- exist yet (its migration not applied) is skipped.
 select r.rolname::text as object, p.problem
 from pg_roles r
 cross join lateral (
