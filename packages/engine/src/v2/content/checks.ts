@@ -92,7 +92,14 @@ export interface CheckDefinition {
    */
   onShell: (p: ContentFeatures) => PageVerdict;
   /** The fix a failing template opens; null when the contract has no fix type for the check. */
-  fix: Extract<FixType, 'quotable_opening' | 'missing_author_date' | 'specs_as_images'> | null;
+  fix: Extract<
+    FixType,
+    | 'quotable_opening'
+    | 'missing_author_date'
+    | 'specs_as_images'
+    | 'missing_schema_description'
+    | 'no_question_headings'
+  > | null;
   /** The readable key prefix of that fix's fingerprint. */
   key: string | null;
   recommendation_class: RecommendationClass;
@@ -128,8 +135,8 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
   question_headings: {
     judge: questionHeadings,
     onShell: unread,
-    fix: null,
-    key: null,
+    fix: 'no_question_headings',
+    key: 'questions',
     recommendation_class: 'experimental',
     confidence: 'inconclusive',
     scored: false,
@@ -137,10 +144,8 @@ export const CONTENT_CHECKS: Readonly<Record<ContentCheck, CheckDefinition>> = {
   schema_with_description: {
     judge: schemaWithDescription,
     onShell: unread,
-    // no fix type in the contract for this check yet (a gap SPEC 17 states), so a failing template
-    // opens no fix
-    fix: null,
-    key: null,
+    fix: 'missing_schema_description',
+    key: 'schema',
     recommendation_class: 'documented_requirement',
     confidence: 'inconclusive',
     scored: false,

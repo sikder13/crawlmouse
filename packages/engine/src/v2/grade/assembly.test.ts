@@ -11,7 +11,7 @@ import type { ContentFeatures } from '../content/read.js';
 import { detectStructure } from '../detectors/index.js';
 import { contentSignals, schemaOrg } from './declarations.js';
 import { csrSite, post } from '../../../fixtures/v2/grade/sites.js';
-import { gradeCheck } from './index.js';
+import { contentWithheld, gradeCheck } from './index.js';
 
 describe('Content Signals', () => {
   it('is present in the comment form Cloudflare writes, as crawlmouse.com serves it', () => {
@@ -99,7 +99,14 @@ describe('both grades for a check', () => {
       score: null,
       range: { min: 0, max: 20 },
     });
-    expect(g.content).toBe(null);
+    expect(g.content).toMatchObject({ score: null, score_withheld: 'no_check_counted' });
+    expect(g.content.checks.map((c) => [c.check, c.counted])).toEqual([
+      ['direct_answer_150', false],
+      ['question_headings', false],
+      ['schema_with_description', false],
+      ['author_and_date', false],
+      ['specs_as_text', false],
+    ]);
     expect(g.grade_version).toBe('2.0.0');
   });
 
@@ -130,7 +137,14 @@ describe('both grades for a check', () => {
       ...base,
       content: new Map([...base.content.keys()].map((u) => [u, failing])),
     });
-    expect(g.content).toBe(null);
+    expect(g.content).toMatchObject({ score: null, score_withheld: 'no_check_counted' });
+    expect(g.content.checks.map((c) => [c.check, c.counted])).toEqual([
+      ['direct_answer_150', false],
+      ['question_headings', false],
+      ['schema_with_description', false],
+      ['author_and_date', false],
+      ['specs_as_text', false],
+    ]);
     expect(g.ai_readability.components.quotable).toEqual(
       gradeCheck(base).ai_readability.components.quotable,
     );
@@ -145,7 +159,14 @@ describe('both grades for a check', () => {
     const [first, ...rest] = [...base.content.entries()];
     expect(first).toBeDefined();
     const g = gradeCheck({ ...base, content: new Map(rest) });
-    expect(g.content).toBe(null);
+    expect(g.content).toMatchObject({ score: null, score_withheld: 'no_check_counted' });
+    expect(g.content.checks.map((c) => [c.check, c.counted])).toEqual([
+      ['direct_answer_150', false],
+      ['question_headings', false],
+      ['schema_with_description', false],
+      ['author_and_date', false],
+      ['specs_as_text', false],
+    ]);
     expect(g.ai_readability.components.quotable.score).toBe(null);
     expect(g.ai_readability.components.quotable.range).not.toBe(null);
   });
@@ -197,5 +218,14 @@ describe('both grades for a check', () => {
       const parsed = CheckSchema.safeParse(check);
       expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
     }
+  });
+});
+
+describe('why the Content section has no score', () => {
+  const t = (passing: number, decided: number, unread: number) => ({ passing, decided, unread });
+  it('no counted check; a counted check with unread pages; counted checks that applied to no page', () => {
+    expect(contentWithheld({ checks: {} })).toBe('no_check_counted');
+    expect(contentWithheld({ checks: { author_and_date: t(3, 4, 1) } })).toBe('pages_not_read');
+    expect(contentWithheld({ checks: { author_and_date: t(0, 0, 0) } })).toBe('no_check_applied');
   });
 });

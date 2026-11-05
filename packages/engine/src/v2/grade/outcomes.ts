@@ -46,6 +46,8 @@ export const TITLES: Readonly<Partial<Record<FixType, (subject: string) => strin
   quotable_opening: (s) => `Open ${s} pages with a direct answer`,
   missing_author_date: (s) => `Show an author and a date on ${s} pages`,
   specs_as_images: (s) => `Give the specifications on ${s} pages as text`,
+  missing_schema_description: (s) => `Describe ${s} pages in their schema.org markup`,
+  no_question_headings: (s) => `Phrase a section heading on ${s} pages as a question`,
 };
 
 function draft(f: FixRecord, effect: Effect, rank: number, absorbed_by: string | null): FixDraft {

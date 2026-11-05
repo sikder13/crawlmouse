@@ -99,11 +99,18 @@ describe('the template rule', () => {
     expect(answerRecord(pages('/f', [notProse, notProse]))).toEqual([]);
   });
 
-  it('question_headings and schema_with_description have no fix type, so no record', () => {
-    const types = new Set(
-      aggregateContent(pages('/g', [prose(false), prose(false)])).detections.map((d) => d.type),
+  it('each check with a fix type opens a record per template: schema and question headings too', () => {
+    const headed = { ...prose(false), headings: { count: 4, questions: 0, section_questions: 0 } };
+    const detections = aggregateContent(pages('/g', [headed, headed])).detections;
+    // four section headings and no question, no JSON-LD (so the schema check fails), and neither an
+    // article nor a product, so author/date and specs do not apply
+    expect(new Map(detections.map((d) => [d.type, d.key]))).toEqual(
+      new Map([
+        ['quotable_opening', 'answer:/g'],
+        ['no_question_headings', 'questions:/g'],
+        ['missing_schema_description', 'schema:/g'],
+      ]),
     );
-    expect(types).toEqual(new Set(['quotable_opening']));
   });
 });
 

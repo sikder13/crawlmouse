@@ -3,7 +3,11 @@
  * The spec renders this table; contract-pins.test.ts checks that it names exactly the contract's
  * WithheldReason values.
  */
-import type { TechnicalSeoPending, WithheldReason } from '@crawlmouse/types/v2';
+import type {
+  ContentScoreWithheld,
+  TechnicalSeoPending,
+  WithheldReason,
+} from '@crawlmouse/types/v2';
 
 export const WITHHELD_REASON_MEANINGS: Readonly<Record<WithheldReason, string>> = {
   too_few_crawlers_measured:
@@ -26,4 +30,13 @@ export const WITHHELD_REASON_MEANINGS: Readonly<Record<WithheldReason, string>> 
 export const TECHNICAL_SEO_PENDING_MEANINGS: Readonly<Record<TechnicalSeoPending, string>> = {
   grade_refused:
     'The Technical SEO grade is refused (SPEC 5.1a), so there is no score for a fix to move; the effect is estimated once a check grades the site.',
+};
+
+/** Why the Content section has no score. contract-pins.test.ts pins this to the contract. */
+export const CONTENT_SCORE_WITHHELD_MEANINGS: Readonly<Record<ContentScoreWithheld, string>> = {
+  no_check_counted:
+    'No content check counts toward the score yet (a check counts once it clears the bar on an independent, held-out label set); the checks are reported.',
+  pages_not_read:
+    'A counted check could not be read on some graded pages, so its pass rate is a range.',
+  no_check_applied: 'No counted check applied to any graded page.',
 };

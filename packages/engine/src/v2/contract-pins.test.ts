@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FixtureDatasetSchema,
   GradeLetterSchema,
+  ContentScoreWithheldSchema,
   TechnicalSeoPendingSchema,
   WithheldReasonSchema,
   type FixtureDataset,
@@ -14,7 +15,11 @@ import {
 import { scoreToLetter } from '../grade.js';
 import { CRAWLER_REGISTRY_V2 } from './crawler-registry.js';
 import { severityOf } from './diff/severity.js';
-import { TECHNICAL_SEO_PENDING_MEANINGS, WITHHELD_REASON_MEANINGS } from './grade/withheld.js';
+import {
+  CONTENT_SCORE_WITHHELD_MEANINGS,
+  TECHNICAL_SEO_PENDING_MEANINGS,
+  WITHHELD_REASON_MEANINGS,
+} from './grade/withheld.js';
 
 const DIR = new URL('../../../../apps/web/lib/fixtures/v2/', import.meta.url);
 const fixtures: [string, FixtureDataset][] = readdirSync(DIR)
@@ -33,6 +38,14 @@ describe('WithheldReason is the engine table of reasons', () => {
   it('the engine gives a meaning for every reason, and for no other', () => {
     expect(Object.keys(WITHHELD_REASON_MEANINGS).sort()).toEqual(
       [...WithheldReasonSchema.options].sort(),
+    );
+  });
+});
+
+describe('ContentScoreWithheld is the engine table of reasons', () => {
+  it('the engine gives a meaning for every reason, and for no other', () => {
+    expect(Object.keys(CONTENT_SCORE_WITHHELD_MEANINGS).sort()).toEqual(
+      [...ContentScoreWithheldSchema.options].sort(),
     );
   });
 });

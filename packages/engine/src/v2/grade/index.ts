@@ -9,6 +9,7 @@ import type {
   AiReadability,
   Check,
   ContentCheck,
+  ContentScoreWithheld,
   LinkEdge,
   PageResult,
   TechnicalSeo,
@@ -40,8 +41,6 @@ export interface GradeInput {
   structure: readonly Detection[];
   /** robots.txt as read: '' when the site has none, null when it could not be read. */
   robots_txt: string | null;
-  /** Pages lacking a title or a meta description (CC-12d); null until the worker records them. */
-  untitled: readonly string[] | null;
   refusal: TechnicalSeoInput['refusal'];
 }
 
@@ -57,8 +56,8 @@ export interface Grades {
   grade_version: string;
   technical_seo: TechnicalSeo;
   ai_readability: AiReadability;
-  /** The Content section: null when Quotable has no score. */
-  content: Check['content'];
+  /** The Content section: the five checks, with a score once a counted check gives one. */
+  content: NonNullable<Check['content']>;
   /** schema_org and content_signals, as Check.signals carries them. */
   signals: SignalResult[];
   /** Each graded page's failed checks; null when the page was not read for content. */
@@ -76,6 +75,13 @@ export function aiFrom(inputs: AiInputs): AiReadability {
   });
 }
 
+/** Why the Content section has no score, from the Quotable input (the counted checks' tallies). */
+export function contentWithheld(q: QuotableInput): ContentScoreWithheld {
+  const ts = Object.values(q.checks);
+  if (ts.length === 0) return 'no_check_counted';
+  return ts.some((t) => t.unread > 0) ? 'pages_not_read' : 'no_check_applied';
+}
+
 export function gradeCheck(input: GradeInput): Grades {
   const graded = input.pages.filter(isGraded);
   const homepage = input.content.get(input.homepage_url);
@@ -85,7 +91,6 @@ export function gradeCheck(input: GradeInput): Grades {
     homepage_url: input.homepage_url,
     homepage_client_rendered: homepage?.client_rendered ?? false,
     detections: input.structure,
-    untitled: input.untitled,
     refusal: input.refusal,
     added_links: [],
   };
@@ -118,7 +123,11 @@ export function gradeCheck(input: GradeInput): Grades {
     grade_version: GRADE_VERSION,
     technical_seo: technicalSeo(seo),
     ai_readability,
-    content: rate === null ? null : { score: round(100 * rate), checks: content.by_template },
+    content: {
+      score: rate === null ? null : round(100 * rate),
+      score_withheld: rate === null ? contentWithheld(content.quotable) : null,
+      checks: content.by_template,
+    },
     signals: declarations,
     content_failures: content.content_failures,
     content_detections: content.detections,
