@@ -11,8 +11,9 @@
  * between them (`<span>Ridge</span><span>tent</span>`) stays one word, as a browser shows it.
  *
  * The split is one pass over the HTML string: a space is written before each opening or closing tag of
- * a boundary element. Where such a tag is not markup (inside a script, a comment or an attribute value)
- * the space lands there instead; both sides get the same treatment.
+ * a boundary element. Where such a tag is not markup the space lands there instead: in a script, a
+ * comment or an attribute value, or in text the extractor does count (a `<textarea>`, an `<xmp>`),
+ * where it can split a word. Both sides get the same treatment.
  */
 import * as cheerio from 'cheerio';
 import { extractMainContent } from '../../analysis/ai-readiness/main-content.js';
@@ -25,7 +26,6 @@ export const BOUNDARY_ELEMENTS = [
   'blockquote',
   'br',
   'button',
-  'caption',
   'dd',
   'details',
   'dialog',
@@ -47,7 +47,6 @@ export const BOUNDARY_ELEMENTS = [
   'hr',
   'img',
   'input',
-  'label',
   'legend',
   'li',
   'main',
@@ -57,7 +56,6 @@ export const BOUNDARY_ELEMENTS = [
   'p',
   'pre',
   'section',
-  'select',
   'summary',
   'table',
   'tbody',

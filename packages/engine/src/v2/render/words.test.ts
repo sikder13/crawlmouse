@@ -55,10 +55,24 @@ describe('mainWords', () => {
 describe('the boundary split', () => {
   it.each([
     ['buttons', '<button>Add</button><button>Remove</button>', 2],
-    ['labels and inputs', '<label>Name</label><input><label>Email</label>', 2],
+    ['inputs between labels', '<label>Name</label><input><label>Email</label>', 2],
+    [
+      'nothing between inline labels, as a browser shows them',
+      '<label>Name</label><label>Email</label>',
+      1,
+    ],
     ['table cells', '<table><tr><td>Size</td><td>2P</td></tr></table>', 2],
     ['a line break', 'one<br>two<br/>three', 3],
     ['tags in upper case', '<P>One</P><P>Two</P>', 2],
+    ['images', 'one<img src="/a.png">two', 2],
+    ['a caption', '<table><caption>Sizes</caption><tr><td>2P</td></tr></table>', 2],
+    ['a legend', '<fieldset><legend>Size</legend>2P</fieldset>', 2],
+    [
+      'a select and its options',
+      '<select><option>Small</option><option>Large</option></select>',
+      2,
+    ],
+    ['a textarea', 'Notes<textarea>none</textarea>', 2],
   ])('separates %s', (_name, inner, words) => {
     expect(mainWords(`<body><main>${inner}</main></body>`)).toBe(words);
   });
