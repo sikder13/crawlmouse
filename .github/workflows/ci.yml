@@ -331,3 +331,50 @@ jobs:
         with:
           entrypoint: /root/osv-scanner
           args: scan source --config=osv-scanner.toml --lockfile=pnpm-lock.yaml
+
+  # actionlint over every workflow, with shellcheck on their run blocks (both are in the image).
+  # Pinned by image digest. The two ignored messages are nightly.yml's, which predate this job: the
+  # skipped Lighthouse placeholder (`if: false`) and an `ls` in its run block (SC2012, info).
+  actionlint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      # renovate: datasource=docker depName=rhysd/actionlint
+      ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo "$ACTIONLINT_IMAGE" -color \
+            -ignore 'constant expression "false" in condition' -ignore 'SC2012:'
+
+  # The real Supabase CLI, against an empty Postgres, lists exactly the files of
+  # infra/supabase/migrations (scripts/db/verify-cli-files.ts). The unit test pins the wrapper's
+  # list; this pins what the CLI itself reads.
+  db-cli-files:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6-bookworm@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/supabase-cli
+      - name: The CLI reads infra/supabase/migrations
+        working-directory: scripts
+        env:
+          DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          # The CLI opens with TLS unless told not to; the service container has none.
+          PGSSLMODE: disable
+        run: pnpm exec tsx db/verify-cli-files.ts
