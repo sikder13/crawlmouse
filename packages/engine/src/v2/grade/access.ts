@@ -75,14 +75,13 @@ export function accessScore(crawlers: readonly CrawlerTally[]): AccessMeasure {
   const measured = shares.flatMap((s) => (s.share === null ? [] : [s.share]));
   const unmeasured = shares.filter((s) => s.standing === 'unmeasured').length;
   // the crawlers that are not measured must each be blocked by choice, none with a page refused as
-  // unverified; the measured ones' own pages follow the ordinary rules (owner ruling, 2026-11-05)
-  const unverified = ours.some(
-    (c, i) => shares[i]!.standing !== 'measured' && (c.counts.refused_unverified ?? 0) > 0,
-  );
+  // unverified (owner ruling, 2026-11-05). The second follows from the first: a refused page is a
+  // page whose rules were read and that was not disallowed, so its crawler is not blocked by choice
+  // (crawlerShare) and counts as unmeasured. The measured ones' own pages follow the ordinary rules.
   if (measured.length >= MIN_MEASURED_CRAWLERS) {
     return { ...scored(AI_WEIGHTS.access * mean(measured)), reason: null, scored_from: null };
   }
-  if (measured.length > 0 && unmeasured === 0 && !unverified) {
+  if (measured.length > 0 && unmeasured === 0) {
     return {
       ...scored(AI_WEIGHTS.access * mean(measured)),
       reason: null,
