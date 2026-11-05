@@ -62,6 +62,10 @@ ${table(
   ],
 )}
 
+Refusing the \`script\` resource type stops script files from loading. A script written inline in the
+HTML still runs on the static side, so text such a script writes is counted on both sides and does not
+lower the share.
+
 The user agent is the one the v2 fixtures record on their \`identity_role: render\` rows. Browser Run
 adds headers that cannot be removed and name the request as its own (\`cf-brapi-request-id\`,
 \`Signature-agent\`), so the user agent does not hide what the request is.

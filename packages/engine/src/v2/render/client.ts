@@ -3,9 +3,10 @@
  * HTML the browser holds when the page settles. Nothing here touches the disk: the reply is read into
  * memory, bounded by MAX_REPLY_BYTES, and handed back.
  *
- * The two sides of a page are the same request but for one field. Both run in Browser Run, from the same
- * network, with the same user agent, viewport and wait, so the only thing that differs between the words
- * they show is JavaScript: the static side refuses scripts.
+ * The two sides of a page are the same request but for one field: the static side refuses the `script`
+ * resource type. Both run in Browser Run, from the same network, with the same user agent, viewport and
+ * wait. Refusing the resource type stops script files from loading; a script written inline in the HTML
+ * still runs on the static side, so text such a script writes is counted on both sides.
  */
 import {
   REJECTED_RESOURCE_TYPES,

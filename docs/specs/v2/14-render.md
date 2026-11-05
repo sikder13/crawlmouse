@@ -23,6 +23,10 @@ network, with the same request but for one field:
 | Refused on the static side | `websocket`, `eventsource`, `media`, `script`                                                           |
 | Largest reply read         | 10 MiB                                                                                                  |
 
+Refusing the `script` resource type stops script files from loading. A script written inline in the
+HTML still runs on the static side, so text such a script writes is counted on both sides and does not
+lower the share.
+
 The user agent is the one the v2 fixtures record on their `identity_role: render` rows. Browser Run
 adds headers that cannot be removed and name the request as its own (`cf-brapi-request-id`,
 `Signature-agent`), so the user agent does not hide what the request is.
@@ -192,6 +196,7 @@ No reason below fails the check:
 | `oversize`                 | The reply passed 10 MiB and was not read further.                               |
 | `network_error`            | The request to Browser Run failed before an answer.                             |
 | `challenged`               | A side of the render is a challenge or block page (challenge.ts).               |
+| `measure_failed`           | Counting the words of the two renders threw.                                    |
 | `nothing_rendered`         | The rendered side has no words, so there is no share.                           |
 
 ## Contract gaps
