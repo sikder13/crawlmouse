@@ -21,7 +21,9 @@ import type { ContentFeatures } from './read.js';
  * MIN_CONFIRMED_FIRINGS firings the labels confirm, and a one-sided 95 % lower bound of at least
  * MIN_LOWER_BOUND on its precision and on its pass accuracy, measured on a label set that is
  * independent (labelled by someone other than the session that implemented the checks) and held out
- * (labels frozen before the check runs on it). `counts` applies all of it.
+ * (labels frozen before the check runs on it). `counts` applies all of it. The firings follow from the
+ * bound: 13 of 13 has a lower bound of 79.4 %, so no tally under 14 confirmed reaches 80 %
+ * (labels.test.ts); the minimum is kept as the owner stated it.
  */
 export const MIN_CONFIRMED_FIRINGS = 14;
 export const MIN_LOWER_BOUND = 0.8;

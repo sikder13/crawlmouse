@@ -123,6 +123,16 @@ describe('the content checks on the labelled pages', () => {
     expect(lowerBound(14, 14)).toBeCloseTo(0.05 ** (1 / 14), 10);
   });
 
+  it(`the ${MIN_CONFIRMED_FIRINGS} firings follow from the ${MIN_LOWER_BOUND * 100} % bound: under ${MIN_CONFIRMED_FIRINGS} confirmed, no tally reaches it`, () => {
+    for (let x = 1; x < MIN_CONFIRMED_FIRINGS; x++) {
+      for (let n = x; n <= x + 5; n++)
+        expect(lowerBound(x, n)!, `${x} of ${n}`).toBeLessThan(MIN_LOWER_BOUND);
+    }
+    expect(lowerBound(MIN_CONFIRMED_FIRINGS, MIN_CONFIRMED_FIRINGS)!).toBeGreaterThanOrEqual(
+      MIN_LOWER_BOUND,
+    );
+  });
+
   it('the exact one-sided 95 % lower bound: 2 of 2 is 0.05^(1/2) = 0.2236; 0 of n is 0; no trials, none', () => {
     expect(lowerBound(2, 2)).toBeCloseTo(Math.sqrt(0.05), 10);
     expect(lowerBound(0, 7)).toBe(0);

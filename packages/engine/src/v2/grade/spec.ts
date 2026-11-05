@@ -277,7 +277,7 @@ function labelSet(): string {
     'left out. "Applies" counts the pages labelled `pass` or `fail`. After each share, ≥ is its exact one-sided 95 % lower',
     'bound (Clopper-Pearson): how far the sample vouches for it.',
     '',
-    `**The bar (owner ruling, 2026-11-05).** A check counts in Quotable only on a label set that is independent (labelled by someone other than the session that implemented the checks) and held out (labels frozen before the check runs on it), with ${MIN_CONFIRMED_FIRINGS} confirmed firings or more and a lower bound of ${pct(MIN_LOWER_BOUND)} or more on both its precision and its pass accuracy (label-set.ts \`counts\`). This set is neither independent nor held out, so no check counts on it, whatever its numbers; labels.test.ts fails while any check is counted. CC-18 builds the set the bar asks for. ${barVerdict()}`,
+    `**The bar (owner ruling, 2026-11-05).** A check counts in Quotable only on a label set that is independent (labelled by someone other than the session that implemented the checks) and held out (labels frozen before the check runs on it), with ${MIN_CONFIRMED_FIRINGS} confirmed firings or more and a lower bound of ${pct(MIN_LOWER_BOUND)} or more on both its precision and its pass accuracy (label-set.ts \`counts\`). The firings follow from the bound: ${MIN_CONFIRMED_FIRINGS - 1} of ${MIN_CONFIRMED_FIRINGS - 1} has a lower bound of ${(100 * lowerBound(MIN_CONFIRMED_FIRINGS - 1, MIN_CONFIRMED_FIRINGS - 1)!).toFixed(1)} %. This set is neither independent nor held out, so no check counts on it, whatever its numbers; labels.test.ts fails while any check is counted. CC-18 builds the set the bar asks for. ${barVerdict()}`,
     '',
     tallyTable(tallies()),
     '',
