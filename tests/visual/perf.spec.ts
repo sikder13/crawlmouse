@@ -51,7 +51,8 @@ import { test, expect, type Browser, type Page, type TestInfo } from './pw';
  *   and the medians are printed, and with PERF_SAMPLES_DIR set the samples are written there for
  *   the nightly trend. What says a run measured anything at all (a main thread and its tasks in the
  *   trace, enough frames, the window spanning its moment) must hold on every run. The visual job
- *   retries a failed run of this spec once (packages/timing/scripts/perf-retry.sh).
+ *   retries a run of this spec once when every failure in it was a budget miss
+ *   (packages/timing/scripts/perf-retry.sh).
  * Each window opens at its moment (`?at=`), with the map laid out cold there, and plays from it.
  * A viewer who has watched from 0:00 has the map the warm layouts built, which move more pages at
  * each layout: these windows understate that work, a known gap of this spec, not measured here.

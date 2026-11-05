@@ -67,7 +67,7 @@ that did not start, a failure that names no test, a test timeout, a thrown error
 assertion inside a budget test, such as one marked `MEASUREMENT INVALID` (the checks that a run
 measured anything) or the explorer's canvas not rendering. A second error inside a test that
 already missed its budget fails it too when it starts one of those lines; one that does not (a
-thrown value that is not an `Error`) is not read. Both attempts' `[perf]` lines go to the job summary. A flaky or
+thrown value that is not an `Error`) is not read. Each attempt's `[perf]` lines go to the job summary. A flaky or
 inconclusive outcome writes a warning annotation and a register row (below). It is the one step
 the workflow retries (`grep -n "perf-retry\|--last-failed\|retries" .github/workflows/*.yml` finds
 it and the baselines step, which re-draws screenshots and asserts nothing); production checks run
@@ -153,21 +153,28 @@ Three things keep a busy machine from failing `pnpm test` on noise:
   and `crawl-round-budget` (2 s rounds, a 12 s crawl, 5 s navigation timeouts) keep their budgets.
   The engine's `test` script runs the rest of the engine suite with the two files left out, then
   `test:timers` runs them one after the other (`--no-file-parallelism`), so no other engine file
-  shares the machine with them. A failure in either run fails `test`;
-  `packages/timing/src/engine-timers.test.ts` pins the split, that the two runs between them list
-  every engine test file, and the exit status. The PR's `test (engine)` job runs the same script.
+  shares the machine with them. A failure in either run fails `test`. Arguments to `test`
+  (`pnpm --filter @crawlmouse/engine test -- <filter>`) go to the main run; the serial run always
+  runs both fixtures. `packages/engine/src/test-timers-split.test.ts`, which runs in the main run
+  and so in the PR's `test (engine)` job, runs the `test` line with a stand-in vitest. It pins the
+  two vitest command lines the line runs, that those exact command lines select every engine test
+  file once between them (read with the real `vitest list`), the exit status for each pair of run
+  results, and where appended arguments go.
   - _Why not a longer navigation timeout._ Before this split, stall-retries' first test failed
     inside the capped suite having reached no stalled path, which a 1 s timeout expiring on the
-    fixture's own home page would explain. Raising it to 5 s was tried first, at `611f487`, and
-    failed with the file run alone on an idle workstation (load average 2), twice in two runs:
-    eight stalled paths at concurrency 2 cost four 5 s waits, 20 s of the 22 s budget, so "still
-    RECORDS a timed-out URL as a failed fetch" recorded 5 of 8 and "reaches the pages BEHIND the
-    stalled ones" ran out of budget. That is the budget's arithmetic, not load, so the timeout
-    went back to 1 s and the cause stays unconfirmed. round-budget already had 5 s.
+    fixture's own home page would explain. Raising it to 5 s was tried first, at `611f487`, with
+    the file run alone, and two of its three tests failed: "still RECORDS a timed-out URL as a
+    failed fetch" recorded 5 of the 8 stalled paths inside the 22 s budget, and "reaches the pages
+    BEHIND the stalled ones" ended with the budget exhausted. The first test, with 60 s, took 35.2 s
+    to give its 8 stalled paths one request each, about 4.4 s a path, so at 5 s a path the 22 s
+    budget does not reach all 8. The same 5 of 8 came back in both of the author's runs (the first at a one-minute load
+    average of 2) and in review at 5.7 and 11.4, so it does not follow load. The timeout went back to 1 s,
+    and the cause of the earlier failures stays unconfirmed. round-budget already had 5 s.
   - _The record before the split._ Run alone beside twelve CPU busy loops, both passed three runs
     in a row (stall-retries' tests 7.3 s to 8.0 s, round-budget's 2.2 s to 3.1 s). Inside the
-    capped suite one or both failed in three of four runs without a load harness, and once beside
-    twelve busy loops (the register below).
+    capped suite, the register below has four runs with a failure without a load harness, and one
+    beside twelve busy loops. A capped run without a harness at `2adc31e` passed; the other passing runs
+    were not recorded, so no failure rate is given.
   - _With the split:_ three capped full runs in a row at `3cf6fae`
     (`turbo run test --force --continue --concurrency=2`, no harness) passed in every package:
 
@@ -367,6 +374,12 @@ normal and still fail the frame budgets, and then the job fails, as on a normal 
 Add a row whenever a timing check fails and a re-run or the retry shows it was noise. The visual
 job writes the row for you (job summary, and the `flake-entry-<run>-<attempt>` artifact); commit it
 in the PR that saw it.
+
+The crawl-fixture rows carry the label the owner ruled for them, "Timer-based: load-sensitive
+above concurrency 2; CI unaffected". "CI unaffected" means the PR jobs, which run one package
+each. The nightly `test` job runs `pnpm test`, at the cap, so there the fixtures' serial run can
+share the hosted runner with another package's suite. The rows before 2026-11-05 include failures
+at concurrency 2 itself; the serial run (the busy-machine section above) is what followed them.
 
 | date       | test                                                                                                      | run                                                                                                                                           | what decided it was noise                                                                                                                                                                                                                                                                                                                             |
 | ---------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
