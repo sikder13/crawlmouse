@@ -19,6 +19,14 @@ const SECRET_SHAPES: readonly [name: string, pattern: RegExp][] = [
   ['private key', /BEGIN [A-Z ]*PRIVATE KEY/],
   ['JWT', /\beyJhbGciOi[A-Za-z0-9_-]{10,}/],
   ['Slack token', /\bxox[baprs]-[A-Za-z0-9-]{10,}/],
+  [
+    'Cloudflare token or key near a Cloudflare name',
+    /(?:cloudflare|\bcf_|browser_?rendering|browser_?run)[\s\S]{0,60}?['"`][A-Za-z0-9_-]{37,40}['"`]/i,
+  ],
+  [
+    'Cloudflare account id near a Cloudflare name',
+    /(?:cloudflare|\bcf_)[\s\S]{0,60}?['"`][A-Fa-f0-9]{32}['"`]/i,
+  ],
 ];
 
 const ROOT = new URL('../../../', import.meta.url);
@@ -68,13 +76,33 @@ describe('the scan', () => {
     ['private key', `-----${'BEGIN'} RSA PRIVATE KEY-----`],
     ['JWT', `${'eyJhbGciOi'}${'x'.repeat(20)}`],
     ['Slack token', `${'xoxb'}-${'1'.repeat(20)}`],
+    [
+      'Cloudflare token or key near a Cloudflare name',
+      `CLOUDFLARE_BROWSER_RENDERING_TOKEN = '${'Ab_9'.repeat(10)}'`,
+    ],
+    ['Cloudflare account id near a Cloudflare name', `cloudflareAccount: "${'AB12'.repeat(8)}"`],
   ];
 
   it.each(planted)('finds a planted %s', (name, value) => {
-    expect(shapesIn(`const x = "${value}";`)).toContain(name);
+    expect(shapesIn(`const x = ${JSON.stringify(value)};\n${value}`)).toContain(name);
   });
 
   it('has a planted example for every shape', () => {
     expect(planted.map(([n]) => n)).toEqual(SECRET_SHAPES.map(([n]) => n));
+  });
+});
+
+describe('the Browser Run credentials', () => {
+  const DIR = new URL('./', import.meta.url);
+  const sources = readdirSync(DIR)
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+    .map((f) => [f, readFileSync(new URL(f, DIR), 'utf8')] as const);
+
+  it('are read from the environment by name, in clientFromEnv only', () => {
+    const readers = sources
+      .filter(([, src]) => /env\[ENV\.(?:token|account)\]/.test(src))
+      .map(([f]) => f);
+    expect(readers).toEqual(['client.ts']);
+    expect(sources.filter(([, src]) => /process\.env/.test(src)).map(([f]) => f)).toEqual([]);
   });
 });
