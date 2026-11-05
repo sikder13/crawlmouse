@@ -120,12 +120,6 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     allowedIn: [],
   },
   {
-    text: 'a member naming an alternate that does not annotate it back is flagged',
-    withdrawnIn: 'packages/engine/src/v2/grade/technical-seo.ts (header), CC-17 third rulings',
-    truth: 'Same proposition, in the grade module header.',
-    allowedIn: [],
-  },
-  {
     text: 'An alternate does not annotate back, or redirects or is gone.',
     withdrawnIn: 'docs/specs/v2/16-structure-detectors.md (conditions), CC-17 third rulings',
     truth:
