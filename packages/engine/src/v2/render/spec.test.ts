@@ -58,11 +58,16 @@ describe('withdrawn claims', () => {
     [/Fragments found only on challenge/i, 'a page quoting a marker is taken for a challenge'],
     [/It never throws for a page/i, 'replaced by what the code catches'],
     [
-      /inline in the HTML (?:is not a request and )?still runs on the static side/i,
-      'the static side sends setJavaScriptEnabled: false',
+      /with no page of this check in flight/i,
+      'the daily budget is asked once per check, not per page',
     ],
     [
-      /against the check's cap and against today's budget/i,
+      /reservation is settled whatever happens to the page/i,
+      'the daily budget is settled once per check, not per page',
+    ],
+    [/inline\b[^.]*\bstill runs/i, 'the static side sends setJavaScriptEnabled: false'],
+    [
+      /against the check[’']s cap and against today[’']s budget/i,
       'today\u2019s budget is asked once per check',
     ],
   ];

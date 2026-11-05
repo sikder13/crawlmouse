@@ -198,7 +198,7 @@ describe('the per-check cap', () => {
 });
 
 describe('a render whose browser time is not known', () => {
-  it('settles at its reservation, so a check held to one page’s reservation stays within it', async () => {
+  it('counts at its reservation, so a check held to one page’s reservation stays within it', async () => {
     const unknown: RenderReply = {
       ok: true,
       html: '<body><main><p>a b</p></main></body>',
@@ -227,7 +227,7 @@ describe('a cap that binds while pages are in flight', () => {
   }));
   const candidates = many.map((f, i) => candidate(f, `/m${i}`));
 
-  it('lets a page wait for another to settle, so a cap with room for one reservation renders them all', async () => {
+  it('lets a page wait for another of the check to finish, so a cap with room for one reservation renders them all', async () => {
     // One page's reservation plus what eight pages use, 1 s each.
     const out = await renderCheck(
       input({

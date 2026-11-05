@@ -74,7 +74,7 @@ on both sides and raise the share, reading a page that needs JavaScript as one t
 Cloudflare documents that field for \`/snapshot\` (read ${BROWSER_RUN.read_on}); the \`/content\` page
 does not name it. ${
       STATIC_JS_OFF_SHOWN_LIVE === null
-        ? '**Whether `/content` honours it is unproven:** the live inline-script probe (below) has not yet passed. If it shows the setting ignored, the static side moves to `/snapshot`, where it is documented.'
+        ? '**Whether `/content` honours it is unproven:** no passing run of the live inline-script probe (below) is recorded here. If it shows the setting ignored, the static side moves to `/snapshot`, where it is documented.'
         : `The live inline-script probe (below) showed \`/content\` honouring it on ${STATIC_JS_OFF_SHOWN_LIVE}.`
     }
 
@@ -252,7 +252,7 @@ throws, each is \`daily_budget_unavailable\`, and admission is not run for any o
 cap is below one page's ${seconds(2 * RESERVE_PER_RENDER_MS)} does not ask, and each page is
 \`check_cap\`. When it grants, the budget is settled once, after the last page has finished, at the
 browser time the check counted; a settle that throws is returned as \`settle_failed\`, and the day
-then still counts the whole allowance. So a day with room for some pages of a check but not its
+may still count the whole allowance, depending on the store. So a day with room for some pages of a check but not its
 allowance renders none of that check.
 
 Within the check, before a page starts it reserves both of its renders at ${seconds(RESERVE_PER_RENDER_MS)} each
@@ -334,6 +334,10 @@ Offline, a replayed reply is identical every time, so the bounds below are held 
   writes a marker assembled at run time, and which loads a script file. The static side must hold
   neither the marker nor the file's report; the rendered side must hold the marker and report the
   file loaded;
+- the same page on the static side's request with JavaScript turned back on, so its inline script
+  can report the file: it must report the file blocked;
+- the probes send the page as \`html\`, where production sends \`url\`, so they show the request's
+  settings on that input;
 - a probe page whose requests report whether they loaded, rendered twice: with the rules left out,
   each request and a WebSocket must load; with them, rules \`ip_literal\` and \`download\`, one host
   from each list and the WebSocket must be refused while two twin requests still load.

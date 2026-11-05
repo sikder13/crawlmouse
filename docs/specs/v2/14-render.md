@@ -31,7 +31,7 @@ written inline in the HTML is not a request, so the static side also sends
 `setJavaScriptEnabled: false`: were an inline script to run there, the text it writes would count
 on both sides and raise the share, reading a page that needs JavaScript as one that does not.
 Cloudflare documents that field for `/snapshot` (read 2026-11-05); the `/content` page
-does not name it. **Whether `/content` honours it is unproven:** the live inline-script probe (below) has not yet passed. If it shows the setting ignored, the static side moves to `/snapshot`, where it is documented.
+does not name it. **Whether `/content` honours it is unproven:** no passing run of the live inline-script probe (below) is recorded here. If it shows the setting ignored, the static side moves to `/snapshot`, where it is documented.
 
 The user agent is the one the v2 fixtures record on their `identity_role: render` rows. Browser Run's
 documentation (automatic request headers, read 2026-11-05) says it adds headers a request
@@ -208,7 +208,7 @@ throws, each is `daily_budget_unavailable`, and admission is not run for any of 
 cap is below one page's 90 s does not ask, and each page is
 `check_cap`. When it grants, the budget is settled once, after the last page has finished, at the
 browser time the check counted; a settle that throws is returned as `settle_failed`, and the day
-then still counts the whole allowance. So a day with room for some pages of a check but not its
+may still count the whole allowance, depending on the store. So a day with room for some pages of a check but not its
 allowance renders none of that check.
 
 Within the check, before a page starts it reserves both of its renders at 45 s each
@@ -302,6 +302,10 @@ Offline, a replayed reply is identical every time, so the bounds below are held 
   writes a marker assembled at run time, and which loads a script file. The static side must hold
   neither the marker nor the file's report; the rendered side must hold the marker and report the
   file loaded;
+- the same page on the static side's request with JavaScript turned back on, so its inline script
+  can report the file: it must report the file blocked;
+- the probes send the page as `html`, where production sends `url`, so they show the request's
+  settings on that input;
 - a probe page whose requests report whether they loaded, rendered twice: with the rules left out,
   each request and a WebSocket must load; with them, rules `ip_literal` and `download`, one host
   from each list and the WebSocket must be refused while two twin requests still load.

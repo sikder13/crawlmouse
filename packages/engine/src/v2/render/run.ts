@@ -89,7 +89,7 @@ export interface RenderOutcome {
   browser_ms: number;
   estimate: SiteEstimate;
   /**
-   * True when today's budget threw on the closing settle. The day then still counts the whole
+   * True when today's budget threw on the closing settle. The day may then still count the whole
    * allowance, which is at least what the check used unless a render reported more than its
    * reservation; CC-20 decides how the store is corrected.
    */

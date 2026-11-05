@@ -287,8 +287,9 @@ and reads these from that process's environment:
 A check asks the day's budget once, before any page, for its allowance: the per-check cap, or 90 s
 for each page it sampled, whichever is less. When the day has less than that left, the check renders
 nothing and records `daily_cap` on each sampled page, even if a few pages would have fitted. After its
-last page the check settles once, giving back what it did not use; if that settle fails, the day keeps
-counting the whole allowance and the outcome carries `settle_failed`.
+last page the check settles once, at the browser time it counted: that gives back what it did not use,
+or adds what renders reported beyond their reservation. If that settle fails, the outcome carries
+`settle_failed`, and the day may still count the whole allowance, depending on the store.
 
 Without both credentials, or with a zero cap, a check records its sampled pages as not rendered and
 goes on; it does not fail. To stop rendering, unset the token or set either cap to `0`.
@@ -316,7 +317,8 @@ delete the old one in the dashboard.
 Run one test file at a time, from `packages/engine`:
 `timeout -s KILL 150 node node_modules/vitest/vitest.mjs run src/v2/render/<file>.test.ts --pool=threads`.
 The live tests read the credentials from the environment, or, with `RENDER_LIVE=1`, from
-`~/.config/crawlmouse/render.env` outside the repository; they never print them:
+`~/.config/crawlmouse/render.env` outside the repository. Their console lines print word counts and
+probe output, not the credentials (`grep -n console.info src/v2/render/live.test.ts`):
 `RENDER_LIVE=1 timeout -s KILL 600 node node_modules/vitest/vitest.mjs run src/v2/render/live.test.ts --pool=threads`.
 
 Only ever kill processes started from your own worktree. Another session's tests may be running on

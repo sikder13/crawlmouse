@@ -24,8 +24,9 @@
 export const REJECTED_RESOURCE_TYPES = ['websocket', 'eventsource', 'media'] as const;
 
 /**
- * The static side also refuses the `script` resource type, so script files do not load on it. A script
- * written inline in the HTML is not a request and still runs.
+ * The static side also refuses the `script` resource type, so script files do not load on it; the live
+ * script-file probe checks it. An inline script is not a request, so this list cannot stop it: the
+ * static request turns JavaScript off for that (client.ts).
  */
 export const STATIC_REJECTED_RESOURCE_TYPES = [...REJECTED_RESOURCE_TYPES, 'script'] as const;
 
