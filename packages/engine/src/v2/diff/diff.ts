@@ -132,6 +132,15 @@ export function diffCheck(input: DiffInput): DiffResult {
     });
   }
 
+  // A fix's effect names the fix that absorbed it by that fix's number, known once every fix is placed.
+  const numberOf = new Map([...input.fixes, ...fixes].map((f) => [f.fingerprint, f.number]));
+  for (const f of fixes) {
+    if (!found.has(f.id)) continue;
+    const outcome = outcomes.get(f.fingerprint);
+    const by = outcome?.state === 'detected' ? outcome.fix.absorbed_by_fingerprint : null;
+    if (by !== null) f.effect = { ...f.effect, absorbed_by: numberOf.get(by) ?? null };
+  }
+
   const byNumber = (a: Fix, b: Fix) => a.number - b.number;
   fixes.splice(0, fixes.length, ...reranked(input.fixes, fixes, found).sort(byNumber));
   const order = new Map(fixes.map((f, k) => [f.id, k]));

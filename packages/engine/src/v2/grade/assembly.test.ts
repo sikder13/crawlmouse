@@ -86,18 +86,28 @@ describe('both grades for a check', () => {
     const g = gradeCheck(csrSite(0.31));
     expect(g.ai_readability.components.access.score).toBe(40);
     expect(g.ai_readability.components.readable.score).toBe(9.3);
-    // Quotable: each counted check passes on all six pages: 20.
-    // Signals: schema and Content Signals present: 10. Total 40 + 9.30 + 20 + 10 = 79.30.
-    expect(g.ai_readability).toMatchObject({ withheld: false, total: 79.3, grade: 'B' });
-    expect(g.content).toMatchObject({ score: 100 });
+    // Signals: schema and Content Signals present: 10. Quotable counts no check yet, so the grade is
+    // withheld for it alone, with Quotable's range 0..20: the total would be 59.30 to 79.30.
+    expect(g.ai_readability.components.signals.score).toBe(10);
+    expect(g.ai_readability).toMatchObject({
+      withheld: true,
+      withheld_reasons: ['quotable_unmeasured'],
+      total: null,
+      scored_from_fewer_crawlers: null,
+    });
+    expect(g.ai_readability.components.quotable).toMatchObject({
+      score: null,
+      range: { min: 0, max: 20 },
+    });
+    expect(g.content).toBe(null);
     expect(g.grade_version).toBe('2.0.0');
   });
 
-  it('before any page is rendered, AI readability is withheld for Readable, with the other components scored', () => {
+  it('before any page is rendered, AI readability is withheld for Readable too, with Access and Signals scored', () => {
     const g = gradeCheck(csrSite(null));
     expect(g.ai_readability).toMatchObject({
       withheld: true,
-      withheld_reasons: ['readable_unmeasured'],
+      withheld_reasons: ['readable_unmeasured', 'quotable_unmeasured'],
       total: null,
       access_range: null,
     });
@@ -109,27 +119,25 @@ describe('both grades for a check', () => {
     expect(g.technical_seo.score).not.toBeNull();
   });
 
-  it('the Content section score is 100 × the mean pass rate of the counted checks, rounded once', () => {
+  it('no check counts in Quotable: what the checks find moves neither Quotable nor the Content section', () => {
     const base = csrSite(0.31);
-    const ids = [...base.content.keys()];
-    const undescribed = {
-      ...post(true),
-      json_ld: post(true).json_ld.map((n) => ({ ...n, has_description: false })),
+    const failing = {
+      ...post(false),
+      json_ld: [],
       headings: { count: 4, questions: 0, section_questions: 0 },
     };
-    // answer-first fails everywhere and question headings on pages 1..4: both are reported, not
-    // counted, so they move neither score
-    const content = new Map(
-      ids.map((u, i) => [
-        u,
-        i >= 1 && i <= 4 ? { ...undescribed, opening: post(false).opening } : post(false),
-      ]),
+    const g = gradeCheck({
+      ...base,
+      content: new Map([...base.content.keys()].map((u) => [u, failing])),
+    });
+    expect(g.content).toBe(null);
+    expect(g.ai_readability.components.quotable).toEqual(
+      gradeCheck(base).ai_readability.components.quotable,
     );
-    const g = gradeCheck({ ...base, content });
-    // schema with a description: 2 of 6 pass (pages 1..4 have none); author/date passes on all 6
-    // rate = (2/6 + 1)/2 = 0.6666…; 100 × that = 66.67 (from the rounded Quotable, 13.33 × 5 = 66.65)
-    expect(g.content!.score).toBe(66.67);
-    expect(g.ai_readability.components.quotable.score).toBe(13.33);
+    // every page fails three checks; author/date and specs do not apply without an Article or Product node
+    expect([...g.content_failures.values()]).toEqual(
+      Array(6).fill(['direct_answer_150', 'question_headings', 'schema_with_description']),
+    );
   });
 
   it('a graded page not fetched leaves the Content section without a score, and Quotable a range', () => {

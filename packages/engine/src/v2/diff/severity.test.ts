@@ -11,6 +11,8 @@ const withEffect = (technical_seo: number, ai_readability: number | null): Fix =
       technical_seo,
       ai_readability,
       ai_readability_pending_on: ai_readability === null ? ['0000000000000001'] : [],
+      technical_seo_pending_on: [],
+      absorbed_by: null,
       estimate: true,
     },
   };

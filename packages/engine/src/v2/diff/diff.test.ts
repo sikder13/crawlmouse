@@ -88,6 +88,8 @@ describe('the first check of a site', () => {
         technical_seo: 4,
         ai_readability: 0,
         ai_readability_pending_on: [],
+        technical_seo_pending_on: [],
+        absorbed_by: null,
         estimate: true,
       },
     });
@@ -373,6 +375,7 @@ describe('grade rows', () => {
             signals: { score: 5, max: 10, heuristic: false, range: null },
           },
           access_range: { min: 0, max: 40 },
+          scored_from_fewer_crawlers: null,
         };
       } else if (c.ai_readability && !c.ai_readability.withheld) {
         // The other three components sum to 20 (builders.ts); Access makes up the total.
@@ -561,6 +564,8 @@ describe('crawler rows', () => {
         technical_seo: 0,
         ai_readability: 10,
         ai_readability_pending_on: [],
+        technical_seo_pending_on: [],
+        absorbed_by: null,
         estimate: true,
       },
     });
@@ -777,6 +782,39 @@ describe('ranks', () => {
       [1, 2],
       [2, 1],
     ]);
+  });
+
+  it('names the fix that absorbed an effect by its number: one found before, and one new on this check', () => {
+    const a = fixWithHistory(1, 'open');
+    const absorbed = (by: number, rank: number): DetectorOutcome => ({
+      fingerprint: fingerprint(rank + 10),
+      state: 'detected',
+      fix: draft('deep_pages', {
+        rank,
+        effect: { ...draft('deep_pages').effect, technical_seo: -0.26, ai_readability: 0 },
+        absorbed_by_fingerprint: fingerprint(by),
+      }),
+    });
+    const result = diff({
+      previous: side(1),
+      current: side(2),
+      fixes: [a.fix],
+      events: a.events,
+      outcomes: [
+        detected(1, 'orphan_pages', 1),
+        detected(2, 'orphan_pages', 2),
+        absorbed(1, 3),
+        absorbed(2, 4),
+      ],
+    });
+    const byRank = new Map(result.fixes.map((f) => [f.rank, f]));
+    const numberOf = (n: number) =>
+      result.fixes.find((f) => f.fingerprint === fingerprint(n))!.number;
+    expect(numberOf(1)).toBe(1);
+    expect(byRank.get(3)!.effect.absorbed_by).toBe(1);
+    expect(byRank.get(4)!.effect.absorbed_by).toBe(numberOf(2));
+    expect(numberOf(2)).not.toBe(1);
+    expect(byRank.get(1)!.effect.absorbed_by).toBe(null);
   });
 
   it('breaks a tie between two fixes the detector ranked alike by number, whatever the order', () => {

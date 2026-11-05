@@ -48,8 +48,16 @@ export const TITLES: Readonly<Partial<Record<FixType, (subject: string) => strin
   specs_as_images: (s) => `Give the specifications on ${s} pages as text`,
 };
 
-function draft(f: FixRecord, effect: Effect, rank: number): FixDraft {
-  const base = { detail: null, effort: null, before_after: [], packet: null, effect, rank };
+function draft(f: FixRecord, effect: Effect, rank: number, absorbed_by: string | null): FixDraft {
+  const base = {
+    detail: null,
+    effort: null,
+    before_after: [],
+    packet: null,
+    effect,
+    rank,
+    absorbed_by_fingerprint: absorbed_by,
+  };
   if (f.family === 'access') {
     const r = f.record;
     return {
@@ -117,8 +125,8 @@ export function detectorOutcomes(
   const outcomes = records.map((f): DetectorOutcome => {
     const { fingerprint, state } = f.record;
     if (state === 'detected') {
-      const { effect, rank } = byFix.get(fingerprint)!;
-      return { fingerprint, state, fix: draft(f, effect, rank) };
+      const { effect, rank, absorbed_by } = byFix.get(fingerprint)!;
+      return { fingerprint, state, fix: draft(f, effect, rank, absorbed_by) };
     }
     if (state === 'not_detected') return { fingerprint, state };
     return { fingerprint, state, gone: f.family === 'structure' ? f.record.page_gone : null };

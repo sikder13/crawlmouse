@@ -7,13 +7,14 @@ import { describe, expect, it } from 'vitest';
 import {
   FixtureDatasetSchema,
   GradeLetterSchema,
+  TechnicalSeoPendingSchema,
   WithheldReasonSchema,
   type FixtureDataset,
 } from '@crawlmouse/types/v2';
 import { scoreToLetter } from '../grade.js';
 import { CRAWLER_REGISTRY_V2 } from './crawler-registry.js';
 import { severityOf } from './diff/severity.js';
-import { WITHHELD_REASON_MEANINGS } from './grade/withheld.js';
+import { TECHNICAL_SEO_PENDING_MEANINGS, WITHHELD_REASON_MEANINGS } from './grade/withheld.js';
 
 const DIR = new URL('../../../../apps/web/lib/fixtures/v2/', import.meta.url);
 const fixtures: [string, FixtureDataset][] = readdirSync(DIR)
@@ -32,6 +33,14 @@ describe('WithheldReason is the engine table of reasons', () => {
   it('the engine gives a meaning for every reason, and for no other', () => {
     expect(Object.keys(WITHHELD_REASON_MEANINGS).sort()).toEqual(
       [...WithheldReasonSchema.options].sort(),
+    );
+  });
+});
+
+describe('TechnicalSeoPending is the engine table of reasons', () => {
+  it('the engine gives a meaning for every reason, and for no other', () => {
+    expect(Object.keys(TECHNICAL_SEO_PENDING_MEANINGS).sort()).toEqual(
+      [...TechnicalSeoPendingSchema.options].sort(),
     );
   });
 });

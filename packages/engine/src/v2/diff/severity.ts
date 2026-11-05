@@ -28,6 +28,6 @@ export function severityOf(
   const large =
     effect !== undefined &&
     ((effect.ai_readability ?? 0) >= BAD_AI_READABILITY_POINTS ||
-      effect.technical_seo >= BAD_TECHNICAL_SEO_POINTS);
+      (effect.technical_seo ?? 0) >= BAD_TECHNICAL_SEO_POINTS);
   return large ? 'bad' : 'warn';
 }

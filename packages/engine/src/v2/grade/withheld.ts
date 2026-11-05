@@ -3,7 +3,7 @@
  * The spec renders this table; contract-pins.test.ts checks that it names exactly the contract's
  * WithheldReason values.
  */
-import type { WithheldReason } from '@crawlmouse/types/v2';
+import type { TechnicalSeoPending, WithheldReason } from '@crawlmouse/types/v2';
 
 export const WITHHELD_REASON_MEANINGS: Readonly<Record<WithheldReason, string>> = {
   too_few_crawlers_measured:
@@ -20,4 +20,10 @@ export const WITHHELD_REASON_MEANINGS: Readonly<Record<WithheldReason, string>> 
     "For a fix's effect only: the fix's crawler has fewer than two pages that decide its share, so how much Access it adds is not known.",
   check_not_scored:
     "For a fix's effect only: the fix's content check is reported but not counted in Quotable (it has not cleared the bar on the label set, or it is held), so it adds no points yet.",
+};
+
+/** Why a fix's Technical SEO effect is not estimated. contract-pins.test.ts pins this to the contract. */
+export const TECHNICAL_SEO_PENDING_MEANINGS: Readonly<Record<TechnicalSeoPending, string>> = {
+  grade_refused:
+    'The Technical SEO grade is refused (SPEC 5.1a), so there is no score for a fix to move; the effect is estimated once a check grades the site.',
 };
