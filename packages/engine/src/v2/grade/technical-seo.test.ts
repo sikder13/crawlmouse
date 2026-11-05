@@ -12,20 +12,20 @@ import { detectStructure } from '../detectors/index.js';
 import type { Detection } from '../detectors/types.js';
 import {
   combine,
-  crawlabilityMeasures,
+  crawlability,
+  defectivePages,
   seoParts,
   technicalSeo,
   type TechnicalSeoInput,
 } from './technical-seo.js';
 
-const records = (type: Detection['type'], states: Partial<Record<Detection['state'], number>>) =>
-  Object.entries(states).flatMap(([state, n]) =>
-    Array.from({ length: n ?? 0 }, (_, i) => ({
-      type,
-      state: state as Detection['state'],
-      fingerprint: `${type}-${state}-${i}`,
-    })),
-  );
+/** A CC-16 record of `type` in `state`, marking `affected` pages. */
+const record = (type: Detection['type'], state: Detection['state'], affected: string[]) => ({
+  type,
+  state,
+  fingerprint: `${type}-${state}-${affected.join(',')}`,
+  affected_urls: affected,
+});
 
 function inputOf(
   specs: readonly PageSpec[],
@@ -38,7 +38,7 @@ function inputOf(
     homepage_url: s.homepage_url,
     homepage_client_rendered: false,
     detections: detectStructure(s),
-    title_and_meta: null,
+    untitled: null,
     refusal: { excludedPageCount: 0, estimateSource: 'frontier', crawlTruncated: false },
     added_links: [],
     ...over,
@@ -64,38 +64,73 @@ describe('the 60/40 blend', () => {
 
 describe('crawlability', () => {
   const base = inputOf(hub(4));
+  const url = (i: number) => `https://a.test/x${i}`;
+  const fifty = Array.from({ length: 50 }, (_, i) => ({
+    ...base.pages[0]!,
+    url: url(i),
+    status_code: i === 0 ? 404 : 200,
+  }));
 
-  it('TS1 measures: 49 of 50 URLs answer 200 (0.98), 9 of 10 link targets in one hop (0.9), 5 of 5 canonicals (1.0)', () => {
-    const pages = Array.from({ length: 50 }, (_, i) => ({
-      ...base.pages[0]!,
-      url: `https://a.test/x${i}`,
-      status_code: i === 0 ? 404 : 200,
-    }));
+  it('TS1: of 50 URLs, one answers 404 and two carry defects (one carries two), so 47 / 50 = 0.94', () => {
     const detections = [
-      ...records('redirect_chain', { not_detected: 9, detected: 1 }),
-      ...records('canonical_mismatch', { not_detected: 5 }),
-      ...records('hreflang_gap', { indeterminate: 2 }),
+      record('redirect_chain', 'detected', [url(1), url(2)]),
+      record('canonical_mismatch', 'detected', [url(2)]),
+      record('redirect_chain', 'not_detected', [url(3)]),
+      record('hreflang_gap', 'indeterminate', [url(4)]),
     ];
-    const m = crawlabilityMeasures({ ...base, pages, detections });
-    expect(m).toEqual({ answers_200: 0.98, redirect_chain: 0.9, canonical_mismatch: 1 });
-    // mean (0.98 + 0.9 + 1.0)/3 = 0.96, the K of TS1
+    const input = { ...base, pages: fifty, detections };
+    expect(defectivePages(input)).toEqual([url(1), url(2)]);
+    expect(crawlability(input)).toBe(0.94);
+    // 0.6 × 72.5 + 40 × 0.94 = 43.5 + 37.6
+    expect(combine(72.5, 0.94)).toBe(81.1);
   });
 
-  it('an indeterminate record decides nothing, and a detector with nothing decided does not apply', () => {
-    const m = crawlabilityMeasures({
+  it('a URL that answers 404 and carries a defect counts once', () => {
+    const input = {
       ...base,
-      detections: records('duplicate_pagination', { indeterminate: 3 }),
-    });
-    expect(Object.keys(m)).toEqual(['answers_200']);
+      pages: fifty,
+      detections: [record('duplicate_pagination', 'detected', [url(0)])],
+    };
+    expect(crawlability(input)).toBe(0.98);
   });
 
-  it('title and meta description facts join the same mean once recorded, as one more equal measure', () => {
-    const m = crawlabilityMeasures({
+  it('one affected page on a 45-page site moves Technical SEO by 40/45 = 0.89', () => {
+    const pages = fifty.slice(1, 46);
+    expect(pages).toHaveLength(45);
+    const clean = { ...base, pages, detections: [] };
+    const one = { ...clean, detections: [record('duplicate_pagination', 'detected', [url(5)])] };
+    expect(crawlability(clean)).toBe(1);
+    expect(40 * (crawlability(clean) - crawlability(one))).toBeCloseTo(40 / 45, 12);
+  });
+
+  it('a record not detected, or undecided, marks no page; an affected URL not crawled counts nothing', () => {
+    const input = {
       ...base,
-      detections: [],
-      title_and_meta: { passing: 1, decided: 2 },
-    });
-    expect(m).toEqual({ answers_200: 1, title_and_meta: 0.5 });
+      detections: [
+        record('redirect_chain', 'not_detected', [base.pages[1]!.url]),
+        record('canonical_mismatch', 'indeterminate', [base.pages[1]!.url]),
+        record('hreflang_gap', 'detected', ['https://elsewhere.test/']),
+      ],
+    };
+    expect(defectivePages(input)).toEqual([]);
+    expect(crawlability(input)).toBe(1);
+  });
+
+  it('a structure record that is not a crawlability detector marks no page', () => {
+    const input = {
+      ...base,
+      detections: [
+        record('orphan_pages', 'detected', [base.pages[1]!.url]),
+        record('deep_pages', 'detected', [base.pages[2]!.url]),
+        record('generic_anchor_text', 'detected', [base.pages[3]!.url]),
+      ],
+    };
+    expect(crawlability(input)).toBe(1);
+  });
+
+  it('pages lacking a title or a meta description join as defects of the same kind once recorded', () => {
+    const input = { ...base, detections: [], untitled: [base.pages[1]!.url] };
+    expect(crawlability(input)).toBe(4 / 5);
   });
 });
 
@@ -105,12 +140,11 @@ describe('crawlability detectors', () => {
     'canonical_mismatch',
     'duplicate_pagination',
     'hreflang_gap',
-  ] as const)('%s records are a measure: one detected of two decided is 0.5', (type) => {
-    const m = crawlabilityMeasures({
-      ...inputOf(hub(4)),
-      detections: records(type, { detected: 1, not_detected: 1 }),
-    });
-    expect(m[type]).toBe(0.5);
+  ] as const)('a detected %s record marks its affected pages: one of 5 is 0.8', (type) => {
+    const input = inputOf(hub(4));
+    expect(
+      crawlability({ ...input, detections: [record(type, 'detected', [input.pages[2]!.url])] }),
+    ).toBe(0.8);
   });
 });
 
@@ -136,13 +170,7 @@ describe('the grade', () => {
     const v1 = computeGrade(gradeInputsFrom(ga, input.pages.length));
     expect(t.site_structure_score).toBe(v1.score);
     expect(t.breakdown).toEqual(v1.breakdown);
-    expect(t.score).toBe(
-      combine(
-        v1.score,
-        Object.values(crawlabilityMeasures(input)).reduce((a, b) => a + b, 0) /
-          Object.keys(crawlabilityMeasures(input)).length,
-      ),
-    );
+    expect(t.score).toBe(combine(v1.score, crawlability(input)));
     expect(TechnicalSeoSchema.safeParse(t).success).toBe(true);
   });
 

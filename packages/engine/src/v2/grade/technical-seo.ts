@@ -4,14 +4,14 @@
  *   structure    = v1's grade (packages/engine/src/grade.ts, its four components and weights unchanged)
  *                  of the link graph of the crawled pages answering 200 (structureOf), 0..100;
  *                  also `site_structure_score`
- *   crawlability = mean over the measures that apply of the share of subjects that pass, 0..1
+ *   crawlability = crawled URLs that answer 200 and carry no crawlability defect / crawled URLs, 0..1
  *   score        = 0.6 × structure + 40 × crawlability
  *
- * The crawlability measures are: crawled URLs that answer 200; and, for each of CC-16's redirect,
- * canonical, pagination and hreflang detectors, the records decided `not_detected` of those decided.
- * A measure with nothing decided does not apply. Title and meta description facts are not recorded by
- * the crawl worker yet (CC-12d); they join as one more measure in the same mean. The 60/40 split is
- * unchanged by that, and the measures stay equally weighted, so each one's share of the mean shrinks.
+ * A URL carries a crawlability defect when it is among the affected pages of a detected record of
+ * CC-16's redirect, canonical, pagination or hreflang detectors. A URL counts once however many it
+ * carries, so one affected page on a 45-page site moves the score by 40/45 (owner ruling, 2026-11-05).
+ * A record that is not detected, or could not decide, marks no page. Pages lacking a title or a meta
+ * description will be defects of the same kind once the crawl worker records them (CC-12d).
  *
  * The 5.1a refusal is v1's `decideRefusal`, on the same evidence: a refused grade has no score.
  */
@@ -21,7 +21,7 @@ import { deriveGradeInputs, gradeInputsFrom } from '../../grade-inputs.js';
 import { buildGraph } from '../../graph.js';
 import { decideRefusal, type RefusalEvidence } from '../../refusal.js';
 import type { Detection } from '../detectors/types.js';
-import { mean, round } from './numbers.js';
+import { round } from './numbers.js';
 import { SEO_WEIGHTS } from './weights.js';
 
 /** The CC-16 detectors whose records are crawlability measures. */
@@ -32,12 +32,6 @@ export const CRAWLABILITY_DETECTORS = [
   'hreflang_gap',
 ] as const;
 
-/** One crawlability measure: subjects that pass, of those decided. */
-export interface Tally {
-  passing: number;
-  decided: number;
-}
-
 export interface TechnicalSeoInput {
   pages: readonly PageResult[];
   edges: readonly LinkEdge[];
@@ -45,9 +39,9 @@ export interface TechnicalSeoInput {
   /** The homepage is served for JavaScript to fill in: v1's orphan suppression applies. */
   homepage_client_rendered: boolean;
   /** CC-16's records for this check. */
-  detections: readonly Pick<Detection, 'type' | 'state' | 'fingerprint'>[];
-  /** Pages titled and described, of those read (CC-12d); null until the worker records them. */
-  title_and_meta: Tally | null;
+  detections: readonly Pick<Detection, 'type' | 'state' | 'fingerprint' | 'affected_urls'>[];
+  /** Pages lacking a title or a meta description (CC-12d); null until the worker records them. */
+  untitled: readonly string[] | null;
   /** What `decideRefusal` reads that the records do not carry. */
   refusal: Pick<RefusalEvidence, 'excludedPageCount' | 'estimateSource' | 'crawlTruncated'>;
   /**
@@ -61,34 +55,23 @@ export interface TechnicalSeoInput {
 export const isGraded = (p: Pick<PageResult, 'kind' | 'status_code' | 'is_html'>): boolean =>
   p.kind === 'content' && p.status_code === 200 && p.is_html;
 
-/** The crawlability measures that apply, by name, each as a share 0..1. */
-export function crawlabilityMeasures(input: TechnicalSeoInput): Record<string, number> {
-  const tallies: Record<string, Tally | null> = {
-    answers_200: {
-      passing: input.pages.filter((p) => p.status_code === 200).length,
-      decided: input.pages.length,
-    },
-    ...Object.fromEntries(
-      CRAWLABILITY_DETECTORS.map((type) => {
-        const decided = input.detections.filter(
-          (d) => d.type === type && d.state !== 'indeterminate',
-        );
-        return [
-          type,
-          {
-            passing: decided.filter((d) => d.state === 'not_detected').length,
-            decided: decided.length,
-          },
-        ];
-      }),
-    ),
-    title_and_meta: input.title_and_meta,
-  };
-  return Object.fromEntries(
-    Object.entries(tallies).flatMap(([k, t]) =>
-      t && t.decided > 0 ? [[k, t.passing / t.decided]] : [],
-    ),
-  );
+/** The crawled URLs that carry a crawlability defect, each once, sorted. */
+export function defectivePages(input: TechnicalSeoInput): string[] {
+  const types: readonly string[] = CRAWLABILITY_DETECTORS;
+  const marked = new Set(input.untitled ?? []);
+  for (const d of input.detections) {
+    if (d.state === 'detected' && types.includes(d.type))
+      for (const u of d.affected_urls) marked.add(u);
+  }
+  return input.pages.flatMap((p) => (marked.has(p.url) ? [p.url] : [])).sort();
+}
+
+/** Crawled URLs that answer 200 and carry no crawlability defect, of the crawled URLs; 1 with none. */
+export function crawlability(input: TechnicalSeoInput): number {
+  if (input.pages.length === 0) return 1;
+  const defective = new Set(defectivePages(input));
+  const clean = input.pages.filter((p) => p.status_code === 200 && !defective.has(p.url));
+  return clean.length / input.pages.length;
 }
 
 /** 0.6 × structure + 40 × crawlability. */
@@ -145,7 +128,7 @@ export function seoParts(input: TechnicalSeoInput) {
     fetchedOkCount: input.pages.filter((p) => p.status_code === 200).length,
     ...input.refusal,
   });
-  const formula = combine(structure.score, mean(Object.values(crawlabilityMeasures(input))));
+  const formula = combine(structure.score, crawlability(input));
   return { structure, refusal, formula };
 }
 

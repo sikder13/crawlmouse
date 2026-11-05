@@ -25,7 +25,7 @@ import { contentSignals, schemaOrg } from './declarations.js';
 import { quotableRate, quotableScore, type QuotableInput } from './quotable.js';
 import { readableScore, type ReadablePage } from './readable.js';
 import { signalsScore, type SignalStates } from './signals.js';
-import { isGraded, technicalSeo, type Tally, type TechnicalSeoInput } from './technical-seo.js';
+import { isGraded, technicalSeo, type TechnicalSeoInput } from './technical-seo.js';
 import { GRADE_VERSION } from './weights.js';
 
 export interface GradeInput {
@@ -40,7 +40,8 @@ export interface GradeInput {
   structure: readonly Detection[];
   /** robots.txt as read: '' when the site has none, null when it could not be read. */
   robots_txt: string | null;
-  title_and_meta: Tally | null;
+  /** Pages lacking a title or a meta description (CC-12d); null until the worker records them. */
+  untitled: readonly string[] | null;
   refusal: TechnicalSeoInput['refusal'];
 }
 
@@ -84,7 +85,7 @@ export function gradeCheck(input: GradeInput): Grades {
     homepage_url: input.homepage_url,
     homepage_client_rendered: homepage?.client_rendered ?? false,
     detections: input.structure,
-    title_and_meta: input.title_and_meta,
+    untitled: input.untitled,
     refusal: input.refusal,
     added_links: [],
   };
