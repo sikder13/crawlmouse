@@ -43,22 +43,26 @@ runs once.
 
 **The visual job on a PR** (`.github/workflows/ci.yml`, shard 1). A runner probe times a fixed CPU
 workload (`packages/timing/src/probe.ts`), then `packages/timing/scripts/perf-retry.sh` runs the
-budgets and decides what a failure means:
+budgets and decides what a failure means. Attempt 1 is classified before anything is retried:
 
-| attempt 1 | attempt 2 (`--last-failed`) | runner probe   | outcome                   | job  |
-| --------- | --------------------------- | -------------- | ------------------------- | ---- |
-| pass      | not run                     | any            | passed                    | pass |
-| fail      | pass                        | any            | flaky: passed on retry    | pass |
-| fail      | fail                        | normal/unknown | failed: reproduced        | fail |
-| fail      | fail                        | slow           | inconclusive: slow runner | pass |
+| attempt 1         | attempt 2 (`--last-failed`) | runner probe   | outcome                      | job  |
+| ----------------- | --------------------------- | -------------- | ---------------------------- | ---- |
+| pass              | not run                     | any            | passed                       | pass |
+| fail, other       | not run                     | any            | failed: not a budget failure | fail |
+| fail, budget only | pass                        | any            | flaky: passed on retry       | pass |
+| fail, budget only | fail                        | normal/unknown | failed: reproduced           | fail |
+| fail, budget only | fail, other                 | slow           | failed: reproduced           | fail |
+| fail, budget only | fail, budget only           | slow           | inconclusive: slow runner    | pass |
 
-"Slow" means the probe's median is over `SLOW_RUNNER_FACTOR` (1.5) times `PROBE_REFERENCE_MS`. An
-inconclusive pass also needs, on the second attempt, one reported error per failed test, every one
-the budget assertion's own (`Error: medians of 5 runs`, which only a budget test raises). Errors
+"Slow" means the probe's median is over `SLOW_RUNNER_FACTOR` (1.5) times `PROBE_REFERENCE_MS`.
+"Budget only" means one reported error per failed test, every one the budget assertion's own
+(`Error: medians of 5 runs`, which only a budget test raises). The script asks it of attempt 1
+before it retries, and of attempt 2 before an inconclusive pass. Errors
 are read with colour codes stripped (Playwright's workers print with `FORCE_COLOR=1`), from the
 lines that start with an error's name (`Error:`, `TypeError:`, `TimeoutError:`,
 `Error [ERR_...]:`, ...) or with `Test timeout of`. A failed test whose error is not the budget
-assertion fails the job on any runner, alone or beside a budget miss: a failed control, a server
+assertion fails the job on any runner, alone or beside a budget miss, and in attempt 1 it fails
+it without a retry: a failed control, a server
 that did not start, a failure that names no test, a test timeout, a thrown error, or another
 assertion inside a budget test, such as one marked `MEASUREMENT INVALID` (the checks that a run
 measured anything) or the explorer's canvas not rendering. A second error inside a test that
@@ -67,11 +71,11 @@ thrown value that is not an `Error`) is not read. Both attempts' `[perf]` lines 
 inconclusive outcome writes a warning annotation and a register row (below). It is the one step
 the workflow retries (`grep -n "perf-retry\|--last-failed\|retries" .github/workflows/*.yml` finds
 it and the baselines step, which re-draws screenshots and asserts nothing); production checks run
-in their own step, without a retry. The retry
-re-runs whatever failed in the step, so on a "flaky: passed on retry" outcome a failed control or
-an invalid measurement that passes the second time passes too; only the slow-runner rule refuses
-them.
-`packages/timing/src/perf-retry.test.ts` runs the script against stand-in commands for each row.
+in their own step, without a retry. Because attempt 1 must be budget only, the retry re-runs
+budget tests and nothing else: a failed control, an invalid measurement, a timeout or a thrown
+error is never given a second attempt. `packages/timing/src/perf-retry.test.ts` runs the script
+against stand-in commands for each row; its "attempt 1 is classified before any retry" block plans
+a pass for attempt 2 after each non-budget failure, so a script that retried them would exit 0.
 
 **The strict nightly job** (`.github/workflows/nightly.yml`, `perf-strict`). Every absolute budget
 at its real threshold: the unit budgets under `PERF_STRICT=1`, one test file at a time, then the
@@ -101,8 +105,9 @@ trend into the job summary.
 - **A cache keyed on a value, not an object, still hides a cold path.** `setup` gives each run (or
   each pair, in a relative check) a new input object; the robots and llms.txt checks take a string, and a memo keyed on an equal string
   still hits.
-- **A regression that fails about half the time can pass as "flaky: passed on retry".** The retry
-  cannot tell a marginal regression from noise. The row it writes goes into the register, where a
+- **A budget regression that fails about half the time can pass as "flaky: passed on retry".**
+  The retry cannot tell a marginal regression from noise; it is only offered when every failure in
+  attempt 1 was a budget assertion. The row it writes goes into the register, where a
   reviewer reads it, and the strict nightly holds the budget.
 - **The nightly runs after merge.** A regression the PR let through is reported the next morning,
   against the last seven nightlies, not before it merges.
@@ -143,16 +148,37 @@ Three things keep a busy machine from failing `pnpm test` on noise:
   runs, and five-minute averages of 23.7 to 29.9): 683 s at the default concurrency
   (three packages failed: an engine and a web test past vitest's 5 s timeout, and the worker load
   test's event-loop bound below), against 625 s at concurrency 2, with every package passing.
-- **The two crawl fixtures wait on timers, so CPU time does not help them.** `crawl-stall-retries`
-  (a 22 s crawl budget, 1 s navigation timeouts) and `crawl-round-budget` (2 s rounds, a 12 s
-  crawl) keep their budgets. Run alone beside twelve CPU busy loops, both passed three runs in a row:
-  stall-retries' tests took 7.3 s to 8.0 s, round-budget's 2.2 s to 3.1 s. Inside the whole capped
-  suite beside the same twelve loops, `crawl-stall-retries` failed once: its first test reached no
-  stalled path, its file taking 17.1 s, so the crawl ended early rather than running out of its
-  60 s; a 1 s navigation timeout expiring on the fixture's own home page would do that, which is
-  not confirmed. Both are in the register below as timer-based. Their budgets are not raised further.
-  "CI unaffected" in their rows means the PR jobs, one package each; the nightly `test` job runs
-  `pnpm test`, so it runs at the cap and both fixtures are exposed there, on a hosted runner.
+- **The two crawl fixtures wait on timers, so CPU time does not help them, and they run in a
+  vitest run of their own.** `crawl-stall-retries` (a 22 s crawl budget, 1 s navigation timeouts)
+  and `crawl-round-budget` (2 s rounds, a 12 s crawl, 5 s navigation timeouts) keep their budgets.
+  The engine's `test` script runs the rest of the engine suite with the two files left out, then
+  `test:timers` runs them one after the other (`--no-file-parallelism`), so no other engine file
+  shares the machine with them. A failure in either run fails `test`;
+  `packages/timing/src/engine-timers.test.ts` pins the split, that the two runs between them list
+  every engine test file, and the exit status. The PR's `test (engine)` job runs the same script.
+  - _Why not a longer navigation timeout._ Before this split, stall-retries' first test failed
+    inside the capped suite having reached no stalled path, which a 1 s timeout expiring on the
+    fixture's own home page would explain. Raising it to 5 s was tried first, at `611f487`, and
+    failed with the file run alone on an idle workstation (load average 2), twice in two runs:
+    eight stalled paths at concurrency 2 cost four 5 s waits, 20 s of the 22 s budget, so "still
+    RECORDS a timed-out URL as a failed fetch" recorded 5 of 8 and "reaches the pages BEHIND the
+    stalled ones" ran out of budget. That is the budget's arithmetic, not load, so the timeout
+    went back to 1 s and the cause stays unconfirmed. round-budget already had 5 s.
+  - _The record before the split._ Run alone beside twelve CPU busy loops, both passed three runs
+    in a row (stall-retries' tests 7.3 s to 8.0 s, round-budget's 2.2 s to 3.1 s). Inside the
+    capped suite one or both failed in three of four runs without a load harness, and once beside
+    twelve busy loops (the register below).
+  - _With the split:_ three capped full runs in a row at `3cf6fae`
+    (`turbo run test --force --continue --concurrency=2`, no harness) passed in every package:
+
+    | run | time  | one-minute load, start → end | stall-retries file | round-budget file |
+    | --- | ----- | ---------------------------- | ------------------ | ----------------- |
+    | 1   | 383 s | 2.8 → 8.8                    | 21.6 s             | 6.5 s             |
+    | 2   | 431 s | 8.8 → 9.4                    | 21.6 s             | 6.6 s             |
+    | 3   | 429 s | 9.4 → 8.8                    | 21.7 s             | 6.7 s             |
+
+    Five-minute averages at the ends were 12.0, 15.6 and 16.5, from other sessions. The run beside
+    twelve busy loops was not repeated.
 
 ## Reading the trend
 
@@ -208,8 +234,9 @@ deadline. The load test's memory bounds in `packages/worker` are correctness bou
 scope here.
 
 **Crawl fixtures with a wall-clock budget, timer-based:** `crawl-stall-retries.test.ts` gives its
-crawl 22 s (it was 9 s), and `crawl-round-budget.test.ts` keeps its 2 s rounds and 12 s crawl. The
-section on busy machines above has their numbers.
+crawl 22 s (it was 9 s), and `crawl-round-budget.test.ts` keeps its 2 s rounds and 12 s crawl. Both
+run in the engine's `test:timers` run, after the rest of the engine suite. The section on busy
+machines above has their numbers.
 
 **Found late, out of scope:** `packages/worker/src/load.test.ts:175` (`expectLoopFree`) holds the
 event loop's longest stall under 1,000 ms and its utilisation under 0.5 while the load test reads
@@ -353,3 +380,4 @@ in the PR that saw it.
 | 2026-11-03 | `crawl-stall-retries.test.ts` › spends ONE request on a stalled URL, not the whole retry budget           | local, the same run; and `--concurrency=2` beside twelve CPU busy loops, `88056e9`                                                            | **Timer-based: load-sensitive above concurrency 2; CI unaffected.** "No stalled path was reached", its file taking 17.1 s; passed alone beside the same loads, three runs in a row (7.3 s to 8.0 s).                                                                                                                                                  |
 | 2026-11-04 | `crawl-stall-retries.test.ts` › spends ONE request on a stalled URL, not the whole retry budget           | local, `turbo run test --force --continue --concurrency=2`, no harness, one-minute load average 7.6 at the end from other sessions, `d21500e` | **Timer-based: load-sensitive above concurrency 2; CI unaffected.** The same "no stalled path was reached", its file taking 17.5 s against about 22 s when it passes: the crawl ended early, not at its 60 s budget. Probable cause, not confirmed: the fixture's 1 s navigation timeout expiring on its own home page. Not changed without a ruling. |
 | 2026-11-04 | `crawl-round-budget.test.ts` and `crawl-stall-retries.test.ts`, one test each (as in the rows above)      | local, `turbo run test --force --continue --concurrency=2`, no harness, one-minute load average 5.3 at the end from other sessions, `788584a` | **Timer-based: load-sensitive above concurrency 2; CI unaffected.** Both failed in the same capped run: round-budget missed `/z-fast-0`, stall-retries reached no stalled path. With the earlier rows, one or both failed in three of the last four capped full runs; the engine suite run alone passed. Not changed without a ruling.                |
+| 2026-11-05 | `crawl-stall-retries.test.ts` › spends ONE request on a stalled URL, not the whole retry budget           | local, `turbo run test --force --continue --concurrency=2`, no harness, `611f487`                                                             | **Timer-based: load-sensitive above concurrency 2; CI unaffected.** The same "no stalled path was reached", the last failure before the two fixtures moved to a serial run of their own (`test:timers`). Three capped runs at `3cf6fae` then passed (the busy-machine section above).                                                                 |
