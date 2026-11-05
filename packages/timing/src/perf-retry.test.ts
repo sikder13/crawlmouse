@@ -175,13 +175,11 @@ describe('perf-retry.sh: the decision table', () => {
   });
 
   it('fail twice on a slow runner, but not on a budget: fails', () => {
-    expect(run(['control', 'control'], 'slow').status).toBe(1);
     expect(run(['budget', 'control'], 'slow').status).toBe(1);
   });
 
   it('fail twice on a slow runner, a budget test and the control together: fails', () => {
     expect(run(['budget', 'both'], 'slow').status).toBe(1);
-    expect(run(['both', 'both'], 'slow').status).toBe(1);
   });
 
   it('fail twice on a slow runner, a budget test whose measurement was invalid: fails', () => {
@@ -235,7 +233,7 @@ describe('perf-retry.sh: the decision table', () => {
   });
 
   it('fail twice on a slow runner with no failed test listed (the server never started): fails', () => {
-    expect(run(['crash', 'crash'], 'slow').status).toBe(1);
+    expect(run(['budget', 'crash'], 'slow').status).toBe(1);
   });
 
   it('fail twice on a slow runner, a budget miss then an error with a Node code in the same test: fails', () => {
@@ -253,11 +251,65 @@ describe('perf-retry.sh: the decision table', () => {
   });
 
   it('fail twice on a slow runner, having printed no test and no error: fails', () => {
-    expect(run(['nothing', 'nothing'], 'slow').status).toBe(1);
+    expect(run(['budget', 'nothing'], 'slow').status).toBe(1);
   });
 
   it('refuses to run without a command', () => {
     const r = spawnSync('bash', [SCRIPT, 'probe.json', '--'], { encoding: 'utf8' });
     expect(r.status).toBe(2);
+  });
+});
+
+/** Attempt-1 outcomes that are not budget only: each must fail at once, never reaching a retry. */
+const NOT_BUDGET: Outcome[] = [
+  'both',
+  'invalid',
+  'canvas',
+  'timeout',
+  'thrown',
+  'budget-and-thrown',
+  'near-budget',
+  'silent',
+  'budget-and-teardown',
+  'budget-and-silent',
+  'budget-then-coloured-timeout',
+  'budget-and-timeout-error',
+  'budget-then-coded',
+  'two-budget-errors-one-test',
+  'crash',
+  'nothing',
+];
+
+describe('perf-retry.sh: attempt 1 is classified before any retry', () => {
+  // Each plan's second outcome is a pass, so a script that retried would exit 0 as flaky.
+  it('a control failure in attempt 1 exits 1 without a second attempt', () => {
+    for (const probe of ['normal', 'slow'] as const) {
+      const r = run(['control', 'pass'], probe);
+      expect(r.status, probe).toBe(1);
+      expect(r.args, probe).toEqual(['perf.spec.ts']);
+      expect(r.stdout).toContain('::error title=performance budget::failed: not a budget failure');
+      expect(r.summary).toContain('**failed: not a budget failure.**');
+      expect(r.summary).not.toContain('Attempt 2');
+      expect(r.entry, probe).toBeNull();
+    }
+  });
+
+  it.each(NOT_BUDGET)(
+    '%s in attempt 1: fails without a retry, on a normal or a slow runner',
+    (o) => {
+      for (const probe of ['normal', 'slow'] as const) {
+        const r = run([o, 'pass'], probe);
+        expect(r.status, probe).toBe(1);
+        expect(r.args, probe).toEqual(['perf.spec.ts']);
+        expect(r.entry, probe).toBeNull();
+      }
+    },
+  );
+
+  it('a budget miss in attempt 1 whose ✘ line is coloured: is retried, as uncoloured', () => {
+    const r = run(['coloured-budget', 'pass'], 'normal');
+    expect(r.status).toBe(0);
+    expect(r.args).toEqual(['perf.spec.ts', 'perf.spec.ts --last-failed']);
+    expect(r.stdout).toContain('::warning title=flaky: passed on retry::');
   });
 });

@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
-# Runs the visual job's performance budgets, retries a failure once, and decides what a failure
-# means. docs/ops/ci-timing.md states the rule; this is it, row for row:
+# Runs the visual job's performance budgets, retries a budget failure once, and decides what a
+# failure means. docs/ops/ci-timing.md states the rule; this is it, row for row:
 #
-#   attempt 1   attempt 2   runner probe     outcome                             exit
-#   pass        -           -                passed                              0
-#   fail        pass        -                flaky: passed on retry              0
-#   fail        fail        normal/unknown   failed: reproduced                  1
-#   fail        fail        slow             inconclusive: slow runner           0
+#   attempt 1          attempt 2          runner probe     outcome                         exit
+#   pass               -                  -                passed                          0
+#   fail, other        - (no retry)       -                failed: not a budget failure    1
+#   fail, budget only  pass               -                flaky: passed on retry          0
+#   fail, budget only  fail               normal/unknown   failed: reproduced              1
+#   fail, budget only  fail, other        slow             failed: reproduced              1
+#   fail, budget only  fail, budget only  slow             inconclusive: slow runner       0
 #
-# An inconclusive pass needs two things of the second attempt: a probe that rates the runner
-# slow, and one reported error per failed test, every one of them the budget assertion itself
-# (BUDGET_ERROR, the message perf.spec.ts gives `expect(missed)`, which only a budget test has).
-# Errors are read, colour codes stripped, from the lines Playwright starts with an error's name
-# (`Error:`, `TypeError:`, `Error [ERR_...]:`, ...) or with `Test timeout of`. So any other failure is not excused: a
-# measurement marked MEASUREMENT INVALID, a canvas that never rendered, a thrown error, a test
-# timeout, a failed trace control, a server that did not start, a failure that names no test.
+# "Budget only" (budget_only below) means one reported error per failed test, every one of them
+# the budget assertion itself (BUDGET_ERROR, the message perf.spec.ts gives `expect(missed)`, which
+# only a budget test has). Errors are read, colour codes stripped, from the lines Playwright starts
+# with an error's name (`Error:`, `TypeError:`, `Error [ERR_...]:`, ...) or with `Test timeout of`.
+# So "other" is any other failure: a measurement marked MEASUREMENT INVALID, a canvas that never
+# rendered, a thrown error, a test timeout, a failed trace control, a server that did not start, a
+# failure that names no test. Attempt 1 is read before any retry, so none of those is retried, and
+# the retry (`--last-failed`) re-runs only the budget tests that failed.
 #
 # Usage: perf-retry.sh <probe.json> -- <command...>
 #   The command runs as given, then once more with --last-failed appended.
@@ -73,6 +76,17 @@ attempt() {
   return "$status"
 }
 
+# Whether every failure in an attempt's log is a budget assertion: one BUDGET_ERROR per failed
+# test, and no other error. With no error at all, "$errors" reads as one empty line, which is not
+# BUDGET_ERROR, so a failure that printed nothing is not budget only.
+budget_only() {
+  local failed errors budget_errors
+  failed=$(failed_titles "$1")
+  errors=$(plain "$1" | grep -E '^ *([A-Za-z]*Error( \[[^]]*\])?: |Test timeout of )')
+  budget_errors=$(grep -cE "$BUDGET_ERROR" <<<"$errors")
+  ! grep -vqE "$BUDGET_ERROR" <<<"$errors" && [ "$budget_errors" -eq "$(grep -c . <<<"$failed")" ]
+}
+
 # A flake register row (docs/ops/ci-timing.md), for the PR author to commit.
 register_row() {
   local tests
@@ -98,6 +112,12 @@ if attempt 1 "$@"; then
   exit 0
 fi
 
+if ! budget_only "$logs/attempt-1.log"; then
+  echo "::error title=performance budget::failed: not a budget failure; attempt 1 failed on something other than a budget assertion, so it is not retried; $probe_line."
+  echo "**failed: not a budget failure.** Attempt 1 failed on something other than a budget assertion, so it was not retried ($probe_line)." >>"$summary"
+  exit 1
+fi
+
 if attempt 2 "$@" --last-failed; then
   echo "::warning title=flaky: passed on retry::The performance budgets failed once and passed on retry; the job summary holds a flake register row."
   echo "**flaky: passed on retry.**" >>"$summary"
@@ -105,12 +125,7 @@ if attempt 2 "$@" --last-failed; then
   exit 0
 fi
 
-failed=$(failed_titles "$logs/attempt-2.log")
-errors=$(plain "$logs/attempt-2.log" | grep -E '^ *([A-Za-z]*Error( \[[^]]*\])?: |Test timeout of )')
-budget_errors=$(grep -cE "$BUDGET_ERROR" <<<"$errors")
-# With no error at all, "$errors" reads as one empty line, which is not BUDGET_ERROR: refused.
-if [ "$rating" = slow ] && ! grep -vqE "$BUDGET_ERROR" <<<"$errors" &&
-  [ "$budget_errors" -eq "$(grep -c . <<<"$failed")" ]; then
+if [ "$rating" = slow ] && budget_only "$logs/attempt-2.log"; then
   echo "::warning title=inconclusive: slow runner::The performance budgets failed twice on a runner the probe rates slow ($probe_line). The strict nightly job holds the budgets."
   echo "**inconclusive: slow runner.** The strict nightly job holds the budgets." >>"$summary"
   register_row "inconclusive: slow runner; $probe_line"
