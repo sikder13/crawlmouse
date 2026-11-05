@@ -33,9 +33,13 @@ async function words(c: BrowserRunClient, url: string, side: RenderSide) {
   return mainWords(r.html);
 }
 
-/** Renders `html` with the request a page's `side` gets, and returns the HTML Browser Run holds. */
-async function renderHtml(html: string, side: RenderSide): Promise<string> {
+/**
+ * Renders `html` with the request a page's `side` gets, and returns the HTML Browser Run holds. With
+ * `rules: false` the refusal lists are sent empty, for a control render.
+ */
+async function renderHtml(html: string, side: RenderSide, rules = true): Promise<string> {
   const body: Record<string, unknown> = { ...renderRequestBody(STATIC_PAGE, side), html };
+  if (!rules) Object.assign(body, { rejectResourceTypes: [], rejectRequestPattern: [] });
   delete body.url;
   const res = await fetch(
     BROWSER_RUN.endpoint.replace('{account_id}', process.env[ENV.account]!.trim()),
@@ -118,38 +122,36 @@ live('Browser Run, live', () => {
     expect(renderedOut).toContain('script=loaded');
   }, 120_000);
 
-  it('refuses what the patterns refuse, while the same kind of request elsewhere loads', async () => {
-    // Each refused URL loads when nothing refuses it; each control is a twin that must load.
-    const out = outOf(
-      await renderHtml(
-        probePage({
-          control_ip: 'https://one.one.one.one/cdn-cgi/trace',
-          ip_literal: 'https://1.1.1.1/cdn-cgi/trace',
-          control_download: 'https://registry.npmjs.org/left-pad',
-          download: 'https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz',
-          control_cdn: 'https://cdn.jsdelivr.net/npm/jquery@3.7.1/package.json',
-          host_analytics: 'https://www.googletagmanager.com/gtm.js?id=GTM-K9J7',
-          host_advertising: 'https://securepubads.g.doubleclick.net/tag/js/gpt.js',
-          host_consent: 'https://cdn.cookielaw.org/scripttemplates/otSDKStub.js',
-          host_chat: 'https://widget.intercom.io/widget/abc123',
-        }),
-        'rendered',
-      ),
-    );
-    console.info(`policy probe: ${out}`);
-    for (const control of ['control_ip', 'control_download', 'control_cdn']) {
-      expect(out).toContain(`${control}=loaded`);
-    }
-    for (const refused of [
+  it('refuses what the rules refuse, each of which loads when the rules are left out', async () => {
+    const attempts = {
+      control_ip: 'https://one.one.one.one/cdn-cgi/trace',
+      ip_literal: 'https://1.1.1.1/cdn-cgi/trace',
+      control_download: 'https://registry.npmjs.org/left-pad',
+      download: 'https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz',
+      host_analytics: 'https://www.googletagmanager.com/gtm.js?id=GTM-K9J7',
+      host_advertising: 'https://securepubads.g.doubleclick.net/tag/js/gpt.js',
+      host_consent: 'https://cdn.cookielaw.org/scripttemplates/otSDKStub.js',
+      host_chat: 'https://widget.intercom.io/widget/abc123',
+    };
+    const refused = [
       'ip_literal',
       'download',
       'host_analytics',
       'host_advertising',
       'host_consent',
       'host_chat',
-    ]) {
-      expect(out).toContain(`${refused}=blocked`);
+      'websocket',
+    ];
+    // Without the rules, each URL and the WebSocket must load: otherwise a refusal below shows nothing.
+    const open = outOf(await renderHtml(probePage(attempts), 'rendered', false));
+    const ruled = outOf(await renderHtml(probePage(attempts), 'rendered'));
+    console.info(`policy probe, rules off: ${open}`);
+    console.info(`policy probe, rules on: ${ruled}`);
+    for (const name of [...Object.keys(attempts), 'websocket']) {
+      expect(open).toContain(`${name}=loaded`);
     }
-    expect(out).not.toContain('websocket=loaded');
+    for (const name of ['control_ip', 'control_download'])
+      expect(ruled).toContain(`${name}=loaded`);
+    for (const name of refused) expect(ruled).toContain(`${name}=blocked`);
   }, 120_000);
 });

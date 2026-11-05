@@ -98,11 +98,18 @@ describe('the Browser Run credentials', () => {
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
     .map((f) => [f, readFileSync(new URL(f, DIR), 'utf8')] as const);
 
-  it('are read from the environment by name, in clientFromEnv only', () => {
+  it('are read from the environment by name in client.ts, and not from process.env in the module', () => {
     const readers = sources
       .filter(([, src]) => /env\[ENV\.(?:token|account)\]/.test(src))
       .map(([f]) => f);
     expect(readers).toEqual(['client.ts']);
     expect(sources.filter(([, src]) => /process\.env/.test(src)).map(([f]) => f)).toEqual([]);
+  });
+
+  it('have no value to fall back on when the environment holds none', () => {
+    const client = sources.find(([f]) => f === 'client.ts')![1];
+    const fallback = /env\[ENV\.(?:token|account)\][^;\n]*(?:\?\?|\|\|)/;
+    expect(client).not.toMatch(fallback);
+    expect("const t = env[ENV.token] ?? 'x';").toMatch(fallback);
   });
 });
