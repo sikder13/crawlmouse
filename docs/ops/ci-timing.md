@@ -151,11 +151,12 @@ Three things keep a busy machine from failing `pnpm test` on noise:
 - **The two crawl fixtures wait on timers, so CPU time does not help them, and they run in a
   vitest run of their own.** `crawl-stall-retries` (a 22 s crawl budget, 1 s navigation timeouts)
   and `crawl-round-budget` (2 s rounds, a 12 s crawl, 5 s navigation timeouts) keep their budgets.
-  The engine's `test` script runs the rest of the engine suite with the two files left out, then
+  The deep-chain audit check (the inventory below) joined them by a later ruling.
+  The engine's `test` script runs the rest of the engine suite with these files left out, then
   `test:timers` runs them one after the other (`--no-file-parallelism`), so no other engine file
   shares the machine with them. A failure in either run fails `test`. Arguments to `test`
   (`pnpm --filter @crawlmouse/engine test -- <filter>`) go to the main run; the serial run always
-  runs both fixtures. `packages/engine/src/test-timers-split.test.ts` runs in the serial run, named
+  runs all of its files. `packages/engine/src/test-timers-split.test.ts` runs in the serial run, named
   on its command line (vitest picks the order; with no results cache it runs the largest file first), so an edit that narrows the main run cannot deselect it, and the PR's
   `test (engine)` job runs it. It runs the `test` line with a stand-in vitest. It pins the
   two vitest command lines the line runs, that those exact command lines select every engine test
@@ -254,10 +255,13 @@ scope here.
 **Crawl fixtures with a wall-clock budget, timer-based:** `crawl-stall-retries.test.ts` gives its
 crawl 22 s (it was 9 s), and `crawl-round-budget.test.ts` keeps its 2 s rounds and 12 s crawl. Both
 run in the engine's `test:timers` run, after the rest of the engine suite. The section on busy
-machines above has their numbers. Found in review, the same class and left in the main run (no
-ruling moves it): `reproducibility.test.ts` › "certifies a budget-exhausted deep-chain crawl as
-low-confidence" gives a crawl of a chain whose pages each answer after 150 ms a 2 s budget, and
-asserts it fetched at least `MIN_COVERAGE_PAGES` (5) pages. Its one failure is in the register.
+machines above has their numbers. Found in review, the same class and given the same handling (owner ruling, 2026-11-05):
+"certifies a budget-exhausted deep-chain crawl as low-confidence" gives a crawl of a chain whose
+pages each answer after 150 ms a 2 s budget, and asserts it fetched at least `MIN_COVERAGE_PAGES`
+(5) pages. It moved unchanged from `reproducibility.test.ts` to
+`reproducibility-deep-chain.test.ts`, a file of its own because the serial run selects whole files,
+and runs in `test:timers` with the two crawl fixtures. Its one failure, before the move, is in the
+register.
 
 **Found late, out of scope:** `packages/worker/src/load.test.ts:175` (`expectLoopFree`) holds the
 event loop's longest stall under 1,000 ms and its utilisation under 0.5 while the load test reads
@@ -409,5 +413,5 @@ outside load as registered, with no further serialisation (ruling of 2026-11-05)
 | 2026-11-04 | `crawl-stall-retries.test.ts` › spends ONE request on a stalled URL, not the whole retry budget           | local, `turbo run test --force --continue --concurrency=2`, no harness, one-minute load average 7.6 at the end from other sessions, `d21500e`                           | **Timer-based: load-sensitive under outside load; CI unaffected.** The same "no stalled path was reached", its file taking 17.5 s against about 22 s when it passes: the crawl ended early, not at its 60 s budget. Probable cause, not confirmed: the fixture's 1 s navigation timeout expiring on its own home page. Not changed without a ruling. |
 | 2026-11-04 | `crawl-round-budget.test.ts` and `crawl-stall-retries.test.ts`, one test each (as in the rows above)      | local, `turbo run test --force --continue --concurrency=2`, no harness, one-minute load average 5.3 at the end from other sessions, `788584a`                           | **Timer-based: load-sensitive under outside load; CI unaffected.** Both failed in the same capped run: round-budget missed `/z-fast-0`, stall-retries reached no stalled path. With the earlier rows, one or both failed in three of the last four capped full runs; the engine suite run alone passed. Not changed without a ruling.                |
 | 2026-11-05 | `crawl-stall-retries.test.ts` › spends ONE request on a stalled URL, not the whole retry budget           | local, `turbo run test --force --continue --concurrency=2`, no harness, `611f487`                                                                                       | **Timer-based: load-sensitive under outside load; CI unaffected.** The same "no stalled path was reached", the last failure before the two fixtures moved to a serial run of their own (`test:timers`). Three capped runs at `3cf6fae` then passed (the busy-machine section above).                                                                 |
-| 2026-11-05 | `reproducibility.test.ts` › certifies a budget-exhausted deep-chain crawl as low-confidence + caveated    | local, review, `pnpm --filter @crawlmouse/engine test`, one-minute load average 26 at the start and a five-minute average of 44.6 after, from other sessions, `4f55a41` | **Timer-based, wall-clock lower bound.** `expected 4 to be greater than or equal to 5` pages inside the 2 s budget; the same run logged a vitest worker RPC timeout. Run alone straight after (`-t "deep-chain"`), it passed in 2.3 s. Not moved to the serial run without a ruling.                                                                 |
+| 2026-11-05 | `reproducibility.test.ts` › certifies a budget-exhausted deep-chain crawl as low-confidence + caveated    | local, review, `pnpm --filter @crawlmouse/engine test`, one-minute load average 26 at the start and a five-minute average of 44.6 after, from other sessions, `4f55a41` | **Timer-based, wall-clock lower bound.** `expected 4 to be greater than or equal to 5` pages inside the 2 s budget; the same run logged a vitest worker RPC timeout. Run alone straight after (`-t "deep-chain"`), it passed in 2.3 s. Moved to the serial run afterwards (owner ruling), as `reproducibility-deep-chain.test.ts`.                   |
 | 2026-11-05 | `crawl-stall-retries.test.ts` › spends ONE request on a stalled URL, not the whole retry budget           | local, review, `pnpm run test:timers` alone in `packages/engine`, one-minute load average 18.6 from other sessions, `81180a3`                                           | **Timer-based: load-sensitive under outside load; CI unaffected.** The first failure inside the serial run: "no stalled path was reached", its file taking 16.7 s against about 22 s. Passed alone twice straight after (22.6 s and 22.4 s) and inside the full engine run that followed. Not changed without a ruling.                              |
