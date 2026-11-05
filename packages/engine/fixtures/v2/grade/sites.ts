@@ -114,7 +114,7 @@ export function blogSite(
       crawlers: access.crawlers,
       structure: detectStructure(s),
       robots_txt: '',
-        refusal: REFUSAL,
+      refusal: REFUSAL,
     },
     access: access.detections,
   };
