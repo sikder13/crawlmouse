@@ -269,6 +269,36 @@ applying (Fly says 5 to 10 minutes): re-run the job. If it ends with "could not 
 seen", read the error lines: the token may not be allowed to open an SSH console (take the reading
 above by hand with an organisation token), or the machine may not be running.
 
+## Browser Run: the render token, limits and cost
+
+The render step (CC-14, `docs/specs/v2/14-render.md`) calls Cloudflare Browser Run's REST `/content`
+endpoint. It is not part of the worker; it runs in whichever process the pipeline (CC-20) gives it,
+and reads these from that process's environment:
+
+- `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account's id.
+- `CLOUDFLARE_BROWSER_RENDERING_TOKEN`: an API token scoped to that account with the one permission
+  `Browser Run - Edit` (Cloudflare dashboard, My Profile, API Tokens, Create Custom Token). Nothing
+  else.
+- `RENDER_MAX_BROWSER_SECONDS_PER_CHECK` and `RENDER_MAX_BROWSER_SECONDS_PER_DAY`: whole seconds.
+  Unset or invalid reads as zero, and zero renders nothing.
+
+Without both credentials, or with a zero cap, a check records its sampled pages as not rendered and
+goes on; it does not fail. To stop rendering, unset the token or set either cap to `0`.
+
+Limits on Workers Paid, as Cloudflare's limits page stood on 2026-10-14 (read 2026-11-05): 30 Quick
+Actions requests per second per account, after which Browser Run answers 429; a browser closes after
+60 s without a command. The render step keeps at most 5 requests open and retries a 429 after its
+`Retry-After`.
+
+Cost: $0.09 per browser-hour after the 10 browser-hours a month Workers Paid includes. Each reply
+reports its browser time in the `x-browser-ms-used` header, and the step totals it per check as
+`browser_ms`. A check's cost is that total in hours times the price, so a check held to 200
+browser-seconds costs about $0.005, though a check can end above its cap by the excess of the renders
+in flight. The dashboard's Browser Run page shows the account's usage.
+
+To rotate the token: create the new one, set it where the old one is set, redeploy that process, then
+delete the old one in the dashboard.
+
 ## What each verdict means
 
 Each tested crawler gets one verdict per sampled page, from the decision table in the spec.
