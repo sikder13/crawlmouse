@@ -111,6 +111,15 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     allowedIn: [],
   },
   {
+    text: 'which is an owner question',
+    withdrawnIn: 'docs/specs/v2/16-structure-detectors.md (conditions), CC-17 fourth ruling',
+    truth:
+      'The owner ruled (2026-11-05) that the hreflang placement as built is the rule: an alternate ' +
+      'the crawl did not read cannot be a finding, and a redirecting or gone alternate puts the ' +
+      'defect on the member whose annotation must change.',
+    allowedIn: [],
+  },
+  {
     text: 'the defect counted on the member that names it',
     withdrawnIn: 'docs/specs/v2/17-content-and-grade.md (Technical SEO), CC-17 third rulings',
     truth:

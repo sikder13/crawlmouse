@@ -82,7 +82,7 @@ const CARRIES: Readonly<Record<(typeof CRAWLABILITY_DETECTORS)[number], string>>
     'the page whose canonical cannot be honoured, or that is linked under another URL',
   duplicate_pagination: 'each later page found to repeat page 1',
   hreflang_gap:
-    'each URL the detector marks: a member missing its self-reference or its x-default, or with an invalid code; for a missing return, the alternate that was read and does not annotate back; for an alternate that redirects or is gone, the member that names it (its conditions name the cases that occur, not which URL carries which: `hreflang_missing_return`, `hreflang_alternate_redirects`, `hreflang_alternate_gone`; the reading of the ruling is an owner question, SPEC 16)',
+    'each URL the detector marks: a member missing its self-reference or its x-default, or with an invalid code; for a missing return, the alternate that was read and does not annotate back; for an alternate that redirects or is gone, the member that names it (its conditions name the cases that occur, not which URL carries which: `hreflang_missing_return`, `hreflang_alternate_redirects`, `hreflang_alternate_gone`; owner rulings, SPEC 16)',
 };
 
 /** What each content check applies to and passes on, said with the constants it reads. */

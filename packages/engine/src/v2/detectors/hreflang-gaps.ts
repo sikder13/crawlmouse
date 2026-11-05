@@ -4,15 +4,12 @@
  * A cluster is the set of URLs joined by the hreflang annotations of the crawled 200 pages whose
  * hreflang was read, keyed by its lowest URL. A member that was read is checked for a self-reference
  * (in a language, not as the `x-default`), an `x-default`, valid codes, and a return annotation from
- * each alternate it names. The owner ruled (2026-11-05) that a missing return goes on the alternate
- * that fails to annotate back when it is in the crawl, and on the member naming it otherwise. This
- * module's reading of "in the crawl" is "its annotations were read", and it is an owner question
- * (SPEC 16): an alternate that was read and does not annotate back carries `hreflang_missing_return`;
- * an alternate that was crawled and redirects or is gone cannot annotate back, so the member naming
- * it carries `hreflang_alternate_redirects` or `hreflang_alternate_gone`; an alternate not crawled,
- * or that kept its content from us, stays unknown (below). For one not crawled (another host, or past
- * the page cap) that departs from the ruling read literally, which would put the defect on the
- * member. A member that was not crawled, was not read at its own URL, or
+ * each alternate it names. Where a missing return goes (owner rulings, 2026-11-05; SPEC 16): an
+ * alternate that was read and does not annotate back carries `hreflang_missing_return`; an alternate
+ * that was crawled and redirects or is gone cannot annotate back, so the member whose annotation must
+ * change carries `hreflang_alternate_redirects` or `hreflang_alternate_gone`; an alternate the crawl
+ * did not read cannot be a finding and stays unknown (below). A member that was not crawled, was not
+ * read at its own URL, or
  * answered a status that kept its content from us (`isUnread`) is unknown, and its annotations are
  * not counted as missing. A cluster with no defect is clear only when `absenceUnproven` (scope.ts)
  * finds nothing the crawl missed: an unfetched page could annotate into it.
