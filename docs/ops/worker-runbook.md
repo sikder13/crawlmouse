@@ -280,7 +280,9 @@ and reads these from that process's environment:
   `Browser Run - Edit`, as Cloudflare's Quick Actions page named it on 2026-11-05 (Cloudflare
   dashboard, My Profile, API Tokens, Create Custom Token). Nothing else.
 - `RENDER_MAX_BROWSER_SECONDS_PER_CHECK` and `RENDER_MAX_BROWSER_SECONDS_PER_DAY`: whole seconds.
-  Unset or invalid reads as zero, and zero renders nothing.
+  Unset or invalid reads as zero, and zero renders nothing. A page reserves 90 s (two renders at the
+  45 s request timeout) before it starts, so a cap under 90 renders nothing, and a check has about
+  `cap / 90` pages rendering at once, at most 5.
 
 Without both credentials, or with a zero cap, a check records its sampled pages as not rendered and
 goes on; it does not fail. To stop rendering, unset the token or set either cap to `0`.
@@ -294,8 +296,9 @@ asked to wait longer.
 
 Cost: $0.09 per browser-hour after the 10 browser-hours a month Workers Paid includes. Each reply
 reports its browser time in the `x-browser-ms-used` header. The step counts that against its caps and
-totals it per check as `browser_ms`, using the 45 s request timeout where a reply reports none or a
-request timed out; Cloudflare bills its own measure, shown on the dashboard's Browser Run page. Beyond
+totals it per check as `browser_ms`, using the 45 s request timeout where a reply reports none or no
+reply came. Cloudflare's bill is on the dashboard's Browser Run page; this build has not compared it
+with `browser_ms`. Beyond
 the included hours, 200 counted browser-seconds is about $0.005. A check can end above its cap by
 what renders in flight report beyond their reservation.
 

@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CAP_ENV } from './budget.js';
 import { BROWSER_RUN, ENV, REQUEST_TIMEOUT_MS } from './client.js';
-import { RENDER_IN_FLIGHT, RENDER_RETRY } from './run.js';
+import { RENDER_IN_FLIGHT, RENDER_RETRY, RESERVE_PER_RENDER_MS } from './run.js';
 
 const RUNBOOK = readFileSync(
   new URL('../../../../../docs/ops/worker-runbook.md', import.meta.url),
@@ -43,6 +43,11 @@ describe('the runbook’s Browser Run section', () => {
     ['the tries', `after ${RENDER_RETRY.attempts} tries`],
     ['the backoff start', `backs off from ${RENDER_RETRY.base_ms / 1000} s`],
     ['the request timeout', `the ${REQUEST_TIMEOUT_MS / 1000} s request timeout`],
+    ['a page’s reservation', `A page reserves ${(2 * RESERVE_PER_RENDER_MS) / 1000} s`],
+    [
+      'the smallest cap that renders',
+      `a cap under ${(2 * RESERVE_PER_RENDER_MS) / 1000} renders nothing`,
+    ],
   ])('names %s as the code has it', (_name, text) => {
     expect(section).toContain(text);
   });

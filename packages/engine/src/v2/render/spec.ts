@@ -202,19 +202,20 @@ range.`,
     `## The site estimate
 
 \`\`\`text
-ratio(t)        = median text_share of template t's rendered pages
-site_text_share = Σ_t pages(t) × ratio(t) / Σ_t pages(t), over templates with a rendered page
-unrendered      = graded pages in templates with no rendered page / graded pages
+ratio(t)        = median text_share of template t's measured pages
+site_text_share = Σ_t pages(t) × ratio(t) / Σ_t pages(t), over templates with a measured page
+unrendered      = graded pages in templates with no measured page / graded pages
 Readable range  = 30 × site_text_share × (1 − unrendered)  to  that + 30 × unrendered
 \`\`\`
 
 \`pages(t)\` is t's graded pages, the weight CC-17's Readable uses, and graded pages robots.txt kept from
-the render count in it. A template with no rendered page is left out of the share, not guessed at;
-\`unrendered\` says how much of the graded site that leaves out. When nothing was rendered there is no
+the render count in it. A template with no measured page is left out of the share, not guessed at;
+\`unrendered\` (the field \`unrendered_share\`) says how much of the graded site that leaves out; a
+template whose pages were rendered but none measured counts in it. When nothing was measured there is no
 share, \`unrendered\` is 1 and the range is 0 to 30. \`single_render_weight\` is the part of the share's
 weight resting on templates with one measured page, whose ratio is one page's share.
 
-The label reads "estimated from N rendered pages across K of T templates", then, where each is above
+The label reads "estimated from N measured pages across K of T templates", then, where each is above
 zero, "X % of graded pages are in templates with no measured page" and "Y % of the estimate's weight
 rests on one measured page per template". A template with no measured page includes one whose renders
 failed or came back challenged. A part above zero is printed as "<1 %" rather than "0 %"
@@ -240,10 +241,11 @@ reservation; the count of what today has used lives in the caller's store.
 Before a page starts it reserves both of its renders at ${seconds(RESERVE_PER_RENDER_MS)} each, against the
 check's cap and against today's budget. When either cannot take them while other pages of the check are
 in flight, the page waits for one to settle and tries again; when nothing is in flight, rendering stops
-for the rest of the check. A render settles at the browser time Browser Run reports. A reply that
-reports none, and a request that timed out or failed, is counted at the request timeout, the longest it
-could have been open and the same as its reservation; the browser's own time could still be longer. A
-429 reports no browser time and is counted at zero. A render can report more than its reservation, so
+for the rest of the check. A render settles at the browser time its reply reports, whatever happened
+after the reply arrived. A reply that reports none, and a request that got no reply, is counted at the
+request timeout, the longest it could have been open and the same as its reservation; the browser's
+own time could still be longer. The header is not read on a 429: it is counted at zero, on the
+assumption that no browser time was used. A render can report more than its reservation, so
 a check can end above its cap by that excess on the pages in flight, and which pages a binding cap
 leaves unrendered depends on how long the earlier renders took.
 
@@ -262,13 +264,13 @@ ${table(
 
 What is known to move the measured share, with the direction where it is known.
 
-Upward, towards "readable", because the rendered side comes back short:
+Upward, towards "readable":
 
 - **No scrolling.** DECISION-LOG I8 named scroll steps; this build does not scroll. Content a page
   loads as it is scrolled is missing from the rendered side.
-- **The wait cap.** A page still loading at ${seconds(RENDER_TIMEOUT_MS)} either fails (Browser Run's
-  documentation gives 422 for a page that timed out; not observed here) or comes back with what had
-  loaded, short on the rendered side.
+- **The wait cap.** A page still loading at ${seconds(RENDER_TIMEOUT_MS)} can come back with what had
+  loaded, short on the rendered side. (One that fails instead, which Browser Run's documentation gives
+  as a 422, leaves the sample: below.)
 - **Refused connections and hosts.** Text a page receives over a WebSocket or eventsource, or from a
   reject-listed host, is missing from the rendered side.
 - **A short-counted rendered side.** Where the rendered side is counted short of the static side, the
@@ -277,7 +279,8 @@ Upward, towards "readable", because the rendered side comes back short:
 
 Downward, towards "empty shell":
 
-- **Third-party widgets not on the reject-list** add their words to the rendered side only.
+- **Third-party widgets not on the reject-list** can add words to the rendered side only, where a
+  script file loads them and the extractor keeps their text.
 
 Direction not known:
 
@@ -292,9 +295,9 @@ The contract carries none of these, and each goes into the next contract revisio
 - browser-seconds per check (\`UsageEvent.compute_seconds\` is worker and server time, per account);
   the engine returns it as \`browser_ms\` on \`RenderOutcome\`;
 - why a sampled page has no \`without_js\`; the engine returns it as each page's \`reason\`;
-- what \`Check.without_js.site_text_share\` was estimated from: the rendered pages and templates, the
+- what \`Check.without_js.site_text_share\` was estimated from: the measured pages and templates, the
   unrendered share and \`single_render_weight\`. A reader of that field alone sees a share with no sign
-  of how much of the site stands behind it. All of them can be recomputed from the check's
+  of how much of the site stands behind it. Each can be recomputed from the check's
   \`PageResult\` rows (\`template_key\`, the graded fields and \`without_js\`), which that reader may not
   have.`,
 

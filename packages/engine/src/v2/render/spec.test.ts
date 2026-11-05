@@ -14,6 +14,9 @@ describe('docs/specs/v2/14-render.md', () => {
  */
 const flat = (text: string) => text.replace(/\s*\n\s*(?:\*(?!\/)\s?|\/\/\s?)?/g, ' ');
 
+/** A file read as a sentence reads: every scan below goes through this. */
+const readFlat = (url: URL) => flat(readFileSync(url, 'utf8'));
+
 describe('the claim that sub-requests are checked one by one in our process', () => {
   // Browser Run's REST endpoint cannot call our code per request (ruling R1). The spec says so once;
   // nothing in the module or the spec may say the opposite.
@@ -23,7 +26,7 @@ describe('the claim that sub-requests are checked one by one in our process', ()
   const files = ['admission.ts', 'client.ts', 'policy.ts', 'run.ts', 'spec.ts'];
 
   it.each(files)('is not made in %s', (f) => {
-    expect(flat(readFileSync(new URL(f, DIR), 'utf8'))).not.toMatch(CLAIM);
+    expect(readFlat(new URL(f, DIR))).not.toMatch(CLAIM);
   });
 
   it('is not made in the spec, which says the opposite', () => {
@@ -59,13 +62,11 @@ describe('withdrawn claims', () => {
   const texts = [
     ...readdirSync(DIR)
       .filter((f) => f.endsWith('.ts') && f !== 'spec.test.ts')
-      .map((f) => [f, flat(readFileSync(new URL(f, DIR), 'utf8'))] as const),
-    ['14-render.md', flat(readFileSync(SPEC_URL, 'utf8'))] as const,
+      .map((f) => [f, readFlat(new URL(f, DIR))] as const),
+    ['14-render.md', readFlat(SPEC_URL)] as const,
     [
       'worker-runbook.md',
-      flat(
-        readFileSync(new URL('../../../../../docs/ops/worker-runbook.md', import.meta.url), 'utf8'),
-      ),
+      readFlat(new URL('../../../../../docs/ops/worker-runbook.md', import.meta.url)),
     ] as const,
   ];
 
@@ -78,6 +79,10 @@ describe('withdrawn claims', () => {
       WITHDRAWN.find(([re]) => re.source.includes('Cloudflare enforces'))![0],
     );
     expect(flat('A claim, which Cloudflare\n// enforces.')).toMatch(/which Cloudflare enforces/i);
+  });
+
+  it('reads each file folded, so no line break is left for a claim to hide behind', () => {
+    expect(texts.filter(([, t]) => t.includes('\n')).map(([f]) => f)).toEqual([]);
   });
 
   it('reads the files it says it reads', () => {

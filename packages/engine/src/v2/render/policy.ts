@@ -17,8 +17,9 @@
  */
 
 /**
- * Resource types refused on both sides. WebSocket and eventsource connections stay open, which keeps
- * the network from going idle; a page whose text arrives over one loses that text on the rendered side.
+ * Resource types refused on both sides: media adds no text, and WebSocket and eventsource are long-lived
+ * connections a measurement of the page does not need. A page whose text arrives over one loses that
+ * text on the rendered side.
  */
 export const REJECTED_RESOURCE_TYPES = ['websocket', 'eventsource', 'media'] as const;
 

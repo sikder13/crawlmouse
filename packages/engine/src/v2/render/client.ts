@@ -5,8 +5,9 @@
  *
  * The two sides of a page are the same request but for one field: the static side refuses the `script`
  * resource type. Both run in Browser Run, from the same network, with the same user agent, viewport and
- * wait. Refusing the resource type stops script files from loading; a script written inline in the HTML
- * still runs on the static side, so text such a script writes is counted on both sides.
+ * wait. Refusing the resource type is documented to stop script files from loading (live.test.ts checks
+ * it); a script written inline in the HTML is not a request and still runs on the static side, so text
+ * such a script writes is counted on both sides.
  */
 import {
   REJECTED_RESOURCE_TYPES,
@@ -107,7 +108,8 @@ export interface ClientOptions {
 /**
  * The browser time a reply reports. When it reports none, or no reply came, the time is not known and
  * is counted at the request timeout, the longest the request could have been open; the browser's own
- * time could still be longer. A 429 is counted at zero: it reports no browser time, and this assumes it used none.
+ * time could still be longer. The header is not read on a 429: it is counted at zero, on the assumption
+ * that no browser time was used.
  */
 function browserMsOf(res: Response, unknownMs: number): number {
   const raw = res.headers.get(BROWSER_RUN.browser_ms_header);
