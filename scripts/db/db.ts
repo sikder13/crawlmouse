@@ -37,11 +37,15 @@ function wrap(sql: Sql, close: () => Promise<void>): Db {
 
 /**
  * A direct connection. The URL comes from the caller and is never logged here; TLS follows its
- * `sslmode` parameter (supabase-api.ts builds pooler URLs with `sslmode=require`).
+ * `sslmode` parameter (supabase-api.ts builds pooler URLs with `sslmode=require`). `recycle: false`
+ * keeps the connection open until `close`, for a session lock.
  */
-export function connect(url: string): Db {
+export function connect(url: string, { recycle = true } = {}): Db {
   const sql = postgres(url, {
     max: 1,
+    // postgres.js closes a connection after a random 30 to 60 minutes by default; one that holds a
+    // session lock must not be closed under it.
+    ...(recycle ? {} : { max_lifetime: null }),
     onnotice: () => {},
     connection: { application_name: 'crawlmouse-db-ops' },
   });

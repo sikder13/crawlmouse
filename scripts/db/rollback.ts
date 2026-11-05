@@ -80,6 +80,8 @@ export const LOCK_HISTORY = 'lock table supabase_migrations.schema_migrations in
  */
 export const DB_OPS_LOCK_KEY = 7_406_230_501;
 export const TAKE_DB_OPS_LOCK = 'select pg_advisory_xact_lock($1)';
+/** A rollback that cannot get the lock in two minutes fails, rather than waiting out the job. */
+export const LOCK_WAIT = "set local lock_timeout = '2min'";
 
 /**
  * For `revert` on production: inside the rollback's transaction, waits for the apply's advisory lock
@@ -88,6 +90,7 @@ export const TAKE_DB_OPS_LOCK = 'select pg_advisory_xact_lock($1)';
  * moment the rollback runs.
  */
 export async function newestFirstGuard(tx: Db, migration: MigrationFile): Promise<void> {
+  await tx.query(LOCK_WAIT);
   await tx.query(TAKE_DB_OPS_LOCK, [DB_OPS_LOCK_KEY]);
   await tx.query(LOCK_HISTORY);
   const rows = await readHistory(tx);

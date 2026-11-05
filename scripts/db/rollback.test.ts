@@ -6,6 +6,7 @@ import {
   migrationForRollback,
   missingRollbacks,
   LOCK_HISTORY,
+  LOCK_WAIT,
   TAKE_DB_OPS_LOCK,
   newestFirstGuard,
   rerun,
@@ -99,12 +100,14 @@ describe('newestFirstGuard, inside the rollback transaction', () => {
     expect(compareFingerprints(fp, await readFingerprint(after))).toEqual([]);
   }, 240_000);
 
-  it("takes the apply's advisory lock before it locks and reads the history", async () => {
+  it("sets a lock timeout, then takes the apply's advisory lock before it locks and reads the history", async () => {
     const { after } = await databases();
     const m006b = pending.find((m) => m.version === '20261103000001')!;
     after.executed.length = 0;
     await revert(after, [m006b], () => {}, newestFirstGuard);
     const advisory = after.executed.indexOf(TAKE_DB_OPS_LOCK);
+    expect(after.executed.indexOf(LOCK_WAIT)).toBeGreaterThanOrEqual(0);
+    expect(after.executed.indexOf(LOCK_WAIT)).toBeLessThan(advisory);
     expect(advisory).toBeGreaterThanOrEqual(0);
     expect(advisory).toBeLessThan(after.executed.indexOf(LOCK_HISTORY));
   }, 240_000);

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { listMigrations } from './files';
-import { driftProblems, gateProblems, manifestProblems } from './production';
+import {
+  applyUnderLock,
+  driftProblems,
+  gateProblems,
+  manifestProblems,
+  type ApplySteps,
+} from './production';
 import { rollbackOrderProblem } from './rollback';
 import { parseSummary, type DryRunSummary } from './summary';
 
@@ -139,5 +145,54 @@ describe('the fingerprint check after the owner approves', () => {
     expect(driftProblems({}, PRODUCTION, 'the plan')).toEqual([
       'the plan recorded no fingerprint of production',
     ]);
+  });
+});
+
+describe('the production apply holds the lock across every check and the push', () => {
+  const manifest = pending.map((f) => ({ file: f.file, sha256: f.sha256 }));
+
+  function steps(over: Partial<ApplySteps> = {}) {
+    const calls: string[] = [];
+    const s: ApplySteps = {
+      lock: async () => {
+        calls.push('lock');
+        return async () => {
+          calls.push('release');
+        };
+      },
+      pending: async () => (calls.push('pending'), pending),
+      fingerprint: async () => (calls.push('fingerprint'), { ...PRODUCTION }),
+      listed: async () => (calls.push('listed'), pending.map((f) => f.file)),
+      push: async () => {
+        calls.push('push');
+      },
+      ...over,
+    };
+    return { s, calls };
+  }
+
+  it('locks before it reads anything and releases after the push', async () => {
+    const { s, calls } = steps();
+    expect(await applyUnderLock(manifest, PRODUCTION, s)).toBe(true);
+    expect(calls).toEqual(['lock', 'pending', 'fingerprint', 'listed', 'push', 'release']);
+  });
+
+  it('a rollback seen under the lock stops the push, and the lock is released', async () => {
+    // The newest file was rolled back before the lock was taken: one more file is pending.
+    const more = [...listMigrations().filter((f) => f.version === '20261101000001'), ...pending];
+    const { s, calls } = steps({ pending: async () => (calls.push('pending'), more) });
+    await expect(applyUnderLock(manifest, PRODUCTION, s)).rejects.toThrow(
+      /not the approved manifest/,
+    );
+    expect(calls).toEqual(['lock', 'pending', 'release']);
+  });
+
+  it('production that changed since the plan stops the push', async () => {
+    const { s, calls } = steps({
+      fingerprint: async () => (calls.push('fingerprint'), { ...PRODUCTION, acls: 'f'.repeat(32) }),
+    });
+    await expect(applyUnderLock(manifest, PRODUCTION, s)).rejects.toThrow(/acls section changed/);
+    expect(calls).not.toContain('push');
+    expect(calls.at(-1)).toBe('release');
   });
 });

@@ -141,6 +141,47 @@ async function plan(
   if (problems.length > 0) throw new Error(`the gate refuses:\n${problems.join('\n')}`);
 }
 
+/** The steps of a production apply, injected so their order can be tested. */
+export interface ApplySteps {
+  /** Takes the advisory lock a production rollback waits for; returns its release. */
+  lock(): Promise<() => Promise<void>>;
+  pending(): Promise<MigrationFile[]>;
+  fingerprint(): Promise<Record<string, string>>;
+  /** The files `supabase db push --dry-run` lists. */
+  listed(): Promise<string[]>;
+  push(): Promise<void>;
+}
+
+/**
+ * Takes the lock first and holds it to the end of the push, so every check below reads production
+ * as the push will find it: a rollback cannot commit between a check and the push. Returns false
+ * when nothing is pending.
+ */
+export async function applyUnderLock(
+  manifest: Manifest,
+  planned: Record<string, string>,
+  steps: ApplySteps,
+): Promise<boolean> {
+  const release = await steps.lock();
+  try {
+    const problems = manifestProblems(manifest, await steps.pending());
+    if (problems.length > 0) throw new Error(problems.join('\n'));
+    if (manifest.length === 0) return false;
+    // The approval may come days after the plan: production must still be what the plan read.
+    const drift = driftProblems(planned, await steps.fingerprint(), 'the plan');
+    if (drift.length > 0) throw new Error(drift.join('\n'));
+    const listed = await steps.listed();
+    const expected = manifest.map((m) => m.file);
+    if (listed.join(',') !== expected.join(',')) {
+      throw new Error(`the CLI would push [${listed.join(', ')}], not [${expected.join(', ')}]`);
+    }
+    await steps.push();
+    return true;
+  } finally {
+    await release();
+  }
+}
+
 async function apply(
   token: string,
   password: string,
@@ -148,32 +189,32 @@ async function apply(
   productionPath: string,
 ): Promise<void> {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Manifest;
-  const problems = manifestProblems(manifest, await pendingOnProduction(token));
-  if (problems.length > 0) throw new Error(problems.join('\n'));
-  if (manifest.length === 0) {
+  const planned = JSON.parse(readFileSync(productionPath, 'utf8')) as Record<string, string>;
+  const url = await new ManagementApi(token).poolerUrl(PRODUCTION_REF, password);
+  const applied = await applyUnderLock(manifest, planned, {
+    async lock() {
+      // A connection of its own, holding a session lock. The release unlocks explicitly: a pooler
+      // that keeps the server connection after the client leaves must not keep the lock with it.
+      const conn = connect(url, { recycle: false });
+      await conn.query('select pg_advisory_lock($1)', [DB_OPS_LOCK_KEY]);
+      return async () => {
+        try {
+          await conn.query('select pg_advisory_unlock($1)', [DB_OPS_LOCK_KEY]);
+        } finally {
+          await conn.close();
+        }
+      };
+    },
+    pending: () => pendingOnProduction(token),
+    fingerprint: async () => digests(await readFingerprint(readOnlyApi(PRODUCTION_REF, token))),
+    listed: async () => (await dbPush(url, { dryRun: true })).files,
+    push: async () => {
+      await dbPush(url, { dryRun: false });
+    },
+  });
+  if (!applied) {
     publish('### Nothing to apply\n\nProduction has no pending migration files.');
     return;
-  }
-  // The approval may come days after the plan: production must still be what the plan read.
-  const planned = JSON.parse(readFileSync(productionPath, 'utf8')) as Record<string, string>;
-  const now = digests(await readFingerprint(readOnlyApi(PRODUCTION_REF, token)));
-  const drift = driftProblems(planned, now, 'the plan');
-  if (drift.length > 0) throw new Error(drift.join('\n'));
-  const url = await new ManagementApi(token).poolerUrl(PRODUCTION_REF, password);
-  const listed = await dbPush(url, { dryRun: true });
-  const expected = manifest.map((m) => m.file);
-  if (listed.files.join(',') !== expected.join(',')) {
-    throw new Error(
-      `the CLI would push [${listed.files.join(', ')}], not [${expected.join(', ')}]`,
-    );
-  }
-  // Held on a connection of its own for the whole push: a production rollback waits for it.
-  const lock = connect(url);
-  try {
-    await lock.query('select pg_advisory_lock($1)', [DB_OPS_LOCK_KEY]);
-    await dbPush(url, { dryRun: false });
-  } finally {
-    await lock.close();
   }
   await report(url, `### Applied to production (${PRODUCTION_REF})\n\n${filesTable(manifest)}`);
 }

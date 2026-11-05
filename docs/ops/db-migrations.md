@@ -128,9 +128,10 @@ row in one transaction, then runs the checks and writes the fingerprint to the j
   one on, so it fails when one of them has no rollback file: adding a rollback for an old v1
   migration needs rollbacks for the migrations after it too.
 - Rollback and apply runs queue in separate groups: a push that queues an apply does not cancel a
-  queued rollback. The two can run at the same time, but not overlap: the apply holds an advisory lock for the
-  whole of `supabase db push`, and the rollback waits for it before it locks the history table and
-  checks the order, so it sees any migration the push recorded.
+  queued rollback. The two can run at the same time, but not overlap: the apply takes an advisory lock before its
+  checks and holds it to the end of `supabase db push`, and the rollback waits for it (two minutes
+  at most, then it fails) before it locks the history table and checks the order, so it sees any
+  migration the push recorded. A rollback that commits first is seen by the apply's checks.
 - 007's rollback refuses while the `evidence` or `reports` bucket holds objects, and gives the
   count per bucket. Empty them through the Storage API first. It sets
   `storage.allow_delete_query` for its own transaction, which `storage.protect_delete()` requires.
