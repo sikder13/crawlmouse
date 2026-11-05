@@ -5,15 +5,15 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-// The two timer-based crawl fixtures run in a vitest run of their own, one file at a time, after
-// the rest of this suite (docs/ops/ci-timing.md). This file pins that split, and runs in the
-// serial run itself, named on its command line, so an edit that narrows the main run cannot
-// deselect it; `test (engine)` runs it. It runs the real `test` script line with stand-ins for
-// vitest and pnpm, records the vitest command lines the script runs, and lists the files those
-// exact command lines select with the real vitest. Removing this file from the serial line would
-// switch it off, which no test here can see: that edit is to the line pinned below. So would a
-// vitest.config.ts `exclude` of this file alone; a config edit that drops all three files fails,
-// because the serial line sets --passWithNoTests=false.
+// The timer-based fixtures (two crawl fixtures and the deep-chain audit) run in a vitest run of
+// their own, one file at a time, after the rest of this suite (docs/ops/ci-timing.md). This file
+// pins that split, and runs in the serial run itself, named on its command line, so an edit that
+// narrows the main run cannot deselect it; `test (engine)` runs it. It runs the real `test` script
+// line with stand-ins for vitest and pnpm, records the vitest command lines the script runs, and
+// lists the files those exact command lines select with the real vitest. Removing this file from
+// the serial line would switch it off, which no test here can see: that edit is to the line pinned
+// below. So would a vitest.config.ts `exclude` of this file alone; a config edit that leaves the
+// serial run no file fails it, because the serial line sets --passWithNoTests=false.
 
 const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const scripts = JSON.parse(readFileSync(join(ENGINE, 'package.json'), 'utf8')).scripts as Record<
@@ -25,6 +25,7 @@ const SERIAL = [
   'src/test-timers-split.test.ts',
   'src/crawl-stall-retries.test.ts',
   'src/crawl-round-budget.test.ts',
+  'src/reproducibility-deep-chain.test.ts',
 ];
 
 /**
@@ -76,7 +77,7 @@ function listFiles(runArgs: string[]) {
 }
 
 describe('the serial run of the timer-based crawl fixtures', () => {
-  it('runs the rest of the suite, then this guard and the two fixtures one file at a time', () => {
+  it('runs the rest of the suite, then this guard and the timer-based fixtures one file at a time', () => {
     const { calls } = runTest([0, 0]);
     expect(calls[0]).toEqual(['run', ...SERIAL.flatMap((f) => ['--exclude', f])]);
     expect(calls[1]).toEqual([
