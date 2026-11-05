@@ -1,0 +1,92 @@
+name: DB dry run
+
+# Every pull request that changes the database, or the tooling that applies it, gets a dry run on a
+# Supabase preview branch made from production: scripts/db/dry-run.ts lists the steps. Its summary,
+# with the sha256 of every file it applied, is posted on the pull request and kept as an artifact;
+# db-apply-prod.yml refuses to apply a file that a passed dry run did not apply byte for byte.
+# docs/ops/db-migrations.md is the runbook.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - 'infra/supabase/**'
+      - 'scripts/db/**'
+      - '.github/workflows/db-*.yml'
+      - '.github/actions/supabase-cli/**'
+
+permissions:
+  contents: read
+
+# One run per pull request at a time, queued rather than cancelled: a cancelled run would leave
+# its branch behind.
+concurrency:
+  group: db-dry-run-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  dry-run:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # Holds SUPABASE_ACCESS_TOKEN. A pull request from a fork receives no secrets, so its run fails
+    # at the first step that needs the token.
+    environment: db-dry-run
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/supabase-cli
+      - name: Dry run on a branch of production
+        working-directory: scripts
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          BRANCH: pr-${{ github.event.pull_request.number }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          pnpm exec tsx db/dry-run.ts --branch "$BRANCH" --commit "$COMMIT" \
+            --summary-json "$RUNNER_TEMP/db-dry-run-summary.json" \
+            --summary-md "$RUNNER_TEMP/db-dry-run-summary.md"
+      - name: Keep the summary for the production apply
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: db-dry-run-summary
+          path: ${{ runner.temp }}/db-dry-run-summary.json
+          retention-days: 90
+          overwrite: true
+          if-no-files-found: error
+      - name: Post the summary on the pull request
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [ -f "$RUNNER_TEMP/db-dry-run-summary.md" ]; then
+            gh pr comment "$PR" --repo "$REPO" --body-file "$RUNNER_TEMP/db-dry-run-summary.md" \
+              --edit-last --create-if-none
+          fi
+
+  delete-branch:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: db-dry-run
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Delete the pull request's Supabase branch
+        working-directory: scripts
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          BRANCH: pr-${{ github.event.pull_request.number }}
+        run: pnpm exec tsx db/delete-branch.ts --name "$BRANCH"

@@ -1,8 +1,9 @@
-import { lstatSync, readdirSync, realpathSync } from 'node:fs';
+import { lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CLI_WORKDIR, MIGRATIONS_DIR, REPO_ROOT, listMigrations } from './files';
 import {
+  SUPABASE_CLI_VERSION,
   CLI_MIGRATIONS_DIR,
   cliMigrationFiles,
   parsePushList,
@@ -66,5 +67,14 @@ describe('reading the CLI output', () => {
     const url = 'postgresql://postgres.abc:p%40ss@h:5432/postgres';
     const text = `failed: ${url} p@ss p%40ss`;
     expect(redact(text, [url, 'p@ss', 'p%40ss'])).toBe('failed: *** *** ***');
+  });
+});
+
+describe('the CLI version', () => {
+  it('is the one the workflows install', () => {
+    const action = readFileSync(join(REPO_ROOT, '.github/actions/supabase-cli/action.yml'), 'utf8');
+    const installed = [...action.matchAll(/^\s*VERSION: (\S+)$/gm)].map((m) => m[1]);
+    expect(installed).toEqual([SUPABASE_CLI_VERSION]);
+    expect(action).toContain(`name: Install supabase ${SUPABASE_CLI_VERSION}`);
   });
 });
