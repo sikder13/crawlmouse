@@ -83,6 +83,9 @@ describe('the rules that refuse', () => {
     ['https://site.example/files/report.zip?v=2', 'download'],
     ['https://www.googletagmanager.com/gtm.js?id=GTM-1', 'host_analytics'],
     ['https://cdn.cookielaw.org/consent.js', 'host_consent'],
+    ['https://www.doubleclick.net./x.js', 'host_advertising'],
+    ['https://site.example/files/REPORT.ZIP', 'download'],
+    ['https://site.example/files/report.Zip?v=1', 'download'],
   ])('refuses %s by %s', (href, rule) => {
     expect(refusingRule(new URL(href).href)?.name).toBe(rule);
   });
@@ -94,6 +97,8 @@ describe('the rules that refuse', () => {
     'https://123.site.example/page',
     'https://site.example/?file=report.zip',
     'https://site.example/report.zip.html',
+    'https://0xcafe.de/',
+    'https://0xbad.cafe/page',
     'data:text/html,hello',
     'blob:https://site.example/1234',
   ])('lets %s through', (href) => {
@@ -125,6 +130,7 @@ describe('the reject-list', () => {
     'https://unpkg.com/vue@3.4.0/dist/vue.global.prod.js',
     'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js',
     'https://static.wixstatic.com/app.js',
+    'https://static.zdassets.com/hc/assets/theme.js',
     'https://www.bing.com/search',
     'https://www.facebook.com/page',
   ])('loads the script host %s', (href) => {
@@ -133,7 +139,12 @@ describe('the reject-list', () => {
 });
 
 describe('ordinary public pages', () => {
-  const label = fc.stringMatching(/^[a-z][a-z0-9-]{0,14}[a-z0-9]$/);
+  // Labels that start with 0x are ordinary names when the last label is not numeric: a host matcher
+  // keyed on digits must not take them for addresses.
+  const label = fc.oneof(
+    fc.stringMatching(/^[a-z][a-z0-9-]{0,14}[a-z0-9]$/),
+    fc.stringMatching(/^0x[0-9a-f]{1,8}$/),
+  );
   const tld = fc.constantFrom('com', 'org', 'net', 'io', 'co.uk', 'de', 'shop', 'zip');
   const path = fc.array(fc.stringMatching(/^[a-z0-9_-]{1,12}$/), { maxLength: 4 });
 

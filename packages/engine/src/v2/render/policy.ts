@@ -18,7 +18,10 @@
 /** Resource types refused on both sides: they add no text, and WebSocket and eventsource stay open. */
 export const REJECTED_RESOURCE_TYPES = ['websocket', 'eventsource', 'media'] as const;
 
-/** The static side also refuses scripts, so it shows what a reader that runs no JavaScript gets. */
+/**
+ * The static side also refuses the `script` resource type, so script files do not load on it. A script
+ * written inline in the HTML is not a request and still runs.
+ */
 export const STATIC_REJECTED_RESOURCE_TYPES = [...REJECTED_RESOURCE_TYPES, 'script'] as const;
 
 export interface HostList {
@@ -27,9 +30,11 @@ export interface HostList {
 }
 
 /**
- * Hosts whose requests are refused, with every subdomain of each. Hand-compiled on 2026-11-05 from the
- * hosts each vendor's standard embed snippet loads from; not taken from a maintained block list. A
- * vendor missing here is loaded like any other script.
+ * Hosts whose requests are refused, with every subdomain of each. Hand-compiled on 2026-11-05 from
+ * what was known of each vendor's embed snippet, not fetched from the vendors and not taken from a
+ * maintained block list, so it misses hosts. A host missing here loads like any other script. A host
+ * here can also serve something that is content (a tag manager can inject text); its words are then
+ * missing from the rendered side, which raises the share.
  */
 export const REJECTED_HOSTS_AS_OF = '2026-11-05';
 export const REJECTED_HOSTS: readonly HostList[] = [
@@ -61,6 +66,7 @@ export const REJECTED_HOSTS: readonly HostList[] = [
       'hotjar.com',
       'cdn.segment.com',
       'mixpanel.com',
+      'mxpnl.com',
       'cdn.amplitude.com',
       'fullstory.com',
       'heapanalytics.com',
@@ -80,6 +86,7 @@ export const REJECTED_HOSTS: readonly HostList[] = [
       'privacy-center.org',
       'iubenda.com',
       'cookieyes.com',
+      'cdn-cookieyes.com',
       'termly.io',
     ],
   },
@@ -89,7 +96,6 @@ export const REJECTED_HOSTS: readonly HostList[] = [
       'intercom.io',
       'intercomcdn.com',
       'driftt.com',
-      'zdassets.com',
       'zopim.com',
       'crisp.chat',
       'tawk.to',
@@ -143,6 +149,10 @@ export interface UrlRule {
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** `zip` as `[zZ][iI][pP]`: a pattern that matches in any case without relying on a flag. */
+const anyCase = (s: string) =>
+  [...s].map((c) => (/[a-z]/.test(c) ? `[${c}${c.toUpperCase()}]` : c)).join('');
+
 /**
  * The patterns are written for URLs as the browser hands them over: scheme and host in lower case,
  * IP addresses in their canonical form, a default port dropped. `/` cannot occur in a host, so
@@ -155,7 +165,7 @@ function hostRule(list: HostList): UrlRule {
     name: `host_${list.name}`,
     refuses: `${list.name} hosts and their subdomains`,
     pattern: new RegExp(
-      `^https?://(?:[^/?#@]*\\.)?(?:${list.hosts.map(escape).join('|')})${HOST_END}`,
+      `^https?://(?:[^/?#@]*\\.)?(?:${list.hosts.map(escape).join('|')})\\.?${HOST_END}`,
     ),
   };
 }
@@ -174,7 +184,7 @@ export const URL_RULES: readonly UrlRule[] = [
   {
     name: 'ip_literal',
     refuses: 'an IP address in place of a host name, IPv4 or bracketed IPv6',
-    pattern: new RegExp(`^https?://(?:\\[[^\\]]*\\]|[0-9.]+|0x[0-9a-f.x]*)${HOST_END}`),
+    pattern: new RegExp(`^https?://(?:\\[[^\\]]*\\]|[0-9.]+)${HOST_END}`),
   },
   {
     name: 'port',
@@ -192,7 +202,7 @@ export const URL_RULES: readonly UrlRule[] = [
     name: 'download',
     refuses: `a path ending in ${DOWNLOAD_EXTENSIONS.map((e) => `\`.${e}\``).join(', ')}`,
     pattern: new RegExp(
-      `^https?://[^/?#]*/[^?#]*\\.(?:${DOWNLOAD_EXTENSIONS.join('|')})(?:[?#]|$)`,
+      `^https?://[^/?#]*/[^?#]*\\.(?:${DOWNLOAD_EXTENSIONS.map(anyCase).join('|')})(?:[?#]|$)`,
     ),
   },
   ...REJECTED_HOSTS.map(hostRule),
