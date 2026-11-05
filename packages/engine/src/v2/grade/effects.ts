@@ -48,6 +48,7 @@ import { quotableScore } from './quotable.js';
 import { readableScore } from './readable.js';
 import { signalsScore } from './signals.js';
 import { MAX_HEALTHY_DEPTH } from '../../constants.js';
+import { canonicalizeUrl } from '../../url-canonical.js';
 import { isGraded, seoParts, type TechnicalSeoInput } from './technical-seo.js';
 
 export type FixRecord =
@@ -105,6 +106,56 @@ function shallowParent(seo: TechnicalSeoInput): string {
     .filter(([, d]) => d === deepest)
     .map(([u]) => u)
     .sort()[0]!;
+}
+
+/** The final URL of the request for `url`, in the engine's spelling; null when unknown. */
+function landedAt(seo: TechnicalSeoInput, url: string): string | null {
+  const final = seo.pages.find((p) => p.url === url)?.final_url ?? null;
+  if (final === null) return null;
+  try {
+    const spelled = canonicalizeUrl(final);
+    return spelled === url ? null : spelled;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The redirect fix: links to `url` point straight at where it redirects, so `url` leaves the crawl
+ * (owner ruling, 2026-11-05). The worker stores a requested URL with its final response's status and
+ * the landed page's links, so a followed chain is a row answering 200 and a node of the graph:
+ *   - when the final URL is known and was crawled as its own row, links to `url` move to it, and the
+ *     row for `url` and the links filed under it (the landed page's, a second time) go;
+ *   - when it is known and was not crawled, the row becomes the final URL, with its links;
+ *   - otherwise (a chain the crawl stopped, or a loop) the row goes, and links to it stay where they
+ *     were: they are not graph edges, since the row does not answer 200.
+ */
+function linkedStraight(seo: TechnicalSeoInput, url: string): TechnicalSeoInput {
+  const final = landedAt(seo, url);
+  const row = seo.pages.find((p) => p.url === url);
+  if (row === undefined) return seo;
+  if (final === null || row.status_code !== 200)
+    return { ...seo, pages: seo.pages.filter((p) => p !== row) };
+  const crawled = seo.pages.some((p) => p.url === final);
+  const to = (u: string) => (u === url ? final : u);
+  const edges = seo.edges
+    .filter((e) => !(crawled && e.from_url === url))
+    .map((e) => ({ ...e, from_url: to(e.from_url), to_url: to(e.to_url) }))
+    .filter((e) => e.from_url !== e.to_url);
+  // a page that linked both the redirecting URL and the final one now links the final one twice
+  const seen = new Set<string>();
+  const unique = edges.filter((e) => {
+    const k = `${e.from_url}\u0000${e.to_url}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const pages = crawled
+    ? seo.pages.filter((p) => p !== row)
+    : seo.pages.map((p) =>
+        p === row ? { ...p, url: final, final_url: final, redirect: null } : p,
+      );
+  return { ...seo, pages, edges: unique, homepage_url: to(seo.homepage_url) };
 }
 
 const cleared = (seo: TechnicalSeoInput, fingerprint: string): TechnicalSeoInput => ({
@@ -180,12 +231,8 @@ export function applyFix(
         },
         ai,
       };
-    case 'redirect_chain': {
-      // the links point at the final URL, so the redirecting URL leaves the crawl (owner ruling,
-      // 2026-11-05); links to it were never graph edges, since it does not answer 200
-      const without = cleared(seo, r.fingerprint);
-      return { seo: { ...without, pages: without.pages.filter((p) => p.url !== url) }, ai };
-    }
+    case 'redirect_chain':
+      return { seo: linkedStraight(cleared(seo, r.fingerprint), url), ai };
     default:
       return { seo: cleared(seo, r.fingerprint), ai };
   }

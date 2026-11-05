@@ -10,7 +10,9 @@
  * A crawlability defect is counted on the URL that carries it (owner rulings, 2026-11-05):
  *   - a detected CC-16 record marks the URLs it is about (`defectUrls`): a redirect chain the
  *     redirecting URL, a canonical mismatch the page, duplicate pagination the repeated later pages,
- *     an hreflang gap the cluster members whose annotations are incomplete. The pages linking to a
+ *     an hreflang gap the members its detector flags (a member naming an alternate that does not
+ *     annotate it back is flagged, though the missing annotation is the alternate's). The pages
+ *     linking to a
  *     redirect stay in the record's `affected_urls` for the fix, but carry no defect, so one
  *     site-wide link to a redirect costs at most one URL;
  *   - a page answering 200 that was read and declares no title, or no meta description (CC-12d's

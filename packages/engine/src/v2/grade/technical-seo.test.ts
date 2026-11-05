@@ -105,7 +105,7 @@ describe('crawlability', () => {
   });
 
   it('one site-wide link to a redirect costs at most one URL: the redirecting one, not the 49 linking pages', () => {
-    // x0 answers 301 and is a two-hop chain; every other page links to it
+    // x0 is a chain the crawl stopped, stored as a 301; every other page links to it
     const pages = fifty.map((p, i) => (i === 0 ? { ...p, status_code: 301 } : p));
     const linking = pages.slice(1).map((p) => p.url);
     const withRecord = {
@@ -118,12 +118,30 @@ describe('crawlability', () => {
     // the redirecting URL answers 301, so it is outside the numerator already: 49 / 50 either way
     expect(crawlability(withRecord)).toBe(0.98);
     expect(crawlability(without)).toBe(0.98);
-    // a redirect URL that was not crawled costs nothing
+    // a record whose redirecting URL was not crawled marks nothing: x0's own 301 is the 1/50 left
     const uncrawled = {
       ...withRecord,
       detections: [record('redirect_chain', 'detected', 'https://a.test/gone-away', linking)],
     };
     expect(crawlability(uncrawled)).toBe(1 - 1 / 50);
+  });
+
+  it('one site-wide link to a redirect costs at most one URL, in the shape the worker stores a followed chain too', () => {
+    // the worker stores the requested URL with its final response's status: a chain that ends at a
+    // page answering 200 is a 200 row whose final_url is elsewhere
+    const pages = fifty.map((p, i) =>
+      i === 0 ? { ...p, status_code: 200, final_url: url(1) } : { ...p, status_code: 200 },
+    );
+    const linking = pages.slice(1).map((p) => p.url);
+    const withRecord = {
+      ...base,
+      pages,
+      detections: [record('redirect_chain', 'detected', url(0), linking)],
+    };
+    expect(defectivePages(withRecord)).toEqual([url(0)]);
+    // 49 / 50 with the record, 50 / 50 without it: one URL
+    expect(crawlability(withRecord)).toBe(0.98);
+    expect(crawlability({ ...withRecord, detections: [] })).toBe(1);
   });
 
   it('a duplicate pagination record marks the repeated pages, an hreflang gap the incomplete members', () => {

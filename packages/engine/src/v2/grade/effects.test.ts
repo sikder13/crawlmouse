@@ -15,7 +15,7 @@ import type { PageSpec } from '../../../fixtures/v2/detectors/builders.js';
 import type { ContentFeatures } from '../content/read.js';
 import type { Detection } from '../detectors/types.js';
 import { applyFix, effectsOf } from './effects.js';
-import { technicalSeo } from './technical-seo.js';
+import { crawlability, technicalSeo } from './technical-seo.js';
 import { aiFrom, gradeCheck, type Grades } from './index.js';
 import { detectorOutcomes } from './outcomes.js';
 
@@ -490,6 +490,112 @@ describe('the structure counterfactuals, by hand', () => {
     expect(alone.technical_seo).toBeGreaterThan(0);
     expect(byFix.get(deep.fingerprint)!.effect.technical_seo).toBeLessThanOrEqual(0);
     expect(byFix.get(deep.fingerprint)!.absorbed_by).toBe(null);
+  });
+
+  it('a followed chain is a 200 row: the fix points its links at the final URL and drops the row', () => {
+    // /old-menu-target redirects in two hops to /blog/post-0; the worker stores it as the requested URL
+    // with the final response's status (200) and the landed page's links, and every page links to it
+    const post0 = 'https://a.test/blog/post-0';
+    // its row carries a link post-0's own row does not (read at another moment): the row's links
+    // go with it, and post-0's own links stand
+    const extra: PageSpec[] = [
+      {
+        path: '/old-menu-target',
+        links: ['/', '/blog/post-5'],
+        facts: { final_url: post0, redirect: { hops: 2, loop: false } },
+      },
+    ];
+    const { grades } = blog(13, 0, {}, extra);
+    const target = 'https://a.test/old-menu-target';
+    const others = grades.inputs.seo.pages.filter((p) => p.url !== target);
+    const edge = grades.inputs.seo.edges[0]!;
+    const menu = others.map((p) => ({
+      ...edge,
+      from_url: p.url,
+      to_url: target,
+      anchor_text: 'Old',
+    }));
+    const redirect = {
+      type: 'redirect_chain',
+      state: 'detected',
+      fingerprint: 'nav200',
+      key: `redirect:${target}`,
+      affected_urls: others.map((p) => p.url),
+    } as never;
+    const seo = {
+      ...grades.inputs.seo,
+      edges: [...grades.inputs.seo.edges, ...menu],
+      detections: [redirect],
+    };
+    const inputs = { ...grades.inputs, seo };
+    const after = applyFix(inputs, { family: 'structure', record: redirect });
+    expect(after.seo.pages.map((p) => p.url)).not.toContain(target);
+    expect(after.seo.edges.some((e) => e.from_url === target || e.to_url === target)).toBe(false);
+    expect(after.seo.edges.some((e) => e.from_url === post0 && e.to_url.endsWith('/post-5'))).toBe(
+      false,
+    );
+    // the menu links now reach post-0, once from each page
+    const toPost0 = after.seo.edges.filter((e) => e.to_url === post0).map((e) => e.from_url);
+    expect(new Set(toPost0).size).toBe(toPost0.length);
+    expect(toPost0).toEqual(
+      expect.arrayContaining(others.map((p) => p.url).filter((u) => u !== post0)),
+    );
+    // the record costs one URL: 14 of 15 clean, then 14 of 14
+    expect(crawlability(seo)).toBeCloseTo(14 / 15, 12);
+    expect(crawlability(after.seo)).toBe(1);
+  });
+
+  it('a chain the crawl stopped (a 3xx row) is dropped, and links to it are not moved to where it stopped', () => {
+    const post0 = 'https://a.test/blog/post-0';
+    const { grades } = blog(6, 0, {}, [
+      { path: '/r', status: 301, facts: { final_url: post0, redirect: { hops: 5, loop: false } } },
+    ]);
+    const edge = grades.inputs.seo.edges[0]!;
+    const toR = grades.inputs.seo.pages
+      .filter((p) => p.url.includes('/blog/'))
+      .map((p) => ({ ...edge, from_url: p.url, to_url: 'https://a.test/r' }));
+    const redirect = {
+      type: 'redirect_chain',
+      state: 'detected',
+      fingerprint: 'r5',
+      key: 'redirect:https://a.test/r',
+      affected_urls: [],
+    } as never;
+    const seo = {
+      ...grades.inputs.seo,
+      edges: [...grades.inputs.seo.edges, ...toR],
+      detections: [redirect],
+    };
+    const after = applyFix({ ...grades.inputs, seo }, { family: 'structure', record: redirect });
+    expect(after.seo.pages.map((p) => p.url)).not.toContain('https://a.test/r');
+    expect(after.seo.edges.filter((e) => e.to_url === post0)).toEqual(
+      seo.edges.filter((e) => e.to_url === post0),
+    );
+  });
+
+  it('a followed chain whose final URL was not crawled: the row becomes the final URL, links and all', () => {
+    const { grades } = blog(6, 0, {}, [
+      {
+        path: '/moved',
+        links: ['/'],
+        facts: { final_url: 'https://a.test/new-home', redirect: { hops: 2, loop: false } },
+      },
+    ]);
+    const redirect = {
+      type: 'redirect_chain',
+      state: 'detected',
+      fingerprint: 'mv',
+      key: 'redirect:https://a.test/moved',
+      affected_urls: [],
+    } as never;
+    const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, detections: [redirect] } };
+    const after = applyFix(inputs, { family: 'structure', record: redirect });
+    expect(after.seo.pages.map((p) => p.url)).toContain('https://a.test/new-home');
+    expect(after.seo.pages.map((p) => p.url)).not.toContain('https://a.test/moved');
+    expect(after.seo.pages).toHaveLength(inputs.seo.pages.length);
+    expect(after.seo.edges.filter((e) => e.from_url === 'https://a.test/new-home')).toHaveLength(
+      inputs.seo.edges.filter((e) => e.from_url === 'https://a.test/moved').length,
+    );
   });
 
   it('a site-wide link to a redirect chain costs one URL, the redirecting one: 84.75, and the fix +2.67', () => {
