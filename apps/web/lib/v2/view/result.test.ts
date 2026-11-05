@@ -350,6 +350,15 @@ describe('the tables’ labels', () => {
     expect(scopeTitled('Server-render the product template in 2 steps')).toBe('158 pages');
   });
 
+  it('a Content section with no score yet shows "not scored yet" and no bar, not 0', () => {
+    const v = view('bad-site', (c) => {
+      c.content = { ...c.content!, score: null, score_withheld: 'no_check_counted' };
+    });
+    const d = door(v, 'Content an answer engine can quote');
+    expect(d.pill).toEqual({ state: 'neutral', label: 'not scored yet' });
+    expect(d.bar).toBeUndefined();
+  });
+
   it('a fix whose Technical SEO effect is not estimated (a refused grade) shows no +0, alone or grouped', () => {
     const v = view('bad-site', (_, d) => {
       for (const f of d.fixes) {

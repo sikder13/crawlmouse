@@ -323,10 +323,13 @@ export function contentView(
     frame,
     headline: {
       title: headline(check, direct),
-      pill: {
-        state: content.score >= GOOD_SCORE ? 'ok' : 'warn',
-        label: `${content.score} / 100`,
-      },
+      pill:
+        content.score === null
+          ? { state: 'neutral', label: 'not scored yet' }
+          : {
+              state: content.score >= GOOD_SCORE ? 'ok' : 'warn',
+              label: `${content.score} / 100`,
+            },
       body: body(check, direct),
     },
     tiles: [

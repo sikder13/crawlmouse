@@ -492,8 +492,19 @@ function contentDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => bo
   );
   return {
     title: 'Content an answer engine can quote',
-    pill: { state: content.score >= 80 ? 'ok' : 'warn', label: `${content.score} / 100` },
-    bar: { percent: content.score, tone: content.score >= 80 ? 'neutral' : 'warn' },
+    // no score until a content check counts (score_withheld says why): no bar, as for structure
+    ...(content.score === null
+      ? { pill: { state: 'neutral' as const, label: 'not scored yet' } }
+      : {
+          pill: {
+            state: content.score >= 80 ? ('ok' as const) : ('warn' as const),
+            label: `${content.score} / 100`,
+          },
+          bar: {
+            percent: content.score,
+            tone: content.score >= 80 ? ('neutral' as const) : ('warn' as const),
+          },
+        }),
     body: body.filter(Boolean).join(' '),
     footer,
     coverage: {
