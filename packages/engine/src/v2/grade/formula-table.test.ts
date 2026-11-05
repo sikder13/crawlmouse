@@ -123,6 +123,19 @@ describe('Access (max 40)', () => {
     expect(accessScore(four({ allowed: 2 }, d, d, d)).score).toBe(40);
   });
 
+  it('A5e: a disallow moves Access to the mean of the others, so it can lower it, and raise it less than an unblock', () => {
+    const d = { disallowed_by_robots: 2 };
+    const thin = { allowed_thin: 2 };
+    // served, thin, served, served: 40 × (1 + 0.5 + 1 + 1)/4 = 35; the first disallowed: 40 × 2.5/3 = 33.33
+    expect(accessScore(four({ allowed: 2 }, thin, { allowed: 2 }, { allowed: 2 })).score).toBe(35);
+    expect(accessScore(four(d, thin, { allowed: 2 }, { allowed: 2 })).score).toBe(33.33);
+    // thin, blocked, disallowed, disallowed: 40 × 0.5/2 = 10; unblocking: 40 × 1.5/2 = 30; disallowing: 40 × 0.5 = 20
+    const u = { blocked_by_ua_rule: 2 };
+    expect(accessScore(four(thin, u, d, d)).score).toBe(10);
+    expect(accessScore(four(thin, { allowed: 2 }, d, d)).score).toBe(30);
+    expect(accessScore(four(thin, d, d, d)).score).toBe(20);
+  });
+
   it('A6: every scored crawler disallowed by robots.txt on every page: withheld, blocked by choice', () => {
     const d = { disallowed_by_robots: 3 };
     expect(accessScore(four(d, d, d, d))).toEqual({

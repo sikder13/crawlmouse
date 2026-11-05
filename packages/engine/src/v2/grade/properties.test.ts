@@ -97,7 +97,7 @@ function within(m: Measure, max: number): boolean {
 }
 
 describe('Access', () => {
-  it('lies in 0..40, and has a score exactly when two crawlers are measured, or one with the rest blocked by choice', () => {
+  it('lies in 0..40, and has a score exactly when two crawlers are measured, or one with the rest blocked by choice and no page refused unverified', () => {
     fc.assert(
       fc.property(crawlersArb, (cs) => {
         const a = accessScore(cs);
@@ -109,6 +109,33 @@ describe('Access', () => {
         expect(a.score !== null).toBe(measured >= 2 || fewer);
         expect(a.scored_from).toBe(fewer ? measured : null);
         expect(a.reason === null).toBe(a.score !== null);
+      }),
+      RUNS,
+    );
+  });
+
+  it('one measured and three blocked by choice: scored from the one exactly when no page is refused unverified', () => {
+    const shape = fc.tuple(
+      measuredCounts,
+      fc.array(byChoiceCounts, { minLength: 3, maxLength: 3 }),
+      fc.nat({ max: 2 }),
+      fc.nat({ max: 3 }),
+    );
+    fc.assert(
+      fc.property(shape, ([m, rest, refused, at]) => {
+        const counts = [m as Counts, ...rest];
+        if (refused > 0) counts[at] = { ...counts[at], refused_unverified: refused };
+        const cs = counts.map((c, i) => tally(`c${i}`, c));
+        const a = accessScore(cs);
+        const share =
+          (m.allowed + 0.5 * m.allowed_thin) / (m.allowed + m.allowed_thin + m.blocked_by_ua_rule);
+        // a refused page on a crawler blocked by choice leaves it disallowed on fewer pages than were
+        // read, so unmeasured; on the measured crawler it is the refused page itself: either stops it
+        expect(a.score === null).toBe(refused > 0);
+        if (refused === 0) {
+          expect(a.score).toBeCloseTo(40 * share, 2);
+          expect(a.scored_from).toBe(1);
+        }
       }),
       RUNS,
     );

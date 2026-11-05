@@ -6,16 +6,19 @@
  *   Access   = 40 × mean of share(c) over the measured scored crawlers
  *
  * A crawler is measured with MIN_ACCESS_PAGES pages or more in its denominator. One that robots.txt
- * disallows on every page whose rules were read is blocked by choice and left out, so a deliberate
- * block never lowers the score. With fewer than MIN_MEASURED_CRAWLERS measured:
+ * disallows on every page whose rules were read is blocked by choice and left out of the mean: the
+ * block is not scored as a block, so Access moves to the mean of the others, up when the crawler's
+ * share was below it and down when above. With fewer than MIN_MEASURED_CRAWLERS measured:
  *   - when every other scored crawler is blocked by choice, and no scored crawler had a page refused
  *     as unverified, Access is scored from the measured ones, and `scored_from` records how many
- *     (owner ruling, 2026-11-05);
+ *     (owner ruling, 2026-11-05; "no page refused as unverified" is this module's reading of the
+ *     ruling's "none refused_unverified", the stricter of the two);
  *   - when every scored crawler is blocked by choice, Access has no score: `blocked_by_choice`;
  *   - otherwise it has no score: `too_few_crawlers_measured`, with the range the score could take
  *     when each unmeasured crawler is anything from 0 to 1.
- * A robots.txt disallow therefore raises Access as an unblock does: it is the site's stated intent
- * (R11 decision 5), and no fix recommends it.
+ * So disallowing a crawler whose share is below the others' mean raises Access, as unblocking it
+ * would, when the others' mean is 1. A disallow is the site's stated intent (R11 decision 5), and no
+ * fix recommends it.
  *
  * Words served are compared with the browser control's words for the same static page (the worker's
  * `allowed_thin`, packages/worker/src/verdict/table.ts), so a page that needs JavaScript reads the same
