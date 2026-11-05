@@ -107,15 +107,20 @@ describe('the Browser Run credentials', () => {
     expect(sources.filter(([, src]) => /process\.env/.test(src)).map(([f]) => f)).toEqual([]);
   });
 
-  it('are the only two variables the client reads', () => {
+  it.each([
+    ['holds neither', false],
+    ['holds both, so a client is built', true],
+  ])('are the only two variables the client reads when the environment %s', (_name, held) => {
+    // With both held, the read is followed past the check that returns no client.
     const read: string[] = [];
     const env = new Proxy({} as Record<string, string | undefined>, {
       get(_target, key) {
         if (typeof key === 'string') read.push(key);
-        return undefined;
+        return held && (key === ENV.account || key === ENV.token) ? 'present' : undefined;
       },
     });
-    clientFromEnv(env);
+    const client = clientFromEnv(env);
+    expect(client === null).toBe(!held);
     expect([...new Set(read)].sort()).toEqual([ENV.account, ENV.token].sort());
   });
 
