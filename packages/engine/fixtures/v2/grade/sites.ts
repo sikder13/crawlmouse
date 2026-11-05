@@ -69,7 +69,6 @@ export function csrSite(textShare: number | null): GradeInput {
     crawlers: detectAccess(grid({ pages: ['/', '/p/1'] })).crawlers,
     structure: detectStructure(s),
     robots_txt: CONTENT_SIGNALS,
-    untitled: null,
     refusal: REFUSAL,
   };
 }
@@ -115,8 +114,7 @@ export function blogSite(
       crawlers: access.crawlers,
       structure: detectStructure(s),
       robots_txt: '',
-      untitled: null,
-      refusal: REFUSAL,
+        refusal: REFUSAL,
     },
     access: access.detections,
   };

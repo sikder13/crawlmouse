@@ -7,15 +7,18 @@
  *   crawlability = crawled URLs that answer 200 and carry no crawlability defect / crawled URLs, 0..1
  *   score        = 0.6 × structure + 40 × crawlability
  *
- * A URL carries a crawlability defect when it is among the affected pages of a detected record of
- * CC-16's redirect, canonical, pagination or hreflang detectors. A URL counts once however many it
- * carries, so one affected page on a 45-page site moves the score by 40/45 (owner ruling, 2026-11-05).
- * Three readings of the ruling are this module's, and SPEC 17 states them: the denominator is every
- * crawled URL, so a URL that does not answer 200 is a defect no fix here clears; a record that could
- * not decide marks no page, so its pages count clean (the old mean dropped such a measure); and a
- * record's pages are its `affected_urls`, which for a redirect chain are the pages linking to the
- * redirecting URL, so one site-wide link to a chain marks every page. Pages lacking a title or a meta
- * description will be defects of the same kind once the crawl worker records them (CC-12d).
+ * A crawlability defect is counted on the URL that carries it (owner rulings, 2026-11-05):
+ *   - a detected CC-16 record marks the URLs it is about (`defectUrls`): a redirect chain the
+ *     redirecting URL, a canonical mismatch the page, duplicate pagination the repeated later pages,
+ *     an hreflang gap the cluster members whose annotations are incomplete. The pages linking to a
+ *     redirect stay in the record's `affected_urls` for the fix, but carry no defect, so one
+ *     site-wide link to a redirect costs at most one URL;
+ *   - a page answering 200 that was read and declares no title, or no meta description (CC-12d's
+ *     page facts), carries a defect;
+ *   - a URL that does not answer 200 is outside the numerator: the denominator is every crawled URL.
+ * A URL counts once however many defects it carries, so one defective URL on a 45-page site moves the
+ * score by 40/45. A record that could not decide marks no URL, so its URLs count clean (this module's
+ * reading; the old mean dropped such a measure).
  *
  * The 5.1a refusal is v1's `decideRefusal`, on the same evidence: a refused grade has no score.
  */
@@ -24,6 +27,7 @@ import { computeGrade, scoreToLetter } from '../../grade.js';
 import { deriveGradeInputs, gradeInputsFrom } from '../../grade-inputs.js';
 import { buildGraph } from '../../graph.js';
 import { decideRefusal, type RefusalEvidence } from '../../refusal.js';
+import { subjectOfKey } from '../detectors/fingerprint.js';
 import type { Detection } from '../detectors/types.js';
 import { round } from './numbers.js';
 import { SEO_WEIGHTS } from './weights.js';
@@ -43,9 +47,10 @@ export interface TechnicalSeoInput {
   /** The homepage is served for JavaScript to fill in: v1's orphan suppression applies. */
   homepage_client_rendered: boolean;
   /** CC-16's records for this check. */
-  detections: readonly Pick<Detection, 'type' | 'state' | 'fingerprint' | 'affected_urls'>[];
-  /** Pages lacking a title or a meta description (CC-12d); null until the worker records them. */
-  untitled: readonly string[] | null;
+  detections: readonly Pick<
+    Detection,
+    'type' | 'state' | 'fingerprint' | 'key' | 'affected_urls'
+  >[];
   /** What `decideRefusal` reads that the records do not carry. */
   refusal: Pick<RefusalEvidence, 'excludedPageCount' | 'estimateSource' | 'crawlTruncated'>;
   /**
@@ -59,13 +64,41 @@ export interface TechnicalSeoInput {
 export const isGraded = (p: Pick<PageResult, 'kind' | 'status_code' | 'is_html'>): boolean =>
   p.kind === 'content' && p.status_code === 200 && p.is_html;
 
+/**
+ * The URLs a detected crawlability record is about: the redirecting URL and the page with the wrong
+ * canonical are the record's subject (its key); a pagination or hreflang record's subject is a
+ * template or a cluster, so the URLs are its affected pages, which are the repeated pages and the
+ * members with an incomplete annotation.
+ */
+export function defectUrls(d: Pick<Detection, 'type' | 'key' | 'affected_urls'>): string[] {
+  switch (d.type) {
+    case 'redirect_chain':
+    case 'canonical_mismatch':
+      return [subjectOfKey(d.key)];
+    case 'duplicate_pagination':
+    case 'hreflang_gap':
+      return [...d.affected_urls];
+    default:
+      return [];
+  }
+}
+
+/** A page answering 200 that was read and declares no title or no meta description (CC-12d). */
+export const lacksTitleOrDescription = (
+  p: Pick<PageResult, 'status_code' | 'is_html' | 'title' | 'meta_description'>,
+): boolean =>
+  p.status_code === 200 &&
+  p.is_html &&
+  ((p.title !== null && p.title.text === null) ||
+    (p.meta_description !== null && p.meta_description.text === null));
+
 /** The crawled URLs that carry a crawlability defect, each once, sorted. */
 export function defectivePages(input: TechnicalSeoInput): string[] {
   const types: readonly string[] = CRAWLABILITY_DETECTORS;
-  const marked = new Set(input.untitled ?? []);
+  const marked = new Set(input.pages.filter(lacksTitleOrDescription).map((p) => p.url));
   for (const d of input.detections) {
     if (d.state === 'detected' && types.includes(d.type))
-      for (const u of d.affected_urls) marked.add(u);
+      for (const u of defectUrls(d)) marked.add(u);
   }
   return input.pages.flatMap((p) => (marked.has(p.url) ? [p.url] : [])).sort();
 }

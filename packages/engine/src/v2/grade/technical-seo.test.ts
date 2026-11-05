@@ -19,11 +19,30 @@ import {
   type TechnicalSeoInput,
 } from './technical-seo.js';
 
-/** A CC-16 record of `type` in `state`, marking `affected` pages. */
-const record = (type: Detection['type'], state: Detection['state'], affected: string[]) => ({
+const PREFIX: Partial<Record<Detection['type'], string>> = {
+  redirect_chain: 'redirect',
+  canonical_mismatch: 'canonical',
+  duplicate_pagination: 'pagination',
+  hreflang_gap: 'hreflang',
+  orphan_pages: 'orphan',
+  deep_pages: 'depth',
+  generic_anchor_text: 'anchors',
+};
+
+/**
+ * A CC-16 record of `type` in `state` about `subject` (a URL, or for pagination and hreflang a
+ * template or cluster), with `affected` pages.
+ */
+const record = (
+  type: Detection['type'],
+  state: Detection['state'],
+  subject: string,
+  affected: string[],
+) => ({
   type,
   state,
-  fingerprint: `${type}-${state}-${affected.join(',')}`,
+  key: `${PREFIX[type]}:${subject}`,
+  fingerprint: `${type}-${state}-${subject}`,
   affected_urls: affected,
 });
 
@@ -38,7 +57,6 @@ function inputOf(
     homepage_url: s.homepage_url,
     homepage_client_rendered: false,
     detections: detectStructure(s),
-    untitled: null,
     refusal: { excludedPageCount: 0, estimateSource: 'frontier', crawlTruncated: false },
     added_links: [],
     ...over,
@@ -73,10 +91,11 @@ describe('crawlability', () => {
 
   it('TS1: of 50 URLs, one answers 404 and two carry defects (one carries two), so 47 / 50 = 0.94', () => {
     const detections = [
-      record('redirect_chain', 'detected', [url(1), url(2)]),
-      record('canonical_mismatch', 'detected', [url(2)]),
-      record('redirect_chain', 'not_detected', [url(3)]),
-      record('hreflang_gap', 'indeterminate', [url(4)]),
+      record('canonical_mismatch', 'detected', url(1), [url(1)]),
+      record('canonical_mismatch', 'detected', url(2), [url(2)]),
+      record('hreflang_gap', 'detected', url(2), [url(2)]),
+      record('redirect_chain', 'not_detected', url(3), [url(4)]),
+      record('hreflang_gap', 'indeterminate', url(4), [url(4)]),
     ];
     const input = { ...base, pages: fifty, detections };
     expect(defectivePages(input)).toEqual([url(1), url(2)]);
@@ -85,66 +104,120 @@ describe('crawlability', () => {
     expect(combine(72.5, 0.94)).toBe(81.1);
   });
 
+  it('one site-wide link to a redirect costs at most one URL: the redirecting one, not the 49 linking pages', () => {
+    // x0 answers 301 and is a two-hop chain; every other page links to it
+    const pages = fifty.map((p, i) => (i === 0 ? { ...p, status_code: 301 } : p));
+    const linking = pages.slice(1).map((p) => p.url);
+    const withRecord = {
+      ...base,
+      pages,
+      detections: [record('redirect_chain', 'detected', url(0), linking)],
+    };
+    const without = { ...base, pages, detections: [] };
+    expect(defectivePages(withRecord)).toEqual([url(0)]);
+    // the redirecting URL answers 301, so it is outside the numerator already: 49 / 50 either way
+    expect(crawlability(withRecord)).toBe(0.98);
+    expect(crawlability(without)).toBe(0.98);
+    // a redirect URL that was not crawled costs nothing
+    const uncrawled = {
+      ...withRecord,
+      detections: [record('redirect_chain', 'detected', 'https://a.test/gone-away', linking)],
+    };
+    expect(crawlability(uncrawled)).toBe(1 - 1 / 50);
+  });
+
+  it('a duplicate pagination record marks the repeated pages, an hreflang gap the incomplete members', () => {
+    const input = {
+      ...base,
+      pages: fifty,
+      detections: [
+        record('duplicate_pagination', 'detected', '/blog/page/{n}', [url(5), url(6)]),
+        record('hreflang_gap', 'detected', url(7), [url(8)]),
+      ],
+    };
+    expect(defectivePages(input)).toEqual([url(5), url(6), url(8)]);
+  });
+
   it('a URL that answers 404 and carries a defect counts once', () => {
     const input = {
       ...base,
       pages: fifty,
-      detections: [record('duplicate_pagination', 'detected', [url(0)])],
+      detections: [record('canonical_mismatch', 'detected', url(0), [url(0)])],
     };
     expect(crawlability(input)).toBe(0.98);
   });
 
-  it('one affected page on a 45-page site moves Technical SEO by 40/45 = 0.89', () => {
+  it('one defective URL on a 45-page site moves Technical SEO by 40/45 = 0.89', () => {
     const pages = fifty.slice(1, 46);
     expect(pages).toHaveLength(45);
     const clean = { ...base, pages, detections: [] };
-    const one = { ...clean, detections: [record('duplicate_pagination', 'detected', [url(5)])] };
+    const one = {
+      ...clean,
+      detections: [record('duplicate_pagination', 'detected', '/x/{n}', [url(5)])],
+    };
     expect(crawlability(clean)).toBe(1);
     expect(40 * (crawlability(clean) - crawlability(one))).toBeCloseTo(40 / 45, 12);
   });
 
-  it('a record not detected, or undecided, marks no page; an affected URL not crawled counts nothing', () => {
+  it('a record not detected, or undecided, marks no URL; a URL not crawled counts nothing', () => {
     const input = {
       ...base,
       detections: [
-        record('redirect_chain', 'not_detected', [base.pages[1]!.url]),
-        record('canonical_mismatch', 'indeterminate', [base.pages[1]!.url]),
-        record('hreflang_gap', 'detected', ['https://elsewhere.test/']),
+        record('redirect_chain', 'not_detected', base.pages[1]!.url, []),
+        record('canonical_mismatch', 'indeterminate', base.pages[1]!.url, [base.pages[1]!.url]),
+        record('hreflang_gap', 'detected', 'https://elsewhere.test/', ['https://elsewhere.test/']),
       ],
     };
     expect(defectivePages(input)).toEqual([]);
     expect(crawlability(input)).toBe(1);
   });
 
-  it('a structure record that is not a crawlability detector marks no page', () => {
+  it('a structure record that is not a crawlability detector marks no URL', () => {
     const input = {
       ...base,
       detections: [
-        record('orphan_pages', 'detected', [base.pages[1]!.url]),
-        record('deep_pages', 'detected', [base.pages[2]!.url]),
-        record('generic_anchor_text', 'detected', [base.pages[3]!.url]),
+        record('orphan_pages', 'detected', base.pages[1]!.url, [base.pages[1]!.url]),
+        record('deep_pages', 'detected', base.pages[2]!.url, [base.pages[2]!.url]),
+        record('generic_anchor_text', 'detected', base.pages[3]!.url, [base.pages[3]!.url]),
       ],
     };
     expect(crawlability(input)).toBe(1);
   });
 
-  it('pages lacking a title or a meta description join as defects of the same kind once recorded', () => {
-    const input = { ...base, detections: [], untitled: [base.pages[1]!.url] };
-    expect(crawlability(input)).toBe(4 / 5);
+  it('a page read that declares no title, or no meta description, carries a defect (CC-12d)', () => {
+    const declares = { text: 'x', chars: 1, cut: false };
+    const none = { text: null, chars: 0, cut: false };
+    const at = (i: number, edit: object) => ({
+      ...base,
+      detections: [],
+      pages: base.pages.map((p, j) =>
+        j === i ? { ...p, title: declares, meta_description: declares, ...edit } : p,
+      ),
+    });
+    expect(crawlability(at(1, { title: none }))).toBe(4 / 5);
+    expect(crawlability(at(1, { meta_description: none }))).toBe(4 / 5);
+    expect(crawlability(at(1, {}))).toBe(1);
+    // not read (null), or not a page answering 200 as HTML: no defect of this kind
+    expect(crawlability(at(1, { title: null, meta_description: null }))).toBe(1);
+    expect(crawlability(at(1, { title: none, is_html: false }))).toBe(1);
   });
 });
 
 describe('crawlability detectors', () => {
   it.each([
-    'redirect_chain',
-    'canonical_mismatch',
-    'duplicate_pagination',
-    'hreflang_gap',
-  ] as const)('a detected %s record marks its affected pages: one of 5 is 0.8', (type) => {
+    ['redirect_chain', 'the redirecting URL, not the pages linking to it'],
+    ['canonical_mismatch', 'the page'],
+    ['duplicate_pagination', 'the repeated later page'],
+    ['hreflang_gap', 'the member with an incomplete annotation'],
+  ] as const)('a detected %s record marks %s', (type, _what) => {
     const input = inputOf(hub(4));
+    const [a, b] = [input.pages[2]!.url, input.pages[3]!.url];
+    // the subject is `a`; `b` is in the affected pages only for redirect chains (a linking page)
+    const subject = type === 'duplicate_pagination' ? '/p/{n}' : a;
+    const affected = type === 'redirect_chain' ? [b] : [a];
     expect(
-      crawlability({ ...input, detections: [record(type, 'detected', [input.pages[2]!.url])] }),
-    ).toBe(0.8);
+      defectivePages({ ...input, detections: [record(type, 'detected', subject, affected)] }),
+    ).toEqual([a]);
   });
 });
 

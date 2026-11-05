@@ -180,6 +180,12 @@ export function applyFix(
         },
         ai,
       };
+    case 'redirect_chain': {
+      // the links point at the final URL, so the redirecting URL leaves the crawl (owner ruling,
+      // 2026-11-05); links to it were never graph edges, since it does not answer 200
+      const without = cleared(seo, r.fingerprint);
+      return { seo: { ...without, pages: without.pages.filter((p) => p.url !== url) }, ai };
+    }
     default:
       return { seo: cleared(seo, r.fingerprint), ai };
   }

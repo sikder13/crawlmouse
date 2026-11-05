@@ -360,42 +360,46 @@ describe('a fix on a counted check (the checks passed as counted, as CC-18 will 
 });
 
 describe('the structure counterfactuals, by hand', () => {
-  it('clearing a redirect record on one of 7 pages: crawlability 5/7 → 6/7, so 40/7 = +5.71', () => {
-    const { grades } = blog(6, 0);
-    const [p1, p2] = grades.inputs.seo.pages.filter((p) => p.url.includes('/blog/'));
-    const redirect = (i: number, on: string) =>
-      ({
-        type: 'redirect_chain',
-        state: 'detected',
-        fingerprint: `r${i}`,
-        key: `redirect:/r${i}`,
-        affected_urls: [on],
-      }) as never;
-    const records = [redirect(0, p1!.url), redirect(1, p2!.url)];
-    const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, detections: records } };
-    expect(grades.inputs.seo.pages).toHaveLength(7);
-    const { overview } = effectsOf(inputs, [{ family: 'structure', record: records[0]! }]);
-    expect(overview.technical_seo).toBe(5.71);
+  it('fixing a redirect chain takes the redirecting URL out of the crawl: 7/8 → 7/7, so 40/8 = +5.00', () => {
+    // the blog's 7 pages and /r0, a URL behind a redirect chain that every post links to
+    const { grades } = blog(6, 0, {}, [{ path: '/r0', status: 301 }]);
+    const r0 = grades.inputs.seo.pages.find((p) => p.url.endsWith('/r0'))!.url;
+    const posts = grades.inputs.seo.pages.filter((p) => p.url.includes('/blog/')).map((p) => p.url);
+    const redirect = {
+      type: 'redirect_chain',
+      state: 'detected',
+      fingerprint: 'r0',
+      key: `redirect:${r0}`,
+      affected_urls: posts,
+    } as never;
+    const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, detections: [redirect] } };
+    expect(grades.inputs.seo.pages).toHaveLength(8);
+    const { overview } = effectsOf(inputs, [{ family: 'structure', record: redirect }]);
+    expect(overview.technical_seo).toBe(5);
+    const after = applyFix(inputs, { family: 'structure', record: redirect });
+    expect(after.seo.pages.map((p) => p.url)).not.toContain(r0);
     // AI readability is withheld (Quotable counts no check): no AI effect, waiting on its reason
     expect(overview).toMatchObject({
       ai_readability: null,
       ai_readability_pending_on: ['quotable_unmeasured'],
     });
   });
-
   it('three defects on one page: neither of the first two would raise a grade alone, so neither is absorbed', () => {
     const { grades } = blog(6, 0);
     const [p1] = grades.inputs.seo.pages.filter((p) => p.url.includes('/blog/'));
-    const records = (['canonical_mismatch', 'hreflang_gap', 'redirect_chain'] as const).map(
-      (type) =>
-        ({
-          type,
-          state: 'detected',
-          fingerprint: type,
-          key: `${type}:x`,
-          affected_urls: [p1!.url],
-        }) as never,
-    );
+    const on = (type: string, prefix: string, subject: string) =>
+      ({
+        type,
+        state: 'detected',
+        fingerprint: type,
+        key: `${prefix}:${subject}`,
+        affected_urls: [p1!.url],
+      }) as never;
+    const records = [
+      on('canonical_mismatch', 'canonical', p1!.url),
+      on('duplicate_pagination', 'pagination', '/blog/page/{n}'),
+      on('hreflang_gap', 'hreflang', p1!.url),
+    ];
     const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, detections: records } };
     const { byFix } = effectsOf(
       inputs,
@@ -407,17 +411,16 @@ describe('the structure counterfactuals, by hand', () => {
       [5.72, null],
     ]);
   });
-
   it('the absorber is the first fix above that takes the effect, not the first that names the page', () => {
-    // /old-1 is an orphan, so also deep, and a redirect record marks it: clearing the record ranks
+    // /old-1 is an orphan, so also deep, and a canonical record marks it: clearing the record ranks
     // first and leaves the deep-page fix its effect; the orphan fix, second, takes it
     const { grades } = blog(6, 0, {}, [{ path: '/old-1' }]);
     const old = grades.inputs.seo.pages.find((p) => p.url.endsWith('/old-1'))!.url;
     const redirect = {
-      type: 'redirect_chain',
+      type: 'canonical_mismatch',
       state: 'detected',
       fingerprint: 'r',
-      key: 'redirect:https://a.test/r',
+      key: `canonical:${old}`,
       affected_urls: [old],
     } as never;
     const detections = [...structureOf(grades), redirect];
@@ -429,7 +432,7 @@ describe('the structure counterfactuals, by hand', () => {
     const ranked = [...byFix].sort((x, y) => x[1].rank - y[1].rank);
     const type = (fp: string) => detections.find((d) => d.fingerprint === fp)!.type;
     expect(ranked.map(([fp]) => type(fp))).toEqual([
-      'redirect_chain',
+      'canonical_mismatch',
       'orphan_pages',
       'deep_pages',
     ]);
@@ -489,37 +492,44 @@ describe('the structure counterfactuals, by hand', () => {
     expect(byFix.get(deep.fingerprint)!.absorbed_by).toBe(null);
   });
 
-  it('a site-wide link to a redirect chain marks every linking page: 87.42 → 47.42, a fix worth +40', () => {
-    const { grades } = blog(13, 0);
-    expect(grades.technical_seo.score).toBe(87.42);
+  it('a site-wide link to a redirect chain costs one URL, the redirecting one: 84.75, and the fix +2.67', () => {
+    // the blog's 14 pages and the URL behind the chain, crawled (it answers 301); every page links to it
+    const { grades: plain } = blog(13, 0);
+    expect(plain.technical_seo.score).toBe(87.42);
+    const { grades } = blog(13, 0, {}, [{ path: '/old-menu-target', status: 301 }]);
+    const target = grades.inputs.seo.pages.find((p) => p.url.endsWith('/old-menu-target'))!.url;
+    const linking = grades.inputs.seo.pages.filter((p) => p.url !== target).map((p) => p.url);
+    expect(linking).toHaveLength(14);
     const redirect = {
       type: 'redirect_chain',
       state: 'detected',
       fingerprint: 'nav',
-      key: 'redirect:https://a.test/old-menu-target',
-      affected_urls: grades.inputs.seo.pages.map((p) => p.url),
+      key: `redirect:${target}`,
+      affected_urls: linking,
     } as never;
-    expect(grades.inputs.seo.pages).toHaveLength(14);
     const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, detections: [redirect] } };
-    // crawlability 0/14: 0.6 × structure + 0, with structure 79.03 here (87.42 − 40) / 0.6
-    expect(technicalSeo(inputs.seo).score).toBe(47.42);
+    // crawlability 14/15 with the record or without it: the 301 is outside the numerator either way
+    // 0.6 × 79.03 + 40 × 14/15 = 47.418 + 37.333 = 84.75
+    expect(technicalSeo(inputs.seo).score).toBe(84.75);
+    expect(technicalSeo(grades.inputs.seo).score).toBe(84.75);
+    // the fix links to the final URL, which takes the 301 out of the crawl: back to 87.42
     expect(
       effectsOf(inputs, [{ family: 'structure', record: redirect }]).overview.technical_seo,
-    ).toBe(40);
+    ).toBe(2.67);
   });
 
   it('a page carrying two defects counts once: clearing one moves nothing, clearing both 40/7', () => {
     const { grades } = blog(6, 0);
     const [p1] = grades.inputs.seo.pages.filter((p) => p.url.includes('/blog/'));
-    const record = (type: string, i: number) =>
+    const record = (type: string, prefix: string) =>
       ({
         type,
         state: 'detected',
-        fingerprint: `${type}${i}`,
-        key: `${type}:${i}`,
+        fingerprint: `${type}0`,
+        key: `${prefix}:${p1!.url}`,
         affected_urls: [p1!.url],
       }) as never;
-    const records = [record('redirect_chain', 0), record('canonical_mismatch', 0)];
+    const records = [record('hreflang_gap', 'hreflang'), record('canonical_mismatch', 'canonical')];
     const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, detections: records } };
     const one = effectsOf(inputs, [{ family: 'structure', record: records[0]! }]);
     expect(one.overview.technical_seo).toBe(0);
