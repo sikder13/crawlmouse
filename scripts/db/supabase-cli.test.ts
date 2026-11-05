@@ -9,6 +9,7 @@ import {
   parsePushList,
   pushArgs,
   redact,
+  secretsOf,
 } from './supabase-cli';
 
 describe('the CLI wrapper reads infra/supabase/migrations exactly', () => {
@@ -63,11 +64,25 @@ describe('reading the CLI output', () => {
     ]);
   });
 
-  it('redacts the URL and the password, encoded or not', () => {
-    const url = 'postgresql://postgres.abc:p%40ss@h:5432/postgres';
-    const text = `failed: ${url} p@ss p%40ss`;
-    expect(redact(text, [url, 'p@ss', 'p%40ss'])).toBe('failed: *** *** ***');
-  });
+  it.each(['p@ss', 'a$b@c', 'x/y?z#w', 'plain'])(
+    'redacts the URL and the password %s in each of its spellings',
+    (password) => {
+      const url = new URL('postgresql://postgres.abc@h:5432/postgres');
+      url.password = password;
+      const spellings = [
+        url.toString(),
+        url.password,
+        encodeURIComponent(password),
+        password,
+        `postgres.abc:${url.password}@h:5432`,
+      ];
+      const text = spellings.map((s) => `line: ${s}`).join('\n');
+      const clean = redact(text, secretsOf(url.toString()));
+      for (const s of [url.password, encodeURIComponent(password), password]) {
+        expect(clean).not.toContain(s);
+      }
+    },
+  );
 });
 
 describe('the CLI version', () => {

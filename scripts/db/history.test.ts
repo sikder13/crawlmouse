@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -241,8 +242,13 @@ describe('the history diff matches a row to a file by exact name, never by prefi
     const text = formatDiff(diff);
     expect(text).toContain('20260101000001 audits');
     expect(text).toContain('20260109000000 gone');
-    expect(text).toContain('revoke all on x from anon;');
     expect(text).toContain('20260101000002 audits_ttl');
+    // A statement applied outside the repository may hold a secret: by default only its md5.
+    expect(text).not.toContain('revoke all on x from anon;');
+    expect(text).toContain(
+      `statement md5 ${createHash('md5').update('revoke all on x from anon;').digest('hex')}`,
+    );
+    expect(formatDiff(diff, { showStatements: true })).toContain('revoke all on x from anon;');
   });
 });
 

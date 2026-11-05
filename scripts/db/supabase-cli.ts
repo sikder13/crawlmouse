@@ -41,9 +41,22 @@ export function parsePushList(output: string): string[] {
     .filter((f): f is string => Boolean(f));
 }
 
-/** Replaces every occurrence of each secret with ***. */
+/**
+ * What to redact for a connection URL: the URL, and its password as the URL encodes it, as
+ * encodeURIComponent encodes it, and raw. The encodings differ for characters such as $ and @.
+ */
+export function secretsOf(dbUrl: string): string[] {
+  const encoded = new URL(dbUrl).password;
+  const password = decodeURIComponent(encoded);
+  return [dbUrl, encoded, encodeURIComponent(password), password];
+}
+
+/** Replaces each occurrence of each secret with ***, longest first. */
 export function redact(text: string, secrets: string[]): string {
-  return secrets.filter(Boolean).reduce((t, s) => t.split(s).join('***'), text);
+  return secrets
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+    .reduce((t, s) => t.split(s).join('***'), text);
 }
 
 export interface PushResult {
@@ -59,8 +72,7 @@ export async function dbPush(
   dbUrl: string,
   { dryRun = false, bin = process.env.SUPABASE_BIN ?? 'supabase', log = console.log } = {},
 ): Promise<PushResult> {
-  const password = decodeURIComponent(new URL(dbUrl).password);
-  const secrets = [dbUrl, password, encodeURIComponent(password)];
+  const secrets = secretsOf(dbUrl);
   const child = spawn(bin, pushArgs(dbUrl, { dryRun }), { stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   const collect = (chunk: Buffer) => {

@@ -51,7 +51,12 @@ export class ManagementApi {
     });
     if (!res.ok) throw new Error(`${method} ${path}: HTTP ${res.status} ${await res.text()}`);
     const text = await res.text();
-    return (text ? JSON.parse(text) : undefined) as T;
+    try {
+      return (text ? JSON.parse(text) : undefined) as T;
+    } catch {
+      // The parser's message quotes the input, which may hold a password.
+      throw new Error(`${method} ${path}: the response is not JSON`);
+    }
   }
 
   listBranches(projectRef: string): Promise<Branch[]> {
@@ -98,6 +103,8 @@ export class ManagementApi {
     url.searchParams.set('sslmode', 'require');
     const text = url.toString();
     mask(text);
+    mask(url.password);
+    mask(encodeURIComponent(password));
     return text;
   }
 }

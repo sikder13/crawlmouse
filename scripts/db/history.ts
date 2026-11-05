@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import type { Db } from './db';
@@ -10,7 +11,7 @@ import { openTarget } from './target';
  * statements in REPAIR_STATEMENTS: a file's bytes reach the database as a bound parameter, never
  * as SQL to run.
  *
- *   tsx scripts/db/history.ts --project-ref <ref> [--yes-production]
+ *   tsx scripts/db/history.ts --project-ref <ref> [--yes-production] [--show-statements]
  *   tsx scripts/db/history.ts --db-url-env DB_URL [--yes-production] \
  *     --repair --applied-through <version> [--drop-orphan <version>]...
  */
@@ -105,7 +106,12 @@ export function diffHistory(files: MigrationFile[], rows: HistoryRow[]): History
   return diff;
 }
 
-export function formatDiff(diff: HistoryDiff): string {
+/**
+ * The diff as text. A row with no file is shown by the md5 of its statements unless
+ * `showStatements` is set: the text reaches public job logs, and a statement applied outside the
+ * repository may hold a secret.
+ */
+export function formatDiff(diff: HistoryDiff, { showStatements = false } = {}): string {
   const lines = [
     `${diff.files} migration files, ${diff.rows} history rows`,
     `recorded under the file's version, with statements: ${diff.matched}`,
@@ -116,7 +122,11 @@ export function formatDiff(diff: HistoryDiff): string {
     `rows with no file (--repair --drop-orphan <version> deletes): ${diff.orphans.length}`,
     ...diff.orphans.flatMap((row) => [
       `  ${row.version} ${row.name}`,
-      ...(row.statements ?? []).map((s) => `    ${s}`),
+      ...(row.statements ?? []).map((s) =>
+        showStatements
+          ? `    ${s}`
+          : `    statement md5 ${createHash('md5').update(s).digest('hex')}`,
+      ),
     ]),
     `files with no row: ${diff.unrecorded.length}`,
     ...diff.unrecorded.map((f) => `  ${f.version} ${f.name}`),
@@ -210,6 +220,7 @@ async function main(): Promise<void> {
       repair: { type: 'boolean', default: false },
       'applied-through': { type: 'string', default: '' },
       'drop-orphan': { type: 'string', multiple: true, default: [] },
+      'show-statements': { type: 'boolean', default: false },
     },
   });
   const target = openTarget({
@@ -221,7 +232,7 @@ async function main(): Promise<void> {
     const files = listMigrations();
     const diff = diffHistory(files, await readHistory(target.db));
     console.log(`target: ${target.label}`);
-    console.log(formatDiff(diff));
+    console.log(formatDiff(diff, { showStatements: values['show-statements'] }));
     if (!values.repair) return;
     if (!target.writable) throw new Error('--repair needs a writable target: use --db-url-env');
     const plan = planRepair(files, diff, {
