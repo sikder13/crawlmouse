@@ -2,15 +2,18 @@
  * The render step of one check: pick the pages, render each twice (static side, then rendered side),
  * measure, and estimate the site. A page that is not rendered carries the reason and the check goes on:
  * a client that throws is read as `network_error`, and a word count that throws as `measure_failed`.
- * The day's reservation is settled whatever happens to the page. Nothing is written to disk.
+ * Nothing is written to disk.
  *
- * COST. Before a page starts, it reserves both of its renders at RESERVE_PER_RENDER_MS each, against
- * the check's cap and against today's budget. When either cannot take them while other pages of the
- * check are in flight, the page waits for one to settle and tries again; when nothing is in flight,
- * rendering stops for the rest of the check. A render settles at the browser time Browser Run reports
- * for it, or, when that is not known, at the request timeout, which is also its reservation. A render
- * can report more than its reservation, so a check can end above its cap by that excess on the pages
- * in flight. Which pages a binding cap leaves unrendered depends on how long the earlier renders took.
+ * COST. Today's budget is asked once per check, before any page, to reserve the check's allowance: its
+ * cap, or RESERVE_PER_RENDER_MS for each render of each sampled page, whichever is less. When it
+ * refuses or throws, no page renders and every sampled page carries the reason. When it grants, the
+ * pages reserve their two renders from that allowance, here and not from the budget: a page that
+ * finds no room waits while another page of the check is in flight, and when none is, rendering stops
+ * for the rest of the check. A render counts the browser time Browser Run reports for it, or, when that
+ * is not known, the request timeout, which is also its reservation. A render can report more than its
+ * reservation, so a check can end above its allowance by that excess on the pages in flight. After
+ * the last page, the budget is settled once, at what the check counted. Which pages a binding cap
+ * leaves unrendered depends on how long the earlier renders took.
  *
  * RATE LIMITS. At most RENDER_IN_FLIGHT requests are open at once. A 429 is retried after the wait it
  * asks for in seconds, or with exponential backoff when it gives none, up to RENDER_RETRY.attempts
@@ -33,8 +36,8 @@ import type { JsTextState } from './state.js';
 export const RENDER_IN_FLIGHT = 5;
 export const RENDER_RETRY = { attempts: 5, base_ms: 1000, max_ms: 16_000 } as const;
 /**
- * What one render reserves before it runs: the request timeout, which is also what a render of unknown
- * browser time is counted at, so such a render never settles above its reservation.
+ * What one render reserves from the check's allowance before it runs: the request timeout, which is also
+ * what a render of unknown browser time is counted at, so such a render never counts above it.
  */
 export const RESERVE_PER_RENDER_MS = REQUEST_TIMEOUT_MS;
 
@@ -45,11 +48,11 @@ export const NOT_RENDERED = {
   not_admitted:
     'Admission refused the URL. `detail` is the policy rule, `resolution`, `unparseable`, or `error` for an admission that threw something else.',
   check_cap:
-    "The check's cap could not take a page's two renders with no page in flight; rendering stopped for this page and those after it.",
+    "The check's allowance could not take a page's two renders with no page in flight; rendering stopped for this page and those after it.",
   daily_cap:
-    "Today's budget could not take a page's two renders with no page of this check in flight; rendering stopped for this page and those after it.",
+    "Today's budget refused the check's allowance, asked for once before any page; no page of the check rendered.",
   daily_budget_unavailable:
-    "Today's budget threw when asked to reserve or settle; rendering stopped for this page and those after it.",
+    "Today's budget threw when asked for the check's allowance; no page of the check rendered.",
   rate_limited: `Browser Run answered 429 on each of ${RENDER_RETRY.attempts} tries, or asked for a wait longer than ${RENDER_RETRY.max_ms} ms.`,
   timed_out: `Browser Run did not answer, or did not finish its reply, within ${REQUEST_TIMEOUT_MS / 1000} s.`,
   page_failed:
@@ -85,6 +88,12 @@ export interface RenderOutcome {
    */
   browser_ms: number;
   estimate: SiteEstimate;
+  /**
+   * True when today's budget threw on the closing settle. The day then still counts the whole
+   * allowance, which is at least what the check used unless a render reported more than its
+   * reservation; CC-20 decides how the store is corrected.
+   */
+  settle_failed: boolean;
 }
 
 export interface RenderCheckInput {
@@ -151,70 +160,35 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
   }
 
   /**
-   * Pages asking today's budget for a reservation now, and pages rendering on one. A page that cannot
-   * reserve waits in one of two queues: for room under the check's cap, which any page frees when it
-   * is refused or settles; or for room in today's budget, which only a page that settles frees.
+   * The check's own reservations, kept here: what the pages in flight hold and what settled pages used,
+   * against the allowance reserved from today's budget. Nothing in this loop awaits between the test
+   * for room and the wait for it, so a page that settles cannot be missed by one about to wait.
    */
-  let asking = 0;
   let rendering = 0;
-  const forCheckRoom: (() => void)[] = [];
-  const forDayRoom: (() => void)[] = [];
-  const until = (queue: (() => void)[]) => new Promise<void>((resolve) => queue.push(resolve));
-  const wake = (queue: (() => void)[]) => queue.splice(0).forEach((resolve) => resolve());
+  const forRoom: (() => void)[] = [];
+  const untilRoom = () => new Promise<void>((resolve) => forRoom.push(resolve));
 
-  /**
-   * Reserve a page's two renders against the check's cap and today's budget. When the check's cap
-   * cannot take them while another page is asking or rendering, wait for room and try again. When
-   * today's budget refuses them while another page is asking or rendering, wait for a page to settle
-   * and try again: an answer can arrive before an earlier question's. When there is nothing to wait
-   * for, rendering stops for the rest of the check.
-   */
-  async function reserve(): Promise<NotRenderedReason | null> {
+  async function reserve(allowanceMs: number): Promise<NotRenderedReason | null> {
     for (;;) {
       if (stopped) return stopped;
-      if (checkHeld + pageReserve > input.caps.perCheckMs) {
-        if (asking + rendering === 0) return (stopped = 'check_cap');
-        await until(forCheckRoom);
-        continue;
-      }
-      checkHeld += pageReserve;
-      asking += 1;
-      let reserved: unknown;
-      try {
-        reserved = await input.daily.reserve(pageReserve, input.caps.perDayMs);
-      } catch {
-        stopped ??= 'daily_budget_unavailable';
-        reserved = false;
-      } finally {
-        asking -= 1;
-      }
-      if (reserved === true) {
+      if (checkHeld + pageReserve <= allowanceMs) {
+        checkHeld += pageReserve;
         rendering += 1;
         return null;
       }
-      checkHeld -= pageReserve;
-      wake(forCheckRoom);
-      if (stopped) {
-        wake(forDayRoom);
-        return stopped;
-      }
-      if (rendering + asking === 0) {
-        stopped = 'daily_cap';
-        wake(forDayRoom);
-        return stopped;
-      }
-      await until(forDayRoom);
+      if (rendering === 0) return (stopped = 'check_cap');
+      await untilRoom();
     }
   }
 
-  async function renderPage(p: Picked): Promise<RenderedPage> {
+  async function renderPage(p: Picked, allowanceMs: number): Promise<RenderedPage> {
     if (stopped) return notRendered(p, stopped);
     try {
       await admit(p.url);
     } catch (e) {
       return notRendered(p, 'not_admitted', e instanceof NotAdmitted ? e.rule : 'error');
     }
-    const refused = await reserve();
+    const refused = await reserve(allowanceMs);
     if (refused) return notRendered(p, refused);
 
     const used = { ms: 0 };
@@ -223,14 +197,8 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
     } finally {
       browserMs += used.ms;
       checkHeld += used.ms - pageReserve;
-      try {
-        await input.daily.settle(pageReserve, used.ms);
-      } catch {
-        stopped ??= 'daily_budget_unavailable';
-      }
       rendering -= 1;
-      wake(forCheckRoom);
-      wake(forDayRoom);
+      forRoom.splice(0).forEach((resolve) => resolve());
     }
   }
 
@@ -254,15 +222,41 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
       : notRendered(p, m.reason);
   }
 
+  /**
+   * Today's budget is asked once, before any page: for the check's whole allowance, which is its cap or
+   * what its sampled pages could reserve, whichever is less. Refused, or unreadable, nothing renders.
+   * Granted, it is settled once, at the browser time the check counted, after every page has finished.
+   */
+  const allowanceMs = Math.min(input.caps.perCheckMs, sample.length * pageReserve);
+  let settleFailed = false;
+  if (!stopped && sample.length > 0 && allowanceMs < pageReserve) stopped = 'check_cap';
+  let reserved = false;
+  if (!stopped && sample.length > 0) {
+    try {
+      reserved = (await input.daily.reserve(allowanceMs, input.caps.perDayMs)) === true;
+      if (!reserved) stopped = 'daily_cap';
+    } catch {
+      stopped = 'daily_budget_unavailable';
+    }
+  }
+
   const results: RenderedPage[] = new Array(sample.length);
   let next = 0;
   const worker = async () => {
     while (next < sample.length) {
       const i = next++;
-      results[i] = await renderPage(sample[i]!);
+      results[i] = await renderPage(sample[i]!, allowanceMs);
     }
   };
   await Promise.all(Array.from({ length: Math.min(RENDER_IN_FLIGHT, sample.length) }, worker));
+
+  if (reserved) {
+    try {
+      await input.daily.settle(allowanceMs, browserMs);
+    } catch {
+      settleFailed = true;
+    }
+  }
 
   const shares = new Map(
     results.flatMap((r) => (r.rendered ? [[r.url, r.without_js.text_share] as const] : [])),
@@ -273,5 +267,5 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
       text_share: shares.get(c.url) ?? null,
     })),
   );
-  return { pages: results, browser_ms: browserMs, estimate };
+  return { pages: results, browser_ms: browserMs, estimate, settle_failed: settleFailed };
 }

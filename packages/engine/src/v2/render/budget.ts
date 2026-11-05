@@ -3,8 +3,8 @@
  *
  * Both caps fail closed: a variable that is unset, empty or not a whole number of seconds reads as zero,
  * and a zero cap renders nothing. The per-day cap is shared by every check, so its count lives with the
- * caller (CC-20 wires the store); the engine asks it to reserve against the per-day cap read here, and
- * to settle.
+ * caller (CC-20 wires the store). The engine asks it once per check to reserve the check's allowance
+ * against the per-day cap read here, and, when that was granted, once to settle after the last page.
  */
 
 export const CAP_ENV = {
