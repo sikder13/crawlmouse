@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   BROWSER_RUN,
   clientFromEnv,
@@ -62,17 +62,38 @@ const INLINE_SCRIPT_PAGE = readFileSync(
 /** What the fixture's inline script writes, assembled the way the script assembles it. */
 const INLINE_MARKER = ['inline', 'scriptran'].join('');
 
-/** A page served whole as HTML, with no script: its two sides should agree. */
-const STATIC_PAGE = 'https://example.com/';
+/**
+ * A page served whole as HTML, with no script: its two sides should agree. (example.com was the first
+ * choice; since it began loading /s.js, which writes the same paragraph in other languages, its two
+ * sides differ by design.)
+ */
+const STATIC_PAGE = 'https://info.cern.ch/hypertext/WWW/TheProject.html';
 /** A long page with scripts, for the spread between renders. */
 const REPEAT_PAGE = 'https://developers.cloudflare.com/browser-run/';
 /** DECISION-LOG I8: the spread is taken over five renders. */
 const REPEAT_RENDERS = 5;
 
+/**
+ * A 429 is waited out here as the render step does: its Retry-After in seconds, or else
+ * LIVE_RETRY_WAIT_MS, up to LIVE_TRIES tries. The account's request rate is not ours to set, and these
+ * tests are about what a render returns, not how fast.
+ */
+const LIVE_TRIES = 8;
+const LIVE_RETRY_WAIT_MS = 10_000;
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const waits: number[] = [];
+
 async function words(c: BrowserRunClient, url: string, side: RenderSide) {
-  const r = await c.content(url, side);
-  if (!r.ok) throw new Error(`${side} render of ${url} failed: ${r.reason}`);
-  return mainWords(r.html);
+  for (let attempt = 1; ; attempt += 1) {
+    const r = await c.content(url, side);
+    if (r.ok) return mainWords(r.html);
+    if (r.reason !== 'rate_limited' || attempt >= LIVE_TRIES) {
+      throw new Error(`${side} render of ${url} failed: ${r.reason}`);
+    }
+    const ms = r.retryAfterMs ?? LIVE_RETRY_WAIT_MS;
+    waits.push(ms);
+    await pause(ms);
+  }
 }
 
 /**
@@ -84,43 +105,65 @@ async function renderHtml(
   side: RenderSide,
   rules = true,
   javaScriptOn = false,
+  extra: Record<string, unknown> = {},
 ): Promise<string> {
-  const body: Record<string, unknown> = { ...renderRequestBody(STATIC_PAGE, side), html };
+  const body: Record<string, unknown> = { ...renderRequestBody(STATIC_PAGE, side), html, ...extra };
   if (!rules) Object.assign(body, { rejectResourceTypes: [], rejectRequestPattern: [] });
   if (javaScriptOn) delete body.setJavaScriptEnabled;
   delete body.url;
   let res: Response;
-  try {
-    res = await fetch(
-      BROWSER_RUN.endpoint.replace('{account_id}', encodeURIComponent(env[ENV.account]!.trim())),
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${env[ENV.token]!.trim()}`,
-          'content-type': 'application/json',
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      res = await fetch(
+        BROWSER_RUN.endpoint.replace('{account_id}', encodeURIComponent(env[ENV.account]!.trim())),
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${env[ENV.token]!.trim()}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      },
-    );
-  } catch {
-    // The error could carry the URL, which holds the account id.
-    throw new Error('the request to Browser Run failed');
+      );
+    } catch {
+      // The error could carry the URL, which holds the account id.
+      throw new Error('the request to Browser Run failed');
+    }
+    if (res.status !== 429 || attempt >= LIVE_TRIES) break;
+    await res.body?.cancel().catch(() => {});
+    const after = res.headers.get('retry-after')?.trim() ?? '';
+    const ms = /^[0-9]+$/.test(after) ? Number(after) * 1000 : LIVE_RETRY_WAIT_MS;
+    waits.push(ms);
+    await pause(ms);
   }
   expect(res.status).toBe(200);
   expect(Number(res.headers.get(BROWSER_RUN.browser_ms_header))).toBeGreaterThan(0);
   return ((await res.json()) as { result: string }).result;
 }
 
-/** A page that requests each URL and writes `name=loaded` or `name=blocked` into #out. */
+/**
+ * A page that requests each URL and writes `name=loaded`, `name=blocked` or `name=timeout` into #out,
+ * then adds #done once every attempt has reported. Its results arrive after the page has loaded, so the
+ * render waits for #done (PROBE_WAIT).
+ */
 function probePage(attempts: Record<string, string>): string {
   const calls = Object.entries(attempts)
     .map(([name, url]) => `attempt(${JSON.stringify(name)}, ${JSON.stringify(url)});`)
     .join('\n');
+  const total = Object.keys(attempts).length + 1;
   return `<html><body><main><p id="out">probe</p></main><script>
     const out = document.getElementById('out');
-    const mark = (name, outcome) => out.append(' ' + name + '=' + outcome);
+    const seen = new Set();
+    const mark = (name, outcome) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      out.append(' ' + name + '=' + outcome);
+      if (seen.size === ${total}) document.body.append(Object.assign(document.createElement('i'), { id: 'done' }));
+    };
     function attempt(name, url) {
-      fetch(url, { mode: 'no-cors', cache: 'no-store' }).then(
+      const stop = new AbortController();
+      setTimeout(() => { stop.abort(); mark(name, 'timeout'); }, 8000);
+      fetch(url, { mode: 'no-cors', cache: 'no-store', signal: stop.signal }).then(
         () => mark(name, 'loaded'),
         () => mark(name, 'blocked'),
       );
@@ -130,15 +173,23 @@ function probePage(attempts: Record<string, string>): string {
       const ws = new WebSocket('wss://ws.postman-echo.com/raw');
       ws.onopen = () => mark('websocket', 'loaded');
       ws.onerror = () => mark('websocket', 'blocked');
+      setTimeout(() => mark('websocket', 'timeout'), 8000);
     } catch {
       mark('websocket', 'blocked');
     }
   </script></body></html>`;
 }
 
+/** Waits for the probe page's #done, past the load the render otherwise stops at. */
+const PROBE_WAIT = { waitForSelector: { selector: '#done', timeout: 12_000 } };
+
 const outOf = (html: string) => /<p id="out">([^<]*)/.exec(html)?.[1] ?? '';
 
 live('Browser Run, live', () => {
+  afterAll(() => {
+    console.info(`429 waits taken: ${waits.length ? waits.join(', ') + ' ms' : 'none'}`);
+  });
+
   it(`renders a static page to within ${PARITY_SPREAD * 100} % of its static side`, async () => {
     const raw = await words(client!, STATIC_PAGE, 'static');
     const rendered = await words(client!, STATIC_PAGE, 'rendered');
@@ -147,7 +198,7 @@ live('Browser Run, live', () => {
     );
     expect(raw).toBeGreaterThan(0);
     expect(within(raw, rendered, PARITY_SPREAD)).toBe(true);
-  }, 120_000);
+  }, 600_000);
 
   it(`renders one page ${REPEAT_RENDERS} times to within ${REPEAT_SPREAD * 100} % of itself`, async () => {
     const counts: number[] = [];
@@ -158,7 +209,7 @@ live('Browser Run, live', () => {
     console.info(`repeat ${REPEAT_PAGE}: ${counts.join(', ')}, spread ${spread(lo, hi)}`);
     expect(lo).toBeGreaterThan(0);
     expect(within(lo, hi, REPEAT_SPREAD)).toBe(true);
-  }, 300_000);
+  }, 900_000);
 
   it('runs no script on the static side, inline or from a file, and runs both on the rendered side', async () => {
     // The static request turns JavaScript off and refuses script files; an inline script is not a
@@ -173,7 +224,7 @@ live('Browser Run, live', () => {
     expect(staticHtml).not.toContain(INLINE_MARKER);
     expect(renderedHtml).toContain(INLINE_MARKER);
     expect(outOf(renderedHtml)).toContain('file=loaded');
-  }, 120_000);
+  }, 600_000);
 
   it('refuses script files on the static side, seen with JavaScript left on so the page can report it', async () => {
     // JavaScript off hides whether the file loaded, so this render keeps the static side's resource
@@ -182,7 +233,7 @@ live('Browser Run, live', () => {
     console.info(`script-file probe, static side with JavaScript on: "${staticOut}"`);
     expect(staticOut).toContain(INLINE_MARKER);
     expect(staticOut).toContain('file=blocked');
-  }, 120_000);
+  }, 600_000);
 
   it('refuses what the rules refuse, each of which loads when the rules are left out', async () => {
     const attempts = {
@@ -205,8 +256,8 @@ live('Browser Run, live', () => {
       'websocket',
     ];
     // Without the rules, each URL and the WebSocket must load: otherwise a refusal below shows nothing.
-    const open = outOf(await renderHtml(probePage(attempts), 'rendered', false));
-    const ruled = outOf(await renderHtml(probePage(attempts), 'rendered'));
+    const open = outOf(await renderHtml(probePage(attempts), 'rendered', false, false, PROBE_WAIT));
+    const ruled = outOf(await renderHtml(probePage(attempts), 'rendered', true, false, PROBE_WAIT));
     console.info(`policy probe, rules off: ${open}`);
     console.info(`policy probe, rules on: ${ruled}`);
     for (const name of [...Object.keys(attempts), 'websocket']) {
@@ -215,5 +266,5 @@ live('Browser Run, live', () => {
     for (const name of ['control_ip', 'control_download'])
       expect(ruled).toContain(`${name}=loaded`);
     for (const name of refused) expect(ruled).toContain(`${name}=blocked`);
-  }, 120_000);
+  }, 600_000);
 });
