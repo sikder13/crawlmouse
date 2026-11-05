@@ -4,14 +4,25 @@
  * A cluster is the set of URLs joined by the hreflang annotations of the crawled 200 pages whose
  * hreflang was read, keyed by its lowest URL. A member that was read is checked for a self-reference
  * (in a language, not as the `x-default`), an `x-default`, valid codes, and a return annotation from
- * each alternate it names. A member that was crawled and redirects or is gone cannot annotate back,
- * so links to it lack their return. A member that was not crawled, was not read at its own URL, or
+ * each alternate it names. Where a return is missing, the URL that carries the defect is the one to
+ * fix (owner ruling, 2026-11-05): an alternate that was read and does not annotate back carries
+ * `hreflang_missing_return`; an alternate that was crawled and redirects or is gone cannot annotate
+ * back, so the member naming it carries `hreflang_alternate_redirects` or `hreflang_alternate_gone`.
+ * A member that was not crawled, was not read at its own URL, or
  * answered a status that kept its content from us (`isUnread`) is unknown, and its annotations are
  * not counted as missing. A cluster with no defect is clear only when `absenceUnproven` (scope.ts)
  * finds nothing the crawl missed: an unfetched page could annotate into it.
  */
 import { LANGUAGE_CODES, REGION_CODES } from './hreflang-codes.js';
-import { absenceUnproven, byText, isUnread, record, scopeOf, type Scope } from './scope.js';
+import {
+  absenceUnproven,
+  byText,
+  isRedirect,
+  isUnread,
+  record,
+  scopeOf,
+  type Scope,
+} from './scope.js';
 import type { Condition, Detection, DetectorInput, HreflangLink } from './types.js';
 
 export { LANGUAGE_CODES, REGION_CODES };
@@ -68,18 +79,21 @@ function judge(
   const flag = (url: string, c: Condition) =>
     defects.set(url, (defects.get(url) ?? new Set()).add(c));
   // A crawled member that redirects or is gone serves no annotations of its own to link back with.
-  const cannotAnswer = (url: string) => {
+  const cannotAnswer = (url: string): 'redirects' | 'gone' | null => {
     const p = s.page.get(url);
-    if (p === undefined) return false;
-    if (p.status_code !== 200) return !isUnread(p.status_code);
+    if (p === undefined) return null;
+    if (p.status_code !== 200) {
+      if (isUnread(p.status_code)) return null;
+      return isRedirect(p.status_code) ? 'redirects' : 'gone';
+    }
     const landed = s.facts.get(url)?.final_url ?? null;
-    return landed !== null && landed !== url;
+    return landed !== null && landed !== url ? 'redirects' : null;
   };
   let unknown = false;
   for (const m of members) {
     const links = read.get(m);
     if (links === undefined) {
-      if (!cannotAnswer(m)) unknown = true;
+      if (cannotAnswer(m) === null) unknown = true;
       continue;
     }
     if (!links.some((l) => l.href === m && !isXDefault(l.lang))) flag(m, 'hreflang_missing_self');
@@ -88,8 +102,13 @@ function judge(
     for (const target of new Set(links.map((l) => l.href))) {
       if (target === m) continue;
       const back = read.get(target);
-      if (back ? !back.some((l) => l.href === m) : cannotAnswer(target))
-        flag(m, 'hreflang_missing_return');
+      if (back !== undefined) {
+        if (!back.some((l) => l.href === m)) flag(target, 'hreflang_missing_return');
+        continue;
+      }
+      const dead = cannotAnswer(target);
+      if (dead === 'redirects') flag(m, 'hreflang_alternate_redirects');
+      if (dead === 'gone') flag(m, 'hreflang_alternate_gone');
     }
   }
   const key = members[0]!;

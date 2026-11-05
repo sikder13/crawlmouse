@@ -102,6 +102,15 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     allowedIn: [],
   },
   {
+    text: 'An alternate does not annotate back, or redirects or is gone.',
+    withdrawnIn: 'docs/specs/v2/16-structure-detectors.md (conditions), CC-17 third rulings',
+    truth:
+      'hreflang_missing_return is carried by the alternate that was read and does not annotate back; ' +
+      'an alternate that redirects or is gone is hreflang_alternate_redirects or ' +
+      'hreflang_alternate_gone, carried by the member naming it (hreflang-gaps.ts).',
+    allowedIn: [],
+  },
+  {
     // SPEC 12 and SPEC 15 both said it, each rendered from code (worker/src/spec/render.ts,
     // engine/src/v2/access/spec.ts); CC-12d replaced the canary rule with the witness rule.
     text: 'only when the tagged Googlebot canary was served',

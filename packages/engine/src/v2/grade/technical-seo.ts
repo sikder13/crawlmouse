@@ -10,11 +10,10 @@
  * A crawlability defect is counted on the URL that carries it (owner rulings, 2026-11-05):
  *   - a detected CC-16 record marks the URLs it is about (`defectUrls`): a redirect chain the
  *     redirecting URL, a canonical mismatch the page, duplicate pagination the repeated later pages,
- *     an hreflang gap the members its detector flags (a member naming an alternate that does not
- *     annotate it back is flagged, though the missing annotation is the alternate's). The pages
- *     linking to a
- *     redirect stay in the record's `affected_urls` for the fix, but carry no defect, so one
- *     site-wide link to a redirect costs at most one URL;
+ *     an hreflang gap the URLs its detector marks (a missing return on the alternate that does not
+ *     annotate back; an alternate that redirects or is gone on the member naming it). The pages
+ *     linking to a redirect stay in the record's `affected_urls` for the fix, but carry no defect,
+ *     so one site-wide link to a redirect costs at most one URL;
  *   - a page answering 200 that was read and declares no title, or no meta description (CC-12d's
  *     page facts), carries a defect;
  *   - a URL that does not answer 200 is outside the numerator: the denominator is every crawled URL.
@@ -69,8 +68,8 @@ export const isGraded = (p: Pick<PageResult, 'kind' | 'status_code' | 'is_html'>
 /**
  * The URLs a detected crawlability record is about: the redirecting URL and the page with the wrong
  * canonical are the record's subject (its key); a pagination or hreflang record's subject is a
- * template or a cluster, so the URLs are its affected pages, which are the repeated pages and the
- * members with an incomplete annotation.
+ * template or a cluster, so the URLs are its affected pages: the repeated pages, and the URLs the
+ * hreflang detector marks (hreflang-gaps.ts says which URL carries each defect).
  */
 export function defectUrls(d: Pick<Detection, 'type' | 'key' | 'affected_urls'>): string[] {
   switch (d.type) {

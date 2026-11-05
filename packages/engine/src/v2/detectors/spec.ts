@@ -111,11 +111,12 @@ const RULES: Readonly<Record<StructureFixType, Rule>> = {
   hreflang_gap: {
     subject: 'lowest URL in the cluster',
     detected:
-      'a member read at its own URL lacks a self-reference, an `x-default` or a return annotation, or uses an invalid code; a member that redirects or is gone cannot annotate back',
+      'a member read at its own URL lacks a self-reference or an `x-default`, or uses an invalid code; an alternate it names was read and does not annotate it back; or an alternate it names redirects or is gone, so it cannot annotate back',
     clear: `every member was read and none of those holds, and ${ABSENCE.replace('cannot', 'can')}`,
     indeterminate: `a member was not crawled, not read at its own URL, or not read (its annotations are unknown, not missing); no defect and ${ABSENCE}`,
     measured: 'members with a defect',
-    affected: 'those members',
+    affected:
+      'those members: for a missing return, the alternate that does not annotate back; for an alternate that redirects or is gone, the member that names it',
   },
 };
 
@@ -269,7 +270,15 @@ const CONDITION_TEXT: Readonly<Record<Condition, [StructureFixType, string]>> = 
   ],
   hreflang_missing_return: [
     'hreflang_gap',
-    'An alternate does not annotate back, or redirects or is gone.',
+    'An alternate that was read does not annotate back the page naming it; the alternate carries it.',
+  ],
+  hreflang_alternate_redirects: [
+    'hreflang_gap',
+    'An alternate the page names redirects (a 3xx the crawl stopped at, or a request that landed elsewhere), so it cannot annotate back; the page naming it carries it.',
+  ],
+  hreflang_alternate_gone: [
+    'hreflang_gap',
+    'An alternate the page names answers 404 or 410, so it cannot annotate back; the page naming it carries it.',
   ],
   hreflang_missing_x_default: ['hreflang_gap', 'No `x-default` annotation.'],
   hreflang_invalid_code: [
