@@ -43,7 +43,7 @@ async function expectFinding(prefix: string, mutation: string, expected: string)
 }
 
 describe('the check files', () => {
-  it('are the six of the brief, each with a title', () => {
+  it('are the six of the brief and the partition-trigger check, each with a title', () => {
     expect(checks.map((c) => c.file)).toEqual([
       '01-client-table-privileges.sql',
       '02-partitions-rls-owner-only.sql',
@@ -51,6 +51,7 @@ describe('the check files', () => {
       '04-private-schemas.sql',
       '05-private-buckets.sql',
       '06-client-functions.sql',
+      '07-partition-triggers.sql',
     ]);
     for (const c of checks) expect(c.title.length, c.file).toBeGreaterThan(10);
   });
@@ -202,6 +203,31 @@ describe('each check fails on what it guards', () => {
     ],
   ])('06: %s', async (mutation, expected) => {
     await expectFinding('06-', mutation, expected);
+  });
+});
+
+describe("check 07: each partition holds its parent's triggers", () => {
+  it.each([
+    ['research_check_runs', 'check_runs_no_truncate'],
+    ['research_crawler_observations', 'crawler_observations_no_truncate'],
+  ])('fails when a partition of %s lacks %s', async (parent, trigger) => {
+    await expectFinding(
+      '07-',
+      `drop trigger ${trigger} on partitions.{${parent}}`,
+      `partitions.{${parent}}: lacks trigger ${trigger}`,
+    );
+  });
+});
+
+describe("Supabase's own partitioned tables are left to Supabase", () => {
+  it('a partition whose parent is outside public, research and partitions is not checked', async () => {
+    const setup = `create schema zz_platform;
+      create table zz_platform.p (d date) partition by range (d);
+      create table zz_platform.p1 partition of zz_platform.p for values from ('2026-01-01') to ('2026-02-01');
+      grant select on zz_platform.p1 to anon`;
+    for (const prefix of ['01-', '02-', '07-']) {
+      expect(await findingsAfter(prefix, setup), prefix).toEqual([]);
+    }
   });
 });
 

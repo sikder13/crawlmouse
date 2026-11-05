@@ -3,7 +3,7 @@
 -- grants in this file's `declared` list, at the table or column level: a privilege held but not listed,
 -- or listed on an existing table and column but not held, is a finding. The v2 tables are the ones
 -- in its `v2_tables` list, every relation in the research and partitions schemas, and every
--- partition in any schema. A table, column or role that does not exist yet (a migration not
+-- partition, in any schema, of a table in those schemas or public. A table, column or role that does not exist yet (a migration not
 -- applied) is skipped; scripts/db/check.test.ts requires every listed table to exist once the
 -- migrations have run.
 --
@@ -119,7 +119,10 @@ rels as (
   where c.relkind in ('r', 'p', 'v', 'm')
     and (format('%s.%s', n.nspname, c.relname) in (select rel from v2_tables)
          or n.nspname in ('research', 'partitions')
-         or c.relispartition)
+         or (c.relispartition and exists (
+               select 1 from pg_inherits i join pg_class pc on pc.oid = i.inhparent
+                 join pg_namespace pn on pn.oid = pc.relnamespace
+                where i.inhrelid = c.oid and pn.nspname in ('public', 'research', 'partitions'))))
 ),
 roles(role) as (
   select rolname::text from pg_roles where rolname in ('anon', 'authenticated', 'crawl_worker')
