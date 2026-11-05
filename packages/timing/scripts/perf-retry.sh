@@ -20,7 +20,8 @@
 # the retry (`--last-failed`) re-runs only the budget tests that failed.
 #
 # Usage: perf-retry.sh <probe.json> -- <command...>
-#   The command runs as given, then once more with --last-failed appended.
+#   The command runs as given, then, when attempt 1 failed on budgets alone, once more with
+#   --last-failed appended.
 # Environment:
 #   GITHUB_STEP_SUMMARY  the job summary to append to (optional)
 #   FLAKE_ENTRY          where to write a flake register row when one is due (default flake-entry.md)

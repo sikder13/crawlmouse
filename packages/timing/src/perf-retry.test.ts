@@ -31,27 +31,29 @@ const CONTROL_FAIL =
  * in the same test; a budget miss whose ✘ line is coloured; two budget errors under one failed test;
  * a server that never started; or a command that fails having printed nothing. Each failure prints its error as Playwright's list reporter does.
  */
-type Outcome =
-  | 'pass'
-  | 'budget'
-  | 'control'
-  | 'both'
-  | 'invalid'
-  | 'canvas'
-  | 'timeout'
-  | 'thrown'
-  | 'budget-and-thrown'
-  | 'near-budget'
-  | 'silent'
-  | 'budget-and-teardown'
-  | 'budget-and-silent'
-  | 'budget-then-coloured-timeout'
-  | 'budget-and-timeout-error'
-  | 'nothing'
-  | 'budget-then-coded'
-  | 'coloured-budget'
-  | 'two-budget-errors-one-test'
-  | 'crash';
+const OUTCOMES = [
+  'pass',
+  'budget',
+  'control',
+  'both',
+  'invalid',
+  'canvas',
+  'timeout',
+  'thrown',
+  'budget-and-thrown',
+  'near-budget',
+  'silent',
+  'budget-and-teardown',
+  'budget-and-silent',
+  'budget-then-coloured-timeout',
+  'budget-and-timeout-error',
+  'nothing',
+  'budget-then-coded',
+  'coloured-budget',
+  'two-budget-errors-one-test',
+  'crash',
+] as const;
+type Outcome = (typeof OUTCOMES)[number];
 
 function fakeCommand(dir: string, plan: Array<Outcome>) {
   const path = join(dir, 'fake.sh');
@@ -260,30 +262,18 @@ describe('perf-retry.sh: the decision table', () => {
   });
 });
 
-/** Attempt-1 outcomes that are not budget only: each must fail at once, never reaching a retry. */
-const NOT_BUDGET: Outcome[] = [
-  'both',
-  'invalid',
-  'canvas',
-  'timeout',
-  'thrown',
-  'budget-and-thrown',
-  'near-budget',
-  'silent',
-  'budget-and-teardown',
-  'budget-and-silent',
-  'budget-then-coloured-timeout',
-  'budget-and-timeout-error',
-  'budget-then-coded',
-  'two-budget-errors-one-test',
-  'crash',
-  'nothing',
-];
+/**
+ * Attempt-1 outcomes that are not budget only: every outcome but the pass and the two budget
+ * misses, so an outcome added to OUTCOMES is in this list unless it is added to the exclusions.
+ * Each must fail at once, never reaching a retry.
+ */
+const BUDGET_ONLY: readonly Outcome[] = ['pass', 'budget', 'coloured-budget'];
+const NOT_BUDGET = OUTCOMES.filter((o) => !BUDGET_ONLY.includes(o));
 
 describe('perf-retry.sh: attempt 1 is classified before any retry', () => {
   // Each plan's second outcome is a pass, so a script that retried would exit 0 as flaky.
   it('a control failure in attempt 1 exits 1 without a second attempt', () => {
-    for (const probe of ['normal', 'slow'] as const) {
+    for (const probe of ['normal', 'slow', 'missing'] as const) {
       const r = run(['control', 'pass'], probe);
       expect(r.status, probe).toBe(1);
       expect(r.args, probe).toEqual(['perf.spec.ts']);
