@@ -67,7 +67,10 @@ export function selectRenders(
   const fixes = new Set(openFixTemplates);
   const keys = [...templates.keys()].sort();
   for (const key of keys.filter((k) => fixes.has(k))) {
-    for (const p of templates.get(key)!.slice(0, PAGES_PER_FIX_TEMPLATE)) take(p, 'open_fix');
+    const pages = templates.get(key)!;
+    for (let i = 0; i < Math.min(PAGES_PER_FIX_TEMPLATE, pages.length); i += 1) {
+      take(pages[i]!, 'open_fix');
+    }
   }
   const largestFirst = keys
     .filter((k) => !fixes.has(k))
