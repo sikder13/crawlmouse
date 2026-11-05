@@ -181,7 +181,7 @@ function budgetSection(): string {
   return [
     '## Performance budgets, on the production build',
     '',
-    `From \`tests/visual/budgets.ts\`, which \`tests/visual/perf.spec.ts\` reads. CI runs it on \`next start\` after \`next build\` (VISUAL_SERVER=start, VISUAL_PERF=1, one worker). Each window is measured up to ${RUNS} times and judged on its best run.`,
+    `From \`tests/visual/budgets.ts\`, which \`tests/visual/perf.spec.ts\` reads. CI runs it on \`next start\` after \`next build\` (VISUAL_SERVER=start, VISUAL_PERF=1, one worker). Each window is measured ${RUNS} times and each budget is judged on the median of its ${RUNS} readings (\`docs/ops/ci-timing.md\`).`,
     '',
     table(
       ['Window', 'Budget'],

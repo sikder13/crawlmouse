@@ -1,0 +1,204 @@
+import { isMainThread } from 'node:worker_threads';
+import { recordSample } from './samples.js';
+import { fmt, median } from './stats.js';
+
+/** Measured runs per check; the check is judged on their median. */
+export const TIMING_RUNS = 5;
+/** Runs before the measured ones, not counted: the first call pays for compiling the code. */
+export const WARMUP_RUNS = 1;
+/**
+ * The default suite holds a median, in CPU time, to this many times its budget. The budget itself,
+ * on the wall clock, is held by the strict job (PERF_STRICT=1).
+ */
+export const DEFAULT_CEILING_FACTOR = 3;
+
+type Env = Record<string, string | undefined>;
+
+/** Whether this run holds medians to their budgets rather than the default ceiling. */
+export function isStrict(env: Env = process.env): boolean {
+  return env.PERF_STRICT === '1';
+}
+
+export interface Clock {
+  name: 'CPU time' | 'wall-clock time';
+  /** Milliseconds. */
+  now: () => number;
+}
+
+/**
+ * The clock a check reads. The default suite reads CPU time, user plus system, because the wall
+ * clock measures the machine as well as the code: on a loaded machine a function waits for a core,
+ * and only the wall clock counts the wait. PERF_STRICT=1 reads the wall clock, the time a reader
+ * waits, which is what a budget promises. `process.cpuUsage()` counts every thread of the process,
+ * so CPU time is refused inside a worker thread (vitest's `threads` pool); the suites run in the
+ * default `forks` pool.
+ */
+export function clockFor(env: Env = process.env, mainThread: boolean = isMainThread): Clock {
+  if (isStrict(env)) return { name: 'wall-clock time', now: () => performance.now() };
+  if (!mainThread) {
+    throw new Error(
+      'CPU time in a worker thread counts every thread of the process; run this suite in the forks pool.',
+    );
+  }
+  return {
+    name: 'CPU time',
+    now: () => {
+      const { user, system } = process.cpuUsage();
+      return (user + system) / 1000;
+    },
+  };
+}
+
+interface Options {
+  /** Milliseconds; injected by tests in place of the clock clockFor picks. */
+  now?: () => number;
+  /** Read for PERF_STRICT and PERF_SAMPLES_DIR; injected by tests. */
+  env?: Env;
+}
+
+export interface BudgetOptions<I> extends Options {
+  budgetMs: number;
+  /**
+   * Builds the input for one run, off the clock. Each run, the warm-up included, gets a fresh one,
+   * so a cache keyed on the input cannot turn the measured runs into cache hits. An input of equal
+   * value (a string, say) still reaches a cache keyed on its value.
+   */
+  setup?: () => I;
+}
+
+export interface BudgetResult<T> {
+  /** What each run returned, the warm-up first: `values[0]` is the cold call. */
+  values: T[];
+  samples: number[];
+  median: number;
+  limitMs: number;
+}
+
+const list = (xs: number[]) => `${xs.map(fmt).join(', ')} ms`;
+
+function timed<T>(fn: () => T, now: () => number): { value: T; ms: number } {
+  const start = now();
+  const value = fn();
+  return { value, ms: now() - start };
+}
+
+/** Runs needed over the limit for the median of TIMING_RUNS to be over it. */
+const MAJORITY = Math.floor(TIMING_RUNS / 2) + 1;
+
+/**
+ * Runs `fn` WARMUP_RUNS times, then up to TIMING_RUNS times on the clock clockFor picks, and throws
+ * unless the median of those runs is under the limit: the budget, on the wall clock, under
+ * PERF_STRICT=1; DEFAULT_CEILING_FACTOR times it, in CPU time, otherwise. It stops as soon as
+ * MAJORITY runs are over the limit, since the median is then over it whatever the rest read. The
+ * samples are recorded to PERF_SAMPLES_DIR, when set, pass or fail.
+ */
+export function expectWithinBudget<T, I = undefined>(
+  name: string,
+  fn: (input: I) => T,
+  { budgetMs, setup, now, env = process.env }: BudgetOptions<I>,
+): BudgetResult<T> {
+  const strict = isStrict(env);
+  const clock = clockFor(env);
+  const read = now ?? clock.now;
+  const limitMs = strict ? budgetMs : budgetMs * DEFAULT_CEILING_FACTOR;
+  const run = () => {
+    const input = (setup ? setup() : undefined) as I;
+    return timed(() => fn(input), read);
+  };
+  const warmups = Array.from({ length: WARMUP_RUNS }, run);
+  const runs: Array<{ value: T; ms: number }> = [];
+  let over = 0;
+  while (runs.length < TIMING_RUNS && over < MAJORITY) {
+    const r = run();
+    runs.push(r);
+    if (!(r.ms < limitMs)) over++;
+  }
+  const samples = runs.map((r) => r.ms);
+  const mid = median(samples);
+  const pass = over < MAJORITY && mid < limitMs;
+  recordSample(env.PERF_SAMPLES_DIR, {
+    metric: name,
+    unit: 'ms',
+    median: mid,
+    limit: limitMs,
+    pass,
+    samples,
+  });
+  if (!pass) {
+    const against = strict
+      ? `the budget of ${fmt(budgetMs)} ms (PERF_STRICT=1)`
+      : `the default ceiling of ${fmt(limitMs)} ms (${DEFAULT_CEILING_FACTOR} × the ${fmt(budgetMs)} ms budget, which the strict job holds)`;
+    const verdict =
+      runs.length < TIMING_RUNS
+        ? `${over} of ${runs.length} runs over the limit, so the median of ${TIMING_RUNS} is over it: ${clock.name} against ${against}`
+        : `median ${fmt(mid)} ms of ${clock.name} over ${TIMING_RUNS} runs is not under ${against}`;
+    throw new Error(
+      `${name}: ${verdict}. Samples: ${list(samples)}; warm-up ${list(warmups.map((w) => w.ms))}.`,
+    );
+  }
+  return {
+    values: [...warmups, ...runs].map((r) => r.value),
+    samples,
+    median: mid,
+    limitMs,
+  };
+}
+
+export interface RelativeOptions<A, B> extends Options {
+  /** The limit for the measured median, given the reference median. */
+  limit: (referenceMs: number) => number;
+  /** The rule the limit encodes, in words, for the failure message. */
+  rule: string;
+  /**
+   * Builds the inputs for one pair, off the clock. Each pair, the warm-up included, gets fresh ones,
+   * so a cache keyed on an input object cannot turn the measured runs into hits.
+   */
+  setup?: () => { measured: A; reference: B };
+}
+
+/**
+ * Times `measured` and `reference` in turn, a warm-up of each and then TIMING_RUNS pairs, and
+ * throws unless the median of `measured` is under `limit(median of reference)`, on the clock
+ * clockFor picks. Interleaving puts both sides under the same load, so the comparison has no
+ * ceiling factor.
+ */
+export function expectWithinRelative<A = undefined, B = undefined>(
+  name: string,
+  { measured, reference }: { measured: (input: A) => unknown; reference: (input: B) => unknown },
+  { limit, rule, setup, now, env = process.env }: RelativeOptions<A, B>,
+): { measured: number[]; reference: number[] } {
+  const clock = clockFor(env);
+  const read = now ?? clock.now;
+  const pair = () => {
+    const inputs = setup ? setup() : { measured: undefined as A, reference: undefined as B };
+    return {
+      m: timed(() => measured(inputs.measured), read).ms,
+      r: timed(() => reference(inputs.reference), read).ms,
+    };
+  };
+  for (let i = 0; i < WARMUP_RUNS; i++) pair();
+  const m: number[] = [];
+  const r: number[] = [];
+  for (let i = 0; i < TIMING_RUNS; i++) {
+    const p = pair();
+    m.push(p.m);
+    r.push(p.r);
+  }
+  const bound = limit(median(r));
+  const pass = median(m) < bound;
+  recordSample(env.PERF_SAMPLES_DIR, {
+    metric: name,
+    unit: 'ms',
+    median: median(m),
+    limit: bound,
+    pass,
+    samples: m,
+  });
+  if (!pass) {
+    throw new Error(
+      `${name}: median ${fmt(median(m))} ms of ${clock.name} is not under ${fmt(bound)} ms (${rule}). ` +
+        `Measured: ${list(m)}; reference: ${list(r)}, median ${fmt(median(r))} ms.`,
+    );
+  }
+  return { measured: m, reference: r };
+}

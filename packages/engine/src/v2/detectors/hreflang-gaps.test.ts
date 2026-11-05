@@ -1,3 +1,4 @@
+import { expectWithinBudget } from '@crawlmouse/timing';
 import { describe, expect, it } from 'vitest';
 import { site, u } from '../../../fixtures/v2/detectors/builders.js';
 import {
@@ -255,11 +256,12 @@ describe('hreflang_gap', () => {
         },
       })),
     ];
-    const input = site(specs);
-    const started = performance.now();
-    const out = detectHreflangGaps(input);
-    // Measured at about 0.25 s; a copy per URL took 43 s.
-    expect(performance.now() - started).toBeLessThan(5_000);
-    expect(out).toHaveLength(1);
+    // Measured at about 0.25 s; a copy per URL took 43 s. Each run gets a site built for it.
+    const { values } = expectWithinBudget(
+      'hreflang clusters, 400 pages of 256 alternates',
+      (input: ReturnType<typeof site>) => detectHreflangGaps(input),
+      { budgetMs: 5_000, setup: () => site(specs) },
+    );
+    expect(values[0]).toHaveLength(1);
   }, 30_000);
 });

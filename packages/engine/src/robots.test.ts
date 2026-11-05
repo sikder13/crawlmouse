@@ -1,3 +1,4 @@
+import { expectWithinBudget } from '@crawlmouse/timing';
 import { afterEach, describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import {
@@ -561,8 +562,13 @@ describe('parse cost and storage are linear in the file', () => {
       used += line.length;
     }
     expect(lines.length).toBeGreaterThan(30_000);
-    const { ms, robots } = timedParse(lines.join('') + 'Disallow:/\n');
-    expect(ms).toBeLessThan(1000);
+    const text = lines.join('') + 'Disallow:/\n';
+    const { values } = expectWithinBudget(
+      'robots.txt of 30,000+ User-agent lines in one group',
+      () => parseRobotsTxt(text),
+      { budgetMs: 1000 },
+    );
+    const robots = values[0]!;
     expect(Object.keys(robots.rules)).toHaveLength(lines.length);
     expect(isAllowedByRobots(robots, id(lines.length - 1), '/x')).toBe(false);
   });
@@ -573,15 +579,22 @@ describe('parse cost and storage are linear in the file', () => {
     expect(utf8Bytes(text)).toBeGreaterThan(LIMIT - 32);
     expect(bigPaths.length).toBeGreaterThan(20_000);
 
-    const t0 = performance.now();
-    const robots = parseRobotsTxt(text);
-    const a = robots.rules[id(42)];
-    const ownPathBlocked = !isAllowedByRobots(robots, id(43).toUpperCase(), `/-${id(43)}`);
-    const otherPathAllowed = isAllowedByRobots(robots, id(43), `/-${id(42)}`);
-    const ms = performance.now() - t0;
     // Tighter than the 2 s used above: combining every agent at parse time instead of on first read
     // is the regression this shape exists to catch, and it misses a 2 s bound by less.
-    expect(ms).toBeLessThan(1000);
+    const { values } = expectWithinBudget(
+      'robots.txt with every agent in two groups, parse and look up',
+      () => {
+        const robots = parseRobotsTxt(text);
+        return {
+          robots,
+          a: robots.rules[id(42)],
+          ownPathBlocked: !isAllowedByRobots(robots, id(43).toUpperCase(), `/-${id(43)}`),
+          otherPathAllowed: isAllowedByRobots(robots, id(43), `/-${id(42)}`),
+        };
+      },
+      { budgetMs: 1000 },
+    );
+    const { robots, a, ownPathBlocked, otherPathAllowed } = values[0]!;
 
     expect(Object.keys(robots.rules)).toHaveLength(agents);
     expect(a).toEqual({ disallow: [`/-${id(42)}`], allow: bigPaths });

@@ -21,6 +21,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@crawlmouse/timing": "workspace:*",
     "@types/node": "^22.5.0",
     "esbuild": "0.28.0",
     "fast-check": "^4.9.0",

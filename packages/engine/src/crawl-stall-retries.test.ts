@@ -33,8 +33,12 @@ const FASTS = 4;
 const stallPaths = Array.from({ length: STALLS }, (_, i) => `/a-stall-${i}`);
 const fastPaths = Array.from({ length: FASTS }, (_, i) => `/z-fast-${i}`);
 
-/** Long enough that a fixed crawl finishes with room; far short of the retried cost. */
-const BUDGET_MS = 9000;
+/**
+ * Three times what the fixed crawl takes, and well short of what the retrying one needs: measured
+ * at 7.2 s fixed and 35 s with the retries restored (docs/ops/ci-timing.md). At 9 s the fixed crawl
+ * had 1.8 s to spare, so a loaded machine cut it and these tests measured the clock.
+ */
+const BUDGET_MS = 22_000;
 const NAV_TIMEOUT_SECS = 1;
 
 beforeAll(async () => {
@@ -46,7 +50,11 @@ beforeAll(async () => {
     res.on('error', () => {});
     const path = (req.url ?? '/').split('?')[0]!;
     requested.push(path);
-    if (path === '/robots.txt' || path === '/sitemap.xml') { res.statusCode = 404; res.end(''); return; }
+    if (path === '/robots.txt' || path === '/sitemap.xml') {
+      res.statusCode = 404;
+      res.end('');
+      return;
+    }
     // The stall: accept the connection, never answer. Every retry is a fresh request and shows up in
     // `requested`, which is what makes the retry count observable rather than inferred.
     if (stallPaths.includes(path)) return;
@@ -62,7 +70,9 @@ afterAll(async () => {
   await new Promise<void>((r) => server.close(() => r()));
 });
 
-beforeEach(() => { requested = []; });
+beforeEach(() => {
+  requested = [];
+});
 
 const INPUT = () => ({
   startUrls: [baseUrl],
@@ -77,7 +87,8 @@ const INPUT = () => ({
   navigationTimeoutSecsForTesting: NAV_TIMEOUT_SECS,
 });
 
-const pathsOf = (out: { pages: { url: string }[] }) => out.pages.map((p) => new URL(p.url).pathname);
+const pathsOf = (out: { pages: { url: string }[] }) =>
+  out.pages.map((p) => new URL(p.url).pathname);
 
 describe('SPEC 5.1a §6 — a navigation timeout is a verdict, not a throttle', () => {
   it('spends ONE request on a stalled URL, not the whole retry budget', async () => {
@@ -85,7 +96,7 @@ describe('SPEC 5.1a §6 — a navigation timeout is a verdict, not a throttle', 
     // costs five identical 30s waits in production to establish what the first one established.
     //
     // THE BUDGET HERE IS DELIBERATELY GENEROUS, and the first draft of this test proved why: under the
-    // 9s budget the other two tests use, this assertion PASSED ON THE RETRYING WIRING — not because
+    // 9 s budget the other two tests then used, this assertion PASSED ON THE RETRYING WIRING — not because
     // retries were suppressed but because the deadline fired before any retry was attempted. A count of
     // one meant "we ran out of time", not "we declined to repeat ourselves". The budget must be large
     // enough for the retries to happen, or the test measures the clock instead of the policy.

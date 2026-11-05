@@ -97,7 +97,7 @@ From `apps/web/components/v2/screens/map/keys.ts`. The focus sits on a listbox o
 
 ## Performance budgets, on the production build
 
-From `tests/visual/budgets.ts`, which `tests/visual/perf.spec.ts` reads. CI runs it on `next start` after `next build` (VISUAL_SERVER=start, VISUAL_PERF=1, one worker). Each window is measured up to 3 times and judged on its best run.
+From `tests/visual/budgets.ts`, which `tests/visual/perf.spec.ts` reads. CI runs it on `next start` after `next build` (VISUAL_SERVER=start, VISUAL_PERF=1, one worker). Each window is measured 5 times and each budget is judged on the median of its 5 readings (`docs/ops/ci-timing.md`).
 
 | Window                                                                                | Budget                                                                                                                                    |
 | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
