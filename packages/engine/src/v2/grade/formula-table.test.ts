@@ -66,7 +66,7 @@ describe('Access (max 40)', () => {
     expect(a.score).toBe(26.67);
   });
 
-  it('A4b: a robots.txt disallow never lowers the score: the same site with that crawler served scores no less', () => {
+  it('A4b: with the others served in full, a crawler disallowed by robots.txt leaves Access at 40, as serving it would', () => {
     const blocked = accessScore(
       four({ allowed: 4 }, { allowed: 4 }, { disallowed_by_robots: 4 }, { allowed: 4 }),
     );
@@ -114,7 +114,7 @@ describe('Access (max 40)', () => {
     expect([a.score, a.reason]).toEqual([null, 'too_few_crawlers_measured']);
   });
 
-  it('A5d: a robots.txt disallow raises Access as an unblock does (respected intent): 20 → 40 either way', () => {
+  it('A5d: with the other measured crawler served in full, disallowing the blocked one raises Access as far as unblocking it: 20 → 40 either way', () => {
     const u = { blocked_by_ua_rule: 2 };
     const d = { disallowed_by_robots: 2 };
     const before = accessScore(four({ allowed: 2 }, u, d, d));
