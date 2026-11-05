@@ -15,7 +15,8 @@ export const READABLE_FROM = 0.8;
 
 /**
  * Static words over rendered words, at most 1; null when the rendered side has no words. A static side
- * longer than the rendered one (a script that removes text) is clamped: the page serves all of it.
+ * with more words than the rendered one is clamped to 1. A script that removes text is one cause; a
+ * rendered side that was counted short is another, and the clamp reads it as readable all the same.
  */
 export function textShare(rawWords: number, renderedWords: number): number | null {
   if (renderedWords === 0) return null;

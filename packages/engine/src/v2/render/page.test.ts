@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { CHALLENGE_MARKERS, CHALLENGE_TITLES, challengeIn } from './challenge.js';
+import {
+  CHALLENGE_MARKERS,
+  CHALLENGE_TITLE_ENDINGS,
+  CHALLENGE_TITLES,
+  challengeIn,
+} from './challenge.js';
 import { measurePage } from './page.js';
 
 const page = (main: string, title = 'A page') =>
@@ -68,6 +73,11 @@ describe('a page that is not measured', () => {
 describe('challenge pages', () => {
   it.each(CHALLENGE_TITLES)('are recognised by the title %j, in any case', (title) => {
     expect(challengeIn(page('<p>x</p>', title.toUpperCase()))).toBe(true);
+  });
+
+  it.each(CHALLENGE_TITLE_ENDINGS)('are recognised by a title ending %j', (ending) => {
+    expect(challengeIn(page('<p>x</p>', `Access denied | shop.example ${ending}`))).toBe(true);
+    expect(challengeIn(page('<p>x</p>', `${ending} — a history`))).toBe(false);
   });
 
   it.each(CHALLENGE_MARKERS)('are recognised by the marker %j in the HTML', (marker) => {

@@ -26,7 +26,16 @@ export interface SiteEstimate {
   templates_total: number;
   /** Graded pages in a template with no rendered page, over all graded pages; 1 when none is graded. */
   unrendered_share: number;
-  /** "estimated from N rendered pages across K of T templates"; null when nothing was rendered. */
+  /**
+   * Of the weight behind site_text_share, the part resting on templates with a single rendered page:
+   * their ratio is one page's share. 0 when nothing was rendered.
+   */
+  single_render_weight: number;
+  /**
+   * "estimated from N rendered pages across K of T templates", then, where they are above zero, the
+   * percentage of graded pages in templates with no rendered page and the percentage of the estimate
+   * resting on a single rendered page per template. Null when nothing was rendered.
+   */
   label: string | null;
 }
 
@@ -37,6 +46,12 @@ function median(xs: readonly number[]): number {
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** A share as a whole percentage, never rounded down to 0 % or up to 100 % when it is neither. */
+function percent(x: number): string {
+  const p = Math.round(x * 100);
+  return `${x > 0 && p === 0 ? '<1' : x < 1 && p === 100 ? '>99' : p} %`;
+}
 
 export function siteEstimate(pages: readonly GradedPageShare[]): SiteEstimate {
   const templates = new Map<string, { pages: number; shares: number[] }>();
@@ -50,24 +65,35 @@ export function siteEstimate(pages: readonly GradedPageShare[]): SiteEstimate {
   let renderedWeight = 0;
   let renderedPages = 0;
   let templatesRendered = 0;
+  let singleWeight = 0;
   for (const t of templates.values()) {
     if (t.shares.length === 0) continue;
     weighted += t.pages * median(t.shares);
     renderedWeight += t.pages;
     renderedPages += t.shares.length;
     templatesRendered += 1;
+    if (t.shares.length === 1) singleWeight += t.pages;
   }
   const total = templates.size;
   const site_text_share = renderedWeight === 0 ? null : weighted / renderedWeight;
+  const unrendered_share = pages.length === 0 ? 1 : (pages.length - renderedWeight) / pages.length;
+  const single_render_weight = renderedWeight === 0 ? 0 : singleWeight / renderedWeight;
+  const clauses = [
+    `estimated from ${plural(renderedPages, 'rendered page')} across ${templatesRendered} of ${plural(total, 'template')}`,
+    ...(unrendered_share > 0
+      ? [`${percent(unrendered_share)} of graded pages are in templates not rendered`]
+      : []),
+    ...(single_render_weight > 0
+      ? [`${percent(single_render_weight)} of the estimate rests on one rendered page per template`]
+      : []),
+  ];
   return {
     site_text_share,
     rendered_pages: renderedPages,
     templates_rendered: templatesRendered,
     templates_total: total,
-    unrendered_share: pages.length === 0 ? 1 : (pages.length - renderedWeight) / pages.length,
-    label:
-      site_text_share === null
-        ? null
-        : `estimated from ${plural(renderedPages, 'rendered page')} across ${templatesRendered} of ${plural(total, 'template')}`,
+    unrendered_share,
+    single_render_weight,
+    label: site_text_share === null ? null : clauses.join('; '),
   };
 }

@@ -24,7 +24,9 @@ describe('the site estimate', () => {
       rendered_pages: 4,
       templates_rendered: 2,
       templates_total: 3,
-      label: 'estimated from 4 rendered pages across 2 of 3 templates',
+      single_render_weight: 0.4,
+      label:
+        'estimated from 4 rendered pages across 2 of 3 templates; 50 % of graded pages are in templates not rendered; 40 % of the estimate rests on one rendered page per template',
     });
   });
 
@@ -46,7 +48,7 @@ describe('the site estimate', () => {
 
   it('says one page and one template in the singular', () => {
     expect(siteEstimate(pages('/t', [0.5])).label).toBe(
-      'estimated from 1 rendered page across 1 of 1 template',
+      'estimated from 1 rendered page across 1 of 1 template; 100 % of the estimate rests on one rendered page per template',
     );
   });
 
@@ -57,6 +59,7 @@ describe('the site estimate', () => {
       templates_rendered: 0,
       templates_total: 1,
       unrendered_share: 1,
+      single_render_weight: 0,
       label: null,
     });
   });
@@ -68,8 +71,39 @@ describe('the site estimate', () => {
       templates_rendered: 0,
       templates_total: 0,
       unrendered_share: 1,
+      single_render_weight: 0,
       label: null,
     });
+  });
+});
+
+describe('a site whose estimate rests on little', () => {
+  it('says so when one rendered page stands for a site whose graded pages are almost all unrendered', () => {
+    const e = siteEstimate([...pages('/', [1]), ...pages('/p/{slug}', Array(1000).fill(null))]);
+    expect(e.site_text_share).toBe(1);
+    expect(e.label).toBe(
+      'estimated from 1 rendered page across 1 of 2 templates; >99 % of graded pages are in templates not rendered; 100 % of the estimate rests on one rendered page per template',
+    );
+  });
+
+  it('says how much of the estimate one page per template carries', () => {
+    // 400 graded pages with one rendered, and a 10-page template with ten rendered: 400 / 410.
+    const e = siteEstimate([
+      ...pages('/big', [1, ...Array(399).fill(null)]),
+      ...pages('/small', Array(10).fill(0)),
+    ]);
+    expect(e.single_render_weight).toBeCloseTo(400 / 410, 12);
+    expect(e.label).toContain('98 % of the estimate rests on one rendered page per template');
+    expect(e.label).not.toContain('templates not rendered');
+  });
+
+  it('never rounds a part that is there down to 0 %', () => {
+    const e = siteEstimate([
+      ...pages('/a', [0.5, 0.5]),
+      ...pages('/a', Array(998).fill(null)),
+      ...pages('/b', [null]),
+    ]);
+    expect(e.label).toContain('<1 % of graded pages are in templates not rendered');
   });
 });
 
