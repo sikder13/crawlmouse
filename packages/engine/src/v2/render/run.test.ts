@@ -452,6 +452,47 @@ describe('the per-day cap', () => {
   });
 });
 
+describe('a page that throws out of the render', () => {
+  it('lets the other pages finish, settles what the check counted, and then throws', async () => {
+    const log: string[] = [];
+    const tooMany: RenderReply = {
+      ok: false,
+      reason: 'rate_limited',
+      retryAfterMs: 1000,
+      browserMs: 0,
+    };
+    const inner = fakeClient(FIXTURES.values(), {
+      delayMs: 2,
+      before: (_n, url) => (url === urlOf('server-rendered') ? tooMany : undefined),
+    });
+    const client = {
+      async content(url: string, side: 'static' | 'rendered') {
+        log.push('request');
+        return inner.content(url, side);
+      },
+    };
+    const settle = vi.fn(async (_reservedMs: number, _usedMs: number) => {
+      log.push('settle');
+    });
+    const run = renderCheck(
+      input({
+        client,
+        daily: { reserve: async () => true, settle },
+        sleep: async () => {
+          throw new Error('sleep failed');
+        },
+      }),
+    );
+    await expect(run).rejects.toThrow('sleep failed');
+    expect(log.at(-1)).toBe('settle');
+    expect(settle).toHaveBeenCalledTimes(1);
+    // The two other pages rendered both sides; their time is in the settle.
+    const other = [fixture('client-rendered'), fixture('partial')];
+    const used = other.reduce((a, f) => a + f.static.browser_ms + f.rendered.browser_ms, 0);
+    expect(settle.mock.calls[0]![1]).toBe(used);
+  });
+});
+
 describe('a 429 from Browser Run', () => {
   const tooMany: RenderReply = {
     ok: false,

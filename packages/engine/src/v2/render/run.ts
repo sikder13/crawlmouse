@@ -248,7 +248,11 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
       results[i] = await renderPage(sample[i]!, allowanceMs);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(RENDER_IN_FLIGHT, sample.length) }, worker));
+  // Every worker is waited for, even after one throws, so no request is still open when the budget
+  // is settled; a throw is passed on only after the settle.
+  const ran = await Promise.allSettled(
+    Array.from({ length: Math.min(RENDER_IN_FLIGHT, sample.length) }, worker),
+  );
 
   if (reserved) {
     try {
@@ -257,6 +261,8 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
       settleFailed = true;
     }
   }
+  const thrown = ran.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (thrown) throw thrown.reason;
 
   const shares = new Map(
     results.flatMap((r) => (r.rendered ? [[r.url, r.without_js.text_share] as const] : [])),
