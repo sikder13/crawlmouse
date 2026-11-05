@@ -18,6 +18,8 @@ permissions:
 
 jobs:
   delete-branch:
+    # As in db-dry-run.yml: Renovate's pull requests never get a branch, and never get the token.
+    if: github.event.pull_request.user.login != 'renovate[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: db-dry-run

@@ -7,7 +7,8 @@ name: DB apply to production
 #           reads production's pending files and refuses any the dry run did not apply byte for
 #           byte. The job summary lists each pending file with its sha256, next to the dry run's.
 #   apply   bound to the `production` environment, so it waits for the owner's approval. It
-#           re-checks the files against the approved manifest, runs `supabase db push`, the checks
+#           re-checks the files against the approved manifest and production's fingerprint against
+#           the one the plan read, runs `supabase db push`, the checks
 #           and the fingerprint. It never retries and never runs a rollback.
 #   report  opens an issue when either job fails.
 
@@ -44,6 +45,7 @@ jobs:
       pull-requests: read
     outputs:
       manifest: ${{ steps.plan.outputs.manifest }}
+      production: ${{ steps.plan.outputs.production }}
       pending: ${{ steps.plan.outputs.pending }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -95,11 +97,16 @@ jobs:
           set -euo pipefail
           pnpm exec tsx db/production.ts plan --yes-production \
             --dry-run-summary "$RUNNER_TEMP/dry-run/db-dry-run-summary.json" \
-            --manifest-out "$RUNNER_TEMP/manifest.json"
+            --manifest-out "$RUNNER_TEMP/manifest.json" \
+            --production-out "$RUNNER_TEMP/production.json"
           manifest=$(cat "$RUNNER_TEMP/manifest.json")
           pending=$(jq length "$RUNNER_TEMP/manifest.json")
-          echo "manifest=$manifest" >> "$GITHUB_OUTPUT"
-          echo "pending=$pending" >> "$GITHUB_OUTPUT"
+          production=$(cat "$RUNNER_TEMP/production.json")
+          {
+            echo "manifest=$manifest"
+            echo "production=$production"
+            echo "pending=$pending"
+          } >> "$GITHUB_OUTPUT"
 
   apply:
     needs: plan
@@ -122,10 +129,13 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           MANIFEST: ${{ needs.plan.outputs.manifest }}
+          PRODUCTION: ${{ needs.plan.outputs.production }}
         run: |
           set -euo pipefail
           printf '%s' "$MANIFEST" > "$RUNNER_TEMP/manifest.json"
-          pnpm exec tsx db/production.ts apply --yes-production --manifest "$RUNNER_TEMP/manifest.json"
+          printf '%s' "$PRODUCTION" > "$RUNNER_TEMP/production.json"
+          pnpm exec tsx db/production.ts apply --yes-production \
+            --manifest "$RUNNER_TEMP/manifest.json" --expect-production "$RUNNER_TEMP/production.json"
 
   report:
     needs: [plan, apply]

@@ -71,8 +71,10 @@ jobs:
           retention-days: 90
           overwrite: true
           if-no-files-found: error
+      # The artifact above is the evidence the gate reads; a failure to comment must not fail it.
       - name: Post the summary on the pull request
         if: ${{ !cancelled() }}
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -83,8 +85,11 @@ jobs:
           body="$RUNNER_TEMP/db-dry-run-summary.md"
           [ -f "$body" ] || exit 0
           printf '\n<!-- db-dry-run -->\n' >> "$body"
+          # Every marker comment's id, one per line (jq runs per page); the first is ours. sed reads
+          # all of its input, so gh never writes to a closed pipe.
           id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- db-dry-run -->")))][0].id // empty' | head -n 1)
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- db-dry-run -->"))) | .id' \
+            | sed -n 1p)
           if [ -n "$id" ]; then
             jq -n --rawfile body "$body" '{body: $body}' \
               | gh api --method PATCH "repos/$REPO/issues/comments/$id" --input - > /dev/null

@@ -332,6 +332,43 @@ jobs:
           entrypoint: /root/osv-scanner
           args: scan source --config=osv-scanner.toml --lockfile=pnpm-lock.yaml
 
+  # Migration files are append-only: once on main, a migration file is applied or about to be, and
+  # an edit would never reach production (scripts/db/dry-run.ts refuses it too, but the dry run runs
+  # only on pull requests that touch the database). This job runs on every push and pull request,
+  # so it can be a required check.
+  migrations-append-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: No migration file is modified, deleted or renamed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$(git rev-parse HEAD^1)"
+          elif [ "$REF" = "refs/heads/main" ]; then
+            base="$PUSH_BEFORE"
+          else
+            base="$(git merge-base origin/main HEAD)"
+          fi
+          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD^)"
+          fi
+          changed=$(git diff --name-status --diff-filter=MDR "$base" HEAD -- infra/supabase/migrations)
+          if [ -n "$changed" ]; then
+            echo "$changed"
+            echo "::error::a migration file was modified, deleted or renamed; add a new migration instead"
+            exit 1
+          fi
+          echo "no migration file modified, deleted or renamed since $base"
+
   # actionlint over the workflows, with shellcheck on their run blocks (both are in the image).
   # Pinned by image digest. nightly.yml runs on its own with two findings ignored that predate this
   # job: the skipped Lighthouse placeholder (`if: false`) and an `ls` in its run block (SC2012,
