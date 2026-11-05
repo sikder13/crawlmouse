@@ -179,7 +179,7 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
       }
       checkHeld += pageReserve;
       asking += 1;
-      let reserved: boolean;
+      let reserved: unknown;
       try {
         reserved = await input.daily.reserve(pageReserve, input.caps.perDayMs);
       } catch {
@@ -188,7 +188,7 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
       } finally {
         asking -= 1;
       }
-      if (reserved) {
+      if (reserved === true) {
         rendering += 1;
         return null;
       }

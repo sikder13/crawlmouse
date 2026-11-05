@@ -106,7 +106,7 @@ describe('a check whose renders all succeed', () => {
     // By hand: three templates of one graded page each, shares 1, 0 and 0.5.
     expect(out.estimate.site_text_share).toBeCloseTo(0.5, 12);
     expect(out.estimate.label).toBe(
-      "estimated from 3 rendered pages across 3 of 3 templates; 100 % of the estimate's weight rests on one measured page per template",
+      "estimated from 3 measured pages across 3 of 3 templates; 100 % of the estimate's weight rests on one measured page per template",
     );
   });
 
@@ -269,7 +269,7 @@ describe('the estimate behind a check', () => {
     const out = await renderCheck(
       input({ candidates: [candidate(f, '/g', 0.5), candidate(f, '/f', 0.5)] }),
     );
-    expect(out.estimate.rendered_pages).toBe(1);
+    expect(out.estimate.measured_pages).toBe(1);
     expect(out.estimate.templates_total).toBe(1);
   });
 
@@ -436,6 +436,12 @@ describe('the per-day cap', () => {
     ]);
     expect(outcome).not.toBe('hung');
     expect((await run).pages.every((p) => !p.rendered && p.reason === 'daily_cap')).toBe(true);
+  });
+
+  it('takes only true as a reservation granted', async () => {
+    const reserve = vi.fn(async () => 'false' as unknown as boolean);
+    const out = await renderCheck(input({ daily: { reserve, settle: async () => {} } }));
+    expect(out.pages.every((p) => !p.rendered && p.reason === 'daily_cap')).toBe(true);
   });
 
   it('gives back what a render did not use', async () => {

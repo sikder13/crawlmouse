@@ -34,7 +34,10 @@ export function capsFromEnv(env: Record<string, string | undefined>): RenderCaps
 }
 
 export interface DailyBudget {
-  /** Reserve `ms` of today's browser time: false when that would pass `limitMs`, today's cap. */
+  /**
+   * Reserve `ms` of today's browser time: false when that would pass `limitMs`, today's cap. Only `true`
+   * is taken as granted.
+   */
   reserve(ms: number, limitMs: number): Promise<boolean>;
   /** Close a reservation of `reservedMs` that used `usedMs`, giving back or adding the difference. */
   settle(reservedMs: number, usedMs: number): Promise<void>;
