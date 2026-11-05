@@ -4,7 +4,13 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { renderRequestBody } from './client.js';
 import { defaultAdmit, NotAdmitted } from './admission.js';
-import { REJECTED_HOSTS, refusingRule, URL_RULES } from './policy.js';
+import {
+  REJECTED_HOSTS,
+  refusingRule,
+  URL_RULES,
+  wirePattern,
+  PATTERNS_SHOWN_LIVE,
+} from './policy.js';
 
 const HOSTILE = readFileSync(
   new URL('../../../fixtures/v2/render/hostile-page.html', import.meta.url),
@@ -35,7 +41,8 @@ function attempts(): Attempt[] {
  */
 function refusedOnTheWire(body: ReturnType<typeof renderRequestBody>, a: Attempt): boolean {
   const href = new URL(a.url).href;
-  const patterns = body.rejectRequestPattern.map((p) => new RegExp(p.slice(1, -1)));
+  // Read as Browser Run was seen to read them live: each string is the expression's source.
+  const patterns = body.rejectRequestPattern.map((p) => new RegExp(p));
   const byType = a.resourceType !== null && body.rejectResourceTypes.includes(a.resourceType);
   return byType || patterns.some((re) => re.test(href));
 }
@@ -43,6 +50,8 @@ function refusedOnTheWire(body: ReturnType<typeof renderRequestBody>, a: Attempt
 /** A resolver that answers with a public address, so a refusal cannot have come from DNS. */
 const publicResolver = async () => ['93.184.215.14'];
 
+// Each case is covered by what we send. Browser Run applied the patterns live (PATTERNS_SHOWN_LIVE);
+// the WebSocket case is the exception: live, it opened anyway (spec, known limits).
 const CASES = ['file', 'metadata', 'mapped-loopback', 'download', 'websocket'] as const;
 
 describe('the hostile fixture page', () => {
@@ -53,17 +62,32 @@ describe('the hostile fixture page', () => {
   describe.each(CASES)('its %s attempt', (name) => {
     const a = () => attempts().find((x) => x.attempt === name)!;
 
-    it('is refused by what the rendered side sends Browser Run', () => {
+    it('is covered by what the rendered side sends Browser Run', () => {
       expect(refusedOnTheWire(renderRequestBody(a().url, 'rendered'), a())).toBe(true);
     });
 
-    it('is refused by what the static side sends Browser Run', () => {
+    it('is covered by what the static side sends Browser Run', () => {
       expect(refusedOnTheWire(renderRequestBody(a().url, 'static'), a())).toBe(true);
     });
 
     it('is refused as a navigation before any request is sent', async () => {
       await expect(defaultAdmit(publicResolver)(a().url)).rejects.toBeInstanceOf(NotAdmitted);
     });
+  });
+});
+
+describe('a pattern on the wire', () => {
+  it('is the bare regular-expression source, the form the live probe showed applied', () => {
+    expect(wirePattern(/^https?:\/\/a\.example(?:[/?#]|$)/)).toBe(
+      '^https?:\\/\\/a\\.example(?:[/?#]|$)',
+    );
+    for (const r of URL_RULES) {
+      const wire = wirePattern(r.pattern);
+      expect(wire).toBe(r.pattern.source);
+      expect(wire.startsWith('/')).toBe(false);
+      expect(new RegExp(wire).source).toBe(r.pattern.source);
+    }
+    expect(PATTERNS_SHOWN_LIVE).toBe('2026-11-05');
   });
 });
 

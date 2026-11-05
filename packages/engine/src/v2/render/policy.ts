@@ -18,8 +18,9 @@
 
 /**
  * Resource types refused on both sides: media adds no text, and WebSocket and eventsource are long-lived
- * connections a measurement of the page does not need. A page whose text arrives over one loses that
- * text on the rendered side.
+ * connections a measurement of the page does not need. The live policy probe of 2026-11-05 saw a
+ * WebSocket open with `websocket` refused here and with the `scheme` rule matching its URL, so naming
+ * it here does not stop it (spec, known limits). It stays listed so the request asks for what it means.
  */
 export const REJECTED_RESOURCE_TYPES = ['websocket', 'eventsource', 'media'] as const;
 
@@ -214,8 +215,13 @@ export const URL_RULES: readonly UrlRule[] = [
   ...REJECTED_HOSTS.map(hostRule),
 ];
 
-/** A pattern as Browser Run reads it: the regular expression between slashes. */
-export const wirePattern = (re: RegExp): string => `/${re.source}/`;
+/**
+ * A pattern as Browser Run applies it: the regular expression's source, with no slashes. The live
+ * policy probe showed this on PATTERNS_SHOWN_LIVE: sent this way, each rule refused its request and the
+ * twin requests loaded; sent wrapped in slashes, as this build first did, none was refused.
+ */
+export const wirePattern = (re: RegExp): string => re.source;
+export const PATTERNS_SHOWN_LIVE = '2026-11-05';
 
 /** The first rule that refuses `href` (a URL as the browser would request it), or null. */
 export function refusingRule(href: string): UrlRule | null {

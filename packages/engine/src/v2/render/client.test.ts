@@ -68,10 +68,12 @@ describe('the request body', () => {
     expect(RENDER_TIMEOUT_MS).toBe(15_000);
   });
 
-  it('sends patterns Browser Run can read back into the same regular expressions', () => {
-    for (const p of renderRequestBody('https://site.example/', 'rendered').rejectRequestPattern) {
-      expect(p.startsWith('/') && p.endsWith('/')).toBe(true);
-      expect(() => new RegExp(p.slice(1, -1))).not.toThrow();
+  it('sends each pattern as its bare source, which reads back into the same regular expression', () => {
+    const sent = renderRequestBody('https://site.example/', 'rendered').rejectRequestPattern;
+    expect(sent).toEqual(URL_RULES.map((r) => r.pattern.source));
+    for (const p of sent) {
+      expect(p.startsWith('/')).toBe(false);
+      expect(new RegExp(p).source).toBe(p);
     }
   });
 });
