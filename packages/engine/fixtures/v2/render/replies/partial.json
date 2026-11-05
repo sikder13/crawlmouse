@@ -1,0 +1,12 @@
+{
+  "provenance": "Constructed by hand in the reply shape Browser Run's /content documentation shows ({success, result}); not recorded from Browser Run, which this branch has no token for. The live parity test is what checks real renders.",
+  "url": "https://site.example/blog/post",
+  "static": {
+    "html": "<!doctype html><html><head><title>Post</title></head><body><header><nav><a href=\"/\">Home</a><a href=\"/shop\">Shop</a><a href=\"/about\">About</a></nav></header><main><h1>Post title</h1><p>word0 word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18 word19 word20 word21 word22 word23 word24 word25 word26 word27 word28 word29 word30 word31 word32 word33 word34 word35 word36 word37 word38 word39 word40 word41 word42 word43 word44 word45 word46 word47</p></main><footer>Footer text</footer></body></html>",
+    "browser_ms": 1640
+  },
+  "rendered": {
+    "html": "<!doctype html><html><head><title>Post</title></head><body><header><nav><a href=\"/\">Home</a><a href=\"/shop\">Shop</a><a href=\"/about\">About</a></nav></header><main><h1>Post title</h1><p>word0 word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18 word19 word20 word21 word22 word23 word24 word25 word26 word27 word28 word29 word30 word31 word32 word33 word34 word35 word36 word37 word38 word39 word40 word41 word42 word43 word44 word45 word46 word47</p><section><p>comment0 comment1 comment2 comment3 comment4 comment5 comment6 comment7 comment8 comment9 comment10 comment11 comment12 comment13 comment14 comment15 comment16 comment17 comment18 comment19 comment20 comment21 comment22 comment23 comment24 comment25 comment26 comment27 comment28 comment29 comment30 comment31 comment32 comment33 comment34 comment35 comment36 comment37 comment38 comment39 comment40 comment41 comment42 comment43 comment44 comment45 comment46 comment47 comment48 comment49</p></section></main><footer>Footer text</footer></body></html>",
+    "browser_ms": 3120
+  }
+}
