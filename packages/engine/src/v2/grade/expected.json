@@ -1,6 +1,6 @@
 {
   "grade_version": "2.0.0",
-  "source_digest": "081fd64150094122f7887005f641f0e123fdd50a3cac33af66a30f53c24c1e14",
+  "source_digest": "dc0844ea05f635deeaa19d77379d511290b76e5dfb65cf004807793da583422c",
   "cases": {
     "blog: no post names its author, 6 of 13 lack a page description, no question headings": {
       "technical_seo": {
@@ -21,52 +21,25 @@
         "site_structure_score": 79.03
       },
       "ai_readability": {
-        "withheld": false,
-        "withheld_reasons": [],
-        "total": 81.43,
-        "grade": "B+",
+        "withheld": true,
+        "withheld_reasons": ["quotable_unmeasured"],
+        "total": null,
+        "grade": null,
         "components": {
           "access": { "score": 40, "max": 40, "heuristic": false, "range": null },
           "readable": { "score": 30, "max": 30, "heuristic": false, "range": null },
-          "quotable": { "score": 6.43, "max": 20, "heuristic": true, "range": null },
+          "quotable": {
+            "score": null,
+            "max": 20,
+            "heuristic": true,
+            "range": { "min": 0, "max": 20 }
+          },
           "signals": { "score": 5, "max": 10, "heuristic": false, "range": null }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
-      "content": {
-        "score": 32.14,
-        "checks": [
-          {
-            "check": "direct_answer_150",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 13, "total": 13 }
-            ]
-          },
-          {
-            "check": "question_headings",
-            "by_template": [
-              { "template_key": "/", "passing": 0, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 0, "total": 13 }
-            ]
-          },
-          {
-            "check": "schema_with_description",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 7, "total": 13 }
-            ]
-          },
-          {
-            "check": "author_and_date",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 0, "total": 13 }
-            ]
-          },
-          { "check": "specs_as_text", "by_template": [] }
-        ]
-      },
+      "content": null,
       "signals": [
         { "signal": "schema_org", "state": "detected" },
         { "signal": "content_signals", "state": "not_detected" }
@@ -78,16 +51,21 @@
           "rank": 1,
           "effect": {
             "technical_seo": 0,
-            "ai_readability": 9.28,
-            "ai_readability_pending_on": [],
+            "technical_seo_pending_on": [],
+            "ai_readability": null,
+            "ai_readability_pending_on": ["check_not_scored", "quotable_unmeasured"],
+            "absorbed_by": null,
             "estimate": true
-          }
+          },
+          "absorbed_by": null
         }
       ],
       "overview": {
         "technical_seo": 0,
-        "ai_readability": 9.28,
-        "ai_readability_pending_on": [],
+        "technical_seo_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["quotable_unmeasured"],
+        "absorbed_by": null,
         "estimate": true
       }
     },
@@ -110,52 +88,25 @@
         "site_structure_score": 68
       },
       "ai_readability": {
-        "withheld": false,
-        "withheld_reasons": [],
-        "total": 79.3,
-        "grade": "B",
+        "withheld": true,
+        "withheld_reasons": ["quotable_unmeasured"],
+        "total": null,
+        "grade": null,
         "components": {
           "access": { "score": 40, "max": 40, "heuristic": false, "range": null },
           "readable": { "score": 9.3, "max": 30, "heuristic": false, "range": null },
-          "quotable": { "score": 20, "max": 20, "heuristic": true, "range": null },
+          "quotable": {
+            "score": null,
+            "max": 20,
+            "heuristic": true,
+            "range": { "min": 0, "max": 20 }
+          },
           "signals": { "score": 10, "max": 10, "heuristic": false, "range": null }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
-      "content": {
-        "score": 100,
-        "checks": [
-          {
-            "check": "direct_answer_150",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/p/{slug}", "passing": 5, "total": 5 }
-            ]
-          },
-          {
-            "check": "question_headings",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/p/{slug}", "passing": 5, "total": 5 }
-            ]
-          },
-          {
-            "check": "schema_with_description",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/p/{slug}", "passing": 5, "total": 5 }
-            ]
-          },
-          {
-            "check": "author_and_date",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/p/{slug}", "passing": 5, "total": 5 }
-            ]
-          },
-          { "check": "specs_as_text", "by_template": [] }
-        ]
-      },
+      "content": null,
       "signals": [
         { "signal": "schema_org", "state": "detected" },
         { "signal": "content_signals", "state": "detected" }
@@ -163,8 +114,10 @@
       "fixes": [],
       "overview": {
         "technical_seo": 0,
-        "ai_readability": 0,
-        "ai_readability_pending_on": [],
+        "technical_seo_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["quotable_unmeasured"],
+        "absorbed_by": null,
         "estimate": true
       }
     },
@@ -188,7 +141,7 @@
       },
       "ai_readability": {
         "withheld": true,
-        "withheld_reasons": ["readable_unmeasured"],
+        "withheld_reasons": ["readable_unmeasured", "quotable_unmeasured"],
         "total": null,
         "grade": null,
         "components": {
@@ -199,45 +152,18 @@
             "heuristic": false,
             "range": { "min": 0, "max": 30 }
           },
-          "quotable": { "score": 20, "max": 20, "heuristic": true, "range": null },
+          "quotable": {
+            "score": null,
+            "max": 20,
+            "heuristic": true,
+            "range": { "min": 0, "max": 20 }
+          },
           "signals": { "score": 10, "max": 10, "heuristic": false, "range": null }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
-      "content": {
-        "score": 100,
-        "checks": [
-          {
-            "check": "direct_answer_150",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/p/{slug}", "passing": 5, "total": 5 }
-            ]
-          },
-          {
-            "check": "question_headings",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/p/{slug}", "passing": 5, "total": 5 }
-            ]
-          },
-          {
-            "check": "schema_with_description",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/p/{slug}", "passing": 5, "total": 5 }
-            ]
-          },
-          {
-            "check": "author_and_date",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/p/{slug}", "passing": 5, "total": 5 }
-            ]
-          },
-          { "check": "specs_as_text", "by_template": [] }
-        ]
-      },
+      "content": null,
       "signals": [
         { "signal": "schema_org", "state": "detected" },
         { "signal": "content_signals", "state": "detected" }
@@ -245,8 +171,10 @@
       "fixes": [],
       "overview": {
         "technical_seo": 0,
-        "ai_readability": 0,
-        "ai_readability_pending_on": [],
+        "technical_seo_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["readable_unmeasured", "quotable_unmeasured"],
+        "absorbed_by": null,
         "estimate": true
       }
     },
@@ -269,119 +197,99 @@
         "site_structure_score": 73.78
       },
       "ai_readability": {
-        "withheld": false,
-        "withheld_reasons": [],
-        "total": 80,
-        "grade": "B+",
+        "withheld": true,
+        "withheld_reasons": ["quotable_unmeasured"],
+        "total": null,
+        "grade": null,
         "components": {
           "access": { "score": 25, "max": 40, "heuristic": false, "range": null },
           "readable": { "score": 30, "max": 30, "heuristic": false, "range": null },
-          "quotable": { "score": 20, "max": 20, "heuristic": true, "range": null },
+          "quotable": {
+            "score": null,
+            "max": 20,
+            "heuristic": true,
+            "range": { "min": 0, "max": 20 }
+          },
           "signals": { "score": 5, "max": 10, "heuristic": false, "range": null }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
-      "content": {
-        "score": 100,
-        "checks": [
-          {
-            "check": "direct_answer_150",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 5, "total": 13 },
-              { "template_key": "/old-1/{slug}", "passing": 1, "total": 1 },
-              { "template_key": "/old-2/{slug}", "passing": 1, "total": 1 }
-            ]
-          },
-          {
-            "check": "question_headings",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 13, "total": 13 },
-              { "template_key": "/old-1/{slug}", "passing": 1, "total": 1 },
-              { "template_key": "/old-2/{slug}", "passing": 1, "total": 1 }
-            ]
-          },
-          {
-            "check": "schema_with_description",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 13, "total": 13 },
-              { "template_key": "/old-1/{slug}", "passing": 1, "total": 1 },
-              { "template_key": "/old-2/{slug}", "passing": 1, "total": 1 }
-            ]
-          },
-          {
-            "check": "author_and_date",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 13, "total": 13 },
-              { "template_key": "/old-1/{slug}", "passing": 1, "total": 1 },
-              { "template_key": "/old-2/{slug}", "passing": 1, "total": 1 }
-            ]
-          },
-          { "check": "specs_as_text", "by_template": [] }
-        ]
-      },
+      "content": null,
       "signals": [
         { "signal": "schema_org", "state": "detected" },
         { "signal": "content_signals", "state": "not_detected" }
       ],
       "fixes": [
         {
-          "type": "edge_rule_blocks_crawler",
-          "fingerprint": "940d5300be1d7b98",
-          "rank": 1,
-          "effect": {
-            "technical_seo": 0,
-            "ai_readability": 10,
-            "ai_readability_pending_on": [],
-            "estimate": true
-          }
-        },
-        {
           "type": "orphan_pages",
           "fingerprint": "66c6e4c24be83395",
-          "rank": 2,
+          "rank": 1,
           "effect": {
             "technical_seo": 1.28,
-            "ai_readability": 0,
-            "ai_readability_pending_on": [],
+            "technical_seo_pending_on": [],
+            "ai_readability": null,
+            "ai_readability_pending_on": ["quotable_unmeasured"],
+            "absorbed_by": null,
             "estimate": true
-          }
+          },
+          "absorbed_by": null
         },
         {
           "type": "orphan_pages",
           "fingerprint": "6a9d03c8fa9d7581",
-          "rank": 3,
+          "rank": 2,
           "effect": {
             "technical_seo": 1.33,
-            "ai_readability": 0,
-            "ai_readability_pending_on": [],
+            "technical_seo_pending_on": [],
+            "ai_readability": null,
+            "ai_readability_pending_on": ["quotable_unmeasured"],
+            "absorbed_by": null,
             "estimate": true
-          }
+          },
+          "absorbed_by": null
         },
         {
           "type": "deep_pages",
           "fingerprint": "0a49cb169022b634",
-          "rank": 4,
+          "rank": 3,
           "effect": {
             "technical_seo": -0.26,
-            "ai_readability": 0,
-            "ai_readability_pending_on": [],
+            "technical_seo_pending_on": [],
+            "ai_readability": null,
+            "ai_readability_pending_on": ["quotable_unmeasured"],
+            "absorbed_by": null,
             "estimate": true
-          }
+          },
+          "absorbed_by": "6a9d03c8fa9d7581"
         },
         {
           "type": "deep_pages",
           "fingerprint": "2ce4f3c17dffa487",
-          "rank": 5,
+          "rank": 4,
           "effect": {
             "technical_seo": -0.08,
-            "ai_readability": 0,
-            "ai_readability_pending_on": [],
+            "technical_seo_pending_on": [],
+            "ai_readability": null,
+            "ai_readability_pending_on": ["quotable_unmeasured"],
+            "absorbed_by": null,
             "estimate": true
-          }
+          },
+          "absorbed_by": "66c6e4c24be83395"
+        },
+        {
+          "type": "edge_rule_blocks_crawler",
+          "fingerprint": "940d5300be1d7b98",
+          "rank": 5,
+          "effect": {
+            "technical_seo": 0,
+            "technical_seo_pending_on": [],
+            "ai_readability": null,
+            "ai_readability_pending_on": ["quotable_unmeasured"],
+            "absorbed_by": null,
+            "estimate": true
+          },
+          "absorbed_by": null
         },
         {
           "type": "quotable_opening",
@@ -389,16 +297,21 @@
           "rank": 6,
           "effect": {
             "technical_seo": 0,
+            "technical_seo_pending_on": [],
             "ai_readability": null,
-            "ai_readability_pending_on": ["check_not_scored"],
+            "ai_readability_pending_on": ["check_not_scored", "quotable_unmeasured"],
+            "absorbed_by": null,
             "estimate": true
-          }
+          },
+          "absorbed_by": null
         }
       ],
       "overview": {
         "technical_seo": 2.27,
-        "ai_readability": 10,
-        "ai_readability_pending_on": [],
+        "technical_seo_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["quotable_unmeasured"],
+        "absorbed_by": null,
         "estimate": true
       }
     },
@@ -422,7 +335,7 @@
       },
       "ai_readability": {
         "withheld": true,
-        "withheld_reasons": ["too_few_crawlers_measured"],
+        "withheld_reasons": ["too_few_crawlers_measured", "quotable_unmeasured"],
         "total": null,
         "grade": null,
         "components": {
@@ -433,45 +346,18 @@
             "range": { "min": 0, "max": 30 }
           },
           "readable": { "score": 30, "max": 30, "heuristic": false, "range": null },
-          "quotable": { "score": 20, "max": 20, "heuristic": true, "range": null },
+          "quotable": {
+            "score": null,
+            "max": 20,
+            "heuristic": true,
+            "range": { "min": 0, "max": 20 }
+          },
           "signals": { "score": 5, "max": 10, "heuristic": false, "range": null }
         },
-        "access_range": { "min": 0, "max": 30 }
+        "access_range": { "min": 0, "max": 30 },
+        "scored_from_fewer_crawlers": null
       },
-      "content": {
-        "score": 100,
-        "checks": [
-          {
-            "check": "direct_answer_150",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 6, "total": 6 }
-            ]
-          },
-          {
-            "check": "question_headings",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 6, "total": 6 }
-            ]
-          },
-          {
-            "check": "schema_with_description",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 6, "total": 6 }
-            ]
-          },
-          {
-            "check": "author_and_date",
-            "by_template": [
-              { "template_key": "/", "passing": 1, "total": 1 },
-              { "template_key": "/blog/{slug}", "passing": 6, "total": 6 }
-            ]
-          },
-          { "check": "specs_as_text", "by_template": [] }
-        ]
-      },
+      "content": null,
       "signals": [
         { "signal": "schema_org", "state": "detected" },
         { "signal": "content_signals", "state": "not_detected" }
@@ -483,16 +369,154 @@
           "rank": 1,
           "effect": {
             "technical_seo": 0,
+            "technical_seo_pending_on": [],
             "ai_readability": null,
-            "ai_readability_pending_on": ["too_few_crawlers_measured"],
+            "ai_readability_pending_on": ["too_few_crawlers_measured", "quotable_unmeasured"],
+            "absorbed_by": null,
             "estimate": true
-          }
+          },
+          "absorbed_by": null
         }
       ],
       "overview": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": null,
-        "ai_readability_pending_on": ["too_few_crawlers_measured"],
+        "ai_readability_pending_on": ["too_few_crawlers_measured", "quotable_unmeasured"],
+        "absorbed_by": null,
+        "estimate": true
+      }
+    },
+    "blog: one scored crawler measured, the other three disallowed by robots.txt": {
+      "technical_seo": {
+        "score": 87.42,
+        "grade": "A-",
+        "breakdown": {
+          "orphanRatioScore": 1,
+          "depthScore": 1,
+          "anchorDiversityScore": 0,
+          "structureScore": 0.9513489675679156
+        },
+        "refusal": {
+          "refused": false,
+          "triggers": [],
+          "confidenceCapped": false,
+          "unevaluable": []
+        },
+        "site_structure_score": 79.03
+      },
+      "ai_readability": {
+        "withheld": true,
+        "withheld_reasons": ["quotable_unmeasured"],
+        "total": null,
+        "grade": null,
+        "components": {
+          "access": { "score": 40, "max": 40, "heuristic": false, "range": null },
+          "readable": { "score": 30, "max": 30, "heuristic": false, "range": null },
+          "quotable": {
+            "score": null,
+            "max": 20,
+            "heuristic": true,
+            "range": { "min": 0, "max": 20 }
+          },
+          "signals": { "score": 5, "max": 10, "heuristic": false, "range": null }
+        },
+        "access_range": null,
+        "scored_from_fewer_crawlers": 1
+      },
+      "content": null,
+      "signals": [
+        { "signal": "schema_org", "state": "detected" },
+        { "signal": "content_signals", "state": "not_detected" }
+      ],
+      "fixes": [],
+      "overview": {
+        "technical_seo": 0,
+        "technical_seo_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["quotable_unmeasured"],
+        "absorbed_by": null,
+        "estimate": true
+      }
+    },
+    "45 pages: the second page of a paginated archive repeats the first": {
+      "technical_seo": {
+        "score": 83.53,
+        "grade": "B+",
+        "breakdown": {
+          "orphanRatioScore": 1,
+          "depthScore": 0.9886363636363636,
+          "anchorDiversityScore": 0,
+          "structureScore": 0.7129463838857303
+        },
+        "refusal": {
+          "refused": false,
+          "triggers": [],
+          "confidenceCapped": false,
+          "unevaluable": []
+        },
+        "site_structure_score": 74.03
+      },
+      "ai_readability": {
+        "withheld": true,
+        "withheld_reasons": ["quotable_unmeasured"],
+        "total": null,
+        "grade": null,
+        "components": {
+          "access": { "score": 40, "max": 40, "heuristic": false, "range": null },
+          "readable": { "score": 30, "max": 30, "heuristic": false, "range": null },
+          "quotable": {
+            "score": null,
+            "max": 20,
+            "heuristic": true,
+            "range": { "min": 0, "max": 20 }
+          },
+          "signals": { "score": 5, "max": 10, "heuristic": false, "range": null }
+        },
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
+      },
+      "content": null,
+      "signals": [
+        { "signal": "schema_org", "state": "detected" },
+        { "signal": "content_signals", "state": "not_detected" }
+      ],
+      "fixes": [
+        {
+          "type": "deep_pages",
+          "fingerprint": "f16c64d2672d9688",
+          "rank": 1,
+          "effect": {
+            "technical_seo": 3.58,
+            "technical_seo_pending_on": [],
+            "ai_readability": null,
+            "ai_readability_pending_on": ["quotable_unmeasured"],
+            "absorbed_by": null,
+            "estimate": true
+          },
+          "absorbed_by": null
+        },
+        {
+          "type": "duplicate_pagination",
+          "fingerprint": "2493c00aaf2ba114",
+          "rank": 2,
+          "effect": {
+            "technical_seo": 0.89,
+            "technical_seo_pending_on": [],
+            "ai_readability": null,
+            "ai_readability_pending_on": ["quotable_unmeasured"],
+            "absorbed_by": null,
+            "estimate": true
+          },
+          "absorbed_by": null
+        }
+      ],
+      "overview": {
+        "technical_seo": 4.47,
+        "technical_seo_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["quotable_unmeasured"],
+        "absorbed_by": null,
         "estimate": true
       }
     }

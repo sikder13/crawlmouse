@@ -11,13 +11,15 @@ import { MAX_HEALTHY_DEPTH, MIN_GRADEABLE_PAGES } from '../../constants.js';
 import { SIGNAL_TABLE } from '../access/declarations.js';
 import { CONTENT_CHECKS, judgePage } from '../content/checks.js';
 import {
+  clearsBar,
   lowerBound,
-  MIN_PASS_ACCURACY,
-  MIN_PRECISION,
+  MIN_CONFIRMED_FIRINGS,
+  MIN_LOWER_BOUND,
+  naFirings,
+  PROVENANCE,
   RULINGS,
   rulingTallies,
   tallies,
-  validated,
   VARIANTS,
   variantTallies,
   type Ruling,
@@ -56,10 +58,10 @@ export const COUNTERFACTUALS: Readonly<Record<FixType, string>> = {
     'a link to the page from its `suggested_parent_url`, or from the homepage when it has none',
   deep_pages: `a link to the page from the deepest graded page within ${MAX_HEALTHY_DEPTH - 1} clicks of the homepage (the lowest URL among them), or from the homepage when none is`,
   generic_anchor_text: "the hub's outbound links get descriptive anchors",
-  redirect_chain: 'the record becomes `not_detected`',
-  canonical_mismatch: 'the record becomes `not_detected`',
-  duplicate_pagination: 'the record becomes `not_detected`',
-  hreflang_gap: 'the record becomes `not_detected`',
+  redirect_chain: 'the record becomes `not_detected`, so it marks no page',
+  canonical_mismatch: 'the record becomes `not_detected`, so it marks no page',
+  duplicate_pagination: 'the record becomes `not_detected`, so it marks no page',
+  hreflang_gap: 'the record becomes `not_detected`, so it marks no page',
   edge_rule_blocks_crawler: "the crawler's `blocked_by_ua_rule` pages become `allowed`",
   robots_txt_blocks_crawler: 'none: respected intent opens no fix',
   quotable_opening: "the template's failing pages pass the check, when the check counts",
@@ -85,7 +87,7 @@ const CHECK_RULES: Readonly<
     shell: 'unread',
   },
   schema_with_description: {
-    applies: 'a page with a typed JSON-LD node',
+    applies: 'every page read: a page with no JSON-LD fails (owner ruling, 2026-11-05)',
     passes:
       'a node of a type about the page itself (`…Page`, `…Article`, `BlogPosting`, `Product`, `Service`, `Event`, `TouristTrip` and the others in checks.ts) has a non-empty `description`',
     shell: 'unread',
@@ -140,16 +142,12 @@ function tallyTable(t: Record<string, Tally>, checks = Object.keys(t)): string {
   );
 }
 
-/** Which counted checks would clear the bar on the labels as first read, said from the tallies. */
-function firstReadVerdict(): string {
-  const first = tallies(true);
-  const counted = (Object.keys(CONTENT_CHECKS) as (keyof typeof CONTENT_CHECKS)[]).filter(
-    (c) => CONTENT_CHECKS[c].scored,
-  );
-  const failing = counted.filter((c) => !validated(first[c]));
-  return failing.length === 0
-    ? 'On the labels as first read, every counted check also clears the bar.'
-    : `On the labels as first read, ${list(failing)} would not clear the bar: the corrections are what let ${failing.length === 1 ? 'it' : 'them'} count.`;
+/** Which checks clear the bar's numbers, as labelled now and as first read, said from the tallies. */
+function barVerdict(): string {
+  const checks = Object.keys(CONTENT_CHECKS) as (keyof typeof CONTENT_CHECKS)[];
+  const [now, first] = [tallies(), tallies(true)].map((t) => checks.filter((c) => clearsBar(t[c])));
+  const say = (cs: string[]) => (cs.length === 0 ? 'no check' : list(cs));
+  return `By the numbers alone, ${say(now!)} would clear the bar as labelled now, and ${say(first!)} as first read.`;
 }
 
 /** The pages, grouped by the checks they are labelled for. */
@@ -169,20 +167,37 @@ function coverage(): string {
     .join('; ');
 }
 
-/** The checks that clear the bar and are held out of Quotable, each with its reason, from checks.ts. */
-function held(): string[] {
-  const rulings = rulingTallies();
-  return (Object.keys(CONTENT_CHECKS) as (keyof typeof CONTENT_CHECKS)[]).flatMap((c) => {
-    const reason = CONTENT_CHECKS[c].held;
-    if (reason === null) return [];
-    const each = (Object.keys(RULINGS) as Ruling[])
-      .filter((r) => RULINGS[r].check === c)
-      .map((r) => {
-        const t = rulings[r];
-        return `if ${RULINGS[r].ruling}, precision ${share(t.confirmed, t.fires, 'no firing')} and pass accuracy ${share(t.passes_confirmed, t.passes, 'no pass')}, so it ${validated(t) ? 'clears' : 'does not clear'} the bar`;
-      });
+/** The owner's ruling on the pages it decides, counted both ways, from label-set.ts. */
+function ruling(): string[] {
+  const t = rulingTallies();
+  const names = Object.keys(RULINGS) as Ruling[];
+  const ruled = names.filter((r) => RULINGS[r].ruled);
+  const pages = labels.pages.filter((p) =>
+    p.corrections.some((c) => names.some((r) => RULINGS[r].cause === c.cause)),
+  ).length;
+  return ruled.flatMap((r) => {
+    const other = names.filter((x) => x !== r);
+    const read = (x: Ruling) =>
+      `precision ${share(t[x].confirmed, t[x].fires, 'no firing')} and pass accuracy ${share(t[x].passes_confirmed, t[x].passes, 'no pass')}`;
     return [
-      `${code(c)} clears the bar with the pages that turn on the ruling left out, and is held out of Quotable: ${reason}. ${each.length > 0 ? `Ruled, ${each.join('; ')}.` : ''}`,
+      `**The call-to-action ruling.** On ${pages} pages every question heading is a call to action; they are labelled \`unsure\` for ${code(RULINGS[r].check)} until CC-18 relabels the set. The owner ruled (2026-11-05) that ${RULINGS[r].ruling}. Counted that way, ${code(RULINGS[r].check)} has ${read(r)}; ${other.map((x) => `if ${RULINGS[x].ruling}, ${read(x)}`).join('; ')}. The check as built counts a call to action as a question, so it must set them aside before CC-18 measures it again.`,
+      '',
+    ];
+  });
+}
+
+/**
+ * Firings on pages labelled `na` that carry no JSON-LD: the pages the 2026-11-05 schema rule turns
+ * from not applicable to failing, which the labels predate (label-set.ts naFirings).
+ */
+function naNote(): string[] {
+  const n = naFirings();
+  return (Object.keys(n) as (keyof typeof n)[]).flatMap((c) => {
+    const x = n[c];
+    if (x.without_json_ld === 0) return [];
+    const t = tallies()[c];
+    return [
+      `**${code(c)} after the 2026-11-05 ruling.** ${x.without_json_ld} of its ${t.fires} firings are on pages labelled \`na\` that carry no JSON-LD: the criteria made such a page not applicable, and the ruling makes it fail. The labels are not changed until CC-18, so its precision here is against the old rule.`,
       '',
     ];
   });
@@ -251,7 +266,7 @@ function labelSet(): string {
     "of the reader the features were read with, and labels.test.ts fails when it is not the reader's.",
     '',
     '**How the set was used.** To choose rules as well as to measure them, so its counts are not a held-out',
-    'test of the rules they helped choose.',
+    `test of the rules they helped choose. labels.json records it: independent ${code(String(PROVENANCE.independent))}, held out ${code(String(PROVENANCE.held_out))}.`,
     '',
     'The criteria, as labels.json carries them:',
     '',
@@ -260,13 +275,14 @@ function labelSet(): string {
     `A check fires when it judges a page \`fail\`. Precision is the share of its firings labelled \`fail\`;`,
     'pass accuracy the share of the pages it judges `pass` that are labelled `pass`; pages labelled `unsure` are',
     'left out. "Applies" counts the pages labelled `pass` or `fail`. After each share, ≥ is its exact one-sided 95 % lower',
-    'bound (Clopper-Pearson): how far the sample vouches for it. A check counts in Quotable only if it fires,',
-    `passes, and keeps precision at ${pct(MIN_PRECISION)} or more and pass accuracy at ${pct(MIN_PASS_ACCURACY)} or more`,
-    '(labels.test.ts); the bar is on the shares, not the bounds. The others are reported and score nothing.',
+    'bound (Clopper-Pearson): how far the sample vouches for it.',
+    '',
+    `**The bar (owner ruling, 2026-11-05).** A check counts in Quotable only on a label set that is independent (labelled by someone other than the session that implemented the checks) and held out (labels frozen before the check runs on it), with ${MIN_CONFIRMED_FIRINGS} confirmed firings or more and a lower bound of ${pct(MIN_LOWER_BOUND)} or more on both its precision and its pass accuracy (label-set.ts \`counts\`). This set is neither independent nor held out, so no check counts on it, whatever its numbers; labels.test.ts fails while any check is counted. CC-18 builds the set the bar asks for. ${barVerdict()}`,
     '',
     tallyTable(tallies()),
     '',
-    ...held(),
+    ...ruling(),
+    ...naNote(),
     '**Rules measured and not kept.** Each was measured on this set beside the rule kept, whose counts the',
     'table repeats after "kept". The table is partial: the reader rules changed in review (the client-rendered',
     'definition, bylines read after site chrome, nested blocks read once) fixed defects, and their alternatives',
@@ -282,8 +298,6 @@ function labelSet(): string {
     'The counts with the labels as first read, before the corrections:',
     '',
     tallyTable(tallies(true)),
-    '',
-    firstReadVerdict(),
   ].join('\n');
 }
 
@@ -301,7 +315,7 @@ function exampleSites(): string {
         : `${c.technical_seo.score} ${c.technical_seo.grade}`,
       ai.withheld ? `withheld: ${list(ai.withheld_reasons)}` : String(ai.total),
       String(c.fixes.length),
-      `${c.overview.technical_seo} / ${c.overview.ai_readability ?? 'waits'}`,
+      `${c.overview.technical_seo ?? 'waits'} / ${c.overview.ai_readability ?? 'waits'}`,
     ];
   });
   return table(['Site', 'Technical SEO', 'AI readability', 'Fixes', 'Fixes add (SEO / AI)'], rows);
@@ -351,7 +365,11 @@ export function renderGradeSpec(): string {
           String(AI_WEIGHTS.readable),
           'the share of words served without JavaScript (CC-14)',
         ],
-        ['Quotable', String(AI_WEIGHTS.quotable), `the counted content checks: ${list(counted)}`],
+        [
+          'Quotable',
+          String(AI_WEIGHTS.quotable),
+          `the counted content checks: ${counted.length === 0 ? 'none yet (the bar is under "The label set")' : list(counted)}`,
+        ],
         ['Signals', String(AI_WEIGHTS.signals), 'schema.org markup and Content Signals'],
       ],
     ),
@@ -371,13 +389,15 @@ export function renderGradeSpec(): string {
     '',
     `A scored crawler is measured with ${MIN_ACCESS_PAGES} pages or more in its denominator. One that robots.txt disallows on the pages whose rules were read (disallowed pages equal to pages read) is blocked by choice: left out of the mean, so a deliberate block lowers nothing. With fewer than ${MIN_MEASURED_CRAWLERS} measured, Access has no score: \`blocked_by_choice\` when the scored crawlers are blocked by choice and none is measured or unmeasured; otherwise \`too_few_crawlers_measured\`, with the range [${AI_WEIGHTS.access} × Σshare / (m + u), ${AI_WEIGHTS.access} × (Σshare + u) / (m + u)] for m measured and u unmeasured crawlers.`,
     '',
+    `One exception (owner ruling, 2026-11-05): with fewer than ${MIN_MEASURED_CRAWLERS} measured but at least one, when every other scored crawler is blocked by choice and no scored crawler had a page \`refused_unverified\`, Access is scored from the measured ones, and \`scored_from_fewer_crawlers\` records how many. A robots.txt disallow therefore raises Access as an unblock does: it is the site's stated intent (R11 decision 5), left out rather than counted against the site. No fix opens for it, and no fix copy may recommend disallowing a crawler.`,
+    '',
     '### Readable',
     '',
     `ratio(t) = median \`text_share\` of template t's rendered pages; Readable = ${AI_WEIGHTS.readable} × Σ pages(t) × ratio(t) / Σ pages(t) over the graded pages. A template with no rendered page makes it a range, its pages counted at 0 and at 1; no graded page, or none rendered, is [0, ${AI_WEIGHTS.readable}]. Until CC-14 renders pages, \`text_share\` is null, so Readable is unmeasured on a check.`,
     '',
     '### Quotable',
     '',
-    `rate(k) = pages passing check k / pages k was decided on; Quotable = ${AI_WEIGHTS.quotable} × mean of rate(k) over the counted checks decided on a page. A check counts only if it clears the bar on the label set (below) and is not held; ${list(uncounted)} are reported and do not count. A counted check's graded pages that were not read for it make Quotable a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread), over each check decided or unread on a page. Nothing decided and nothing unread is the range [0, ${AI_WEIGHTS.quotable}].`,
+    `rate(k) = pages passing check k / pages k was decided on; Quotable = ${AI_WEIGHTS.quotable} × mean of rate(k) over the counted checks decided on a page. A check counts only once it clears the bar under "The label set" (below); ${uncounted.length === Object.keys(CONTENT_CHECKS).length ? 'no check does yet, so Quotable has no score: it is the range' : `${list(uncounted)} are reported and do not count. With none decided it is the range`} [0, ${AI_WEIGHTS.quotable}], and AI readability is withheld for \`quotable_unmeasured\`. A counted check's graded pages that were not read for it make Quotable a range: rate(k) between passing / (decided + unread) and (passing + unread) / (decided + unread), over each check decided or unread on a page. Nothing decided and nothing unread is the range [0, ${AI_WEIGHTS.quotable}].`,
     '',
     '### Signals',
     '',
@@ -394,7 +414,7 @@ export function renderGradeSpec(): string {
     '',
     '### The grade and withholding',
     '',
-    'The total is the sum of the four components, given when the four have a score; its letter is the engine scale (v1 `scoreToLetter`). Otherwise the grade is withheld, `withheld_reasons` names each component without a score, and each such component carries its range.',
+    'The total is the sum of the four components, given when the four have a score; its letter is the engine scale (v1 `scoreToLetter`). Otherwise the grade is withheld, `withheld_reasons` names each component without a score, and each such component carries its range. AI readability is graded whether or not Technical SEO is refused: the refusal covers the structure grade only, and the copy beside it says so (owner ruling, 2026-11-05).',
     '',
     table(['Letter', 'From'], letterScale()),
     '',
@@ -405,7 +425,7 @@ export function renderGradeSpec(): string {
     '',
     '## Technical SEO',
     '',
-    `score = ${SEO_WEIGHTS.structure / 100} × structure + ${SEO_WEIGHTS.crawlability} × crawlability. Structure is v1's grade (packages/engine/src/grade.ts, its components and weights unchanged) of the link graph whose nodes are the crawled pages answering 200 (a 404 or a redirect is a crawl outcome, not a node: v1's SPEC 01 path), 0 to 100, also \`site_structure_score\`. Crawlability is the mean, over the measures that apply, of: crawled URLs answering 200, and for ${list(CRAWLABILITY_DETECTORS)}, the records decided \`not_detected\` of those decided. Title and meta description facts join as one more measure once the crawl worker records them (CC-12d). The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
+    `score = ${SEO_WEIGHTS.structure / 100} × structure + ${SEO_WEIGHTS.crawlability} × crawlability. Structure is v1's grade (packages/engine/src/grade.ts, its components and weights unchanged) of the link graph whose nodes are the crawled pages answering 200 (a 404 or a redirect is a crawl outcome, not a node: v1's SPEC 01 path), 0 to 100, also \`site_structure_score\`. Crawlability is the share of crawled URLs that answer 200 and carry no crawlability defect (owner ruling, 2026-11-05). A URL carries a defect when it is among the affected pages of a detected ${list(CRAWLABILITY_DETECTORS)} record; a record not detected, or undecided, marks no page; a URL counts once however many defects it carries. One affected page on a site of N crawled URLs therefore moves the score by ${SEO_WEIGHTS.crawlability}/N. Pages lacking a title or a meta description will be defects of the same kind once the crawl worker records them (CC-12d). The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
     '',
     '## Content checks',
     '',
@@ -426,7 +446,7 @@ export function renderGradeSpec(): string {
     '',
     `A template's content fix is detected when ${T.TEMPLATE_RULE.DETECT_MIN_PAGES} or more of its decided pages fail and they are ${pct(T.TEMPLATE_RULE.DETECT_SHARE)} or more of them; clear at ${pct(T.TEMPLATE_RULE.CLEAR_SHARE)} or less; indeterminate between (hysteresis), or when a page of the template was not read. An opened content fix is \`info\` (diff/severity.ts).`,
     '',
-    `The Content section score (\`Check.content.score\`) is 100 × the mean pass rate of the counted checks (${list(counted)}). \`content.checks\` lists every check, and the contract has no field saying which count, so a screen that shows both must not present the score as covering the others: a reported contract gap, and a blocker for the content segment at cutover.`,
+    `The Content section score (\`Check.content.score\`) is 100 × the mean pass rate of the counted checks, and each entry of \`content.checks\` says whether its check is \`counted\`. ${counted.length === 0 ? 'No check counts yet, so there is no score, and the contract requires one: `Check.content` is null on every check, and the five checks\' per-template results are not carried there. A reported contract gap: `ContentSummary.score` would have to be nullable for the section to report the checks before one counts.' : `Counted: ${list(counted)}.`}`,
     '',
     '### The label set',
     '',
@@ -434,20 +454,22 @@ export function renderGradeSpec(): string {
     '',
     '## Fix effects',
     '',
-    "Each effect is a counterfactual recompute. Fixes whose AI effect applied alone can be stated rank first, by that effect (Technical SEO plus AI readability, larger first); then the fixes whose AI effect waits on a reason; ties by fingerprint. In that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade less the current one. When two fixes' counterfactuals overlap, the higher-ranked takes the shared change and the lower-ranked shows what remains, which can be 0; no field says which fix took it.",
+    "Each effect is a counterfactual recompute. Fixes whose AI effect applied alone can be stated rank first, by that effect (Technical SEO plus AI readability, larger first; an effect not estimated counts 0); then the fixes whose AI effect waits on a reason; ties by fingerprint. In that order each effect is the grade with it and the fixes above it applied, less the grade without it, so the effects add up to the projected grade less the current one.",
     '',
-    'An effect can be negative: a counterfactual can lower a grade, as a link added for a deep page can lower the concentration of PageRank on hubs. It is shown as computed (an owner question).',
+    'An effect can be 0 or negative: a counterfactual can lower a grade, as a link added for a deep page can lower the concentration of PageRank on hubs, and two fixes can change the same thing. The computed value is kept, so the effects still add up (owner ruling, 2026-11-05). When a fix would raise a grade alone and its effect in the order is 0 or less, `absorbed_by` names the higher-ranked fix that took it: the first, in rank order, of the fixes above it that name a page, crawler or template it names, by whose application its effect is 0 or less. None found leaves `absorbed_by` null with the effect as computed. The engine records the fix by fingerprint and the diff writes its `number`. The copy that says so ("covered by fix #k") is UI work.',
     '',
-    `An effect is the change in the grades as given, each component already to ${DECIMALS} places, so it can differ in the last place from the change before rounding; the effects then add up to the change in the grades as given.`,
+    'A page carrying two crawlability defects counts once, so fixing either alone moves nothing; in the order, the first shows 0 and the second the whole change, and neither is absorbed (neither would raise a grade alone).',
     '',
-    "Technical SEO is 0 when the grade is refused as checked, or before or after the fix: there is no score to move, and the contract's `Effect.technical_seo` cannot say \"not estimated\" (a reported gap). The AI effect is the change in the component the fix moves: Access for an edge-rule fix, Quotable for a content fix, none for a structure fix. It is null and waits on a reason when that component has no score before or after, when an edge fix's crawler has too few pages for a share (`crawler_too_few_pages`), or when a content fix's check does not count in Quotable (`check_not_scored`). The projected grades leave out fixes on checks that do not count. A link a counterfactual adds carries no anchor text, and anchor diversity leaves it out.",
+    `An effect is the change in the grades as given, each to ${DECIMALS} places, so it can differ in the last place from the change before rounding; the effects then add up to the change in the grades as given.`,
+    '',
+    "Technical SEO is null, waiting on `grade_refused`, when the grade is refused as checked, or before or after the fix: there is no score to move. AI readability is the change in the grade's total. It is null while the grade is withheld as checked, before or after the fix, and waits on the grade's withheld reasons; it also waits when the fix cannot move a score: a content fix's check does not count in Quotable (`check_not_scored`), or an edge fix's crawler has too few pages for a share (`crawler_too_few_pages`). Until a check counts in Quotable, AI readability is withheld on every check, so no AI effect is stated (owner ruling, 2026-11-05; component deltas on the screen are UI work). The projected grades leave out fixes on checks that do not count. A link a counterfactual adds carries no anchor text, and anchor diversity leaves it out.",
     '',
     table(
       ['Fix', 'Counterfactual'],
       (Object.entries(COUNTERFACTUALS) as [FixType, string][]).map(([t, c]) => [code(t), c]),
     ),
     '',
-    'A structure fix takes its recommendation class from its type; the structure detectors read our own crawl, so its confidence is `likely`:',
+    "A structure fix takes its recommendation class from its type; the structure detectors read our own crawl, so its confidence is `likely`. A content fix takes its check's class and confidence (the content checks table).",
     '',
     table(
       ['Structure fix', 'Class'],

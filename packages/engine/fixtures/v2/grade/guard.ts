@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { every } from '../access/builders.js';
+import { simhashAway, u } from '../detectors/builders.js';
 import { detectorOutcomes } from '../../../src/v2/grade/outcomes.js';
 import { gradeCheck, type GradeInput } from '../../../src/v2/grade/index.js';
 import type { AccessDetection } from '../../../src/v2/access/types.js';
@@ -149,7 +150,13 @@ function outcomeOf(input: GradeInput, access: AccessDetection[] = []) {
     fixes: outcomes
       .flatMap((o) => (o.state === 'detected' ? [{ fingerprint: o.fingerprint, ...o.fix }] : []))
       .sort((a, b) => a.rank - b.rank)
-      .map((f) => ({ type: f.type, fingerprint: f.fingerprint, rank: f.rank, effect: f.effect })),
+      .map((f) => ({
+        type: f.type,
+        fingerprint: f.fingerprint,
+        rank: f.rank,
+        effect: f.effect,
+        absorbed_by: f.absorbed_by_fingerprint,
+      })),
     overview,
   };
 }
@@ -171,7 +178,25 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
     'Claude-SearchBot': refused,
     PerplexityBot: blocked,
   });
-  // the counted checks fail on posts, and question headings (not counted) on every page
+  const disallowed = every(2, 'disallowed_by_robots');
+  const byChoice = blogSite(6, 0, {
+    'OAI-SearchBot': disallowed,
+    'ChatGPT-User': disallowed,
+    'Claude-SearchBot': disallowed,
+  });
+  // the homepage, 42 posts, the archive and its page 2, which is within 3 bits of page 1
+  const BASE = '0123456789abcdef';
+  const paginated = blogSite(42, 0, {}, [
+    { path: '/blog', links: ['/blog/page/2'], facts: { simhash: BASE } },
+    {
+      path: '/blog/page/2',
+      template: '/blog/page/{n}',
+      kind: 'pagination',
+      links: ['/blog'],
+      facts: { simhash: simhashAway(BASE, 3), canonical: { href: u('/blog/page/2') } },
+    },
+  ]);
+  // author and date and schema fail on posts, and question headings on every page: no check counts
   const thin = blogSite(13, 0);
   const posts = [...thin.input.content.keys()].filter((u) => u.includes('/blog/'));
   const content = new Map(
@@ -204,5 +229,13 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
       blog.access,
     ),
     'blog: one scored crawler measured': outcomeOf(oneMeasured.input, oneMeasured.access),
+    'blog: one scored crawler measured, the other three disallowed by robots.txt': outcomeOf(
+      byChoice.input,
+      byChoice.access,
+    ),
+    '45 pages: the second page of a paginated archive repeats the first': outcomeOf(
+      paginated.input,
+      paginated.access,
+    ),
   };
 }
