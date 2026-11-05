@@ -14,6 +14,7 @@ import {
   RENDER_VIEWPORT,
   RENDER_WAIT_UNTIL,
   REQUEST_TIMEOUT_MS,
+  STATIC_JS_OFF_SHOWN_LIVE,
 } from './client.js';
 import { PARITY_SPREAD, REPEAT_SPREAD } from './parity.js';
 import {
@@ -60,15 +61,22 @@ ${table(
     ['Wait', `${code(RENDER_WAIT_UNTIL)}, capped at ${seconds(RENDER_TIMEOUT_MS)}`],
     ['Refused on both sides', list(REJECTED_RESOURCE_TYPES)],
     ['Refused on the static side', list(STATIC_REJECTED_RESOURCE_TYPES)],
+    ['JavaScript on the static side', 'off (`setJavaScriptEnabled: false`)'],
     ['Request timeout, reply included', seconds(REQUEST_TIMEOUT_MS)],
     ['Largest reply read', `${MAX_REPLY_BYTES / 1024 / 1024} MiB`],
   ],
 )}
 
-Refusing the \`script\` resource type is documented to stop script files from loading; the live script
-probe (below) is what shows it. A script written inline in the
-HTML still runs on the static side, so text such a script writes is counted on both sides and does not
-lower the share.
+Refusing the \`script\` resource type is documented to stop script files from loading. A script
+written inline in the HTML is not a request, so the static side also sends
+\`setJavaScriptEnabled: false\`: were an inline script to run there, the text it writes would count
+on both sides and raise the share, reading a page that needs JavaScript as one that does not.
+Cloudflare documents that field for \`/snapshot\` (read ${BROWSER_RUN.read_on}); the \`/content\` page
+does not name it. ${
+      STATIC_JS_OFF_SHOWN_LIVE === null
+        ? '**Whether `/content` honours it is unproven:** the live inline-script probe (below) has not yet passed. If it shows the setting ignored, the static side moves to `/snapshot`, where it is documented.'
+        : `The live inline-script probe (below) showed \`/content\` honouring it on ${STATIC_JS_OFF_SHOWN_LIVE}.`
+    }
 
 The user agent is the one the v2 fixtures record on their \`identity_role: render\` rows. Browser Run's
 documentation (automatic request headers, read ${BROWSER_RUN.read_on}) says it adds headers a request
@@ -148,9 +156,9 @@ is not rendered), and then the host is resolved and a private or reserved addres
 admission instead. The resolution happens in our process and the browser resolves the name again on
 Cloudflare, possibly to another address, so the default is a defence, not a guarantee.
 
-**Redirects.** The \`/content\` reply carries the HTML only: no final URL and no status code. A
-redirect's target is therefore not admitted in our process, and whether Browser Run applies the
-patterns to it is not verified here.`,
+**Redirects.** The \`/content\` reply carries the HTML only: no final URL and no status code, so
+admitting the URL a redirect ends on is not possible with this endpoint. A redirect's target is not
+admitted in our process, and whether Browser Run applies the patterns to it is not verified here.`,
 
     `## Challenge pages
 
@@ -235,13 +243,22 @@ ${table(
 
 Without both credentials nothing renders (\`not_configured\`). Each cap is a whole number of seconds;
 unset, empty or anything else reads as zero, and a cap that is not a positive finite number renders
-nothing (\`caps_not_configured\`). The per-day value is handed to the caller's budget with each
-reservation; the count of what today has used lives in the caller's store.
+nothing (\`caps_not_configured\`). The count of what today has used lives in the caller's store.
 
-Before a page starts it reserves both of its renders at ${seconds(RESERVE_PER_RENDER_MS)} each, against the
-check's cap and against today's budget. When either cannot take them while other pages of the check are
-in flight, the page waits for one to settle and tries again; when nothing is in flight, rendering stops
-for the rest of the check. A render settles at the browser time its reply reports, whatever happened
+**Today's budget is asked once per check**, before any page, to reserve the check's allowance: its
+cap, or ${seconds(2 * RESERVE_PER_RENDER_MS)} for each sampled page, whichever is less, against the per-day
+value. When it refuses, no page of the check renders and each sampled page is \`daily_cap\`; when it
+throws, each is \`daily_budget_unavailable\`, and admission is not run for any of them. A check whose
+cap is below one page's ${seconds(2 * RESERVE_PER_RENDER_MS)} does not ask, and each page is
+\`check_cap\`. When it grants, the budget is settled once, after the last page has finished, at the
+browser time the check counted; a settle that throws is returned as \`settle_failed\`, and the day
+then still counts the whole allowance. So a day with room for some pages of a check but not its
+allowance renders none of that check.
+
+Within the check, before a page starts it reserves both of its renders at ${seconds(RESERVE_PER_RENDER_MS)} each
+from the allowance. When the allowance cannot take them while other pages of the check are in flight,
+the page waits for one to finish and tries again; when nothing is in flight, rendering stops for the
+rest of the check. A render counts the browser time its reply reports, whatever happened
 after the reply arrived. A reply that reports none, and a request that got no reply, is counted at the
 request timeout, the longest it could have been open and the same as its reservation; the browser's
 own time could still be longer. The header is not read on a 429: it is counted at zero, on the
@@ -273,9 +290,13 @@ Upward, towards "readable":
   as a 422, leaves the sample: below.)
 - **Refused connections and hosts.** Text a page receives over a WebSocket or eventsource, or from a
   reject-listed host, is missing from the rendered side.
-- **A short-counted rendered side.** Where the rendered side is counted short of the static side, the
-  clamp reads the page as share 1. Where a script really removed text, share 1 may be the right reading.
-- **Block pages the challenge rule does not recognise**, served to both sides, read as share 1.
+- **The clamp.** Where the rendered side is counted short of the static side, the share is clamped
+  and the page reads as share 1. Where a script really removed text, share 1 may be the right reading.
+- **Block pages the challenge rule does not recognise**, served to both sides, read as share 1.${
+      STATIC_JS_OFF_SHOWN_LIVE === null
+        ? '\n- **Inline scripts on the static side, if `/content` ignores `setJavaScriptEnabled`.** Text they\n  write would count on both sides. Unproven either way until the live inline-script probe passes.'
+        : ''
+    }
 
 Downward, towards "empty shell":
 
@@ -304,11 +325,15 @@ The contract carries none of these, and each goes into the next contract revisio
     `## Determinism and the live tests
 
 Offline, a replayed reply is identical every time, so the bounds below are held to real renders only.
-\`live.test.ts\` runs when the environment holds the credentials and is skipped otherwise:
+\`live.test.ts\` runs when the environment holds the credentials, or when \`RENDER_LIVE=1\` and
+\`~/.config/crawlmouse/render.env\` (outside the repository) holds them, and is skipped otherwise:
 
 - five renders of one page within ${pct(REPEAT_SPREAD)} of each other in rendered words (I8);
 - the two sides of a static page within ${pct(PARITY_SPREAD)};
-- a page with an external script file loads it on the rendered side and not on the static side;
+- the inline-script probe (\`fixtures/v2/render/inline-script.html\`): a page whose inline script
+  writes a marker assembled at run time, and which loads a script file. The static side must hold
+  neither the marker nor the file's report; the rendered side must hold the marker and report the
+  file loaded;
 - a probe page whose requests report whether they loaded, rendered twice: with the rules left out,
   each request and a WebSocket must load; with them, rules \`ip_literal\` and \`download\`, one host
   from each list and the WebSocket must be refused while two twin requests still load.

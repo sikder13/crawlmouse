@@ -57,6 +57,14 @@ describe('withdrawn claims', () => {
     [/holds each rule below to a test/i, 'Browser Run behaviour is held only by the live tests'],
     [/Fragments found only on challenge/i, 'a page quoting a marker is taken for a challenge'],
     [/It never throws for a page/i, 'replaced by what the code catches'],
+    [
+      /inline in the HTML (?:is not a request and )?still runs on the static side/i,
+      'the static side sends setJavaScriptEnabled: false',
+    ],
+    [
+      /against the check's cap and against today's budget/i,
+      'today\u2019s budget is asked once per check',
+    ],
   ];
   const DIR = new URL('./', import.meta.url);
   const texts = [

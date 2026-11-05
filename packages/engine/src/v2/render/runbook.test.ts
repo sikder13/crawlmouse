@@ -48,6 +48,12 @@ describe('the runbook’s Browser Run section', () => {
       'the smallest cap that renders',
       `a cap under ${(2 * RESERVE_PER_RENDER_MS) / 1000} renders nothing`,
     ],
+    [
+      'the check’s allowance',
+      `or ${(2 * RESERVE_PER_RENDER_MS) / 1000} s for each page it sampled, whichever is less`,
+    ],
+    ['the one ask of the day’s budget', "asks the day's budget once, before any page"],
+    ['the rule on killing processes', 'Only ever kill processes started from your own worktree.'],
   ])('names %s as the code has it', (_name, text) => {
     expect(section).toContain(text);
   });

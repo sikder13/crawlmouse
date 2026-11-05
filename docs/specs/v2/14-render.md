@@ -22,13 +22,16 @@ network, with the same request but for one field:
 | Wait                            | `networkidle0`, capped at 15 s                                                                          |
 | Refused on both sides           | `websocket`, `eventsource`, `media`                                                                     |
 | Refused on the static side      | `websocket`, `eventsource`, `media`, `script`                                                           |
+| JavaScript on the static side   | off (`setJavaScriptEnabled: false`)                                                                     |
 | Request timeout, reply included | 45 s                                                                                                    |
 | Largest reply read              | 10 MiB                                                                                                  |
 
-Refusing the `script` resource type is documented to stop script files from loading; the live script
-probe (below) is what shows it. A script written inline in the
-HTML still runs on the static side, so text such a script writes is counted on both sides and does not
-lower the share.
+Refusing the `script` resource type is documented to stop script files from loading. A script
+written inline in the HTML is not a request, so the static side also sends
+`setJavaScriptEnabled: false`: were an inline script to run there, the text it writes would count
+on both sides and raise the share, reading a page that needs JavaScript as one that does not.
+Cloudflare documents that field for `/snapshot` (read 2026-11-05); the `/content` page
+does not name it. **Whether `/content` honours it is unproven:** the live inline-script probe (below) has not yet passed. If it shows the setting ignored, the static side moves to `/snapshot`, where it is documented.
 
 The user agent is the one the v2 fixtures record on their `identity_role: render` rows. Browser Run's
 documentation (automatic request headers, read 2026-11-05) says it adds headers a request
@@ -115,9 +118,9 @@ is not rendered), and then the host is resolved and a private or reserved addres
 admission instead. The resolution happens in our process and the browser resolves the name again on
 Cloudflare, possibly to another address, so the default is a defence, not a guarantee.
 
-**Redirects.** The `/content` reply carries the HTML only: no final URL and no status code. A
-redirect's target is therefore not admitted in our process, and whether Browser Run applies the
-patterns to it is not verified here.
+**Redirects.** The `/content` reply carries the HTML only: no final URL and no status code, so
+admitting the URL a redirect ends on is not possible with this endpoint. A redirect's target is not
+admitted in our process, and whether Browser Run applies the patterns to it is not verified here.
 
 ## Challenge pages
 
@@ -196,13 +199,22 @@ failed or came back challenged. A part above zero is printed as "<1 %" rather th
 
 Without both credentials nothing renders (`not_configured`). Each cap is a whole number of seconds;
 unset, empty or anything else reads as zero, and a cap that is not a positive finite number renders
-nothing (`caps_not_configured`). The per-day value is handed to the caller's budget with each
-reservation; the count of what today has used lives in the caller's store.
+nothing (`caps_not_configured`). The count of what today has used lives in the caller's store.
 
-Before a page starts it reserves both of its renders at 45 s each, against the
-check's cap and against today's budget. When either cannot take them while other pages of the check are
-in flight, the page waits for one to settle and tries again; when nothing is in flight, rendering stops
-for the rest of the check. A render settles at the browser time its reply reports, whatever happened
+**Today's budget is asked once per check**, before any page, to reserve the check's allowance: its
+cap, or 90 s for each sampled page, whichever is less, against the per-day
+value. When it refuses, no page of the check renders and each sampled page is `daily_cap`; when it
+throws, each is `daily_budget_unavailable`, and admission is not run for any of them. A check whose
+cap is below one page's 90 s does not ask, and each page is
+`check_cap`. When it grants, the budget is settled once, after the last page has finished, at the
+browser time the check counted; a settle that throws is returned as `settle_failed`, and the day
+then still counts the whole allowance. So a day with room for some pages of a check but not its
+allowance renders none of that check.
+
+Within the check, before a page starts it reserves both of its renders at 45 s each
+from the allowance. When the allowance cannot take them while other pages of the check are in flight,
+the page waits for one to finish and tries again; when nothing is in flight, rendering stops for the
+rest of the check. A render counts the browser time its reply reports, whatever happened
 after the reply arrived. A reply that reports none, and a request that got no reply, is counted at the
 request timeout, the longest it could have been open and the same as its reservation; the browser's
 own time could still be longer. The header is not read on a 429: it is counted at zero, on the
@@ -216,24 +228,24 @@ after 1000 ms doubling to at most 16000 ms when it gives none (an HTTP date
 counts as none), up to 5 tries; a wait longer than 16000 ms is not
 taken. No reason below fails the check:
 
-| Reason                     | Meaning                                                                                                                                      |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `not_configured`           | The environment holds no Browser Run account or token.                                                                                       |
-| `caps_not_configured`      | A cost cap is not a positive whole number of seconds, so nothing renders.                                                                    |
-| `not_admitted`             | Admission refused the URL. `detail` is the policy rule, `resolution`, `unparseable`, or `error` for an admission that threw something else.  |
-| `check_cap`                | The check's cap could not take a page's two renders with no page in flight; rendering stopped for this page and those after it.              |
-| `daily_cap`                | Today's budget could not take a page's two renders with no page of this check in flight; rendering stopped for this page and those after it. |
-| `daily_budget_unavailable` | Today's budget threw when asked to reserve or settle; rendering stopped for this page and those after it.                                    |
-| `rate_limited`             | Browser Run answered 429 on each of 5 tries, or asked for a wait longer than 16000 ms.                                                       |
-| `timed_out`                | Browser Run did not answer, or did not finish its reply, within 45 s.                                                                        |
-| `page_failed`              | Browser Run answered 422, which its documentation gives for a page that timed out, crashed or errored.                                       |
-| `api_error`                | Browser Run answered another error status.                                                                                                   |
-| `bad_reply`                | The reply was not the documented `{success: true, result: "<html>"}`.                                                                        |
-| `oversize`                 | The reply passed 10 MiB and was not read further.                                                                                            |
-| `network_error`            | The request failed or its reply could not be read, for a reason other than the timeout, or the client threw.                                 |
-| `challenged`               | A side of the render matches a challenge title or marker listed in challenge.ts.                                                             |
-| `nothing_rendered`         | The rendered side has no words, so there is no share.                                                                                        |
-| `measure_failed`           | Counting the words of the two renders threw.                                                                                                 |
+| Reason                     | Meaning                                                                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `not_configured`           | The environment holds no Browser Run account or token.                                                                                      |
+| `caps_not_configured`      | A cost cap is not a positive whole number of seconds, so nothing renders.                                                                   |
+| `not_admitted`             | Admission refused the URL. `detail` is the policy rule, `resolution`, `unparseable`, or `error` for an admission that threw something else. |
+| `check_cap`                | The check's allowance could not take a page's two renders with no page in flight; rendering stopped for this page and those after it.       |
+| `daily_cap`                | Today's budget refused the check's allowance, asked for once before any page; no page of the check rendered.                                |
+| `daily_budget_unavailable` | Today's budget threw when asked for the check's allowance; no page of the check rendered.                                                   |
+| `rate_limited`             | Browser Run answered 429 on each of 5 tries, or asked for a wait longer than 16000 ms.                                                      |
+| `timed_out`                | Browser Run did not answer, or did not finish its reply, within 45 s.                                                                       |
+| `page_failed`              | Browser Run answered 422, which its documentation gives for a page that timed out, crashed or errored.                                      |
+| `api_error`                | Browser Run answered another error status.                                                                                                  |
+| `bad_reply`                | The reply was not the documented `{success: true, result: "<html>"}`.                                                                       |
+| `oversize`                 | The reply passed 10 MiB and was not read further.                                                                                           |
+| `network_error`            | The request failed or its reply could not be read, for a reason other than the timeout, or the client threw.                                |
+| `challenged`               | A side of the render matches a challenge title or marker listed in challenge.ts.                                                            |
+| `nothing_rendered`         | The rendered side has no words, so there is no share.                                                                                       |
+| `measure_failed`           | Counting the words of the two renders threw.                                                                                                |
 
 ## Known biases
 
@@ -248,9 +260,11 @@ Upward, towards "readable":
   as a 422, leaves the sample: below.)
 - **Refused connections and hosts.** Text a page receives over a WebSocket or eventsource, or from a
   reject-listed host, is missing from the rendered side.
-- **A short-counted rendered side.** Where the rendered side is counted short of the static side, the
-  clamp reads the page as share 1. Where a script really removed text, share 1 may be the right reading.
+- **The clamp.** Where the rendered side is counted short of the static side, the share is clamped
+  and the page reads as share 1. Where a script really removed text, share 1 may be the right reading.
 - **Block pages the challenge rule does not recognise**, served to both sides, read as share 1.
+- **Inline scripts on the static side, if `/content` ignores `setJavaScriptEnabled`.** Text they
+  write would count on both sides. Unproven either way until the live inline-script probe passes.
 
 Downward, towards "empty shell":
 
@@ -279,11 +293,15 @@ The contract carries none of these, and each goes into the next contract revisio
 ## Determinism and the live tests
 
 Offline, a replayed reply is identical every time, so the bounds below are held to real renders only.
-`live.test.ts` runs when the environment holds the credentials and is skipped otherwise:
+`live.test.ts` runs when the environment holds the credentials, or when `RENDER_LIVE=1` and
+`~/.config/crawlmouse/render.env` (outside the repository) holds them, and is skipped otherwise:
 
 - five renders of one page within 2 % of each other in rendered words (I8);
 - the two sides of a static page within 5 %;
-- a page with an external script file loads it on the rendered side and not on the static side;
+- the inline-script probe (`fixtures/v2/render/inline-script.html`): a page whose inline script
+  writes a marker assembled at run time, and which loads a script file. The static side must hold
+  neither the marker nor the file's report; the rendered side must hold the marker and report the
+  file loaded;
 - a probe page whose requests report whether they loaded, rendered twice: with the rules left out,
   each request and a WebSocket must load; with them, rules `ip_literal` and `download`, one host
   from each list and the WebSocket must be refused while two twin requests still load.

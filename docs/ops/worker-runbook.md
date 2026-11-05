@@ -281,8 +281,14 @@ and reads these from that process's environment:
   dashboard, My Profile, API Tokens, Create Custom Token). Nothing else.
 - `RENDER_MAX_BROWSER_SECONDS_PER_CHECK` and `RENDER_MAX_BROWSER_SECONDS_PER_DAY`: whole seconds.
   Unset or invalid reads as zero, and zero renders nothing. A page reserves 90 s (two renders at the
-  45 s request timeout) before it starts, so a cap under 90 renders nothing, and a check has about
-  `cap / 90` pages rendering at once, at most 5.
+  45 s request timeout) from its check's allowance before it starts, so a cap under 90 renders
+  nothing, and a check has about `cap / 90` pages rendering at once, at most 5.
+
+A check asks the day's budget once, before any page, for its allowance: the per-check cap, or 90 s
+for each page it sampled, whichever is less. When the day has less than that left, the check renders
+nothing and records `daily_cap` on each sampled page, even if a few pages would have fitted. After its
+last page the check settles once, giving back what it did not use; if that settle fails, the day keeps
+counting the whole allowance and the outcome carries `settle_failed`.
 
 Without both credentials, or with a zero cap, a check records its sampled pages as not rendered and
 goes on; it does not fail. To stop rendering, unset the token or set either cap to `0`.
@@ -304,6 +310,17 @@ what renders in flight report beyond their reservation.
 
 To rotate the token: create the new one, set it where the old one is set, redeploy that process, then
 delete the old one in the dashboard.
+
+### Running the render tests
+
+Run one test file at a time, from `packages/engine`:
+`timeout -s KILL 150 node node_modules/vitest/vitest.mjs run src/v2/render/<file>.test.ts --pool=threads`.
+The live tests read the credentials from the environment, or, with `RENDER_LIVE=1`, from
+`~/.config/crawlmouse/render.env` outside the repository; they never print them:
+`RENDER_LIVE=1 timeout -s KILL 600 node node_modules/vitest/vitest.mjs run src/v2/render/live.test.ts --pool=threads`.
+
+Only ever kill processes started from your own worktree. Another session's tests may be running on
+the same machine, and killing by process name stops them too.
 
 ## What each verdict means
 
