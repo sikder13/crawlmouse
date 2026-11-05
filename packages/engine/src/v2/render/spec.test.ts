@@ -65,6 +65,14 @@ describe('withdrawn claims', () => {
       /the WebSocket must be refused/i,
       'the live probe saw the WebSocket open with every rule sent',
     ],
+    [/an HTTP date counts as none/i, 'a Retry-After date is now read'],
+    [/an HTTP date or anything else/i, 'a Retry-After date is now read'],
+    [
+      /has not observed Browser Run reading or enforcing/i,
+      'the live probe showed the patterns applied',
+    ],
+    [/longer than 16000 ms/i, 'the longest wait taken is now 60 s'],
+    [/each rule refused its request/i, 'the probe covers some rules, not each'],
     [
       /with no page of this check in flight/i,
       'the daily budget is asked once per check, not per page',

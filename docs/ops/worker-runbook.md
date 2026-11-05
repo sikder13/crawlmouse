@@ -307,8 +307,9 @@ asks, in seconds or as a date, backs off from 2 s when it gives neither, and lea
 Free (the owner's billing page, 2026-11-05). On Free, the same limits page gives one Quick Actions
 request every 10 s per account and 10 browser-minutes a day. Measured on 2026-11-05 with the live
 tests: a request sent at once after another was answered 429; one sent 10 s after a 429 was answered
-200; the 429s carried no `Retry-After` in seconds. A check with 2 requests in flight sends faster
-than that rate, so on Free its pages wait on 429s, and some end `rate_limited`.
+200; the 429s carried no `Retry-After` in seconds. Each page sends its two requests back to back, so
+a check exceeds that rate at any in-flight setting, and on Free its pages wait on 429s and can end
+`rate_limited`.
 
 Cost: $0.09 per browser-hour after the 10 browser-hours a month Workers Paid includes. Each reply
 reports its browser time in the `x-browser-ms-used` header. The step counts that against its caps and

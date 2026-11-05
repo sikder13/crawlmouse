@@ -265,7 +265,8 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
     }
   };
   // Every worker is waited for, even after one throws, so no request is still open when the budget
-  // is settled; a throw is passed on only after the settle.
+  // is settled; a throw is passed on only after the settle. The other workers go on taking pages from
+  // the queue until it is empty, and the results of the check are then discarded with the throw.
   const ran = await Promise.allSettled(
     Array.from(
       {

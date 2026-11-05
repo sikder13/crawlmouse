@@ -74,8 +74,8 @@ const REPEAT_PAGE = 'https://developers.cloudflare.com/browser-run/';
 const REPEAT_RENDERS = 5;
 
 /**
- * A 429 is waited out here as the render step does: its Retry-After in seconds, or else
- * LIVE_RETRY_WAIT_MS, up to LIVE_TRIES tries. The account's request rate is not ours to set, and these
+ * A 429 is waited out here more simply than the render step does it: its Retry-After in seconds, or
+ * else a flat LIVE_RETRY_WAIT_MS (no HTTP date, no doubling), up to LIVE_TRIES tries. The account's request rate is not ours to set, and these
  * tests are about what a render returns, not how fast.
  */
 const LIVE_TRIES = 8;
@@ -90,7 +90,8 @@ async function words(c: BrowserRunClient, url: string, side: RenderSide) {
     if (r.reason !== 'rate_limited' || attempt >= LIVE_TRIES) {
       throw new Error(`${side} render of ${url} failed: ${r.reason}`);
     }
-    const ms = r.retryAfterMs ?? LIVE_RETRY_WAIT_MS;
+    // At least the flat wait, at most a minute: a date's zero or a far-off date is not taken as given.
+    const ms = Math.min(Math.max(r.retryAfterMs ?? 0, LIVE_RETRY_WAIT_MS), 60_000);
     waits.push(ms);
     await pause(ms);
   }

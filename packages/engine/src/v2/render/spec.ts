@@ -127,15 +127,16 @@ sends the resource types above and the URL patterns below for Browser Run to enf
 documentation describes (\`rejectResourceTypes\`, \`rejectRequestPattern\`). **By design, sub-requests are
 filtered by these patterns, not by per-request interception in our process.** Each pattern is sent as
 the regular expression's source, with no slashes. The live policy probe (below) showed that form
-applied on ${PATTERNS_SHOWN_LIVE}: each rule refused its request while the twin requests loaded. Sent
+applied on ${PATTERNS_SHOWN_LIVE}: the rules it covers (\`ip_literal\`, \`download\` and one host from each
+list) refused their requests while the twin requests loaded. The rules it does not cover are below. Sent
 wrapped in slashes, as this build first did and as one of the documentation's examples shows, none
 was refused. \`policy.test.ts\` pins the form.
 
 **WebSockets are not stopped (known limit).** On ${PATTERNS_SHOWN_LIVE} the probe's WebSocket opened with
 the \`websocket\` resource type refused and with the \`scheme\` rule, which matches \`wss:\`, sent. No
 setting found here stops it. The browser runs on Cloudflare's network, not ours, so where a page
-opens one the connection leaves from Cloudflare. Text a page receives over one counts on the rendered
-side.
+opens one the connection leaves from Cloudflare. Text a page received over one would count on the
+rendered side; the probe saw the connection open, not text arrive.
 
 ${table(
   ['Rule', 'Refuses'],
@@ -273,7 +274,7 @@ cap is below one page's ${seconds(2 * RESERVE_PER_RENDER_MS)} does not ask, and 
 \`check_cap\`. When it grants, the budget is settled once, after the last page has finished, at the
 browser time the check counted; a settle that throws is returned as \`settle_failed\`, and the day
 may still count the whole allowance, depending on the store. So a day with room for some pages of a check but not its
-allowance renders none of that check.
+allowance renders none of that check. If a page throws out of the render (only the injected \`sleep\` or the previous-state lookup can), the other pages go on, taking and rendering the pages left in the queue; once all have finished, the budget is settled at what the check counted and the throw is passed on, so those pages' results are discarded.
 
 Within the check, before a page starts it reserves both of its renders at ${seconds(RESERVE_PER_RENDER_MS)} each
 from the allowance. When the allowance cannot take them while other pages of the check are in flight,
@@ -296,8 +297,8 @@ On Workers Free, Cloudflare's limits page gives one Quick Actions request every
 ${BROWSER_RUN.free_request_every_s} s per account and ${BROWSER_RUN.free_browser_minutes_per_day} browser-minutes a day. The live run of
 2026-11-05, on such an account, was answered 429 on a request sent at once after another, and 200
 on one sent ${BROWSER_RUN.free_request_every_s} s after a 429; the 429s carried no \`Retry-After\` in seconds.
-A check with more than one request in flight sends faster than that rate, so production rendering
-needs Workers Paid.
+Each page sends its two requests back to back, so a check exceeds that rate at any in-flight setting,
+and production rendering needs Workers Paid.
 No reason below fails the check:
 
 ${table(
