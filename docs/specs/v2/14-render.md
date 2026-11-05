@@ -31,7 +31,7 @@ written inline in the HTML is not a request, so the static side also sends
 `setJavaScriptEnabled: false`: were an inline script to run there, the text it writes would count
 on both sides and raise the share, reading a page that needs JavaScript as one that does not.
 Cloudflare documents that field for `/snapshot` (read 2026-11-05); the `/content` page
-does not name it. **Whether `/content` honours it is unproven:** no passing run of the live inline-script probe (below) is recorded here. If it shows the setting ignored, the static side moves to `/snapshot`, where it is documented.
+does not name it. **Whether `/content` honours it is unproven:** no passing run of the live inline-script probe (below) is recorded here. If it shows the setting ignored, the static side moves to `/snapshot`, where it is documented. If `/content` refuses the field instead, each static side comes back `api_error` and no page is measured; the probe fails on that too, since it expects a 200.
 
 The user agent is the one the v2 fixtures record on their `identity_role: render` rows. Browser Run's
 documentation (automatic request headers, read 2026-11-05) says it adds headers a request

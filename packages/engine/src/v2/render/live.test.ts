@@ -44,7 +44,11 @@ function liveEnv(): Record<string, string | undefined> {
     if (!m || (m[1] !== ENV.account && m[1] !== ENV.token)) continue;
     read[m[1]] = m[2]!.replace(/^(['"])(.*)\1$/, '$2');
   }
-  return { ...fromEnv, ...read };
+  // The file fills only what the environment lacks, and a blank line in it fills nothing.
+  return {
+    [ENV.account]: fromEnv[ENV.account] || read[ENV.account] || undefined,
+    [ENV.token]: fromEnv[ENV.token] || read[ENV.token] || undefined,
+  };
 }
 
 const env = liveEnv();

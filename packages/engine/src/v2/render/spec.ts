@@ -74,7 +74,7 @@ on both sides and raise the share, reading a page that needs JavaScript as one t
 Cloudflare documents that field for \`/snapshot\` (read ${BROWSER_RUN.read_on}); the \`/content\` page
 does not name it. ${
       STATIC_JS_OFF_SHOWN_LIVE === null
-        ? '**Whether `/content` honours it is unproven:** no passing run of the live inline-script probe (below) is recorded here. If it shows the setting ignored, the static side moves to `/snapshot`, where it is documented.'
+        ? '**Whether `/content` honours it is unproven:** no passing run of the live inline-script probe (below) is recorded here. If it shows the setting ignored, the static side moves to `/snapshot`, where it is documented. If `/content` refuses the field instead, each static side comes back `api_error` and no page is measured; the probe fails on that too, since it expects a 200.'
         : `The live inline-script probe (below) showed \`/content\` honouring it on ${STATIC_JS_OFF_SHOWN_LIVE}.`
     }
 
