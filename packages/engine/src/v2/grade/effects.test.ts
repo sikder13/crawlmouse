@@ -13,6 +13,7 @@ import { every } from '../../../fixtures/v2/access/builders.js';
 import { blogSite, type Cells } from '../../../fixtures/v2/grade/sites.js';
 import type { PageSpec } from '../../../fixtures/v2/detectors/builders.js';
 import type { ContentFeatures } from '../content/read.js';
+import type { Detection } from '../detectors/types.js';
 import { applyFix, effectsOf } from './effects.js';
 import { technicalSeo } from './technical-seo.js';
 import { aiFrom, gradeCheck, type Grades } from './index.js';
@@ -35,6 +36,9 @@ function scored(n: number, unanswered: number, cells: Cells = {}, extra: PageSpe
   const grades: Grades = { ...g, inputs, ai_readability: aiFrom(inputs.ai) };
   return { grades, ...detectorOutcomes(grades, access, input.structure) };
 }
+
+/** The structure records gradeCheck was given: whole records, which its input type narrows. */
+const structureOf = (g: Grades) => g.inputs.seo.detections as unknown as readonly Detection[];
 
 const SEO_STATED = { technical_seo_pending_on: [], absorbed_by: null, estimate: true } as const;
 
@@ -416,7 +420,7 @@ describe('the structure counterfactuals, by hand', () => {
       key: 'redirect:https://a.test/r',
       affected_urls: [old],
     } as never;
-    const detections = [...grades.inputs.seo.detections, redirect];
+    const detections = [...structureOf(grades), redirect];
     const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, detections } };
     const fixes = detections
       .filter((d) => d.state === 'detected')
@@ -436,6 +440,72 @@ describe('the structure counterfactuals, by hand', () => {
     ];
     expect(deep[1].effect.technical_seo).toBeLessThanOrEqual(0);
     expect(deep[1].absorbed_by).toBe(orphan[0]);
+  });
+
+  it('an effect gone before any fix naming its page is left unattributed, not given to that fix', () => {
+    // /y is an orphan, and the only page linking /x1../x4; its fixes link it, and the four with it,
+    // so the deep-page fixes on /x1../x4 have nothing left. A redirect record names /x1 and ranks
+    // between them; it takes nothing from deep(/x1)
+    const extra: PageSpec[] = [
+      { path: '/y', links: ['/x1', '/x2', '/x3', '/x4'] },
+      ...['/x1', '/x2', '/x3', '/x4'].map((path) => ({ path })),
+    ];
+    const { grades } = blog(12, 0, {}, extra);
+    const x1 = grades.inputs.seo.pages.find((p) => p.url.endsWith('/x1'))!.url;
+    const redirect = {
+      type: 'redirect_chain',
+      state: 'detected',
+      fingerprint: 'redir',
+      key: 'redirect:https://a.test/r',
+      affected_urls: [x1],
+    } as never;
+    const detections = [...structureOf(grades), redirect];
+    const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, detections } };
+    const fixes = detections
+      .filter((d) => d.state === 'detected')
+      .map((record) => ({ family: 'structure' as const, record }));
+    const { byFix } = effectsOf(inputs, fixes);
+    const keyOf = new Map(detections.map((d) => [d.fingerprint, d.key]));
+    const absorbed = new Map(
+      [...byFix].map(([fp, v]) => [keyOf.get(fp)!, v.absorbed_by && keyOf.get(v.absorbed_by)]),
+    );
+    expect(absorbed.get(`depth:${x1}`)).not.toBe('redirect:https://a.test/r');
+    for (const [, v] of byFix) if (v.absorbed_by === 'redir') throw new Error('redirect named');
+  });
+
+  it('the absorber must name what the fix names: an orphan fix on another page taking the effect is not named', () => {
+    // /old-1 is an orphan linking /old-2; the orphan fix on /old-1 also brings /old-2 within reach,
+    // so the deep-page fix on /old-2 has nothing left, but the two fixes name different pages
+    const { grades } = blog(20, 0, {}, [{ path: '/old-1', links: ['/old-2'] }, { path: '/old-2' }]);
+    const old2 = grades.inputs.seo.pages.find((p) => p.url.endsWith('/old-2'))!.url;
+    const fixes = structureOf(grades)
+      .filter((d) => d.state === 'detected')
+      .map((record) => ({ family: 'structure' as const, record }));
+    const { byFix } = effectsOf(grades.inputs, fixes);
+    const deep = structureOf(grades).find((d) => d.key === `depth:${old2}`)!;
+    const alone = effectsOf(grades.inputs, [{ family: 'structure', record: deep }]).overview;
+    expect(alone.technical_seo).toBeGreaterThan(0);
+    expect(byFix.get(deep.fingerprint)!.effect.technical_seo).toBeLessThanOrEqual(0);
+    expect(byFix.get(deep.fingerprint)!.absorbed_by).toBe(null);
+  });
+
+  it('a site-wide link to a redirect chain marks every linking page: 87.42 → 47.42, a fix worth +40', () => {
+    const { grades } = blog(13, 0);
+    expect(grades.technical_seo.score).toBe(87.42);
+    const redirect = {
+      type: 'redirect_chain',
+      state: 'detected',
+      fingerprint: 'nav',
+      key: 'redirect:https://a.test/old-menu-target',
+      affected_urls: grades.inputs.seo.pages.map((p) => p.url),
+    } as never;
+    expect(grades.inputs.seo.pages).toHaveLength(14);
+    const inputs = { ...grades.inputs, seo: { ...grades.inputs.seo, detections: [redirect] } };
+    // crawlability 0/14: 0.6 × structure + 0, with structure 79.03 here (87.42 − 40) / 0.6
+    expect(technicalSeo(inputs.seo).score).toBe(47.42);
+    expect(
+      effectsOf(inputs, [{ family: 'structure', record: redirect }]).overview.technical_seo,
+    ).toBe(40);
   });
 
   it('a page carrying two defects counts once: clearing one moves nothing, clearing both 40/7', () => {
@@ -508,7 +578,7 @@ describe('the structure counterfactuals, by hand', () => {
 describe('the effects', () => {
   const orphans: PageSpec[] = ['/old-1', '/old-2'].map((path) => ({ path }));
 
-  it('add up to the projected grades less the current ones, within rounding', () => {
+  it('add up to the projected grades less the current ones, exactly', () => {
     const { outcomes, overview } = scored(13, 8, { PerplexityBot: blocked }, orphans);
     const fs = fixes(outcomes);
     expect(fs.map((f) => f.type).sort()).toEqual(
@@ -516,8 +586,8 @@ describe('the effects', () => {
     );
     const seo = fs.reduce((n, f) => n + f.effect.technical_seo!, 0);
     const ai = fs.reduce((n, f) => n + (f.effect.ai_readability ?? 0), 0);
-    expect(Math.abs(seo - overview.technical_seo!)).toBeLessThanOrEqual(0.005 * fs.length + 1e-9);
-    expect(Math.abs(ai - overview.ai_readability!)).toBeLessThanOrEqual(0.005 * fs.length + 1e-9);
+    expect(Math.abs(seo - overview.technical_seo!)).toBeLessThan(1e-9);
+    expect(Math.abs(ai - overview.ai_readability!)).toBeLessThan(1e-9);
     expect(overview.technical_seo).toBeGreaterThan(0);
     expect(overview.ai_readability).toBeGreaterThan(0);
   });
@@ -657,36 +727,43 @@ describe('the effects', () => {
     });
   });
 
-  it('add up on random sites too: any number of orphans and deep pages, any blocked crawlers', () => {
+  it('add up on random sites too: any number of orphans and deep pages, any blocked crawlers, refused or not', () => {
+    let aiStated = 0;
+    let refused = 0;
     fc.assert(
       fc.property(
         fc.nat({ max: 4 }),
         fc.nat({ max: 3 }),
         fc.subarray(['PerplexityBot', 'Claude-SearchBot', 'OAI-SearchBot']),
         fc.nat({ max: 6 }),
-        (nOrphans, depth, blockedBots, unanswered) => {
+        fc.constantFrom('withheld', 'scored', 'small'),
+        (nOrphans, depth, blockedBots, unanswered, kind) => {
+          const orphans = Array.from({ length: nOrphans }, (_, i) => ({ path: `/orphan/${i}` }));
           const chain: PageSpec[] = Array.from({ length: depth + 4 }, (_, i) => ({
             path: `/deep/${i}`,
             links: i + 1 < depth + 4 ? [`/deep/${i + 1}`] : [],
           }));
-          const extra: PageSpec[] = [
-            ...Array.from({ length: nOrphans }, (_, i) => ({ path: `/orphan/${i}` })),
-            { path: '/hub', links: ['/deep/0'] },
-            ...chain,
-          ];
+          const extra: PageSpec[] = [...orphans, { path: '/hub', links: ['/deep/0'] }, ...chain];
           const cells = Object.fromEntries(blockedBots.map((b) => [b, blocked]));
-          const r = blog(8, unanswered, cells, extra);
+          // small: the homepage, one post and up to two orphans, under the floor of graded pages
+          const r =
+            kind === 'small'
+              ? blog(1, Math.min(unanswered, 1), cells, orphans.slice(0, 2))
+              : (kind === 'scored' ? scored : blog)(8, unanswered, cells, extra);
           const fs = fixes(r.outcomes);
           for (const f of fs) expect(EffectSchema.safeParse(f.effect).success).toBe(true);
+          if (kind === 'small') {
+            expect(r.overview.technical_seo).toBe(null);
+            refused += 1;
+          }
           // a refused grade leaves every Technical SEO effect unstated, and the overview's with them
           for (const f of fs) {
             expect(f.effect.technical_seo === null).toBe(r.overview.technical_seo === null);
           }
+          // each effect is a difference of two grades given to two places, so the sum is exact
           if (r.overview.technical_seo !== null) {
             const seo = fs.reduce((n, f) => n + f.effect.technical_seo!, 0);
-            expect(Math.abs(seo - r.overview.technical_seo)).toBeLessThanOrEqual(
-              0.005 * fs.length + 1e-9,
-            );
+            expect(Math.abs(seo - r.overview.technical_seo)).toBeLessThan(1e-9);
           }
           // an absorbed fix names one ranked above it, and has no positive effect left
           const rankOf = new Map(
@@ -701,16 +778,20 @@ describe('the effects', () => {
               (f.effect.technical_seo ?? 0) + (f.effect.ai_readability ?? 0),
             ).toBeLessThanOrEqual(0);
           }
+          // AI effects are stated only when the grade is given, and then add up to the overview
+          expect(r.overview.ai_readability !== null).toBe(!r.grades.ai_readability.withheld);
           if (r.overview.ai_readability !== null) {
             const ai = fs.reduce((n, f) => n + (f.effect.ai_readability ?? 0), 0);
-            expect(Math.abs(ai - r.overview.ai_readability)).toBeLessThanOrEqual(
-              0.005 * fs.length + 1e-9,
-            );
+            expect(Math.abs(ai - r.overview.ai_readability)).toBeLessThan(1e-9);
+            aiStated += 1;
           }
         },
       ),
-      { numRuns: 25, seed: 1717 },
+      { numRuns: 30, seed: 1717 },
     );
+    // both branches ran
+    expect(aiStated).toBeGreaterThan(0);
+    expect(refused).toBeGreaterThan(0);
   });
 });
 
