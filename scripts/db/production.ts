@@ -6,7 +6,13 @@ import { connect, readOnlyApi } from './db';
 import { listMigrations, rollbackPath, sha256, type MigrationFile } from './files';
 import { formatFingerprint, readFingerprint } from './fingerprint';
 import { diffHistory, formatDiff, readHistory } from './history';
-import { migrationForRollback, newestFirstGuard, revert, rollbackOrderProblem } from './rollback';
+import {
+  DB_OPS_LOCK_KEY,
+  migrationForRollback,
+  newestFirstGuard,
+  revert,
+  rollbackOrderProblem,
+} from './rollback';
 import {
   digests,
   filesTable,
@@ -161,7 +167,14 @@ async function apply(
       `the CLI would push [${listed.files.join(', ')}], not [${expected.join(', ')}]`,
     );
   }
-  await dbPush(url, { dryRun: false });
+  // Held on a connection of its own for the whole push: a production rollback waits for it.
+  const lock = connect(url);
+  try {
+    await lock.query('select pg_advisory_lock($1)', [DB_OPS_LOCK_KEY]);
+    await dbPush(url, { dryRun: false });
+  } finally {
+    await lock.close();
+  }
   await report(url, `### Applied to production (${PRODUCTION_REF})\n\n${filesTable(manifest)}`);
 }
 

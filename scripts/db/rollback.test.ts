@@ -5,6 +5,8 @@ import {
   FORGET_VERSION,
   migrationForRollback,
   missingRollbacks,
+  LOCK_HISTORY,
+  TAKE_DB_OPS_LOCK,
   newestFirstGuard,
   rerun,
   revert,
@@ -95,6 +97,16 @@ describe('newestFirstGuard, inside the rollback transaction', () => {
       '20261103000001 is newer than 20261102000003 and still applied: roll back newest first',
     );
     expect(compareFingerprints(fp, await readFingerprint(after))).toEqual([]);
+  }, 240_000);
+
+  it("takes the apply's advisory lock before it locks and reads the history", async () => {
+    const { after } = await databases();
+    const m006b = pending.find((m) => m.version === '20261103000001')!;
+    after.executed.length = 0;
+    await revert(after, [m006b], () => {}, newestFirstGuard);
+    const advisory = after.executed.indexOf(TAKE_DB_OPS_LOCK);
+    expect(advisory).toBeGreaterThanOrEqual(0);
+    expect(advisory).toBeLessThan(after.executed.indexOf(LOCK_HISTORY));
   }, 240_000);
 
   it('lets the newest recorded migration revert', async () => {

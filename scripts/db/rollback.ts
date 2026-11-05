@@ -74,12 +74,21 @@ export function rollbackOrderProblem(version: string, recorded: string[]): strin
 export const LOCK_HISTORY = 'lock table supabase_migrations.schema_migrations in exclusive mode';
 
 /**
- * For `revert` on production: inside the rollback's transaction, locks the history table (a
- * `supabase db push` records its files there, so it waits) and requires the migration to be the
+ * The advisory lock production's apply holds for the whole of `supabase db push`, and a production
+ * rollback takes before it reads the history: while one holds it, the other waits. The lock on the
+ * history table alone would not do, because the CLI runs a file's DDL before it records the file.
+ */
+export const DB_OPS_LOCK_KEY = 7_406_230_501;
+export const TAKE_DB_OPS_LOCK = 'select pg_advisory_xact_lock($1)';
+
+/**
+ * For `revert` on production: inside the rollback's transaction, waits for the apply's advisory lock
+ * (DB_OPS_LOCK_KEY), locks the history table, and requires the migration to be the
  * newest one recorded. The plan checked this before the approval; this checks it again at the
  * moment the rollback runs.
  */
 export async function newestFirstGuard(tx: Db, migration: MigrationFile): Promise<void> {
+  await tx.query(TAKE_DB_OPS_LOCK, [DB_OPS_LOCK_KEY]);
   await tx.query(LOCK_HISTORY);
   const rows = await readHistory(tx);
   const problem = rollbackOrderProblem(
