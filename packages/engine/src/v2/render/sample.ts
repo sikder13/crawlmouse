@@ -26,7 +26,10 @@ export interface RenderCandidate extends Pick<
   PageResult,
   'url' | 'template_key' | 'kind' | 'status_code' | 'is_html' | 'pagerank_share'
 > {
-  /** The crawl fetched this page as our crawler, under our robots.txt group. */
+  /**
+   * The crawl fetched this page as our crawler, under our robots.txt group. Rows are matched by `url`
+   * as written, so the caller passes each URL in the one canonical form the crawl stores.
+   */
   fetched_under_our_robots: boolean;
 }
 
