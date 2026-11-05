@@ -1,20 +1,5 @@
-import * as cheerio from 'cheerio';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { countWords, mainWords } from './words.js';
-
-vi.mock('cheerio', async (original) => {
-  const real = await original<typeof import('cheerio')>();
-  return { ...real, load: vi.fn(real.load) };
-});
-vi.mock('../../analysis/ai-readiness/main-content.js', async (original) => {
-  const real = await original<typeof import('../../analysis/ai-readiness/main-content.js')>();
-  return { ...real, extractMainContent: vi.fn(real.extractMainContent) };
-});
-
-const { extractMainContent } = await import('../../analysis/ai-readiness/main-content.js');
-const { measurePage } = await import('./page.js');
-
-afterEach(() => vi.clearAllMocks());
+import { describe, expect, it } from 'vitest';
+import { BOUNDARY_ELEMENTS, countWords, mainWords } from './words.js';
 
 describe('countWords', () => {
   it('counts runs of non-space characters', () => {
@@ -67,17 +52,42 @@ describe('mainWords', () => {
   });
 });
 
-describe('the two sides of a page', () => {
-  it('go through the same function, parsed the same way', () => {
-    const staticHtml = '<body><main><p>Served text here.</p></main></body>';
-    const renderedHtml =
-      '<body><main><p>Served text here. And more from scripts.</p></main></body>';
-    measurePage({ staticHtml, renderedHtml, previous: null });
+describe('the boundary split', () => {
+  it.each([
+    ['buttons', '<button>Add</button><button>Remove</button>', 2],
+    ['labels and inputs', '<label>Name</label><input><label>Email</label>', 2],
+    ['table cells', '<table><tr><td>Size</td><td>2P</td></tr></table>', 2],
+    ['a line break', 'one<br>two<br/>three', 3],
+    ['tags in upper case', '<P>One</P><P>Two</P>', 2],
+  ])('separates %s', (_name, inner, words) => {
+    expect(mainWords(`<body><main>${inner}</main></body>`)).toBe(words);
+  });
 
-    expect(extractMainContent).toHaveBeenCalledTimes(2);
-    const loads = vi.mocked(cheerio.load).mock.calls;
-    expect(loads.map((args) => args[0])).toEqual([staticHtml, renderedHtml]);
-    // Neither call passes options, so both parses are cheerio's defaults: the same parser either side.
-    expect(loads.map((args) => args.length)).toEqual([1, 1]);
+  it('does not split on a tag whose name only starts like a boundary element', () => {
+    expect(mainWords('<body><main><p>co<pre-x>op</pre-x></p></main></body>')).toBe(1);
+  });
+
+  it('lists each element once', () => {
+    expect(new Set(BOUNDARY_ELEMENTS).size).toBe(BOUNDARY_ELEMENTS.length);
+  });
+});
+
+describe('the cost of counting', () => {
+  const flat = (n: number) => `<body><main>${'<p>w</p>'.repeat(n)}</main></body>`;
+  const fastest = (html: string) => {
+    let best = Infinity;
+    for (let i = 0; i < 3; i += 1) {
+      const t = performance.now();
+      mainWords(html);
+      best = Math.min(best, performance.now() - t);
+    }
+    return best;
+  };
+
+  it('grows about linearly with flat siblings, not with their square', () => {
+    // Four times the siblings: about 4x when linear, about 16x when quadratic.
+    expect(mainWords(flat(80_000))).toBe(80_000);
+    const ratio = fastest(flat(80_000)) / fastest(flat(20_000));
+    expect(ratio).toBeLessThan(9);
   });
 });
