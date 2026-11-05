@@ -2,8 +2,10 @@
 -- anon holds nothing on any v2 table or partition. authenticated and crawl_worker hold exactly the
 -- grants in this file's `declared` list, at the table or column level: a privilege held but not listed,
 -- or listed on an existing table and column but not held, is a finding. The v2 tables are the ones
--- in its `v2_tables` list, plus every relation in the research and partitions schemas. A table, column
--- or role that does not exist yet (a migration not applied) is skipped.
+-- in its `v2_tables` list, every relation in the research and partitions schemas, and every
+-- partition in any schema. A table, column or role that does not exist yet (a migration not
+-- applied) is skipped; scripts/db/check.test.ts requires every listed table to exist once the
+-- migrations have run.
 --
 -- A migration that changes these grants changes this list in the same pull request.
 with
@@ -114,9 +116,10 @@ declared(rel, role, privilege, columns) as (
 rels as (
   select c.oid, format('%s.%s', n.nspname, c.relname) as rel
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
-  where c.relkind in ('r', 'p', 'v')
+  where c.relkind in ('r', 'p', 'v', 'm')
     and (format('%s.%s', n.nspname, c.relname) in (select rel from v2_tables)
-         or n.nspname in ('research', 'partitions'))
+         or n.nspname in ('research', 'partitions')
+         or c.relispartition)
 ),
 roles(role) as (
   select rolname::text from pg_roles where rolname in ('anon', 'authenticated', 'crawl_worker')
@@ -125,7 +128,7 @@ table_held as (
   select r.rel, ro.role, p.privilege
   from rels r cross join roles ro
   cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES',
-                          'TRIGGER']) p(privilege)
+                          'TRIGGER', 'MAINTAIN']) p(privilege)
   where has_table_privilege(ro.role, r.oid, p.privilege)
 ),
 column_held as (
@@ -145,17 +148,21 @@ column_declared as (
 )
 select h.rel as object, format('%s holds %s on the table; not declared', h.role, h.privilege) as problem
 from table_held h
-where (h.rel, h.role, h.privilege) not in (select rel, role, privilege from table_declared)
+where not exists (select 1 from table_declared d
+                  where d.rel = h.rel and d.role = h.role and d.privilege = h.privilege)
 union all
 select d.rel, format('%s is declared to hold %s on the table and does not', d.role, d.privilege)
 from table_declared d
 join rels r on r.rel = d.rel
 join roles ro on ro.role = d.role
-where (d.rel, d.role, d.privilege) not in (select rel, role, privilege from table_held)
+where not exists (select 1 from table_held h
+                  where h.rel = d.rel and h.role = d.role and h.privilege = d.privilege)
 union all
 select format('%s.%s', h.rel, h.col), format('%s holds %s on the column; not declared', h.role, h.privilege)
 from column_held h
-where (h.rel, h.role, h.privilege, h.col) not in (select rel, role, privilege, col from column_declared)
+where not exists (select 1 from column_declared d
+                  where d.rel = h.rel and d.role = h.role and d.privilege = h.privilege
+                    and d.col = h.col)
 union all
 select format('%s.%s', d.rel, d.col),
        format('%s is declared to hold %s on the column and does not', d.role, d.privilege)
@@ -163,5 +170,7 @@ from column_declared d
 join rels r on r.rel = d.rel
 join roles ro on ro.role = d.role
 join pg_attribute a on a.attrelid = r.oid and a.attname = d.col and not a.attisdropped
-where (d.rel, d.role, d.privilege, d.col) not in (select rel, role, privilege, col from column_held)
+where not exists (select 1 from column_held h
+                  where h.rel = d.rel and h.role = d.role and h.privilege = d.privilege
+                    and h.col = d.col)
 order by 1, 2;

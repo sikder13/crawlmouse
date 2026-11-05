@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import type { Db } from './db';
-import { CHECKS_DIR } from './files';
+import { CHECKS_DIR, FINGERPRINT_FILE } from './files';
 import { openTarget } from './target';
 
 /**
@@ -40,17 +40,25 @@ function parseHeader(file: string, sql: string): { title: string; meaning: strin
   return { title: title.trim(), meaning: rest.join(' ').replace(/\s+/g, ' ').trim() };
 }
 
+/**
+ * The check files, in name order. A `.sql` file that is neither a check nor the fingerprint throws,
+ * so a misnamed check cannot be skipped, and an empty list throws.
+ */
 export function listChecks(dir = CHECKS_DIR): Check[] {
-  return readdirSync(dir)
-    .filter((f) => CHECK_FILE.test(f))
-    .sort()
-    .map((file) => {
-      const sql = readFileSync(join(dir, file), 'utf8');
-      return { file, sql, ...parseHeader(file, sql) };
-    });
+  const sqlFiles = readdirSync(dir).filter((f) => f.endsWith('.sql') && f !== FINGERPRINT_FILE);
+  const misnamed = sqlFiles.filter((f) => !CHECK_FILE.test(f));
+  if (misnamed.length > 0) {
+    throw new Error(`${misnamed.join(', ')} in ${dir}: a check is named NN-<name>.sql`);
+  }
+  if (sqlFiles.length === 0) throw new Error(`${dir} holds no checks`);
+  return sqlFiles.sort().map((file) => {
+    const sql = readFileSync(join(dir, file), 'utf8');
+    return { file, sql, ...parseHeader(file, sql) };
+  });
 }
 
 export async function runChecks(db: Db, checks = listChecks()): Promise<CheckResult[]> {
+  if (checks.length === 0) throw new Error('no checks to run');
   const results: CheckResult[] = [];
   for (const check of checks) results.push({ check, findings: await db.query(check.sql) });
   return results;

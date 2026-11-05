@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { failed, formatResults, listChecks, runChecks } from './check';
-import { migratedDb, pgliteDb, withRollback } from './test-support';
+import { readFileSync } from 'node:fs';
+import { CHECKS_DIR } from './files';
+import { migratedDb, partitionOf, pgliteDb, withRollback } from './test-support';
 
 const checks = listChecks();
 const byFile = (prefix: string) => checks.filter((c) => c.file.startsWith(prefix));
@@ -14,13 +16,30 @@ beforeAll(async () => {
   db = await migratedDb();
 }, 180_000);
 
+/**
+ * Replaces `{public_page_results}` and the like with the name of an existing partition of that
+ * table: partitions are named for the months around now(), so no test names a month.
+ */
+async function resolve(text: string): Promise<string> {
+  let out = text;
+  for (const [token, parent] of text.matchAll(/\{([a-z_]+)\}/g)) {
+    out = out.replace(token, await partitionOf(db, parent!));
+  }
+  return out;
+}
+
 /** The findings of one check after a mutation, inside a transaction that is rolled back. */
 async function findingsAfter(prefix: string, mutation: string): Promise<string[]> {
+  const sql = await resolve(mutation);
   return withRollback(db, async (tx) => {
-    await tx.exec(mutation);
+    await tx.exec(sql);
     const [result] = await runChecks(tx, byFile(prefix));
     return result!.findings.map((row) => Object.values(row).join(': '));
   });
+}
+
+async function expectFinding(prefix: string, mutation: string, expected: string) {
+  expect((await findingsAfter(prefix, mutation)).join('\n')).toContain(await resolve(expected));
 }
 
 describe('the check files', () => {
@@ -49,6 +68,19 @@ describe('the check files', () => {
   }, 180_000);
 });
 
+describe('check 01 names tables that exist', () => {
+  it('every relation in its v2_tables and declared lists exists once the migrations have run', async () => {
+    const sql = readFileSync(join(CHECKS_DIR, '01-client-table-privileges.sql'), 'utf8');
+    const named = [...new Set([...sql.matchAll(/'(public\.[a-z_]+)'/g)].map((m) => m[1]!))];
+    expect(named.length).toBeGreaterThanOrEqual(25);
+    const { rows } = await db.query<{ rel: string }>(
+      `select r as rel from unnest($1::text[]) r where to_regclass(r) is null`,
+      [named],
+    );
+    expect(rows.map((r) => r.rel)).toEqual([]);
+  });
+});
+
 describe('each check fails on what it guards', () => {
   it.each([
     ['grant select on public.sites to anon', 'public.sites: anon holds SELECT on the table'],
@@ -69,48 +101,73 @@ describe('each check fails on what it guards', () => {
       'research.check_runs: authenticated holds SELECT on the table',
     ],
     [
-      'grant select on partitions.public_page_results_2026_12 to anon',
-      'partitions.public_page_results_2026_12: anon holds SELECT',
+      'grant select on partitions.{public_page_results} to anon',
+      'partitions.{public_page_results}: anon holds SELECT',
     ],
     [
       'grant delete on public.usage_events to authenticated',
       'public.usage_events: authenticated holds DELETE',
     ],
+    ['grant maintain on public.sites to anon', 'public.sites: anon holds MAINTAIN on the table'],
+    [
+      `create table public.page_results_2031_01 partition of public.page_results
+         for values from ('2031-01-01') to ('2031-02-01');
+       grant select on public.page_results_2031_01 to anon`,
+      'public.page_results_2031_01: anon holds SELECT on the table',
+    ],
+    [
+      'create materialized view research.zz_mv as select 1 as x; grant select on research.zz_mv to anon',
+      'research.zz_mv: anon holds SELECT on the table',
+    ],
   ])('01: %s', async (mutation, expected) => {
-    const findings = await findingsAfter('01-', mutation);
-    expect(findings.join('\n')).toContain(expected);
+    await expectFinding('01-', mutation, expected);
   });
 
   it.each([
     [
-      'alter table partitions.public_link_edges_2027_01 disable row level security',
-      'partitions.public_link_edges_2027_01: row-level security is off',
+      'alter table partitions.{public_link_edges} disable row level security',
+      'partitions.{public_link_edges}: row-level security is off',
     ],
     [
-      'alter table partitions.research_check_runs_2026_11 disable row level security',
-      'partitions.research_check_runs_2026_11: row-level security is off',
+      'alter table partitions.{research_check_runs} disable row level security',
+      'partitions.{research_check_runs}: row-level security is off',
     ],
     [
-      'grant select on partitions.research_crawler_observations_2026_12 to service_role',
+      'grant select on partitions.{research_crawler_observations} to service_role',
       'service_role holds SELECT',
     ],
-    ['grant select on partitions.public_access_tests_2026_11 to public', 'PUBLIC holds SELECT'],
+    ['grant select on partitions.{public_access_tests} to public', 'PUBLIC holds SELECT'],
+    [
+      `create table public.page_results_2031_01 partition of public.page_results
+         for values from ('2031-01-01') to ('2031-02-01');
+       alter table public.page_results_2031_01 disable row level security`,
+      'public.page_results_2031_01: row-level security is off',
+    ],
   ])('02: %s', async (mutation, expected) => {
-    expect((await findingsAfter('02-', mutation)).join('\n')).toContain(expected);
+    await expectFinding('02-', mutation, expected);
   });
 
   it.each([
     ['alter role crawl_worker login', 'crawl_worker: can log in'],
     ['alter role research_retention bypassrls', 'research_retention: bypasses row-level security'],
+    ['alter role crawl_worker createrole', 'crawl_worker: can create roles'],
+    [
+      'grant service_role to crawl_worker',
+      'crawl_worker: is a member of service_role, which bypasses row-level security',
+    ],
+    [
+      'create role zz_middle; grant service_role to zz_middle; grant zz_middle to research_retention',
+      'research_retention: is a member of service_role',
+    ],
   ])('03: %s', async (mutation, expected) => {
-    expect((await findingsAfter('03-', mutation)).join('\n')).toContain(expected);
+    await expectFinding('03-', mutation, expected);
   });
 
   it.each([
     ['grant usage on schema research to authenticated', 'research: authenticated holds USAGE'],
     ['grant create on schema partitions to public', 'partitions: anon holds CREATE'],
   ])('04: %s', async (mutation, expected) => {
-    expect((await findingsAfter('04-', mutation)).join('\n')).toContain(expected);
+    await expectFinding('04-', mutation, expected);
   });
 
   it.each([
@@ -123,7 +180,7 @@ describe('each check fails on what it guards', () => {
       'evidence: the bucket is public',
     ],
   ])('05: %s', async (mutation, expected) => {
-    expect((await findingsAfter('05-', mutation)).join('\n')).toContain(expected);
+    await expectFinding('05-', mutation, expected);
   });
 
   it.each([
@@ -144,7 +201,7 @@ describe('each check fails on what it guards', () => {
       'public.usage_counts(uuid): authenticated is declared to execute it and cannot',
     ],
   ])('06: %s', async (mutation, expected) => {
-    expect((await findingsAfter('06-', mutation)).join('\n')).toContain(expected);
+    await expectFinding('06-', mutation, expected);
   });
 });
 
@@ -168,6 +225,20 @@ describe('the runner', () => {
     expect(formatResults(results)).toContain(
       'FAIL  02-row.sql  Something is wrong here.\n      object: problem',
     );
+  });
+
+  it.each([
+    [
+      'a .sql file that is not named as a check',
+      ['1-misnamed.sql'],
+      /1-misnamed.sql.*NN-<name>.sql/,
+    ],
+    ['a directory with no checks', [], /holds no checks/],
+  ])('refuses %s', (_label, files, error) => {
+    const dir = mkdtempSync(join(tmpdir(), 'db-checks-'));
+    writeFileSync(join(dir, 'fingerprint.sql'), 'select 1;\n');
+    for (const f of files) writeFileSync(join(dir, f), '-- A check.\nselect 1 where false;\n');
+    expect(() => listChecks(dir)).toThrow(error);
   });
 
   it('refuses a check file without its leading comment', () => {
