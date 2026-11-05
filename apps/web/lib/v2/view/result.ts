@@ -693,7 +693,9 @@ function fixRows(
       key: 'rest',
       title: `${capitalise(numberWord(rest.length))} more, grouped by type`,
       scope: null,
-      points: `+${rest.reduce((n, f) => n + (f.effect.technical_seo ?? 0), 0)} SEO`,
+      points: rest.some((f) => f.effect.technical_seo === null)
+        ? 'SEO not estimated'
+        : `+${rest.reduce((n, f) => n + f.effect.technical_seo!, 0)} SEO`,
       open: false,
       count: rest.length,
       href: '#pro',

@@ -131,8 +131,17 @@ function groupPoints(fixes: readonly Fix[]): string {
   const seo = fixes.reduce((n, f) => n + (f.effect.technical_seo ?? 0), 0);
   const ai = fixes.reduce((n, f) => n + (f.effect.ai_readability ?? 0), 0);
   const pending = fixes.filter((f) => f.effect.ai_readability === null).length;
-  const parts = [`+${seo} Technical SEO`, ai ? `+${ai} AI readability` : null].filter(Boolean);
-  return `${parts.join(', ')} together${pending ? `; AI effect not yet estimated for ${pending}` : ''}`;
+  const seoPending = fixes.filter((f) => f.effect.technical_seo === null).length;
+  const parts = [
+    seoPending === fixes.length ? null : `+${seo} Technical SEO`,
+    ai ? `+${ai} AI readability` : null,
+  ].filter(Boolean);
+  const waits = [
+    seoPending ? `Technical SEO effect not estimated for ${seoPending}` : null,
+    pending ? `AI effect not yet estimated for ${pending}` : null,
+  ].filter(Boolean);
+  const head = parts.length ? `${parts.join(', ')} together` : 'no estimated effect';
+  return `${head}${waits.length ? `; ${waits.join('; ')}` : ''}`;
 }
 
 /**

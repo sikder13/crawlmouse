@@ -349,6 +349,20 @@ describe('the tables’ labels', () => {
     expect(scopeTitled('Server-render the 158 product pages')).toBeNull();
     expect(scopeTitled('Server-render the product template in 2 steps')).toBe('158 pages');
   });
+
+  it('a fix whose Technical SEO effect is not estimated (a refused grade) shows no +0, alone or grouped', () => {
+    const v = view('bad-site', (_, d) => {
+      for (const f of d.fixes) {
+        f.effect.ai_readability = null;
+        f.effect.ai_readability_pending_on = ['readable_unmeasured'];
+        f.effect.technical_seo = null;
+        f.effect.technical_seo_pending_on = ['grade_refused'];
+      }
+    });
+    const points = v.fixes!.rows.map((r) => r.points);
+    expect(points.length).toBeGreaterThan(0);
+    expect(points.every((p) => p === 'SEO not estimated')).toBe(true);
+  });
 });
 
 describe('the fix to do first', () => {
