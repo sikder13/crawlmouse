@@ -129,15 +129,17 @@ function browserMsOf(res: Response, unknownMs: number): number {
   return Number.isFinite(ms) && ms >= 0 ? ms : unknownMs;
 }
 
-/** Retry-After in seconds as milliseconds; null when absent, empty, an HTTP date or anything else. */
+/** RFC 7231's preferred HTTP date, e.g. `Wed, 05 Nov 2026 14:00:00 GMT`; the only date form read. */
+const HTTP_DATE = /^[A-Z][a-z]{2}, [0-9]{2} [A-Z][a-z]{2} [0-9]{4} [0-9]{2}:[0-9]{2}:[0-9]{2} GMT$/;
+
 /**
- * The wait a 429 asks for: Retry-After as whole seconds, or as an HTTP date (the time until it, at
- * least zero). Null when it is absent or neither form, and the caller backs off.
+ * The wait a 429 asks for: Retry-After as whole seconds, or as an HTTP date in the form HTTP_DATE
+ * matches (the time until it, at least zero). Null for anything else, and the caller backs off.
  */
 function retryAfterMsOf(res: Response, now = Date.now()): number | null {
   const raw = res.headers.get('retry-after')?.trim() ?? '';
   if (/^[0-9]+$/.test(raw)) return Number(raw) * 1000;
-  const at = /[a-z]/i.test(raw) ? Date.parse(raw) : NaN;
+  const at = HTTP_DATE.test(raw) ? Date.parse(raw) : NaN;
   return Number.isFinite(at) ? Math.max(0, at - now) : null;
 }
 

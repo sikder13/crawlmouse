@@ -180,7 +180,8 @@ function hostRule(list: HostList): UrlRule {
 export const URL_RULES: readonly UrlRule[] = [
   {
     name: 'scheme',
-    refuses: 'any scheme but http, https, data and blob (file:, ws:, wss:, chrome: and the rest)',
+    refuses:
+      'any scheme but http, https, data and blob (file:, chrome: and the rest; it matches ws: and wss:, but a WebSocket opened anyway live: see the known limit)',
     pattern: /^(?!(?:https?|data|blob):)/,
   },
   {
@@ -217,8 +218,9 @@ export const URL_RULES: readonly UrlRule[] = [
 
 /**
  * A pattern as Browser Run applies it: the regular expression's source, with no slashes. The live
- * policy probe showed this on PATTERNS_SHOWN_LIVE: sent this way, each rule refused its request and the
- * twin requests loaded; sent wrapped in slashes, as this build first did, none was refused.
+ * policy probe showed this on PATTERNS_SHOWN_LIVE: sent this way, the rules it covers (ip_literal,
+ * download, one host from each list) refused their requests and the twin requests loaded; sent wrapped
+ * in slashes, as this build first did, none was refused. Flags are not sent, so no rule may use one.
  */
 export const wirePattern = (re: RegExp): string => re.source;
 export const PATTERNS_SHOWN_LIVE = '2026-11-05';

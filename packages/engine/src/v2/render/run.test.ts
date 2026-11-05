@@ -570,7 +570,8 @@ describe('a 429 from Browser Run', () => {
     ['a set limit', 5, 5],
     ['zero, read as the default', 0, RENDER_IN_FLIGHT_DEFAULT],
     ['above the most, read as the default', RENDER_IN_FLIGHT_MAX + 1, RENDER_IN_FLIGHT_DEFAULT],
-    ['a fraction, read as the default', 2.5, RENDER_IN_FLIGHT_DEFAULT],
+    // 1.5 would give one worker if it were not read as the default.
+    ['a fraction, read as the default', 1.5, RENDER_IN_FLIGHT_DEFAULT],
   ] as const)('is queued under the in-flight limit: %s', async (_name, inFlight, expected) => {
     const many = Array.from({ length: 14 }, (_, i) => ({
       provenance: 'test',

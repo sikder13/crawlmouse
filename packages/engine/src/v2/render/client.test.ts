@@ -149,7 +149,7 @@ describe('a reply', () => {
     });
   });
 
-  it.each([null, '', '  ', 'soon', '-1'])(
+  it.each([null, '', '  ', 'soon', '-1', 'Retry 5', '2026-11-05T14:00:00Z'])(
     'is rate_limited with no wait of its own when Retry-After is %j, so the caller backs off',
     async (header) => {
       const { client } = clientWith(async () =>

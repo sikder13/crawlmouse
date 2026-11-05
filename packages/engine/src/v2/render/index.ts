@@ -4,6 +4,8 @@ export { CAP_ENV, capsFromEnv, type DailyBudget, type RenderCaps } from './budge
 export { clientFromEnv, ENV, type BrowserRunClient } from './client.js';
 export { siteEstimate, type GradedPageShare, type SiteEstimate } from './estimate.js';
 export {
+  IN_FLIGHT_ENV,
+  inFlightFromEnv,
   NOT_RENDERED,
   renderCheck,
   type NotRenderedReason,

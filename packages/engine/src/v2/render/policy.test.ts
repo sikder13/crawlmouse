@@ -89,6 +89,15 @@ describe('a pattern on the wire', () => {
     }
     expect(PATTERNS_SHOWN_LIVE).toBe('2026-11-05');
   });
+
+  it('carries no flag, since flags are not sent', () => {
+    // A flag would be dropped on the wire: an `i` on the download rule would leave `.ZIP` unrefused
+    // there while refusingRule, which keeps the flag, still refused it.
+    expect(URL_RULES.filter((r) => r.pattern.flags !== '').map((r) => r.name)).toEqual([]);
+    const sent = (href: string) =>
+      URL_RULES.some((r) => new RegExp(wirePattern(r.pattern)).test(href));
+    expect(sent('https://site.example/files/REPORT.ZIP')).toBe(true);
+  });
 });
 
 describe('the rules that refuse', () => {
