@@ -6,6 +6,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
+import { clientFromEnv, ENV } from './client.js';
 
 /** Shapes of live credentials. Each is pinned by the planted examples below. */
 const SECRET_SHAPES: readonly [name: string, pattern: RegExp][] = [
@@ -106,7 +107,25 @@ describe('the Browser Run credentials', () => {
     expect(sources.filter(([, src]) => /process\.env/.test(src)).map(([f]) => f)).toEqual([]);
   });
 
-  it('have no value to fall back on when the environment holds none', () => {
+  it('are the only two variables the client reads', () => {
+    const read: string[] = [];
+    const env = new Proxy({} as Record<string, string | undefined>, {
+      get(_target, key) {
+        if (typeof key === 'string') read.push(key);
+        return undefined;
+      },
+    });
+    clientFromEnv(env);
+    expect([...new Set(read)].sort()).toEqual([ENV.account, ENV.token].sort());
+  });
+
+  it('build no client when the environment holds none, or only blanks', () => {
+    expect(clientFromEnv({})).toBeNull();
+    expect(clientFromEnv({ [ENV.account]: 'acct', [ENV.token]: '   ' })).toBeNull();
+    expect(clientFromEnv({ [ENV.account]: '   ', [ENV.token]: 'tok' })).toBeNull();
+  });
+
+  it('take no `??` or `||` default in the statement that reads them', () => {
     const client = sources.find(([f]) => f === 'client.ts')![1];
     const fallback = /env\[ENV\.(?:token|account)\][^;\n]*(?:\?\?|\|\|)/;
     expect(client).not.toMatch(fallback);
