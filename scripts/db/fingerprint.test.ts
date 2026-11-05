@@ -188,6 +188,17 @@ describe('each section detects a change of its own kind, and names it', () => {
     expect(compareFingerprints(base, after)).toEqual([]);
   });
 
+  it('a role setting changes the roles section and its value never appears in the lines', async () => {
+    const after = await withRollback(db, async (tx) => {
+      await tx.exec(`alter role authenticator set app.webhook_key = 'sk_test_role_secret'`);
+      return readFingerprint(tx);
+    });
+    expect(differingSections(base, after)).toEqual(['roles']);
+    const lines = [...after.values()].flatMap((s) => s.lines).join('\n');
+    expect(lines).toContain('app.webhook_key=md5:');
+    expect(lines).not.toContain('sk_test_role_secret');
+  });
+
   it('a new view changes the relations section', async () => {
     const after = await withRollback(db, async (tx) => {
       await tx.exec('create view public.zz as select 1 as x');

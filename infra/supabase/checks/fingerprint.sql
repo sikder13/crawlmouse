@@ -26,8 +26,9 @@
 -- privilege, so neither collation nor the order of aclitems can change a digest. The grantor is
 -- left out: it names whoever ran the GRANT, which differs between a branch and production.
 --
--- Function, view and trigger definitions appear as md5s: a trigger's arguments can hold a key (a
--- dashboard database webhook stores its Authorization header there), and the lines of a differing
+-- Function, view and trigger definitions, and role setting values, appear as md5s: a trigger's
+-- arguments or a role setting can hold a key (a
+-- dashboard database webhook stores its Authorization header in a trigger), and the lines of a differing
 -- section are printed in a public job log.
 --
 -- search_path is set to pg_catalog for this statement only (set_config is_local, evaluated before
@@ -218,7 +219,9 @@ cross join lateral (
              '%s login=%s bypassrls=%s superuser=%s createrole=%s createdb=%s inherit=%s replication=%s connection_limit=%s config=%s',
              r.rolname, r.rolcanlogin, r.rolbypassrls, r.rolsuper, r.rolcreaterole,
              r.rolcreatedb, r.rolinherit, r.rolreplication, r.rolconnlimit,
-             coalesce((select string_agg(c, ',' order by c collate "C")
+             coalesce((select string_agg(split_part(c, '=', 1) || '=md5:' ||
+                                           md5(substr(c, strpos(c, '=') + 1)),
+                                         ',' order by c collate "C")
                        from unnest(r.rolconfig) c), ''))
     from pg_roles r where r.oid in (select oid from watched_roles)
 
