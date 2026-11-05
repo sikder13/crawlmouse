@@ -33,8 +33,8 @@ export interface SiteEstimate {
   single_render_weight: number;
   /**
    * "estimated from N rendered pages across K of T templates", then, where they are above zero, the
-   * percentage of graded pages in templates with no rendered page and the percentage of the estimate
-   * resting on a single rendered page per template. Null when nothing was rendered.
+   * percentage of graded pages in templates with no measured page and the percentage of the estimate's
+   * weight resting on a single measured page per template. Null when nothing was measured.
    */
   label: string | null;
 }
@@ -81,10 +81,12 @@ export function siteEstimate(pages: readonly GradedPageShare[]): SiteEstimate {
   const clauses = [
     `estimated from ${plural(renderedPages, 'rendered page')} across ${templatesRendered} of ${plural(total, 'template')}`,
     ...(unrendered_share > 0
-      ? [`${percent(unrendered_share)} of graded pages are in templates not rendered`]
+      ? [`${percent(unrendered_share)} of graded pages are in templates with no measured page`]
       : []),
     ...(single_render_weight > 0
-      ? [`${percent(single_render_weight)} of the estimate rests on one rendered page per template`]
+      ? [
+          `${percent(single_render_weight)} of the estimate's weight rests on one measured page per template`,
+        ]
       : []),
   ];
   return {

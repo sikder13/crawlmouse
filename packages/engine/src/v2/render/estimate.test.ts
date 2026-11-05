@@ -26,7 +26,7 @@ describe('the site estimate', () => {
       templates_total: 3,
       single_render_weight: 0.4,
       label:
-        'estimated from 4 rendered pages across 2 of 3 templates; 50 % of graded pages are in templates not rendered; 40 % of the estimate rests on one rendered page per template',
+        "estimated from 4 rendered pages across 2 of 3 templates; 50 % of graded pages are in templates with no measured page; 40 % of the estimate's weight rests on one measured page per template",
     });
   });
 
@@ -48,7 +48,7 @@ describe('the site estimate', () => {
 
   it('says one page and one template in the singular', () => {
     expect(siteEstimate(pages('/t', [0.5])).label).toBe(
-      'estimated from 1 rendered page across 1 of 1 template; 100 % of the estimate rests on one rendered page per template',
+      "estimated from 1 rendered page across 1 of 1 template; 100 % of the estimate's weight rests on one measured page per template",
     );
   });
 
@@ -82,8 +82,14 @@ describe('a site whose estimate rests on little', () => {
     const e = siteEstimate([...pages('/', [1]), ...pages('/p/{slug}', Array(1000).fill(null))]);
     expect(e.site_text_share).toBe(1);
     expect(e.label).toBe(
-      'estimated from 1 rendered page across 1 of 2 templates; >99 % of graded pages are in templates not rendered; 100 % of the estimate rests on one rendered page per template',
+      "estimated from 1 rendered page across 1 of 2 templates; >99 % of graded pages are in templates with no measured page; 100 % of the estimate's weight rests on one measured page per template",
     );
+  });
+
+  it('counts a template with two measured pages as resting on more than one', () => {
+    const e = siteEstimate([...pages('/two', [0.2, 0.4]), ...pages('/one', [1])]);
+    // By hand: the one-page template carries 1 of 3 graded pages' weight.
+    expect(e.single_render_weight).toBeCloseTo(1 / 3, 12);
   });
 
   it('says how much of the estimate one page per template carries', () => {
@@ -93,8 +99,22 @@ describe('a site whose estimate rests on little', () => {
       ...pages('/small', Array(10).fill(0)),
     ]);
     expect(e.single_render_weight).toBeCloseTo(400 / 410, 12);
-    expect(e.label).toContain('98 % of the estimate rests on one rendered page per template');
-    expect(e.label).not.toContain('templates not rendered');
+    expect(e.label).toContain(
+      "98 % of the estimate's weight rests on one measured page per template",
+    );
+    expect(e.label).not.toContain('templates with no measured page');
+  });
+
+  it('never rounds a weight that is there down to 0 %', () => {
+    // 100 pages in a template with one measured page, against 39,900 in one with two: 0.25 %.
+    const e = siteEstimate([
+      ...pages('/one', [0.5, ...Array(99).fill(null)]),
+      ...pages('/two', [0.5, 0.5, ...Array(39_898).fill(null)]),
+    ]);
+    expect(e.single_render_weight).toBeCloseTo(0.0025, 12);
+    expect(e.label).toContain(
+      "<1 % of the estimate's weight rests on one measured page per template",
+    );
   });
 
   it('never rounds a part that is there down to 0 %', () => {
@@ -103,7 +123,7 @@ describe('a site whose estimate rests on little', () => {
       ...pages('/a', Array(998).fill(null)),
       ...pages('/b', [null]),
     ]);
-    expect(e.label).toContain('<1 % of graded pages are in templates not rendered');
+    expect(e.label).toContain('<1 % of graded pages are in templates with no measured page');
   });
 });
 
