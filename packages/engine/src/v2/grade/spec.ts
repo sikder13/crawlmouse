@@ -81,7 +81,8 @@ const CARRIES: Readonly<Record<(typeof CRAWLABILITY_DETECTORS)[number], string>>
   canonical_mismatch:
     'the page whose canonical cannot be honoured, or that is linked under another URL',
   duplicate_pagination: 'each later page found to repeat page 1',
-  hreflang_gap: 'each member of the cluster with a missing or broken annotation',
+  hreflang_gap:
+    'each member the detector flags: one missing its self-reference or its x-default, one with an invalid code, and one naming an alternate that does not annotate it back (the missing annotation is on that alternate, the defect counted on the member that names it)',
 };
 
 /** What each content check applies to and passes on, said with the constants it reads. */
@@ -314,19 +315,38 @@ function labelSet(): string {
   ].join('\n');
 }
 
-/** The example site whose every page links to a redirect chain, from expected.json. */
+/** The two example sites whose every page links to a redirect chain, from expected.json. */
 function siteWideRedirect(): string {
-  const name =
-    '14-page blog: a link on every page to a URL behind a redirect chain, crawled as a 301';
+  const one = (name: string, how: string) => {
+    const c = (
+      expected.cases as Record<string, (typeof expected.cases)[keyof typeof expected.cases]>
+    )[name];
+    if (c === undefined) throw new Error(`expected.json has no case "${name}"`);
+    const fix = c.fixes.find((f) => f.type === 'redirect_chain')!;
+    const [score, structure] = [c.technical_seo.score!, c.technical_seo.site_structure_score!];
+    // crawlability from the grade as recorded: (score − 0.6 × structure) / 40
+    const crawl = (score - (SEO_WEIGHTS.structure / 100) * structure) / SEO_WEIGHTS.crawlability;
+    return `on "${name}", ${how}, Technical SEO is ${score} (${SEO_WEIGHTS.structure / 100} × ${structure} + ${SEO_WEIGHTS.crawlability} × crawlability ≈ ${crawl.toFixed(3)}, from the grade as recorded) and the fix is worth +${fix.effect.technical_seo}`;
+  };
+  return `On the example sites: ${one(
+    '14-page blog: a link on every page to a URL behind a redirect chain, crawled as a 301',
+    'where the 301 is the one URL outside the numerator with or without the record',
+  )}; ${one(
+    '14-page blog: a link on every page to a URL behind a redirect chain that ends at a post',
+    'where the record takes the 200 row out of the numerator',
+  )}.`;
+}
+
+/** The example site whose pages declare no meta description, from expected.json. */
+function noDescription(): string {
+  const name = '14-page blog: every page declares a title and no meta description';
   const c = (
     expected.cases as Record<string, (typeof expected.cases)[keyof typeof expected.cases]>
   )[name];
   if (c === undefined) throw new Error(`expected.json has no case "${name}"`);
-  const fix = c.fixes.find((f) => f.type === 'redirect_chain')!;
   const [score, structure] = [c.technical_seo.score!, c.technical_seo.site_structure_score!];
-  // crawlability from the grade as recorded: (score − 0.6 × structure) / 40
   const crawl = (score - (SEO_WEIGHTS.structure / 100) * structure) / SEO_WEIGHTS.crawlability;
-  return `On the example site "${name}", Technical SEO is ${score} (${SEO_WEIGHTS.structure / 100} × ${structure} + ${SEO_WEIGHTS.crawlability} × ${crawl.toFixed(4)}): the 301 is the one URL outside the numerator, with or without the record. The fix, linking to the final URL, takes it out of the crawl and is worth +${fix.effect.technical_seo}.`;
+  return `No fix type opens for a missing title or meta description yet, so nothing recovers what it costs: on the example site "${name}", Technical SEO is ${score} ${c.technical_seo.grade} (${SEO_WEIGHTS.structure / 100} × ${structure} + ${SEO_WEIGHTS.crawlability} × crawlability ≈ ${crawl.toFixed(3)}, from the grade as recorded), with ${c.fixes.length} ${c.fixes.length === 1 ? 'fix' : 'fixes'}: a site missing one on every page loses all ${SEO_WEIGHTS.crawlability} crawlability points (an owner question).`;
 }
 
 function exampleSites(): string {
@@ -470,7 +490,7 @@ ${table(
   ],
 )}
 
-A redirecting URL answers 3xx, so it is outside the numerator already and its record costs nothing extra: one site-wide link to a redirect costs at most one URL (a formula row in technical-seo.test.ts). The redirect fix's counterfactual takes the redirecting URL out of the crawl. No fix type clears a linked 404 or a single-hop 301 yet (CC-16b). A page whose title or description was not read (\`null\`) carries no defect of that kind. A record that could not decide marks no URL, so its URLs count as clean; that is this branch's reading (the old formula dropped a measure with nothing decided).
+The worker stores a requested URL with its final response's status. A chain the crawl stopped is a 3xx row, outside the numerator already, so its record costs nothing extra; a chain followed to a page answering 200 is a 200 row, and its record takes that URL out of the numerator. In both, one site-wide link to a redirect costs at most one URL (formula rows in technical-seo.test.ts, one per shape). The redirect fix's counterfactual is the fix: links to the redirecting URL point at the final URL, and the redirecting row goes (a stopped chain's row goes and its links stay, since they are not graph edges; a final URL that was not crawled takes the row's place). No fix type clears a linked 404 or a single-hop 301 yet (CC-16b). A page whose title or description was not read (\`null\`) carries no defect of that kind. ${noDescription()} A record that could not decide marks no URL, so its URLs count as clean; that is this branch's reading (the old formula dropped a measure with nothing decided).
 
 ${siteWideRedirect()} The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${MIN_GRADEABLE_PAGES} graded pages as its floor: a refused grade has no score.`,
     '',

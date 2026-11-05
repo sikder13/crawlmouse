@@ -169,6 +169,13 @@ const blocked = every(2, 'blocked_by_ua_rule');
 export const SITE_WIDE_REDIRECT =
   '14-page blog: a link on every page to a URL behind a redirect chain, crawled as a 301';
 
+/** The same site, with the chain followed to a post: stored as a 200 row, as the worker stores it. */
+export const SITE_WIDE_REDIRECT_FOLLOWED =
+  '14-page blog: a link on every page to a URL behind a redirect chain that ends at a post';
+
+/** The example site whose pages declare a title and no meta description; SPEC 17 renders it. */
+export const NO_DESCRIPTION = '14-page blog: every page declares a title and no meta description';
+
 /** The example sites, by name, and what the engine makes of each. */
 export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
   const blog = blogSite(
@@ -214,6 +221,14 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
     fingerprint: fingerprintOf(`redirect:${target}`),
     affected_urls: sitewide.input.pages.filter((p) => p.url !== target).map((p) => p.url),
   };
+  const followed = blogSite(13, 0, {}, [
+    {
+      path: '/old-menu-target',
+      links: ['/'],
+      facts: { final_url: 'https://a.test/blog/post-0', redirect: { hops: 2, loop: false } },
+    },
+  ]);
+  const undescribed = blogSite(13, 0);
   // author and date and schema fail on posts, and question headings on every page: no check counts
   const thin = blogSite(13, 0);
   const posts = [...thin.input.content.keys()].filter((u) => u.includes('/blog/'));
@@ -250,6 +265,33 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
     'blog: one scored crawler measured, the other three disallowed by robots.txt': outcomeOf(
       byChoice.input,
       byChoice.access,
+    ),
+    [NO_DESCRIPTION]: outcomeOf(
+      {
+        ...undescribed.input,
+        pages: undescribed.input.pages.map((p) => ({
+          ...p,
+          title: { text: 'A post', chars: 6, cut: false },
+          meta_description: { text: null, chars: 0, cut: false },
+        })),
+      },
+      undescribed.access,
+    ),
+    [SITE_WIDE_REDIRECT_FOLLOWED]: outcomeOf(
+      {
+        ...followed.input,
+        edges: [
+          ...followed.input.edges,
+          ...followed.input.pages
+            .filter((p) => p.url !== target)
+            .map((p) => ({ ...followed.input.edges[0]!, from_url: p.url, to_url: target })),
+        ],
+        structure: [
+          ...followed.input.structure,
+          { ...menuLink, fingerprint: fingerprintOf('followed') },
+        ],
+      },
+      followed.access,
     ),
     [SITE_WIDE_REDIRECT]: outcomeOf(
       { ...sitewide.input, structure: [...sitewide.input.structure, menuLink] },
