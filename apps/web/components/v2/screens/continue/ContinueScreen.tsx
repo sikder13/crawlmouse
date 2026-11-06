@@ -9,8 +9,8 @@ import { Field } from '../../Field';
 import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
 import layout from '../../layout.module.css';
-import { SEND_COPY, sendLink, type SendOutcome } from '../signup/send-link';
-import { useTurnstile } from '../signup/useTurnstile';
+import { SEND_COPY } from '../signup/send-link';
+import { useLinkSender } from '../signup/useLinkSender';
 import styles from '../check-email/Door.module.css';
 
 export type ContinueState = 'idle' | 'expired';
@@ -76,19 +76,17 @@ function Idle({ onExpired }: { onExpired: () => void }) {
 
 function Expired() {
   const ids = useId();
-  const turnstile = useTurnstile();
-  const [outcome, setOutcome] = useState<SendOutcome | null>(null);
-  const [busy, setBusy] = useState(false);
+  const sender = useLinkSender();
+  const { state } = sender;
 
-  async function submit(e: FormEvent<HTMLFormElement>) {
+  function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const email = (e.currentTarget.elements.namedItem('email') as HTMLInputElement).value.trim();
-    setBusy(true);
-    setOutcome(await sendLink({ email, turnstileToken: turnstile.spend() }));
-    setBusy(false);
+    sender.request({ email });
   }
 
-  const refused = outcome !== null && outcome !== 'sent';
+  const refused = state in SEND_COPY ? (state as keyof typeof SEND_COPY) : null;
+  const busy = state === 'verifying' || state === 'sending';
   return (
     <>
       <Heading level={1} size="m">
@@ -110,18 +108,18 @@ function Expired() {
           type="email"
           placeholder="you@company.com"
           autoComplete="email"
-          invalid={outcome === 'invalid_email'}
+          invalid={refused === 'invalid_email'}
           describedBy={refused ? `${ids}-error` : undefined}
         />
-        {turnstile.widget}
-        <Button type="submit" variant="primary" disabled={busy || turnstile.waiting}>
+        {sender.widget}
+        <Button type="submit" variant="primary" disabled={busy}>
           Send a new link
         </Button>
         <p id={`${ids}-error`} className={styles.error} role="alert">
-          {refused ? SEND_COPY[outcome] : null}
+          {refused ? SEND_COPY[refused] : null}
         </p>
         <p className={styles.message} role="status">
-          {outcome === 'sent'
+          {state === 'sent'
             ? `Sent. Check your email; the new link works for ${AUTH_LINK_MINUTES} minutes.`
             : null}
         </p>

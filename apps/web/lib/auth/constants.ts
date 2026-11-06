@@ -42,3 +42,10 @@ export const COOKIES = {
 
 /** `cm_device` lives a year (SECURITY-DESIGN §5.3). */
 export const DEVICE_COOKIE_SECONDS = 365 * 24 * 60 * 60;
+
+/**
+ * The only kinds of email an account gets (DESIGN-LOCK: exactly three). The Sign-up page's
+ * sentence about email is built from this list, so it names no kind that is not here.
+ */
+export const EMAIL_KINDS = ['sign_in_link', 'change_note', 'trial_reminder'] as const;
+export type EmailKind = (typeof EMAIL_KINDS)[number];
