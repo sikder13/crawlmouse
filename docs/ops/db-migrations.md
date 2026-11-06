@@ -417,3 +417,52 @@ On 2026-11-05 a fourth turned up. The rows recorded for 003, 005, 007 and 006b a
 applied them hold only a comment naming each file and its sha256, so a branch would replay none of
 them. The diff counts such a row as having no statements, and the repair adds the file's bytes
 after the comment.
+
+## 9. Parity and v1 hardening (applied once, by the owner)
+
+A branch built from production differs from it in three catalog sections after its replay has
+finished: `acls`, `default_acls` and `buckets`. Supabase creates a branch without default
+privileges on the public schema, production has 24 of them, and the v1 tables and functions got
+grants from them on production that a replay does not give. `report-logos` was made by hand. The
+measured lines are in `scripts/db/fixtures/2026-11-06-settled-branch-vs-production.json`. Two
+migrations close the difference, so the dry run can pass:
+
+- **P1**, `20261106000001_service_role_parity.sql`, writes down the `service_role` lines and the
+  bucket. Production already holds them, so its fingerprint must not change. Its rollback does
+  nothing, on purpose: see the file.
+- **P2** revokes what `anon` and `authenticated` hold on the v1 tables and functions and grants back
+  what the v1 app uses. It changes production and waits for the owner's approval of its grant
+  table.
+
+Neither can pass a dry run while pending: the branch would lack production's lines at the
+fingerprint step. Each reaches production once, by `supabase db push` from this repository's
+checkout, which applies the file's bytes and records its history row. Not the SQL editor.
+
+**P1.** From a checkout of the commit that adds P1, with Node 22, `pnpm install` done, Supabase CLI
+2.84.2 on the path (`supabase --version`), and the session pooler's connection string from the
+dashboard's **Connect** dialog:
+
+```bash
+cd scripts
+read -rs DB_URL && export DB_URL
+mkdir -p ~/db-apply
+pnpm exec tsx db/fingerprint.ts --db-url-env DB_URL --yes-production --out ~/db-apply/p1-before.json
+cd ..
+supabase --workdir infra db push --db-url "$DB_URL" --dry-run
+```
+
+The listing must name exactly one file, `20261106000001_service_role_parity.sql`. If it names any
+other, stop. Then:
+
+```bash
+supabase --workdir infra db push --db-url "$DB_URL"
+cd scripts
+pnpm exec tsx db/fingerprint.ts --db-url-env DB_URL --yes-production --out ~/db-apply/p1-after.json
+pnpm exec tsx db/fingerprint.ts --before ~/db-apply/p1-before.json --after ~/db-apply/p1-after.json
+pnpm exec tsx db/history.ts --db-url-env DB_URL --yes-production
+pnpm exec tsx db/check.ts --db-url-env DB_URL --yes-production
+```
+
+The comparison must print `no change, as expected`. The history read must show every file recorded
+under its own version, with nothing renamed, empty, orphaned or unrecorded. The checks must pass.
+Any other result: stop and report it; P1 has no rollback that would change production.
