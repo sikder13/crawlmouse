@@ -64,8 +64,9 @@ export class StepFailed extends Error {}
 /**
  * Runs a migration's recorded statements on the branch in a transaction that is always rolled
  * back, and returns the first error's message, or null when every statement ran. The branch is a
- * throwaway copy, and nothing is kept either way, unless a statement ends the transaction itself (no
- * migration file in this repository has a top-level `commit` or `begin`).
+ * throwaway copy, and nothing is kept either way, unless a statement ends the transaction itself.
+ * No migration file here has a top-level one:
+ * `grep -nE '^\s*(begin|commit|rollback)\s*;' infra/supabase/migrations/*.sql` prints nothing.
  */
 export async function replayError(db: Db, statements: string[]): Promise<string | null> {
   const ranClean = new Error('every statement ran; rolling back');

@@ -286,6 +286,8 @@ describe('the dry run', () => {
   it('quotes the first error line of the run log when Supabase has one', async () => {
     const log = [
       'Applying migration 20261101000001_v2_001_entitlement_tables.sql...',
+      // A line that mentions an error without being one: it must not be quoted as the error.
+      'Loaded 20261029000001_error_handling.sql; ON_ERROR_STOP is set',
       'ERROR: relation "public.accounts" does not exist (SQLSTATE 42P01)',
       'At statement: 12',
     ].join('\n');

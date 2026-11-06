@@ -454,10 +454,13 @@ checkout, which applies the file's bytes and records its history row. Not the SQ
 **P1.** From the `build/cc-db-ops` checkout at commit `6de90b21`, which has P1 and not P2, with
 Node 22, `pnpm install` done, Supabase CLI 2.84.2 on the path (`supabase --version`), and the
 session pooler's connection string from the dashboard's **Connect** dialog. `~/db-apply` holds the
-fingerprints and, for P2, a dump of production's rows: keep it out of any synced folder.
+fingerprints and, for P2, a dump of production's rows: keep it out of any synced folder. Run each
+block from the repository root. The sha256 must read
+`560af38b00fe6e692e8c0595a76792ad4569beb260c52b0d66bca6bab77050c7`, the bytes reviewed; if not, stop.
 
 ```bash
 git checkout --detach 6de90b21
+sha256sum infra/supabase/migrations/20261106000001_service_role_parity.sql
 cd scripts
 read -rs DB_URL && export DB_URL
 install -d -m 700 ~/db-apply
@@ -484,10 +487,13 @@ Any other result: stop and report it; P1 has no rollback that would change produ
 
 **P2**, after P1 has been applied and checked. From the same checkout at the head of
 `build/cc-db-ops`, with the same setup. Take the dump first; it holds every row of `public`, so it
-stays in `~/db-apply` and is deleted once the smoke below has passed:
+stays in `~/db-apply` and is deleted when this section ends, whichever way it ends. The sha256 must
+read `2ecba08d2551dd9ce4ead8d7193cf993a1b9f3e48bf6e3557a4d7dab0fc81e27`, the bytes reviewed and
+approved; if not, stop:
 
 ```bash
 git checkout build/cc-db-ops
+sha256sum infra/supabase/migrations/20261106000002_v1_client_grant_hardening.sql
 cd scripts
 read -rs DB_URL && export DB_URL
 umask 077
@@ -528,9 +534,8 @@ step in a fresh private window:
    opens the Stripe portal. The Pro check returns false rather than an error when it cannot read
    `users.pro_until`, so a non-Pro account would not show that grant missing.
 
-Each must work, and Sentry must show no new `permission denied` error from these minutes. Then
-delete the dump: `rm ~/db-apply/public-before-p2.dump`. If any step fails, revert P2 and take the
-smoke again:
+Each must work, and Sentry must show no new `permission denied` error from these minutes. If any
+step fails, revert P2 and take the smoke again:
 
 ```bash
 cd scripts
@@ -540,5 +545,6 @@ pnpm exec tsx db/fingerprint.ts --before ~/db-apply/p2-before.json --after ~/db-
 ```
 
 The rollback runs in one transaction, removes P2's history row, and runs the checks; the comparison
-must print `no change, as expected`. Once both are applied and checked, re-run the pull request's
+must print `no change, as expected`. Last, on every path (smoke passed, smoke failed and P2
+reverted, or a mismatch reported): `rm ~/db-apply/public-before-p2.dump`. Once both are applied and checked, re-run the pull request's
 dry run: it must pass, and that run is the merge gate.
