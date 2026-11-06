@@ -36,7 +36,8 @@ import { PRODUCTION_REF, refOfUrl } from './target';
  *      one on are reverted, newest first, and pushed again, and the fingerprint must not change
  *
  * Step 4 also fails when the pull request changes a migration file that is already applied:
- * production would never receive the change. Add a new migration instead.
+ * production would never receive the change. Add a new migration instead. A changed file whose
+ * history row holds exactly its bytes, as one statement, passes: it was applied before the merge.
  *
  * Any failed step stops the run, and the summary says which step and why. The branch is deleted
  * at the end, pass or fail.
@@ -216,15 +217,22 @@ export async function dryRun(
     const pending = await step(
       'History is clean and each pending file has a rollback',
       async () => {
-        const diff = diffHistory(files, await readHistory(branchDb));
+        const rows = await readHistory(branchDb);
+        const diff = diffHistory(files, rows);
         if (diff.misversioned.length + diff.orphans.length + diff.withoutStatements.length > 0) {
           throw new Error(
             `production's history needs the repair in docs/ops/db-migrations.md first\n${formatDiff(diff)}`,
           );
         }
-        const editedApplied = files.filter(
-          (f) => !diff.unrecorded.includes(f) && changedNames.has(f.file),
-        );
+        // A changed file that production recorded with exactly its bytes was applied ahead of the
+        // merge (docs/ops/db-migrations.md §9) and has nothing left to deliver. Any other change to
+        // an applied file, a comment or whitespace included, is refused.
+        const recorded = new Map(rows.map((r) => [r.version, r.statements]));
+        const editedApplied = files.filter((f) => {
+          if (diff.unrecorded.includes(f) || !changedNames.has(f.file)) return false;
+          const statements = recorded.get(f.version);
+          return !(statements?.length === 1 && statements[0] === f.sql);
+        });
         if (editedApplied.length > 0) {
           throw new Error(
             `${editedApplied.map((f) => f.file).join(', ')} is already applied; ` +

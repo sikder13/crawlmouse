@@ -33,7 +33,9 @@ The scripts behind them are in `scripts/db`. Their tests:
       production's, section by section, and fail on a difference;
    4. read the branch's migration history: fail if it needs the repair in §5, if a pending file
       has no rollback, or if the pull request changes a migration file that is already applied
-      (production would never receive the change: add a new migration instead);
+      (production would never receive the change: add a new migration instead). A changed file
+      whose history row holds exactly its bytes, as one statement, passes: it was applied before
+      the merge, as in §9;
    5. `supabase db push`, after checking that the CLI's list equals the pending files;
    6. run the checks in §6;
    7. run each pending file again in its own transaction, and fail if the fingerprint changes;

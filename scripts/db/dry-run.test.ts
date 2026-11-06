@@ -184,9 +184,15 @@ describe('the dry run', () => {
   );
 
   it('fails when the pull request changes a migration that is already applied', async () => {
-    const h = await harness();
+    // The file's bytes now differ from what production recorded for it.
+    const edited = files.map((f) =>
+      f.file === '20260524000001_init_users.sql'
+        ? { ...f, sql: `${f.sql}\nalter table public.users add column nickname text;\n` }
+        : f,
+    );
+    const h = await harness({ fileList: edited });
     const summary = await dryRun(h.deps, {
-      files,
+      files: edited,
       branch: 'pr-6',
       commit: 'abc',
       changed: ['infra/supabase/migrations/20260524000001_init_users.sql'],
@@ -196,6 +202,50 @@ describe('the dry run', () => {
       '20260524000001_init_users.sql is already applied',
     );
     expect(h.calls).toEqual(['create pr-6']);
+  }, 300_000);
+
+  it.each([
+    ['an added comment', (sql: string) => `-- a note added later\n${sql}`],
+    ['a trailing newline', (sql: string) => `${sql}\n`],
+  ])(
+    'fails when an applied migration differs from its recorded bytes only by %s',
+    async (_label, edit) => {
+      const edited = files.map((f) =>
+        f.file === '20260524000001_init_users.sql' ? { ...f, sql: edit(f.sql) } : f,
+      );
+      expect(edited.find((f) => f.file === '20260524000001_init_users.sql')!.sql).not.toBe(
+        files.find((f) => f.file === '20260524000001_init_users.sql')!.sql,
+      );
+      const h = await harness({ fileList: edited });
+      const summary = await dryRun(h.deps, {
+        files: edited,
+        branch: 'pr-6b',
+        commit: 'abc',
+        changed: ['infra/supabase/migrations/20260524000001_init_users.sql'],
+      });
+      expect(summary.passed).toBe(false);
+      expect(summary.steps.at(-1)!.result).toContain(
+        '20260524000001_init_users.sql is already applied',
+      );
+    },
+    300_000,
+  );
+
+  it('accepts a migration the pull request adds when production recorded exactly its bytes before merge', async () => {
+    // P1 and P2 of this pull request: applied to production ahead of the merge, with a history row
+    // holding the file's bytes, so the file is in the diff against main and already recorded.
+    const h = await harness();
+    const summary = await dryRun(h.deps, {
+      files,
+      branch: 'pr-6c',
+      commit: 'abc',
+      changed: ['infra/supabase/migrations/20260524000001_init_users.sql'],
+    });
+    const history = summary.steps.find(
+      (s) => s.step === 'History is clean and each pending file has a rollback',
+    )!;
+    expect(history.result).not.toContain('FAILED');
+    expect(history.result).not.toContain('20260524000001_init_users.sql');
   }, 300_000);
 
   it('reverts and re-applies from an applied migration whose rollback the pull request changes', async () => {
