@@ -21,7 +21,13 @@
  * structure detectors (the redirect conflict CC-20a reports; see the spec).
  */
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import type { AccessTest, BatchResult, CrawlBatchResult } from '@crawlmouse/types/v2';
+import { format, resolveConfig } from 'prettier';
+import type {
+  AccessTest,
+  BatchResult,
+  CrawlBatchResult,
+  FixtureDataset,
+} from '@crawlmouse/types/v2';
 import { createFetcher } from '../../../../worker/src/fetch/fetcher.js';
 import { Sites } from '../../../../worker/src/politeness/sites.js';
 import { InstantClock } from '../../../../worker/src/test-support/clock.js';
@@ -38,6 +44,7 @@ import {
   renderCandidates,
   sample,
   serialiseBuilt,
+  type BuiltCheck,
 } from '../../../src/v2/build/index.js';
 import { templateKeyFor } from '../../../src/analysis/template-key.js';
 import { fakeClient, memoryDailyBudget } from '../../../src/v2/render/fakes.js';
@@ -199,7 +206,56 @@ async function main(): Promise<void> {
     const variant = await record(true);
     writeBatches('variant', renamed(variant.batches, variant.base));
   }
-  writeFileSync(new URL('expected.json', OUT), serialiseBuilt(buildCheck(recordedBuild())));
+  const built = buildCheck(recordedBuild());
+  writeFileSync(new URL('expected.json', OUT), serialiseBuilt(built));
+  // The web fixtures are Prettier-formatted, as the repository's format check reads them.
+  const path = WEB_FIXTURE.pathname;
+  const options = { ...(await resolveConfig(path)), filepath: path };
+  writeFileSync(WEB_FIXTURE, await format(json(webFixture(built)), options));
+}
+
+const WEB_FIXTURE = new URL(
+  '../../../../../apps/web/lib/fixtures/v2/built-site.json',
+  import.meta.url,
+);
+
+/**
+ * The built check as a web FixtureDataset (apps/web/lib/fixtures/v2/built-site.json), so the screens
+ * render what the builder produces. An anonymous site, so no account, seat or usage event; the whole
+ * check is held, so nothing is withheld. `engine_derived` names the collections the builder filled.
+ */
+function webFixture(built: BuiltCheck): FixtureDataset {
+  return {
+    provenance: 'fixture',
+    as_of: built.check.finished_at!,
+    description:
+      "built-site.test (a reserved, fictional host), audited without an account: the rows the check builder (CC-20a) made from the crawl worker's own batches for the synthetic shop in packages/engine/fixtures/v2/build/site, with one of each planted defect. Nothing here was written by hand.",
+    engine_derived: [
+      '/checks/0',
+      '/page_results',
+      '/link_edges',
+      '/access_tests',
+      '/fixes',
+      '/fix_events',
+      '/changes',
+      '/lineages',
+    ],
+    accounts: [],
+    seats: [],
+    sites: [recordedInput().site],
+    checks: [built.check],
+    page_results: built.page_results,
+    link_edges: built.link_edges,
+    access_tests: built.access_tests,
+    fixes: built.fixes,
+    fix_events: built.fix_events,
+    changes: built.changes,
+    alert_rules: [],
+    reports: [],
+    lineages: [built.lineage],
+    usage_events: built.usage_event ? [built.usage_event] : [],
+    withheld: [],
+  };
 }
 
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) await main();
