@@ -4,7 +4,7 @@
  * bounds and lineage values are read from the code; the fixture tables and the findings are computed
  * from the recorded fixture when the spec renders. spec.test.ts fails when the file differs.
  */
-import type { Check, PageResult } from '@crawlmouse/types/v2';
+import type { BatchResult, Check, PageResult } from '@crawlmouse/types/v2';
 import {
   CONTENT_FEATURES_BYTES,
   JSON_LD_TYPE_BYTES,
@@ -225,8 +225,30 @@ function defects(b: BuiltCheck): string[][] {
   ];
 }
 
+/** The recorded crawl with its homepage redirecting to /home, its links recorded from there. */
+function homepageRedirects(batches: readonly BatchResult[]): BatchResult[] {
+  const moved = structuredClone(batches) as BatchResult[];
+  for (const b of moved) {
+    if (b.kind !== 'crawl') continue;
+    for (const p of b.pages) if (p.url === HOST) p.final_url = `${HOST}/home`;
+    for (const e of b.link_edges) if (e.from_url === HOST) e.from_url = `${HOST}/home`;
+  }
+  return moved;
+}
+
 export function renderBuildSpec(): string {
   const golden = buildCheck(recordedBuild());
+  const crawlOnlyOf = (batches: readonly BatchResult[]) =>
+    buildCheck({
+      ...recordedInput(),
+      batches: batches.filter((x) => x.kind === 'crawl'),
+      render: null,
+    });
+  const plain = crawlOnlyOf(readRecorded('batches'));
+  const redirected = crawlOnlyOf(homepageRedirects(readRecorded('batches')));
+  const grade = (b: BuiltCheck) =>
+    `${b.check.technical_seo!.grade} ${b.check.technical_seo!.score}`;
+  const undepthed = (b: BuiltCheck) => b.page_results.filter((p) => p.depth === null).length;
   const crawlOnly = (dir: string) =>
     buildCheck({
       ...recordedInput(),
@@ -338,8 +360,14 @@ export function renderBuildSpec(): string {
     '## The built-site fixture',
     `${golden.page_results.length} pages crawled in ${readRecorded('batches').filter((x) => x.kind === 'crawl').length} crawl batches, ${golden.check.coverage!.pages_sampled} sampled in ${readRecorded('batches').filter((x) => x.kind === 'access').length} access batches, ${golden.fixes.length} fixes. Recorded from the worker by \`fixtures/v2/build/generate.ts\`.`,
     table(['Planted', 'Where', 'What the built check holds'], defects(golden)),
+    '## Signed-off grade changes',
+    `Two corrections to what the builder feeds the grade, signed off by the owner (2026-11-06) as input corrections inside \`packages/engine/src/v2/build\`, not a re-curving: v1's \`grade.ts\` and \`graph.ts\`, the v2 grade and the detectors are unchanged.`,
+    [
+      `- **A redirected page's links count** (\`filing.ts\`). Measured on \`3a39263a\`, the commit before the change: the golden check graded B+ 81.7, and the crawl with its homepage redirecting to \`/home\` graded C+ 69.39 with 59 of 60 pages at no depth. Now, rendered from this code: the golden check grades ${grade(golden)}; the crawl alone grades ${grade(plain)} as recorded and ${grade(redirected)} with the homepage redirecting, with ${undepthed(plain)} and ${undepthed(redirected)} of ${plain.page_results.length} pages at no depth.`,
+      "- **Coverage and crawl health** count a stopped redirect's target as unread, leave sitemap seeds of another host out, count a failed request as attempted and leave robots-excluded URLs out. They move a grade only where those cases occur; the recorded fixture has none of them.",
+    ].join('\n'),
     '## Found by the built fixture',
     `- **A redirect that lands on a crawled page hides absences.** \`detectors/scope.ts\` files a redirected row's links under the requested URL only when no other row has the final URL; \`grade/effects.ts\` \`linkedStraight\` describes them as filed there anyway. On the fixture's variant (one more link, to ${code(site.REDIRECT_TO)}, so it is crawled as its own page): without it, ${states(before).join(', ')}; with it, ${states(after).join(', ')}. Technical SEO ${before.check.technical_seo!.score} without, ${after.check.technical_seo!.score} with. In the variant both URLs answer 200 with the same content, so v1's duplicate rule keeps the one that sorts first: ${code(site.REDIRECT_FROM)} is ${code(pageOf(after, site.REDIRECT_FROM)!.kind)}, ${code(site.REDIRECT_TO)} is ${code(pageOf(after, site.REDIRECT_TO)!.kind)}. Not settled here.`,
-    `- **A client-rendered template leaves the graded population before it can be rendered.** v1's thin-content rule classifies the app-shell pages ${site.CLIENT_RENDERED.map((p) => `${code(p)} as ${code(pageOf(golden, p)!.kind)}`).join(', ')}; a render candidate must be a content page, so none of them is rendered. No detector opens a ${code('client_rendered_template')} fix yet: ${code('grep -rln client_rendered_template packages/engine/src/v2 --include=*.ts | grep -v test')} lists the planner, the diff's subject table and two specs, and no detector.`,
+    `- **A client-rendered template leaves the graded population before it can be rendered.** v1's thin-content rule classifies the app-shell pages ${site.CLIENT_RENDERED.map((p) => `${code(p)} as ${code(pageOf(golden, p)!.kind)}`).join(', ')}; CC-14's \`renderable\` (\`packages/engine/src/v2/render/sample.ts:62\`) bars a render candidate that is not a content page, and the thin rule is v1's (\`packages/engine/src/analysis/classify-pages.ts:98\`), so none of them is rendered; the builder's planner offers them (build.test.ts). For CC-20b. No detector opens a ${code('client_rendered_template')} fix yet: ${code('grep -rln client_rendered_template packages/engine/src/v2 --include=*.ts | grep -v test')} lists the planner, the diff's subject table and two specs, and no detector.`,
   ].join('\n\n')}\n`;
 }

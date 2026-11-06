@@ -41,7 +41,9 @@ import {
   recordedInput,
 } from '../../../fixtures/v2/build/recorded.js';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
+import { renderable } from '../render/sample.js';
 import { assemble } from './assemble.js';
+import { renderCandidates, sample } from './plan.js';
 import { readBatches } from './batches.js';
 import { buildCheck, serialiseBuilt } from './build.js';
 import { registryVersion } from './lineage.js';
@@ -195,6 +197,22 @@ describe('the planted defects', () => {
       expect(rows.find((r) => r.url === at(path))!.content_features!.client_rendered).toBe(true);
       expect(page(path).kind).toBe('thin');
       expect(page(path).without_js).toBeNull();
+    }
+  });
+
+  it("offers the client-rendered pages to the render step: CC-14's renderable bars them, not this planner", () => {
+    const input = recordedBuild();
+    const a = assemble(
+      input,
+      readBatches(input.batches, input.check, input.lineage.worker_release),
+    );
+    const s = sample(a);
+    const plan = renderCandidates(a, [...s.stage1, ...s.stage2], [], new Map());
+    for (const path of CLIENT_RENDERED) {
+      const c = plan.candidates.find((x) => x.url === at(path));
+      expect(c, path).toMatchObject({ kind: 'thin', status_code: 200, is_html: true });
+      // render/sample.ts:62: a render candidate must be a content page.
+      expect(renderable(c!)).toBe(false);
     }
   });
 
