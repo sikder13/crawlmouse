@@ -27,7 +27,7 @@ import { effectiveTier, GATES } from '../entitlement-v2';
 import type { FunnelEvent } from '../analytics-events';
 import { TimeZoneSchema } from '@crawlmouse/types/v2';
 import type { DoorStore, LedgerHash, MemberAccount, Report, Serialize } from './door-store';
-import { hashLedgerValue, ledgerDecision, ledgerValues, oldestRelevant } from './ledger';
+import { hashLedgerValue, ledgerDecision, ledgerValues, oldestRelevant, slotKey } from './ledger';
 import { scheduleFor } from './schedule';
 import { hostFromSiteInput } from './site-host';
 import { trialVariantFor } from './trial-variant';
@@ -46,7 +46,7 @@ export function isFirstLogin(
   return Math.abs(signedIn - confirmed) <= FIRST_LOGIN_TOLERANCE_MS;
 }
 
-/** What the Sign-up form asked for, as carried in the `cm_signup` cookie: re-validated here. */
+/** What the Sign-up form asked for, as carried in the `cm_auth_signup` cookie: re-validated here. */
 export interface SignupIntent {
   site?: string;
   tz?: string;
@@ -57,7 +57,7 @@ export interface FirstLoginInput {
   email: string;
   emailConfirmedAt: string | null;
   lastSignInAt: string | null;
-  /** The `cm_device` cookie of the browser that opened the link. */
+  /** The `cm_auth_device` cookie of the browser that opened the link. */
   device: string | null;
   /** `getClientIp`'s value; 'unknown' when the platform gave none. */
   ip: string;
@@ -150,7 +150,7 @@ async function decideTrial(
 
   for (const h of hashes) {
     if (h.kind === 'ip24') continue; // a network is shared by strangers; it never holds a slot
-    if (!(await deps.serialize(`trial:${h.kind}:${h.value_hash}`)))
+    if (!(await deps.serialize(slotKey(pepper, h.kind, h.value_hash))))
       return { outcome: 'busy', variant };
   }
 

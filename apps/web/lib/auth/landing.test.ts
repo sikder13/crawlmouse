@@ -146,10 +146,10 @@ describe('requestCookie', () => {
     const { requestCookie } = await import('./request-cookie');
     const req = new Request('https://x.test/', {
       method: 'POST',
-      headers: { cookie: 'a=1; cm_device=ab%3Dc; b' },
+      headers: { cookie: 'a=1; cm_auth_device=ab%3Dc; b' },
       body: '{"k":1}',
     });
-    expect(requestCookie(req, 'cm_device')).toBe('ab=c');
+    expect(requestCookie(req, 'cm_auth_device')).toBe('ab=c');
     expect(requestCookie(req, 'missing')).toBeUndefined();
     expect(await req.json()).toEqual({ k: 1 });
   });

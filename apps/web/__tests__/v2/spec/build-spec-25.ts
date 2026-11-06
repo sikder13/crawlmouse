@@ -68,7 +68,7 @@ function cookiesSection(): string {
   return [
     '## Cookies',
     '',
-    'Each is httpOnly, `SameSite=Lax`, and `Secure` in production. Every value read back is validated again: a cookie is the caller’s to set.',
+    'Each is httpOnly, `SameSite=Lax`, and `Secure` in production. Every value read back is validated again: a cookie is the caller’s to set. The door’s names contain `auth`, which Sentry’s request-header filter replaces with `[Filtered]` on traced spans (`__tests__/v2/account-door-sentry.test.ts` runs that filter over each); `lib/auth/sentry-scrub.ts`, in `sentry.server.config.ts`, removes the link’s `token_hash` and `code` from URLs and `post_login_next` from every Sentry event.',
     '',
     table(
       ['Name', 'Set by', 'Path', 'Lifetime', 'Holds'],
@@ -120,7 +120,7 @@ function flagSection(): string {
         [
           '`POST /api/auth/magic-link`',
           'v1: `site`, `tz`, `claimCheckId` are not read',
-          'reads them; refuses a cross-site post; sets `cm_signup`, `cm_device`; computes `next`',
+          'reads them; refuses a cross-site post; sets `cm_auth_signup`, `cm_auth_device`; computes `next`',
         ],
         ['`GET /login/verify`', 'renders (carries the token to Continue)', 'the same'],
         [
@@ -221,7 +221,7 @@ function gapsSection(): string {
     '- **The ledger is decided after Check-email is shown.** A refused sign-up reads "if it is your first trial" there; CC-26 shows the reason category on the dashboard.',
     '- **No-JS Continue** signs in and redirects, and fires no PostHog event.',
     '- **The check id is the claim right** (ARCH-2 §4.3): a member who holds an unowned check’s id may claim it. Two claims for two sites can pass the site limit together; the limit has no database constraint.',
-    '- **Login CSRF through the link itself**: someone can send a person a sign-in link to the sender’s own account; opening it puts the sender’s token in `cm_otp`, and Continue signs the person in as the sender. The POST refuses cross-site posts, which stops a page from doing this silently; the link itself is inherent to magic links.',
+    '- **Login CSRF through the link itself**: someone can send a person a sign-in link to the sender’s own account; opening it puts the sender’s token in `cm_auth_otp`, and Continue signs the person in as the sender. The POST refuses cross-site posts, which stops a page from doing this silently; the link itself is inherent to magic links. Signed in as the sender, the person’s anonymous v1 audits in this browser, and a Keep they asked for in the last 15 minutes, are claimed into the sender’s account.',
     '- **Existing users naming a site on Sign-up**: the site is attached on the first login only; CC-26’s dashboard adds sites after that.',
   ].join('\n');
 }
@@ -250,7 +250,7 @@ export async function buildSpec25(): Promise<string> {
         ],
         [
           '`GET /login/verify`',
-          'never verifies; moves the token into `cm_otp`, 303 to `/login/verify/continue`',
+          'never verifies; moves the token into `cm_auth_otp`, 303 to `/login/verify/continue`',
         ],
         [
           '`GET /login/verify/continue`',

@@ -11,7 +11,7 @@ Sign-up, Check your email, the sign-in landing that a link scanner cannot spend,
 | `GET /signup`                                                | `V2_ACCOUNT_DOOR=1`, else 404                                                                |
 | `GET /check-email?kind=signin\|named-site\|from-audit&site=` | `V2_ACCOUNT_DOOR=1`, else 404; `site` shown only when it is a hostname                       |
 | `POST /api/auth/magic-link`                                  | rate limits and Turnstile as before; with the door on, a cross-site post is a 403            |
-| `GET /login/verify`                                          | never verifies; moves the token into `cm_otp`, 303 to `/login/verify/continue`               |
+| `GET /login/verify`                                          | never verifies; moves the token into `cm_auth_otp`, 303 to `/login/verify/continue`          |
 | `GET /login/verify/continue`                                 | renders Continue, or the expired state with `?state=expired`                                 |
 | `POST /login/verify`                                         | same-origin (`Origin`, or `Origin: null` with `Sec-Fetch-Site: same-origin`), else 403       |
 | `POST /api/checks/[id]/claim`                                | `V2_ACCOUNT_DOOR=1`, else 404; an `Origin` not ours is a 403; a session, else 401; a uuid id |
@@ -20,26 +20,26 @@ Sign-up, Check your email, the sign-in landing that a link scanner cannot spend,
 
 Read per request by `apps/web/lib/auth/flags.ts`; on for the value `1` only.
 
-| Surface                       | `V2_ACCOUNT_DOOR` unset                       | `V2_ACCOUNT_DOOR=1`                                                                   |
-| ----------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `/signup`, `/check-email`     | 404                                           | rendered, noindex, no canonical                                                       |
-| `POST /api/checks/[id]/claim` | 404                                           | claims for a member                                                                   |
-| `POST /api/auth/magic-link`   | v1: `site`, `tz`, `claimCheckId` are not read | reads them; refuses a cross-site post; sets `cm_signup`, `cm_device`; computes `next` |
-| `GET /login/verify`           | renders (carries the token to Continue)       | the same                                                                              |
-| `POST /login/verify`          | verifies, v1 claim, redirect                  | and then the first-login hook and a Keep’s claim                                      |
+| Surface                       | `V2_ACCOUNT_DOOR` unset                       | `V2_ACCOUNT_DOOR=1`                                                                             |
+| ----------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `/signup`, `/check-email`     | 404                                           | rendered, noindex, no canonical                                                                 |
+| `POST /api/checks/[id]/claim` | 404                                           | claims for a member                                                                             |
+| `POST /api/auth/magic-link`   | v1: `site`, `tz`, `claimCheckId` are not read | reads them; refuses a cross-site post; sets `cm_auth_signup`, `cm_auth_device`; computes `next` |
+| `GET /login/verify`           | renders (carries the token to Continue)       | the same                                                                                        |
+| `POST /login/verify`          | verifies, v1 claim, redirect                  | and then the first-login hook and a Keep’s claim                                                |
 
 With `V2_PIPELINE=1` (CC-20b) Sign-up and Check-email say a named site’s first audit starts when the link is opened; without it they say the site is attached (D6). This step starts no check.
 
 ## Cookies
 
-Each is httpOnly, `SameSite=Lax`, and `Secure` in production. Every value read back is validated again: a cookie is the caller’s to set.
+Each is httpOnly, `SameSite=Lax`, and `Secure` in production. Every value read back is validated again: a cookie is the caller’s to set. The door’s names contain `auth`, which Sentry’s request-header filter replaces with `[Filtered]` on traced spans (`__tests__/v2/account-door-sentry.test.ts` runs that filter over each); `lib/auth/sentry-scrub.ts`, in `sentry.server.config.ts`, removes the link’s `token_hash` and `code` from URLs and `post_login_next` from every Sentry event.
 
 | Name              | Set by                                     | Path            | Lifetime                                         | Holds                                                  |
 | ----------------- | ------------------------------------------ | --------------- | ------------------------------------------------ | ------------------------------------------------------ |
-| `cm_otp`          | GET /login/verify                          | `/login/verify` | 15 minutes                                       | the link’s token, until the POST spends or refuses it  |
-| `cm_signup`       | the magic-link route, door on              | `/`             | 15 minutes                                       | the named site (shape-checked host) and the time zone  |
+| `cm_auth_otp`     | GET /login/verify                          | `/login/verify` | 15 minutes                                       | the link’s token, until the POST spends or refuses it  |
+| `cm_auth_signup`  | the magic-link route, door on              | `/`             | 15 minutes                                       | the named site (shape-checked host) and the time zone  |
 | `post_login_next` | the magic-link route                       | `/`             | 15 minutes for a door request; 10 minutes for v1 | the return target; for a Keep, the claim               |
-| `cm_device`       | the magic-link route, door on, when absent | `/`             | 365 days                                         | 32 random bytes, base64url: the ledger’s device signal |
+| `cm_auth_device`  | the magic-link route, door on, when absent | `/`             | 365 days                                         | 32 random bytes, base64url: the ledger’s device signal |
 
 ## First login and the trial ledger
 
@@ -146,5 +146,5 @@ From `apps/web/lib/v2/copy/account-door.ts`, applied by the lock comparison in `
 - **The ledger is decided after Check-email is shown.** A refused sign-up reads "if it is your first trial" there; CC-26 shows the reason category on the dashboard.
 - **No-JS Continue** signs in and redirects, and fires no PostHog event.
 - **The check id is the claim right** (ARCH-2 §4.3): a member who holds an unowned check’s id may claim it. Two claims for two sites can pass the site limit together; the limit has no database constraint.
-- **Login CSRF through the link itself**: someone can send a person a sign-in link to the sender’s own account; opening it puts the sender’s token in `cm_otp`, and Continue signs the person in as the sender. The POST refuses cross-site posts, which stops a page from doing this silently; the link itself is inherent to magic links.
+- **Login CSRF through the link itself**: someone can send a person a sign-in link to the sender’s own account; opening it puts the sender’s token in `cm_auth_otp`, and Continue signs the person in as the sender. The POST refuses cross-site posts, which stops a page from doing this silently; the link itself is inherent to magic links. Signed in as the sender, the person’s anonymous v1 audits in this browser, and a Keep they asked for in the last 15 minutes, are claimed into the sender’s account.
 - **Existing users naming a site on Sign-up**: the site is attached on the first login only; CC-26’s dashboard adds sites after that.

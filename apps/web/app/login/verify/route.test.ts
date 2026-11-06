@@ -77,7 +77,7 @@ describe('GET /login/verify renders, never verifies', () => {
     expect(exchangeCodeForSession).not.toHaveBeenCalled();
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toBe(`${ORIGIN}/login/verify/continue`);
-    const carried = setCookies(res).find((c) => c.startsWith('cm_otp='))!;
+    const carried = setCookies(res).find((c) => c.startsWith('cm_auth_otp='))!;
     expect(carried).toMatch(/HttpOnly/i);
     expect(carried).toMatch(/Path=\/login\/verify(;|$)/);
     expect(carried).toMatch(/Max-Age=900/);
@@ -90,7 +90,7 @@ describe('GET /login/verify renders, never verifies', () => {
     vi.stubEnv('NODE_ENV', 'production');
     try {
       const res = await GET(new Request(`${ORIGIN}/login/verify?token_hash=${TOKEN}`));
-      expect(setCookies(res).find((c) => c.startsWith('cm_otp='))).toMatch(/Secure/);
+      expect(setCookies(res).find((c) => c.startsWith('cm_auth_otp='))).toMatch(/Secure/);
     } finally {
       vi.unstubAllEnvs();
     }
@@ -116,7 +116,7 @@ describe('POST /login/verify verifies', () => {
       { origin: 'null', 'sec-fetch-site': 'cross-site' },
     ];
     for (const headers of crossSite) {
-      const res = await POST(post({ cm_otp: otp() }, headers));
+      const res = await POST(post({ cm_auth_otp: otp() }, headers));
       expect(res.status).toBe(403);
     }
     expect(verifyOtp).not.toHaveBeenCalled();
@@ -124,22 +124,22 @@ describe('POST /login/verify verifies', () => {
 
   it('accepts a no-JS form post that sends Origin: null with Sec-Fetch-Site: same-origin', async () => {
     const res = await POST(
-      post({ cm_otp: otp() }, { origin: 'null', 'sec-fetch-site': 'same-origin' }),
+      post({ cm_auth_otp: otp() }, { origin: 'null', 'sec-fetch-site': 'same-origin' }),
     );
     expect(res.status).toBe(303);
     expect(verifyOtp).toHaveBeenCalledWith({ token_hash: TOKEN, type: 'magiclink' });
   });
 
   it('signs in, consumes the token cookie, and lands on /dashboard with no-store', async () => {
-    const res = await POST(post({ cm_otp: otp() }));
+    const res = await POST(post({ cm_auth_otp: otp() }));
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toBe(`${ORIGIN}/dashboard`);
     expect(res.headers.get('Cache-Control')).toContain('no-store');
-    expect(setCookies(res).find((c) => c.startsWith('cm_otp='))).toMatch(/Max-Age=0/);
+    expect(setCookies(res).find((c) => c.startsWith('cm_auth_otp='))).toMatch(/Max-Age=0/);
   });
 
   it('exchanges a carried PKCE code', async () => {
-    await POST(post({ cm_otp: JSON.stringify({ kind: 'code', value: 'pkce_123' }) }));
+    await POST(post({ cm_auth_otp: JSON.stringify({ kind: 'code', value: 'pkce_123' }) }));
     expect(exchangeCodeForSession).toHaveBeenCalledWith('pkce_123');
   });
 
@@ -150,9 +150,9 @@ describe('POST /login/verify verifies', () => {
       error: { status: 403, code: 'otp_expired' },
     });
     anon.id = 'anon-1';
-    const res = await POST(post({ cm_otp: otp() }));
+    const res = await POST(post({ cm_auth_otp: otp() }));
     expect(res.headers.get('location')).toBe(`${ORIGIN}/login/verify/continue?state=expired`);
-    expect(setCookies(res).find((c) => c.startsWith('cm_otp='))).toMatch(/Max-Age=0/);
+    expect(setCookies(res).find((c) => c.startsWith('cm_auth_otp='))).toMatch(/Max-Age=0/);
     expect(setCookies(res).some((c) => c.startsWith('sb-'))).toBe(false);
     expect(anonUpdate).not.toHaveBeenCalled();
     expect(afterSignIn).not.toHaveBeenCalled();
@@ -165,28 +165,28 @@ describe('POST /login/verify verifies', () => {
   });
 
   it('returns the user to a validated same-origin `next` and clears it (R1 fold-in, moved from GET)', async () => {
-    const res = await POST(post({ cm_otp: otp(), post_login_next: '/r/abc' }));
+    const res = await POST(post({ cm_auth_otp: otp(), post_login_next: '/r/abc' }));
     expect(res.headers.get('location')).toBe(`${ORIGIN}/r/abc`);
     expect(setCookies(res).find((c) => c.startsWith('post_login_next='))).toMatch(/Max-Age=0/);
   });
 
   it('IGNORES an off-origin `next` cookie (no open redirect) → /dashboard', async () => {
     for (const evil of ['https://evil.com', '//evil.com', '/\\evil.com', '/.//evil.com']) {
-      const res = await POST(post({ cm_otp: otp(), post_login_next: evil }));
+      const res = await POST(post({ cm_auth_otp: otp(), post_login_next: evil }));
       expect(res.headers.get('location')).toBe(`${ORIGIN}/dashboard`);
     }
   });
 
   it('still claims the anonymous v1 audits of this browser', async () => {
     anon.id = 'anon-1';
-    await POST(post({ cm_otp: otp() }));
+    await POST(post({ cm_auth_otp: otp() }));
     expect(anonUpdate).toHaveBeenCalledWith({ user_id: 'u1' });
   });
 
   it('with the door off, the v2 hook never runs, and a claim-shaped `next` lands on /dashboard', async () => {
     const res = await POST(
       post({
-        cm_otp: otp(),
+        cm_auth_otp: otp(),
         post_login_next: '/api/checks/0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11/claim?then=/dashboard',
       }),
     );
@@ -204,9 +204,9 @@ describe('POST /login/verify verifies', () => {
           origin: ORIGIN,
           'x-forwarded-for': '203.0.113.9',
           cookie: cookieHeader({
-            cm_otp: otp(),
-            cm_signup: JSON.stringify({ site: 'acme.com', tz: 'Europe/Kyiv' }),
-            cm_device: 'dev-1',
+            cm_auth_otp: otp(),
+            cm_auth_signup: JSON.stringify({ site: 'acme.com', tz: 'Europe/Kyiv' }),
+            cm_auth_device: 'dev-1',
           }),
         },
       }),
@@ -221,13 +221,13 @@ describe('POST /login/verify verifies', () => {
       }),
     );
     expect(res.headers.get('location')).toBe(`${ORIGIN}/dashboard?claim=site_limit`);
-    expect(setCookies(res).find((c) => c.startsWith('cm_signup='))).toMatch(/Max-Age=0/);
+    expect(setCookies(res).find((c) => c.startsWith('cm_auth_signup='))).toMatch(/Max-Age=0/);
   });
 
   it('a hook that throws does not fail the sign-in', async () => {
     process.env.V2_ACCOUNT_DOOR = '1';
     afterSignIn.mockRejectedValue(new Error('db down'));
-    const res = await POST(post({ cm_otp: otp() }));
+    const res = await POST(post({ cm_auth_otp: otp() }));
     expect(res.headers.get('location')).toBe(`${ORIGIN}/dashboard`);
   });
 
@@ -237,7 +237,9 @@ describe('POST /login/verify verifies', () => {
       dest: null,
       events: [{ name: 'trial_started', props: { kind: 'pro', variant: 'no_card' } }],
     });
-    const res = await POST(post({ cm_otp: otp() }, { origin: ORIGIN, accept: 'application/json' }));
+    const res = await POST(
+      post({ cm_auth_otp: otp() }, { origin: ORIGIN, accept: 'application/json' }),
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({

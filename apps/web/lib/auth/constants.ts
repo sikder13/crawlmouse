@@ -31,11 +31,11 @@ export const TRIAL_REMINDER_DAYS_BEFORE_END = 3;
 /** Cookie names. Each is httpOnly; their lifetimes are below. */
 export const COOKIES = {
   /** The sign-in link's token, between the GET that receives it and the POST that verifies it. */
-  otp: 'cm_otp',
+  otp: 'cm_auth_otp',
   /** What a sign-up asked for: the first site and the time zone. */
-  signup: 'cm_signup',
+  signup: 'cm_auth_signup',
   /** A random per-browser id, one of the trial ledger's signals. */
-  device: 'cm_device',
+  device: 'cm_auth_device',
   /** The validated return target after sign-in (v1's cookie, shared). */
   next: 'post_login_next',
 } as const;
@@ -43,7 +43,7 @@ export const COOKIES = {
 /** v1's return target lives 10 minutes, as it did before the door. */
 export const V1_NEXT_COOKIE_SECONDS = 600;
 
-/** `cm_device` lives a year (SECURITY-DESIGN §5.3). */
+/** `cm_auth_device` lives a year (SECURITY-DESIGN §5.3). */
 export const DEVICE_COOKIE_SECONDS = 365 * 24 * 60 * 60;
 
 /**

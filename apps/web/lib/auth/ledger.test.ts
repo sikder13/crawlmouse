@@ -7,6 +7,7 @@ import {
   ledgerDecision,
   ledgerValues,
   pepperFrom,
+  slotKey,
   twelveMonthsBefore,
   type PriorLedgerRow,
 } from './ledger';
@@ -98,6 +99,17 @@ describe('hashLedgerValue', () => {
         },
       ),
     );
+  });
+});
+
+describe('slotKey', () => {
+  it('names the slot by a separate HMAC, so it never equals the ledger hash it guards', () => {
+    const pepper = 'p'.repeat(32);
+    const hash = hashLedgerValue(pepper, 'email', 'a@b.co');
+    const key = slotKey(pepper, 'email', hash);
+    expect(key).toMatch(/^trial:email:[0-9a-f]{64}$/);
+    expect(key).not.toContain(hash);
+    expect(slotKey(pepper, 'device', hash)).not.toBe(key);
   });
 });
 

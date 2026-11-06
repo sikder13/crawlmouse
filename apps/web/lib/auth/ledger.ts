@@ -3,7 +3,7 @@
  *
  * A first login is refused the no-card Pro trial when a `trial_ledger` row with the same hash says:
  * - `email`: a trial on this normalised email in the last 12 months;
- * - `device`: two trials from this browser's `cm_device` id in the last 30 days (this would be the
+ * - `device`: two trials from this browser's `cm_auth_device` id in the last 30 days (this would be the
  *   third, SECURITY-DESIGN §5.3);
  * - `ip24`: two trials from this /24 (IPv4) or /48 (IPv6) in the last 30 days AND at least one from
  *   this device in the same 30 days: the IP never refuses a trial on its own (§5.3, shared networks).
@@ -76,6 +76,15 @@ export function ledgerDecision(rows: readonly PriorLedgerRow[], now: Date): Ledg
 
 export function hashLedgerValue(pepper: string, kind: LedgerKind, value: string): string {
   return createHmac('sha256', pepper).update(`${kind}:${value}`).digest('hex');
+}
+
+/**
+ * The name of the one-shot slot a first login takes on a ledger value. A separate HMAC label, so the
+ * slot's key (stored in `rate_limits`, and logged if the rate-limit RPC fails) never equals the
+ * ledger row's `value_hash`, and the two cannot be joined.
+ */
+export function slotKey(pepper: string, kind: LedgerKind, valueHash: string): string {
+  return `trial:${kind}:${createHmac('sha256', pepper).update(`slot:${kind}:${valueHash}`).digest('hex')}`;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;

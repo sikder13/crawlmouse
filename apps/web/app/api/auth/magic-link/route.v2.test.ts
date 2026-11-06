@@ -61,8 +61,8 @@ describe('with V2_ACCOUNT_DOOR off, the route is exactly v1', () => {
       next: '/r/abc',
     });
     expect(res.status).toBe(200);
-    expect(cookieNamed(res, 'cm_signup')).toBeUndefined();
-    expect(cookieNamed(res, 'cm_device')).toBeUndefined();
+    expect(cookieNamed(res, 'cm_auth_signup')).toBeUndefined();
+    expect(cookieNamed(res, 'cm_auth_device')).toBeUndefined();
     expect(valueOf(res, 'post_login_next')).toBe('/r/abc');
     expect(cookieNamed(res, 'post_login_next')).toMatch(/Max-Age=600/);
   });
@@ -81,7 +81,7 @@ describe('with V2_ACCOUNT_DOOR=1', () => {
     expect(cookieNamed(res, 'post_login_next')).toMatch(/Max-Age=900/);
   });
 
-  it('a sign-up: next is /dashboard, and cm_signup carries the normalised host and the zone', async () => {
+  it('a sign-up: next is /dashboard, and cm_auth_signup carries the normalised host and the zone', async () => {
     const res = await call({
       email: 'a@b.com',
       site: 'https://Acme-Outdoors.com/x',
@@ -89,11 +89,11 @@ describe('with V2_ACCOUNT_DOOR=1', () => {
     });
     expect(res.status).toBe(200);
     expect(valueOf(res, 'post_login_next')).toBe('/dashboard');
-    expect(JSON.parse(valueOf(res, 'cm_signup'))).toEqual({
+    expect(JSON.parse(valueOf(res, 'cm_auth_signup'))).toEqual({
       site: 'acme-outdoors.com',
       tz: 'Asia/Kolkata',
     });
-    const c = cookieNamed(res, 'cm_signup')!;
+    const c = cookieNamed(res, 'cm_auth_signup')!;
     expect(c).toMatch(/HttpOnly/i);
     expect(c).toMatch(/SameSite=lax/i);
     expect(c).toMatch(/Max-Age=900/);
@@ -103,14 +103,14 @@ describe('with V2_ACCOUNT_DOOR=1', () => {
     for (const tz of ['Mars/Olympus', 'x'.repeat(500), 42]) {
       const res = await call({ email: 'a@b.com', tz });
       expect(res.status).toBe(200);
-      expect(JSON.parse(valueOf(res, 'cm_signup') || '{}').tz).toBeUndefined();
+      expect(JSON.parse(valueOf(res, 'cm_auth_signup') || '{}').tz).toBeUndefined();
     }
   });
 
   it('a zone Node does not list but the browser reports is kept (Europe/Kyiv, Asia/Kolkata)', async () => {
     for (const tz of ['Europe/Kyiv', 'Asia/Kolkata', 'UTC']) {
       const res = await call({ email: 'a@b.com', tz });
-      expect(JSON.parse(valueOf(res, 'cm_signup')).tz).toBe(tz);
+      expect(JSON.parse(valueOf(res, 'cm_auth_signup')).tz).toBe(tz);
     }
   });
 
@@ -133,14 +133,18 @@ describe('with V2_ACCOUNT_DOOR=1', () => {
     expect(signInWithOtp).not.toHaveBeenCalled();
   });
 
-  it('sets cm_device when absent (random, httpOnly, a year) and leaves an existing one alone', async () => {
+  it('sets cm_auth_device when absent (random, httpOnly, a year) and leaves an existing one alone', async () => {
     const res = await call({ email: 'a@b.com', tz: 'UTC' });
-    const c = cookieNamed(res, 'cm_device')!;
-    expect(valueOf(res, 'cm_device')).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const c = cookieNamed(res, 'cm_auth_device')!;
+    expect(valueOf(res, 'cm_auth_device')).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(c).toMatch(/HttpOnly/i);
     expect(c).toMatch(new RegExp(`Max-Age=${365 * 24 * 60 * 60}`));
-    const again = await call({ email: 'a@b.com', tz: 'UTC' }, { origin: ORIGIN }, 'cm_device=kept');
-    expect(cookieNamed(again, 'cm_device')).toBeUndefined();
+    const again = await call(
+      { email: 'a@b.com', tz: 'UTC' },
+      { origin: ORIGIN },
+      'cm_auth_device=kept',
+    );
+    expect(cookieNamed(again, 'cm_auth_device')).toBeUndefined();
   });
 
   it('refuses a cross-site browser post, so another site cannot plant the door cookies', async () => {
