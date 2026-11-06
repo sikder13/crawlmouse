@@ -6,7 +6,13 @@
  * dashboard and the failure goes to Sentry (account id only).
  */
 import { claimCheck, type ClaimDeps } from './claim';
-import { claimFromNext, claimRefusedDest, DASHBOARD, type SignupCarry } from './continue-intent';
+import {
+  claimFromNext,
+  claimRefusedDest,
+  DASHBOARD,
+  emailBinding,
+  type SignupCarry,
+} from './continue-intent';
 import type { Report } from './door-store';
 import { runFirstLogin, type DoorEvent, type FirstLoginDeps } from './first-login';
 
@@ -21,6 +27,8 @@ export interface LandingInput {
   user: SignedInUser;
   /** The `post_login_next` cookie, unvalidated. */
   next: string | undefined;
+  /** The `cm_auth_for` cookie: whom the door request that set `next` and `signup` was for. */
+  boundTo: string | undefined;
   signup: SignupCarry | null;
   device: string | null;
   ip: string;
@@ -38,6 +46,12 @@ export async function afterSignIn(
 ): Promise<Landing> {
   const events: DoorEvent[] = [];
   const { user } = input;
+  // The named site and a Keep's claim were asked for by one address; they count only when the link
+  // signed that address in (not someone else's link opened in the same browser).
+  const bound =
+    input.boundTo !== undefined &&
+    user.email !== undefined &&
+    input.boundTo === emailBinding(user.email);
   if (user.email) {
     try {
       const r = await runFirstLogin(deps.firstLogin, {
@@ -47,7 +61,7 @@ export async function afterSignIn(
         lastSignInAt: user.last_sign_in_at ?? null,
         device: input.device,
         ip: input.ip,
-        signup: input.signup,
+        signup: bound ? input.signup : null,
       });
       events.push(...r.events);
     } catch {
@@ -55,7 +69,7 @@ export async function afterSignIn(
     }
   }
 
-  const checkId = claimFromNext(input.next);
+  const checkId = bound ? claimFromNext(input.next) : null;
   if (checkId === null) return { dest: null, events };
   try {
     const claimed = await claimCheck(deps.claim, { checkId, userId: user.id });

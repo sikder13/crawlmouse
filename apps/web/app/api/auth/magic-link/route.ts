@@ -20,6 +20,7 @@ import {
 import {
   claimNext,
   DASHBOARD,
+  emailBinding,
   encodeSignup,
   isUuid,
   type SignupCarry,
@@ -171,6 +172,13 @@ export async function POST(req: Request) {
   }
 
   if (v2) {
+    res.cookies.set(COOKIES.binding, emailBinding(email), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: secure(),
+      maxAge: AUTH_LINK_SECONDS,
+      path: '/',
+    });
     const carry: SignupCarry = {};
     if (host) carry.site = host;
     if (zone) carry.tz = zone;

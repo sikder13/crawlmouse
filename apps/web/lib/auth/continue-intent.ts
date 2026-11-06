@@ -2,6 +2,7 @@
  * What rides the one-shot cookies between the magic-link request and the sign-in POST. Every value
  * is re-validated when it is read: a cookie is the caller's to set.
  */
+import { createHash } from 'node:crypto';
 import { safeNextPath } from '../safe-next-path';
 
 /** Where a sign-in from the v2 door lands. */
@@ -12,6 +13,11 @@ const CLAIM_NEXT = /^\/api\/checks\/([0-9a-f-]{36})\/claim\?then=\/dashboard$/;
 
 export function isUuid(v: unknown): v is string {
   return typeof v === 'string' && UUID.test(v);
+}
+
+/** The address a door request was made for, as `cm_auth_for` holds it: a hash, never the address. */
+export function emailBinding(email: string): string {
+  return createHash('sha256').update(`cm-auth-for:${email.trim().toLowerCase()}`).digest('hex');
 }
 
 /** A Keep's return target (D8): the claim, then the dashboard. */

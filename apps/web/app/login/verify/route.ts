@@ -141,6 +141,7 @@ export async function POST(request: Request) {
         {
           user,
           next,
+          boundTo: req.cookies.get(COOKIES.binding)?.value,
           signup: decodeSignup(req.cookies.get(COOKIES.signup)?.value),
           device: req.cookies.get(COOKIES.device)?.value ?? null,
           ip: getClientIp(request),
@@ -160,5 +161,6 @@ export async function POST(request: Request) {
   const res = respond(dest, events);
   res.cookies.set(COOKIES.next, '', { path: '/', maxAge: 0 });
   res.cookies.set(COOKIES.signup, '', { path: '/', maxAge: 0 });
+  res.cookies.set(COOKIES.binding, '', { path: '/', maxAge: 0 });
   return res;
 }

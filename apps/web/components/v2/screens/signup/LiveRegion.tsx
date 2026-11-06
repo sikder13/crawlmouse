@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import layout from '../../layout.module.css';
 
 /**
@@ -11,19 +10,18 @@ export function LiveRegion({
   role,
   id,
   className,
-  children,
+  text,
 }: {
   role: 'alert' | 'status';
   id?: string;
   /** The region's look once it holds text. */
   className: string | undefined;
-  children: ReactNode;
+  /** What the region says; null or empty while there is nothing to say. */
+  text: string | null;
 }) {
-  const empty =
-    children === null || children === undefined || children === false || children === '';
   return (
-    <p id={id} role={role} className={empty ? layout.srOnly : className} data-v2-addition="">
-      {children}
+    <p id={id} role={role} className={text ? className : layout.srOnly} data-v2-addition="">
+      {text}
     </p>
   );
 }

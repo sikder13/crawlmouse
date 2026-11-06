@@ -147,6 +147,13 @@ describe('with V2_ACCOUNT_DOOR=1', () => {
     expect(cookieNamed(again, 'cm_auth_device')).toBeUndefined();
   });
 
+  it('binds a door request to its address in cm_auth_for, as a hash', async () => {
+    const res = await call({ email: 'Ada@Example.com', tz: 'UTC' });
+    expect(valueOf(res, 'cm_auth_for')).toMatch(/^[0-9a-f]{64}$/);
+    expect(valueOf(res, 'cm_auth_for')).not.toContain('ada');
+    expect(cookieNamed(res, 'cm_auth_for')).toMatch(/HttpOnly/i);
+  });
+
   it('sets cm_auth_device on a sign-in without the door fields too (v1 /login, a bare resend)', async () => {
     const res = await call({ email: 'a@b.com' });
     expect(valueOf(res, 'cm_auth_device')).toMatch(/^[A-Za-z0-9_-]{43}$/);

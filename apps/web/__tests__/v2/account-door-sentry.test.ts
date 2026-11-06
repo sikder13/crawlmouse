@@ -7,7 +7,12 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { COOKIES } from '../../lib/auth/constants';
+import { execFileSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { scrubDoorSecrets } from '../../lib/auth/sentry-scrub';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 const TOKEN = 'pkce_LEAKCANARY_77';
 
@@ -65,16 +70,74 @@ describe('scrubDoorSecrets', () => {
     expect(out).not.toContain('/api/checks/abc');
   });
 
-  it('keeps everything else', () => {
-    const out = scrubDoorSecrets(event());
+  it('drops every cookie key, and keeps everything else', () => {
+    const out = scrubDoorSecrets({
+      ...event(),
+      request: { ...event().request, headers: { cookie: 'a=1', accept: 'text/html' } },
+    }) as ReturnType<typeof event> & { request: { headers: Record<string, string> } };
     expect(out.request.query_string).toBe('token_hash=[Filtered]&type=magiclink');
-    expect(out.request.cookies).toEqual({ other: 'kept' });
+    expect('cookies' in out.request).toBe(false);
+    expect(out.request.headers).toEqual({ accept: 'text/html' });
     expect(out.spans[0]!.data['http.method']).toBe('GET');
+  });
+
+  it.each([
+    [`/x?next=%2Flogin%2Fverify%3Ftoken_hash%3D${TOKEN}%26type%3Dmagiclink`],
+    [`/login/verify?TOKEN_HASH=${TOKEN}`],
+    [`a=1;token_hash=${TOKEN}`],
+    [`/login/verify?code=${TOKEN}#x`],
+  ])('replaces the token in %s', (url) => {
+    expect(scrubDoorSecrets({ url }).url).not.toContain('LEAKCANARY');
   });
 
   it('a parameter that only ends in the name is not a secret (error_code=, zip_code=)', () => {
     expect(scrubDoorSecrets({ q: '/x?error_code=otp_expired&zip_code=1' }).q).toBe(
       '/x?error_code=otp_expired&zip_code=1',
     );
+  });
+});
+
+/** What reached Sentry's transport, from a fresh process running _lib/sentry-capture.ts. */
+function capturedWith(mode: 'full' | 'integration' | 'scrubber' | 'none'): string {
+  const tsx = createRequire(import.meta.url).resolve('tsx/cli');
+  return execFileSync(process.execPath, [tsx, join(HERE, '_lib', 'sentry-capture.ts'), mode], {
+    encoding: 'utf8',
+    timeout: 60_000,
+  });
+}
+
+const CANARIES = ['LEAKCANARY', '11111111-1111', 'DEVICECANARY', 'SIGNUPCANARY', 'SESSIONCANARY'];
+
+describe('the server SDK sends no door secret in an event', () => {
+  /** The cookie values; the link token in the request URL is the scrubber's alone to remove. */
+  const URL_TOKEN = 'URLCANARY';
+
+  it.each([
+    ['with sentryServerOptions, as sentry.server.config.ts runs', 'full', [...CANARIES, URL_TOKEN]],
+    ['with the request-data integration alone: no cookie', 'integration', CANARIES],
+    ['with the scrubber alone: no cookie and no URL token', 'scrubber', [...CANARIES, URL_TOKEN]],
+  ] as const)(
+    '%s',
+    (_, mode, absent) => {
+      const out = capturedWith(mode);
+      // The capture reached the transport: an empty run cannot pass.
+      expect(out).toContain('auth.landing-failed');
+      for (const canary of absent) expect(out, canary).not.toContain(canary);
+    },
+    60_000,
+  );
+
+  it('without either, the SDK does send them (the test sees what it guards against)', () => {
+    const out = capturedWith('none');
+    for (const canary of [...CANARIES, URL_TOKEN]) expect(out, canary).toContain(canary);
+  }, 60_000);
+});
+
+describe('scrubDoorSecrets, inside strings', () => {
+  it('replaces a post_login_next value in a cookie header string', () => {
+    const out = scrubDoorSecrets({
+      request: { headers: { 'x-raw': 'post_login_next=/api/checks/abc/claim; x=1' } },
+    });
+    expect(out.request.headers['x-raw']).toBe('post_login_next=[Filtered]; x=1');
   });
 });

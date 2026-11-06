@@ -132,7 +132,7 @@ describe('Check-email', () => {
     expect(on).toContain('starts the moment you open it');
     expect(on).toContain(`about ${['zero', 'one', 'two'][FIRST_AUDIT_MINUTES]} minutes`);
     expect(off).not.toContain('starts the moment');
-    expect(off).toContain('is added to your account when you open it.');
+    expect(off).toContain('is added to your account when you open it, if the account has room');
     // With nothing running checks, no cadence and no alerts sender is promised (D6).
     for (const html of [off, checkEmail('from-audit', 'x.com', false)]) {
       expect(html).not.toContain('re-checked');

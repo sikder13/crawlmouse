@@ -80,7 +80,7 @@ export function hashLedgerValue(pepper: string, kind: LedgerKind, value: string)
 
 /**
  * The name of the one-shot slot a first login takes on a ledger value. A separate HMAC label, so the
- * slot's key (stored in `rate_limits`, and logged if the rate-limit RPC fails) never equals the
+ * slot's key (stored in `rate_limits`) never equals the
  * ledger row's `value_hash`, and the two cannot be joined.
  */
 export function slotKey(pepper: string, kind: LedgerKind, valueHash: string): string {

@@ -10,8 +10,8 @@
  *
  * Order, and what makes it once:
  * 1. a slot on the email and the device hash (`gridSerialize` in stores.ts): of two first logins
- *    sharing either within half a slot window of each other, the second is refused, failing safe;
- *    one later than that finds the first's ledger rows once the first has written them;
+ *    sharing either within half a slot window of each other, the second is always refused (failing
+ *    safe); further apart, the ledger lookup decides;
  * 2. the ledger lookup;
  * 3. `applyEntitlementTransition(trial_started)`: the RPC reads the account `for update` and
  *    refuses a stale version, and `next()` refuses a second trial;

@@ -204,9 +204,10 @@ export type IncrementCell = (key: string, windowStart: Date) => Promise<number |
  * The slot over two grids of `SERIALIZE_WINDOW_MS`, the second shifted by half a window. A call
  * counts itself in the cell of each grid that holds its moment, and holds the slot only when it is
  * the first in both. Of two calls less than half a window apart, a grid boundary can fall between
- * them in at most one grid, so they share a cell in the other and the second is refused. A call
- * later than that is not refused here: it finds the first's ledger rows, once the first has written
- * them. A cell the store cannot count refuses (fail closed).
+ * them in at most one grid, so they share a cell in the other and the second is always refused. Up
+ * to a full window apart they may still share a cell, and the second may be refused; further apart
+ * they never do, and the ledger lookup decides. Two calls a few milliseconds apart can each count
+ * first in one grid, and then both are refused. A cell the store cannot count refuses (fail closed).
  */
 export function gridSerialize(increment: IncrementCell, now: () => Date): Serialize {
   return async (key) => {

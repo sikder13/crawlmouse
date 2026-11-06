@@ -41,7 +41,7 @@ export const CLAIM_REFUSALS = {
     status: 409,
     when: 'the caller has no v2 account (a user from before migration 001)',
   },
-  expired: { status: 410, when: 'the check expired before its claim finished' },
+  expired: { status: 410, when: 'the check expired before anyone kept it' },
 } as const;
 
 export type ClaimCode = keyof typeof CLAIM_REFUSALS;
@@ -66,17 +66,19 @@ export async function claimCheck(
   if (member === null) return refuse('no_account');
 
   const now = deps.now();
-  const expired = check.expiresAt !== null && check.expiresAt.getTime() <= now.getTime();
   if (check.siteAccountId !== null) {
     if (check.siteAccountId !== member.accountId) return refuse('not_found');
     if (check.expiresAt === null) return refuse('already_claimed');
-    if (expired) return refuse('expired');
-    // Our site, but the check still expires: an earlier claim stopped between its two writes.
+    // Our site, but the check still expires: an earlier claim stopped between its two writes. It took
+    // the site before the check expired (the expiry is tested before the site is taken), so it is
+    // finished now, whatever the time.
     await store.clearExpiry(check.checkId);
     return { ok: true, siteId: check.siteId };
   }
 
-  if (expired) return refuse('expired');
+  if (check.expiresAt !== null && check.expiresAt.getTime() <= now.getTime()) {
+    return refuse('expired');
+  }
   const kept = await store.countActiveSites(member.accountId);
   if (kept >= siteLimitAt(member, now)) return refuse('site_limit');
 

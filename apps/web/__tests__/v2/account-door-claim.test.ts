@@ -196,16 +196,17 @@ describe('claimCheck', () => {
     expect((await site(one.siteId)).schedule_cadence).toBe('monthly');
   });
 
-  it('a half-finished claim of a check that has since expired is a 410, not revived', async () => {
+  it('a half-finished claim is finished even after the check would have expired: the site was taken first', async () => {
     const user = await signUp(db, 'halfgone@example.com');
     const a = await accountOf(db, user);
     const { checkId, siteId } = await anonymousCheck(db, 'halfgone.example.com', NOW);
     await db.query(`update public.sites set account_id = $2 where id = $1`, [siteId, a.id]);
-    expect(await claimCheck(deps(), { checkId, userId: user })).toEqual({
-      ok: false,
-      status: 410,
-      code: 'expired',
-    });
+    expect(await claimCheck(deps(), { checkId, userId: user })).toEqual({ ok: true, siteId });
+    expect(
+      await count(db, `select 1 from public.checks where id = $1 and expires_at is null`, [
+        checkId,
+      ]),
+    ).toBe(1);
   });
 
   it('a Pro trial account gets the weekly schedule', async () => {

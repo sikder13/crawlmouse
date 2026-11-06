@@ -162,12 +162,17 @@ export function KeepBar({
               </Button>
             )}
             {sender.widget}
-            <LiveRegion role="alert" id="save-email-error" className={styles.barSub}>
-              {refused ? SEND_COPY[refused] : null}
-            </LiveRegion>
-            <LiveRegion role="status" className={styles.barSub}>
-              {sender.state === 'verifying' ? VERIFYING_COPY : null}
-            </LiveRegion>
+            <LiveRegion
+              role="alert"
+              id="save-email-error"
+              className={styles.barSub}
+              text={refused ? SEND_COPY[refused] : null}
+            />
+            <LiveRegion
+              role="status"
+              className={styles.barSub}
+              text={sender.state === 'verifying' ? VERIFYING_COPY : null}
+            />
           </form>
         </div>
       ) : state === 'dismissed' ? (

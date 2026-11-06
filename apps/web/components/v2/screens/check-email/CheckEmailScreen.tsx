@@ -56,12 +56,15 @@ export function CheckEmailScreen({
     if (!fixedEmail) setPending(readPending());
   }, [fixedEmail]);
   const sender = useLinkSender();
-  // The page says to wait a minute before sending again, and the button waits that long.
+  // The page says to wait a minute before sending again: the button waits that long after the page
+  // opens and after each link it sends.
   const [canResend, setCanResend] = useState(false);
+  const sent = sender.state === 'sent';
   useEffect(() => {
+    setCanResend(false);
     const t = window.setTimeout(() => setCanResend(true), RESEND_HINT_MINUTES * 60_000);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [sent]);
   const masked = pending ? maskEmail(pending.email) : null;
   const fromAudit = kind === 'from-audit';
   const goBack = () => window.history.back();
@@ -100,7 +103,7 @@ export function CheckEmailScreen({
               <div className={styles.cardTitle}>
                 {fromAudit
                   ? 'Opening the link keeps the audit.'
-                  : `Opening the link creates your account, or signs you in to the one you have, and starts ${trialDays} of Pro if it is your first trial.`}
+                  : `Opening the link creates your account, with ${trialDays} of Pro if it is your first trial, or signs you in to the one you have.`}
               </div>
               <p className={styles.cardBody}>
                 {fromAudit && pipeline ? (
@@ -112,8 +115,8 @@ export function CheckEmailScreen({
                   </>
                 ) : fromAudit ? (
                   <>
-                    From then on, {site} is kept in your account. Until you open it, the audit stays
-                    at its {ANONYMOUS_VISIBLE_HOURS}-hour link.
+                    Until you open it, the audit of {site} stays at its {ANONYMOUS_VISIBLE_HOURS}
+                    -hour link.
                   </>
                 ) : pipeline ? (
                   <>
@@ -126,7 +129,7 @@ export function CheckEmailScreen({
                 ) : (
                   <>
                     <span className={styles.monoStrong}>{site}</span> is added to your account when
-                    you open it.
+                    you open it, if the account has room for another site.
                   </>
                 )}
               </p>
@@ -151,16 +154,22 @@ export function CheckEmailScreen({
               </Button>
             </div>
             {sender.widget}
-            <LiveRegion role="alert" className={styles.error}>
-              {refused ? SEND_COPY[refused] : null}
-            </LiveRegion>
-            <LiveRegion role="status" className={styles.message}>
-              {sender.state === 'sent'
-                ? 'Sent again. The earlier link no longer works.'
-                : sender.state === 'verifying'
-                  ? VERIFYING_COPY
-                  : null}
-            </LiveRegion>
+            <LiveRegion
+              role="alert"
+              className={styles.error}
+              text={refused ? SEND_COPY[refused] : null}
+            />
+            <LiveRegion
+              role="status"
+              className={styles.message}
+              text={
+                sender.state === 'sent'
+                  ? 'Sent again. The earlier link no longer works.'
+                  : sender.state === 'verifying'
+                    ? VERIFYING_COPY
+                    : null
+              }
+            />
             <div className={styles.rowLine}>
               <span>Wrong address?</span>
               {fromAudit ? (
@@ -179,7 +188,7 @@ export function CheckEmailScreen({
             You can close this tab.{' '}
             {kind === 'signin'
               ? 'The link signs you in and opens your dashboard.'
-              : `Opened in this browser, the link signs you in and keeps ${fromAudit ? 'this audit' : site} in your account.`}{' '}
+              : `Opened in this browser, the link signs you in and keeps ${fromAudit ? 'this audit' : site} in your account, if it has room for another site.`}{' '}
             If the link has expired, the sign-in page offers a new one.
           </div>
         </section>

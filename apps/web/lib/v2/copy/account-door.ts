@@ -14,9 +14,9 @@ const FIRST_TRIAL =
 const SAME_BROWSER =
   'FACTS correction (CC-25 known gap): the named site and the kept audit ride a cookie in the browser that asked for the link; opened on another device, the link signs in without them.';
 const PIPELINE =
-  'FACTS correction (CC-25 D6): nothing starts or repeats a check, and nothing sends a change note, until CC-20b sets V2_PIPELINE=1 (and CC-28 sends from alerts@); until then the page says the site is kept, not that it is audited or re-checked. With V2_PIPELINE=1 the locked sentence renders.';
+  'FACTS correction (CC-25 D6): nothing starts or repeats a check, and nothing sends a change note, until CC-20b sets V2_PIPELINE=1 (and CC-28 sends from alerts@); until then the page says the site is kept, not that it is audited or re-checked. With V2_PIPELINE=1 the locked sentence renders, with the first-trial condition.';
 const ANY_ACCOUNT =
-  'FACTS correction (CC-25 review): Sign-up invites an existing account to use the same form, and a named site is added at any sign-in, so the sentence holds for a new account and an existing one.';
+  'FACTS correction (CC-25 review): Sign-up invites an existing account to use the same form, and a named site is added at any sign-in with room, so the sentence holds for a new account and an existing one; the trial comes only with a new account.';
 const DASHBOARD =
   'FACTS correction (CC-25 review): the dashboard is v1 until CC-26 and shows no v2 site, so the page says the link keeps it, not that the dashboard shows it.';
 
@@ -34,7 +34,8 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     kind: 'facts',
     locked:
       'If you name one, its first audit starts the moment you open the sign-in link, about two minutes.',
-    rendered: 'If you name one, it is added to your account when you open the sign-in link.',
+    rendered:
+      'If you name one, it is added to your account when you open the sign-in link, if the account has room for another site.',
     source: `${PIPELINE} ${ANY_ACCOUNT}`,
   },
   {
@@ -82,15 +83,16 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     screen: 'check-email',
     kind: 'facts',
     locked:
-      'is re-checked weekly for 14 days and monthly after; if a check finds a change, the note comes from alerts@crawlmouse.com.',
-    rendered: 'is kept in your account.',
+      'From then on, example-outfitter.com is re-checked weekly for 14 days and monthly after; if a check finds a change, the note comes from alerts@crawlmouse.com. Until you open it, the audit stays at its 24-hour link.',
+    rendered: 'Until you open it, the audit of example-outfitter.com stays at its 24-hour link.',
     source: `${PIPELINE} With it, the sentence is also conditional on the trial: ${FIRST_TRIAL.replace('FACTS correction ', '')}`,
   },
   {
     screen: 'check-email',
     kind: 'facts',
     locked: 'The link opens your dashboard with this audit as its first site.',
-    rendered: 'Opened in this browser, the link signs you in and keeps this audit in your account.',
+    rendered:
+      'Opened in this browser, the link signs you in and keeps this audit in your account, if it has room for another site.',
     source: `${SAME_BROWSER} ${DASHBOARD.replace('FACTS correction ', '')}`,
   },
   // ── Check-email, a sign-up naming a site ──────────────────────────────────────────────────
@@ -113,7 +115,7 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     kind: 'facts',
     locked: 'Opening the link creates your account and starts 14 days of Pro.',
     rendered:
-      'Opening the link creates your account, or signs you in to the one you have, and starts 14 days of Pro if it is your first trial.',
+      'Opening the link creates your account, with 14 days of Pro if it is your first trial, or signs you in to the one you have.',
     source: `${FIRST_TRIAL} ${ANY_ACCOUNT.replace('FACTS correction ', '')}`,
   },
   {
@@ -121,7 +123,8 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     kind: 'facts',
     locked:
       'The first audit of acme-outdoors.com starts the moment you open it, about two minutes; after that it is re-checked weekly for 14 days and monthly, and if a check finds a change the note comes from alerts@crawlmouse.com.',
-    rendered: 'acme-outdoors.com is added to your account when you open it.',
+    rendered:
+      'acme-outdoors.com is added to your account when you open it, if the account has room for another site.',
     source: `${PIPELINE} ${ANY_ACCOUNT.replace('FACTS correction ', '')}`,
   },
   {
@@ -129,7 +132,7 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     kind: 'facts',
     locked: 'The link opens your dashboard with acme-outdoors.com as its first site.',
     rendered:
-      'Opened in this browser, the link signs you in and keeps acme-outdoors.com in your account.',
+      'Opened in this browser, the link signs you in and keeps acme-outdoors.com in your account, if it has room for another site.',
     source: `${SAME_BROWSER} ${DASHBOARD.replace('FACTS correction ', '')}`,
   },
 ];

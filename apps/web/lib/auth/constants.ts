@@ -36,6 +36,12 @@ export const COOKIES = {
   signup: 'cm_auth_signup',
   /** A random per-browser id, one of the trial ledger's signals. */
   device: 'cm_auth_device',
+  /**
+   * Which address a door request was made for: a hash (continue-intent.ts `emailBinding`), not the
+   * address. The landing uses the named site and a Keep's claim only when it matches the email the
+   * link verified, so a link to someone else's account cannot carry them into it.
+   */
+  binding: 'cm_auth_for',
   /** The validated return target after sign-in (v1's cookie, shared). */
   next: 'post_login_next',
 } as const;

@@ -6,7 +6,7 @@ vi.mock('./first-login', () => ({ runFirstLogin: (...a: unknown[]) => runFirstLo
 vi.mock('./claim', () => ({ claimCheck: (...a: unknown[]) => claimCheck(...a) }));
 
 import { afterSignIn } from './landing';
-import { claimFromNext, claimNext, decodeOtp, decodeSignup } from './continue-intent';
+import { claimFromNext, claimNext, decodeOtp, decodeSignup, emailBinding } from './continue-intent';
 
 const CHECK = '0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11';
 const user = {
@@ -17,7 +17,14 @@ const user = {
 };
 const report = vi.fn();
 const deps = { firstLogin: {} as never, claim: {} as never, report };
-const base = { user, next: undefined, signup: null, device: 'd', ip: '203.0.113.1' };
+const base = {
+  user,
+  next: undefined,
+  boundTo: emailBinding('ada@example.com'),
+  signup: null,
+  device: 'd',
+  ip: '203.0.113.1',
+};
 
 beforeEach(() => {
   runFirstLogin.mockReset().mockResolvedValue({ trial: 'started', siteId: null, events: [] });
@@ -79,6 +86,25 @@ describe('afterSignIn', () => {
       ['first-login-failed', { userId: 'u1' }],
       ['claim-failed', { userId: 'u1' }],
     ]);
+  });
+
+  it('another address’s request in this browser carries neither its site nor its claim in', async () => {
+    for (const boundTo of [emailBinding('someone-else@example.com'), undefined]) {
+      const r = await afterSignIn(deps, {
+        ...base,
+        boundTo,
+        signup: { site: 'acme.com' },
+        next: claimNext(CHECK),
+      });
+      expect(runFirstLogin.mock.lastCall![1]).toMatchObject({ signup: null });
+      expect(claimCheck).not.toHaveBeenCalled();
+      expect(r.dest).toBeNull();
+    }
+  });
+
+  it('the binding is the address lowercased and trimmed, and never the address itself', () => {
+    expect(emailBinding(' Ada@Example.com ')).toBe(emailBinding('ada@example.com'));
+    expect(emailBinding('ada@example.com')).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('passes the events the hook produced', async () => {

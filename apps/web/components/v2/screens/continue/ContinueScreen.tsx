@@ -116,16 +116,23 @@ function Expired() {
         <Button type="submit" variant="primary" disabled={busy}>
           Send a new link
         </Button>
-        <LiveRegion role="alert" id={`${ids}-error`} className={styles.error}>
-          {refused ? SEND_COPY[refused] : null}
-        </LiveRegion>
-        <LiveRegion role="status" className={styles.message}>
-          {state === 'sent'
-            ? `Sent. Check your email; the new link works for ${AUTH_LINK_MINUTES} minutes.`
-            : state === 'verifying'
-              ? VERIFYING_COPY
-              : null}
-        </LiveRegion>
+        <LiveRegion
+          role="alert"
+          id={`${ids}-error`}
+          className={styles.error}
+          text={refused ? SEND_COPY[refused] : null}
+        />
+        <LiveRegion
+          role="status"
+          className={styles.message}
+          text={
+            state === 'sent'
+              ? `Sent. Check your email; the new link works for ${AUTH_LINK_MINUTES} minutes.`
+              : state === 'verifying'
+                ? VERIFYING_COPY
+                : null
+          }
+        />
       </form>
     </>
   );

@@ -23,7 +23,7 @@ vi.mock('../../lib/auth/claim', () => ({ claimCheck }));
 
 import { POST } from '../../app/api/checks/[id]/claim/route';
 import { afterSignIn } from '../../lib/auth/landing';
-import { claimNext } from '../../lib/auth/continue-intent';
+import { claimNext, emailBinding } from '../../lib/auth/continue-intent';
 
 const CHECK = '0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11';
 
@@ -42,6 +42,7 @@ describe('the claim has one implementation', () => {
         {
           user: { id: 'u1', email: 'a@b.co' },
           next: claimNext(CHECK),
+          boundTo: emailBinding('a@b.co'),
           signup: null,
           device: null,
           ip: 'unknown',

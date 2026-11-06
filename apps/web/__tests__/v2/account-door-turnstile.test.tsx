@@ -30,6 +30,7 @@ import { SignupScreen } from '../../components/v2/screens/signup/SignupScreen';
 import { CheckEmailScreen } from '../../components/v2/screens/check-email/CheckEmailScreen';
 import { ContinueScreen } from '../../components/v2/screens/continue/ContinueScreen';
 import { SEND_COPY } from '../../components/v2/screens/signup/send-link';
+import { RESEND_HINT_MINUTES } from '../../lib/auth/constants';
 import {
   VERIFY_TIMEOUT_MS,
   VERIFYING_COPY,
@@ -105,6 +106,56 @@ describe('a send that waits for Turnstile', () => {
     });
     expect(alertText(host)).toBe(SEND_COPY.verification);
     expect(button(host).disabled).toBe(false);
+  });
+});
+
+describe('Check-email: Send the link again', () => {
+  it('waits the minute the page mentions after the page opens', () => {
+    vi.useFakeTimers();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() =>
+      root!.render(<CheckEmailScreen kind="signin" site={null} pipeline={false} email="a@b.co" />),
+    );
+    const again = () =>
+      [...host.querySelectorAll('button')].find((b) => b.textContent === 'Send the link again')!;
+    expect(again().disabled).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(RESEND_HINT_MINUTES * 60_000 - 1);
+    });
+    expect(again().disabled).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(again().disabled).toBe(false);
+  });
+
+  it('waits again after each link it sends', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', async () => new Response('{"ok":true}'));
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() =>
+      root!.render(<CheckEmailScreen kind="signin" site={null} pipeline={false} email="a@b.co" />),
+    );
+    const again = () =>
+      [...host.querySelectorAll('button')].find((b) => b.textContent === 'Send the link again')!;
+    act(() => {
+      vi.advanceTimersByTime(RESEND_HINT_MINUTES * 60_000);
+    });
+    act(() => again().click());
+    await act(async () => {
+      widget.onToken!('tok-2');
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(host.textContent).toContain('Sent again.');
+    expect(again().disabled).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(RESEND_HINT_MINUTES * 60_000);
+    });
+    expect(again().disabled).toBe(false);
   });
 });
 

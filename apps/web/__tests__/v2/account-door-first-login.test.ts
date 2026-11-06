@@ -292,6 +292,36 @@ describe('runFirstLogin', () => {
     expect((await accountOf(db, i.userId)).timezone).toBe('UTC');
   });
 
+  it('a later sign-in on a paid account with a site kept adds the second, weekly, as site 2', async () => {
+    const i = await input('second@example.com', {
+      emailConfirmedAt: '2026-08-01T10:00:00Z',
+      lastSignInAt: '2026-11-05T11:59:59Z',
+      signup: { site: 'two.example.com' },
+    });
+    const a = await accountOf(db, i.userId);
+    await db.query(
+      `update public.accounts set state = 'pro_trial', tier = 'pro', trial_variant = 'no_card',
+              trial_ends_at = $2, trial_used_at = $3, site_limit = 5, seat_limit = 2, competitor_limit = 1,
+              state_history = state_history || jsonb_build_array(jsonb_build_object('state','pro_trial','since','2026-11-01T00:00:00.000Z'))
+        where id = $1`,
+      [a.id, new Date('2026-11-15T00:00:00Z'), new Date('2026-11-01T00:00:00Z')],
+    );
+    await db.query(`insert into public.sites (account_id, host) values ($1, 'one.example.com')`, [
+      a.id,
+    ]);
+    const r = await runFirstLogin(deps(), i);
+    expect(r.events).toEqual([{ name: 'site_added', props: { n: 2 } }]);
+    const { rows } = await db.query<Record<string, unknown>>(
+      `select schedule_cadence, schedule_iso_weekday, schedule_hour_local from public.sites where id = $1`,
+      [r.siteId],
+    );
+    expect(rows[0]).toEqual({
+      schedule_cadence: 'weekly',
+      schedule_iso_weekday: 4,
+      schedule_hour_local: 6,
+    });
+  });
+
   it('every event name it emits is a funnel event', () => {
     for (const name of ['trial_started', 'site_added']) expect(FUNNEL_EVENTS).toContain(name);
   });

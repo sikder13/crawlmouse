@@ -88,12 +88,17 @@ export function SignupForm({
       <Button type="submit" variant="primary" disabled={busy} className={styles.submit}>
         {state === 'sending' ? 'Sending…' : 'Send my sign-in link'}
       </Button>
-      <LiveRegion role="alert" id={`${ids}-error`} className={styles.error}>
-        {refused ? SEND_COPY[refused] : null}
-      </LiveRegion>
-      <LiveRegion role="status" className={styles.status}>
-        {state === 'verifying' ? VERIFYING_COPY : null}
-      </LiveRegion>
+      <LiveRegion
+        role="alert"
+        id={`${ids}-error`}
+        className={styles.error}
+        text={refused ? SEND_COPY[refused] : null}
+      />
+      <LiveRegion
+        role="status"
+        className={styles.status}
+        text={state === 'verifying' ? VERIFYING_COPY : null}
+      />
       <p className={styles.fine}>
         {emailKindsSentence()}{' '}
         <a href="/privacy" className={styles.underline}>

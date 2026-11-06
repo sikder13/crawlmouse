@@ -206,6 +206,7 @@ describe('POST /login/verify verifies', () => {
           cookie: cookieHeader({
             cm_auth_otp: otp(),
             cm_auth_signup: JSON.stringify({ site: 'acme.com', tz: 'Europe/Kyiv' }),
+            cm_auth_for: 'binding-hash',
             cm_auth_device: 'dev-1',
           }),
         },
@@ -216,12 +217,14 @@ describe('POST /login/verify verifies', () => {
       expect.objectContaining({
         user: USER,
         signup: { site: 'acme.com', tz: 'Europe/Kyiv' },
+        boundTo: 'binding-hash',
         device: 'dev-1',
         ip: '203.0.113.9',
       }),
     );
     expect(res.headers.get('location')).toBe(`${ORIGIN}/dashboard?claim=site_limit`);
     expect(setCookies(res).find((c) => c.startsWith('cm_auth_signup='))).toMatch(/Max-Age=0/);
+    expect(setCookies(res).find((c) => c.startsWith('cm_auth_for='))).toMatch(/Max-Age=0/);
   });
 
   it('a hook that throws does not fail the sign-in', async () => {
