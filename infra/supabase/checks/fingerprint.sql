@@ -61,10 +61,11 @@ cross join lateral (
   -- the roles section. Each entry is matched exactly: the role, the member, and the admin,
   -- inherit and set options. Measured: production held no membership with
   -- supabase_realtime_admin as the member (2026-11-06 UTC), and a branch created from it the same
-  -- day held these three (docs/ops/db-migrations.md §5 has the query). Any other membership by
-  -- supabase_realtime_admin, or one of these with other options, is read. So is that role owning
-  -- a table, view, sequence or function, or holding a grant on one, in the schemas above. (No
-  -- section records the owner of a type, for any role.)
+  -- day held these three (docs/ops/db-migrations.md §5 has the query). Every other membership
+  -- whose member is a member named here is read, whichever role it is of, including roles the
+  -- section does not otherwise watch; so is one of these with other options. So is that role
+  -- owning a table, view, sequence or function, or holding a grant on one, in the schemas above.
+  -- (No section records the owner of a type, for any role.)
   supabase_managed_members(role_name, member_name, admin_option, inherit_option, set_option) as (
     values ('anon', 'supabase_realtime_admin', false, false, true),
            ('authenticated', 'supabase_realtime_admin', false, false, true),
@@ -255,7 +256,8 @@ cross join lateral (
              pg_get_userbyid(m.member), pg_get_userbyid(m.roleid), m.admin_option,
              m.inherit_option, m.set_option)
     from pg_auth_members m
-    where (m.roleid in (select oid from watched_roles) or m.member in (select oid from watched_roles))
+    where (m.roleid in (select oid from watched_roles) or m.member in (select oid from watched_roles)
+           or pg_get_userbyid(m.member) in (select member_name from supabase_managed_members))
       and not exists (
         select 1 from supabase_managed_members s
         where s.role_name = pg_get_userbyid(m.roleid) and s.member_name = pg_get_userbyid(m.member)

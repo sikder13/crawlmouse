@@ -292,6 +292,27 @@ describe('SUPABASE_MANAGED_MEMBERS: the three memberships Supabase grants a new 
       'grant service_role to supabase_realtime_admin with inherit false, set false',
       'supabase_realtime_admin member of service_role admin=f inherit=f set=f',
     ],
+    // Roles the section does not otherwise watch: a membership by a listed member is read anyway.
+    [
+      'of postgres',
+      'grant postgres to supabase_realtime_admin with inherit false',
+      'supabase_realtime_admin member of postgres admin=f inherit=f set=t',
+    ],
+    [
+      'of pg_read_all_data',
+      'grant pg_read_all_data to supabase_realtime_admin with inherit false',
+      'supabase_realtime_admin member of pg_read_all_data admin=f inherit=f set=t',
+    ],
+    [
+      'of pg_write_all_data',
+      'grant pg_write_all_data to supabase_realtime_admin with inherit false',
+      'supabase_realtime_admin member of pg_write_all_data admin=f inherit=f set=t',
+    ],
+    [
+      'of another Supabase role',
+      'create role supabase_admin; grant supabase_admin to supabase_realtime_admin with inherit false',
+      'supabase_realtime_admin member of supabase_admin admin=f inherit=f set=t',
+    ],
   ])(
     'a membership by supabase_realtime_admin %s changes the roles section',
     async (_l, grant, line) => {
@@ -304,23 +325,29 @@ describe('SUPABASE_MANAGED_MEMBERS: the three memberships Supabase grants a new 
     },
   );
 
-  // Vary the role's name: a role near anon is not one of the three.
-  it.each(['anon_2', 'xanon', '"Anon"', '"anon "'])(
-    'supabase_realtime_admin as a member of %s still shows',
-    async (role) => {
-      const after = await withRollback(db, async (tx) => {
-        await tx.exec(
-          `create role ${role}; ${CREATE}; grant ${role} to supabase_realtime_admin with inherit false`,
-        );
-        return readFingerprint(tx);
-      });
-      expect(differingSections(base, after)).toEqual(['roles']);
-      const name = role.replace(/"/g, '');
-      expect(roleLines(after)).toContain(
-        `supabase_realtime_admin member of ${name} admin=f inherit=f set=t`,
+  // Vary the role's name: a role near one of the three is not one of them.
+  it.each([
+    'anon_2',
+    'xanon',
+    '"Anon"',
+    '"anon "',
+    'authenticated_2',
+    '"Authenticated"',
+    'service_role_2',
+    '" service_role"',
+  ])('supabase_realtime_admin as a member of %s still shows', async (role) => {
+    const after = await withRollback(db, async (tx) => {
+      await tx.exec(
+        `create role ${role}; ${CREATE}; grant ${role} to supabase_realtime_admin with inherit false`,
       );
-    },
-  );
+      return readFingerprint(tx);
+    });
+    expect(differingSections(base, after)).toEqual(['roles']);
+    const name = role.replace(/"/g, '');
+    expect(roleLines(after)).toContain(
+      `supabase_realtime_admin member of ${name} admin=f inherit=f set=t`,
+    );
+  });
 
   // Vary the member's name: a role near supabase_realtime_admin is not it.
   it.each([

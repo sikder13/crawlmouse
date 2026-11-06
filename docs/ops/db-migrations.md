@@ -298,23 +298,29 @@ order by r.rolname;
 `fingerprint.sql` now leaves out exactly those three memberships, through `SUPABASE_MANAGED_MEMBERS`:
 a list of entries, each a role, a member and the admin, inherit and set options as the branch held
 them, matched exactly
-(`grep -n -A4 'supabase_managed_members(role_name' infra/supabase/checks/fingerprint.sql`). Any
-other membership by `supabase_realtime_admin` changes the `roles` section: of `crawl_worker`,
-`research_retention` or `authenticator`, of `service_role` with the admin option, with inherit, or
-without set, and of a role whose name is near one of the three. So does `supabase_realtime_admin`
-granted to another role, owning a table or function, or holding a grant on one; the tests use
-objects in `public`
+(`grep -n -A4 'supabase_managed_members(role_name' infra/supabase/checks/fingerprint.sql`). The
+`roles` section reads every membership whose member is named in that list, including memberships
+of roles it does not otherwise watch (`postgres`, `pg_*`, other `supabase_*` roles), and leaves out
+only the listed entries. The tests show a membership by `supabase_realtime_admin` changing the
+section when it is of `crawl_worker`, `research_retention`, `authenticator`, `postgres`,
+`pg_read_all_data`, `pg_write_all_data` or another Supabase role; of `service_role` with the admin
+option, with inherit, or without set; or of a role whose name is near one of the three. They also
+show `supabase_realtime_admin` owning a table or function, or holding a grant on one, in `public`
 (`pnpm --filter @crawlmouse/scripts exec vitest run db/fingerprint.test.ts -t SUPABASE_MANAGED_MEMBERS`).
+`supabase_realtime_admin` granted _to_ a role is read as any membership is: when that role is one
+the section watches.
+
 If Supabase changes what it grants a new branch, the dry run fails on the `roles` section and
-names the lines; an entry is added only on the evidence above: no rows on production, rows on a
+names the lines. An entry is added only on the evidence above: no rows on production, rows on a
 fresh branch.
 
-On 2026-11-06 production was read through the read-only endpoint with this file and with the one
-at `796199b6` (`readFingerprint` with each file's text, then `compareFingerprints`); no section
-differed. A role added to the list needs the same
-evidence: zero rows on production, rows on a fresh branch.
+On 2026-11-06 production was read through the read-only endpoint with the file as this change
+leaves it, and with the ones at `796199b6` and `13875535` (`readFingerprint` with each file's
+text, then `compareFingerprints`); no section differed.
 
-**The dry run again, with the list.** On a new branch, from commit `a085de0c`, with
+**The dry run again, with the first list.** That list left out every membership by
+`supabase_realtime_admin`, matched by name alone; it has since been narrowed as above. On a new
+branch, from commit `a085de0c`, with
 `pnpm exec tsx db/dry-run.ts --branch cc-db-ops-live-2`. Its summary, unedited:
 
 ```text
