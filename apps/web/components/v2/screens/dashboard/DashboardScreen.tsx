@@ -79,6 +79,9 @@ function Strip({ strip }: { strip: NonNullable<DashboardView['strip']> }) {
           <span className={styles.big}>{strip.other.count}</span>
           <a href={strip.other.show.href} className={styles.show}>
             {strip.other.show.label}
+            {strip.other.show.context ? (
+              <VisuallyHidden>{` ${strip.other.show.context}`}</VisuallyHidden>
+            ) : null}
           </a>
         </div>
       </div>

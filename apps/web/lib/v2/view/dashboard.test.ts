@@ -5,7 +5,13 @@
 import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
 import { firstRunNow } from './account';
-import { ACCOUNT_ACTIONS, dashboardView, type DashboardView } from './dashboard';
+import {
+  ACCOUNT_ACTIONS,
+  dashboardView,
+  moveOver,
+  weekdayAmbiguous,
+  type DashboardView,
+} from './dashboard';
 import { CLEAN_VIEWER } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
 
 const BAD_ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
@@ -263,5 +269,53 @@ describe('the actions CC-26b wires', () => {
       const known = new Set(Object.values(ACCOUNT_ACTIONS).map((a) => a.route));
       for (const a of actions) expect(known).toContain(a.route);
     }
+  });
+});
+
+describe('The health move compares only the sites graded at both moments', () => {
+  // Worked by hand: no fixture holds a moment where a site graded then is not graded now.
+  it('leaves out a site graded then but not now', () => {
+    const then = new Map<string, [number, number]>([
+      ['x', [80, 80]],
+      ['y', [20, 20]],
+    ]);
+    const now = new Map<string, [number, number]>([['x', [90, 90]]]);
+    // Over every site graded then, the earlier mean would be 50.
+    expect(moveOver(then, now)).toEqual({ both: ['x'], a: 80, b: 90 });
+  });
+
+  it('leaves out a site graded now but not then', () => {
+    const then = new Map<string, [number, number]>([['x', [70, 70]]]);
+    const now = new Map<string, [number, number]>([
+      ['x', [80, 80]],
+      ['z', [0, 0]],
+    ]);
+    // Over every site graded now, the later mean would be 40.
+    expect(moveOver(then, now)).toEqual({ both: ['x'], a: 70, b: 80 });
+  });
+});
+
+describe('“Since” names a check by its date when a weekday could mean another', () => {
+  const IND = 'America/Indiana/Indianapolis';
+  const NOW = '2026-10-30T12:00:00Z'; // Fri 30 Oct, 08:00 in Indiana
+
+  it('a week or more back, by its date, whatever the newest result’s weekday', () => {
+    expect(weekdayAmbiguous('2026-10-22T12:00:00Z', null, NOW, IND)).toBe(true); // Thu, 8 days
+    expect(weekdayAmbiguous('2026-10-23T12:00:00Z', null, NOW, IND)).toBe(true); // Fri, 7 days
+    expect(weekdayAmbiguous('2026-10-22T12:00:00Z', '2026-10-29T12:00:00Z', NOW, IND)).toBe(true);
+  });
+
+  it('under a week back, by its date only when the newest result fell on the same weekday', () => {
+    expect(weekdayAmbiguous('2026-10-24T12:00:00Z', null, NOW, IND)).toBe(false); // Sat, 6 days
+    expect(weekdayAmbiguous('2026-10-26T12:00:00Z', '2026-10-29T12:00:00Z', NOW, IND)).toBe(false);
+    expect(weekdayAmbiguous('2026-10-29T12:00:00Z', '2026-10-29T20:00:00Z', NOW, IND)).toBe(true);
+  });
+});
+
+describe('The first-run note follows the site’s schedule', () => {
+  it('on the clean dashboard, whose site has none, says only that it will be checked again', () => {
+    expect(dashboardView(fixture('clean-site'), CLEAN_VIEWER).sites.foot).toBe(
+      'Changes appear here once the site is checked again. Nothing to compare yet.',
+    );
   });
 });

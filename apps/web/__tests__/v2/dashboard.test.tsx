@@ -6,7 +6,12 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DashboardScreen } from '../../components/v2/screens/dashboard/DashboardScreen';
-import { dashboardPreview } from '../../app/(v2-preview)/v2-preview/_preview/accounts';
+import { SiteScreen } from '../../components/v2/screens/site/SiteScreen';
+import {
+  dashboardPreview,
+  shellPreview,
+  sitePreview,
+} from '../../app/(v2-preview)/v2-preview/_preview/accounts';
 import { ACCOUNT_ACTIONS } from '../../lib/v2/view/dashboard';
 import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
 
@@ -91,5 +96,46 @@ describe('Dashboard, clean: the one-time trial offer (H5)', () => {
 describe('Dashboard, withheld: the sites the health mean leaves out (D5)', () => {
   it('says how many and why, beside the mean', () => {
     expect(render('withheld')).toContain('1 site excluded: AI readability withheld');
+  });
+});
+
+describe('Each action’s context reaches the page it is on', () => {
+  /** Every action in a view model: an object with a route and a non-empty context. */
+  const contexts = (data: unknown): string[] => {
+    const out: string[] = [];
+    const walk = (x: unknown) => {
+      if (Array.isArray(x)) x.forEach(walk);
+      else if (x && typeof x === 'object') {
+        const o = x as Record<string, unknown>;
+        if (typeof o.route === 'string' && typeof o.context === 'string' && o.context) {
+          out.push(o.context);
+        }
+        Object.values(o).forEach(walk);
+      }
+    };
+    walk(data);
+    return out;
+  };
+  const text = (html: string) =>
+    html
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&#x27;|&#39;/g, "'")
+      .replace(/&quot;/g, '"');
+
+  it.each(['day0', 'home', 'clean', 'withheld'] as const)('dashboard, %s', (name) => {
+    const data = dashboardPreview(name);
+    const found = contexts(data);
+    const page = text(renderToStaticMarkup(<DashboardScreen data={data} />));
+    for (const c of found) expect(page, c).toContain(c);
+    if (name === 'home') expect(found).toContain('the other changes');
+  });
+
+  it.each(['home', 'clean', 'withheld'] as const)('site, %s', (name) => {
+    const data = sitePreview(name);
+    const found = contexts(data);
+    const page = text(renderToStaticMarkup(<SiteScreen data={data} shell={shellPreview(name)} />));
+    if (name !== 'clean') expect(found.length).toBeGreaterThan(0);
+    for (const c of found) expect(page, c).toContain(c);
   });
 });

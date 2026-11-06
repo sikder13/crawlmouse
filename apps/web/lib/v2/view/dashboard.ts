@@ -271,18 +271,30 @@ const newestResult = (v: AccountView) =>
  * read as another check, when the earlier one is a week or more before now or falls on the same
  * weekday as the latest result; then its date ("Fri 23 Oct").
  */
+/**
+ * A weekday names the earlier check only when it cannot mean another: the check is under a week
+ * before now, and the newest result (when it is a different check) fell on another weekday.
+ */
+export function weekdayAmbiguous(
+  prev: string,
+  newest: string | null,
+  now: string,
+  zone: string,
+): boolean {
+  return (
+    calendarDays(prev, now, zone) >= 7 ||
+    (newest !== null && weekday(newest, zone) === weekday(prev, zone))
+  );
+}
+
 function sinceName(
   v: AccountView,
   prev: Check,
 ): { weekday: string; short: string } | { date: string } {
   const zone = zoneOf(v);
   const newest = newestResult(v);
-  const ambiguous =
-    calendarDays(prev.finished_at!, v.now, zone) >= 7 ||
-    (newest !== null &&
-      newest.id !== prev.id &&
-      weekday(newest.finished_at!, zone) === weekday(prev.finished_at!, zone));
-  return ambiguous
+  const other = newest !== null && newest.id !== prev.id ? newest.finished_at! : null;
+  return weekdayAmbiguous(prev.finished_at!, other, v.now, zone)
     ? { date: dayDate(prev.finished_at!, zone) }
     : { weekday: weekdayLong(prev.finished_at!, zone), short: weekday(prev.finished_at!, zone) };
 }
@@ -392,6 +404,22 @@ const meanOf = (pairs: Iterable<[number, number]>) => {
   return all.length ? Math.round(all.reduce((a, b) => a + b, 0) / all.length) : null;
 };
 
+/**
+ * The health move compares like with like: the mean of the sites graded at both moments, then and
+ * now. A site graded at only one of them is left out of both means.
+ */
+export function moveOver(
+  then: ReadonlyMap<string, [number, number]>,
+  now: ReadonlyMap<string, [number, number]>,
+) {
+  const both = [...now.keys()].filter((id) => then.has(id));
+  return {
+    both,
+    a: meanOf(both.map((id) => then.get(id)!)),
+    b: meanOf(both.map((id) => now.get(id)!)),
+  };
+}
+
 function health(d: FixtureDataset, viewer: Viewer, v: AccountView): HealthView {
   const now = healthAt(v);
   const value = meanOf(now.values.values());
@@ -411,9 +439,7 @@ function health(d: FixtureDataset, viewer: Viewer, v: AccountView): HealthView {
     // read the sites as they stood then, from the moment the account can be read at all.
     const at = Math.max(instant(prev.finished_at!), instant(firstRunNow(d, viewer)));
     const then = healthAt(viewAt(d, { ...viewer, now: new Date(at).toISOString() }));
-    const both = [...now.values.keys()].filter((id) => then.values.has(id));
-    const a = meanOf(both.map((id) => then.values.get(id)!));
-    const b = meanOf(both.map((id) => now.values.get(id)!));
+    const { both, a, b } = moveOver(then.values, now.values);
     if (a !== null && b !== null) {
       const over =
         both.length === now.values.size
@@ -563,7 +589,8 @@ function setup(v: AccountView, site: Site, firstRun: boolean, trial: boolean): S
       key,
       label: done ? doneLabel : todo,
       done,
-      action: done ? null : { ...act, context: `: ${todo}` },
+      // The row's header cell already names the item, so the control carries no context of its own.
+      action: done ? null : act,
     });
   const settings = (label: string) =>
     action('sitePage', label, { id: site.id }, { query: '#settings' });

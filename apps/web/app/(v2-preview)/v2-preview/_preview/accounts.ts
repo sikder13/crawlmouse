@@ -83,7 +83,11 @@ export function shellPreview(name: keyof typeof ACCOUNT_VIEWERS) {
 export const dashboardPreview = (name: keyof typeof ACCOUNT_VIEWERS) =>
   dashboardView(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]());
 
-/** The site each site preview opens: the account's primary site in every fixture. */
+/**
+ * The site each site preview opens. On bad-site and clean-site it is the account's primary site
+ * (example-outfitter.com, the clean site). On challenged-site it is granitepeak.example, the site
+ * whose AI readability is withheld; the primary site there is harborlight.example, made a day earlier.
+ */
 export const SITE_OF = {
   home: '50000000-0000-4000-8000-000000000001',
   clean: cleanSite.id,
