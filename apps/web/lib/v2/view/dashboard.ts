@@ -236,6 +236,8 @@ export interface DashboardView {
 }
 
 const HISTORY_CHECKS = 6;
+/** The fixes the first-run dashboard starts with, as the locked page lists them. */
+const TOP_FIXES = 3;
 const RUN_BY_YOU = new Set<Check['trigger']>(['manual', 'fix_recheck']);
 
 const latest = (v: AccountView, siteId: string) => resultChecks(v, siteId).at(-1) ?? null;
@@ -727,7 +729,7 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
       firstRun && result && fixes.length
         ? {
             title: COPY.topFixesTitle,
-            rows: fixes.slice(0, 3).map((f) => ({
+            rows: fixes.slice(0, TOP_FIXES).map((f) => ({
               key: f.id,
               number: f.number,
               title: f.title,
@@ -736,7 +738,7 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
               open: action('packet', 'Open', { checkId: result.id, fixId: f.id }),
             })),
             foot: COPY.topFixesFoot(
-              Math.max(0, fixes.length - 3),
+              Math.max(0, fixes.length - TOP_FIXES),
               daysLeft !== null
                 ? `open for ${daysLeft} ${plural(daysLeft, 'day', 'days')}`
                 : v.tier === 'free'
