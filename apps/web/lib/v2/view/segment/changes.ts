@@ -58,14 +58,14 @@ export interface ChangesView {
   keep: { title: string; sub: string } | null;
 }
 
-const PILL: Record<ChangeKind, DoorView['pill']['state']> = {
+export const PILL: Record<ChangeKind, DoorView['pill']['state']> = {
   opened: 'bad',
   resolved: 'ok',
   changed: 'neutral',
   baseline: 'neutral',
 };
 
-const SUBJECTS: Record<ChangeSubject, string> = {
+export const SUBJECTS: Record<ChangeSubject, string> = {
   crawler_access: 'crawler access',
   text_without_js: 'text without JavaScript',
   grade: 'grade',
@@ -75,7 +75,7 @@ const SUBJECTS: Record<ChangeSubject, string> = {
   deploy: 'deploy',
 };
 
-const GRADES: Record<GradeName, string> = {
+export const GRADES: Record<GradeName, string> = {
   technical_seo: 'Technical SEO',
   ai_readability: 'AI readability',
 };
