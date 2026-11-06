@@ -62,7 +62,8 @@ cross join lateral (
   -- membership with supabase_realtime_admin as the member (2026-11-06 UTC), and a branch created
   -- from it the same day held three, of anon, authenticated and service_role
   -- (docs/ops/db-migrations.md §5 has the query). Only the membership lines are left out: a role
-  -- listed here that owns an object or holds a grant in the schemas above is still read.
+  -- listed here that owns a table, view, sequence or function, or holds a grant on one, in the
+  -- schemas above is still read. (No section records the owner of a type, for any role.)
   supabase_managed_members(rolname) as (values ('supabase_realtime_admin')),
   watched_roles as (
     select oid, rolname from pg_roles

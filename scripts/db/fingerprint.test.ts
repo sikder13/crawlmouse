@@ -269,6 +269,8 @@ describe('SUPABASE_MANAGED_MEMBERS: memberships Supabase grants a new branch', (
     'xsupabase_realtime_admin',
     '"Supabase_Realtime_Admin"',
     'supabase_admin_realtime',
+    '"supabase_realtime_admin "',
+    '" supabase_realtime_admin"',
   ])('a membership by %s still shows in the roles section', async (member) => {
     const after = await withRollback(db, async (tx) => {
       await tx.exec(`create role ${member} noinherit; grant authenticated to ${member}`);
@@ -288,6 +290,9 @@ describe('SUPABASE_MANAGED_MEMBERS: memberships Supabase grants a new branch', (
       return readFingerprint(tx);
     });
     expect(differingSections(base, after)).toEqual(['roles']);
+    expect(roleLines(after)).toContain(
+      'authenticated member of supabase_realtime_admin admin=f inherit=t set=t',
+    );
   });
 
   it.each([

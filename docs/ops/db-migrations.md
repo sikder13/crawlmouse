@@ -296,12 +296,23 @@ order by r.rolname;
 ```
 
 `fingerprint.sql` now leaves them out through `SUPABASE_MANAGED_MEMBERS`, a list of member role
-names matched exactly, holding `supabase_realtime_admin` alone. Only membership lines with a listed
-member are left out: `supabase_realtime_admin` granted to another role, owning an object, or
-holding a grant in `public`, `research` or `partitions` still shows
+names matched exactly, holding `supabase_realtime_admin` alone
+(`grep -n 'supabase_managed_members(rolname)' infra/supabase/checks/fingerprint.sql`). Only
+membership lines with a listed member are left out: `supabase_realtime_admin` granted to another
+role, owning a table or function, or holding a grant on one still shows; the tests use objects in
+`public`
 (`pnpm --filter @crawlmouse/scripts exec vitest run db/fingerprint.test.ts -t SUPABASE_MANAGED_MEMBERS`).
-Read from production on 2026-11-06 through the read-only endpoint, `compareFingerprints` found no
-difference between this file and the one at `796199b6`. A role added to the list needs the same
+
+What the list costs: a membership _by_ `supabase_realtime_admin` of any role is unseen, including
+`crawl_worker`, `authenticator`, or `service_role` with the admin option. The checks in §6 do
+not see it either: `03-worker-roles-no-login.sql`, the only one that reads memberships
+(`grep -ln 'pg_has_role\|pg_auth_members' infra/supabase/checks/0*.sql`), asks what the worker
+roles are members of, not who is a member of them. Listing the three observed memberships instead
+of the member's name would close this; the list is by name as the owner ruled.
+
+On 2026-11-06 production was read through the read-only endpoint with this file and with the one
+at `796199b6` (`readFingerprint` with each file's text, then `compareFingerprints`); no section
+differed. A role added to the list needs the same
 evidence: zero rows on production, rows on a fresh branch.
 
 **The dry run again, with the list.** On a new branch, from commit `a085de0c`, with
