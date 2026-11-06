@@ -113,8 +113,22 @@ const pending = (collection: string, r: Rec): boolean =>
     const [table, column] = at.split('.') as [string, string];
     return TABLE_OF_COLLECTION[collection] === table && values.includes(r[column] as string);
   });
-const storable = (collection: string, rows: Rec[]): Rec[] =>
-  rows.filter((r) => !pending(collection, r)).map((r) => omit(r, deferred(collection)));
+/**
+ * `pending`, and the rows that name a fix `pending` keeps out: a change or a fix event names its fix
+ * by a foreign key, so it cannot be written without it (built-site's content fixes, CC-20a).
+ */
+const pendingIn = (d: FixtureDataset) => {
+  const unwritten = new Set(
+    (d.fixes as Rec[]).filter((f) => pending('fixes', f)).map((f) => String(f.id)),
+  );
+  return (collection: string, r: Rec): boolean =>
+    pending(collection, r) ||
+    ((collection === 'changes' || collection === 'fix_events') &&
+      r.fix_id != null &&
+      unwritten.has(String(r.fix_id)));
+};
+const storable = (collection: string, rows: Rec[], isPending = pending): Rec[] =>
+  rows.filter((r) => !isPending(collection, r)).map((r) => omit(r, deferred(collection)));
 
 /**
  * Database-only columns (06b), by table: not contract fields, so not in the fixtures. The loader
@@ -212,8 +226,11 @@ async function load(db: PGlite, d: FixtureDataset): Promise<void> {
   for (const r of storable('access_tests', d.access_tests as Rec[]))
     await insertRow(db, 'access_tests', measured(r));
   for (const r of storable('fixes', d.fixes as Rec[])) await insertRow(db, 'site_fixes', r);
-  for (const r of d.fix_events) await insertRow(db, 'fix_events', r);
-  for (const r of d.changes) await insertRow(db, 'changes', r);
+  const blocked = pendingIn(d);
+  for (const r of storable('fix_events', d.fix_events as Rec[], blocked))
+    await insertRow(db, 'fix_events', r);
+  for (const r of storable('changes', d.changes as Rec[], blocked))
+    await insertRow(db, 'changes', r);
   // The entitlement trigger reads now(); a fixture's plan is as of its own date, so the trigger
   // is not what this test is about. It is tested on its own in v2-003-check-tables.test.ts.
   await db.exec('alter table public.alert_rules disable trigger alert_rules_entitlement_check');
@@ -359,10 +376,11 @@ describe.each(FILES)('fixture %s round-trips through the tables', (file) => {
     await db.exec(`set timezone = 'UTC'`);
     await load(db, dataset);
     const back = await project(db);
+    const blocked = pendingIn(dataset);
     for (const c of COLLECTIONS) {
       const key = KEY[c] ?? ((r: Rec) => String(r.id));
       const all = dataset[c] as Rec[];
-      const original = byId(storable(c, all), key);
+      const original = byId(storable(c, all, blocked), key);
       const stored = byId(back[c]!, key);
       // What a deferred field holds comes only from the fixture: no column holds it yet.
       const full = new Map(all.map((r) => [key(r), r]));
@@ -382,8 +400,8 @@ describe.each(FILES)('fixture %s round-trips through the tables', (file) => {
         ).toBe(true);
       }
       expect(normalize(stored), `${file}: ${c}`).toEqual(normalize(original));
-      // Only the rows a pending value keeps out are missing, and each holds one.
-      expect(all.length - stored.length).toBe(all.filter((r) => pending(c, r)).length);
+      // Only the rows a pending value keeps out are missing: each holds one, or names a fix that does.
+      expect(all.length - stored.length).toBe(all.filter((r) => blocked(c, r)).length);
     }
     // The generated statuses, on real data, are what the contract's functions give.
     const statuses = await rowsOf(db, 'checks');
