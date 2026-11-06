@@ -14,3 +14,7 @@ docs/research/
 
 # HTML test inputs: kept byte-for-byte, often deliberately malformed.
 packages/**/fixtures/**/*.html
+
+# The check builder's recorded fixture: the worker's results as recorded, and the BuiltCheck the
+# golden test compares byte-for-byte with what serialiseBuilt gives (packages/engine/src/v2/build).
+packages/engine/fixtures/v2/build/**/*.json
