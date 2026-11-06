@@ -147,6 +147,12 @@ describe('with V2_ACCOUNT_DOOR=1', () => {
     expect(cookieNamed(again, 'cm_auth_device')).toBeUndefined();
   });
 
+  it('sets cm_auth_device on a sign-in without the door fields too (v1 /login, a bare resend)', async () => {
+    const res = await call({ email: 'a@b.com' });
+    expect(valueOf(res, 'cm_auth_device')).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(cookieNamed(res, 'cm_auth_signup')).toBeUndefined();
+  });
+
   it('refuses a cross-site browser post, so another site cannot plant the door cookies', async () => {
     for (const headers of [
       { origin: 'https://evil.example' },

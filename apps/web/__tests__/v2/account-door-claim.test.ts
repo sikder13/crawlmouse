@@ -34,6 +34,17 @@ async function site(siteId: string) {
   return rows[0]!;
 }
 
+/** The account on a no-card Pro trial ending at `endsAt`, as `apply_entitlement_transition` writes one. */
+async function asProTrial(accountId: string, endsAt: Date) {
+  await db.query(
+    `update public.accounts set state = 'pro_trial', tier = 'pro', trial_variant = 'no_card',
+            trial_ends_at = $2, trial_used_at = $3, site_limit = 5, seat_limit = 2, competitor_limit = 1,
+            state_history = state_history || jsonb_build_array(jsonb_build_object('state','pro_trial','since','2026-10-20T00:00:00.000Z'))
+      where id = $1`,
+    [accountId, endsAt, new Date('2026-10-21T00:00:00Z')],
+  );
+}
+
 async function ownerSeat(accountId: string) {
   const { rows } = await db.query<{ id: string }>(
     `select id from public.seats where account_id = $1 and role = 'owner'`,
@@ -136,10 +147,8 @@ describe('claimCheck', () => {
     const user = await signUp(db, 'dupe@example.com');
     const first = await anonymousCheck(db, 'dupe.example.com', LATER);
     expect((await claimCheck(deps(), { checkId: first.checkId, userId: user })).ok).toBe(true);
-    // Free keeps one site; give the account room so the host rule, not the limit, decides.
-    await db.query(`update public.accounts set site_limit = 5 where id = $1`, [
-      (await accountOf(db, user)).id,
-    ]);
+    // Free keeps one site; a Pro trial gives room, so the host rule, not the limit, decides.
+    await asProTrial((await accountOf(db, user)).id, LATER);
     const second = await anonymousCheck(db, 'dupe.example.com', LATER);
     expect(await claimCheck(deps(), { checkId: second.checkId, userId: user })).toEqual({
       ok: false,
@@ -172,17 +181,37 @@ describe('claimCheck', () => {
     });
   });
 
+  it('an expired no-card trial claims as Free: one site, whatever its stored limit', async () => {
+    const user = await signUp(db, 'lapsed@example.com');
+    const a = await accountOf(db, user);
+    await asProTrial(a.id, new Date('2026-11-04T00:00:00Z'));
+    const one = await anonymousCheck(db, 'one.lapsed.com', LATER);
+    const two = await anonymousCheck(db, 'two.lapsed.com', LATER);
+    expect((await claimCheck(deps(), { checkId: one.checkId, userId: user })).ok).toBe(true);
+    expect(await claimCheck(deps(), { checkId: two.checkId, userId: user })).toEqual({
+      ok: false,
+      status: 409,
+      code: 'site_limit',
+    });
+    expect((await site(one.siteId)).schedule_cadence).toBe('monthly');
+  });
+
+  it('a half-finished claim of a check that has since expired is a 410, not revived', async () => {
+    const user = await signUp(db, 'halfgone@example.com');
+    const a = await accountOf(db, user);
+    const { checkId, siteId } = await anonymousCheck(db, 'halfgone.example.com', NOW);
+    await db.query(`update public.sites set account_id = $2 where id = $1`, [siteId, a.id]);
+    expect(await claimCheck(deps(), { checkId, userId: user })).toEqual({
+      ok: false,
+      status: 410,
+      code: 'expired',
+    });
+  });
+
   it('a Pro trial account gets the weekly schedule', async () => {
     const user = await signUp(db, 'trial@example.com');
     const a = await accountOf(db, user);
-    await db.query(
-      `update public.accounts set state = 'pro_trial', tier = 'pro', trial_variant = 'no_card',
-              trial_ends_at = $2, trial_used_at = $3, site_limit = 5, seat_limit = 2,
-              competitor_limit = 1,
-              state_history = state_history || jsonb_build_array(jsonb_build_object('state','pro_trial','since','2026-11-05T11:00:00.000Z'))
-        where id = $1`,
-      [a.id, LATER, NOW],
-    );
+    await asProTrial(a.id, LATER);
     const { checkId, siteId } = await anonymousCheck(db, 'weekly.example.com', LATER);
     expect((await claimCheck(deps(), { checkId, userId: user })).ok).toBe(true);
     expect((await site(siteId)).schedule_cadence).toBe('weekly');

@@ -15,6 +15,7 @@
 import { effectiveTier } from '../entitlement-v2';
 import type { DoorStore } from './door-store';
 import { scheduleFor } from './schedule';
+import { siteLimitAt } from './site-limit';
 
 export interface ClaimDeps {
   store: DoorStore;
@@ -32,12 +33,15 @@ export const CLAIM_REFUSALS = {
     when: 'the account owns the check’s site and the check no longer expires',
   },
   host_kept: { status: 409, when: 'the account already keeps a site with that host' },
-  site_limit: { status: 409, when: 'the account keeps as many sites as its limit' },
+  site_limit: {
+    status: 409,
+    when: 'the account keeps as many sites as its limit, read at its tier now (an expired trial is Free)',
+  },
   no_account: {
     status: 409,
     when: 'the caller has no v2 account (a user from before migration 001)',
   },
-  expired: { status: 410, when: 'the check expired before anyone kept it' },
+  expired: { status: 410, when: 'the check expired before its claim finished' },
 } as const;
 
 export type ClaimCode = keyof typeof CLAIM_REFUSALS;
@@ -61,20 +65,20 @@ export async function claimCheck(
   const member = await store.loadMember(input.userId);
   if (member === null) return refuse('no_account');
 
+  const now = deps.now();
+  const expired = check.expiresAt !== null && check.expiresAt.getTime() <= now.getTime();
   if (check.siteAccountId !== null) {
     if (check.siteAccountId !== member.accountId) return refuse('not_found');
     if (check.expiresAt === null) return refuse('already_claimed');
+    if (expired) return refuse('expired');
     // Our site, but the check still expires: an earlier claim stopped between its two writes.
     await store.clearExpiry(check.checkId);
     return { ok: true, siteId: check.siteId };
   }
 
-  const now = deps.now();
-  if (check.expiresAt !== null && check.expiresAt.getTime() <= now.getTime()) {
-    return refuse('expired');
-  }
+  if (expired) return refuse('expired');
   const kept = await store.countActiveSites(member.accountId);
-  if (kept >= member.siteLimit) return refuse('site_limit');
+  if (kept >= siteLimitAt(member, now)) return refuse('site_limit');
 
   const taken = await store.takeSite(check.siteId, {
     accountId: member.accountId,

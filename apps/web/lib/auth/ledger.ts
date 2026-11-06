@@ -107,7 +107,19 @@ export function ip24(ip: string): string | null {
   if (family === 6) {
     const groups = expandIpv6(addr);
     if (!groups) return null;
-    const [a, b, c] = groups;
+    const [a, b, c, d, e, f, g, h] = groups;
+    // An IPv4 address mapped into IPv6 in hex form (::ffff:cb00:7109) is that IPv4 address.
+    if (
+      a === '0000' &&
+      b === '0000' &&
+      c === '0000' &&
+      d === '0000' &&
+      e === '0000' &&
+      f === 'ffff'
+    ) {
+      const high = parseInt(g!, 16);
+      return `${high >> 8}.${high & 255}.${parseInt(h!, 16) >> 8}.0/24`;
+    }
     return `${a}:${b}:${c}::/48`;
   }
   return null;

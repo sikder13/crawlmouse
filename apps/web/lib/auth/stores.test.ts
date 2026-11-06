@@ -5,7 +5,14 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { rateLimitSerialize, sentryReport, SERIALIZE_WINDOW_MS, supabaseDoorStore } from './stores';
+import fc from 'fast-check';
+import {
+  gridSerialize,
+  sentryReport,
+  SERIALIZE_WINDOW_MS,
+  supabaseDoorStore,
+  type IncrementCell,
+} from './stores';
 
 type Answer = { data?: unknown; error?: { code?: string; message: string } | null; count?: number };
 
@@ -102,14 +109,62 @@ describe('supabaseDoorStore', () => {
   });
 });
 
-describe('rateLimitSerialize', () => {
-  it('takes a bucket of one, fail-closed, for the serialise window', async () => {
-    const check = vi.fn(async () => ({ allowed: true }));
-    await expect(rateLimitSerialize(check)('trial:email:h')).resolves.toBe(true);
-    expect(check).toHaveBeenCalledWith('trial:email:h', 1, SERIALIZE_WINDOW_MS, {
-      failClosed: true,
-    });
-    await expect(rateLimitSerialize(async () => ({ allowed: false }))('k')).resolves.toBe(false);
+describe('gridSerialize', () => {
+  const W = SERIALIZE_WINDOW_MS;
+  /** An in-memory increment_rate_limit: one count per (key, window start). */
+  function cells() {
+    const counts = new Map<string, number>();
+    const increment: IncrementCell = async (key, start) => {
+      const k = `${key}@${start.toISOString()}`;
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+      return counts.get(k)!;
+    };
+    return { increment, counts };
+  }
+  const BOUNDARY = Math.ceil(Date.parse('2026-11-05T12:00:00Z') / W) * W;
+
+  it('refuses the second of two calls a few seconds apart across a window boundary', async () => {
+    const { increment } = cells();
+    await expect(gridSerialize(increment, () => new Date(BOUNDARY - 2000))('k')).resolves.toBe(
+      true,
+    );
+    await expect(gridSerialize(increment, () => new Date(BOUNDARY + 2000))('k')).resolves.toBe(
+      false,
+    );
+  });
+
+  it('refuses any second call less than half a window after the first, wherever the boundaries fall', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.integer({ min: 0, max: 10 * W }),
+        fc.integer({ min: 0, max: W / 2 - 1 }),
+        async (t, gap) => {
+          const { increment } = cells();
+          const at = BOUNDARY + t;
+          expect(await gridSerialize(increment, () => new Date(at))('k')).toBe(true);
+          expect(await gridSerialize(increment, () => new Date(at + gap))('k')).toBe(false);
+        },
+      ),
+    );
+  });
+
+  it('a different key, or a call a full window later in both grids, takes its own slot', async () => {
+    const { increment } = cells();
+    const at = () => new Date(BOUNDARY + 1000);
+    await gridSerialize(increment, at)('k');
+    await expect(gridSerialize(increment, at)('other')).resolves.toBe(true);
+    await expect(
+      gridSerialize(increment, () => new Date(BOUNDARY + 1000 + 2 * W))('k'),
+    ).resolves.toBe(true);
+  });
+
+  it('a cell the store cannot count refuses', async () => {
+    await expect(
+      gridSerialize(
+        async () => null,
+        () => new Date(BOUNDARY),
+      )('k'),
+    ).resolves.toBe(false);
   });
 });
 

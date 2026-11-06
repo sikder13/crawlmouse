@@ -47,7 +47,7 @@ First login is the verify that confirmed the email: in that verify’s response 
 
 The ledger rule (D4 as amended, with SECURITY-DESIGN §5.3): the trial is refused when `trial_ledger` holds, under the same hash, an `email` row younger than 12 calendar months; or 2 `device` rows in the last 30 days; or 2 `ip24` rows in the last 30 days together with a `device` row in the same window. An IP alone never refuses. IPv4 is keyed by its /24, IPv6 by its /48. Values are HMAC-SHA256 under `TRIAL_LEDGER_PEPPER` over `kind:value`; a pepper shorter than 32 characters reads as none, and then nothing is read or written, the account stays Free and Sentry gets `auth.trial-ledger-no-pepper`. CC-04 owns the `hostname` and `card_fingerprint` kinds and the 13-month sweep.
 
-Before the lookup, a one-shot bucket (`increment_rate_limit`, limit 1, 10 minutes, fail-closed) is taken on the email and device hashes, so two accounts sharing either cannot both pass. The trial is `trial_started {variant: 'no_card'}` through `applyEntitlementTransition`; the ledger rows are written only when that transition was applied.
+Before the lookup, a slot is taken on the email and the device hash (`gridSerialize`, `lib/auth/stores.ts`): one `increment_rate_limit` count in each of two grids of 10 minutes, the second shifted by half a window. Of two first logins sharing either less than 5 minutes apart, the second is refused; a later one finds the first’s ledger rows once they are written. A count the store cannot make refuses. The slot’s key is its own HMAC, never the ledger hash. The trial is `trial_started {variant: 'no_card'}` through `applyEntitlementTransition`; the ledger rows are written only when that transition was applied.
 
 | Outcome        | Meaning                                                                                     |
 | -------------- | ------------------------------------------------------------------------------------------- |
@@ -65,14 +65,14 @@ A named first site is attached after the SSRF guard (`validateUrlOrThrow`), with
 
 `claimCheck` (`apps/web/lib/auth/claim.ts`) is called by `POST /api/checks/[id]/claim` and by the sign-in POST for a Keep. One conditional update takes an unowned site (`where account_id is null`) for the caller’s default account and owner seat, with the tier’s schedule; then the check’s `expires_at` is cleared. A claim stopped between the two writes is completed by the next one.
 
-| Code              | Status | When                                                              |
-| ----------------- | ------ | ----------------------------------------------------------------- |
-| `not_found`       | 404    | no check has that id, or the check is of another account’s site   |
-| `already_claimed` | 409    | the account owns the check’s site and the check no longer expires |
-| `host_kept`       | 409    | the account already keeps a site with that host                   |
-| `site_limit`      | 409    | the account keeps as many sites as its limit                      |
-| `no_account`      | 409    | the caller has no v2 account (a user from before migration 001)   |
-| `expired`         | 410    | the check expired before anyone kept it                           |
+| Code              | Status | When                                                                                          |
+| ----------------- | ------ | --------------------------------------------------------------------------------------------- |
+| `not_found`       | 404    | no check has that id, or the check is of another account’s site                               |
+| `already_claimed` | 409    | the account owns the check’s site and the check no longer expires                             |
+| `host_kept`       | 409    | the account already keeps a site with that host                                               |
+| `site_limit`      | 409    | the account keeps as many sites as its limit, read at its tier now (an expired trial is Free) |
+| `no_account`      | 409    | the caller has no v2 account (a user from before migration 001)                               |
+| `expired`         | 410    | the check expired before its claim finished                                                   |
 
 The Storage move of the check’s evidence objects is CC-20b’s; no evidence object exists yet.
 

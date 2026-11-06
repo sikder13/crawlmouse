@@ -64,8 +64,8 @@ export interface DoorStore {
 }
 
 /**
- * Takes a one-shot slot named by `key`, atomically. False when another caller holds it (or the
- * store cannot say): the caller then refuses, never allows.
+ * Takes the slot named by `key` (stores.ts `gridSerialize`). False when another caller took it within
+ * half a slot window, or when the store cannot say: the caller then refuses, never allows.
  */
 export type Serialize = (key: string) => Promise<boolean>;
 

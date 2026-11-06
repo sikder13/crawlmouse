@@ -128,6 +128,8 @@ describe('ip24', () => {
     expect(ip24('2001:db8:abcd:12::1')).toBe('2001:0db8:abcd::/48');
     expect(ip24('2001:db8::1')).toBe('2001:0db8:0000::/48');
     expect(ip24('::ffff:203.0.113.9')).toBe('203.0.113.0/24');
+    expect(ip24('::ffff:cb00:7109')).toBe('203.0.113.0/24');
+    expect(ip24('::ffff:cb00:7109')).toBe(ip24('203.0.113.9'));
   });
 
   it('is null for an unknown or malformed address', () => {

@@ -255,6 +255,26 @@ describe('runFirstLogin', () => {
     expect((await accountOf(db, i.userId)).timezone).toBe('UTC');
   });
 
+  it('attaches no site beyond the tier the account is on now, whatever its stored limit says', async () => {
+    // A no-card trial that ended yesterday, not yet expired by the sweep: state pro_trial, limit 5,
+    // one site kept. Its tier now is Free, which keeps one site.
+    const i = await input('lapsed@example.com', { signup: { site: 'second.example.com' } });
+    const a = await accountOf(db, i.userId);
+    await db.query(
+      `update public.accounts set state = 'pro_trial', tier = 'pro', trial_variant = 'no_card',
+              trial_ends_at = $2, trial_used_at = $3, site_limit = 5, seat_limit = 2, competitor_limit = 1,
+              state_history = state_history || jsonb_build_array(jsonb_build_object('state','pro_trial','since','2026-10-20T00:00:00.000Z'))
+        where id = $1`,
+      [a.id, new Date('2026-11-04T00:00:00Z'), new Date('2026-10-21T00:00:00Z')],
+    );
+    await db.query(`insert into public.sites (account_id, host) values ($1, 'first.example.com')`, [
+      a.id,
+    ]);
+    const r = await runFirstLogin(deps(), i);
+    expect(r.siteId).toBeNull();
+    expect(await count(db, `select 1 from public.sites where account_id = $1`, [a.id])).toBe(1);
+  });
+
   it('every event name it emits is a funnel event', () => {
     for (const name of ['trial_started', 'site_added']) expect(FUNNEL_EVENTS).toContain(name);
   });
@@ -309,6 +329,21 @@ describe('runFirstLogin under interleaving (JS-level; PGlite never contends on a
         expect(await ledgerRows(a.id)).toBe(3);
         expect(await count(db, `select 1 from public.sites where account_id = $1`, [a.id])).toBe(1);
         expect(await count(db, `select 1 from public.accounts where state = 'pro_trial'`)).toBe(1);
+      }),
+      { numRuns: 12 },
+    );
+  }, 600_000);
+
+  it('two accounts whose emails normalise to one, on different devices: at most one trial', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.scheduler(), async (s) => {
+        db = await doorDb();
+        const a = await input('ada.lovelace@gmail.com', { device: 'dev-a', ip: 'unknown' });
+        const b = await input('adalovelace+2@gmail.com', { device: 'dev-b', ip: 'unknown' });
+        await interleave(s, a, b);
+        expect(
+          await count(db, `select 1 from public.accounts where state = 'pro_trial'`),
+        ).toBeLessThanOrEqual(1);
       }),
       { numRuns: 12 },
     );

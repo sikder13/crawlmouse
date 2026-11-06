@@ -176,15 +176,17 @@ export async function POST(req: Request) {
         path: '/',
       });
     }
-    if (!requestCookie(req, COOKIES.device)) {
-      res.cookies.set(COOKIES.device, randomBytes(32).toString('base64url'), {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: secure(),
-        maxAge: DEVICE_COOKIE_SECONDS,
-        path: '/',
-      });
-    }
+  }
+  // The ledger's device signal, for every sign-in while the door is on: a sign-up through v1's
+  // /login, or a resend without the door's fields, reaches first login too.
+  if (door && !requestCookie(req, COOKIES.device)) {
+    res.cookies.set(COOKIES.device, randomBytes(32).toString('base64url'), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: secure(),
+      maxAge: DEVICE_COOKIE_SECONDS,
+      path: '/',
+    });
   }
   return res;
 }

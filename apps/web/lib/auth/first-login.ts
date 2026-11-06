@@ -8,8 +8,9 @@
  * auto-confirm being off, which `scripts/supabase/auth-config.ts --read` asserts.
  *
  * Order, and what makes it once:
- * 1. one-shot buckets on the email and device hashes, so two accounts sharing either cannot both
- *    pass the ledger lookup before one of them writes (a held bucket refuses: it fails safe);
+ * 1. a slot on the email and the device hash (`gridSerialize` in stores.ts): of two first logins
+ *    sharing either within half a slot window of each other, the second is refused, failing safe;
+ *    one later than that finds the first's ledger rows once the first has written them;
  * 2. the ledger lookup;
  * 3. `applyEntitlementTransition(trial_started)`: the RPC reads the account `for update` and
  *    refuses a stale version, and `next()` refuses a second trial;
@@ -23,12 +24,13 @@ import {
   EntitlementConflictError,
   type EntitlementStore,
 } from '../billing/state-machine-apply';
-import { effectiveTier, GATES } from '../entitlement-v2';
+import { effectiveTier } from '../entitlement-v2';
 import type { FunnelEvent } from '../analytics-events';
 import { TimeZoneSchema } from '@crawlmouse/types/v2';
 import type { DoorStore, LedgerHash, MemberAccount, Report, Serialize } from './door-store';
 import { hashLedgerValue, ledgerDecision, ledgerValues, oldestRelevant, slotKey } from './ledger';
 import { scheduleFor } from './schedule';
+import { siteLimitAt } from './site-limit';
 import { hostFromSiteInput } from './site-host';
 import { trialVariantFor } from './trial-variant';
 
@@ -201,7 +203,7 @@ async function attachFirstSite(
   const current = (await deps.store.loadMember(input.userId)) ?? account;
   const tier = effectiveTier(current, now);
   const kept = await deps.store.countActiveSites(account.accountId);
-  if (kept >= Math.min(current.siteLimit, GATES[tier].maxSites)) return null;
+  if (kept >= siteLimitAt(current, now)) return null;
   const inserted = await deps.store.insertSite({
     accountId: account.accountId,
     ownerSeatId: account.ownerSeatId,

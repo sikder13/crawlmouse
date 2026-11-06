@@ -12,6 +12,7 @@ import {
   type EntitlementStore,
 } from '../../../lib/billing/state-machine-apply';
 import type { DoorStore, LedgerHash, MemberAccount, Serialize } from '../../../lib/auth/door-store';
+import { gridSerialize, type IncrementCell } from '../../../lib/auth/stores';
 import { applyAllMigrations, asRole, freshDb } from '../../helpers/pglite-migrations';
 
 let template: Promise<PGlite> | null = null;
@@ -309,18 +310,23 @@ export function pgliteDoorStore(db: PGlite): DoorStore {
   };
 }
 
-/** The serialisation bucket over the real `increment_rate_limit`, one fixed window. */
-export function pgliteSerialize(
-  db: PGlite,
-  windowStart = new Date('2026-11-05T12:00:00Z'),
-): Serialize {
-  return async (key) => {
+/** `increment_rate_limit` itself, as the service role. */
+export function pgliteIncrement(db: PGlite): IncrementCell {
+  return async (key, windowStart) => {
     const { rows } = await svc(db, (tx) =>
       tx.query<{ n: number }>(`select public.increment_rate_limit($1, $2) as n`, [
         key,
         windowStart,
       ]),
     );
-    return rows[0]!.n <= 1;
+    return rows[0]!.n;
   };
+}
+
+/** The production slot, over the real RPC, at a moment the test chooses. */
+export function pgliteSerialize(
+  db: PGlite,
+  now = () => new Date('2026-11-05T12:00:00Z'),
+): Serialize {
+  return gridSerialize(pgliteIncrement(db), now);
 }

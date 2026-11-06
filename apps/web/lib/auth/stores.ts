@@ -191,19 +191,49 @@ export function supabaseDoorStore(sb: SupabaseClient): DoorStore {
   };
 }
 
-/** How long a ledger slot is held. Two first logins sharing an email or device inside it: one waits out. */
+/** The slot window. */
 export const SERIALIZE_WINDOW_MS = 10 * 60 * 1000;
 
-/** The slot is the rate-limit bucket with a limit of one, failing closed when the RPC errs. */
-export function rateLimitSerialize(
-  check: (
-    key: string,
-    limit: number,
-    windowMs: number,
-    opts: { failClosed: true },
-  ) => Promise<{ allowed: boolean }>,
-): Serialize {
-  return async (key) => (await check(key, 1, SERIALIZE_WINDOW_MS, { failClosed: true })).allowed;
+/**
+ * One atomic count for a key in a window: the `increment_rate_limit` RPC's contract (migration
+ * 20260524000005), returning the count after this call, or null when the store cannot say.
+ */
+export type IncrementCell = (key: string, windowStart: Date) => Promise<number | null>;
+
+/**
+ * The slot over two grids of `SERIALIZE_WINDOW_MS`, the second shifted by half a window. A call
+ * counts itself in the cell of each grid that holds its moment, and holds the slot only when it is
+ * the first in both. Of two calls less than half a window apart, a grid boundary can fall between
+ * them in at most one grid, so they share a cell in the other and the second is refused. A call
+ * later than that is not refused here: it finds the first's ledger rows, once the first has written
+ * them. A cell the store cannot count refuses (fail closed).
+ */
+export function gridSerialize(increment: IncrementCell, now: () => Date): Serialize {
+  return async (key) => {
+    const t = now().getTime();
+    const w = SERIALIZE_WINDOW_MS;
+    let first = true;
+    for (const [grid, shift] of [
+      [0, 0],
+      [1, w / 2],
+    ] as const) {
+      const start = new Date(Math.floor((t + shift) / w) * w - shift);
+      const count = await increment(`${key}:g${grid}`, start);
+      if (count === null || count > 1) first = false;
+    }
+    return first;
+  };
+}
+
+/** `increment_rate_limit` through the service-role client. A failed call reads as null. */
+export function supabaseIncrement(sb: SupabaseClient): IncrementCell {
+  return async (key, windowStart) => {
+    const { data, error } = await sb.rpc('increment_rate_limit', {
+      p_bucket_key: key,
+      p_window_start: windowStart.toISOString(),
+    });
+    return error || typeof data !== 'number' ? null : data;
+  };
 }
 
 /** A Sentry warning named by `signal`, tagged so an alert rule can match it. */
