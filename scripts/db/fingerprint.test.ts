@@ -115,7 +115,8 @@ describe('each section detects a change of its own kind, and names it', () => {
     ['alter table storage.objects disable row level security', ['rls']],
     ['alter default privileges in schema public grant all on sequences to anon', ['default_acls']],
     [
-      'alter default privileges in schema public revoke all on tables from authenticated',
+      // P2 (20261106000002) leaves authenticated no default privilege in public, so add one.
+      'alter default privileges in schema public grant select on tables to authenticated',
       ['default_acls'],
     ],
     ['grant service_role to authenticated', ['roles']],
