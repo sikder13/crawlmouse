@@ -2,12 +2,20 @@
 --
 -- The v1 tables were created on production while Supabase's default privileges for postgres in
 -- public granted every privilege on new tables, sequences and functions to anon and authenticated.
--- RLS was the only thing between those roles and the rows: anon held DELETE, INSERT and TRUNCATE on
--- public.users and public.audits, among others. This revokes every privilege the two client roles
--- hold on the 18 v1 tables and 2 v1 functions, revokes those default privileges, and grants back the
--- columns that code running as a signed-in user selects, filters or orders by. anon keeps nothing:
--- no v1 code reads these tables as anon. An RLS policy's own expression needs no column privilege
--- (measured in PGlite on 2026-11-06), so the policies are unchanged and still scope every row.
+-- anon held DELETE, INSERT and TRUNCATE on public.users and public.audits, among others; RLS scoped
+-- the row-level ones, and nothing but the grant stood in front of TRUNCATE, which RLS does not
+-- govern. This revokes every privilege the two client roles hold on the 18 v1 tables and 2 v1
+-- functions, revokes those default privileges, and grants back the columns that the dashboard, the
+-- Pro and billing checks and the verify page select, filter or order by, running as a signed-in
+-- user. anon keeps nothing on them.
+--
+-- One reader is left without grants on purpose (owner ruling, 2026-11-06): the tRPC procedures in
+-- apps/web/lib/trpc/router.ts, audits.getById (public, so also reached as anon) and audits.listMine,
+-- have no caller, and the v1.2 API will be built on the v2 tables. After this they answer
+-- query_failed; scripts/db/hardening.test.ts runs their exact queries and expects the refusal.
+--
+-- An RLS policy's own expression needs no column privilege (measured in PGlite on 2026-11-06), so
+-- the policies are unchanged and still scope every row.
 --
 -- The lines this removes and adds on production, read before it ran, are in
 -- scripts/db/fixtures/20261106000002-expected-change.json; scripts/db/hardening.test.ts checks this

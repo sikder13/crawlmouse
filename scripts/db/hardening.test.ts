@@ -301,6 +301,23 @@ describe('P2 on a database migrated like production', () => {
     ['anon', 'select slug from public.public_reports'],
     ['anon', 'truncate public.audits'],
     ['anon', `insert into public.users (email) values ('x@example.test')`],
+    // The tRPC procedures, left without grants by the owner's ruling: their exact queries
+    // (apps/web/lib/audits.ts:24 for listMine, apps/web/lib/trpc/router.ts:18 for getById).
+    [
+      'authenticated',
+      `select id, url, grade, score, status, started_at, completed_at from public.audits
+       where (expires_at is null or expires_at > now()) order by started_at desc limit 50`,
+    ],
+    [
+      'authenticated',
+      `select id, url, status, grade, score, page_count, link_count, cms_detected, started_at, completed_at
+       from public.audits where id = '00000000-0000-4000-8000-0000000000a1'`,
+    ],
+    [
+      'anon',
+      `select id, url, status, grade, score, page_count, link_count, cms_detected, started_at, completed_at
+       from public.audits where id = '00000000-0000-4000-8000-0000000000a1'`,
+    ],
   ])(
     '%s is refused: %s',
     async (role, sql) => {
