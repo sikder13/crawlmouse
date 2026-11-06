@@ -182,7 +182,7 @@ const sentence = (s: string) => (/[.!?]$/.test(s) ? s : `${s}.`);
 const bound = (b: Fix['before_after'][number]['after_bound']) =>
   b === 'approx' ? '≈ ' : b === 'at_least' ? '≥ ' : '';
 
-function headOf(f: Omit<Fix, 'packet'>, lede: string[]): FixHead {
+function headOf(f: Omit<Fix, 'packet'>, lede: string[], siteFixes: readonly Fix[]): FixHead {
   const textShare = f.before_after.find((r) => r.measure === 'text_share');
   const effort = effortText(f);
   const tiles: FixTile[] = [];
@@ -202,7 +202,7 @@ function headOf(f: Omit<Fix, 'packet'>, lede: string[]): FixHead {
   if (effort) tiles.push({ label: 'Effort', value: effort, note: null });
   return {
     title: sentence(f.title),
-    ...effectOf(f),
+    ...effectOf(f, siteFixes),
     recommendation: recommendation(f),
     lede,
     tiles,
@@ -389,6 +389,8 @@ export function fixView(
     throw new Error(`Fix ${fixId} was not seen yet at check ${checkId}`);
   }
   const live = fixesAsOf(d, check);
+  // a pending AI effect names fixes of this site by fingerprint, resolved or not
+  const siteFixes = d.fixes.filter((x) => x.site_id === check.site_id);
   const at = live.findIndex((x) => x.id === fixId);
   const bare = withoutPacket(fix);
   const segment = SEGMENT_OF[bare.section];
@@ -422,7 +424,7 @@ export function fixView(
         ? null
         : following
           ? {
-              label: `Next fix: ${following.title} · ${points(following)}`,
+              label: `Next fix: ${following.title} · ${points(following, siteFixes)}`,
               href: hrefs.fix?.(following.id) ?? '#',
             }
           : { label: 'Back to overview', href: hrefs.overview },
@@ -437,7 +439,7 @@ export function fixView(
     return {
       kind: 'resolved',
       frame,
-      head: headOf(bare, []),
+      head: headOf(bare, [], siteFixes),
       beforeAfter: null,
       keep: null,
       resolved: `Verified resolved by the check of ${dayTimeUtc(verified.at)}.`,
@@ -460,7 +462,7 @@ export function fixView(
     return {
       ...lockedPart(frame, free.length),
       frame,
-      head: headOf(bare, []),
+      head: headOf(bare, [], siteFixes),
       beforeAfter,
       keep: keep && { ...keep, primary: true },
     };
@@ -480,7 +482,7 @@ export function fixView(
     return {
       kind: 'open',
       frame,
-      head: headOf(bare, []),
+      head: headOf(bare, [], siteFixes),
       beforeAfter,
       // With no packet to copy, keeping the audit is the reader's next step.
       keep: keep && { ...keep, primary: true },
@@ -494,7 +496,7 @@ export function fixView(
   return {
     kind: 'open',
     frame,
-    head: headOf(bare, packetParagraph(p)),
+    head: headOf(bare, packetParagraph(p), siteFixes),
     beforeAfter,
     keep,
     packet: {

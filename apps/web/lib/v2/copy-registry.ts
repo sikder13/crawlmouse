@@ -312,8 +312,9 @@ const BASE_CHANGES: CopyChange[] = [
     locked:
       'Generic anchor text on 6 pages +2 SEO See with Pro 3 pages deeper than three clicks +1 SEO',
     rendered:
-      'Replace the generic anchor text on 6 pages +2 SEO See with Pro Open every product page with a two-sentence answer +1 SEO',
-    source: 'The fixture’s fix titles, in its rank order (rank 5, then rank 6).',
+      'Replace the generic anchor text on 6 pages +2 SEO See with Pro Open every product page with a two-sentence answer AI after fixes 1 and 2',
+    source:
+      'The fixture’s fix titles, in its rank order (rank 5, then rank 6). The rank-6 fix is a content fix whose AI readability effect waits on fixes 1 and 2 (`ai_readability_pending_on`), so its row says so rather than giving a Technical SEO figure (owner ruling, 2026-11-05).',
   },
   {
     screen: 'result',

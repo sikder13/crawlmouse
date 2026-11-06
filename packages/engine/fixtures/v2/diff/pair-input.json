@@ -371,8 +371,10 @@
       "rank": 1,
       "effect": {
         "technical_seo": 2,
+        "technical_seo_pending_on": [],
         "ai_readability": 6,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -404,8 +406,10 @@
       "rank": 1,
       "effect": {
         "technical_seo": 2,
+        "technical_seo_pending_on": [],
         "ai_readability": 6,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -437,8 +441,10 @@
       "rank": null,
       "effect": {
         "technical_seo": 2,
+        "technical_seo_pending_on": [],
         "ai_readability": 6,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -470,8 +476,10 @@
       "rank": 1,
       "effect": {
         "technical_seo": 2,
+        "technical_seo_pending_on": [],
         "ai_readability": 6,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -503,8 +511,10 @@
       "rank": 1,
       "effect": {
         "technical_seo": 2,
+        "technical_seo_pending_on": [],
         "ai_readability": 6,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -536,8 +546,10 @@
       "rank": 1,
       "effect": {
         "technical_seo": 2,
+        "technical_seo_pending_on": [],
         "ai_readability": 6,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -588,8 +600,10 @@
         "crawler_uas": ["ClaudeBot"],
         "effect": {
           "technical_seo": 0,
+          "technical_seo_pending_on": [],
           "ai_readability": 0,
           "ai_readability_pending_on": [],
+          "absorbed_by": null,
           "estimate": true
         },
         "effort": {
@@ -598,7 +612,8 @@
         },
         "before_after": [],
         "packet": null,
-        "rank": 1
+        "rank": 1,
+        "absorbed_by_fingerprint": null
       }
     },
     {
@@ -620,8 +635,10 @@
         "crawler_uas": [],
         "effect": {
           "technical_seo": 2,
+          "technical_seo_pending_on": [],
           "ai_readability": 6,
           "ai_readability_pending_on": [],
+          "absorbed_by": null,
           "estimate": true
         },
         "effort": {
@@ -630,7 +647,8 @@
         },
         "before_after": [],
         "packet": null,
-        "rank": 3
+        "rank": 3,
+        "absorbed_by_fingerprint": null
       }
     },
     {
@@ -648,8 +666,10 @@
         "crawler_uas": [],
         "effect": {
           "technical_seo": 2,
+          "technical_seo_pending_on": [],
           "ai_readability": 6,
           "ai_readability_pending_on": [],
+          "absorbed_by": null,
           "estimate": true
         },
         "effort": {
@@ -658,7 +678,8 @@
         },
         "before_after": [],
         "packet": null,
-        "rank": 2
+        "rank": 2,
+        "absorbed_by_fingerprint": null
       }
     },
     {
@@ -681,8 +702,10 @@
         "crawler_uas": [],
         "effect": {
           "technical_seo": 2,
+          "technical_seo_pending_on": [],
           "ai_readability": 6,
           "ai_readability_pending_on": [],
+          "absorbed_by": null,
           "estimate": true
         },
         "effort": {
@@ -691,7 +714,8 @@
         },
         "before_after": [],
         "packet": null,
-        "rank": 4
+        "rank": 4,
+        "absorbed_by_fingerprint": null
       }
     },
     {
@@ -709,8 +733,10 @@
         "crawler_uas": [],
         "effect": {
           "technical_seo": 2,
+          "technical_seo_pending_on": [],
           "ai_readability": 6,
           "ai_readability_pending_on": [],
+          "absorbed_by": null,
           "estimate": true
         },
         "effort": {
@@ -719,7 +745,8 @@
         },
         "before_after": [],
         "packet": null,
-        "rank": 5
+        "rank": 5,
+        "absorbed_by_fingerprint": null
       }
     }
   ]

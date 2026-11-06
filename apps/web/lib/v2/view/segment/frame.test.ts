@@ -61,6 +61,15 @@ describe('segmentFrame', () => {
     );
   });
 
+  it('says "not scored yet" for a Content section with no score, rather than a number', () => {
+    const { d, id } = edited('bad-site', (c) => {
+      c.content = { ...c.content!, score: null, score_withheld: 'no_check_counted' };
+    });
+    expect(segmentFrame(d, id, 'structure', { asFirstSeen: true, hrefs }).next.label).toBe(
+      'Next: Content an answer engine can quote · not scored yet',
+    );
+  });
+
   it('drops the figure when the next section was not measured, rather than inventing one', () => {
     const { d, id } = edited('challenged-site');
     expect(segmentFrame(d, id, 'structure', { hrefs }).next.label).toBe(

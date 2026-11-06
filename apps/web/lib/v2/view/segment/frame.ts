@@ -108,7 +108,11 @@ function figureOf(check: Check, key: SegmentKey): string | null {
       return s === null ? 'not graded' : String(Math.round(s));
     }
     case 'content':
-      return check.content ? String(check.content.score) : 'not measured';
+      return check.content
+        ? check.content.score === null
+          ? 'not scored yet'
+          : String(check.content.score)
+        : 'not measured';
     case 'signals': {
       const present = screenSignals(check).filter((s) => s.state === 'detected').length;
       return `${present} of ${SCREEN_SIGNALS.length}`;

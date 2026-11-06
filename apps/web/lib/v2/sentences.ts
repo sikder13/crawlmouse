@@ -168,14 +168,14 @@ export function thinSentence(check: Check): string | null {
 export function fixesToNextBand(score: number, letter: string, fixes: readonly Fix[]) {
   const target = nextBandFloor(letter);
   if (!target) return null;
+  // an effect not estimated (the grade is refused) counts for nothing
+  const seo = (f: Fix) => f.effect.technical_seo ?? 0;
   const bySeo = [...fixes]
-    .filter((f) => f.effect.technical_seo > 0)
-    .sort(
-      (a, b) => b.effect.technical_seo - a.effect.technical_seo || (a.rank ?? 0) - (b.rank ?? 0),
-    );
+    .filter((f) => seo(f) > 0)
+    .sort((a, b) => seo(b) - seo(a) || (a.rank ?? 0) - (b.rank ?? 0));
   let points = 0;
   for (let i = 0; i < bySeo.length; i++) {
-    points += bySeo[i]!.effect.technical_seo;
+    points += seo(bySeo[i]!);
     if (score + points >= target.score) {
       return { fixes: bySeo.slice(0, i + 1), letter: letterFor(score + points) };
     }
@@ -302,5 +302,6 @@ export function aiWithheldSummary(check: Check, measured: number): string {
   const why = meetsEdge(check)
     ? `${EDGE_SENTENCE}, so only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`
     : `Only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`;
-  return `${why} Access is somewhere between ${ai.access_range.min} and ${ai.access_range.max} of 40.`;
+  const range = ai.access_range;
+  return range ? `${why} Access is somewhere between ${range.min} and ${range.max} of 40.` : why;
 }

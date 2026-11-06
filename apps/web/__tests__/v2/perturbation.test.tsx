@@ -270,7 +270,8 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
         change: (c) => {
           const ai = c.ai_readability!;
           if (!ai.withheld) throw new Error('challenged-site is withheld');
-          ai.access_range.max = 25;
+          ai.access_range!.max = 25;
+          ai.components.access.range!.max = 25;
         },
         expect: { Result: ['between 0 and 25 of 40'], Crawl: ['between 0 and 25 of 40'] },
       },
@@ -549,7 +550,9 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
           [five.rank, six.rank] = [6, 5];
         },
         expect: {
-          Result: ['two-sentence answer +1 SEO See with Pro Replace the generic anchor text'],
+          Result: [
+            'two-sentence answer AI after fixes 1 and 2 See with Pro Replace the generic anchor text',
+          ],
         },
       },
     ],

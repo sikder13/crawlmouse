@@ -97,31 +97,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 97,
         "grade": "A",
         "components": {
           "access": {
             "score": 40,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 29,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 18,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 412,
@@ -138,9 +144,11 @@
       },
       "content": {
         "score": 88,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -161,6 +169,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",

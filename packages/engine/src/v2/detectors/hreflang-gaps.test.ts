@@ -63,9 +63,10 @@ describe('hreflang_gap', () => {
     });
   });
 
-  it('detects missing reciprocity among crawled members (truth vector)', () => {
+  it('detects missing reciprocity among crawled members, on the alternate (truth vector)', () => {
     // Hand-computed for a three-member cluster: /en and /fr annotate each other and /de; /de
-    // annotates only /en. So /fr → /de has no return link; /en → /de does. One missing return, on /fr.
+    // annotates only /en. So /fr → /de has no return link; /en → /de does. One missing return, and
+    // /de, the alternate that does not annotate back, carries it (owner ruling, 2026-11-05).
     const full = [alt('en', '/en'), alt('fr', '/fr'), alt('de', '/de'), alt('x-default', '/en')];
     const s = site([
       { path: '/', links: ['/en'] },
@@ -81,7 +82,7 @@ describe('hreflang_gap', () => {
       state: 'detected',
       conditions: ['hreflang_missing_return'],
       measured: 1,
-      affected_urls: [u('/fr')],
+      affected_urls: [u('/de')],
     });
   });
 
@@ -125,15 +126,51 @@ describe('hreflang_gap', () => {
     });
   });
 
-  it('a member that answers other than 200 cannot link back', () => {
+  it('an alternate that is gone cannot link back: the member naming it carries the defect', () => {
+    for (const status of [404, 410]) {
+      const s = site([
+        { path: '/', links: ['/en'] },
+        { path: '/en', facts: { hreflang: COMPLETE.en } },
+        { path: '/fr', status, kind: 'status' },
+      ]);
+      expect(of(detectHreflangGaps(s), '/en'), String(status)).toMatchObject({
+        state: 'detected',
+        conditions: ['hreflang_alternate_gone'],
+        affected_urls: [u('/en')],
+      });
+    }
+  });
+
+  it('an alternate the crawl stopped at a redirect cannot link back: the member carries it', () => {
     const s = site([
       { path: '/', links: ['/en'] },
       { path: '/en', facts: { hreflang: COMPLETE.en } },
-      { path: '/fr', status: 404, kind: 'status' },
+      { path: '/fr', status: 301, kind: 'status' },
     ]);
     expect(of(detectHreflangGaps(s), '/en')).toMatchObject({
       state: 'detected',
-      conditions: ['hreflang_missing_return'],
+      conditions: ['hreflang_alternate_redirects'],
+      affected_urls: [u('/en')],
+    });
+  });
+
+  it('the record says which case applied, and each URL is the one that carries it', () => {
+    // /en names /fr, which was read and does not name /en back (the alternate, /fr, carries it),
+    // and /de, which is gone (the member naming it, /en, carries it)
+    const s = site([
+      { path: '/', links: ['/en', '/fr'] },
+      {
+        path: '/en',
+        facts: { hreflang: [...COMPLETE.en, alt('de', '/de')] },
+      },
+      { path: '/fr', facts: { hreflang: [alt('fr', '/fr'), alt('x-default', '/fr')] } },
+      { path: '/de', status: 404, kind: 'status' },
+    ]);
+    expect(of(detectHreflangGaps(s), '/de')).toMatchObject({
+      state: 'detected',
+      conditions: ['hreflang_alternate_gone', 'hreflang_missing_return'],
+      measured: 2,
+      affected_urls: [u('/en'), u('/fr')],
     });
   });
 
@@ -166,10 +203,10 @@ describe('hreflang_gap', () => {
       { path: '/en', facts: { hreflang: COMPLETE.en } },
       { path: '/fr', facts: { hreflang: COMPLETE.fr, final_url: u('/fr-fr') } },
     ]);
-    // /fr redirects, so it cannot annotate back to /en.
+    // /fr redirects, so it cannot annotate back to /en: the member naming it carries the defect.
     expect(of(detectHreflangGaps(s), '/en')).toMatchObject({
       state: 'detected',
-      conditions: ['hreflang_missing_return'],
+      conditions: ['hreflang_alternate_redirects'],
       affected_urls: [u('/en')],
     });
   });

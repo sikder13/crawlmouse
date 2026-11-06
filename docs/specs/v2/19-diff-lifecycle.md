@@ -56,22 +56,24 @@ From `LIFECYCLE` in `lifecycle.ts`. A row in the last column is written only whe
 
 From `FIX_SECTION`, `FIX_SUBJECT` and `COVERAGE_DEPENDENCE` in `subjects.ts`. The subject follows the section, except where a type has a narrower one. Which coverage a type depends on is provisional until the detectors (CC-15/16/17) state it.
 
-| Fix type                    | Section          | Change subject    | Measurement depends on |
-| --------------------------- | ---------------- | ----------------- | ---------------------- |
-| `robots_txt_blocks_crawler` | `crawler_access` | `crawler_access`  | neither                |
-| `edge_rule_blocks_crawler`  | `crawler_access` | `crawler_access`  | `sample`               |
-| `client_rendered_template`  | `without_js`     | `text_without_js` | `sample`               |
-| `orphan_pages`              | `structure`      | `orphans`         | `page_cap`             |
-| `quotable_opening`          | `content`        | `content`         | `page_cap`             |
-| `generic_anchor_text`       | `structure`      | `structure`       | `page_cap`             |
-| `deep_pages`                | `structure`      | `structure`       | `page_cap`             |
-| `specs_as_images`           | `content`        | `content`         | `page_cap`             |
-| `missing_author_date`       | `content`        | `content`         | `page_cap`             |
-| `js_only_navigation`        | `structure`      | `structure`       | `page_cap`             |
-| `redirect_chain`            | `structure`      | `structure`       | `page_cap`             |
-| `duplicate_pagination`      | `structure`      | `structure`       | `page_cap`             |
-| `canonical_mismatch`        | `structure`      | `structure`       | `page_cap`             |
-| `hreflang_gap`              | `structure`      | `structure`       | `page_cap`             |
+| Fix type                     | Section          | Change subject    | Measurement depends on |
+| ---------------------------- | ---------------- | ----------------- | ---------------------- |
+| `robots_txt_blocks_crawler`  | `crawler_access` | `crawler_access`  | neither                |
+| `edge_rule_blocks_crawler`   | `crawler_access` | `crawler_access`  | `sample`               |
+| `client_rendered_template`   | `without_js`     | `text_without_js` | `sample`               |
+| `orphan_pages`               | `structure`      | `orphans`         | `page_cap`             |
+| `quotable_opening`           | `content`        | `content`         | `page_cap`             |
+| `generic_anchor_text`        | `structure`      | `structure`       | `page_cap`             |
+| `deep_pages`                 | `structure`      | `structure`       | `page_cap`             |
+| `specs_as_images`            | `content`        | `content`         | `page_cap`             |
+| `missing_author_date`        | `content`        | `content`         | `page_cap`             |
+| `js_only_navigation`         | `structure`      | `structure`       | `page_cap`             |
+| `redirect_chain`             | `structure`      | `structure`       | `page_cap`             |
+| `duplicate_pagination`       | `structure`      | `structure`       | `page_cap`             |
+| `canonical_mismatch`         | `structure`      | `structure`       | `page_cap`             |
+| `hreflang_gap`               | `structure`      | `structure`       | `page_cap`             |
+| `missing_schema_description` | `content`        | `content`         | `page_cap`             |
+| `no_question_headings`       | `content`        | `content`         | `page_cap`             |
 
 ## Rows that are not a fix
 

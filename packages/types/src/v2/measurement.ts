@@ -70,8 +70,8 @@ export function technicalSeoStatus(check: {
 
 /**
  * The status of a check's AI readability grade: null until the check has ended; `not_measurable` when
- * the check ended with no grade; `withheld` when fewer than two scored crawlers were measured (FACTS
- * I4); otherwise `measured`.
+ * the check ended with no grade; `withheld` when the grade is withheld, for the reasons it names
+ * (`withheld_reasons`; fewer than two scored crawlers measured is one, FACTS I4); otherwise `measured`.
  */
 export function aiReadabilityStatus(check: {
   status: CheckStatus;

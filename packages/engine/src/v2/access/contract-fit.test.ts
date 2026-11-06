@@ -1,7 +1,7 @@
 /**
  * What the access detectors hand on must fit the contract it will be stored in: each matrix row, less
  * the engine-only extras and with `text_share` (CC-14's) left null, is a CrawlerResult, and the
- * withholding decision is the one the contract's Check rule (`i4_withheld` / `i4_given`) accepts. The
+ * withholding decision is one the contract's Check rules (`i4_withheld`, `withheld_reasons`) accept. The
  * checks are taken from the CC-11 fixtures, a measured one and a withheld one, with only their
  * crawler rows replaced by ours.
  */
@@ -54,12 +54,16 @@ describe('the matrix fits the contract', () => {
 });
 
 describe('withholding agrees with the contract’s Check rule', () => {
-  it('a check we would give a grade passes with a measured grade and fails with a withheld one', () => {
+  it('a check we would give a grade passes with a measured grade, and withheld only with a reason', () => {
     const r = detectAccess(grid({ pages: ['/', '/p/1'] }));
     expect(r.access_withheld).toBe(false);
     expect(CheckSchema.safeParse(withRows(MEASURED, r)).success).toBe(true);
-    const wrong = { ...withRows(WITHHELD, r) };
-    expect(JSON.stringify(CheckSchema.safeParse(wrong).error?.issues)).toContain('i4_given');
+    expect(CheckSchema.safeParse(withRows(WITHHELD, r)).success).toBe(true);
+    const unexplained = withRows(WITHHELD, r);
+    unexplained.ai_readability = { ...unexplained.ai_readability!, withheld_reasons: [] };
+    expect(JSON.stringify(CheckSchema.safeParse(unexplained).error?.issues)).toContain(
+      'withheld_reasons',
+    );
   });
 
   it('a check we would withhold passes withheld and fails with a measured grade', () => {

@@ -424,31 +424,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 41,
         "grade": "D",
         "components": {
           "access": {
             "score": 12,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 9,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 10,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -465,9 +471,11 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -493,6 +501,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -518,6 +527,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -543,6 +553,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -553,6 +564,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -993,31 +1005,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 41,
         "grade": "D",
         "components": {
           "access": {
             "score": 12,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 9,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 10,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -1034,9 +1052,11 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1062,6 +1082,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1087,6 +1108,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1112,6 +1134,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -1122,6 +1145,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -1545,31 +1569,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 41,
         "grade": "D",
         "components": {
           "access": {
             "score": 12,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 9,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 10,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -1586,9 +1616,11 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1614,6 +1646,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1639,6 +1672,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -1664,6 +1698,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -1674,6 +1709,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -2125,31 +2161,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 41,
         "grade": "D",
         "components": {
           "access": {
             "score": 12,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 9,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 10,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -2166,9 +2208,11 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2194,6 +2238,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2219,6 +2264,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2244,6 +2290,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -2254,6 +2301,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -2677,31 +2725,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 41,
         "grade": "D",
         "components": {
           "access": {
             "score": 12,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 9,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 10,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -2718,9 +2772,11 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2746,6 +2802,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2771,6 +2828,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -2796,6 +2854,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -2806,6 +2865,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -3229,31 +3289,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 22,
         "grade": "F",
         "components": {
           "access": {
             "score": 3,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 5,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 4,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": {
         "internal_links": 779,
@@ -3270,9 +3336,11 @@
       },
       "content": {
         "score": 58,
+        "score_withheld": null,
         "checks": [
           {
             "check": "direct_answer_150",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -3298,6 +3366,7 @@
           },
           {
             "check": "question_headings",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -3323,6 +3392,7 @@
           },
           {
             "check": "schema_with_description",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/",
@@ -3348,6 +3418,7 @@
           },
           {
             "check": "author_and_date",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/blog/{slug}",
@@ -3358,6 +3429,7 @@
           },
           {
             "check": "specs_as_text",
+            "counted": true,
             "by_template": [
               {
                 "template_key": "/products/{slug}",
@@ -3793,31 +3865,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 93,
         "grade": "A",
         "components": {
           "access": {
             "score": 40,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 28,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 15,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -3996,31 +4074,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 93,
         "grade": "A",
         "components": {
           "access": {
             "score": 40,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 28,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 15,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -4199,31 +4283,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 78,
         "grade": "B",
         "components": {
           "access": {
             "score": 30,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 24,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 14,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -4402,31 +4492,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 78,
         "grade": "B",
         "components": {
           "access": {
             "score": 30,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 24,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 14,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -4605,31 +4701,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 66,
         "grade": "C",
         "components": {
           "access": {
             "score": 24,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 20,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 12,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -4808,31 +4910,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 66,
         "grade": "C",
         "components": {
           "access": {
             "score": 24,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 20,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 12,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -5043,31 +5151,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 88,
         "grade": "A-",
         "components": {
           "access": {
             "score": 40,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 26,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 12,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -5251,31 +5365,37 @@
       },
       "ai_readability": {
         "withheld": false,
+        "withheld_reasons": [],
         "total": 88,
         "grade": "A-",
         "components": {
           "access": {
             "score": 40,
             "max": 40,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "readable": {
             "score": 26,
             "max": 30,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           },
           "quotable": {
             "score": 12,
             "max": 20,
-            "heuristic": true
+            "heuristic": true,
+            "range": null
           },
           "signals": {
             "score": 10,
             "max": 10,
-            "heuristic": false
+            "heuristic": false,
+            "range": null
           }
         },
-        "access_range": null
+        "access_range": null,
+        "scored_from_fewer_crawlers": null
       },
       "structure": null,
       "without_js": null,
@@ -7258,8 +7378,10 @@
       "rank": 3,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 19,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -7314,8 +7436,10 @@
       "rank": 1,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 24,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -7374,8 +7498,10 @@
       "rank": 2,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 22,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -7468,8 +7594,10 @@
       "rank": 4,
       "effect": {
         "technical_seo": 4,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -7526,8 +7654,10 @@
       "rank": 6,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": null,
         "ai_readability_pending_on": ["0f1e000000000001", "0f1e000000000002"],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
@@ -7583,8 +7713,10 @@
       "rank": 5,
       "effect": {
         "technical_seo": 2,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7637,8 +7769,10 @@
       "rank": 7,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7686,8 +7820,10 @@
       "rank": 8,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": null,
         "ai_readability_pending_on": ["0f1e000000000001", "0f1e000000000002"],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7737,8 +7873,10 @@
       "rank": 9,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": null,
         "ai_readability_pending_on": ["0f1e000000000001", "0f1e000000000002"],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7790,8 +7928,10 @@
       "rank": 10,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7841,8 +7981,10 @@
       "rank": 11,
       "effect": {
         "technical_seo": 1,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7894,8 +8036,10 @@
       "rank": 12,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7943,8 +8087,10 @@
       "rank": 13,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -7992,8 +8138,10 @@
       "rank": 14,
       "effect": {
         "technical_seo": 0,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": null,
@@ -8021,6 +8169,78 @@
       "gone": null
     },
     {
+      "id": "f0000000-0000-4000-8000-00000000001e",
+      "site_id": "50000000-0000-4000-8000-000000000001",
+      "fingerprint": "0f1e00000000001e",
+      "number": 14,
+      "type": "missing_schema_description",
+      "section": "content",
+      "title": "Describe each product page in its schema.org markup",
+      "detail": "template change: a description on the Product node, from the existing summary",
+      "recommendation_class": "documented_requirement",
+      "status": "open",
+      "last_state": "detected",
+      "last_measured_check_id": "c0000000-0000-4000-8000-000000000006",
+      "first_seen_check_id": "c0000000-0000-4000-8000-000000000006",
+      "confidence": "inconclusive",
+      "affected_pages": 158,
+      "template_key": "/products/{slug}",
+      "crawler_uas": [],
+      "rank": 15,
+      "effect": {
+        "technical_seo": 0,
+        "technical_seo_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["check_not_scored"],
+        "absorbed_by": null,
+        "estimate": true
+      },
+      "effort": {
+        "kind": "templates",
+        "templates": 1,
+        "deploys": 1
+      },
+      "before_after": [],
+      "packet": null,
+      "gone": null
+    },
+    {
+      "id": "f0000000-0000-4000-8000-00000000001f",
+      "site_id": "50000000-0000-4000-8000-000000000001",
+      "fingerprint": "0f1e00000000001f",
+      "number": 15,
+      "type": "no_question_headings",
+      "section": "content",
+      "title": "Phrase a section heading on blog posts as the question it answers",
+      "detail": "content change: one h2 per post worded as a question",
+      "recommendation_class": "experimental",
+      "status": "open",
+      "last_state": "detected",
+      "last_measured_check_id": "c0000000-0000-4000-8000-000000000006",
+      "first_seen_check_id": "c0000000-0000-4000-8000-000000000006",
+      "confidence": "inconclusive",
+      "affected_pages": 7,
+      "template_key": "/blog/{slug}",
+      "crawler_uas": [],
+      "rank": 16,
+      "effect": {
+        "technical_seo": 0,
+        "technical_seo_pending_on": [],
+        "ai_readability": null,
+        "ai_readability_pending_on": ["check_not_scored"],
+        "absorbed_by": null,
+        "estimate": true
+      },
+      "effort": {
+        "kind": "templates",
+        "templates": 1,
+        "deploys": 1
+      },
+      "before_after": [],
+      "packet": null,
+      "gone": null
+    },
+    {
       "id": "f0000000-0000-4000-8000-000000000014",
       "site_id": "50000000-0000-4000-8000-000000000002",
       "fingerprint": "0f1e000000000014",
@@ -8041,8 +8261,10 @@
       "rank": null,
       "effect": {
         "technical_seo": 3,
+        "technical_seo_pending_on": [],
         "ai_readability": 0,
         "ai_readability_pending_on": [],
+        "absorbed_by": null,
         "estimate": true
       },
       "effort": {
