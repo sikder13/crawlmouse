@@ -7,6 +7,7 @@ import {
   readFingerprint,
   type Fingerprint,
 } from './fingerprint';
+import { failed, runChecks } from './check';
 import { migratedDb, partitionOf, pgliteDb, withRollback } from './test-support';
 
 const SECTIONS = [
@@ -317,6 +318,11 @@ describe('SUPABASE_MANAGED_MEMBERS: memberships Supabase grants a new branch', (
       'grant execute on function public.is_member(uuid) to supabase_realtime_admin',
       ['acls'],
     ],
+    [
+      'owning a function',
+      'alter function public.is_member(uuid) owner to supabase_realtime_admin',
+      ['acls', 'functions'],
+    ],
   ])(
     'the exclusion is by member name only: supabase_realtime_admin %s is still seen',
     async (_label, mutation, sections) => {
@@ -327,6 +333,22 @@ describe('SUPABASE_MANAGED_MEMBERS: memberships Supabase grants a new branch', (
       expect(differingSections(base, after)).toEqual(sections);
     },
   );
+
+  // The cost of excluding by name, stated in docs/ops/db-migrations.md §5. If the list is narrowed
+  // to the observed memberships, these go red and that paragraph needs rewriting.
+  it.each([
+    'grant crawl_worker to supabase_realtime_admin',
+    'grant research_retention to supabase_realtime_admin',
+    'grant authenticator to supabase_realtime_admin',
+    'grant service_role to supabase_realtime_admin with admin true',
+  ])('what the list costs: %s is not seen, by the fingerprint or the checks', async (mutation) => {
+    const [after, checks] = await withRollback(db, async (tx) => {
+      await tx.exec(`create role supabase_realtime_admin noinherit; ${mutation}`);
+      return [await readFingerprint(tx), await runChecks(tx)] as const;
+    });
+    expect(compareFingerprints(base, after)).toEqual([]);
+    expect(failed(checks)).toBe(false);
+  });
 });
 
 describe('formatDifferences', () => {

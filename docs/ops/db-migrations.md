@@ -303,11 +303,15 @@ role, owning a table or function, or holding a grant on one still shows; the tes
 `public`
 (`pnpm --filter @crawlmouse/scripts exec vitest run db/fingerprint.test.ts -t SUPABASE_MANAGED_MEMBERS`).
 
-What the list costs: a membership _by_ `supabase_realtime_admin` of any role is unseen, including
-`crawl_worker`, `authenticator`, or `service_role` with the admin option. The checks in §6 do
-not see it either: `03-worker-roles-no-login.sql`, the only one that reads memberships
-(`grep -ln 'pg_has_role\|pg_auth_members' infra/supabase/checks/0*.sql`), asks what the worker
-roles are members of, not who is a member of them. Listing the three observed memberships instead
+What the list costs: a membership _by_ `supabase_realtime_admin` is unseen whichever role it is
+of, including `crawl_worker`, `research_retention`, `authenticator`, and `service_role` with the
+admin option
+(`pnpm --filter @crawlmouse/scripts exec vitest run db/fingerprint.test.ts -t 'what the list costs'`).
+The checks in §6 do not see it either. `03-worker-roles-no-login.sql` is the only one that queries
+memberships directly (`grep -ln 'pg_has_role\|pg_auth_members' infra/supabase/checks/0*.sql`),
+and it asks what the worker roles are members of, not who is a member of them. Checks 01, 04 and 06
+test the effective privileges of the roles they name, which a membership granted _to_
+`supabase_realtime_admin` does not change. Listing the three observed memberships instead
 of the member's name would close this; the list is by name as the owner ruled.
 
 On 2026-11-06 production was read through the read-only endpoint with this file and with the one
