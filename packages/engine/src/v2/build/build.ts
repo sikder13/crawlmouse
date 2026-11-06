@@ -28,6 +28,7 @@ import { diffBuilt, diffInputsOf } from './diff.js';
 import { gradeAssembled } from './grade.js';
 import { lineagesOf, usageOf } from './lineage.js';
 import { sample } from './plan.js';
+import { decideStatus } from './status.js';
 import { checkRecord, robotsText } from './record.js';
 import { summariesOf } from './summaries.js';
 import type { BuildInput, BuiltCheck } from './types.js';
@@ -59,19 +60,29 @@ export function buildCheck(input: BuildInput): BuiltCheck {
     );
   }
   const batches = readBatches(input.batches, input.check, input.lineage.worker_release);
-  const assembled = assemble(input, batches);
+  const assembledOf = assemble(input, batches);
 
   // An access test or a render the planners would not have asked for is refused: the rows would
   // claim a sample the check did not choose.
-  const planned = sample(assembled);
+  const planned = sample(assembledOf);
   const sampled = new Set([...planned.stage1, ...planned.stage2].map((p) => p.url));
-  for (const t of assembled.access_tests) {
+  for (const t of assembledOf.access_tests) {
     if (!sampled.has(t.page_url)) {
       throw new Error(
         `buildCheck: an access test of ${t.page_url}, which the sample does not hold`,
       );
     }
   }
+  // A page the sample planned with no crawler test (a lost or unrun access batch) leaves it unfinished.
+  const tested = new Set(
+    assembledOf.access_tests.filter((t) => t.identity_role === 'crawler').map((t) => t.page_url),
+  );
+  const assembled = [...sampled].every((u) => tested.has(u))
+    ? assembledOf
+    : {
+        ...assembledOf,
+        status: decideStatus(batches, [...assembledOf.status.unfinished, 'sample']),
+      };
   // renderCandidates offers the sampled pages and nothing else.
   for (const p of input.render?.pages ?? []) {
     if (!sampled.has(p.url))

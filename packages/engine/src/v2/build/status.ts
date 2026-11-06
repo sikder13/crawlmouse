@@ -57,7 +57,7 @@ export const PARTIAL_RULE: Readonly<
   crawl_delay_10s_or_more: {
     partial: false,
     crawl: false,
-    why: 'the Crawl-delay was honoured in full: the crawl was slow, and every URL was still fetched',
+    why: 'the Crawl-delay was honoured in full: the delay alone does not cut the crawl',
   },
   result_size: {
     partial: true,
@@ -70,19 +70,34 @@ export interface StatusDecision {
   status: Extract<CheckStatus, 'finished' | 'partial'>;
   /** The reasons that made it partial, each once, sorted. */
   reasons: BatchPartialReason[];
-  /** A crawl batch's reason cut the crawl short. */
+  /** A crawl batch's reason cut the crawl short, or the crawl was not run to its end. */
   crawl_partial: boolean;
+  /**
+   * What the check did not finish that no batch reason states: `crawl` when the crawl planner still has
+   * URLs to fetch, `sample` when a page the sample planned has no crawler test. Either makes it partial.
+   */
+  unfinished: Unfinished[];
 }
 
-export function decideStatus(batches: Batches): StatusDecision {
+export type Unfinished = 'crawl' | 'sample';
+
+export function decideStatus(
+  batches: Batches,
+  unfinished: readonly Unfinished[] = [],
+): StatusDecision {
   const counted = (reasons: readonly BatchPartialReason[]) =>
     reasons.filter((r) => PARTIAL_RULE[r].partial);
   const all = [...batches.crawl, ...batches.access].flatMap((b) =>
     counted(b.partial?.reasons ?? []),
   );
   const reasons = [...new Set(all)].sort();
-  const crawl_partial = batches.crawl.some((b) =>
-    (b.partial?.reasons ?? []).some((r) => PARTIAL_RULE[r].crawl),
-  );
-  return { status: reasons.length > 0 ? 'partial' : 'finished', reasons, crawl_partial };
+  const crawl_partial =
+    unfinished.includes('crawl') ||
+    batches.crawl.some((b) => (b.partial?.reasons ?? []).some((r) => PARTIAL_RULE[r].crawl));
+  return {
+    status: reasons.length > 0 || unfinished.length > 0 ? 'partial' : 'finished',
+    reasons,
+    crawl_partial,
+    unfinished: [...new Set(unfinished)].sort(),
+  };
 }

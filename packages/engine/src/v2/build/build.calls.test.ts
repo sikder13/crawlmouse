@@ -31,6 +31,7 @@ const outcomes = await import('../grade/outcomes.js');
 const effects = await import('../grade/effects.js');
 const diff = await import('../diff/diff.js');
 const { buildCheck } = await import('./build.js');
+const { fileEdges, landingsOf } = await import('./filing.js');
 
 const calls = () => ({
   detectAccess: vi.mocked(access.detectAccess).mock.calls,
@@ -66,8 +67,12 @@ describe('buildCheck and the engine entry points', () => {
     const structure = c.detectStructure[0]![0];
     const graded = c.gradeCheck[0]![0];
     expect(urls(c.detectAccess[0]![0].pages)).toEqual(urls(structure.pages));
-    expect(urls(graded.pages)).toEqual(urls(structure.pages));
-    expect(graded.edges).toBe(structure.edges);
+    // The same pages, field by field, but for the two set from the structure detectors' records.
+    const unorphaned = (ps: readonly object[]) =>
+      ps.map((p) => ({ ...p, is_orphan: null, suggested_parent_url: null }));
+    expect(unorphaned(graded.pages)).toEqual(unorphaned(structure.pages));
+    // The same links: the detectors read them as recorded and file them; the grade reads them filed.
+    expect(graded.edges).toEqual(fileEdges(structure.edges, landingsOf(structure.pages)));
     expect(c.detectorOutcomes[0]![0]).toBe(vi.mocked(grade.gradeCheck).mock.results[0]!.value);
     expect(c.effectsOf[0]![0]).toBe(vi.mocked(grade.gradeCheck).mock.results[0]!.value.inputs);
     expect(c.diffCheck[0]![0].current.check).toEqual(out.check);

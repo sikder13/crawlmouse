@@ -1,8 +1,7 @@
 /**
  * The small summary each pipeline step returns to Inngest (ARCH-2 §4.2: under 4 KB; the rows go to
- * Postgres inside the step). One per check phase, counts and enum values only: nothing a site wrote,
- * so the size does not grow with what a page holds. summaries.test.ts measures them on a check at
- * the page cap.
+ * Postgres inside the step). One per check phase, written below from counts, statuses and enum values,
+ * none of them text a site wrote. build.test.ts measures each one's size on the recorded fixture.
  */
 import type { Check } from '@crawlmouse/types/v2';
 import type { DiffResult } from '../diff/types.js';
@@ -44,6 +43,7 @@ export function summariesOf(
       pages_discovered: assembled.coverage.pages_discovered,
       links: assembled.edges.length,
       partial_reasons: assembled.status.reasons,
+      unfinished: assembled.status.unfinished,
     },
     {
       phase: 'crawler_tests',

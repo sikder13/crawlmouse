@@ -56,7 +56,8 @@ const INPUT: Record<keyof BuildInput, string> = {
     "The site's last graded check as `diffCheck` reads it: its `Check` and its `diff_inputs`.",
   fixes: "The site's fixes before this check.",
   events: 'Every event of those fixes.',
-  lineage: '`engine_sha`, and `worker_release`, the build every batch row must name.',
+  lineage:
+    '`engine_sha`, and `worker_release`: a batch row that names a worker release must name this one.',
   now: 'When the lineage row is minted (its `created_at`).',
 };
 
@@ -82,15 +83,15 @@ const PAGE_FIELDS: Record<keyof PageResult, string> = {
   check_id: 'the check',
   url: "the crawl row's URL (refused unless canonical)",
   template_key: 'v1 `templateKeyFor(url)`',
-  kind: "v1 `classifyPages`, with the CMS overlay of the homepage's `stack_signals`, the row's `main_text_chars`, `content_simhash` and `noindex`",
+  kind: "v1 `classifyPages`, with the CMS overlay of the homepage's `stack_signals`, the row's `main_text_chars`, `content_simhash` and `noindex`. A page not read whole has neither signal, so it is not thin and not noindex: v1 keeps a page when a signal is absent",
   status_code: 'the row',
   depth:
-    'v1 `computeDepth` from the homepage over every page and the recorded links; null for a page no link path reaches, and for every page when the homepage is not a page',
-  links_in: 'distinct linking URLs among the recorded links into the page',
+    "v1 `computeDepth` from the homepage over every page and the links filed under the page they were found on (`filing.ts`, the detectors' rule); null for a page no link path reaches, and for every page when the homepage is not a page",
+  links_in: 'distinct linking URLs among the filed links into the page',
   links_out:
     "the row's `links_out`: the distinct same-host links the worker found, recorded or not; 0 when the page was not read",
   pagerank_share:
-    'v1 `computePageRank` over the pages answering 200 (the graph the Technical SEO grade reads), over the sum; null for any other page',
+    'v1 `computePageRank` over the pages answering 200 and the filed links (the graph the Technical SEO grade reads), over the sum; null for any other page',
   is_orphan: "CC-16's `orphan_pages` record for the page is `detected`",
   js_only: 'false: the worker reads links from static HTML only',
   found_via: '`sitemap` for a sitemap seed, else `link` (the enum has no value for the homepage)',
@@ -100,8 +101,9 @@ const PAGE_FIELDS: Record<keyof PageResult, string> = {
   sampled: 'the page has an access test as a crawler',
   without_js: "the render outcome's measurement of the page, else null",
   crawlers_reached:
-    'of the crawlers tested on the page, those served (`allowed`, `allowed_thin`); null when not sampled',
-  crawlers_reading_text: 'of those, the ones whose verdict is `allowed`; null when not sampled',
+    'of the crawlers tested on the page, those served (`allowed`, `allowed_thin`); null when not sampled, or when a crawler test on it measured nothing (`not_measured`)',
+  crawlers_reading_text:
+    'of those, the ones whose verdict is `allowed`; null as for `crawlers_reached`',
   content_failures: "CC-17's `Grades.content_failures`",
   final_url: 'the row',
   redirect: 'the row',
@@ -143,7 +145,7 @@ const CHECK_FIELDS: Record<keyof Check, string> = {
   crawlers:
     "the access matrix (`detectAccess`), with `text_share` null: no step measures a crawler's share yet",
   stack:
-    "`frontend` null (CC-17b); `backend` from the homepage row's `stack_signals`; `edge` Cloudflare when a crawler test carries the `cloudflare_1020` cause, else null",
+    "`frontend` null (CC-17b); `backend` from the homepage row's `stack_signals`, null when the homepage was not read or `detectCms` recognised no CMS (it answers `custom` then); `edge` Cloudflare when a crawler test (not a browser control) carries the `cloudflare_1020` cause, else null",
   competitors: '`[]`',
   progress: 'null: the contract keeps progress for a running check only (`check_progress`)',
 };
@@ -153,7 +155,7 @@ const ARCH_DIFFERENCES = [
   "ARCH-2 stores the sample in `page_results.in_sample` and `sample_stage`. The contract has `PageResult.sampled` only; the stage is the planner's (`sample`), recomputed from the rows.",
   'ARCH-2 names per-crawler verdict columns on `page_results`. The merged contract keeps verdicts on `AccessTest` rows and the site verdict on `Check.crawlers`.',
   "ARCH-2's `discover` step reads robots.txt and sitemaps for the pipeline. The merged worker reads robots.txt itself for each batch (cached across batches) and requests `/sitemap.xml` for its status and size only; sitemap URLs reach the builder as `seeds`.",
-  "ENGINE-GAP §8.4 counts stage 1 as the homepage, 24 templates and 2 challenged pages, at most 25. Here the homepage's and the challenged pages' templates count toward the 24, which is what holds the stage to 25.",
+  "ENGINE-GAP §8.4 counts stage 1 as the homepage, 24 templates and 2 challenged pages, at most 25. Here the homepage's and the challenged pages' templates count toward the 24, and the 25-page bound is checked before each template page: challenged pages can share the homepage's template, since a template key leaves the query out.",
 ];
 
 const BRIEF_DIFFERENCES = [
@@ -162,7 +164,7 @@ const BRIEF_DIFFERENCES = [
   'The builder calls five engine entry points; the sixth, `effectsOf`, is called by `detectorOutcomes`. The once-per-check test counts all six.',
   'A usage event for a site no account keeps is null as a row, since `UsageEventSchema` requires `account_id`.',
   "The worker writes `main_text_chars` and `noindex` on each crawl row and keeps robots.txt whole (`RobotsEvidence.body`, `body_complete`), beyond D2's two fields, by owner ruling.",
-  'Links are emitted as the worker recorded them. A link from a redirected page names where it landed; the detectors file it back themselves. The properties tested are that every link is filed under a crawled page or the final URL one landed on, and that `links_out` is at least the links recorded from the page.',
+  'Links are emitted as the worker recorded them. A link from a redirected page names where it landed; the detectors file it back themselves, and the graph the grade, depth, PageRank and inbound counts read files it by the same rule (`filing.ts`). The properties tested are that every link is filed under a crawled page or the final URL one landed on, that `links_out` is at least the links recorded from the page, and that depth equals a breadth-first walk over the filed links.',
 ];
 
 const pageOf = (b: BuiltCheck, path: string) =>
@@ -271,7 +273,7 @@ export function renderBuildSpec(): string {
       '6. Lineage and usage, then validation.',
     ].join('\n'),
     '## Status',
-    'A check is `partial` when a batch carries a reason marked partial below. The structure detectors read `partial` as "the crawl was cut short" (`detectors/scope.ts` `isTruncated`), so they are told `partial` only for a reason marked as cutting the crawl, on a crawl batch.',
+    'A check is `partial` when a batch carries a reason marked partial below, when the crawl planner still has URLs to fetch (`nextCrawlBatch` is not null: the crawl was stopped, or a batch was lost), or when a page the sample planned has no crawler test. The structure detectors read `partial` as "the crawl was cut short" (`detectors/scope.ts` `isTruncated`), so they are told `partial` only for a reason marked as cutting the crawl on a crawl batch, or for a crawl the planner would go on with.',
     table(['Reason', 'Check', 'Cuts the crawl', 'Why'], rule),
     '## The planners',
     table(
@@ -328,7 +330,7 @@ export function renderBuildSpec(): string {
     ),
     `The detectors that run on a built check, which \`diff_inputs.detectors\` lists: ${DETECTORS_RUN.map(code).join(', ')}.`,
     '## Bounds on the new crawl-row fields',
-    `Content features: ${CONTENT_FEATURES_BYTES / 1024} KiB as JSON, ${MAX_JSON_LD_NODES} JSON-LD nodes of ${MAX_JSON_LD_TYPES} types, a type of ${JSON_LD_TYPE_BYTES} characters as written; past any, the row keeps none and its limitations say so. They count toward the batch's 8 MiB with its text and links. robots.txt is kept whole up to the engine's 500 KiB parse limit, as written; otherwise \`body\` is null and \`body_complete\` false, and the builder reads no robots.txt.`,
+    `Content features: ${CONTENT_FEATURES_BYTES / 1024} KiB as JSON, ${MAX_JSON_LD_NODES} JSON-LD nodes of ${MAX_JSON_LD_TYPES} types, a type of ${JSON_LD_TYPE_BYTES} UTF-8 bytes as written; past any, the row keeps none and its limitations say so. They count toward the batch's 8 MiB with its text and links. robots.txt is kept whole up to the engine's 500 KiB parse limit, as written; otherwise \`body\` is null and \`body_complete\` false, and the builder reads no robots.txt.`,
     '## Differences from ARCH-2 and ENGINE-GAP',
     ARCH_DIFFERENCES.map((d) => `- ${d}`).join('\n'),
     '## Differences from the brief',
@@ -337,7 +339,7 @@ export function renderBuildSpec(): string {
     `${golden.page_results.length} pages crawled in ${readRecorded('batches').filter((x) => x.kind === 'crawl').length} crawl batches, ${golden.check.coverage!.pages_sampled} sampled in ${readRecorded('batches').filter((x) => x.kind === 'access').length} access batches, ${golden.fixes.length} fixes. Recorded from the worker by \`fixtures/v2/build/generate.ts\`.`,
     table(['Planted', 'Where', 'What the built check holds'], defects(golden)),
     '## Found by the built fixture',
-    `- **A redirect that lands on a crawled page hides absences.** \`detectors/scope.ts\` files a redirected row's links under the requested URL only when no other row has the final URL; \`grade/effects.ts\` \`linkedStraight\` describes them as filed there anyway. On the fixture's variant (one more link, to ${code(site.REDIRECT_TO)}, so it is crawled as its own page): without it, ${states(before).join(', ')}; with it, ${states(after).join(', ')}. Technical SEO ${before.check.technical_seo!.score} without, ${after.check.technical_seo!.score} with. Not settled here.`,
+    `- **A redirect that lands on a crawled page hides absences.** \`detectors/scope.ts\` files a redirected row's links under the requested URL only when no other row has the final URL; \`grade/effects.ts\` \`linkedStraight\` describes them as filed there anyway. On the fixture's variant (one more link, to ${code(site.REDIRECT_TO)}, so it is crawled as its own page): without it, ${states(before).join(', ')}; with it, ${states(after).join(', ')}. Technical SEO ${before.check.technical_seo!.score} without, ${after.check.technical_seo!.score} with. In the variant both URLs answer 200 with the same content, so v1's duplicate rule keeps the one that sorts first: ${code(site.REDIRECT_FROM)} is ${code(pageOf(after, site.REDIRECT_FROM)!.kind)}, ${code(site.REDIRECT_TO)} is ${code(pageOf(after, site.REDIRECT_TO)!.kind)}. Not settled here.`,
     `- **A client-rendered template leaves the graded population before it can be rendered.** v1's thin-content rule classifies the app-shell pages ${site.CLIENT_RENDERED.map((p) => `${code(p)} as ${code(pageOf(golden, p)!.kind)}`).join(', ')}; a render candidate must be a content page, so none of them is rendered. No detector opens a ${code('client_rendered_template')} fix yet: ${code('grep -rln client_rendered_template packages/engine/src/v2 --include=*.ts | grep -v test')} lists the planner, the diff's subject table and two specs, and no detector.`,
   ].join('\n\n')}\n`;
 }

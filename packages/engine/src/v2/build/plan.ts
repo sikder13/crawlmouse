@@ -21,16 +21,15 @@ import type { Seed } from './types.js';
 /** URLs per crawl batch: the worker's MAX_URLS_PER_BATCH. */
 export const CRAWL_BATCH_URLS = 50;
 /**
- * Stage 1 covers at most STAGE1_TEMPLATES templates, counting the homepage's and the challenged pages'
- * own, and takes at most STAGE1_CHALLENGED challenged pages. Every page it takes has a template; a
- * template page is taken only for a template not yet covered, so only challenged pages can share a
- * template, at most STAGE1_CHALLENGED - 1 beyond the first. The stage therefore holds at most
- * STAGE1_TEMPLATES + STAGE1_CHALLENGED - 1 pages: STAGE1_MAX_PAGES, ENGINE-GAP §8.4's 25.
- * plan.property.test.ts holds the bound on generated sites.
+ * Stage 1's bounds (ENGINE-GAP §8.4): at most STAGE1_TEMPLATES templates covered, counting the
+ * homepage's and the challenged pages' own; at most STAGE1_CHALLENGED challenged pages; and at most
+ * STAGE1_MAX_PAGES pages, which `sample` checks before each template page. The page bound is not
+ * implied by the other two: challenged pages can share the homepage's template (a template key leaves
+ * the query out). plan.property.test.ts generates that case.
  */
 export const STAGE1_TEMPLATES = 24;
 export const STAGE1_CHALLENGED = 2;
-export const STAGE1_MAX_PAGES = STAGE1_TEMPLATES + STAGE1_CHALLENGED - 1;
+export const STAGE1_MAX_PAGES = 25;
 /** Stage 2: the sample grows to this many pages in all, starting with these picks. */
 export const STAGE2_MAX_PAGES = 50;
 export const STAGE2_PICKS = { hubs: 5, deepest: 4, newest: 4 } as const;
@@ -43,8 +42,9 @@ const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
  * The next crawl batch: up to CRAWL_BATCH_URLS URLs nobody has asked for yet, or null when there are
  * none or the crawl has asked for `pageCap` URLs. The homepage seed comes first, then the sitemap
  * seeds as given, then the URLs the batches discovered, batch by batch in the order each found them.
- * Every URL is compared in canonical spelling; a URL a page landed on counts as asked for. Seeds on
- * another host than the homepage's are not crawled.
+ * Every URL is compared in canonical spelling; a URL a request landed on counts as asked for, and one a
+ * stopped redirect only names (its row still answers 3xx) does not. Seeds on another host than the
+ * homepage's are not crawled (`crawlableSeeds`).
  */
 export function nextCrawlBatch(
   seeds: readonly Seed[],
@@ -55,19 +55,17 @@ export function nextCrawlBatch(
   for (const b of crawl) {
     for (const p of b.pages) {
       asked.add(canonicalizeUrl(p.url));
-      if (p.final_url) asked.add(canonicalizeUrl(p.final_url));
+      const read = landedOn(p);
+      if (read !== null) asked.add(read);
     }
   }
   const requested = crawl.reduce((n, b) => n + b.pages.length, 0);
   const room = Math.min(CRAWL_BATCH_URLS, pageCap - requested);
   if (room <= 0) return null;
-  const home = seeds.find((s) => s.source === 'homepage');
-  const host = home ? new URL(home.url).hostname : null;
+  const crawlable = crawlableSeeds(seeds);
   const queue = [
-    ...seeds.filter((s) => s.source === 'homepage').map((s) => s.url),
-    ...seeds
-      .filter((s) => s.source === 'sitemap' && (host === null || new URL(s.url).hostname === host))
-      .map((s) => s.url),
+    ...crawlable.filter((s) => s.source === 'homepage').map((s) => s.url),
+    ...crawlable.filter((s) => s.source === 'sitemap').map((s) => s.url),
     ...crawl.flatMap((b) => b.discovered_urls),
   ];
   const next: string[] = [];
@@ -79,6 +77,31 @@ export function nextCrawlBatch(
     if (next.length === room) break;
   }
   return next.length > 0 ? next : null;
+}
+
+/**
+ * The seeds the crawl requests: the homepage's, and the sitemap's on the homepage's host. A sitemap can
+ * list another host (www against the apex); those are neither crawled nor counted as discovered.
+ */
+export function crawlableSeeds(seeds: readonly Seed[]): Seed[] {
+  const home = seeds.find((s) => s.source === 'homepage');
+  const host = home ? new URL(home.url).hostname : null;
+  return seeds.filter(
+    (s) => s.source === 'homepage' || host === null || new URL(s.url).hostname === host,
+  );
+}
+
+/**
+ * Where a crawl row's request landed, in canonical spelling: its final URL when the row's own status is
+ * not a redirect, so the URL was requested and answered. A stopped chain's row keeps the redirect's
+ * status and names a Location nobody requested (worker crawl.ts `landed`).
+ */
+export function landedOn(
+  p: Pick<CrawlBatchResult['pages'][number], 'final_url' | 'status_code'>,
+): string | null {
+  if (p.final_url === null || p.status_code === null) return null;
+  if (p.status_code >= 300 && p.status_code < 400) return null;
+  return canonicalizeUrl(p.final_url);
 }
 
 export type SampleReason =
@@ -145,7 +168,7 @@ export function sample(
     .forEach((p) => take(p, 1, 'challenged'));
   const templates = templatesBySize(eligible);
   for (const [key, members] of templates) {
-    if (covered.size >= STAGE1_TEMPLATES) break;
+    if (picked.length >= STAGE1_MAX_PAGES || covered.size >= STAGE1_TEMPLATES) break;
     if (!covered.has(key)) take(members[0]!, 1, 'template');
   }
   const stage1 = [...picked];

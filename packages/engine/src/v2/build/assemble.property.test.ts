@@ -18,7 +18,7 @@ type Outcome = 'ok' | 'gone' | 'redirect' | 'disallowed' | 'not_requested';
 
 interface Generated {
   outcomes: Outcome[];
-  links: [number, number, boolean][];
+  links: [number, number, 'page' | 'away' | 'landing'][];
   extra: number[];
 }
 
@@ -38,8 +38,12 @@ const generated = fc.integer({ min: 2, max: 30 }).chain((n) =>
         ),
       ),
     ),
-    // [from page, to target, to an uncrawled URL instead of a page]
-    links: fc.array(fc.tuple(fc.nat(n - 1), fc.nat(n - 1), fc.boolean()), { maxLength: 80 }),
+    // [from page, to target, where the link points: the page, an uncrawled URL, or (when the target
+    // redirects) the URL its request landed on]
+    links: fc.array(
+      fc.tuple(fc.nat(n - 1), fc.nat(n - 1), fc.constantFrom('page', 'away', 'landing')),
+      { maxLength: 80 },
+    ),
     extra: fc.array(fc.nat(3), { minLength: n, maxLength: n }),
   }),
 );
@@ -51,7 +55,16 @@ function input(g: Generated) {
   const from = (i: number) => (g.outcomes[i] === 'redirect' ? landing(i) : pageUrl(i));
   const edges = g.links
     .filter(([f]) => serves(f))
-    .map(([f, t, away]) => edge(from(f), away ? uncrawled(t) : pageUrl(t)))
+    .map(([f, t, to]) =>
+      edge(
+        from(f),
+        to === 'away'
+          ? uncrawled(t)
+          : to === 'landing' && g.outcomes[t] === 'redirect'
+            ? landing(t)
+            : pageUrl(t),
+      ),
+    )
     .filter((e) => e.from_url !== e.to_url);
   const recorded = (i: number) =>
     new Set(edges.filter((e) => e.from_url === from(i)).map((e) => e.to_url)).size;
@@ -80,7 +93,21 @@ function input(g: Generated) {
     },
     readBatches([batch], { id: CHECK, site_id: SITE }, 'unreleased'),
   );
-  return { n, rows, edges, built, from, serves };
+  // The truth the test files by itself: page i's request landed on landing(i), a URL no other row names.
+  const owner = new Map(
+    g.outcomes.flatMap((o, i) => (o === 'redirect' ? [[landing(i), pageUrl(i)]] : [])),
+  );
+  const file = (u: string) => owner.get(u) ?? u;
+  const seen = new Set<string>();
+  const filed = edges
+    .map((e) => ({ from_url: file(e.from_url), to_url: file(e.to_url) }))
+    .filter(
+      (e) =>
+        e.from_url !== e.to_url &&
+        !seen.has(`${e.from_url} ${e.to_url}`) &&
+        !!seen.add(`${e.from_url} ${e.to_url}`),
+    );
+  return { n, rows, edges, built, from, serves, filed };
 }
 
 /** Breadth-first distances from the homepage over links whose both ends are pages. */
@@ -149,12 +176,12 @@ describe('assemble, on generated checks', () => {
     );
   });
 
-  it('gives each page its inbound links once per linking URL, so they sum to the links into pages', () => {
+  it('gives each page its inbound links once per linking page, so they sum to the filed links into pages', () => {
     fc.assert(
       fc.property(generated, (g) => {
-        const { built } = input(g);
+        const { built, filed } = input(g);
         const pages = new Set(built.pages.map((p) => p.url));
-        const into = built.edges.filter((e) => pages.has(e.to_url)).length;
+        const into = filed.filter((e) => pages.has(e.to_url)).length;
         expect(built.pages.reduce((n, p) => n + p.links_in, 0)).toBe(into);
       }),
     );
@@ -172,12 +199,13 @@ describe('assemble, on generated checks', () => {
     );
   });
 
-  it('gives the homepage depth 0 and every other page its breadth-first distance, or null', () => {
+  it('gives the homepage depth 0 and every other page its breadth-first distance over the filed links, or null', () => {
     fc.assert(
       fc.property(generated, (g) => {
-        const { built } = input(g);
+        const { built, filed } = input(g);
         const pages = new Set(built.pages.map((p) => p.url));
-        const dist = bfs(pages, built.edges);
+        // Over the links filed under the page they were found on: a redirected page's links count.
+        const dist = bfs(pages, filed);
         for (const p of built.pages) expect(p.depth).toBe(dist.get(p.url) ?? null);
         expect(built.pages.find((p) => p.url === HOME)!.depth).toBe(0);
       }),

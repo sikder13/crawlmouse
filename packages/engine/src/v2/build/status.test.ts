@@ -19,6 +19,7 @@ describe("a built check's status", () => {
       status: 'finished',
       reasons: [],
       crawl_partial: false,
+      unfinished: [],
     });
   });
 
@@ -29,6 +30,7 @@ describe("a built check's status", () => {
         status: 'partial',
         reasons: [reason],
         crawl_partial: true,
+        unfinished: [],
       });
     },
   );
@@ -38,6 +40,7 @@ describe("a built check's status", () => {
       status: 'finished',
       reasons: [],
       crawl_partial: false,
+      unfinished: [],
     });
   });
 
@@ -47,6 +50,7 @@ describe("a built check's status", () => {
       status: 'partial',
       reasons: ['budget_requests'],
       crawl_partial: false,
+      unfinished: [],
     });
   });
 
@@ -59,5 +63,23 @@ describe("a built check's status", () => {
       access: [],
     };
     expect(decideStatus(batches).reasons).toEqual(['budget_bytes', 'site_stopped']);
+  });
+
+  it('is partial, the crawl cut short, when the crawl was not run to its end', () => {
+    expect(decideStatus(crawlWith([]), ['crawl'])).toEqual({
+      status: 'partial',
+      reasons: [],
+      crawl_partial: true,
+      unfinished: ['crawl'],
+    });
+  });
+
+  it('is partial, the crawl whole, when the sample was not tested to its end', () => {
+    expect(decideStatus(crawlWith([]), ['sample'])).toEqual({
+      status: 'partial',
+      reasons: [],
+      crawl_partial: false,
+      unfinished: ['sample'],
+    });
   });
 });

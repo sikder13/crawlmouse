@@ -49,7 +49,7 @@ function probeOf(crawl: readonly CrawlBatchResult[], homepage: string, kind: Dec
 
 /** Cloudflare's error 1020 on a crawler test names the edge; no other vendor is read yet. */
 function edgeOf(tests: readonly AccessTest[]): NonNullable<Check['stack']>['edge'] {
-  return tests.some((t) => t.cause === 'cloudflare_1020')
+  return tests.some((t) => t.identity_role === 'crawler' && t.cause === 'cloudflare_1020')
     ? {
         vendor: 'Cloudflare',
         detected_from: "a crawler test answered with Cloudflare's error 1020",
@@ -95,7 +95,7 @@ export function checkRecord(
       .map((p) => ({ template_key: p.template_key, text_share: p.without_js?.text_share ?? null })),
   );
   const home = assembled.rows.get(assembled.homepage_url);
-  const tested = access.map((b) => b.finished_at).sort();
+  const tested = access.map((b) => b.finished_at).sort((a, b) => Date.parse(a) - Date.parse(b));
   return {
     id: input.check.id,
     site_id: input.check.site_id,
@@ -132,12 +132,14 @@ export function checkRecord(
     ),
     stack: {
       frontend: null,
-      backend: home?.stack_signals
-        ? {
-            cms: home.stack_signals.cms,
-            detected_from: `homepage ${home.stack_signals.detected_from}`,
-          }
-        : null,
+      // detectCms answers `custom` when no signature matched: no CMS was recognised, which is not one.
+      backend:
+        home?.stack_signals && home.stack_signals.cms !== 'custom'
+          ? {
+              cms: home.stack_signals.cms,
+              detected_from: `homepage ${home.stack_signals.detected_from}`,
+            }
+          : null,
       edge: edgeOf(assembled.access_tests),
     },
     competitors: [],

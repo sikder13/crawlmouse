@@ -4,8 +4,9 @@
  *   detectAccess → detectStructure → (orphans and their parents onto the pages) → gradeCheck →
  *   detectorOutcomes (which computes the fix effects, effectsOf, itself)
  *
- * Each is called once, on the same pages and links, so nothing is graded from a different population
- * than it is detected or diffed on (build.test.ts counts the calls). The withheld reasons, refusals and
+ * Each is called once, on the same pages and the same links: the detectors read the links as recorded
+ * and file a redirected page's under it themselves (detectors/scope.ts); the grade reads them filed by
+ * the same rule (filing.ts). build.calls.test.ts counts the calls and compares the two filings. The withheld reasons, refusals and
  * fix effects are theirs, passed through.
  */
 import type { PageResult } from '@crawlmouse/types/v2';
@@ -64,7 +65,8 @@ export function gradeAssembled(
   }));
   const grades = gradeCheck({
     pages: withOrphans,
-    edges: assembled.edges,
+    // Filed under the page they were found on, as the detectors file them for themselves (filing.ts).
+    edges: assembled.filed_edges,
     homepage_url: assembled.homepage_url,
     content: assembled.content,
     crawlers: access.crawlers,

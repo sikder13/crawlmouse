@@ -73,8 +73,17 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     withdrawnIn:
       'docs/specs/v2/20a-check-builder.md (Differences from ARCH-2), CC-20a mutation of the stage-1 bound',
     truth:
-      "The challenged pages' templates count toward stage 1's 24, so stage 1 holds at most " +
-      '24 + 2 - 1 = 25 pages (plan.ts STAGE1_MAX_PAGES); the page check that assumed otherwise could never fire.',
+      'Stage 1 holds at most 25 pages because sample checks the page count before each template page ' +
+      '(plan.ts STAGE1_MAX_PAGES); the template bound alone does not imply it.',
+    allowedIn: [],
+  },
+  {
+    text: 'which is what holds the stage to 25',
+    withdrawnIn:
+      'docs/specs/v2/20a-check-builder.md (Differences from ARCH-2), CC-20a review round 1',
+    truth:
+      "Challenged pages can share the homepage's template (a template key leaves the query out), so the " +
+      'template bound allows 26; the 25-page check in sample is what holds the stage to its bound.',
     allowedIn: [],
   },
   {

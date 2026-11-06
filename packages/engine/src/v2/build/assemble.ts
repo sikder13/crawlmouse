@@ -33,6 +33,8 @@ import type { DetectorInput } from '../detectors/types.js';
 import { isGraded, type TechnicalSeoInput } from '../grade/technical-seo.js';
 import type { RenderOutcome } from '../render/run.js';
 import type { Batches } from './batches.js';
+import { fileEdges, landingsOf } from './filing.js';
+import { crawlableSeeds, landedOn, nextCrawlBatch } from './plan.js';
 import { decideStatus, type StatusDecision } from './status.js';
 import type { BuildInput, Seed } from './types.js';
 
@@ -43,7 +45,10 @@ export interface Assembled {
   homepage_url: string;
   /** Sorted by URL. `is_orphan`, `suggested_parent_url` and `content_failures` are set after grading. */
   pages: PageResult[];
+  /** The links as the worker recorded them: LinkEdge rows, and what the structure detectors read. */
   edges: LinkEdge[];
+  /** The same links filed under the page they were found on (filing.ts): what the grade reads. */
+  filed_edges: LinkEdge[];
   disallowed: DetectorInput['disallowed'];
   access_tests: AccessTest[];
   /** The crawl row behind each page, by URL. */
@@ -105,7 +110,17 @@ export function assemble(
     .map((r) => ({ url: r.url, robots_search: r.robots_search }))
     .sort((a, b) => byText(a.url, b.url));
   const edges = distinctEdges(batches.crawl.flatMap((b) => b.link_edges));
-  const access_tests = batches.access.flatMap((b) => b.access_tests);
+  // The graph, depth, inbound counts and grade read the links filed under the page they were found on.
+  const filed = fileEdges(
+    edges,
+    landingsOf(
+      pageRows.map((r) => ({ url: r.url, final_url: r.final_url, status_code: r.status_code! })),
+    ),
+  );
+  // By id, so the order the rows arrive in does not reach the output.
+  const access_tests = batches.access
+    .flatMap((b) => b.access_tests)
+    .sort((a, b) => byText(a.id, b.id));
   for (const t of access_tests) {
     if (!rows.has(t.page_url)) {
       throw new Error(`buildCheck: an access test of ${t.page_url}, which the crawl did not fetch`);
@@ -158,7 +173,7 @@ export function assemble(
       statusCode: 200,
       title: r.title?.text ?? undefined,
     })),
-    toLinks(edges),
+    toLinks(filed),
   );
   const analysis = deriveGradeInputs(graph, {
     homepageUrl: homepage,
@@ -171,14 +186,14 @@ export function assemble(
   // pages there is no root, so no page has a depth (v1's fallback roots would give orphans depth 0).
   const linkGraph = buildGraph(
     pageRows.map((r) => ({ url: r.url, urlHash: r.url, statusCode: r.status_code! })),
-    toLinks(edges),
+    toLinks(filed),
   );
   const depths = linkGraph.hasNode(homepage)
     ? computeDepth(linkGraph, homepage)
     : new Map<string, number>();
 
   const inbound = new Map<string, Set<string>>();
-  for (const e of edges)
+  for (const e of filed)
     (inbound.get(e.to_url) ?? inbound.set(e.to_url, new Set()).get(e.to_url)!).add(e.from_url);
 
   const crawlerRows = new Map<string, AccessTest[]>();
@@ -191,6 +206,7 @@ export function assemble(
 
   const pages: PageResult[] = pageRows.map((r) => {
     const tests = crawlerRows.get(r.url) ?? null;
+    const known = measured(tests);
     const rank = analysis.ranks.get(r.url);
     return {
       check_id: input.check.id,
@@ -209,8 +225,9 @@ export function assemble(
       suggested_parent_url: null,
       sampled: tests !== null,
       without_js: rendered.get(r.url) ?? null,
-      crawlers_reached: tests && distinctUas(tests.filter((t) => SERVED.has(t.verdict))),
-      crawlers_reading_text: tests && distinctUas(tests.filter((t) => t.verdict === 'allowed')),
+      // Unknown, not zero, when a crawler test on the page measured nothing (a stopped access batch).
+      crawlers_reached: known && distinctUas(known.filter((t) => SERVED.has(t.verdict))),
+      crawlers_reading_text: known && distinctUas(known.filter((t) => t.verdict === 'allowed')),
       content_failures: null,
       final_url: r.final_url,
       redirect: r.redirect,
@@ -226,20 +243,30 @@ export function assemble(
   });
 
   // Coverage. A URL a row landed on was read, under the row's URL, so it is not left unread.
-  const landed = new Set(
-    allRows.flatMap((r) => (r.final_url ? [canonicalizeUrl(r.final_url)] : [])),
-  );
+  const landed = new Set(allRows.flatMap((r) => landedOn(r) ?? []));
   const rowUrls = new Set(allRows.map((r) => r.url));
-  const found = [...batches.crawl.flatMap((b) => b.discovered_urls), ...seeds.keys()];
+  const crawlable = crawlableSeeds(input.seeds);
+  const found = [
+    ...batches.crawl.flatMap((b) => b.discovered_urls),
+    ...crawlable.map((s) => canonicalizeUrl(s.url)),
+  ];
   const unread = [...new Set(found)].filter((u) => !rowUrls.has(u) && !landed.has(u)).sort();
   const pages_discovered = rowUrls.size + unread.length;
-  const status = decideStatus(batches);
-  const sitemap = input.seeds
+  // A crawl the planner would go on with was not run to its end (CC-20b stopped it, or lost a batch).
+  const crawlOpen = nextCrawlBatch(input.seeds, batches.crawl, input.check.page_cap) !== null;
+  const status = decideStatus(batches, crawlOpen ? ['crawl'] : []);
+  const sitemap = crawlable
     .filter((s) => s.source === 'sitemap')
     .map((s) => canonicalizeUrl(s.url));
+  // v1's crawl health: a failed request was attempted (status 0, blocked), and a URL robots.txt keeps
+  // from every search engine as well as from us is outside the crawlable site (scope.ts).
+  const robotsExcluded = excludedByRobots(disallowed).size;
   const health = computeCrawlHealth(
-    pages.map((p) => ({ statusCode: p.status_code })),
-    pages_discovered,
+    [
+      ...pages.map((p) => ({ statusCode: p.status_code })),
+      ...allRows.filter((r) => r.outcome === 'failed').map(() => ({ statusCode: 0 })),
+    ],
+    pages_discovered - robotsExcluded,
   );
   const estimate = estimateSiteTotal(health, sitemap.length > 0 ? sitemap.length : null);
   // The exclusion tally is over the pages answering 200, as v1's (refusal.ts: gradeable + excluded is
@@ -268,12 +295,13 @@ export function assemble(
     },
     gradeable: accounting.gradeable,
     excluded: accounting.excluded,
-    excluded_by_robots: excludedByRobots(disallowed).size,
+    excluded_by_robots: robotsExcluded,
   };
   return {
     homepage_url: homepage,
     pages,
     edges,
+    filed_edges: filed,
     disallowed,
     access_tests,
     rows,
@@ -294,6 +322,10 @@ export function assemble(
 }
 
 const distinctUas = (tests: readonly AccessTest[]): number => new Set(tests.map((t) => t.ua)).size;
+
+/** The page's crawler tests, when every one of them measured something; else null. */
+const measured = (tests: readonly AccessTest[] | null): readonly AccessTest[] | null =>
+  tests !== null && tests.every((t) => t.verdict !== 'not_measured') ? tests : null;
 
 function seedMap(seeds: readonly Seed[]): Map<string, Seed> {
   const out = new Map<string, Seed>();

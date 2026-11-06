@@ -41,6 +41,8 @@ import {
   recordedInput,
 } from '../../../fixtures/v2/build/recorded.js';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
+import { assemble } from './assemble.js';
+import { readBatches } from './batches.js';
 import { buildCheck, serialiseBuilt } from './build.js';
 import { registryVersion } from './lineage.js';
 import { SUMMARY_BYTES } from './summaries.js';
@@ -289,7 +291,7 @@ describe('what buildCheck refuses', () => {
 
 describe('lineage and usage', () => {
   it("names the registry the access detectors read, by CC-06b's own hash", async () => {
-    const { grading, fetching } = built.lineages;
+    const { grading } = built.lineages;
     expect(grading.crawler_registry_version).toBe(
       await crawlerRegistryVersion(CRAWLER_REGISTRY_V2),
     );
@@ -384,5 +386,97 @@ describe('the redirect conflict (found by the built fixture)', () => {
       state: 'indeterminate',
       reason: 'links_not_fully_recorded',
     });
+  });
+});
+
+describe('what the built check holds, from its own rows', () => {
+  it('counts the structure from the pages: deep pages and the mean depth over graded pages with one', () => {
+    const graded = built.page_results.filter(
+      (p) => p.kind === 'content' && p.status_code === 200 && p.is_html && p.depth !== null,
+    );
+    const s = built.check.structure!;
+    expect(s.pages_deeper_than_3).toBe(graded.filter((p) => p.depth! > 3).length);
+    expect(s.avg_click_depth).toBeCloseTo(
+      graded.reduce((n, p) => n + p.depth!, 0) / graded.length,
+      12,
+    );
+    expect(s.internal_links).toBe(built.link_edges.length);
+    expect(s.orphan_pages).toBe(built.page_results.filter((p) => p.is_orphan).length);
+  });
+
+  it('dates the crawler tests by the last access batch, and counts the crawl in its summary', () => {
+    const access = recordedBuild().batches.filter(
+      (b) => (b as BatchResult).kind === 'access',
+    ) as BatchResult[];
+    const last = access.map((b) => Date.parse(b.finished_at)).sort((a, b) => b - a)[0]!;
+    expect(Date.parse(built.check.tested_at!)).toBe(last);
+    const crawl = built.summaries.find((s) => s.phase === 'crawl')!;
+    expect(crawl).toMatchObject({
+      links: built.link_edges.length,
+      pages_crawled: built.page_results.length,
+      pages_discovered: built.check.coverage!.pages_discovered,
+    });
+  });
+
+  it('names no backend when detectCms recognised no CMS on the homepage', () => {
+    const home = readRecorded('batches')
+      .flatMap((b) => (b.kind === 'crawl' ? b.pages : []))
+      .find((p) => p.url === HOST)!;
+    expect(home.stack_signals!.cms).toBe('custom');
+    expect(built.check.stack!.backend).toBeNull();
+  });
+});
+
+describe('a check the pipeline did not finish', () => {
+  it('is partial, and tells the detectors the crawl was cut, when the crawl planner still has URLs', () => {
+    const input = recordedBuild();
+    const first = readBatches([crawlOf(input)[0]!], input.check, input.lineage.worker_release);
+    expect(assemble({ ...input, render: null }, first).status).toEqual({
+      status: 'partial',
+      reasons: [],
+      crawl_partial: true,
+      unfinished: ['crawl'],
+    });
+    const whole = readBatches(crawlOf(input), input.check, input.lineage.worker_release);
+    expect(assemble({ ...input, render: null }, whole).status.unfinished).toEqual([]);
+  });
+
+  it('is partial when a page the sample planned has no crawler test', () => {
+    const noStage2 = buildCheck(edited((i) => (i.batches = i.batches.slice(0, -1))));
+    expect(noStage2.check.status).toBe('partial');
+    expect(built.check.status).toBe('finished');
+  });
+
+  it('counts no crawler on a page whose crawler tests measured nothing, rather than none reaching it', () => {
+    const page = built.page_results.find((p) => p.sampled)!;
+    const unmeasured = buildCheck(
+      edited((i) => {
+        for (const b of accessOf(i))
+          for (const t of b.access_tests)
+            if (t.page_url === page.url && t.identity_role === 'crawler')
+              Object.assign(t, { verdict: 'not_measured', cause: null, witness: null });
+      }),
+    );
+    expect(unmeasured.page_results.find((p) => p.url === page.url)).toMatchObject({
+      sampled: true,
+      crawlers_reached: null,
+      crawlers_reading_text: null,
+    });
+  });
+});
+
+describe('order the pipeline cannot control', () => {
+  it('gives the same bytes with rows, links, seeds and access tests in another order', () => {
+    const shuffled = edited((i) => {
+      i.seeds = [...i.seeds].reverse();
+      for (const b of crawlOf(i)) {
+        b.pages.reverse();
+        b.link_edges.reverse();
+        b.discovered_urls.reverse();
+      }
+      for (const b of accessOf(i)) b.access_tests.reverse();
+      i.render!.pages.reverse();
+    });
+    expect(serialiseBuilt(buildCheck(shuffled))).toBe(serialiseBuilt(built));
   });
 });
