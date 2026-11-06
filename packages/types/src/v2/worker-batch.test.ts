@@ -36,6 +36,10 @@ const page = {
   signature_verified: 'not_observable',
   worker_release: 'unreleased',
   timing: { dns_ms: null, connect_ms: null, ttfb_ms: 5, total_ms: 9 },
+  content_features: null,
+  stack_signals: { cms: 'custom', detected_from: 'HTML and response headers' },
+  main_text_chars: 120,
+  noindex: false,
 };
 
 const robots = {
@@ -49,6 +53,8 @@ const robots = {
   from_cache: false,
   crawl_delay_s: null,
   body_excerpt: 'User-agent: *',
+  body: 'User-agent: *',
+  body_complete: true,
 };
 
 const crawl = {

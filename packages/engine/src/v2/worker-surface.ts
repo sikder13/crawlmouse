@@ -32,3 +32,6 @@ export {
 } from '../analysis/ai-readiness/main-content-implied-body.js';
 export { simhashForDedup, SIMHASH_MAX_TOKENS, SIMHASH_MIN_TOKENS } from '../analysis/simhash.js';
 export { CRAWLER_REGISTRY_V2 } from './crawler-registry.js';
+export { readPage as readContentFeatures } from './content/read.js';
+export type { ContentFeatures } from './content/read.js';
+export { detectCms } from '../cms-detection/index.js';

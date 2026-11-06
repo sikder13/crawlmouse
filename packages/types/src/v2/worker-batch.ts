@@ -39,6 +39,8 @@ import {
   RedirectChainSchema,
   SearchRobotsSchema,
 } from './page-facts.js';
+import { CmsNameSchema } from './enums.js';
+import { rules } from './rules.js';
 import { MetaDescriptionSchema, PageTitleSchema } from './page-result.js';
 
 /** The served text a crawl row keeps, in UTF-8 bytes. */
@@ -68,6 +70,72 @@ export const CrawlResponseSchema = z.enum([
   'redirected_away',
   'error',
 ]);
+
+// ─── What the content checks and the stack read of a page, carried on its row ──────────────────
+
+/** The most JSON-LD nodes, and types per node, a row keeps; a page past either keeps no features. */
+export const MAX_JSON_LD_NODES = 256;
+export const MAX_JSON_LD_TYPES = 32;
+export const JSON_LD_TYPE_BYTES = 256;
+/** The most a row's content features may take, serialised as JSON. */
+export const CONTENT_FEATURES_BYTES = 64 * 1024;
+
+const ContentBlockSchema = z.strictObject({
+  tag: z.string().regex(/^[a-z][a-z0-9]*$/),
+  words: z.int().min(1),
+  answer_sentences: CountSchema,
+  question: z.boolean(),
+});
+
+/**
+ * What the engine's content reader (`packages/engine/src/v2/content/read.ts` readPage) reads of one
+ * page's static HTML, read by the worker from the same bytes it counted words on. It holds no page
+ * text: block shapes, heading counts, JSON-LD types and flags, byline markup and specification counts.
+ * The engine's `ContentFeatures` type and this schema are held equal in both directions by
+ * packages/engine/src/v2/build/contract-fit.test.ts.
+ */
+export const ContentFeaturesSchema = z.strictObject({
+  client_rendered: z.boolean(),
+  has_h1: z.boolean(),
+  words_after_h1: CountSchema,
+  opening: z.array(ContentBlockSchema),
+  headings: z.strictObject({
+    count: CountSchema,
+    questions: CountSchema,
+    section_questions: CountSchema,
+  }),
+  json_ld: z
+    .array(
+      z.strictObject({
+        types: z.array(crawledText(JSON_LD_TYPE_BYTES)).max(MAX_JSON_LD_TYPES),
+        has_description: z.boolean(),
+        has_author: z.boolean(),
+        has_dated_publication: z.boolean(),
+      }),
+    )
+    .max(MAX_JSON_LD_NODES),
+  byline: z.strictObject({
+    meta_author: z.boolean(),
+    published_time: z.boolean(),
+    rel_author: z.boolean(),
+    itemprop_author: z.boolean(),
+    itemprop_date: z.boolean(),
+    time_datetime: z.boolean(),
+  }),
+  specs: z.strictObject({
+    structured: CountSchema,
+    label_value_lines: CountSchema,
+    spec_images: CountSchema,
+  }),
+});
+
+export type ContentFeaturesRow = z.infer<typeof ContentFeaturesSchema>;
+
+/** The CMS a page's HTML and response headers point to (v1's detectCms), and what it was read from. */
+export const StackSignalsSchema = z.strictObject({
+  cms: CmsNameSchema,
+  detected_from: z.string().min(1).max(200),
+});
 
 /**
  * CrawlPage: one URL in one crawl batch, and what our crawl identity got back.
@@ -124,6 +192,24 @@ export const CrawlPageSchema = z.strictObject({
   worker_release: WorkerReleaseSchema,
   /** The request's timing (AccessTest's); null when no request was made. */
   timing: RequestTimingSchema.nullable(),
+  /**
+   * The page's content features; null when the page was not read whole, or its features passed the
+   * bounds above (the row's limitations say which), or the batch had used its room for page text.
+   */
+  content_features: ContentFeaturesSchema.nullable(),
+  /** Read on a batch's first URL only, when it was read as HTML; null on every other row. */
+  stack_signals: StackSignalsSchema.nullable(),
+  /**
+   * The length, in characters, of the page's main content as v1's extractMainContent gives it (the
+   * page classifier's thin-content signal); null when the page was not read whole.
+   */
+  main_text_chars: CountSchema.nullable(),
+  /**
+   * The page told search engines not to index it: `noindex` or `none` in a robots, googlebot or bingbot
+   * meta tag, or in an X-Robots-Tag header (v1's two rules). True on the header alone; otherwise null
+   * when the page was not read whole.
+   */
+  noindex: z.boolean().nullable(),
 });
 
 export type CrawlOutcome = z.infer<typeof CrawlOutcomeSchema>;
@@ -158,19 +244,31 @@ export const NotReadReasonSchema = z.enum([
 ]);
 
 /** robots.txt as one origin answered it for the batch, as evidence. */
-export const RobotsEvidenceSchema = z.strictObject({
-  origin: crawledText(ORIGIN_BYTES, 1),
-  /** The user agent robots.txt was requested with: always our crawler's. */
-  identity_sent: crawledText(512, 1),
-  state: RobotsStateSchema,
-  why: RobotsWhySchema.nullable(),
-  status: HttpStatusSchema.nullable(),
-  final_url: HttpUrlSchema.nullable(),
-  fetched_at: TimestampSchema,
-  from_cache: z.boolean(),
-  crawl_delay_s: z.number().min(0).nullable(),
-  body_excerpt: crawledText(ROBOTS_EXCERPT_BYTES).nullable(),
-});
+export const RobotsEvidenceSchema = z
+  .strictObject({
+    origin: crawledText(ORIGIN_BYTES, 1),
+    /** The user agent robots.txt was requested with: always our crawler's. */
+    identity_sent: crawledText(512, 1),
+    state: RobotsStateSchema,
+    why: RobotsWhySchema.nullable(),
+    status: HttpStatusSchema.nullable(),
+    final_url: HttpUrlSchema.nullable(),
+    fetched_at: TimestampSchema,
+    from_cache: z.boolean(),
+    crawl_delay_s: z.number().min(0).nullable(),
+    body_excerpt: crawledText(ROBOTS_EXCERPT_BYTES).nullable(),
+    /**
+     * The whole file, as served, when the worker read all of it (within the engine's 500 KiB parse
+     * limit) as rules and could store it unchanged; null otherwise. `body_complete` says which.
+     */
+    body: z.string().nullable(),
+    body_complete: z.boolean(),
+  })
+  .check(
+    rules((r, rule) => {
+      rule.exactlyWhen('robots_body', r.body !== null, r.body_complete);
+    }),
+  );
 
 export type RobotsEvidence = z.infer<typeof RobotsEvidenceSchema>;
 

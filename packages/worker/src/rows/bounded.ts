@@ -1,6 +1,7 @@
 import { ROBOTS_PARSE_LIMIT_BYTES, toPersistableText } from '@crawlmouse/engine/worker';
 import {
   DECLARATION_MEDIA_TYPE_BYTES,
+  JSON_LD_TYPE_BYTES,
   DESCRIPTION_BYTES,
   MAX_HREFLANG_CHARS,
   TITLE_BYTES,
@@ -65,6 +66,13 @@ export const CAPS = {
   token: text(64),
   /** What a robots.txt reading keeps of the file itself, as evidence. */
   robotsExcerpt: text(4096),
+  /**
+   * A robots.txt file kept whole for the check builder: within the engine's parse limit (a byte order
+   * mark aside, a file read as rules is), and stored only as written.
+   */
+  robotsFile: exact(ROBOTS_PARSE_LIMIT_BYTES + 3),
+  /** A JSON-LD type a page names, as written: a cut or cleaned type would be another type. */
+  jsonLdType: exact(JSON_LD_TYPE_BYTES),
   /** A robots.txt request URL: an origin within the URL cap and `/robots.txt`. */
   robotsUrl: whole(MAX_URL_LENGTH + '/robots.txt'.length),
   /** A rel=canonical href, as written. */

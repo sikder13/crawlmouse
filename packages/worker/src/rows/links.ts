@@ -66,6 +66,13 @@ export interface PageLinks {
   titleText: string | null;
   /** The first `<meta name="description">`'s content as written ('' with none), or null for none. */
   descriptionText: string | null;
+  /**
+   * The length of the page's main content, as the engine's extractMainContent gives it (v1's
+   * `mainTextChars`), from this same walk.
+   */
+  mainTextChars: number;
+  /** A robots, googlebot or bingbot meta tag says `noindex` or `none` (v1's readMetaNoindex rule). */
+  metaNoindex: boolean;
 }
 
 /** JavaScript's `\s`: what the engine collapses and trims. */
@@ -188,6 +195,7 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
   // The first <title> and <meta name=description>, found in the same walk.
   let title: Element | null = null;
   let description: Element | null = null;
+  let metaNoindex = false;
   // The hreflang alternates, found in the same walk: the first MAX_HREFLANG_LINKS, and a count of
   // the rest, so a page of thousands holds no more than that.
   const alternates: Element[] = [];
@@ -221,6 +229,7 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
     if (canonical === null && isCanonicalLink(node)) canonical = node;
     if (title === null && node.type === 'tag' && node.name === 'title') title = node;
     if (description === null && isDescription(node)) description = node;
+    if (!metaNoindex && isNoindexMeta(node)) metaNoindex = true;
     if (node.type === 'tag' && isAlternate(node)) {
       if (alternates.length < MAX_HREFLANG_LINKS) alternates.push(node);
       else moreAlternates++;
@@ -266,7 +275,27 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
     mainTextStart: main.textPrefix(HASHED_TEXT_CHARS),
     titleText: title === null ? null : textOf(title),
     descriptionText: description === null ? null : (description.attribs.content ?? ''),
+    mainTextChars: main.result().mainTextChars,
+    metaNoindex,
   };
+}
+
+/** The meta names v1's readMetaNoindex reads (packages/engine/src/extract.ts), compared trimmed and without case. */
+const NOINDEX_META_NAMES = new Set(['robots', 'googlebot', 'bingbot']);
+
+/**
+ * v1's readMetaNoindex, on one node: a `<meta name>` among NOINDEX_META_NAMES whose content, split on
+ * commas, holds `noindex` or `none`. v1's is not exported, so links.test.ts holds this to extractPage's
+ * `classificationSignals.metaNoindex` on generated pages.
+ */
+function isNoindexMeta(node: AnyNode): boolean {
+  if (node.type !== 'tag' || node.name !== 'meta') return false;
+  const name = node.attribs.name;
+  if (name === undefined || !NOINDEX_META_NAMES.has(name.trim().toLowerCase())) return false;
+  return (node.attribs.content ?? '')
+    .toLowerCase()
+    .split(',')
+    .some((t) => t.trim() === 'noindex' || t.trim() === 'none');
 }
 
 /** `meta[name=description]`, the name compared without case, as search engines read it. */

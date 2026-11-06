@@ -160,6 +160,8 @@ export const RULES = {
   robots_verdict: one('a robots.txt verdict is allowed, disallowed_by_robots or not_measured'),
   robots_ua_unique: one('each search engine has one robots.txt verdict'),
   links_read_html: one('only an HTML response has its links read'),
+  // The crawl worker's batch result
+  robots_body: two('a robots.txt body is kept exactly when the whole file was read'),
 } as const;
 
 export type RuleId = keyof typeof RULES;

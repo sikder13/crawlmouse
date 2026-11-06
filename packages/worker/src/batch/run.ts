@@ -151,5 +151,8 @@ function robotsEvidence(o: OriginRules): RobotsEvidence {
     from_cache: o.fromCache,
     crawl_delay_s: o.crawlDelayS,
     body_excerpt: bodyExcerpt(f),
+    // readRobots keeps the file only from a body that was not cut, so a kept file is the whole file.
+    body: o.reading.state === 'rules' ? o.reading.file : null,
+    body_complete: o.reading.state === 'rules' && o.reading.file !== null,
   };
 }

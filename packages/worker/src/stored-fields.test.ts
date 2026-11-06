@@ -50,7 +50,9 @@ type Format =
   | 'search_engine'
   | 'fly_region'
   | 'worker_release'
-  | 'declaration_path';
+  | 'declaration_path'
+  | 'tag'
+  | 'stack_source';
 /** A field is either made by the helper with the cap named, or a fixed format. */
 type Field = Cap | Format;
 const FORMATS: Record<Format, RegExp> = {
@@ -67,6 +69,10 @@ const FORMATS: Record<Format, RegExp> = {
   declaration_path: new RegExp(
     `^(?:${DECLARATION_PATHS.map((p) => p.replace(/\./g, '\\.')).join('|')})$`,
   ),
+  // An element name, as the parser gives it (a content feature's block).
+  tag: /^[a-z][a-z0-9]*$/,
+  // A module constant (batch/crawl.ts STACK_SOURCE).
+  stack_source: /^HTML and response headers$/,
   // A registry token, a module constant (identities.ts SEARCH_ENGINES).
   search_engine: new RegExp(`^(?:${identities.SEARCH_ENGINES.map((e) => e.token).join('|')})$`),
 };
@@ -116,6 +122,7 @@ const FIELDS: Record<string, Field> = {
     final_url: 'url',
     fetched_at: 'timestamp',
     body_excerpt: 'bodyExcerpt',
+    body: 'robotsFile',
   }),
   ...row('pages[]', {
     ...EVIDENCE,
@@ -136,6 +143,10 @@ const FIELDS: Record<string, Field> = {
     'robots_search[].verdict': 'enum',
     'title.text': 'title',
     'meta_description.text': 'description',
+    'content_features.opening[].tag': 'tag',
+    'content_features.json_ld[].types[]': 'jsonLdType',
+    'stack_signals.cms': 'enum',
+    'stack_signals.detected_from': 'stack_source',
   }),
   ...row('declarations[]', {
     origin: 'origin',
@@ -206,6 +217,7 @@ const CACHED: Record<string, Field | 'empty'> = {
   'fetch.redirectStop': 'enum',
   'fetch.error': 'enum',
   'fetch.body': 'robotsExcerpt',
+  file: 'robotsFile',
 };
 
 /** The string fields a zod schema declares, by path. */
@@ -256,7 +268,9 @@ const PAGE = html(
     `<link rel="alternate" hreflang="en-GB" href="/en?${'é'.repeat(2000)}">` +
     `<link rel="alternate" hreflang="${'h'.repeat(5000)}" href="/h">` +
     `<link rel="alternate" hreflang="fr" href="${LONG_URL_PATH}">` +
-    `<link rel="alternate" hreflang="de" href="/de"></head><body>` +
+    `<link rel="alternate" hreflang="de" href="/de">` +
+    `<script type="application/ld+json">{"@type":"Product","description":"d"}</script></head><body>` +
+    `<h1>A product</h1>` +
     `<a href="/to">${'anchor '.repeat(2000)}</a><a href="${LONG_URL_PATH}">long</a>` +
     `<p>${'word '.repeat(100_000)}</p></body></html>`,
 );
@@ -366,9 +380,10 @@ describe('stored fields', () => {
       ...schemaStrings(LinkEdgeSchema).map((p) => `link_edges[].${p}`),
       ...schemaStrings(AccessTestSchema).map((p) => `access_tests[].${p}`),
     ];
-    // 30 in CrawlPage, 4 in LinkEdge, 26 in AccessTest: the walk reaches the nested header and page
-    // fact fields. AccessTest's request line is two literals, a fixed format the walk does not list.
-    expect(declared).toHaveLength(60);
+    // 34 in CrawlPage, 4 in LinkEdge, 26 in AccessTest: the walk reaches the nested header, page
+    // fact and content feature fields. AccessTest's request line is two literals, a fixed format the
+    // walk does not list.
+    expect(declared).toHaveLength(64);
     expect(declared.filter((p) => !(p in FIELDS))).toEqual([]);
   });
 
@@ -387,6 +402,10 @@ describe('stored fields', () => {
       'pages[].robots_search[].ua',
       'link_edges[].anchor_text',
       'robots[].body_excerpt',
+      'robots[].body',
+      'pages[].content_features.opening[].tag',
+      'pages[].content_features.json_ld[].types[]',
+      'pages[].stack_signals.detected_from',
       'findings[].origin',
       'access_tests[].body_excerpt',
       'pages[].headers[].value',
@@ -423,6 +442,7 @@ describe('stored fields', () => {
       'fetch.headers.<key>',
       'fetch.body',
       'fetch.url',
+      'file',
     ]) {
       expect(seen, p).toContain(p);
     }
@@ -443,11 +463,16 @@ describe('stored fields', () => {
 
   it('holds no stored string longer than its contract allows, at the sizes the batches above reach', async () => {
     const all = (await results()).flatMap((r) => strings(r));
-    const longest = Math.max(...all.map(([, v]) => v.length));
-    // The largest cap is the served text's 64 KiB; nothing a site sent at 5,000 characters or more
-    // per field reaches a row whole unless it is that text.
+    // robots.txt kept whole for the check builder has its own cap, the engine's parse limit.
+    const files = all.filter(([p]) => p === 'robots[].body');
+    expect(files.length).toBeGreaterThan(0);
+    expect(Math.max(...files.map(([, v]) => v.length))).toBeLessThanOrEqual(CAPS.robotsFile.chars);
+    const rest = all.filter(([p]) => p !== 'robots[].body');
+    const longest = Math.max(...rest.map(([, v]) => v.length));
+    // Past that, the largest cap is the served text's 64 KiB; nothing a site sent at 5,000 characters
+    // or more per field reaches a row whole unless it is that text.
     expect(longest).toBeLessThanOrEqual(64 * 1024);
-    const overLong = all
+    const overLong = rest
       .filter(([p, v]) => p !== 'pages[].raw_text' && v.length > 2048)
       .map(([p, v]) => `${p}: ${v.length}`);
     expect(overLong).toEqual([]);
