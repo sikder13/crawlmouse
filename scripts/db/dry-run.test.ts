@@ -234,7 +234,12 @@ describe('the dry run', () => {
   it('accepts a migration the pull request adds when production recorded exactly its bytes before merge', async () => {
     // P1 and P2 of this pull request: applied to production ahead of the merge, with a history row
     // holding the file's bytes, so the file is in the diff against main and already recorded.
-    const h = await harness();
+    // The branch's own row holds the statements split, as Supabase's replay records them.
+    const h = await harness({
+      branchSetup: `update supabase_migrations.schema_migrations
+        set statements = array['create table x ()', 'alter table x enable row level security']
+        where version = '20260524000001'`,
+    });
     const summary = await dryRun(h.deps, {
       files,
       branch: 'pr-6c',

@@ -226,8 +226,9 @@ export async function dryRun(
         }
         // A changed file that production recorded with exactly its bytes was applied ahead of the
         // merge (docs/ops/db-migrations.md §9) and has nothing left to deliver. Any other change to
-        // an applied file, a comment or whitespace included, is refused.
-        const recorded = new Map(rows.map((r) => [r.version, r.statements]));
+        // an applied file, a comment or whitespace included, is refused. Production's row is the one
+        // read: the branch's replay records a file's statements split, not as its bytes.
+        const recorded = new Map((await readHistory(prodDb)).map((r) => [r.version, r.statements]));
         const editedApplied = files.filter((f) => {
           if (diff.unrecorded.includes(f) || !changedNames.has(f.file)) return false;
           const statements = recorded.get(f.version);
