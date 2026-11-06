@@ -169,6 +169,58 @@ pnpm exec tsx db/history.ts --project-ref ezspnfeyzwsisymytssm --yes-production
 ```
 
 <!-- history:start -->
+
+Production on 2026-11-05, after the owner recorded 003, 005, 007 and 006b, as the command above
+printed it (unedited):
+
+```text
+target: ezspnfeyzwsisymytssm (read-only)
+43 migration files, 36 history rows
+recorded under the file's version, with statements: 7
+recorded under another version (--repair renames): 19
+  20260526055250 rls_rate_limits -> 20260526000001
+  20260526055318 function_search_path -> 20260526000002
+  20260601093225 stripe_events -> 20260601000001
+  20260601093243 audits_ttl -> 20260601000002
+  20260601093247 email_events -> 20260601000003
+  20260601173159 user_provisioning -> 20260601000004
+  20260601174725 rls_perf_hardening -> 20260601000005
+  20260601182311 audits_anon_session_idx -> 20260601000006
+  20260601190311 public_reports_denormalize -> 20260601000007
+  20260601190332 embed_view_increment -> 20260601000008
+  20260601190334 takedown_rls_lockdown -> 20260601000009
+  20260601190840 share_fns_invoker -> 20260601000010
+  20260601192720 share_security_followups -> 20260601000011
+  20260601194136 rate_limit_fn_grants -> 20260601000012
+  20260602054456 harden_users_entitlement_grants -> 20260602000013
+  20260603184443 waitlist -> 20260603000014
+  20260614094249 audit_canceled -> 20260614000001
+  20260617204256 engine_v2_crawl_health -> 20260617000001
+  20261103220014 v2_001_entitlement_tables -> 20261101000001
+recorded with no executable statement (--repair adds the file's bytes): 9
+  20260707000001 audit_progress_notify
+  20260707000002 public_reports_visibility
+  20260707000003 spec04_column_privilege_hardening
+  20260707000004 public_reports_client_insert_revoke
+  20260707000005 domain_verifications_client_write_revoke
+  20261102000001 v2_003_sites_checks
+  20261102000002 v2_005_sharing_columns
+  20261102000003 v2_007_storage
+  20261103000001 v2_006b_ledger_usage
+rows with no file (--repair --drop-orphan <version> deletes): 1
+  20260601174823 harden_handle_new_user_grants
+    statement md5 e5480a18f72bc2a3c61027b38a8a1d12
+files with no row: 8
+  20260629000001 spec02_conversion_core
+  20260629000002 fixes_service_role_only
+  20260708000001 spec05_ai_readiness
+  20260727000001 spec05_pages_ai_signals_privilege
+  20260804000001 spec51a_stage4_refusal_coverage_fingerprint
+  20260805000001 spec51a_stage5_frontier_checkpoint
+  20260806000001 spec51a_stage6_frontier_functions
+  20260806000002 spec51a_stage6_settle_frontier_batch
+```
+
 <!-- history:end -->
 
 The row with no file, `20260601174823 harden_handle_new_user_grants`, holds one statement:
@@ -190,6 +242,55 @@ pnpm exec tsx db/history.ts --db-url-env DB_URL --yes-production \
 
 Afterwards the read above prints no renamed, empty or orphan rows, and no files without a row.
 Then re-run the pull request's dry run.
+
+**The dry run before the repair.** Run by hand on 2026-11-06 from commit `5cf0740d`, with
+`pnpm exec tsx db/dry-run.ts --branch cc-db-ops-live`. Its summary, unedited:
+
+```text
+### Migration dry run: FAILED
+
+Commit `5cf0740d`, Supabase branch `cc-db-ops-live`, finished 2026-11-06T01:25:54.798Z.
+
+| Step | Result |
+| --- | --- |
+| Create the branch from production | branch uibsaranofpyfaowdjhl |
+| Branch fingerprint equals the production fingerprint | FAILED: sections differ: acls (0 only on the branch, 1033 only on production), buckets (0 only on the branch, 3 only on production), columns (1 only on the branch, 456 only on production), constraints (1 only on the branch, 314 only on production), default_acls (0 only on the branch, 24 only on production), functions (1 only on the branch, 36 only on production), indexes (0 only on the branch, 110 only on production), policies (0 only on the branch, 22 only on production), relations (0 only on the branch, 30 only on production), rls (0 only on the branch, 30 only on production), roles (3 only on the branch, 5 only on production), schemas (0 only on the branch, 2 only on production), triggers (0 only on the branch, 24 only on production); the lines are in the job log |
+
+Files applied, with the sha256 of the bytes production will receive:
+
+_No migration files were pending._
+
+Rollback files run:
+
+_No rollback file was run._
+```
+
+This is defect 1 in §8 showing itself. The lines that differ are v2 objects production holds and
+the branch lacks, and three lines the branch holds and production does not, traced to history
+rows the branch did not replay:
+
+- `public.public_reports.audit_id uuid not null` and its foreign key: the row for
+  `20260707000002_public_reports_visibility.sql`, which drops the `not null`, is empty;
+- the older `public.apply_entitlement_transition(...)`: the row for 006b, which replaces it, holds
+  only a comment.
+
+The `roles` section is the exception, and the repair does not clear it. The branch holds three
+memberships production does not:
+
+```text
++ supabase_realtime_admin member of anon admin=f inherit=f set=t
++ supabase_realtime_admin member of authenticated admin=f inherit=f set=t
++ supabase_realtime_admin member of service_role admin=f inherit=f set=t
+```
+
+Production has no membership involving `supabase_realtime_admin` (read 2026-11-06:
+`select count(*) from pg_auth_members a join pg_roles m on m.oid = a.member where m.rolname =
+'supabase_realtime_admin'` returns 0). Supabase granted them when it created the branch, and
+nothing in the repair touches roles, so the next branch is expected to carry them and fail here
+again. Until the fingerprint leaves out memberships Supabase grants to its own roles, the dry run
+cannot pass; this is open, and the pull request that added this tooling says so. The other five `roles` lines are
+`crawl_worker`, `research_retention` and their memberships, which the branch lacks because their
+migrations were not replayed.
 
 ## 6. The checks
 
