@@ -1,8 +1,9 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
-import { dryRun, type DryRunDeps } from './dry-run';
+import { dryRun, replayError, type DryRunDeps } from './dry-run';
 import { listMigrations, type MigrationFile } from './files';
 import { diffHistory, readHistory } from './history';
+import type { ReplayState } from './supabase-api';
 import { renderDryRun } from './summary';
 import { HISTORY_TABLE, migratedDb, pgliteDb } from './test-support';
 
@@ -32,15 +33,32 @@ interface Harness {
   logged: string[];
 }
 
+const REPLAYED: ReplayState = {
+  settled: true,
+  failed: [],
+  steps: 'configure=EXITED deploy=EXITED migrate=EXITED pull=EXITED',
+};
+
 async function harness(
   options: {
     branchSetup?: string;
+    /** Run on production and the branch alike: the branch's history is built from production's. */
+    bothSetup?: string;
+    /** Run on production only: what production records that the branch's replay did not reach. */
+    productionSetup?: string;
     cliList?: (pending: string[]) => string[];
     fileList?: MigrationFile[];
+    replay?: ReplayState;
+    replayLog?: string | null;
   } = {},
 ): Promise<Harness> {
   const production = await productionLike();
   const branch = await productionLike();
+  if (options.bothSetup) {
+    await production.exec(options.bothSetup);
+    await branch.exec(options.bothSetup);
+  }
+  if (options.productionSetup) await production.exec(options.productionSetup);
   if (options.branchSetup) await branch.exec(options.branchSetup);
   const calls: string[] = [];
   const deleted: string[] = [];
@@ -57,6 +75,8 @@ async function harness(
     deleteBranch: async (ref) => {
       deleted.push(ref);
     },
+    waitForReplay: async () => options.replay ?? REPLAYED,
+    replayLog: async () => options.replayLog ?? null,
     production: () => pgliteDb(production),
     connect: () => pgliteDb(branch),
     // What the CLI does: each pending file in a transaction, recorded in the history.
@@ -91,6 +111,7 @@ describe('the dry run', () => {
     expect(summary.passed).toBe(true);
     expect(summary.steps.map((s) => s.step)).toEqual([
       'Create the branch from production',
+      'Branch replayed every recorded migration',
       'Branch fingerprint equals the production fingerprint',
       'History is clean and each pending file has a rollback',
       'supabase db push',
@@ -147,7 +168,7 @@ describe('the dry run', () => {
   ])(
     "fails before any push while production's history needs the repair: %s",
     async (_label, setup, named) => {
-      const h = await harness({ branchSetup: setup });
+      const h = await harness({ bothSetup: setup });
       const summary = await dryRun(h.deps, { branch: 'pr-3', commit: 'abc' });
       expect(summary.passed).toBe(false);
       expect(summary.steps.at(-1)!.result).toContain('needs the repair');
@@ -220,5 +241,108 @@ describe('the dry run', () => {
     expect(summary.steps.at(-1)!.step).toBe('supabase db push');
     expect(summary.steps.at(-1)!.result).toContain('the CLI would push');
     expect(h.calls).toEqual(['create pr-5', 'push --dry-run']);
+  }, 300_000);
+  it('fails before the fingerprint when the branch did not record every migration, naming the first and its error', async () => {
+    const h = await harness({
+      productionSetup: `insert into supabase_migrations.schema_migrations (version, name, statements)
+        values ('20261104000001', 'zz_needs_a_hand_made_table', array['select * from public.zz_made_by_hand'])`,
+    });
+    const summary = await dryRun(h.deps, { branch: 'pr-8', commit: 'abc' });
+    expect(summary.passed).toBe(false);
+    const failure = summary.steps.at(-1)!;
+    expect(failure.step).toBe('Branch replayed every recorded migration');
+    expect(failure.result).toContain('the branch has not recorded 1 of');
+    expect(failure.result).toContain('first missing: 20261104000001 zz_needs_a_hand_made_table');
+    // No run log: the error comes from running that migration's recorded statements on the
+    // throwaway branch, in a transaction that is rolled back.
+    expect(failure.result).toContain('error: relation "public.zz_made_by_hand" does not exist');
+    expect(failure.result).toContain('replay steps: configure=EXITED');
+    expect(h.logged.join('\n')).not.toContain('::group::Branch fingerprint');
+    expect(h.calls).toEqual(['create pr-8']);
+    expect(h.deleted).toEqual(['branchref']);
+  }, 300_000);
+
+  it('says so when the missing migration runs without error on the branch', async () => {
+    // 001 is written to run again on a database that has it, so re-running it raises nothing.
+    const h = await harness({
+      branchSetup: `delete from supabase_migrations.schema_migrations where version >= '20261101000001'`,
+    });
+    const summary = await dryRun(h.deps, { branch: 'pr-11', commit: 'abc' });
+    const failure = summary.steps.at(-1)!;
+    expect(failure.step).toBe('Branch replayed every recorded migration');
+    expect(failure.result).toContain('first missing: 20261101000001 v2_001_entitlement_tables');
+    expect(failure.result).toContain(
+      'error: none: its recorded statements run on the branch without one',
+    );
+  }, 300_000);
+
+  it('quotes the first error line of the run log when Supabase has one', async () => {
+    const log = [
+      'Applying migration 20261101000001_v2_001_entitlement_tables.sql...',
+      'ERROR: relation "public.accounts" does not exist (SQLSTATE 42P01)',
+      'At statement: 12',
+    ].join('\n');
+    const h = await harness({
+      branchSetup: `delete from supabase_migrations.schema_migrations where version >= '20261101000001'`,
+      replayLog: log,
+    });
+    const summary = await dryRun(h.deps, { branch: 'pr-9', commit: 'abc' });
+    const failure = summary.steps.at(-1)!;
+    expect(failure.step).toBe('Branch replayed every recorded migration');
+    expect(failure.result).toContain(
+      'error: ERROR: relation "public.accounts" does not exist (SQLSTATE 42P01)',
+    );
+    // The whole log goes to the job log only.
+    expect(failure.result).not.toContain('At statement: 12');
+    expect(h.logged.join('\n')).toContain('At statement: 12');
+  }, 300_000);
+
+  it.each([
+    [
+      'a DEAD step',
+      { settled: true, failed: ['migrate'], steps: 'deploy=EXITED migrate=DEAD' },
+      "Supabase's replay ended with migrate failed (deploy=EXITED migrate=DEAD)",
+    ],
+    [
+      'a replay that did not finish',
+      { settled: false, failed: [], steps: 'migrate=RUNNING' },
+      "the branch's replay did not finish (migrate=RUNNING)",
+    ],
+  ])(
+    'fails at the replay step on %s, before the fingerprint',
+    async (_label, replay, said) => {
+      const h = await harness({ replay });
+      const summary = await dryRun(h.deps, { branch: 'pr-10', commit: 'abc' });
+      expect(summary.passed).toBe(false);
+      const failure = summary.steps.at(-1)!;
+      expect(failure.step).toBe('Branch replayed every recorded migration');
+      expect(failure.result).toContain(said);
+      expect(h.calls).toEqual(['create pr-10']);
+    },
+    300_000,
+  );
+});
+
+describe('replayError runs recorded statements on the branch and keeps nothing', () => {
+  it('returns the first error and rolls back what ran before it', async () => {
+    const pg = await migratedDb(THROUGH_001);
+    const db = pgliteDb(pg);
+    const error = await replayError(db, [
+      'create table public.zz_replay_probe (id int)',
+      'select * from public.zz_missing',
+    ]);
+    expect(error).toBe('relation "public.zz_missing" does not exist');
+    expect(await db.query(`select to_regclass('public.zz_replay_probe') as t`)).toEqual([
+      { t: null },
+    ]);
+  }, 300_000);
+
+  it('returns null when every statement runs, and still keeps nothing', async () => {
+    const pg = await migratedDb(THROUGH_001);
+    const db = pgliteDb(pg);
+    expect(await replayError(db, ['create table public.zz_replay_probe (id int)'])).toBeNull();
+    expect(await db.query(`select to_regclass('public.zz_replay_probe') as t`)).toEqual([
+      { t: null },
+    ]);
   }, 300_000);
 });

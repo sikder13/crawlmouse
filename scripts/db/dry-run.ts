@@ -12,10 +12,10 @@ import {
   readFingerprint,
   type Fingerprint,
 } from './fingerprint';
-import { diffHistory, formatDiff, readHistory } from './history';
+import { diffHistory, formatDiff, readHistory, type HistoryRow } from './history';
 import { missingRollbacks, rerun, revert } from './rollback';
 import { digests, fileList, publish, renderDryRun, type DryRunSummary } from './summary';
-import { ManagementApi, waitForBranch } from './supabase-api';
+import { ManagementApi, waitForBranch, waitForReplay, type ReplayState } from './supabase-api';
 import { dbPush } from './supabase-cli';
 import { PRODUCTION_REF } from './target';
 
@@ -23,17 +23,19 @@ import { PRODUCTION_REF } from './target';
  * The migration dry run, as db-dry-run.yml runs it for a pull request:
  *
  *   1. delete the PR's Supabase branch if one exists, create it again from production, wait for it
- *   2. the branch fingerprint equals the production fingerprint, section by section
- *   3. its history is clean, and every pending file has a rollback
- *   4. `supabase db push` applies the pending files (the CLI's list must equal them)
- *   5. the catalog checks pass
- *   6. each pending file runs again in its own transaction, and the fingerprint does not change
- *   7. the rollbacks run in reverse order, and the fingerprint equals production's again
- *   8. `supabase db push` applies them once more; fingerprint and checks as after step 5
- *   9. if the pull request changes the rollback of an applied migration: the migrations from that
+ *   2. Supabase's replay of production's history onto the branch finished, and the branch recorded
+ *      every migration production records; otherwise name the first missing one and its error
+ *   3. the branch fingerprint equals the production fingerprint, section by section
+ *   4. its history is clean, and every pending file has a rollback
+ *   5. `supabase db push` applies the pending files (the CLI's list must equal them)
+ *   6. the catalog checks pass
+ *   7. each pending file runs again in its own transaction, and the fingerprint does not change
+ *   8. the rollbacks run in reverse order, and the fingerprint equals production's again
+ *   9. `supabase db push` applies them once more; fingerprint and checks as after step 6
+ *  10. if the pull request changes the rollback of an applied migration: the migrations from that
  *      one on are reverted, newest first, and pushed again, and the fingerprint must not change
  *
- * Step 3 also fails when the pull request changes a migration file that is already applied:
+ * Step 4 also fails when the pull request changes a migration file that is already applied:
  * production would never receive the change. Add a new migration instead.
  *
  * Any failed step stops the run, and the summary says which step and why. The branch is deleted
@@ -47,6 +49,10 @@ export interface DryRunDeps {
   /** Creates the branch (deleting one of that name first) and returns a connection URL for it. */
   createBranch(name: string): Promise<{ ref: string; url: string }>;
   deleteBranch(ref: string): Promise<void>;
+  /** Waits for Supabase's replay of production's history onto the branch to finish. */
+  waitForReplay(ref: string): Promise<ReplayState>;
+  /** The replay's run log, or null when Supabase has none. */
+  replayLog(ref: string): Promise<string | null>;
   production(): Db;
   connect(url: string): Db;
   push(url: string, options: { dryRun: boolean }): Promise<{ files: string[] }>;
@@ -54,6 +60,25 @@ export interface DryRunDeps {
 }
 
 export class StepFailed extends Error {}
+
+/**
+ * Runs a migration's recorded statements on the branch in a transaction that is always rolled
+ * back, and returns the first error's message, or null when every statement ran. The branch is a
+ * throwaway copy, and nothing is kept either way.
+ */
+export async function replayError(db: Db, statements: string[]): Promise<string | null> {
+  const ranClean = new Error('every statement ran; rolling back');
+  try {
+    await db.transaction(async (tx) => {
+      for (const statement of statements) await tx.exec(statement);
+      throw ranClean;
+    });
+  } catch (err) {
+    if (err === ranClean) return null;
+    return err instanceof Error ? err.message : String(err);
+  }
+  return null;
+}
 
 export async function dryRun(
   deps: DryRunDeps,
@@ -97,6 +122,18 @@ export async function dryRun(
       deps.log('::endgroup::');
     }
   };
+  // The run log's first error line when Supabase kept a log; otherwise the error the missing
+  // migration's recorded statements raise on the branch. The whole log goes to the job log only.
+  const firstError = async (ref: string, branchDb: Db, row: HistoryRow): Promise<string> => {
+    const log = await deps.replayLog(ref).catch(() => null);
+    if (log) {
+      deps.log(log);
+      const line = log.split('\n').find((l) => /error/i.test(l));
+      if (line) return line.trim();
+    }
+    const error = await replayError(branchDb, row.statements ?? []);
+    return error ?? 'none: its recorded statements run on the branch without one';
+  };
   const same = (
     expected: Fingerprint,
     actual: Fingerprint,
@@ -123,6 +160,38 @@ export async function dryRun(
     });
     db = deps.connect(created.url);
     const branchDb = db;
+    const createdRef = created.ref;
+
+    await step('Branch replayed every recorded migration', async () => {
+      const replay = await deps.waitForReplay(createdRef);
+      const recorded = await readHistory(prodDb);
+      const onBranch = new Set((await readHistory(branchDb)).map((r) => r.version));
+      const missing = recorded.filter((r) => !onBranch.has(r.version));
+      if (replay.settled && replay.failed.length === 0 && missing.length === 0) {
+        return [
+          undefined,
+          `all ${recorded.length} recorded migrations; replay steps: ${replay.steps}`,
+        ];
+      }
+      const problems: string[] = [];
+      if (!replay.settled) problems.push(`the branch's replay did not finish (${replay.steps})`);
+      if (replay.failed.length > 0) {
+        problems.push(
+          `Supabase's replay ended with ${replay.failed.join(', ')} failed (${replay.steps})`,
+        );
+      }
+      if (missing.length > 0) {
+        const first = missing[0]!;
+        problems.push(
+          `the branch has not recorded ${missing.length} of ${recorded.length} migrations; ` +
+            `first missing: ${first.version} ${first.name ?? ''}`.trimEnd(),
+        );
+        problems.push(`error: ${await firstError(createdRef, branchDb, first)}`);
+      }
+      if (replay.settled && replay.failed.length === 0)
+        problems.push(`replay steps: ${replay.steps}`);
+      throw new Error(problems.join('; '));
+    });
 
     const production = await step(
       'Branch fingerprint equals the production fingerprint',
@@ -286,6 +355,12 @@ function liveDeps(token: string): DryRunDeps {
       return { ref: branch.project_ref, url: await api.poolerUrl(branch.project_ref, password) };
     },
     deleteBranch: (ref) => api.deleteBranch(ref),
+    waitForReplay: (ref) => waitForReplay(api, ref),
+    async replayLog(ref) {
+      const runs = await api.listActionRuns(ref);
+      const newest = [...runs].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+      return newest ? api.actionRunLog(ref, newest.id) : null;
+    },
     production: () => readOnlyApi(PRODUCTION_REF, token),
     connect,
     push: (url, { dryRun }) => dbPush(url, { dryRun }),

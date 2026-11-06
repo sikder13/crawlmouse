@@ -23,18 +23,24 @@ The scripts behind them are in `scripts/db`. Their tests:
 2. **Open the pull request.** `db-dry-run.yml` runs `scripts/db/dry-run.ts` on a Supabase branch
    named `pr-<number>`. The steps, in order:
    1. delete any branch of that name, create it again from production, and wait for it to build;
-   2. compare the branch's fingerprint (`infra/supabase/checks/fingerprint.sql`) with
+   2. wait for Supabase's replay of production's history onto the branch to finish (every step of
+      the branch's latest workflow run ended, on two polls in a row), and fail unless the branch
+      recorded every migration production records. The failure names the first missing migration
+      and its error: the run log's first error line when Supabase kept a log, otherwise the error
+      its recorded statements raise on the branch, run in a transaction that is rolled back. The
+      branch reports healthy before its replay has run, so this step comes before any comparison;
+   3. compare the branch's fingerprint (`infra/supabase/checks/fingerprint.sql`) with
       production's, section by section, and fail on a difference;
-   3. read the branch's migration history: fail if it needs the repair in §5, if a pending file
+   4. read the branch's migration history: fail if it needs the repair in §5, if a pending file
       has no rollback, or if the pull request changes a migration file that is already applied
       (production would never receive the change: add a new migration instead);
-   4. `supabase db push`, after checking that the CLI's list equals the pending files;
-   5. run the checks in §6;
-   6. run each pending file again in its own transaction, and fail if the fingerprint changes;
-   7. run the rollbacks in reverse order, and fail unless the fingerprint equals production's;
-   8. `supabase db push` again, and fail unless the fingerprint equals the first push's;
-   9. if the pull request changes the rollback of an applied migration, revert the migrations
-      from that one on, newest first, push them again, and fail if the fingerprint changes.
+   5. `supabase db push`, after checking that the CLI's list equals the pending files;
+   6. run the checks in §6;
+   7. run each pending file again in its own transaction, and fail if the fingerprint changes;
+   8. run the rollbacks in reverse order, and fail unless the fingerprint equals production's;
+   9. `supabase db push` again, and fail unless the fingerprint equals the first push's;
+   10. if the pull request changes the rollback of an applied migration, revert the migrations
+       from that one on, newest first, push them again, and fail if the fingerprint changes.
 
    The branch is deleted at the end of the run, pass or fail, and again when the pull request
    closes (`db-dry-run-cleanup.yml`). The summary, with the sha256 of each file applied and each

@@ -17,6 +17,13 @@ export interface Branch {
   preview_project_status?: string;
 }
 
+/** One run of Supabase's branch workflow, and its steps (configure, migrate, pull, deploy, ...). */
+export interface ActionRun {
+  id: string;
+  created_at: string;
+  run_steps: Array<{ name: string; status: string }>;
+}
+
 interface BranchDetail {
   ref: string;
   db_pass?: string;
@@ -71,6 +78,23 @@ export class ManagementApi {
     await this.call('DELETE', `/v1/branches/${branchRef}`);
   }
 
+  /** The branch's workflow runs. Its run is listed under the branch's own project ref. */
+  listActionRuns(branchRef: string): Promise<ActionRun[]> {
+    return this.call('GET', `/v1/projects/${branchRef}/actions`);
+  }
+
+  /**
+   * A run's log, or null when Supabase has none. Every branch read on 2026-11-06 answered HTTP 400,
+   * "The specified log stream does not exist", so the dry run does not depend on it.
+   */
+  async actionRunLog(branchRef: string, runId: string): Promise<string | null> {
+    const res = await this.fetchImpl(
+      `${MANAGEMENT_API}/v1/projects/${branchRef}/actions/${runId}/logs`,
+      { headers: { authorization: `Bearer ${this.token}` } },
+    );
+    return res.ok ? await res.text() : null;
+  }
+
   getBranch(branchRef: string): Promise<BranchDetail> {
     return this.call('GET', `/v1/branches/${branchRef}`);
   }
@@ -110,8 +134,9 @@ export class ManagementApi {
 }
 
 /**
- * Polls the parent's branch list until the branch's migrations have run and its project is healthy,
- * or fails on a failed status or at the deadline.
+ * Polls the parent's branch list until the branch's project is up and healthy, or fails on a failed
+ * status or at the deadline. It does not mean the history has been replayed onto the branch: that
+ * is still running when the branch first reports healthy (see waitForReplay).
  */
 export async function waitForBranch(
   api: ManagementApi,
@@ -135,5 +160,59 @@ export async function waitForBranch(
     if (Date.now() > deadline)
       throw new Error(`branch ${branchRef} still ${state} at the deadline`);
     await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
+/** Where Supabase's replay of the history onto a new branch stands. */
+export interface ReplayState {
+  /** Every step of the newest run had finished, a replay step among them, on two polls in a row. */
+  settled: boolean;
+  /** Steps that finished DEAD, Supabase's status for a failed step. */
+  failed: string[];
+  /** The newest run's steps as `name=STATUS`, in the order listed. */
+  steps: string;
+}
+
+// Supabase's step statuses: EXITED succeeded, DEAD failed, PAUSED finished with a warning or was
+// skipped. CREATED and RUNNING have not finished.
+const FINISHED = new Set(['EXITED', 'DEAD', 'PAUSED']);
+
+/**
+ * Waits for Supabase to finish replaying the parent's migration history onto a branch. The branch
+ * reports FUNCTIONS_DEPLOYED and ACTIVE_HEALTHY before its replay has run (measured on 2026-11-06:
+ * the branch held 41 of 43 history rows when that status was first read, and all 43 three seconds
+ * later), so the branch's status is not enough. A step can also go from RUNNING back to CREATED, so
+ * a finished-looking run counts only when it is seen twice in a row. Returns the state at the end
+ * instead of throwing: the dry run's replay step decides, and names what failed.
+ */
+export async function waitForReplay(
+  api: Pick<ManagementApi, 'listActionRuns'>,
+  branchRef: string,
+  {
+    timeoutMs = 10 * 60_000,
+    intervalMs = 5_000,
+    log = console.log,
+    sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
+  } = {},
+): Promise<ReplayState> {
+  const deadline = Date.now() + timeoutMs;
+  let last = '';
+  let finishedBefore = '';
+  for (;;) {
+    const runs = await api.listActionRuns(branchRef);
+    const newest = [...runs].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    const stepList = newest?.run_steps ?? [];
+    const steps = stepList.map((s) => `${s.name}=${s.status}`).join(' ');
+    if (steps !== last) log(`branch ${branchRef} replay: ${steps || 'no run yet'}`);
+    last = steps;
+    const finished =
+      stepList.some((s) => s.name === 'migrate') && stepList.every((s) => FINISHED.has(s.status));
+    if (finished && steps === finishedBefore) {
+      const failed = stepList.filter((s) => s.status === 'DEAD').map((s) => s.name);
+      return { settled: true, failed, steps };
+    }
+    finishedBefore = finished ? steps : '';
+    if (Date.now() >= deadline) return { settled: false, failed: [], steps };
+    await sleep(intervalMs);
   }
 }
