@@ -8,7 +8,10 @@
  * - spans: the door's cookie names contain `auth`, which Sentry's span-header filter replaces with
  *   "[Filtered]";
  * - events: `sentryServerOptions` turns off the request-data integration's cookies, which removes
- *   both `request.cookies` and the raw `Cookie` header from every event;
+ *   both `request.cookies` and the raw `Cookie` header from every event, and its request bodies (a
+ *   sign-in POST's body holds an email address; the Edge runtime sends request data only because
+ *   this integration is named). The test pins the cookies; its plain-http harness captures no
+ *   body even with every layer off, so it cannot pin the body setting;
  * - `scrubDoorSecrets`, run on every event and transaction: walks the event's own plain objects
  *   and arrays (never the SDK's `sdkProcessingMetadata`, which holds the live scope and client);
  *   drops `cookie`, `cookies`, `set-cookie`, `token_hash`, `post_login_next` and span cookie-header
@@ -85,10 +88,10 @@ export function scrubDoorSecrets<T>(event: T): T {
  * module does not load the SDK.
  */
 export function sentryServerOptions<I>(
-  requestDataIntegration: (options: { include: { cookies: false } }) => I,
+  requestDataIntegration: (options: { include: { cookies: false; data: false } }) => I,
 ) {
   return {
-    integrations: [requestDataIntegration({ include: { cookies: false } })],
+    integrations: [requestDataIntegration({ include: { cookies: false, data: false } })],
     beforeSend: <E>(event: E) => scrubDoorSecrets(event),
     beforeSendTransaction: <E>(event: E) => scrubDoorSecrets(event),
   };

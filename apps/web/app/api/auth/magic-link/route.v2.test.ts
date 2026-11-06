@@ -15,6 +15,8 @@ vi.mock('@/lib/turnstile-gate', () => ({ turnstileGate: async () => gate.outcome
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstileToken: async () => true }));
 
 import { POST } from './route';
+import { emailBinding } from '@/lib/auth/continue-intent';
+import { AUTH_LINK_SECONDS } from '@/lib/auth/constants';
 
 const ORIGIN = 'https://crawlmouse.com';
 const CHECK = '0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11';
@@ -158,6 +160,9 @@ describe('with V2_ACCOUNT_DOOR=1', () => {
 
   it('binds a door request to its address in cm_auth_for, as a hash', async () => {
     const res = await call({ email: 'Ada@Example.com', tz: 'UTC' });
+    // What the route writes is what the landing compares (lib/auth/landing.ts), for the link's life.
+    expect(valueOf(res, 'cm_auth_for')).toBe(emailBinding('ada@example.com'));
+    expect(cookieNamed(res, 'cm_auth_for')).toMatch(new RegExp(`Max-Age=${AUTH_LINK_SECONDS}`));
     expect(valueOf(res, 'cm_auth_for')).toMatch(/^[0-9a-f]{64}$/);
     expect(valueOf(res, 'cm_auth_for')).not.toContain('ada');
     expect(cookieNamed(res, 'cm_auth_for')).toMatch(/HttpOnly/i);

@@ -5,7 +5,7 @@
  * PostgREST request is.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fc from 'fast-check';
 import { GATES } from '../../lib/entitlement-v2';
 import { FUNNEL_EVENTS } from '../../lib/analytics-events';
@@ -38,6 +38,11 @@ let db: PGlite;
 beforeEach(async () => {
   db = await doorDb();
 }, 60_000);
+// Each test and each property run clones a database; an unclosed clone holds its memory until the
+// worker dies.
+afterEach(async () => {
+  await db?.close();
+});
 
 function deps(
   over: Partial<FirstLoginDeps> = {},
@@ -354,6 +359,7 @@ describe('runFirstLogin under interleaving (JS-level; PGlite never contends on a
   it('with the buckets bypassed, the version check alone still gives one trial and three rows', async () => {
     await fc.assert(
       fc.asyncProperty(fc.scheduler(), async (s) => {
+        await db?.close();
         db = await doorDb();
         const i = await input('cas@example.com');
         const results = await interleave(s, i, i, { serialize: async () => true });
@@ -367,6 +373,7 @@ describe('runFirstLogin under interleaving (JS-level; PGlite never contends on a
   it('two runs for one account: one trial, one site, one set of ledger rows', async () => {
     await fc.assert(
       fc.asyncProperty(fc.scheduler(), async (s) => {
+        await db?.close();
         db = await doorDb();
         const i = await input('race@example.com', { signup: { site: 'race.example.com' } });
         const results = await interleave(s, i, i);
@@ -384,6 +391,7 @@ describe('runFirstLogin under interleaving (JS-level; PGlite never contends on a
   it('two accounts whose emails normalise to one, on different devices: at most one trial', async () => {
     await fc.assert(
       fc.asyncProperty(fc.scheduler(), async (s) => {
+        await db?.close();
         db = await doorDb();
         const a = await input('ada.lovelace@gmail.com', { device: 'dev-a', ip: 'unknown' });
         const b = await input('adalovelace+2@gmail.com', { device: 'dev-b', ip: 'unknown' });
@@ -399,6 +407,7 @@ describe('runFirstLogin under interleaving (JS-level; PGlite never contends on a
   it('two accounts sharing a device: at most one trial', async () => {
     await fc.assert(
       fc.asyncProperty(fc.scheduler(), async (s) => {
+        await db?.close();
         db = await doorDb();
         // One prior trial on the device: a second would be refused, so a third concurrent one must be too.
         await priorTrial({ email: 'first@example.org', device: 'shared', ip: 'unknown' }, 2);

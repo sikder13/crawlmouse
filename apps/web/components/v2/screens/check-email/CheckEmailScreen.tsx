@@ -102,7 +102,7 @@ export function CheckEmailScreen({
             <Card className={styles.card}>
               <div className={styles.cardTitle}>
                 {fromAudit
-                  ? 'Opening the link keeps the audit.'
+                  ? 'Opening the link keeps the audit, if the account has room for another site.'
                   : `Opening the link creates your account, with ${trialDays} of Pro if it is your first trial, or signs you in to the one you have.`}
               </div>
               <p className={styles.cardBody}>
@@ -121,9 +121,10 @@ export function CheckEmailScreen({
                 ) : pipeline ? (
                   <>
                     The first audit of <span className={styles.monoStrong}>{site}</span> starts the
-                    moment you open it, about {numberWord(FIRST_AUDIT_MINUTES)} minutes; after that
-                    it is re-checked {cadenceOf('pro')} for {trialDays} if it is your first trial,
-                    and {cadenceOf('free')}, and if a check finds a change the note comes from{' '}
+                    moment you open it, about {numberWord(FIRST_AUDIT_MINUTES)} minutes, if the
+                    account has room for another site; after that it is re-checked{' '}
+                    {cadenceOf('pro')} for {trialDays} if it is your first trial and{' '}
+                    {cadenceOf('free')} after that; if a check finds a change, the note comes from{' '}
                     <span className={styles.mono}>{ALERTS_SENDER}</span>.
                   </>
                 ) : (
@@ -188,7 +189,7 @@ export function CheckEmailScreen({
             You can close this tab.{' '}
             {kind === 'signin'
               ? 'The link signs you in and opens your dashboard.'
-              : `Opened in this browser, the link signs you in and keeps ${fromAudit ? 'this audit' : site} in your account, if it has room for another site.`}{' '}
+              : `Opened in this browser, the link signs you in and keeps ${fromAudit ? 'this audit' : site} in your account, if the account has room for another site.`}{' '}
             If the link has expired, the sign-in page offers a new one.
           </div>
         </section>

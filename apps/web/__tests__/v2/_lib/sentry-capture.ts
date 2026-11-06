@@ -17,7 +17,7 @@ export const TOKEN = 'pkce_LEAKCANARY_77';
 type SentryNext = {
   init: (o: Record<string, unknown>) => void;
   startSpan: (o: { name: string; forceTransaction: boolean }, fn: () => void) => void;
-  requestDataIntegration: (o: { include: { cookies: false } }) => unknown;
+  requestDataIntegration: (o: { include: { cookies: false; data: false } }) => unknown;
   captureMessage: (m: string) => void;
   flush: (ms: number) => Promise<boolean>;
 };

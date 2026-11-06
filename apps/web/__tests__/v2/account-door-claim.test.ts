@@ -2,7 +2,7 @@
  * The claim of an anonymous check (CC-25 D8) against every applied migration in PGlite.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GATES } from '../../lib/entitlement-v2';
 import { claimCheck, type ClaimDeps } from '../../lib/auth/claim';
 import { scheduleFor } from '../../lib/auth/schedule';
@@ -22,6 +22,9 @@ let db: PGlite;
 beforeEach(async () => {
   db = await doorDb();
 }, 60_000);
+afterEach(async () => {
+  await db?.close();
+});
 
 const deps = (): ClaimDeps => ({ store: pgliteDoorStore(db), now: () => NOW });
 

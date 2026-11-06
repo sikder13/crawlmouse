@@ -69,9 +69,9 @@ export async function claimCheck(
   if (check.siteAccountId !== null) {
     if (check.siteAccountId !== member.accountId) return refuse('not_found');
     if (check.expiresAt === null) return refuse('already_claimed');
-    // Our site, but the check still expires: an earlier claim stopped between its two writes. It took
-    // the site before the check expired (the expiry is tested before the site is taken), so it is
-    // finished now, whatever the time.
+    // Our site, but the check still expires: an earlier claim stopped between its two writes. That
+    // claim tested the expiry before it took the site, so it is finished now, whatever the time.
+    // This assumes the claim is the one writer that gives an account's site a check with an expiry.
     await store.clearExpiry(check.checkId);
     return { ok: true, siteId: check.siteId };
   }

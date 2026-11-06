@@ -14,7 +14,7 @@ const FIRST_TRIAL =
 const SAME_BROWSER =
   'FACTS correction (CC-25 known gap): the named site and the kept audit ride a cookie in the browser that asked for the link; opened on another device, the link signs in without them.';
 const PIPELINE =
-  'FACTS correction (CC-25 D6): nothing starts or repeats a check, and nothing sends a change note, until CC-20b sets V2_PIPELINE=1 (and CC-28 sends from alerts@); until then the page says the site is kept, not that it is audited or re-checked. With V2_PIPELINE=1 the locked sentence renders, with the first-trial condition.';
+  'FACTS correction (CC-25 D6): nothing starts or repeats a check, and nothing sends a change note, until CC-20b sets V2_PIPELINE=1 (and CC-28 sends from alerts@); until then the page says the site is kept, not that it is audited or re-checked. With V2_PIPELINE=1 the locked sentence renders, with the room condition.';
 const ANY_ACCOUNT =
   'FACTS correction (CC-25 review): Sign-up invites an existing account to use the same form, and a named site is added at any sign-in with room, so the sentence holds for a new account and an existing one; the trial comes only with a new account.';
 const DASHBOARD =
@@ -68,6 +68,14 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
   {
     screen: 'check-email',
     kind: 'facts',
+    locked: 'Opening the link keeps the audit.',
+    rendered: 'Opening the link keeps the audit, if the account has room for another site.',
+    source:
+      'FACTS correction (CC-25 review round 3): the claim is refused (site_limit) when the account already keeps as many sites as it may, as a Free account with one site does.',
+  },
+  {
+    screen: 'check-email',
+    kind: 'facts',
     locked: 'you@company.com',
     rendered: 'y…@company.com',
     source: MASKED,
@@ -85,14 +93,14 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     locked:
       'From then on, example-outfitter.com is re-checked weekly for 14 days and monthly after; if a check finds a change, the note comes from alerts@crawlmouse.com. Until you open it, the audit stays at its 24-hour link.',
     rendered: 'Until you open it, the audit of example-outfitter.com stays at its 24-hour link.',
-    source: `${PIPELINE} With it, the sentence is also conditional on the trial: ${FIRST_TRIAL.replace('FACTS correction ', '')}`,
+    source: `${PIPELINE} With it, the re-check sentence also carries the first-trial condition: ${FIRST_TRIAL.replace('FACTS correction ', '')}`,
   },
   {
     screen: 'check-email',
     kind: 'facts',
     locked: 'The link opens your dashboard with this audit as its first site.',
     rendered:
-      'Opened in this browser, the link signs you in and keeps this audit in your account, if it has room for another site.',
+      'Opened in this browser, the link signs you in and keeps this audit in your account, if the account has room for another site.',
     source: `${SAME_BROWSER} ${DASHBOARD.replace('FACTS correction ', '')}`,
   },
   // ── Check-email, a sign-up naming a site ──────────────────────────────────────────────────
@@ -132,7 +140,7 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     kind: 'facts',
     locked: 'The link opens your dashboard with acme-outdoors.com as its first site.',
     rendered:
-      'Opened in this browser, the link signs you in and keeps acme-outdoors.com in your account, if it has room for another site.',
+      'Opened in this browser, the link signs you in and keeps acme-outdoors.com in your account, if the account has room for another site.',
     source: `${SAME_BROWSER} ${DASHBOARD.replace('FACTS correction ', '')}`,
   },
 ];
