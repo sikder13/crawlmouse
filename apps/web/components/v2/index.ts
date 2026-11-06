@@ -31,12 +31,8 @@ export { AccountShell, type AccountShellProps, type RailLink } from './AccountSh
 export { TrialCard, type TrialCardProps } from './TrialCard';
 export { GradeHistory, type GradeHistoryProps, type GradeSeries } from './GradeHistory';
 export { CheckGlyph, CheckGlyphRow, type CheckGlyphCell } from './CheckGlyphRow';
-export {
-  ThemeControl,
-  THEME_CHOICES,
-  type ThemeChoice,
-  type ThemeControlProps,
-} from './ThemeControl';
+export { ThemeControl, type ThemeControlProps } from './ThemeControl';
+export { THEME_CHOICES, type ThemeChoice } from './theme-choices';
 export { BrandLink } from './BrandLink';
 export { NavMenu } from './NavMenu';
 export { SiteFooter, type SiteFooterProps, type ServiceStatus } from './SiteFooter';

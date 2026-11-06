@@ -4,7 +4,6 @@ import { CheckGlyphRow } from '../../CheckGlyphRow';
 import { GradeHistory } from '../../GradeHistory';
 import { Glyph, StatusPill } from '../../StatusPill';
 import { Table } from '../../Table';
-import { VerdictCell } from '../../VerdictCell';
 import { VERDICTS } from '../../verdicts';
 import { VisuallyHidden } from '../../VisuallyHidden';
 import { TAGGED_UA_LINE } from '../../../../lib/v2/copy/site';
@@ -191,12 +190,14 @@ function CrawlersNow({ data }: Props) {
           key: r.ua,
           cells: [
             r.ua,
-            <VerdictCell
-              key="v"
-              verdict={r.verdict}
-              evidence={r.evidence}
-              qualifier={r.qualifier}
-            />,
+            // The full verdict words (FACTS I2) in a pill that may wrap: the card is a third of the row.
+            <span key="v" className={styles.nowPill} data-v2-verdict={r.verdict}>
+              <StatusPill state={VERDICTS[r.verdict].state}>
+                {r.qualifier
+                  ? `${VERDICTS[r.verdict].label} ${r.qualifier}`
+                  : VERDICTS[r.verdict].label}
+              </StatusPill>
+            </span>,
           ],
         }))}
       />
@@ -273,7 +274,10 @@ function TopFixes({ top }: { top: NonNullable<DashboardView['topFixes']> }) {
             String(r.number),
             <span key="t">
               {r.title}
-              {r.effort ? <span className={shared.muted}> · {r.effort}</span> : null}
+              {r.effort ? (
+                // The locked page hides the effort on a phone (table.fx td:nth-child(2) .mut).
+                <span className={`${shared.muted} ${shared.hidePhone}`}> · {r.effort}</span>
+              ) : null}
             </span>,
             r.effect,
             <Button key="o" href={r.open.href} variant="quiet" size="sm">

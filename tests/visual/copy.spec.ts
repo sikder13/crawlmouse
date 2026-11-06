@@ -93,12 +93,29 @@ const SCREENS: { path: string; file: string; scheme: 'light' | 'dark'; screen: L
     scheme: 'light',
     screen: 'link-map',
   },
+  {
+    path: '/v2-preview/screens/dashboard/day0',
+    file: 'Final-Dashboard-Day0.dc.html',
+    scheme: 'light',
+    screen: 'dashboard-day0',
+  },
+  {
+    path: '/v2-preview/screens/dashboard',
+    file: 'Final-Dashboard.dc.html',
+    scheme: 'dark',
+    screen: 'dashboard',
+  },
+  { path: '/v2-preview/screens/site', file: 'Final-Site.dc.html', scheme: 'dark', screen: 'site' },
 ];
 
 const SCREEN_DIR = fileURLToPath(new URL('../../docs/design/v2/screens/', import.meta.url));
 
+// The grade history chart (svg.chart in the lock, data-v2-chart here) is left out on both sides,
+// as the vitest lock comparison leaves out every SVG: its labels are drawn from the view model and
+// pinned in lib/v2/view/dashboard.test.ts.
 const HIDE = `
-  [data-v2-sr-only], label[style*="-9999px"], sc-if + sc-if { display: none !important; }
+  [data-v2-sr-only], label[style*="-9999px"], sc-if + sc-if,
+  svg.chart, svg[data-v2-chart] { display: none !important; }
 `;
 const ADDED = '[data-v2-addition], [data-v2-evidence] { display: none !important; }';
 const SHELL = 'nav[aria-label="Primary"], footer';

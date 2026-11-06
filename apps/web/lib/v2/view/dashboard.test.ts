@@ -105,6 +105,12 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     expect(h.points.map((p) => p.label)).toEqual(['24 Oct', '26', '27', '28', 'Thu 29', 'Fri 30']);
     expect(h.points.map((p) => p.seo)).toEqual([79, 79, 80, 80, 80, 79]);
     expect(h.points.map((p) => p.ai)).toEqual([41, 41, 41, 41, 41, 22]);
+    // AI readability is 41 at the first five checks; at the sixth, robots.txt blocked two crawlers.
+    expect(h.flatNote).toBe('AI readability · 41 since the first audit');
+    expect(h.marker).toEqual({ index: 5, label: 'Claude-SearchBot and ClaudeBot blocked · 22' });
+    expect(h.summary).toBe(
+      'Technical SEO 79 at checks 1 to 2, then 80 at checks 3 to 5, then 79 at check 6; AI readability 41 at checks 1 to 5, then 22 at check 6',
+    );
   });
 
   it('shows crawler access by check for the six AI crawlers, and now for all eight', () => {

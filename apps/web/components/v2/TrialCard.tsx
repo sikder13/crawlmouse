@@ -20,14 +20,19 @@ export interface TrialCardProps {
  */
 export function TrialCard({ title, left, note, aside, children }: TrialCardProps) {
   return (
-    <section className={styles.card} aria-label={title}>
+    <div className={styles.card} data-v2-trial-card="">
       <div className={styles.title}>{title}</div>
       <div className={styles.left}>
         {left}
-        {aside ? <span className={styles.aside}>{aside}</span> : null}
+        {aside ? (
+          <>
+            {' '}
+            <span className={styles.aside}>{aside}</span>
+          </>
+        ) : null}
       </div>
       <div className={styles.note}>{note}</div>
       {children ? <div className={styles.actions}>{children}</div> : null}
-    </section>
+    </div>
   );
 }

@@ -122,3 +122,13 @@
   color: var(--v2-fg);
   font-weight: 500;
 }
+
+/* "Crawler access now" sits in a third of the row: its pills wrap rather than widen the table. */
+.nowPill [data-v2-pill] {
+  white-space: normal;
+  height: auto;
+  min-height: var(--v2-pill-h);
+  padding-top: 3px;
+  padding-bottom: 3px;
+  line-height: 1.3;
+}

@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { AccountShell } from '../../AccountShell';
 import { ThemeControl } from '../../ThemeControl';
 import { TrialCard } from '../../TrialCard';
-import { ACCOUNT_ACTIONS } from '../../../../lib/v2/view/account-actions';
 import type { ShellView } from '../../../../lib/v2/view/account-shell';
 import { ActionControl } from './ActionControl';
 
@@ -24,7 +23,7 @@ export function AccountFrame({ shell, children }: { shell: ShellView; children: 
           </TrialCard>
         ) : null
       }
-      theme={<ThemeControl initial={shell.theme} action={ACCOUNT_ACTIONS.theme.route} />}
+      theme={<ThemeControl initial={shell.theme} action={shell.themeAction.href} />}
     >
       {children}
     </AccountShell>

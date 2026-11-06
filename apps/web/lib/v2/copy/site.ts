@@ -4,7 +4,8 @@
  */
 import type { AlertRule } from '@crawlmouse/types/v2';
 import type { Addition, CopyChange } from '../copy-registry';
-import { RECHECK_MINUTES, railChanges } from './dashboard';
+import { RECHECK_MINUTES } from '../recheck';
+import { railChanges } from './dashboard';
 
 /** FACTS D1: one line under every crawler table. */
 export const TAGGED_UA_LINE =
@@ -14,6 +15,8 @@ export const SITE_COPY = {
   fixesSub: `Mark one done and it is re-checked in about ${RECHECK_MINUTES} minutes; it closes only when the next crawl agrees.`,
   copyAll: 'Copy all as one prompt',
   removeNote: 'Its history stays in your account in case you add it back',
+  noFixes: 'No fixes are open at the latest check.',
+  noAlerts: 'No alert rules yet.',
   searchEngineCause: 'allowed by robots.txt; verified bot, not fetched',
   alertsFoot: (to: string) => `Sent to ${to}, once per check, only when something fires.`,
 };
@@ -125,6 +128,8 @@ export const SITE_CHANGES: CopyChange[] = [
     screen: 'site',
     kind: 'fixture',
     locked: 'the re-check found 12%, so it stays open',
+    // The locked page hides this note on a phone, and so does ours.
+    hiddenOnPhone: true,
     rendered: 'the re-check that day did not agree, so it stays open',
     source:
       'The fixture records the re-check’s verdict (reopened, Wed 28 Oct, at check 4) and no text share for it; 12% is the template’s share at the latest check, not the re-check’s',

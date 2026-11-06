@@ -47,6 +47,17 @@ describe('viewAt', () => {
     expect(mid.inFlight.map((f) => f.status)).toEqual(['running', 'running', 'running', 'running']);
   });
 
+  it('holds a check, and the changes it found, from the instant it finished', () => {
+    // Friday's check of example-outfitter.com finished at 10:02:00Z; its four changes carry that
+    // same instant. A millisecond before, none of them is there.
+    const at = viewAt(d, { accountId: BAD_ACCOUNT, now: '2026-10-30T10:02:00Z' });
+    expect(at.d.checks.map((c) => c.id)).toContain('c0000000-0000-4000-8000-000000000006');
+    expect(at.d.changes.filter((c) => c.detected_at === '2026-10-30T10:02:00Z')).toHaveLength(4);
+    const before = viewAt(d, { accountId: BAD_ACCOUNT, now: '2026-10-30T10:01:59.999Z' });
+    expect(before.d.checks.map((c) => c.id)).not.toContain('c0000000-0000-4000-8000-000000000006');
+    expect(before.d.changes.filter((c) => c.detected_at === '2026-10-30T10:02:00Z')).toEqual([]);
+  });
+
   it('shows only the viewer’s own account', () => {
     const c = fixture('challenged-site');
     const v = viewAt(c, { accountId: C9, now: c.as_of });

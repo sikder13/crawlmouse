@@ -5,13 +5,11 @@
  */
 import { capitalise, numberWord, plural } from '../words';
 import type { Addition, CopyChange, LockedScreen } from '../copy-registry';
+import { RECHECK_MINUTES } from '../recheck';
 import { TRIAL_DAYS } from './account';
 
 /** The one address change notes come from (FACTS: "alerts from alerts@crawlmouse.com"). */
 export const ALERTS_FROM = 'alerts@crawlmouse.com';
-
-/** How long a re-check takes, as every screen that offers one says it. */
-export const RECHECK_MINUTES = 2;
 
 export const DASHBOARD_COPY = {
   kept: (host: string) => `${host} is kept.`,
@@ -91,6 +89,8 @@ export function railChanges(screen: LockedScreen): CopyChange[] {
       screen,
       kind: 'ruling',
       locked: 'the other four sites pause',
+      // In the trial card's note, which the locked page and ours hide on a phone.
+      hiddenOnPhone: true,
       rendered: 'the other three sites pause',
       source:
         'Owner ruling Q10: a staging site holds no primary slot (ARCH-2 §2.5), so four primary sites, three besides example-outfitter.com',
@@ -99,6 +99,8 @@ export function railChanges(screen: LockedScreen): CopyChange[] {
       screen,
       kind: 'facts',
       locked: "Nothing is deleted. We'll email you two days before.",
+      // In the trial card's note, which the locked page and ours hide on a phone.
+      hiddenOnPhone: true,
       rendered: "Nothing you can see is deleted. We'll email you three days before.",
       source: 'FACTS A6 (short form) and A8 (the reminder three days before)',
     },
@@ -118,6 +120,8 @@ const DAY0: CopyChange[] = [
     screen: 'dashboard-day0',
     kind: 'facts',
     locked: 'Nothing is deleted.',
+    // In the trial card's note, which the locked page and ours hide on a phone.
+    hiddenOnPhone: true,
     rendered: 'Nothing you can see is deleted.',
     source: 'FACTS A6, short form',
   },
@@ -169,6 +173,8 @@ const DAY0: CopyChange[] = [
     screen: 'dashboard-day0',
     kind: 'fixture',
     locked: 'Cloudflare · about 10 min',
+    // The locked page hides the effort on a phone, and so does ours.
+    hiddenOnPhone: true,
     rendered: 'Cloudflare · about 10 minutes',
     source:
       'The fixture’s effort is 10 minutes, worded as every screen words it (effortText, as on the fix page)',
@@ -176,10 +182,18 @@ const DAY0: CopyChange[] = [
   {
     screen: 'dashboard-day0',
     kind: 'fixture',
-    locked: 'Link the 7 orphan pages · about 20 min',
-    rendered: 'Link the 7 orphan pages from their collections · about 20 minutes',
-    source:
-      'The fixture’s fix 3 is "Link the 7 orphan pages from their collections"; its effort worded by effortText',
+    locked: 'Link the 7 orphan pages',
+    rendered: 'Link the 7 orphan pages from their collections',
+    source: 'The fixture’s fix 3 is "Link the 7 orphan pages from their collections"',
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'fixture',
+    locked: 'collections · about 20 min',
+    rendered: 'collections · about 20 minutes',
+    source: 'The fixture’s effort is 20 minutes, worded by effortText, as on the fix page',
+    // The locked page hides the effort on a phone, and so does ours.
+    hiddenOnPhone: true,
   },
   {
     screen: 'dashboard-day0',
@@ -291,7 +305,8 @@ const HOME: CopyChange[] = [
   {
     screen: 'dashboard',
     kind: 'fixture',
-    locked: 'sent to Slack #seo Diff Copy fix Email to my developer',
+    // The locked page's three buttons touch, so its text runs them together.
+    locked: 'sent to Slack #seo DiffCopy fixEmail to my developer',
     rendered:
       'sent to Slack #seo Diff Copy fix Email to my developer blocked ClaudeBot is now blocked on example-outfitter.com Detected Fri 06:02 · robots.txt changed Thu 19:40 · 214 pages · this check: AI readability D → F · sent to Slack #seo Diff',
     source:
@@ -426,10 +441,5 @@ export const DASHBOARD_ADDITIONS: Addition[] = [
     screen: 'dashboard',
     what: 'The one-time "Start 14 days of Pro" card, for a Free account that never had a trial',
     source: 'CC-26 brief, D7; DECISION-LOG H5',
-  },
-  {
-    screen: 'dashboard',
-    what: 'The evidence class beside each verdict in "Crawler access now"',
-    source: 'CC-22 brief, scope 1, as on Home and Result',
   },
 ];

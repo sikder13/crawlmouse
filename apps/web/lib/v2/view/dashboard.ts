@@ -9,7 +9,6 @@ import {
   type Change,
   type Check,
   type CrawlerResult,
-  type EvidenceClass,
   type FixtureDataset,
   type Site,
   type Verdict,
@@ -152,7 +151,6 @@ export interface CrawlerByCheckView {
 export interface CrawlerNowView {
   ua: string;
   verdict: Verdict;
-  evidence: EvidenceClass;
   /** FACTS B2: "by robots" after a search engine's verdict. */
   qualifier: string | null;
 }
@@ -710,7 +708,6 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
       ? now.map((r) => ({
           ua: r.ua,
           verdict: r.verdict,
-          evidence: r.evidence_class,
           qualifier: r.group === 'search_engine' && r.verdict === 'allowed' ? 'by robots' : null,
         }))
       : null,

@@ -449,3 +449,82 @@ async function measure(
   ].filter((x): x is string => x !== null);
   return { measured, broken, before, after };
 }
+
+/**
+ * The account screens (CC-26): static pages, so the budget is the load and a scroll. Long tasks
+ * and layout shift are read from a trace over the load, the fonts and one scroll to the foot, and
+ * judged on the median of RUNS runs against BUDGET (blocking); frame intervals over the scroll are
+ * printed and attached, not judged (the brief makes frame rate advisory for these screens).
+ */
+const ACCOUNT_SCREENS = [
+  '/v2-preview/screens/dashboard/day0',
+  '/v2-preview/screens/dashboard',
+  '/v2-preview/screens/dashboard/clean',
+  '/v2-preview/screens/dashboard/withheld',
+  '/v2-preview/screens/site',
+  '/v2-preview/screens/site/clean',
+  '/v2-preview/screens/site/withheld',
+] as const;
+
+async function loadAndScroll(browser: Browser, path: string, width: number, tracePath: string) {
+  const context = await browser.newContext({
+    viewport: { width, height: width < 600 ? 844 : 900 },
+  });
+  const page = await context.newPage();
+  await browser.startTracing(page, { path: tracePath, categories: CATEGORIES });
+  await page.goto(path, { waitUntil: 'load' });
+  await page.evaluate(() => document.fonts.ready);
+  const frames = await page.evaluate(async () => {
+    const gaps: number[] = [];
+    let last = performance.now();
+    const end = last + 1500;
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    await new Promise<void>((done) => {
+      const tick = (t: number) => {
+        gaps.push(t - last);
+        last = t;
+        if (t < end) requestAnimationFrame(tick);
+        else done();
+      };
+      requestAnimationFrame(tick);
+    });
+    return gaps;
+  });
+  await browser.stopTracing();
+  await context.close();
+  return { trace: fromTrace(tracePath), frames };
+}
+
+test.describe('account screens performance', () => {
+  test.describe.configure({ timeout: RUNS * 30_000 });
+
+  for (const path of ACCOUNT_SCREENS) {
+    for (const width of [1280, 390]) {
+      test(`${path} at ${width}px: no stall and no layout shift`, async ({ browser }, testInfo) => {
+        const runs = [];
+        for (let i = 0; i < RUNS; i++) {
+          runs.push(
+            await loadAndScroll(browser, path, width, testInfo.outputPath(`trace-${i}.json`)),
+          );
+        }
+        for (const r of runs) {
+          expect(r.trace.mainThreads, `${INVALID}: no main thread in the trace`).toBeGreaterThan(0);
+          expect(r.trace.tasks, `${INVALID}: no task in the trace`).toBeGreaterThan(0);
+          expect(r.frames.length, `${INVALID}: too few frames`).toBeGreaterThan(20);
+        }
+        const longest = median(runs.map((r) => Math.max(0, ...r.trace.long)));
+        const shift = median(runs.map((r) => r.trace.shift));
+        const sorted = runs.map((r) => [...r.frames].sort((a, b) => a - b));
+        const p95 = median(sorted.map((g) => g[Math.floor(g.length * 0.95)] ?? 0));
+        console.log(
+          `[perf] ${path} ${width}px: longest task ${fmt(longest)} ms, shift ${fmt(shift)}, p95 frame ${fmt(p95)} ms (advisory)`,
+        );
+        testInfo.annotations.push({ type: 'advisory', description: `p95 frame ${fmt(p95)} ms` });
+        expect(longest, `median longest task of ${RUNS} runs`).toBeLessThanOrEqual(BUDGET.stallMs);
+        expect(shift, `median layout shift of ${RUNS} runs`).toBeLessThanOrEqual(
+          BUDGET.layoutShift,
+        );
+      });
+    }
+  }
+});

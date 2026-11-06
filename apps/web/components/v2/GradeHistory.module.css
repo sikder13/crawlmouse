@@ -4,6 +4,22 @@
   position: relative;
 }
 
+/* The chart keeps its width on a phone and scrolls inside its card (DESIGN-LOCK §7.7). */
+.scroll {
+  position: relative;
+  overflow-x: auto;
+}
+
+.scroll:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+/* The text alternative: header cells at the body weight's step, never 700 (rule 5). */
+.values th {
+  font-weight: 500;
+}
+
 .chart {
   display: block;
   width: 100%;

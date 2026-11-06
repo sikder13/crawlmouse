@@ -113,10 +113,11 @@ export function readRuns(labels: readonly string[]): string {
 export const verdictsAcross = (ua: string, checks: readonly Check[]): (Verdict | null)[] =>
   checks.map((c) => c.crawlers.find((x) => x.ua === ua)?.verdict ?? null);
 
-/** How many AI crawlers a check found blocked, and of how many: "3 of 6". */
+/** How many AI crawlers a check found blocked, of how many, and the blocking verdicts it counted. */
 export function blockedOf(c: Check) {
   const ai = c.crawlers.filter(isAi);
-  return { blocked: ai.filter((x) => isBlocked(x.verdict)).length, of: ai.length };
+  const hit = ai.filter((x) => isBlocked(x.verdict));
+  return { blocked: hit.length, of: ai.length, verdicts: [...new Set(hit.map((x) => x.verdict))] };
 }
 
 /** "weekly, Fri", "on each deploy", "not scheduled", "paused". */

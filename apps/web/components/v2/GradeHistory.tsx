@@ -86,6 +86,7 @@ export function GradeHistory({
       <ScrollRegion label={label} className={styles.scroll}>
         <svg
           className={styles.chart}
+          data-v2-chart=""
           viewBox={`0 0 ${W} ${H}`}
           aria-hidden="true"
           focusable="false"
@@ -155,7 +156,7 @@ export function GradeHistory({
           </g>
         </svg>
       </ScrollRegion>
-      <table className={layout.srOnly} data-v2-sr-only="">
+      <table className={`${layout.srOnly} ${styles.values}`} data-v2-sr-only="">
         <caption>{caption}</caption>
         <thead>
           <tr>

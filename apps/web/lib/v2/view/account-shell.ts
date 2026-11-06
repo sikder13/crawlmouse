@@ -38,6 +38,8 @@ export interface ShellView {
   trial: TrialCardView | null;
   /** The signed-in seat's theme. */
   theme: 'system' | 'light' | 'dark';
+  /** Where a new theme is saved (PATCH /api/me {theme}). */
+  themeAction: ActionView;
 }
 
 /** Free re-checks monthly (GATES.free.schedule), in the word the trial card uses. */
@@ -116,5 +118,6 @@ export function accountShellView(
     })),
     trial: trialCard(v),
     theme: seat?.theme ?? 'system',
+    themeAction: action('theme', 'Theme'),
   };
 }

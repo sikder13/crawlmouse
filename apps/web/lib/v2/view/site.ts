@@ -27,6 +27,9 @@ import {
   zoneName,
 } from '../format';
 import { aiWithheldSummary } from '../sentences';
+
+/** The verdicts "blocked" names (FACTS I2), the ones the crawler alert fires on. */
+const BLOCKING_VERDICTS: Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rule'];
 import { capitalise, count, numberWord, plural } from '../words';
 import { PLAN_NAMES, resultChecks, viewAt, type AccountView, type Viewer } from './account';
 import {
@@ -60,6 +63,8 @@ export interface GradeCardView {
   parts: string | null;
   /** Why the grade is withheld (I4), or null. */
   withheld: string | null;
+  /** The blocking verdicts the parts count ("Crawlers blocked 3 of 6"), for the copy guard. */
+  verdicts: Verdict[];
 }
 
 export interface CrawlerGridRowView {
@@ -128,6 +133,8 @@ export interface SiteView {
     rows: {
       key: string;
       label: string;
+      /** The verdicts the rule fires on, for the crawler rule: what its "blocked" means. */
+      verdicts: Verdict[];
       on: boolean;
       fired: string | null;
       extra: string | null;
@@ -202,15 +209,17 @@ function seoCard(c: Check, prev: Check | null, zone: string): GradeCardView {
       g && was ? `${move(was.score, g.score)} since ${weekday(prev!.finished_at!, zone)}` : null,
     parts: parts.length ? parts.join(' · ') : null,
     withheld: g ? null : 'Technical SEO was not graded at this check.',
+    verdicts: [],
   };
 }
 
 function aiCard(c: Check, prev: Check | null, zone: string): GradeCardView {
   const g = aiOf(c);
   const was = prev ? aiOf(prev) : null;
-  const { blocked, of } = blockedOf(c);
+  const { blocked, of, verdicts } = blockedOf(c);
   const parts = [
-    `Crawlers blocked ${blocked} of ${of}`,
+    // FACTS I2: "blocked" names a blocking verdict, so with none the part is left out.
+    blocked ? `Crawlers blocked ${blocked} of ${of}` : null,
     c.without_js ? `Text without JS ${percent(c.without_js.site_text_share)}%` : null,
     c.content?.score != null ? `Quotable ${c.content.score}` : null,
   ].filter(Boolean);
@@ -225,6 +234,7 @@ function aiCard(c: Check, prev: Check | null, zone: string): GradeCardView {
     withheld: c.ai_readability?.withheld
       ? aiWithheldSummary(c, scoredCrawlersMeasured(c.crawlers))
       : null,
+    verdicts,
   };
 }
 
@@ -530,6 +540,7 @@ export function siteView(d: FixtureDataset, viewer: Viewer, siteId: string): Sit
         .map((r) => ({
           key: r.id,
           label: ALERT_LABELS[r.kind](r.threshold_points),
+          verdicts: r.kind === 'crawler_blocked' ? BLOCKING_VERDICTS : [],
           on: r.enabled,
           fired:
             r.last_fired_at && r.last_fired_check_id && siteChecks.has(r.last_fired_check_id)

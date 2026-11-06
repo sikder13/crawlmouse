@@ -66,7 +66,8 @@ export const ACCOUNT_VIEWERS = {
   }),
 };
 
-const DATASET = {
+/** The fixture each viewer reads. */
+export const DATASET = {
   day0: 'bad-site',
   home: 'bad-site',
   clean: 'clean-site',
@@ -92,3 +93,17 @@ export const SITE_OF = {
 /** The site page each preview renders. */
 export const sitePreview = (name: keyof typeof SITE_OF) =>
   siteView(fixture(DATASET[name]), ACCOUNT_VIEWERS[name](), SITE_OF[name]);
+
+/** Each account-screen preview: the screen it renders and the viewer who reads it. */
+export const ACCOUNT_PREVIEWS = {
+  '/v2-preview/screens/dashboard/day0': { screen: 'dashboard', viewer: 'day0' },
+  '/v2-preview/screens/dashboard': { screen: 'dashboard', viewer: 'home' },
+  '/v2-preview/screens/dashboard/clean': { screen: 'dashboard', viewer: 'clean' },
+  '/v2-preview/screens/dashboard/withheld': { screen: 'dashboard', viewer: 'withheld' },
+  '/v2-preview/screens/site': { screen: 'site', viewer: 'home' },
+  '/v2-preview/screens/site/clean': { screen: 'site', viewer: 'clean' },
+  '/v2-preview/screens/site/withheld': { screen: 'site', viewer: 'withheld' },
+} as const satisfies Record<
+  string,
+  { screen: 'dashboard' | 'site'; viewer: keyof typeof ACCOUNT_VIEWERS }
+>;

@@ -60,13 +60,13 @@ describe('AccountShell', () => {
 });
 
 describe('TrialCard', () => {
-  it('names itself by its visible title and shows what the trial leaves', () => {
+  it('shows when the trial ends, what is left and what it leaves, and is not a landmark', () => {
     const out = renderToStaticMarkup(
       <TrialCard title="Pro, trial · ends Sat 7 Nov" left="8 days left" note="Then Free.">
         <button type="button">Keep</button>
       </TrialCard>,
     );
-    expect(out).toMatch(/<section [^>]*aria-label="Pro, trial · ends Sat 7 Nov"/);
+    expect(out).not.toMatch(/<section|aria-label/);
     expect(out).toContain('>Pro, trial · ends Sat 7 Nov<');
     expect(out).toContain('8 days left');
     expect(out).toContain('Then Free.');

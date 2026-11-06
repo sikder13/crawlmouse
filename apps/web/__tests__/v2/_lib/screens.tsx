@@ -6,6 +6,13 @@ import { HomeScreen } from '../../../components/v2/screens/home/HomeScreen';
 import { CrawlScreen } from '../../../components/v2/screens/crawl/CrawlScreen';
 import { ResultScreen } from '../../../components/v2/screens/result/ResultScreen';
 import { ResultState } from '../../../components/v2/screens/result/ResultStates';
+import { DashboardScreen } from '../../../components/v2/screens/dashboard/DashboardScreen';
+import { SiteScreen } from '../../../components/v2/screens/site/SiteScreen';
+import {
+  dashboardPreview,
+  shellPreview,
+  sitePreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
 import { crawlProps } from '../../../app/(v2-preview)/v2-preview/_preview/CrawlPreview';
 import {
   RESULT_PREVIEWS,
@@ -47,3 +54,22 @@ export const segmentElement = (segment: SegmentKey, variant: SegmentVariant) => 
 export const changesHistoryElement = (name: ChangesHistory) => (
   <ChangesHistoryPreview name={name} />
 );
+
+/** The account screens' previews, by registry path, built as their pages build them. */
+export const ACCOUNT_ELEMENTS: Record<string, () => React.ReactElement> = {
+  '/v2-preview/screens/dashboard/day0': () => <DashboardScreen data={dashboardPreview('day0')} />,
+  '/v2-preview/screens/dashboard': () => <DashboardScreen data={dashboardPreview('home')} />,
+  '/v2-preview/screens/dashboard/clean': () => <DashboardScreen data={dashboardPreview('clean')} />,
+  '/v2-preview/screens/dashboard/withheld': () => (
+    <DashboardScreen data={dashboardPreview('withheld')} />
+  ),
+  '/v2-preview/screens/site': () => (
+    <SiteScreen data={sitePreview('home')} shell={shellPreview('home')} />
+  ),
+  '/v2-preview/screens/site/clean': () => (
+    <SiteScreen data={sitePreview('clean')} shell={shellPreview('clean')} />
+  ),
+  '/v2-preview/screens/site/withheld': () => (
+    <SiteScreen data={sitePreview('withheld')} shell={shellPreview('withheld')} />
+  ),
+};

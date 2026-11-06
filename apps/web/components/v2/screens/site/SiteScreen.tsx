@@ -11,6 +11,7 @@ import { ActionControl } from '../account/ActionControl';
 import { CardHead } from '../account/parts';
 import { spokenRun, verdictCell } from '../account/verdict-cells';
 import { AlertSwitch } from './AlertSwitch';
+import { SITE_COPY } from '../../../../lib/v2/copy/site';
 import shared from '../account/AccountScreen.module.css';
 import styles from './SiteScreen.module.css';
 
@@ -37,7 +38,11 @@ function GradeHalf({ g }: { g: GradeCardView }) {
         </div>
       )}
       {g.withheld ? <div className={styles.parts}>{g.withheld}</div> : null}
-      {g.parts ? <div className={styles.parts}>{g.parts}</div> : null}
+      {g.parts ? (
+        <div className={styles.parts} data-v2-verdicts={g.verdicts.join(' ')}>
+          {g.parts}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -110,58 +115,65 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
             </Button>
           ) : null}
         </CardHead>
-        <Table
-          label="Fixes"
-          columns={[
-            { header: 'No.', mono: true, muted: true },
-            { header: 'Fix' },
-            { header: 'Section' },
-            { header: 'Effect, estimated', numeric: true, mono: true },
-            { header: 'Status' },
-            { header: <VisuallyHidden>Packet</VisuallyHidden>, numeric: true },
-          ]}
-          rows={[
-            ...fixes.rows.map((f) => ({
-              key: f.key,
-              cells: [
-                String(f.number),
-                <span key="t">
-                  {f.isNew ? <strong>{f.title}</strong> : f.title}
-                  {f.newLabel ? (
-                    <>
-                      {' '}
-                      <StatusPill state="bad">{f.newLabel}</StatusPill>
-                    </>
-                  ) : null}
-                  {f.note ? <span className={shared.muted}> · {f.note}</span> : null}
-                  {f.diff ? <div className={styles.diff}>{f.diff}</div> : null}
-                </span>,
-                f.section,
-                f.effect,
-                <span key="s" className={shared.muted}>
-                  {f.status}
-                </span>,
-                <ActionControl key="p" action={f.packet} variant="quiet" />,
-              ],
-            })),
-            ...(fixes.rest
-              ? [
-                  {
-                    key: 'rest',
-                    muted: true,
-                    cells: [
-                      fixes.rest.numbers,
-                      fixes.rest.title,
-                      '—',
-                      fixes.rest.effect,
-                      fixes.rest.status,
-                      <ActionControl key="a" action={fixes.rest.show} variant="quiet" />,
-                    ],
-                  },
-                ]
-              : []),
-          ]}
-        />
+        {fixes.rows.length ? (
+          <Table
+            label="Fixes"
+            columns={[
+              { header: 'No.', mono: true, muted: true },
+              { header: 'Fix' },
+              { header: 'Section' },
+              { header: 'Effect, estimated', numeric: true, mono: true },
+              { header: 'Status' },
+              { header: <VisuallyHidden>Packet</VisuallyHidden>, numeric: true },
+            ]}
+            rows={[
+              ...fixes.rows.map((f) => ({
+                key: f.key,
+                cells: [
+                  String(f.number),
+                  <span key="t">
+                    {f.isNew ? <strong>{f.title}</strong> : f.title}
+                    {f.newLabel ? (
+                      <>
+                        {' '}
+                        <StatusPill state="bad">{f.newLabel}</StatusPill>
+                      </>
+                    ) : null}
+                    {f.note ? (
+                      // The locked page hides this note on a phone (table.fx td:nth-child(2) .mut).
+                      <span className={`${shared.muted} ${shared.hidePhone}`}> · {f.note}</span>
+                    ) : null}
+                    {f.diff ? <div className={styles.diff}>{f.diff}</div> : null}
+                  </span>,
+                  f.section,
+                  f.effect,
+                  <span key="s" className={shared.muted}>
+                    {f.status}
+                  </span>,
+                  <ActionControl key="p" action={f.packet} variant="quiet" />,
+                ],
+              })),
+              ...(fixes.rest
+                ? [
+                    {
+                      key: 'rest',
+                      muted: true,
+                      cells: [
+                        fixes.rest.numbers,
+                        fixes.rest.title,
+                        '—',
+                        fixes.rest.effect,
+                        fixes.rest.status,
+                        <ActionControl key="a" action={fixes.rest.show} variant="quiet" />,
+                      ],
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        ) : (
+          <div className={shared.note}>{SITE_COPY.noFixes}</div>
+        )}
       </Card>
 
       <section className={`${shared.two} ${shared.twoWide}`}>
@@ -191,31 +203,37 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
         </Card>
         <Card as="section" className={shared.panel}>
           <CardHead title="Alerts for this site" />
-          <Table
-            label="Alert rules"
-            headersHidden
-            columns={[
-              { header: 'Rule' },
-              { header: 'Last fired', numeric: true },
-              { header: 'On', numeric: true },
-            ]}
-            rows={alerts.rows.map((r) => ({
-              key: r.key,
-              cells: [
-                r.label,
-                r.fired ? (
-                  <StatusPill key="f" state="bad">
-                    {r.fired}
-                  </StatusPill>
-                ) : (
-                  <span key="f" className={shared.muted}>
-                    {r.extra ?? ''}
-                  </span>
-                ),
-                <AlertSwitch key="s" on={r.on} label={r.label} action={r.toggle} />,
-              ],
-            }))}
-          />
+          {alerts.rows.length ? (
+            <Table
+              label="Alert rules"
+              headersHidden
+              columns={[
+                { header: 'Rule' },
+                { header: 'Last fired', numeric: true },
+                { header: 'On', numeric: true },
+              ]}
+              rows={alerts.rows.map((r) => ({
+                key: r.key,
+                cells: [
+                  <span key="l" data-v2-verdicts={r.verdicts.join(' ')}>
+                    {r.label}
+                  </span>,
+                  r.fired ? (
+                    <StatusPill key="f" state="bad">
+                      {r.fired}
+                    </StatusPill>
+                  ) : (
+                    <span key="f" className={shared.muted}>
+                      {r.extra ?? ''}
+                    </span>
+                  ),
+                  <AlertSwitch key="s" on={r.on} label={r.label} action={r.toggle} />,
+                ],
+              }))}
+            />
+          ) : (
+            <div className={shared.note}>{SITE_COPY.noAlerts}</div>
+          )}
           <div className={shared.foot}>{alerts.foot}</div>
         </Card>
       </section>

@@ -1,11 +1,8 @@
 'use client';
 
 import { useEffect, useId, useState, type FormEvent } from 'react';
+import { THEME_CHOICES, type ThemeChoice } from './theme-choices';
 import styles from './ThemeControl.module.css';
-
-export type ThemeChoice = 'system' | 'light' | 'dark';
-
-export const THEME_CHOICES: readonly ThemeChoice[] = ['system', 'light', 'dark'];
 
 const LABELS: Record<ThemeChoice, string> = { system: 'System', light: 'Light', dark: 'Dark' };
 const STORE = 'crawlmouse-theme';

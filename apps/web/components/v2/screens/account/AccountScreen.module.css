@@ -119,6 +119,10 @@
 }
 
 @media (max-width: 760px) {
+  .hidePhone {
+    display: none;
+  }
+
   .two,
   .twoOne {
     grid-template-columns: repeat(1, minmax(0, 1fr));

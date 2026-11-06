@@ -414,7 +414,7 @@ describe('Table, with its headers hidden', () => {
       />,
     );
     expect(out).toMatch(
-      /<thead class="[^"]+"><tr><th scope="col"[^>]*>No\.<\/th><th scope="col"[^>]*>Fix<\/th>/,
+      /<thead class="[^"]+" data-v2-sr-only=""><tr><th scope="col"[^>]*>No\.<\/th><th scope="col"[^>]*>Fix<\/th>/,
     );
     expect(html(<Table label="x" columns={[{ header: 'a' }]} rows={[]} />)).toContain(
       '<thead><tr>',
