@@ -4,9 +4,9 @@
  * no more of the address than it needs to.
  */
 export function maskEmail(email: string): string | null {
-  const at = email.lastIndexOf('@');
-  if (at <= 0 || at === email.length - 1) return null;
-  const local = email.slice(0, at);
-  const domain = email.slice(at + 1);
-  return `${local.length > 1 ? `${[...local][0]}…` : local}@${domain}`;
+  const parts = /^(.+)@([^@]+)$/.exec(email);
+  if (!parts) return null;
+  const [, local, domain] = parts as unknown as [string, string, string];
+  const [first] = [...local];
+  return `${local.length > 1 ? `${first}…` : local}@${domain}`;
 }

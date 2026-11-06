@@ -3,9 +3,9 @@ export function requestCookie(req: Request, name: string): string | undefined {
   const header = req.headers.get('cookie');
   if (!header) return undefined;
   for (const part of header.split(';')) {
-    const eq = part.indexOf('=');
-    if (eq < 0 || part.slice(0, eq).trim() !== name) continue;
-    const raw = part.slice(eq + 1).trim();
+    const [key, ...value] = part.split('=');
+    if (value.length === 0 || key!.trim() !== name) continue;
+    const raw = value.join('=').trim();
     try {
       return decodeURIComponent(raw);
     } catch {

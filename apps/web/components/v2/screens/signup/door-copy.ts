@@ -14,7 +14,7 @@ import {
 } from '@/lib/auth/constants';
 import { count, numberWord } from '@/lib/v2/words';
 
-export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+export const cap = (s: string) => s.replace(/^[a-z]/, (c) => c.toUpperCase());
 
 /** How often a tier re-checks a site it keeps, as a sentence says it. */
 export function cadenceOf(tier: Tier): 'weekly' | 'monthly' {
@@ -44,9 +44,11 @@ const KIND_PHRASE: Record<EmailKind, string> = {
   trial_reminder: `one reminder ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before the ${trialDays} end`,
 };
 
+/** "a, b, and c": a serial comma before the last item. */
 function list(items: readonly string[]): string {
-  if (items.length <= 1) return items.join('');
-  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+  return items
+    .map((item, i) => (i === 0 ? item : i === items.length - 1 ? `, and ${item}` : `, ${item}`))
+    .join('');
 }
 
 export function emailKindsSentence(): string {

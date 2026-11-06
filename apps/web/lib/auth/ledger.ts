@@ -97,7 +97,9 @@ export function ip24(ip: string): string | null {
   }
   if (family === 6) {
     const groups = expandIpv6(addr);
-    return groups ? `${groups.slice(0, 3).join(':')}::/48` : null;
+    if (!groups) return null;
+    const [a, b, c] = groups;
+    return `${a}:${b}:${c}::/48`;
   }
   return null;
 }

@@ -6,7 +6,7 @@ import { supabaseEntitlementStore } from '../billing/state-machine-apply';
 import type { ClaimDeps } from './claim';
 import type { FirstLoginDeps } from './first-login';
 import { pepperFrom } from './ledger';
-import { admitSiteHost } from './site-host';
+import { admitSiteHost } from './admit-site';
 import { rateLimitSerialize, sentryReport, supabaseDoorStore } from './stores';
 
 /** The door's production dependencies: the service-role client, the rate-limit RPC and Sentry. */

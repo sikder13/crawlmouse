@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { admitSiteHost, hostFromSiteInput } from './site-host';
+import { admitSiteHost } from './admit-site';
+import { hostFromSiteInput } from './site-host';
 
 describe('hostFromSiteInput: shape only, no network', () => {
   it.each([
