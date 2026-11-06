@@ -17,7 +17,7 @@ import { missingRollbacks, rerun, revert } from './rollback';
 import { digests, fileList, publish, renderDryRun, type DryRunSummary } from './summary';
 import { ManagementApi, waitForBranch, waitForReplay, type ReplayState } from './supabase-api';
 import { dbPush } from './supabase-cli';
-import { PRODUCTION_REF } from './target';
+import { PRODUCTION_REF, refOfUrl } from './target';
 
 /**
  * The migration dry run, as db-dry-run.yml runs it for a pull request:
@@ -64,7 +64,8 @@ export class StepFailed extends Error {}
 /**
  * Runs a migration's recorded statements on the branch in a transaction that is always rolled
  * back, and returns the first error's message, or null when every statement ran. The branch is a
- * throwaway copy, and nothing is kept either way.
+ * throwaway copy, and nothing is kept either way, unless a statement ends the transaction itself (no
+ * migration file in this repository has a top-level `commit` or `begin`).
  */
 export async function replayError(db: Db, statements: string[]): Promise<string | null> {
   const ranClean = new Error('every statement ran; rolling back');
@@ -123,12 +124,13 @@ export async function dryRun(
     }
   };
   // The run log's first error line when Supabase kept a log; otherwise the error the missing
-  // migration's recorded statements raise on the branch. The whole log goes to the job log only.
+  // migration's recorded statements raise on the branch.
   const firstError = async (ref: string, branchDb: Db, row: HistoryRow): Promise<string> => {
     const log = await deps.replayLog(ref).catch(() => null);
     if (log) {
-      deps.log(log);
-      const line = log.split('\n').find((l) => /error/i.test(l));
+      // Only the error line is used: the job log of a public repository is public, so the rest
+      // of Supabase's log is not printed.
+      const line = log.split('\n').find((l) => /^\s*(ERROR|FATAL)\b/.test(l));
       if (line) return line.trim();
     }
     const error = await replayError(branchDb, row.statements ?? []);
@@ -156,6 +158,10 @@ export async function dryRun(
   try {
     created = await step('Create the branch from production', async () => {
       const b = await deps.createBranch(branch);
+      // Everything below writes to this database: refuse one that names production.
+      if (b.ref === PRODUCTION_REF || refOfUrl(b.url) === PRODUCTION_REF) {
+        throw new Error(`the branch connection names production (${PRODUCTION_REF}); refusing`);
+      }
       return [b, `branch ${b.ref}`];
     });
     db = deps.connect(created.url);

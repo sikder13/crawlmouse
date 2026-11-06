@@ -84,7 +84,8 @@ export class ManagementApi {
   }
 
   /**
-   * A run's log, or null when Supabase has none. Every branch read on 2026-11-06 answered HTTP 400,
+   * A run's log, or null when Supabase has none. The one branch whose log was requested on 2026-11-06
+   * (twice) answered HTTP 400,
    * "The specified log stream does not exist", so the dry run does not depend on it.
    */
   async actionRunLog(branchRef: string, runId: string): Promise<string | null> {

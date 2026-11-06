@@ -132,7 +132,7 @@ describe('waitForReplay waits for the branch replay to finish', () => {
   it('reads the newest run when the branch has several', async () => {
     const old = run([['migrate', 'DEAD']], 'old', '2026-11-06T06:00:00Z');
     const now = run([['migrate', 'EXITED']], 'new', '2026-11-06T06:45:30Z');
-    const state = await waitForReplay(fake([[now, old]]).api, 'branchref', opts);
+    const state = await waitForReplay(fake([[old, now]]).api, 'branchref', opts);
     expect(state).toEqual({ settled: true, failed: [], steps: 'migrate=EXITED' });
   });
 });

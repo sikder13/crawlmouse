@@ -53,6 +53,8 @@ async function harness(
     fileList?: MigrationFile[];
     replay?: ReplayState;
     replayLog?: string | null;
+    /** What createBranch returns, when a test needs other than the default branch. */
+    created?: { ref: string; url: string };
   } = {},
 ): Promise<Harness> {
   const production = await productionLike();
@@ -73,7 +75,7 @@ async function harness(
   const deps: DryRunDeps = {
     createBranch: async (name) => {
       calls.push(`create ${name}`);
-      return { ref: 'branchref', url: 'pglite://branch' };
+      return options.created ?? { ref: 'branchref', url: 'pglite://branch' };
     },
     deleteBranch: async (ref) => {
       deleted.push(ref);
@@ -297,9 +299,10 @@ describe('the dry run', () => {
     expect(failure.result).toContain(
       'error: ERROR: relation "public.accounts" does not exist (SQLSTATE 42P01)',
     );
-    // The whole log goes to the job log only.
+    // Only the error line is used: the rest of Supabase's log is printed nowhere, since the job log
+    // of a public repository is public.
     expect(failure.result).not.toContain('At statement: 12');
-    expect(h.logged.join('\n')).toContain('At statement: 12');
+    expect(h.logged.join('\n')).not.toContain('At statement: 12');
   }, 300_000);
 
   it.each([
@@ -323,6 +326,29 @@ describe('the dry run', () => {
       expect(failure.step).toBe('Branch replayed every recorded migration');
       expect(failure.result).toContain(said);
       expect(h.calls).toEqual(['create pr-10']);
+    },
+    300_000,
+  );
+  it.each([
+    ['its ref', { ref: 'ezspnfeyzwsisymytssm', url: 'pglite://branch' }],
+    [
+      'its connection URL',
+      {
+        ref: 'branchref',
+        url: 'postgresql://postgres.ezspnfeyzwsisymytssm:pw@aws-0-us-east-1.pooler.supabase.com:5432/postgres',
+      },
+    ],
+  ])(
+    'refuses a branch whose %s names production, before connecting to it',
+    async (_l, created) => {
+      const h = await harness({ created });
+      const summary = await dryRun(h.deps, { files, branch: 'pr-12', commit: 'abc' });
+      expect(summary.passed).toBe(false);
+      expect(summary.steps).toHaveLength(1);
+      expect(summary.steps[0]!.result).toContain(
+        'names production (ezspnfeyzwsisymytssm); refusing',
+      );
+      expect(h.deleted).toEqual([]);
     },
     300_000,
   );
