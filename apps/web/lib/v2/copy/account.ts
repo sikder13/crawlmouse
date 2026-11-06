@@ -17,6 +17,6 @@ export const ACCOUNT_COPY = {
       others
         ? `; the other ${numberWord(others)} ${plural(others, 'site pauses', 'sites pause')} until you choose Pro or remove ${plural(others, 'it', 'them')}`
         : ''
-    }. Nothing you can see is deleted. We’ll email you three days before.`,
+    }. Nothing you can see is deleted. We'll email you three days before.`,
   noCard: 'No card on file.',
 };

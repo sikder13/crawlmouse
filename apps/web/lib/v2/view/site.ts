@@ -333,7 +333,7 @@ export function siteView(d: FixtureDataset, viewer: Viewer, siteId: string): Sit
   const fixLine = !fixes.length
     ? 'no fixes'
     : fresh.length && before
-      ? `${fixes.length} fixes: the ${before} ${fromAudit ? 'from the audit' : 'already open'} plus ${fresh.length} new at ${weekdayLong(result.finished_at!, zone)}’s check`
+      ? `${fixes.length} fixes: the ${before} ${fromAudit ? 'from the audit' : 'already open'} plus ${fresh.length} new at ${weekdayLong(result.finished_at!, zone)}'s check`
       : `${fixes.length} ${plural(fixes.length, 'fix', 'fixes')}`;
   const ended = v.d.checks
     .filter((c) => c.site_id === site.id)

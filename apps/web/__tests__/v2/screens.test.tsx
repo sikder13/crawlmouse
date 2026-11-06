@@ -141,7 +141,9 @@ describe('Final-Result, the bad site', () => {
           ? /^FACTS /
           : c.kind === 'a11y'
             ? /^axe /
-            : /^(The fixture|As on Home|The contract)/,
+            : c.kind === 'ruling'
+              ? /^(Owner ruling|CC-26 brief)/
+              : /^(The fixture|As on Home|The contract)/,
       );
     }
   });

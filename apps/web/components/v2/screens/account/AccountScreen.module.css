@@ -1,6 +1,126 @@
-/* Shared by the account screens' parts. */
+/* Shared by the account screens' parts (Final-Dashboard, Final-Site). */
 
 .inlineForm {
   display: inline-flex;
   margin: 0;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.title {
+  font-size: 22px;
+  margin: 0;
+}
+
+.line,
+.sub,
+.foot,
+.note {
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+.line {
+  margin-top: 2px;
+}
+
+.actions,
+.headActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--v2-line);
+}
+
+.h2 {
+  font-size: var(--v2-text-ui);
+}
+
+.sub {
+  margin-top: 2px;
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--v2-line2);
+}
+
+.note {
+  padding: 10px 16px 14px;
+}
+
+.muted {
+  color: var(--v2-mut);
+}
+
+.bad {
+  color: var(--v2-bad);
+}
+
+.score {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+.mono {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+}
+
+.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.twoOne {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (max-width: 1100px) {
+  .twoWide {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .two,
+  .twoOne {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
 }

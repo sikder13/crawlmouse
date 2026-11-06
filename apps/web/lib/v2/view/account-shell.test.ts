@@ -64,7 +64,7 @@ describe('the trial card', () => {
     const t = shellOf('home').trial!;
     expect(t.left).toBe('8 days left');
     expect(t.note).toBe(
-      'Then Free: example-outfitter.com keeps monthly checks; the other three sites pause until you choose Pro or remove them. Nothing you can see is deleted. We’ll email you three days before.',
+      "Then Free: example-outfitter.com keeps monthly checks; the other three sites pause until you choose Pro or remove them. Nothing you can see is deleted. We'll email you three days before.",
     );
     expect(t.keep).toMatchObject({
       label: 'Keep Pro, $19 a month',

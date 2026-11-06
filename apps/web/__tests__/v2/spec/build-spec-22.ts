@@ -209,10 +209,14 @@ function recordingSection(): string {
   ].join('\n');
 }
 
-/** The segment pages' entries are SPEC 23's. */
-/** Screens with specs of their own: the segment pages (SPEC 23), the fix page and the explorer (SPEC 24). */
+/**
+ * Screens with specs of their own: the segment pages (SPEC 23), the fix page and the explorer
+ * (SPEC 24), the dashboard and the site page (SPEC 26).
+ */
 const isSegment = (screen: string) =>
-  screen.startsWith('segment-') || screen === 'fix' || screen === 'link-map';
+  screen.startsWith('segment-') ||
+  screen.startsWith('dashboard') ||
+  ['fix', 'link-map', 'site'].includes(screen);
 
 function copySection(): string {
   return [

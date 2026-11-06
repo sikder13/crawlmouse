@@ -11,6 +11,8 @@
  *   no field for it; `source` says how.
  * - `a11y`: the locked text cannot pass the accessibility checks as typed; `source` names the
  *   axe finding.
+ * - `ruling`: the owner ruled on the screen, or the step's brief leaves the element out; `source`
+ *   names the ruling or the brief.
  * The segment pages' entries live in copy/segment-*.ts, one file per page, and are listed here.
  * Elements the brief adds (`data-v2-addition` in the markup) are left out of the comparison and
  * listed in ADDITIONS instead.
@@ -19,6 +21,8 @@
 import { ACCESS_ADDITIONS, ACCESS_CHANGES } from './copy/segment-access';
 import { CHANGES_ADDITIONS, CHANGES_CHANGES } from './copy/segment-changes';
 import { CONTENT_ADDITIONS, CONTENT_CHANGES } from './copy/segment-content';
+import { DASHBOARD_ADDITIONS, DASHBOARD_CHANGES } from './copy/dashboard';
+import { SITE_ADDITIONS, SITE_CHANGES } from './copy/site';
 import { FIX_ADDITIONS, FIX_CHANGES } from './copy/fix';
 import { LINK_MAP_ADDITIONS, LINK_MAP_CHANGES } from './copy/link-map';
 import { NOJS_ADDITIONS, NOJS_CHANGES } from './copy/segment-nojs';
@@ -36,11 +40,14 @@ export type LockedScreen =
   | 'segment-signals'
   | 'segment-changes'
   | 'fix'
-  | 'link-map';
+  | 'link-map'
+  | 'dashboard-day0'
+  | 'dashboard'
+  | 'site';
 
 export interface CopyChange {
   screen: LockedScreen;
-  kind: 'facts' | 'fixture' | 'a11y';
+  kind: 'facts' | 'fixture' | 'a11y' | 'ruling';
   locked: string;
   rendered: string;
   source: string;
@@ -366,6 +373,8 @@ export const COPY_CHANGES: CopyChange[] = [
   ...CHANGES_CHANGES,
   ...FIX_CHANGES,
   ...LINK_MAP_CHANGES,
+  ...DASHBOARD_CHANGES,
+  ...SITE_CHANGES,
 ];
 
 export interface Addition {
@@ -427,6 +436,8 @@ export const ADDITIONS: Addition[] = [
   ...CHANGES_ADDITIONS,
   ...FIX_ADDITIONS,
   ...LINK_MAP_ADDITIONS,
+  ...DASHBOARD_ADDITIONS,
+  ...SITE_ADDITIONS,
 ];
 
 /**

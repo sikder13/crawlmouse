@@ -15,7 +15,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
   it('counts sixteen fixes: thirteen from the first audit and three first seen at Friday’s check', () => {
     expect(v.header.title).toBe('example-outfitter.com');
     expect(v.header.line).toBe(
-      'Fri 30 Oct · last check today 06:02 · next Fri 6 Nov around 06:00 · 214 pages · 16 fixes: the 13 from the audit plus 3 new at Friday’s check',
+      "Fri 30 Oct · last check today 06:02 · next Fri 6 Nov around 06:00 · 214 pages · 16 fixes: the 13 from the audit plus 3 new at Friday's check",
     );
   });
 

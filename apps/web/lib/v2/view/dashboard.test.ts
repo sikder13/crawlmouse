@@ -31,7 +31,7 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
 
   it('names Thursday’s check and the account’s day in its zone', () => {
     expect(v.firstRun).toBe(false);
-    expect(v.header.title).toBe('Since Thursday’s check');
+    expect(v.header.title).toBe("Since Thursday's check");
     // last check: 10:02Z = 06:02 EDT; next: Fri 6 Nov 06:00 EST; trial: 8 Nov 02:41Z = Sat 7 Nov.
     expect(v.header.line).toBe(
       'Fri 30 Oct · 5 sites · last check today 06:02 · next weekly check Fri 6 Nov around 06:00 · trial ends Sat 7 Nov',
@@ -173,7 +173,7 @@ describe('Dashboard, day 0: the moment the account begins', () => {
       [3, '+4 SEO'],
     ]);
     expect(v.topFixes!.foot).toBe(
-      'Each fix page has “Mark done and re-check now”, about 2 minutes. The other 10 are open for 14 days.',
+      'Each fix page has "Mark done and re-check now", about 2 minutes. The other 10 are open for 14 days.',
     );
     expect(v.header.actions.filter((a) => a.primary).map((a) => a.label)).toEqual([
       'Start with fix 1 · about 10 minutes',
