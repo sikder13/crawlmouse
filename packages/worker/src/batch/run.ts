@@ -1,11 +1,5 @@
 import { canonicalizeUrl } from '@crawlmouse/engine/worker';
-import {
-  BatchPartialSchema,
-  type AccessTest,
-  type BatchPartial,
-  type DeclarationFetch,
-  type LinkEdge,
-} from '@crawlmouse/types/v2';
+import { BatchPartialSchema, type BatchResult, type RobotsEvidence } from '@crawlmouse/types/v2';
 import type { Clock } from '../clock.js';
 import type { Fetcher } from '../fetch/fetcher.js';
 import { CANARY, CRAWL, CRAWLERS } from '../identities.js';
@@ -14,12 +8,11 @@ import type { Sites } from '../politeness/sites.js';
 import { bounded, CAPS } from '../rows/bounded.js';
 import { bodyExcerpt, storedUrl, userAgentOf } from '../rows/evidence.js';
 import { LOCAL_VANTAGE, type Vantage } from '../vantage.js';
-import type { CrawlPage } from '../rows/crawl-page.js';
 import { runAccess } from './access.js';
 import { Budget } from './budget.js';
 import { runCrawl } from './crawl.js';
 import { DeclarationCache, fetchDeclarations } from './declarations.js';
-import { Findings, type Finding } from './findings.js';
+import { Findings } from './findings.js';
 import { inlineReader, type PageReader } from '../reader/read.js';
 import type { FetchContext } from './polite-fetch.js';
 import { batchIdOf, urlsOf, type BatchRequest } from './request.js';
@@ -40,45 +33,14 @@ export interface BatchDeps {
   declarationCache?: DeclarationCache;
 }
 
-export interface RobotsEvidence {
-  origin: string;
-  /** The user agent robots.txt was requested with: always our crawler's. */
-  identity_sent: string;
-  state: OriginRules['reading']['state'];
-  why: string | null;
-  status: number | null;
-  final_url: string | null;
-  fetched_at: string;
-  from_cache: boolean;
-  crawl_delay_s: number | null;
-  body_excerpt: string | null;
-}
+/**
+ * The result's shapes are the contract's (`packages/types/src/v2/worker-batch.ts`): RobotsEvidence,
+ * Finding and BatchResult, so a consumer parses a result with BatchResultSchema without this package.
+ */
+export type { BatchResult, RobotsEvidence };
 
-interface ResultCommon {
-  batch_id: string;
-  check_id: string;
-  site_id: string;
-  started_at: string;
-  finished_at: string;
-  requests: number;
-  bytes: number;
-  coverage: { urls_requested: number; urls_complete: number };
-  /** Null when the batch did everything it was asked; otherwise why it did not (the contract's). */
-  partial: BatchPartial;
-  findings: Finding[];
-  robots: RobotsEvidence[];
-  /** The declaration files a crawl batch requested, once each (declarations.ts); none for access. */
-  declarations: DeclarationFetch[];
-}
-
-export type BatchResult =
-  | (ResultCommon & { kind: 'access'; access_tests: AccessTest[] })
-  | (ResultCommon & {
-      kind: 'crawl';
-      pages: CrawlPage[];
-      link_edges: LinkEdge[];
-      discovered_urls: string[];
-    });
+/** What both kinds of result carry: the keys the two variants share. */
+type ResultCommon = Omit<BatchResult, 'kind'>;
 
 export interface Progress {
   urls_done: number;

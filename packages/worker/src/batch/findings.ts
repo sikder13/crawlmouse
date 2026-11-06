@@ -1,6 +1,9 @@
-import { BatchPartialReasonSchema, type BatchPartialReason } from '@crawlmouse/types/v2';
-import type { TooLargeReason, UnreachableReason } from '../politeness/robots.js';
-import type { SiteStop, StopReason } from '../politeness/sites.js';
+import {
+  BatchPartialReasonSchema,
+  type BatchPartialReason,
+  type Finding,
+} from '@crawlmouse/types/v2';
+import type { SiteStop } from '../politeness/sites.js';
 import { bounded, CAPS } from '../rows/bounded.js';
 import type { BudgetKind } from './budget.js';
 import type { NotReadReason } from '../verdict/limitations.js';
@@ -9,24 +12,13 @@ import { SLOW_CRAWL_DELAY_S, originBlock, type OriginRules } from './site-rules.
 
 /** What a batch met that limited it, recorded once each, and the partial reasons that follow from them. */
 
-export type Finding =
-  | {
-      kind: 'site_stopped';
-      site: string;
-      reason: StopReason;
-      at: string;
-      until: string;
-      /** False when the stop came with the batch's last request, so it refused none of them. */
-      requests_refused: boolean;
-    }
-  | { kind: 'budget_spent'; budget: BudgetKind }
-  | { kind: 'robots_unreachable'; origin: string; why: UnreachableReason }
-  | { kind: 'robots_too_large'; origin: string; why: TooLargeReason }
-  | { kind: 'site_refused'; origin: string }
-  | { kind: 'crawl_delay'; origin: string; declared_s: number; honoured: boolean }
-  | { kind: 'result_size_limit'; limit_bytes: number }
-  /** Responses fetched and not read, by why; none of them a fault of the site. Not a partial reason. */
-  | { kind: 'not_read'; reason: NotReadReason; responses: number };
+/**
+ * A finding as a batch result stores it: the contract's (`packages/types/src/v2/worker-batch.ts`), so
+ * the engine reads the same shape. Each finding below is built from the worker's own reason values
+ * (a site stop's reason, a robots reading's `why`, a budget kind, a reader failure) and typed as the
+ * contract's Finding, so a value the contract does not list is a type error where it is built.
+ */
+export type { Finding };
 
 /** The contract's BatchPartialReason values: the engine reads them as fields of the batch result. */
 export const PARTIAL_REASONS = BatchPartialReasonSchema.options;
