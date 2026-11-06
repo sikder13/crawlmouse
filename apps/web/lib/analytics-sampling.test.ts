@@ -36,15 +36,44 @@ describe('FUNNEL_EVENTS list-drift lock', () => {
     expect(new Set(FUNNEL_EVENTS).size).toBe(35);
     for (const e of ['trial_started', 'site_added']) expect(FUNNEL_EVENTS).toContain(e);
     // the SPEC 02 conversion-spine cohort is present (snake_case, distinct from the kebab launch ones)
-    for (const e of ['grade_revealed', 'gap_viewed', 'free_fix_viewed', 'action_packet_copied', 'wall_viewed', 'upgrade_clicked', 'checkout_started', 'reaudit_clicked', 'delta_viewed']) {
+    for (const e of [
+      'grade_revealed',
+      'gap_viewed',
+      'free_fix_viewed',
+      'action_packet_copied',
+      'wall_viewed',
+      'upgrade_clicked',
+      'checkout_started',
+      'reaudit_clicked',
+      'delta_viewed',
+    ]) {
       expect(FUNNEL_EVENTS).toContain(e);
     }
     // the SPEC 04 viral-loop cohort is present
-    for (const e of ['report_minted', 'report_claimed', 'report_hidden', 'whitelabel_enabled', 'report_pdf_printed', 'share_completed', 'compare_viewed', 'leaderboard_opt_in', 'activity_feed_first_event', 'referral_landing']) {
+    for (const e of [
+      'report_minted',
+      'report_claimed',
+      'report_hidden',
+      'whitelabel_enabled',
+      'report_pdf_printed',
+      'share_completed',
+      'compare_viewed',
+      'leaderboard_opt_in',
+      'activity_feed_first_event',
+      'referral_landing',
+    ]) {
       expect(FUNNEL_EVENTS).toContain(e);
     }
     // SPEC 05 AI/agent-readiness cohort (§14)
-    for (const e of ['ai_score_revealed', 'ai_homepage_view_opened', 'ai_whataisees_opened', 'ai_packet_copied', 'llms_txt_generated', 'ai_finding_expanded', 'ai_report_section_viewed']) {
+    for (const e of [
+      'ai_score_revealed',
+      'ai_homepage_view_opened',
+      'ai_whataisees_opened',
+      'ai_packet_copied',
+      'llms_txt_generated',
+      'ai_finding_expanded',
+      'ai_report_section_viewed',
+    ]) {
       expect(FUNNEL_EVENTS).toContain(e);
     }
   });
