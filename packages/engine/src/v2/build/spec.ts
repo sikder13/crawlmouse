@@ -68,7 +68,8 @@ const OUTPUT: Record<keyof BuiltCheck, string> = {
   fixes: "CC-19's `DiffResult.fixes`, unchanged.",
   fix_events: "CC-19's `DiffResult.events`, unchanged.",
   changes: "CC-19's `DiffResult.changes`, unchanged.",
-  lineage: 'One `MeasurementLineage` (below).',
+  lineages:
+    'Two `MeasurementLineage` rows (below): `grading`, with no worker, which the check names, and `fetching`, with the worker release, which the page, link and access rows name.',
   usage_event:
     'One `UsageEvent`, or null for a site no account keeps (`UsageEventSchema` requires `account_id`).',
   diff_inputs:
@@ -310,7 +311,11 @@ export function renderBuildSpec(): string {
         ['`detector_ruleset_version`', `${code(GRADE_VERSION)}, CC-17's ${code('GRADE_VERSION')}`],
         [
           '`crawler_registry_version`',
-          `sha256 of ${code('serialiseRegistry(CRAWLER_REGISTRY_V2)')}, synchronously; ${code(golden.lineage.crawler_registry_version.slice(0, 12))}... today`,
+          `sha256 of ${code('serialiseRegistry(CRAWLER_REGISTRY_V2)')}, synchronously; ${code(golden.lineages.grading.crawler_registry_version)} today`,
+        ],
+        [
+          '`worker_release`',
+          "`grading`: null, since no worker grades; `fetching`: the input's `worker_release`",
         ],
         ['`population_version`', "null: SPEC 5.1a's population is not versioned (06b §1)"],
         ['`id`', 'derived from the five values the table keeps unique'],

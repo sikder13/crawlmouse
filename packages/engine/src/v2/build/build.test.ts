@@ -95,7 +95,8 @@ describe('buildCheck on the recorded site', () => {
       ].every((r) => r.length > 0),
     ).toBe(true);
     expect(golden.fix_events).toEqual([]);
-    expect(MeasurementLineageSchema.safeParse(golden.lineage).success).toBe(true);
+    expect(MeasurementLineageSchema.safeParse(golden.lineages.grading).success).toBe(true);
+    expect(MeasurementLineageSchema.safeParse(golden.lineages.fetching).success).toBe(true);
     expect(golden.usage_event).toBeNull();
   });
 
@@ -251,7 +252,7 @@ describe('what buildCheck refuses', () => {
 
   it('batches from a worker build the lineage does not name', () => {
     expect(() => buildCheck(edited((i) => (i.lineage.worker_release = 'abcdef012345')))).toThrow(
-      /one lineage names one release/,
+      /the fetching lineage names one release/,
     );
   });
 
@@ -288,14 +289,20 @@ describe('what buildCheck refuses', () => {
 
 describe('lineage and usage', () => {
   it("names the registry the access detectors read, by CC-06b's own hash", async () => {
-    expect(built.lineage.crawler_registry_version).toBe(
+    const { grading, fetching } = built.lineages;
+    expect(grading.crawler_registry_version).toBe(
       await crawlerRegistryVersion(CRAWLER_REGISTRY_V2),
     );
-    expect(registryVersion(CRAWLER_REGISTRY_V2)).toBe(built.lineage.crawler_registry_version);
-    expect(built.lineage).toMatchObject({
-      detector_ruleset_version: '2.0.0',
-      population_version: null,
-    });
+    expect(registryVersion(CRAWLER_REGISTRY_V2)).toBe(grading.crawler_registry_version);
+    expect(grading).toMatchObject({ detector_ruleset_version: '2.0.0', population_version: null });
+  });
+
+  it("names no worker on the grading lineage, and the batches' release on the fetching one", () => {
+    const { grading, fetching } = built.lineages;
+    expect(grading.worker_release).toBeNull();
+    expect(fetching.worker_release).toBe(recordedInput().lineage.worker_release);
+    expect({ ...fetching, id: '', worker_release: null }).toEqual({ ...grading, id: '' });
+    expect(fetching.id).not.toBe(grading.id);
   });
 
   it('meters a check a site keeps: delivered, billable, every request the batches made', () => {

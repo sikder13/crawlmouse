@@ -1,6 +1,6 @@
 /**
- * What produced a built check, and what delivering it cost: one MeasurementLineage and, for a site an
- * account keeps, one UsageEvent (docs/specs/v2/06b-data-foundations.md §1 and the usage section).
+ * What produced a built check, and what delivering it cost: its two MeasurementLineages and, for a site
+ * an account keeps, one UsageEvent (docs/specs/v2/06b-data-foundations.md §1 and the usage section).
  */
 import { createHash } from 'node:crypto';
 import {
@@ -19,7 +19,7 @@ import type { BuildInput } from './types.js';
 
 /**
  * crawlerRegistryVersion (packages/types/src/v2/crawler-registry.ts), synchronously: sha256 hex of
- * serialiseRegistry(entries), the same bytes Web Crypto digests there. lineage.test.ts holds the two
+ * serialiseRegistry(entries), the same bytes Web Crypto digests there. build.test.ts holds the two
  * equal on CRAWLER_REGISTRY_V2.
  */
 export function registryVersion(entries: readonly CrawlerRegistryEntry[]): string {
@@ -27,31 +27,40 @@ export function registryVersion(entries: readonly CrawlerRegistryEntry[]): strin
 }
 
 /**
- * The lineage of a built check. The detector rules are CC-17's GRADE_VERSION; the registry is the one
- * the access detectors read, CRAWLER_REGISTRY_V2; the graded-population definition (SPEC 5.1a) is not
- * versioned yet, so `population_version` is null (06b §1). The id is derived from the five values the
- * table keeps unique, so the same builds always name the same id.
+ * A built check's two lineages (06b §1). `grading` names what graded it, which no worker took part in,
+ * so its `worker_release` is null: `checks.lineage_id` names it. `fetching` names the same builds and
+ * the worker release that fetched the rows: the page, link and access rows name it. The detector rules
+ * are CC-17's GRADE_VERSION; the registry is the one the access detectors read, CRAWLER_REGISTRY_V2;
+ * the graded-population definition (SPEC 5.1a) is not versioned yet, so `population_version` is null.
+ * Each id is derived from the five values the table keeps unique, so the same builds name the same id.
  */
-export function lineageOf(input: Pick<BuildInput, 'lineage' | 'now'>): MeasurementLineage {
-  const values = {
-    engine_sha: input.lineage.engine_sha,
-    detector_ruleset_version: GRADE_VERSION,
-    crawler_registry_version: registryVersion(CRAWLER_REGISTRY_V2),
-    worker_release: input.lineage.worker_release,
-    population_version: null,
+export function lineagesOf(input: Pick<BuildInput, 'lineage' | 'now'>): {
+  grading: MeasurementLineage;
+  fetching: MeasurementLineage;
+} {
+  const of = (worker_release: string | null): MeasurementLineage => {
+    const values = {
+      engine_sha: input.lineage.engine_sha,
+      detector_ruleset_version: GRADE_VERSION,
+      crawler_registry_version: registryVersion(CRAWLER_REGISTRY_V2),
+      worker_release,
+      population_version: null,
+    };
+    return {
+      // A worker release is 1 to 200 printable characters, so '' stands for none without colliding.
+      id: stableId(
+        'measurement_lineage',
+        values.engine_sha,
+        values.detector_ruleset_version,
+        values.crawler_registry_version,
+        worker_release ?? '',
+        '',
+      ),
+      ...values,
+      created_at: input.now,
+    };
   };
-  return {
-    id: stableId(
-      'measurement_lineage',
-      values.engine_sha,
-      values.detector_ruleset_version,
-      values.crawler_registry_version,
-      values.worker_release,
-      '',
-    ),
-    ...values,
-    created_at: input.now,
-  };
+  return { grading: of(null), fetching: of(input.lineage.worker_release) };
 }
 
 /**

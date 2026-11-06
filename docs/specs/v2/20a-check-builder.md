@@ -31,7 +31,7 @@
 | `fixes`        | CC-19's `DiffResult.fixes`, unchanged.                                                                                                                                                                            |
 | `fix_events`   | CC-19's `DiffResult.events`, unchanged.                                                                                                                                                                           |
 | `changes`      | CC-19's `DiffResult.changes`, unchanged.                                                                                                                                                                          |
-| `lineage`      | One `MeasurementLineage` (below).                                                                                                                                                                                 |
+| `lineages`     | Two `MeasurementLineage` rows (below): `grading`, with no worker, which the check names, and `fetching`, with the worker release, which the page, link and access rows name.                                      |
 | `usage_event`  | One `UsageEvent`, or null for a site no account keeps (`UsageEventSchema` requires `account_id`).                                                                                                                 |
 | `diff_inputs`  | `page_cap`, `robots_txt`, `detectors`, `indeterminate`: what the next check's diff needs of this one that `Check` does not carry. CC-20b must persist it (migration 008) and pass it back as the next `previous`. |
 | `grades`       | CC-17's `Grades`, as `gradeCheck` returned them. Not a contract row.                                                                                                                                              |
@@ -143,17 +143,18 @@ A check is `partial` when a batch carries a reason marked partial below. The str
 
 ## Lineage and usage
 
-| Value                      | From                                                                                       |
-| -------------------------- | ------------------------------------------------------------------------------------------ |
-| `detector_ruleset_version` | `2.0.0`, CC-17's `GRADE_VERSION`                                                           |
-| `crawler_registry_version` | sha256 of `serialiseRegistry(CRAWLER_REGISTRY_V2)`, synchronously; `21a6e4ec19f9`... today |
-| `population_version`       | null: SPEC 5.1a's population is not versioned (06b §1)                                     |
-| `id`                       | derived from the five values the table keeps unique                                        |
-| usage `result`             | `delivered` when either grade has a score, else `withheld`                                 |
-| usage `billable`           | `result` is `delivered` (owner ruling)                                                     |
-| usage `compute_seconds`    | the batches' durations and the render's browser time                                       |
-| usage `request_count`      | the batches' requests                                                                      |
-| usage `occurred_at`        | the check's `finished_at`                                                                  |
+| Value                      | From                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `detector_ruleset_version` | `2.0.0`, CC-17's `GRADE_VERSION`                                                                                                            |
+| `crawler_registry_version` | sha256 of `serialiseRegistry(CRAWLER_REGISTRY_V2)`, synchronously; `21a6e4ec19f9401e6b19973b34795eb5b3b7c4ab4d1a90a1d76d7cad4342907c` today |
+| `worker_release`           | `grading`: null, since no worker grades; `fetching`: the input's `worker_release`                                                           |
+| `population_version`       | null: SPEC 5.1a's population is not versioned (06b §1)                                                                                      |
+| `id`                       | derived from the five values the table keeps unique                                                                                         |
+| usage `result`             | `delivered` when either grade has a score, else `withheld`                                                                                  |
+| usage `billable`           | `result` is `delivered` (owner ruling)                                                                                                      |
+| usage `compute_seconds`    | the batches' durations and the render's browser time                                                                                        |
+| usage `request_count`      | the batches' requests                                                                                                                       |
+| usage `occurred_at`        | the check's `finished_at`                                                                                                                   |
 
 The detectors that run on a built check, which `diff_inputs.detectors` lists: `orphan_pages`, `deep_pages`, `generic_anchor_text`, `redirect_chain`, `duplicate_pagination`, `canonical_mismatch`, `hreflang_gap`, `robots_txt_blocks_crawler`, `edge_rule_blocks_crawler`, `quotable_opening`, `no_question_headings`, `missing_schema_description`, `missing_author_date`, `specs_as_images`.
 

@@ -17,8 +17,8 @@ export interface Batches {
   access: AccessBatchResult[];
 }
 
-const batchNumber = (b: BatchResult): number =>
-  Number(b.batch_id.slice(b.batch_id.indexOf(':') + 1));
+/** The batch number after the check id in `batch_id` (`<check_id>:<n>`, BatchResultSchema). */
+const batchNumber = (b: BatchResult): number => Number(b.batch_id.split(':')[1]);
 
 export function readBatches(
   raw: readonly unknown[],
@@ -61,7 +61,7 @@ export function readBatches(
     const other = releases.find((r) => r !== null && r !== workerRelease);
     if (other !== undefined) {
       throw new Error(
-        `buildCheck: batch ${b.batch_id} came from worker ${other}, not ${workerRelease}; one lineage names one release`,
+        `buildCheck: batch ${b.batch_id} came from worker ${other}, not ${workerRelease}; the fetching lineage names one release`,
       );
     }
     if (b.kind !== 'crawl') continue;

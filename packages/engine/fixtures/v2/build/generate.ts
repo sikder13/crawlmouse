@@ -252,7 +252,7 @@ function webFixture(built: BuiltCheck): FixtureDataset {
     changes: built.changes,
     alert_rules: [],
     reports: [],
-    lineages: [built.lineage],
+    lineages: [built.lineages.grading, built.lineages.fetching],
     usage_events: built.usage_event ? [built.usage_event] : [],
     withheld: [],
   };

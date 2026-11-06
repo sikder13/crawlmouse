@@ -31629,6 +31629,15 @@
   "reports": [],
   "lineages": [
     {
+      "id": "3219aed7-6ff7-8765-8c29-d422cbd81c4c",
+      "engine_sha": "0000000000000000000000000000000000000000",
+      "detector_ruleset_version": "2.0.0",
+      "crawler_registry_version": "21a6e4ec19f9401e6b19973b34795eb5b3b7c4ab4d1a90a1d76d7cad4342907c",
+      "worker_release": null,
+      "population_version": null,
+      "created_at": "2026-11-05T02:41:00Z"
+    },
+    {
       "id": "e42c72be-9cdc-82ef-b4c2-caaf4238b0b0",
       "engine_sha": "0000000000000000000000000000000000000000",
       "detector_ruleset_version": "2.0.0",

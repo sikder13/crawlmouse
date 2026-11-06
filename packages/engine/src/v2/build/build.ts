@@ -26,7 +26,7 @@ import { assemble } from './assemble.js';
 import { readBatches } from './batches.js';
 import { diffBuilt, diffInputsOf } from './diff.js';
 import { gradeAssembled } from './grade.js';
-import { lineageOf, usageOf } from './lineage.js';
+import { lineagesOf, usageOf } from './lineage.js';
 import { sample } from './plan.js';
 import { checkRecord, robotsText } from './record.js';
 import { summariesOf } from './summaries.js';
@@ -83,7 +83,7 @@ export function buildCheck(input: BuildInput): BuiltCheck {
   const check = checkRecord(input, batches.crawl, batches.access, assembled, graded);
   const diff_inputs = diffInputsOf(input.check.page_cap, robots, graded.outcomes);
   const diff = diffBuilt(input, { check, ...diff_inputs }, graded.outcomes);
-  const lineage = lineageOf(input);
+  const lineages = lineagesOf(input);
   const all = [...batches.crawl, ...batches.access];
   const usage = usageOf(input.site.account_id, check, all, input.render);
   const rendered = input.render
@@ -101,7 +101,10 @@ export function buildCheck(input: BuildInput): BuiltCheck {
     fixes: valid(FixSchema, 'fixes', diff.fixes),
     fix_events: valid(FixEventSchema, 'fix_events', diff.events),
     changes: valid(ChangeSchema, 'changes', diff.changes),
-    lineage: valid(MeasurementLineageSchema, 'lineage', [lineage])[0]!,
+    lineages: {
+      grading: valid(MeasurementLineageSchema, 'lineages.grading', [lineages.grading])[0]!,
+      fetching: valid(MeasurementLineageSchema, 'lineages.fetching', [lineages.fetching])[0]!,
+    },
     usage_event: usage === null ? null : valid(UsageEventSchema, 'usage_event', [usage])[0]!,
     diff_inputs,
     grades: graded.grades,

@@ -91,7 +91,11 @@ export interface BuiltCheck {
   fixes: Fix[];
   fix_events: FixEvent[];
   changes: Change[];
-  lineage: MeasurementLineage;
+  /**
+   * What produced the check (06b §1): `grading`, with no worker, which `checks.lineage_id` names; and
+   * `fetching`, with the worker release, which the page, link and access rows name.
+   */
+  lineages: { grading: MeasurementLineage; fetching: MeasurementLineage };
   /** Null for a site no account keeps: an anonymous audit is not metered (UsageEventSchema needs an account). */
   usage_event: UsageEvent | null;
   diff_inputs: DiffInputs;
