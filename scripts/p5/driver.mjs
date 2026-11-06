@@ -41,7 +41,14 @@ async function login(email) {
   if (error) { out({ error: 'genlink: ' + error.message }); process.exit(1); }
   const tokenHash = data.properties.hashed_token;
   const jar = {};
-  const res = await fetch(`${BASE}/login/verify?token_hash=${tokenHash}&type=magiclink`, { redirect: 'manual' });
+  // GET /login/verify only carries the token to the Continue page (CC-25); the POST signs in.
+  const landing = await fetch(`${BASE}/login/verify?token_hash=${tokenHash}&type=magiclink`, { redirect: 'manual' });
+  mergeSetCookies(jar, landing.headers.getSetCookie());
+  const res = await fetch(`${BASE}/login/verify`, {
+    method: 'POST',
+    redirect: 'manual',
+    headers: { origin: BASE, cookie: cookieHeader(jar) },
+  });
   mergeSetCookies(jar, res.headers.getSetCookie());
   saveJar(email, jar);
   // verify

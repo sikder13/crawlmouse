@@ -1,72 +1,164 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import type { EmailOtpType } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
+import type { EmailOtpType, User } from '@supabase/supabase-js';
+import * as Sentry from '@sentry/nextjs';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { readAnonSessionId, clearAnonSession } from '@/lib/anon-session';
 import { applyNoStore } from '@/lib/supabase/no-store';
 import { safeNextPath } from '@/lib/safe-next-path';
+import { getClientIp } from '@/lib/client-ip';
+import { accountDoorEnabled } from '@/lib/auth/flags';
+import { AUTH_LINK_SECONDS, COOKIES } from '@/lib/auth/constants';
+import {
+  claimFromNext,
+  decodeOtp,
+  decodeSignup,
+  DASHBOARD,
+  encodeOtp,
+  type OtpCarry,
+} from '@/lib/auth/continue-intent';
+import { afterSignIn } from '@/lib/auth/landing';
+import { doorDeps } from '@/lib/auth/door-deps';
+import { sentryReport } from '@/lib/auth/stores';
+import type { DoorEvent } from '@/lib/auth/first-login';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Only honor OTP types we actually issue — reject an attacker-supplied `type` (e.g. recovery /
-// email_change) before it reaches the auth client. (token_hash is a Supabase-issued secret, so
-// this is defense-in-depth, not the primary guard.)
+/**
+ * The magic-link landing (CC-25 D3, SECURITY-DESIGN J7).
+ *
+ * GET never verifies. A mail scanner that fetches the link must not spend the token, so GET moves
+ * the token into a one-shot httpOnly cookie scoped to this path and sends the browser to the
+ * Continue page, whose URL carries no token: nothing the page loads (PostHog's pageview, a link's
+ * Referer) can see it. POST, from that page's button, verifies and signs in.
+ *
+ * The `token_hash` + verifyOtp path carries no PKCE verifier, so it works when the link is opened on
+ * another device; the Supabase "Magic Link" template must point here with
+ * `?token_hash={{ .TokenHash }}&type=magiclink` (`scripts/supabase/auth-config.ts --read` checks it).
+ * The `?code=` branch is the same-device PKCE fallback.
+ */
+
+const CONTINUE = '/login/verify/continue';
+const EXPIRED = `${CONTINUE}?state=expired`;
+
+// Only OTP types we issue; an attacker-supplied `type` (recovery, email_change) never reaches Supabase.
 const ALLOWED_OTP_TYPES = new Set<EmailOtpType>(['magiclink', 'signup', 'email']);
 
-/**
- * Magic-link callback — runs server-side so the session cookies are set correctly.
- *
- * The robust path is `token_hash` + verifyOtp: it carries no PKCE code-verifier, so it works
- * even when the link is opened on a different device than the one that requested it. For email
- * sign-in to use this, the Supabase "Magic Link" email template must point here with
- * `?token_hash={{ .TokenHash }}&type=magiclink` (tracked as a deploy-gate in the verification
- * plan). The `?code=` / exchangeCodeForSession branch is a SAME-DEVICE-ONLY fallback for the
- * default PKCE link (the verifier cookie only exists in the requesting browser).
- */
+const secure = () => process.env.NODE_ENV === 'production';
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const tokenHash = url.searchParams.get('token_hash');
   const code = url.searchParams.get('code');
   const rawType = url.searchParams.get('type');
-  const type: EmailOtpType = rawType && ALLOWED_OTP_TYPES.has(rawType as EmailOtpType) ? (rawType as EmailOtpType) : 'magiclink';
+  const type =
+    rawType && ALLOWED_OTP_TYPES.has(rawType as EmailOtpType)
+      ? (rawType as 'magiclink' | 'signup' | 'email')
+      : 'magiclink';
+
+  let carry: OtpCarry;
+  if (tokenHash) carry = { kind: 'token_hash', value: tokenHash, type };
+  else if (code) carry = { kind: 'code', value: code };
+  else return NextResponse.redirect(new URL('/login?error=missing_token', url.origin));
+
+  const res = applyNoStore(NextResponse.redirect(new URL(CONTINUE, url.origin), 303));
+  res.headers.set('Referrer-Policy', 'same-origin');
+  res.cookies.set(COOKIES.otp, encodeOtp(carry), {
+    httpOnly: true,
+    secure: secure(),
+    sameSite: 'lax',
+    path: '/login/verify',
+    maxAge: AUTH_LINK_SECONDS,
+  });
+  return res;
+}
+
+/** A form post from our own page. A browser may send `Origin: null` on a no-JS post. */
+function sameOrigin(req: Request, origin: string): boolean {
+  const o = req.headers.get('origin');
+  if (o === origin) return true;
+  return (o === null || o === 'null') && req.headers.get('sec-fetch-site') === 'same-origin';
+}
+
+export async function POST(request: Request) {
+  const url = new URL(request.url);
+  if (!sameOrigin(request, url.origin)) {
+    return applyNoStore(NextResponse.json({ error: 'cross_site' }, { status: 403 }));
+  }
+  const req = new NextRequest(request);
+  const wantsJson = (request.headers.get('accept') ?? '').includes('application/json');
+  const carry = decodeOtp(req.cookies.get(COOKIES.otp)?.value);
+
+  const respond = (dest: string, events: DoorEvent[] = []) => {
+    const res = applyNoStore(
+      wantsJson
+        ? NextResponse.json({ next: dest, events })
+        : NextResponse.redirect(new URL(dest, url.origin), 303),
+    );
+    // The token is spent or refused either way; nothing reads it twice.
+    res.cookies.set(COOKIES.otp, '', { path: '/login/verify', maxAge: 0 });
+    return res;
+  };
+
+  if (carry === null) return respond(EXPIRED);
 
   const sb = await supabaseServer();
-  let error: { status?: number; code?: string } | null = null;
-  if (tokenHash) {
-    ({ error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type }));
-  } else if (code) {
-    ({ error } = await sb.auth.exchangeCodeForSession(code));
-  } else {
-    return NextResponse.redirect(new URL('/login?error=missing_token', url.origin));
-  }
+  const { data, error } =
+    carry.kind === 'token_hash'
+      ? await sb.auth.verifyOtp({ token_hash: carry.value, type: carry.type })
+      : await sb.auth.exchangeCodeForSession(carry.value);
   if (error) {
     console.error('[verify] sign-in failed:', { status: error.status, code: error.code });
-    return NextResponse.redirect(new URL('/login?error=verify_failed', url.origin));
+    return respond(EXPIRED);
   }
+  const user: User | null = data.user ?? (await sb.auth.getUser()).data.user;
 
-  // Claim any audits this browser ran anonymously before signing in (same as /api/auth/claim).
-  // The anon-session id is an httpOnly capability cookie, so a browser only claims its own
-  // still-unclaimed (user_id null) audits.
-  const { data: { user } } = await sb.auth.getUser();
+  // Claim the audits this browser ran anonymously before signing in (v1, as /api/auth/claim). The
+  // anon-session id is an httpOnly capability cookie, so a browser only claims its own unclaimed audits.
   const anonId = await readAnonSessionId();
   if (user && anonId) {
     const admin = supabaseAdmin();
-    await admin.from('audits').update({ user_id: user.id }).eq('anonymous_session_id', anonId).is('user_id', null);
+    await admin
+      .from('audits')
+      .update({ user_id: user.id })
+      .eq('anonymous_session_id', anonId)
+      .is('user_id', null);
     await clearAnonSession();
   }
 
-  // R1 fold-in — return the user to where they started (e.g. the report they were claiming) if a
-  // validated `post_login_next` cookie is present (set at magic-link send). It is RE-VALIDATED here to
-  // a same-origin relative path (defense in depth against a tampered cookie → no open redirect); an
-  // absent/invalid value falls back to /dashboard. The cookie is one-shot (cleared below).
-  const dest = safeNextPath((await cookies()).get('post_login_next')?.value) ?? '/dashboard';
+  // Return the user to a validated same-origin target (R1 fold-in), re-validated here against a
+  // tampered cookie; absent or invalid falls back to /dashboard. A Keep's claim target is never
+  // followed as a URL: the door runs the claim itself, and with the door off it lands on /dashboard.
+  const next = req.cookies.get(COOKIES.next)?.value;
+  let dest = claimFromNext(next) !== null ? DASHBOARD : (safeNextPath(next) ?? DASHBOARD);
+  let events: DoorEvent[] = [];
 
-  // The sign-in response carries the freshly-minted Set-Cookie auth token; mark it no-store so no
-  // shared/CDN cache can retain it. Middleware skips this request (no inbound auth cookie yet), so
-  // the route sets the headers itself.
-  const res = applyNoStore(NextResponse.redirect(new URL(dest, url.origin)));
-  res.cookies.set('post_login_next', '', { path: '/', maxAge: 0 }); // consume the one-shot return target
+  if (user && accountDoorEnabled()) {
+    try {
+      const landing = await afterSignIn(
+        { ...doorDeps(), report: sentryReport((m, ctx) => Sentry.captureMessage(m, ctx)) },
+        {
+          user,
+          next,
+          signup: decodeSignup(req.cookies.get(COOKIES.signup)?.value),
+          device: req.cookies.get(COOKIES.device)?.value ?? null,
+          ip: getClientIp(request),
+        },
+      );
+      if (landing.dest !== null) dest = landing.dest;
+      events = landing.events;
+    } catch {
+      Sentry.captureMessage('auth.landing-failed', {
+        level: 'warning',
+        tags: { signal: 'landing-failed' },
+        extra: { userId: user.id },
+      });
+    }
+  }
+
+  const res = respond(dest, events);
+  res.cookies.set(COOKIES.next, '', { path: '/', maxAge: 0 });
+  res.cookies.set(COOKIES.signup, '', { path: '/', maxAge: 0 });
   return res;
 }

@@ -102,16 +102,14 @@ export function supabaseDoorStore(sb: SupabaseClient): DoorStore {
     },
 
     async insertLedger(accountId, hashes) {
-      const { error } = await sb
-        .from('trial_ledger')
-        .insert(
-          hashes.map((h) => ({
-            kind: h.kind,
-            value_hash: h.value_hash,
-            account_id: accountId,
-            trial_kind: 'pro',
-          })),
-        );
+      const { error } = await sb.from('trial_ledger').insert(
+        hashes.map((h) => ({
+          kind: h.kind,
+          value_hash: h.value_hash,
+          account_id: accountId,
+          trial_kind: 'pro',
+        })),
+      );
       if (error) fail('trial_ledger write', error);
     },
 
