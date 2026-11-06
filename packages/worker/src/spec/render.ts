@@ -205,7 +205,7 @@ export function renderSpec(): string {
     ],
     [
       'Content features kept per page (CC-20a)',
-      `${kib(CONTENT_FEATURES_BYTES)} as JSON, ${MAX_JSON_LD_NODES} JSON-LD nodes of ${MAX_JSON_LD_TYPES} types each, a type of ${JSON_LD_TYPE_BYTES} characters as written; past any, none, and the row says so`,
+      `${kib(CONTENT_FEATURES_BYTES)} as JSON, ${MAX_JSON_LD_NODES} JSON-LD nodes of ${MAX_JSON_LD_TYPES} types each, a type of ${JSON_LD_TYPE_BYTES} UTF-8 bytes as written; past any, none, and the row says so`,
     ],
     [
       'robots.txt kept whole for the check builder (CC-20a)',

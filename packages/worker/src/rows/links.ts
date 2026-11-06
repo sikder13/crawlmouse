@@ -285,8 +285,8 @@ const NOINDEX_META_NAMES = new Set(['robots', 'googlebot', 'bingbot']);
 
 /**
  * v1's readMetaNoindex, on one node: a `<meta name>` among NOINDEX_META_NAMES whose content, split on
- * commas, holds `noindex` or `none`. v1's is not exported, so links.test.ts holds this to extractPage's
- * `classificationSignals.metaNoindex` on generated pages.
+ * commas, holds `noindex` or `none`. v1's is not exported, so reader/features.test.ts holds this to
+ * extractPage's `classificationSignals.metaNoindex` on generated pages.
  */
 function isNoindexMeta(node: AnyNode): boolean {
   if (node.type !== 'tag' || node.name !== 'meta') return false;

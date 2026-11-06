@@ -258,8 +258,9 @@ export const RobotsEvidenceSchema = z
     crawl_delay_s: z.number().min(0).nullable(),
     body_excerpt: crawledText(ROBOTS_EXCERPT_BYTES).nullable(),
     /**
-     * The whole file, as served, when the worker read all of it (within the engine's 500 KiB parse
-     * limit) as rules and could store it unchanged; null otherwise. `body_complete` says which.
+     * The whole file, as served, when the worker read all of it as rules and could store it unchanged;
+     * null otherwise, and `body_complete` says which. The worker keeps a file of at most the engine's
+     * 500 KiB parse limit (its CAPS.robotsFile); this schema does not bound the length.
      */
     body: z.string().nullable(),
     body_complete: z.boolean(),
@@ -315,7 +316,8 @@ export type Finding = z.infer<typeof FindingSchema>;
 // ─── The batch result ──────────────────────────────────────────────────────────────────────────
 
 const common = {
-  batch_id: z.string().regex(/^[0-9a-f-]{36}:\d+$/),
+  /** `<check_id>:<n>`, the batch number without leading zeros, so no two ids share a number. */
+  batch_id: z.string().regex(/^[0-9a-f-]{36}:(?:0|[1-9]\d*)$/),
   check_id: IdSchema,
   site_id: IdSchema,
   started_at: TimestampSchema,
