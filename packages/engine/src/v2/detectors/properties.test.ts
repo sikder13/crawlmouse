@@ -318,6 +318,38 @@ describe('structure detector properties', () => {
     );
   });
 
+  it('an hreflang record marks only pages whose annotations were read, and the generator reaches both cases', () => {
+    // A missing return is carried by the alternate that was read; an alternate that redirects or is
+    // gone puts it on the member naming it (owner ruling, 2026-11-05). Either way the URL carrying
+    // the defect is one whose own annotations were read, never an uncrawled or dead alternate.
+    const seen = new Set<string>();
+    fc.assert(
+      fc.property(siteArb, ([specs]) => {
+        const input = site(specs);
+        const sc = scopeOf(input);
+        const read = (url: string) => {
+          const f = sc.facts.get(url);
+          return (
+            sc.page.get(url)?.status_code === 200 && f?.hreflang != null && f.final_url === url
+          );
+        };
+        for (const d of detectStructure(input)) {
+          if (d.type !== 'hreflang_gap') continue;
+          for (const c of d.conditions) seen.add(c);
+          for (const a of d.affected_urls) expect(read(a), `${d.key} marks ${a}`).toBe(true);
+        }
+      }),
+      { numRuns: 1000, seed: 1 },
+    );
+    for (const c of [
+      'hreflang_missing_return',
+      'hreflang_alternate_redirects',
+      'hreflang_alternate_gone',
+    ]) {
+      expect(seen.has(c), c).toBe(true);
+    }
+  });
+
   it('runs every structure detector', () => {
     expect(DETECTORS.map((d) => d.type).sort()).toEqual(Object.keys(KEY_PREFIX).sort());
   });

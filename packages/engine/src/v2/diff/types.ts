@@ -47,6 +47,11 @@ export type FixDraft = Pick<
    * diff turns it into the site's rank, 1 to n over every live fix (`reranked` in diff.ts).
    */
   rank: number;
+  /**
+   * The fingerprint of the fix found on this check that absorbed this one's effect (effects.ts), or
+   * null. The diff turns it into that fix's number, `Effect.absorbed_by`.
+   */
+  absorbed_by_fingerprint: string | null;
 };
 
 /**

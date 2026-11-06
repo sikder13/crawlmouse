@@ -56,6 +56,8 @@ export const NOT_STORED_YET: Record<string, string> = {
  */
 export const VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {
   'access_tests.source_ip_class': ['other_egress'],
+  // CC-17's two content fix types (owner ruling, 2026-11-05): written only after CC-06c's CHECK
+  'site_fixes.type': ['missing_schema_description', 'no_question_headings'],
 };
 
 /**
@@ -240,15 +242,25 @@ export const GENERATED_STATUS: Record<string, string> = {
 export const RULES_AT_WRITE: Record<string, string> = {
   check_result_link: 'compares two timestamps inside checks.result_email',
   i4_withheld: 'counts measured crawlers across checks.crawlers',
-  i4_given: 'counts measured crawlers across checks.crawlers',
   coverage_gradeable: 'sums an array inside checks.coverage',
   coverage_crawled: 'compares two counts inside checks.coverage',
   coverage_sampled: 'compares counts inside checks.coverage',
   crawler_scored: 'per element of checks.crawlers',
   score_grade_pair: 'inside checks.technical_seo and checks.ai_readability',
   refusal_score: 'inside checks.technical_seo',
-  access_range_order: 'inside checks.ai_readability',
   total_sum: 'sums inside checks.ai_readability',
+  withheld_reasons: 'inside checks.ai_readability',
+  component_range: 'per component inside checks.ai_readability',
+  range_order: 'per component inside checks.ai_readability',
+  access_range_mirror: 'compares two objects inside checks.ai_readability',
+  withheld_unmeasured: 'reads every component inside checks.ai_readability',
+  withheld_reasons_match: 'compares the reasons with the components inside checks.ai_readability',
+  fewer_crawlers: 'reads the Access component inside checks.ai_readability',
+  content_score_withheld: 'compares two fields inside checks.content',
+  effect_seo_pending:
+    'inside site_fixes.effect; added by CC-17 after the v2-003 migration, and a CHECK like site_fixes_effect_pending needs a migration, which the owner applies',
+  effect_absorbed:
+    'sums two numbers inside site_fixes.effect; added by CC-17 after the v2-003 migration, which the owner applies',
   time_zone:
     'a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses',
   coverage_robots: 'compares counts inside checks.coverage',
@@ -299,6 +311,7 @@ export const NESTED: Record<string, string[]> = {
   CmsName: ['checks.stack'],
   Confidence: ['checks.crawlers'],
   ContentCheck: ['checks.content'],
+  ContentScoreWithheld: ['checks.content'],
   CrawlerGroup: ['checks.crawlers'],
   DetectionState: ['checks.signals'],
   EstimateBound: ['site_fixes.before_after'],
@@ -319,7 +332,9 @@ export const NESTED: Record<string, string[]> = {
   SampleMethod: ['checks.coverage'],
   SignalKind: ['checks.signals'],
   StepState: ['checks.progress'],
+  TechnicalSeoPending: ['site_fixes.effect'],
   Verdict: ['checks.crawlers', 'page_results.robots_search'],
+  WithheldReason: ['checks.ai_readability', 'site_fixes.effect'],
 };
 
 /** Enums no table of this step holds, and where they live. */

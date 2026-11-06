@@ -22,6 +22,9 @@ export type StructureFixType = keyof typeof KEY_PREFIX;
 export const fingerprintKey = (type: StructureFixType, subject: string): string =>
   `${KEY_PREFIX[type]}:${subject}`;
 
+/** The subject of a readable key: what follows its `prefix:` (`orphan:https://a.test/x` → the URL). */
+export const subjectOfKey = (key: string): string => key.replace(/^[a-z]+:/, '');
+
 /** The first 64 bits of the key's SHA-256, as 16 hex characters. */
 export const fingerprintOf = (key: string): string =>
   createHash('sha256')

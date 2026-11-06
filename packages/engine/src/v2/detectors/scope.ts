@@ -21,7 +21,7 @@ export const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 
 export const sorted = (xs: Iterable<string>): string[] => [...new Set(xs)].sort(byText);
 
 const isGone = (status: number): boolean => GONE_STATUSES.some((s) => s === status);
-const isRedirect = (status: number): boolean => status >= 300 && status < 400;
+export const isRedirect = (status: number): boolean => status >= 300 && status < 400;
 
 /**
  * An answer that kept the page's content from our crawler: anything but a 200, a redirect, a 404 or

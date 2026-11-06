@@ -117,6 +117,8 @@ export const FixTypeSchema = named(
     'duplicate_pagination',
     'canonical_mismatch',
     'hreflang_gap',
+    'missing_schema_description',
+    'no_question_headings',
   ]),
 );
 /** The before/after rows on the fix page. */
@@ -369,6 +371,40 @@ export const CmsNameSchema = named(
   'CmsName',
   z.enum(['shopify', 'wordpress', 'webflow', 'wix', 'squarespace', 'framer', 'ghost', 'custom']),
 );
+/**
+ * Why the engine gives no AI readability grade, or no AI effect for a fix: one reason per component
+ * that could not be measured, the case where the scored crawlers are blocked by the site's own
+ * robots.txt, and, for a fix's effect only, a crawler with too few pages to measure its share or a
+ * content check that does not count in Quotable. The engine says what each means (packages/engine/src/v2/grade/withheld.ts), and its
+ * test pins the two lists to each other.
+ */
+export const WithheldReasonSchema = named(
+  'WithheldReason',
+  z.enum([
+    'too_few_crawlers_measured',
+    'blocked_by_choice',
+    'readable_unmeasured',
+    'quotable_unmeasured',
+    'signals_unmeasured',
+    'crawler_too_few_pages',
+    'check_not_scored',
+  ]),
+);
+/**
+ * Why a fix's Technical SEO effect is not estimated: the grade is refused (SPEC 5.1a), so there is no
+ * score for the fix to move. The engine says what it means (packages/engine/src/v2/grade/withheld.ts),
+ * and its test pins the two lists to each other.
+ */
+export const TechnicalSeoPendingSchema = named('TechnicalSeoPending', z.enum(['grade_refused']));
+/**
+ * Why the Content section has no score: no check counts toward it yet, a counted check could not be
+ * read on some graded pages, or no counted check applied to any graded page. The engine says what
+ * each means (packages/engine/src/v2/grade/withheld.ts), and its test pins the two lists.
+ */
+export const ContentScoreWithheldSchema = named(
+  'ContentScoreWithheld',
+  z.enum(['no_check_counted', 'pages_not_read', 'no_check_applied']),
+);
 /** v1 `RefusalTrigger`. */
 export const RefusalTriggerSchema = named(
   'RefusalTrigger',
@@ -434,6 +470,9 @@ export const V1_PINNED_ENUMS = {
   PageKind: PageKindSchema,
   CmsName: CmsNameSchema,
   RefusalTrigger: RefusalTriggerSchema,
+  WithheldReason: WithheldReasonSchema,
+  TechnicalSeoPending: TechnicalSeoPendingSchema,
+  ContentScoreWithheld: ContentScoreWithheldSchema,
 } as const;
 
 export const REGISTRY_ONLY_ENUMS = {
@@ -483,6 +522,9 @@ export type AlertRuleKind = z.infer<typeof AlertRuleKindSchema>;
 export type ReportKind = z.infer<typeof ReportKindSchema>;
 export type SeatRole = z.infer<typeof SeatRoleSchema>;
 export type ChangeKind = z.infer<typeof ChangeKindSchema>;
+export type WithheldReason = z.infer<typeof WithheldReasonSchema>;
+export type TechnicalSeoPending = z.infer<typeof TechnicalSeoPendingSchema>;
+export type ContentScoreWithheld = z.infer<typeof ContentScoreWithheldSchema>;
 export type Severity = z.infer<typeof SeveritySchema>;
 export type MeasurementStatus = z.infer<typeof MeasurementStatusSchema>;
 export type UsageKind = z.infer<typeof UsageKindSchema>;

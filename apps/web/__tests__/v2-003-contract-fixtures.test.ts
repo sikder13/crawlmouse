@@ -100,6 +100,7 @@ const omit = (r: Rec, keys: string[]) =>
 const TABLE_OF_COLLECTION: Record<string, string> = {
   page_results: 'page_results',
   access_tests: 'access_tests',
+  fixes: 'site_fixes',
 };
 const deferred = (collection: string): string[] => {
   const entity = ENTITIES.find((e) => e.collection === collection)?.name;
@@ -210,7 +211,7 @@ async function load(db: PGlite, d: FixtureDataset): Promise<void> {
   for (const r of d.link_edges) await insertRow(db, 'link_edges', measured(r));
   for (const r of storable('access_tests', d.access_tests as Rec[]))
     await insertRow(db, 'access_tests', measured(r));
-  for (const r of d.fixes) await insertRow(db, 'site_fixes', r);
+  for (const r of storable('fixes', d.fixes as Rec[])) await insertRow(db, 'site_fixes', r);
   for (const r of d.fix_events) await insertRow(db, 'fix_events', r);
   for (const r of d.changes) await insertRow(db, 'changes', r);
   // The entitlement trigger reads now(); a fixture's plan is as of its own date, so the trigger

@@ -5,7 +5,7 @@ import { bounded, type TextCap } from './bounded.js';
 import { DESCRIPTION_BYTES, headText, TITLE_BYTES } from './head-text.js';
 
 /**
- * The page's title and meta description, for the grade's crawlability "meta" hook (CC-17): the text
+ * The page's title and meta description (the grade's crawlability reads the title, CC-17): the text
  * as a search engine reads it (ASCII whitespace collapsed and trimmed, as document.title is), its
  * true length in characters, and whether the stored text was cut.
  */

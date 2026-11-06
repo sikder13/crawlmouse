@@ -118,7 +118,7 @@
       "previous_check_id": "c0000000-0000-4000-8000-000000000001",
       "detected_at": "2026-10-04T06:00:00Z",
       "kind": "opened",
-      "severity": "warn",
+      "severity": "info",
       "subject": "content",
       "summary": "Fix the quotable opening",
       "where": "/blog/{slug}",

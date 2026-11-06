@@ -168,7 +168,7 @@ describe('decided from worker-shaped rows on a complete crawl', () => {
       ],
       complete: true,
     };
-    // /fr does not name /en: /en's annotation of /fr has no return.
+    // /fr does not name /en: /en's annotation of /fr has no return, and /fr carries it.
     const fr = {
       links: [
         { hreflang: 'fr', href: u('/fr') },
@@ -180,6 +180,7 @@ describe('decided from worker-shaped rows on a complete crawl', () => {
     expect(detectHreflangGaps(gap).find(key('hreflang', '/en'))).toMatchObject({
       state: 'detected',
       conditions: ['hreflang_missing_return'],
+      affected_urls: [u('/fr')],
     });
     const cut = withFields(gap, '/fr', { hreflang: { ...fr, complete: false } });
     expect(detectHreflangGaps(cut).find(key('hreflang', '/en'))).toMatchObject({

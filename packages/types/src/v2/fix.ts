@@ -12,7 +12,6 @@ import {
   FingerprintSchema,
   HttpStatusSchema,
   IdSchema,
-  ScoreSchema,
   TemplateKeySchema,
 } from './common.js';
 import {
@@ -25,22 +24,52 @@ import {
   FixTypeSchema,
   PacketFrameworkSchema,
   RecommendationClassSchema,
+  TechnicalSeoPendingSchema,
+  WithheldReasonSchema,
 } from './enums.js';
 import { rules } from './rules.js';
 
-/** Points per grade, always an estimate. Keys follow the FACTS Developers JSON `effect`. */
+/**
+ * A change in a grade's points: a counterfactual recompute can lower a grade as well as raise it
+ * (adding a link can thin out a hub's share of PageRank), so it is signed.
+ */
+export const PointsDeltaSchema = z.number().min(-100).max(100);
+
+/**
+ * Points per grade, always an estimate. Keys follow the FACTS Developers JSON `effect`, plus
+ * `technical_seo_pending_on` and `absorbed_by`.
+ */
 export const EffectSchema = z
   .strictObject({
-    technical_seo: ScoreSchema,
+    /** Null while the Technical SEO effect cannot be estimated; then `technical_seo_pending_on` says why. */
+    technical_seo: PointsDeltaSchema.nullable(),
+    technical_seo_pending_on: z.array(TechnicalSeoPendingSchema),
     /** Null while the AI effect cannot be estimated yet; then `ai_readability_pending_on` says why. */
-    ai_readability: ScoreSchema.nullable(),
-    ai_readability_pending_on: z.array(FingerprintSchema),
+    ai_readability: PointsDeltaSchema.nullable(),
+    /** What the estimate waits on: fixes, by fingerprint, or a grade component the check could not measure. */
+    ai_readability_pending_on: z.array(z.union([FingerprintSchema, WithheldReasonSchema])),
+    /**
+     * The `number` of the higher-ranked fix that took this fix's effect: set when the effect, taken
+     * after the fixes ranked above it, is zero or less though the fix alone would raise a grade, and
+     * the engine finds the fix that took it among those naming a page, crawler or template this one
+     * names. Null when no such fix is found, or the fix's effect is not of that kind.
+     */
+    absorbed_by: z.int().min(1).nullable(),
     estimate: z.literal(true),
   })
   .check(
     rules((e, rule) => {
       const waiting = (e.ai_readability_pending_on ?? []).length > 0;
       rule.exactlyWhen('effect_pending', e.ai_readability === null, waiting);
+      const seoWaiting = (e.technical_seo_pending_on ?? []).length > 0;
+      rule.exactlyWhen('effect_seo_pending', e.technical_seo === null, seoWaiting);
+      if (
+        e.absorbed_by !== null &&
+        e.absorbed_by !== undefined &&
+        (e.technical_seo ?? 0) + (e.ai_readability ?? 0) > 0
+      ) {
+        rule.fail('effect_absorbed');
+      }
     }),
   );
 

@@ -15,6 +15,7 @@ import {
 import { fixesAsOf } from '../../fixtures';
 import { listOf } from '../../format';
 import { numberWord, plural } from '../../words';
+import { effectHeadline } from '../effect-headline';
 import { freeFixes } from '../free-fixes';
 
 /** A fix's packet; the contract names the schema, not the type. */
@@ -128,22 +129,39 @@ function tally(fixes: readonly Fix[]): ProFixView['recommendations'] {
  * effect not yet estimated, so no part of the group's effect is left out.
  */
 function groupPoints(fixes: readonly Fix[]): string {
-  const seo = fixes.reduce((n, f) => n + f.effect.technical_seo, 0);
+  const seo = fixes.reduce((n, f) => n + (f.effect.technical_seo ?? 0), 0);
   const ai = fixes.reduce((n, f) => n + (f.effect.ai_readability ?? 0), 0);
   const pending = fixes.filter((f) => f.effect.ai_readability === null).length;
-  const parts = [`+${seo} Technical SEO`, ai ? `+${ai} AI readability` : null].filter(Boolean);
-  return `${parts.join(', ')} together${pending ? `; AI effect not yet estimated for ${pending}` : ''}`;
+  const seoPending = fixes.filter((f) => f.effect.technical_seo === null).length;
+  const seoShown = seoPending < fixes.length;
+  // an AI effect estimated at 0 is still an estimate, shown when no Technical SEO points are
+  const aiShown = ai !== 0 || (!seoShown && pending < fixes.length);
+  const parts = [
+    seoShown ? `+${seo} Technical SEO` : null,
+    aiShown ? `+${ai} AI readability` : null,
+  ].filter(Boolean);
+  const waits = [
+    seoPending ? `Technical SEO effect not estimated for ${seoPending}` : null,
+    pending ? `AI effect not yet estimated for ${pending}` : null,
+  ].filter(Boolean);
+  const head = parts.length ? `${parts.join(', ')} together` : 'no estimated effect';
+  return `${head}${waits.length ? `; ${waits.join('; ')}` : ''}`;
 }
 
 /**
- * A fix's estimated effect as the open fix and the fix page head it: its AI readability points when
- * it has some, otherwise its Technical SEO points, with "estimated" in the unit (FACTS A5).
+ * A fix's estimated effect as the open fix and the fix page head it, by `effectHeadline`'s rule: its
+ * points with "estimated" in the unit (FACTS A5), or a dash and why its AI effect waits.
  */
-export function effectOf(f: Pick<Fix, 'effect'>): { points: string; unit: string } {
-  const ai = f.effect.ai_readability;
-  return ai
-    ? { points: `+${ai}`, unit: 'AI readability, estimated' }
-    : { points: `+${f.effect.technical_seo}`, unit: 'Technical SEO, estimated' };
+export function effectOf(
+  f: Pick<Fix, 'effect' | 'section'>,
+  siteFixes: readonly Pick<Fix, 'fingerprint' | 'number'>[],
+): { points: string; unit: string } {
+  const h = effectHeadline(f, siteFixes);
+  if (h.kind === 'ai') return { points: `+${h.points}`, unit: 'AI readability, estimated' };
+  if (h.kind === 'seo') return { points: `+${h.points}`, unit: 'Technical SEO, estimated' };
+  return h.kind === 'waiting'
+    ? { points: '—', unit: h.sentence }
+    : { points: '—', unit: 'Technical SEO, not estimated' };
 }
 
 /** The packet's problem lines: its context without the line naming the site and audit. */
@@ -174,8 +192,8 @@ export function packetPrompt(f: Pick<Fix, 'title'>, p: FixPacket): string {
   ].join('\n');
 }
 
-export function openFix(f: Fix): OpenFixView {
-  const { points, unit } = effectOf(f);
+export function openFix(f: Fix, siteFixes: readonly Fix[]): OpenFixView {
+  const { points, unit } = effectOf(f, siteFixes);
   const p = f.packet;
   const paragraph = p ? packetParagraph(p) : [];
   const verify = p ? verifyLines(p) : [];
@@ -239,7 +257,7 @@ export function sectionFixes(
           .filter(Boolean)
           .join(' · ')
       : 'nothing to fix',
-    open: open.map(openFix),
+    open: open.map((f) => openFix(f, siteFixes)),
     pro: rows,
     proCount: pro.length,
     openElsewhere: free

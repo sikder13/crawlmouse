@@ -68,15 +68,17 @@ export function check(n: number, edit: (c: Check) => void = () => {}): Check {
     },
     ai_readability: {
       withheld: false,
+      withheld_reasons: [],
       total: 40,
       grade: 'D',
       components: {
-        access: { score: 20, max: 40, heuristic: false },
-        readable: { score: 10, max: 30, heuristic: false },
-        quotable: { score: 5, max: 20, heuristic: true },
-        signals: { score: 5, max: 10, heuristic: false },
+        access: { score: 20, max: 40, heuristic: false, range: null },
+        readable: { score: 10, max: 30, heuristic: false, range: null },
+        quotable: { score: 5, max: 20, heuristic: true, range: null },
+        signals: { score: 5, max: 10, heuristic: false, range: null },
       },
       access_range: null,
+      scored_from_fewer_crawlers: null,
     },
     structure: null,
     without_js: null,
@@ -142,11 +144,19 @@ export function draft(type: FixType, edit: Partial<FixDraft> = {}): FixDraft {
     affected_pages: 12,
     template_key: '/blog/{slug}',
     crawler_uas: type === 'robots_txt_blocks_crawler' ? ['GPTBot'] : [],
-    effect: { technical_seo: 2, ai_readability: 6, ai_readability_pending_on: [], estimate: true },
+    effect: {
+      technical_seo: 2,
+      technical_seo_pending_on: [],
+      ai_readability: 6,
+      ai_readability_pending_on: [],
+      absorbed_by: null,
+      estimate: true,
+    },
     effort: { kind: 'minutes', minutes: 10 },
     before_after: [],
     packet: null,
     rank: 1,
+    absorbed_by_fingerprint: null,
     ...edit,
   };
 }
@@ -178,7 +188,11 @@ export function fixWithHistory(
   { type = 'orphan_pages', measuredOn = 1 }: { type?: FixType; measuredOn?: number } = {},
 ): { fix: Fix; events: FixEvent[] } {
   const d = draft(type);
-  const { rank, ...rest } = d;
+  const { rank, ...drafted } = d;
+  // absorbed_by_fingerprint is the draft's own; a fix carries the absorbing fix's number in its effect
+  const rest = Object.fromEntries(
+    Object.entries(drafted).filter(([k]) => k !== 'absorbed_by_fingerprint'),
+  );
   const fix = FixSchema.parse({
     ...rest,
     id: fixId(n),

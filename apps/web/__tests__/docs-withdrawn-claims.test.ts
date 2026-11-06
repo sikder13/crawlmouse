@@ -69,6 +69,75 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'to a redirect chain marks every page that carries it',
+    withdrawnIn:
+      'docs/specs/v2/17-content-and-grade.md (Technical SEO), owner ruling of 2026-11-05 (second set)',
+    truth:
+      'A crawlability defect is counted on the URL that carries it: a redirect record marks the ' +
+      'redirecting URL, not the pages linking to it, so one site-wide link costs at most one URL.',
+    allowedIn: [],
+  },
+  {
+    text: 'a robots.txt disallow therefore raises Access as an unblock does',
+    withdrawnIn:
+      'docs/specs/v2/17-content-and-grade.md (Access) and packages/engine/src/v2/grade/access.ts, CC-17 review round 6',
+    truth:
+      'A disallow leaves the crawler out of the mean, so Access moves to the mean of the others: up ' +
+      'when its share was below it, down when above (35 to 33.33), and as far as an unblock only when ' +
+      "the others' mean is 1 (formula rows A5d, A5e).",
+    allowedIn: [],
+  },
+  {
+    text: 'so a deliberate block lowers nothing',
+    withdrawnIn: 'docs/specs/v2/17-content-and-grade.md (Access), CC-17 review round 6',
+    truth: 'Same proposition: disallowing a crawler served better than the others lowers Access.',
+    allowedIn: [],
+  },
+  {
+    text: 'by whose application its effect is 0 or less',
+    withdrawnIn: 'docs/specs/v2/17-content-and-grade.md (Fix effects), CC-17 review round 6',
+    truth:
+      'The absorber is the fix whose application takes the effect from above 0 to 0 or less; an ' +
+      'effect gone before any fix naming its page is left unattributed (effects.ts).',
+    allowedIn: [],
+  },
+  {
+    text: 'no title, or no meta description',
+    withdrawnIn:
+      'docs/specs/v2/17-content-and-grade.md (Technical SEO) and packages/engine/src/v2/grade/technical-seo.ts, CC-17 third rulings',
+    truth:
+      'A missing or empty title is a crawlability defect on its URL; a missing meta description is ' +
+      'not (owner ruling, 2026-11-05) and stays a page fact (lacksTitle, technical-seo.test.ts).',
+    allowedIn: [],
+  },
+  {
+    text: 'which is an owner question',
+    withdrawnIn: 'docs/specs/v2/16-structure-detectors.md (conditions), CC-17 fourth ruling',
+    truth:
+      'The owner ruled (2026-11-05) that the hreflang placement as built is the rule: an alternate ' +
+      'the crawl did not read cannot be a finding, and a redirecting or gone alternate puts the ' +
+      'defect on the member whose annotation must change.',
+    allowedIn: [],
+  },
+  {
+    text: 'the defect counted on the member that names it',
+    withdrawnIn: 'docs/specs/v2/17-content-and-grade.md (Technical SEO), CC-17 third rulings',
+    truth:
+      'A missing hreflang return is counted on the alternate that was read and does not annotate ' +
+      'back; the member naming an alternate carries the defect only when that alternate redirects ' +
+      'or is gone (hreflang-gaps.ts).',
+    allowedIn: [],
+  },
+  {
+    text: 'An alternate does not annotate back, or redirects or is gone.',
+    withdrawnIn: 'docs/specs/v2/16-structure-detectors.md (conditions), CC-17 third rulings',
+    truth:
+      'hreflang_missing_return is carried by the alternate that was read and does not annotate back; ' +
+      'an alternate that redirects or is gone is hreflang_alternate_redirects or ' +
+      'hreflang_alternate_gone, carried by the member naming it (hreflang-gaps.ts).',
+    allowedIn: [],
+  },
+  {
     // SPEC 12 and SPEC 15 both said it, each rendered from code (worker/src/spec/render.ts,
     // engine/src/v2/access/spec.ts); CC-12d replaced the canary rule with the witness rule.
     text: 'only when the tagged Googlebot canary was served',
