@@ -430,9 +430,19 @@ migrations close the difference, so the dry run can pass:
 - **P1**, `20261106000001_service_role_parity.sql`, writes down the `service_role` lines and the
   bucket. Production already holds them, so its fingerprint must not change. Its rollback does
   nothing, on purpose: see the file.
-- **P2** revokes what `anon` and `authenticated` hold on the v1 tables and functions and grants back
-  what the v1 app uses. It changes production and waits for the owner's approval of its grant
-  table.
+- **P2**, `20261106000002_v1_client_grant_hardening.sql`, revokes everything `anon` and
+  `authenticated` hold on the 18 v1 tables and 2 v1 functions, and their default privileges in
+  `public`, then grants back what code running as a signed-in user reads: `users (id, pro_until,
+stripe_customer_id)`, nine columns of `audits` for the dashboard, and six of
+  `domain_verifications` for the verify page. `anon` keeps nothing on them. The file names the
+  caller of each grant. It changes production: the lines it removes and adds are in
+  `scripts/db/fixtures/20261106000002-expected-change.json`. Approved by the owner on 2026-11-06.
+
+**After P2, tables created in `public` get no client privileges by default.** Production then
+behaves as a branch does. Each migration grants `anon` and `authenticated` what it needs,
+explicitly; the dry run shows a missing grant, because the branch has no default privileges
+either. A migration must sort after `20261106000002`, or the CLI refuses to push it once P2 is
+recorded.
 
 Neither can pass a dry run while pending: the branch would lack production's lines at the
 fingerprint step. Each reaches production once, by `supabase db push` from this repository's
@@ -466,3 +476,54 @@ pnpm exec tsx db/check.ts --db-url-env DB_URL --yes-production
 The comparison must print `no change, as expected`. The history read must show every file recorded
 under its own version, with nothing renamed, empty, orphaned or unrecorded. The checks must pass.
 Any other result: stop and report it; P1 has no rollback that would change production.
+
+**P2**, after P1 has been applied and checked. From a checkout of the commit that adds P2, with the
+same setup as P1. Take the dump first; it holds every row of `public`, so keep it out of the
+repository and delete it once the smoke below has passed:
+
+```bash
+cd scripts
+read -rs DB_URL && export DB_URL
+pg_dump "$DB_URL" --schema=public --format=custom --file ~/db-apply/public-before-p2.dump
+pg_restore --list ~/db-apply/public-before-p2.dump | head -5
+pnpm exec tsx db/fingerprint.ts --db-url-env DB_URL --yes-production --out ~/db-apply/p2-before.json
+pnpm exec tsx db/fingerprint.ts --before ~/db-apply/p1-after.json --after ~/db-apply/p2-before.json
+cd ..
+supabase --workdir infra db push --db-url "$DB_URL" --dry-run
+```
+
+`pg_restore --list` must print the dump's table of contents. The second comparison must print `no
+change, as expected`: production has not moved since P1. The listing must name exactly one file,
+`20261106000002_v1_client_grant_hardening.sql`. Then:
+
+```bash
+supabase --workdir infra db push --db-url "$DB_URL"
+cd scripts
+pnpm exec tsx db/fingerprint.ts --db-url-env DB_URL --yes-production --out ~/db-apply/p2-after.json
+pnpm exec tsx db/fingerprint.ts --before ~/db-apply/p2-before.json --after ~/db-apply/p2-after.json --expect db/fixtures/20261106000002-expected-change.json
+pnpm exec tsx db/history.ts --db-url-env DB_URL --yes-production
+pnpm exec tsx db/check.ts --db-url-env DB_URL --yes-production
+```
+
+The comparison must print `exactly as db/fixtures/20261106000002-expected-change.json lists`; any
+other line is a stop. Then the live smoke on https://crawlmouse.com, each in a fresh private window:
+
+1. Sign in by magic link at `/login`: the emailed link lands you signed in.
+2. Start an audit from the home page on a small site: it runs to a grade.
+3. Open a public report, `/r/<slug>` (one from a `/top/` leaderboard): it renders with its grade.
+4. Load an embed badge, `/embed/<domain>` for that report's domain: the badge renders.
+5. Open `/dashboard` while signed in: your audits are listed and the plan shows.
+
+Each must work, and Sentry must show no new `permission denied` error from these minutes. If any
+step fails, revert P2 and take the smoke again:
+
+```bash
+cd scripts
+pnpm exec tsx db/rollback.ts --db-url-env DB_URL --file 20261106000002_v1_client_grant_hardening.revert.sql --yes-production
+pnpm exec tsx db/fingerprint.ts --db-url-env DB_URL --yes-production --out ~/db-apply/p2-reverted.json
+pnpm exec tsx db/fingerprint.ts --before ~/db-apply/p2-before.json --after ~/db-apply/p2-reverted.json
+```
+
+The rollback runs in one transaction, removes P2's history row, and runs the checks; the comparison
+must print `no change, as expected`. Once both are applied and checked, re-run the pull request's
+dry run: it must pass, and that run is the merge gate.

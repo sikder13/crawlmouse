@@ -240,7 +240,7 @@ Supabase MCP `apply_migration`:
 ```sql
 select has_column_privilege('authenticated','public.pages','ai_signals','SELECT');  -- MUST be false
 select has_column_privilege('anon',         'public.pages','ai_signals','SELECT');  -- MUST be false
-select has_column_privilege('authenticated','public.pages','url','SELECT');         -- MUST be true
+select has_column_privilege('authenticated','public.pages','url','SELECT');         -- true until 20261106000002 (P2), false after it by design: no v1 code reads pages as a client
 ```
 
 The third is not a formality: it is what proves the re-grant actually happened rather than the REVOKE
