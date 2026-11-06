@@ -436,7 +436,10 @@ migrations close the difference, so the dry run can pass:
 stripe_customer_id)`, nine columns of `audits` for the dashboard, and six of
   `domain_verifications` for the verify page. `anon` keeps nothing on them. The file names the
   caller of each grant. It changes production: the lines it removes and adds are in
-  `scripts/db/fixtures/20261106000002-expected-change.json`. Approved by the owner on 2026-11-06.
+  `scripts/db/fixtures/20261106000002-expected-change.json`. Approved by the owner on 2026-11-06,
+  with one reader left without grants: the tRPC procedures `audits.getById` and `audits.listMine`
+  (`apps/web/lib/trpc/router.ts`) have no caller, and answer `query_failed` after P2
+  (`scripts/db/hardening.test.ts` runs their queries and expects the refusal).
 
 **After P2, tables created in `public` get no client privileges by default.** Production then
 behaves as a branch does. Each migration grants `anon` and `authenticated` what it needs,
@@ -448,14 +451,16 @@ Neither can pass a dry run while pending: the branch would lack production's lin
 fingerprint step. Each reaches production once, by `supabase db push` from this repository's
 checkout, which applies the file's bytes and records its history row. Not the SQL editor.
 
-**P1.** From a checkout of the commit that adds P1, with Node 22, `pnpm install` done, Supabase CLI
-2.84.2 on the path (`supabase --version`), and the session pooler's connection string from the
-dashboard's **Connect** dialog:
+**P1.** From the `build/cc-db-ops` checkout at commit `6de90b21`, which has P1 and not P2, with
+Node 22, `pnpm install` done, Supabase CLI 2.84.2 on the path (`supabase --version`), and the
+session pooler's connection string from the dashboard's **Connect** dialog. `~/db-apply` holds the
+fingerprints and, for P2, a dump of production's rows: keep it out of any synced folder.
 
 ```bash
+git checkout --detach 6de90b21
 cd scripts
 read -rs DB_URL && export DB_URL
-mkdir -p ~/db-apply
+install -d -m 700 ~/db-apply
 pnpm exec tsx db/fingerprint.ts --db-url-env DB_URL --yes-production --out ~/db-apply/p1-before.json
 cd ..
 supabase --workdir infra db push --db-url "$DB_URL" --dry-run
@@ -477,13 +482,15 @@ The comparison must print `no change, as expected`. The history read must show e
 under its own version, with nothing renamed, empty, orphaned or unrecorded. The checks must pass.
 Any other result: stop and report it; P1 has no rollback that would change production.
 
-**P2**, after P1 has been applied and checked. From a checkout of the commit that adds P2, with the
-same setup as P1. Take the dump first; it holds every row of `public`, so keep it out of the
-repository and delete it once the smoke below has passed:
+**P2**, after P1 has been applied and checked. From the same checkout at the head of
+`build/cc-db-ops`, with the same setup. Take the dump first; it holds every row of `public`, so it
+stays in `~/db-apply` and is deleted once the smoke below has passed:
 
 ```bash
+git checkout build/cc-db-ops
 cd scripts
 read -rs DB_URL && export DB_URL
+umask 077
 pg_dump "$DB_URL" --schema=public --format=custom --file ~/db-apply/public-before-p2.dump
 pg_restore --list ~/db-apply/public-before-p2.dump | head -5
 pnpm exec tsx db/fingerprint.ts --db-url-env DB_URL --yes-production --out ~/db-apply/p2-before.json
@@ -505,17 +512,25 @@ pnpm exec tsx db/history.ts --db-url-env DB_URL --yes-production
 pnpm exec tsx db/check.ts --db-url-env DB_URL --yes-production
 ```
 
-The comparison must print `exactly as db/fixtures/20261106000002-expected-change.json lists`; any
-other line is a stop. Then the live smoke on https://crawlmouse.com, each in a fresh private window:
+The comparison must print `exactly as db/fixtures/20261106000002-expected-change.json lists`. If
+it prints anything else, P2 is already recorded: revert it with the commands below, then report the
+printed lines; do not push it again. Otherwise take the live smoke on https://crawlmouse.com, each
+step in a fresh private window:
 
 1. Sign in by magic link at `/login`: the emailed link lands you signed in.
 2. Start an audit from the home page on a small site: it runs to a grade.
 3. Open a public report, `/r/<slug>` (one from a `/top/` leaderboard): it renders with its grade.
 4. Load an embed badge, `/embed/<domain>` for that report's domain: the badge renders.
 5. Open `/dashboard` while signed in: your audits are listed and the plan shows.
+6. Open `/verify/<id>` for a domain verification you started (from a report's verify flow): the
+   page shows the domain and its token.
+7. Signed in as a Pro account, open `/api/billing/status`: it returns `{"pro":true}`. Then `/billing`
+   opens the Stripe portal. The Pro check returns false rather than an error when it cannot read
+   `users.pro_until`, so a non-Pro account would not show that grant missing.
 
-Each must work, and Sentry must show no new `permission denied` error from these minutes. If any
-step fails, revert P2 and take the smoke again:
+Each must work, and Sentry must show no new `permission denied` error from these minutes. Then
+delete the dump: `rm ~/db-apply/public-before-p2.dump`. If any step fails, revert P2 and take the
+smoke again:
 
 ```bash
 cd scripts
