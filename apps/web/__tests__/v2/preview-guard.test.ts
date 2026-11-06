@@ -80,7 +80,9 @@ describe('v2 preview group: reachable only outside production', () => {
       if (!isNotFound(thrown)) rendered.push(relative(GROUP, file));
     }
     expect(rendered).toEqual([]);
-  });
+    // Importing every page transforms each one's module tree, so the time grows with the pages. On
+    // 2026-11-06 it took 4.0 s on main and 5.0 s with the CC-26 account previews, past vitest's 5 s.
+  }, 30_000);
 
   it('renders the preview in development and test', async () => {
     for (const env of ['development', 'test']) {
