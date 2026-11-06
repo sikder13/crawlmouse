@@ -87,6 +87,19 @@ From `apps/web/styles/v2/tokens.css`. The source column is the comment on each d
 
 Exported from `apps/web/components/v2/index.ts`. Summaries and prop notes are the components’ own doc comments.
 
+### AccountShell
+
+The signed-in frame: a rail of the account's pages beside the page itself (Final-Dashboard). It
+shares PageShell's canvas, type and element defaults, and has no site header or footer. On a
+phone the rail becomes a band across the top.
+
+| Prop       | Type         | Required | Note                                                        |
+| ---------- | ------------ | -------- | ----------------------------------------------------------- |
+| `nav`      | `RailLink[]` | yes      | The rail's links, in order.                                 |
+| `card`     | `ReactNode`  | no       | The plan card under the links (the trial card), or nothing. |
+| `theme`    | `ReactNode`  | no       | The theme row at the foot of the rail.                      |
+| `children` | `ReactNode`  | yes      |                                                             |
+
 ### BrandLink
 
 The brand: the CrawlmouseMark and the crawl + orange mouse wordmark, linking home.
@@ -266,6 +279,29 @@ A table of records that scrolls sideways on a phone rather than squeezing (phone
 | `heading`   | `ReactNode`           | no       | Rendered inside the scroll region, above the table (a heading row with pills). |
 | `className` | `string \| undefined` | no       |                                                                                |
 
+### ThemeControl
+
+System, Light or Dark (DESIGN-LOCK §2: three states, default System). The choice applies at once
+and is kept in this browser; saving it to the account is the form's job, which a preview stops.
+
+| Prop      | Type          | Required | Note                                                                                     |
+| --------- | ------------- | -------- | ---------------------------------------------------------------------------------------- |
+| `initial` | `ThemeChoice` | yes      | The signed-in seat's saved theme.                                                        |
+| `action`  | `string`      | yes      | Where the choice is saved (PATCH /api/me {theme}); the form names the verb in `_method`. |
+
+### TrialCard
+
+The rail's trial banner: when the trial ends, how long is left, and what Free keeps. On a phone
+it is a single strip with the action still in reach (DESIGN-LOCK §6, phone rules).
+
+| Prop       | Type        | Required | Note                                                                             |
+| ---------- | ----------- | -------- | -------------------------------------------------------------------------------- |
+| `title`    | `string`    | yes      | "Pro, trial · ends Sat 7 Nov".                                                   |
+| `left`     | `string`    | yes      | "8 days left".                                                                   |
+| `note`     | `string`    | yes      | What happens when the trial ends. Hidden on a phone, where the card is one line. |
+| `aside`    | `ReactNode` | no       | Beside the days left: the billing link on the first run.                         |
+| `children` | `ReactNode` | no       | Under the note: keeping the plan.                                                |
+
 ### VerdictCell
 
 One crawler's verdict as a status pill, with how we know it: declared, simulated or observed.
@@ -372,6 +408,9 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Table                               | `/v2-preview/table`                                      | primitive |                                      |
 | Field                               | `/v2-preview/field`                                      | primitive |                                      |
 | PageShell                           | `/v2-preview/page-shell`                                 | primitive |                                      |
+| AccountShell                        | `/v2-preview/account-shell`                              | primitive |                                      |
+| TrialCard                           | `/v2-preview/trial-card`                                 | primitive |                                      |
+| ThemeControl                        | `/v2-preview/theme-control`                              | primitive |                                      |
 | Final-Home                          | `/v2-preview/screens/home`                               | screen    |                                      |
 | Final-Crawl                         | `/v2-preview/screens/crawl`                              | screen    | `?at=47000`, `?at=128000`, `?at=end` |
 | Crawl, clean re-run                 | `/v2-preview/screens/crawl/clean`                        | screen    | `?at=end`                            |

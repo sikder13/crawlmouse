@@ -1,0 +1,90 @@
+/* The account frame (Final-Dashboard .rail and main): a 200px rail beside the page. */
+
+.frame {
+  flex-direction: row;
+  flex-wrap: wrap;
+  font-size: var(--v2-text-small);
+}
+
+.rail {
+  flex: 0 0 200px;
+  padding: 16px 12px;
+  border-right: 1px solid var(--v2-line);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  background: var(--v2-railbg);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--v2-control-h-sm);
+  padding: 0 10px;
+  border-radius: var(--v2-radius-control);
+  color: var(--v2-fg2);
+  text-decoration: none;
+}
+
+.link:hover {
+  background: var(--v2-s1);
+  color: var(--v2-fg);
+  text-decoration: none;
+}
+
+.current {
+  background: var(--v2-s2);
+  color: var(--v2-fg);
+  font-weight: 500;
+}
+
+.count {
+  margin-left: auto;
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+.card {
+  margin-top: auto;
+}
+
+.main {
+  flex: 999 1 520px;
+  min-width: 0;
+  padding: 20px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 760px) {
+  .rail {
+    flex: 1 1 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--v2-line);
+    gap: 10px;
+  }
+
+  .nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .card {
+    margin-top: 0;
+  }
+
+  .main {
+    padding: 20px var(--v2-gutter-phone);
+  }
+}

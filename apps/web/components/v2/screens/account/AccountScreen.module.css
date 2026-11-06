@@ -1,0 +1,6 @@
+/* Shared by the account screens' parts. */
+
+.inlineForm {
+  display: inline-flex;
+  margin: 0;
+}

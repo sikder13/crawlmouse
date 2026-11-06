@@ -1,0 +1,70 @@
+/* The rail's trial card (Final-Dashboard .trial). */
+
+.card {
+  padding: 12px;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+  background: var(--v2-s1);
+}
+
+.title {
+  color: var(--v2-mut);
+  font-size: 12px;
+}
+
+.left {
+  font-size: var(--v2-text-ui);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.aside {
+  margin-left: 6px;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.aside a {
+  color: var(--v2-mut);
+  text-decoration: underline;
+}
+
+.note {
+  color: var(--v2-mut);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.actions {
+  margin-top: 10px;
+}
+
+.actions :is(a, button) {
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+    padding: 8px 12px;
+  }
+
+  .left {
+    margin-top: 0;
+  }
+
+  .note {
+    display: none;
+  }
+
+  .actions {
+    margin: 0 0 0 auto;
+  }
+
+  .actions :is(a, button) {
+    width: auto;
+  }
+}

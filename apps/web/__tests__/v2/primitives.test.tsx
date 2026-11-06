@@ -544,3 +544,18 @@ describe('PageShell', () => {
     expect(r).toContain('font-family: var(--v2-font-body)');
   });
 });
+
+describe('AccountShell and TrialCard (behaviour: account-shell.test.tsx)', () => {
+  it('shares PageShell’s canvas class, so its colours, type and 600 weight are not copied', () => {
+    const src = readFileSync(join(WEB_ROOT, 'components', 'v2', 'AccountShell.tsx'), 'utf8');
+    expect(src).toContain("import shell from './PageShell.module.css'");
+    expect(src).toMatch(/className=\{`\$\{shell\.shell\} /);
+  });
+
+  it('keeps the trial card’s action in reach on a phone and hides its note there (DESIGN-LOCK §6)', () => {
+    const src = css('TrialCard');
+    const phone = src.slice(src.indexOf('@media (max-width: 760px)'));
+    expect(phone).toMatch(/\.note \{\s*display: none;/);
+    expect(phone).not.toMatch(/\.actions \{[^}]*display: none/);
+  });
+});
