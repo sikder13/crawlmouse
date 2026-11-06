@@ -1315,36 +1315,21 @@ Database-only columns (not a field of the contract entity the table holds):
 
 v1 tables where `anon` holds TRUNCATE (before 003): `audits`, `benchmark_cohorts`, `domain_verifications`, `email_events`, `embed_badges`, `findings`, `links`, `pages`, `public_reports`, `rate_limits`, `sessions`, `stripe_events`, `takedown_requests`, `users`.
 
-## Runbook (owner-applied, OPERATING-RULES §7)
+## Runbook (OPERATING-RULES §7)
 
-1. **Dump.** `pg_dump` of `public` from `ezspnfeyzwsisymytssm`.
-2. **Dry run on a fresh Supabase branch** (one no draft of these files was applied to: `create table if not exists` would skip a draft's table). Apply 003, 005 and 007 in order; apply each a second time (it must succeed and change nothing); run the checks of step 4. Then the part PGlite cannot model:
-   - `select id from storage.buckets where id in ('evidence', 'reports')` returns nothing before 007 (the revert deletes both, so neither may predate it), and 007's bucket insert is accepted by the real `storage.buckets`.
-   - `grant usage on schema storage` and `grant insert on storage.objects` to `crawl_worker` are accepted from the migration role, and `create role` is.
+The owner applied 003, 005 and 007 to production on 2026-11-05, with 006b after them (06b's runbook). A later change to these tables goes through the migration workflows in `docs/ops/db-migrations.md`: the pull request's dry run on a Supabase branch made from production, then `supabase db push` after the owner approves it. A rollback is a separate workflow run behind the same approval. The revert order is 006b, 007, 005, 003. 003's revert drops its tables with their rows, so take a `pg_dump` of `public` first.
+
+1. **Checks.** The dry run runs these on the branch, and the apply runs them on production afterwards. They live in `infra/supabase/checks`, and `docs/ops/db-migrations.md` lists them with their meaning. `pnpm --filter @crawlmouse/scripts exec vitest run db/check.test.ts` shows each one failing on what it guards.
+   - `01-client-table-privileges.sql`: the grants shown above, compared with the catalog. `anon` holds nothing on these tables; `authenticated` and `crawl_worker` hold what the tables above show.
+   - `05-private-buckets.sql`: `evidence` and `reports` are private.
+   - `03-worker-roles-no-login.sql`: `crawl_worker` cannot log in or bypass RLS.
+   - `06-client-functions.sql`: in `public`, `research` and `partitions`, `authenticated` may execute `is_member`, `is_member_for_site`, `member_role` and `usage_counts`, and `anon` may execute none of the functions.
+2. **By hand on a Supabase branch, for a change that touches Storage or `crawl_worker`.** The dry run does not cover these:
    - `select policyname, cmd, roles, with_check from pg_policies where schemaname = 'storage' and tablename = 'objects'`: no INSERT policy may apply to `public` (or name no role), because policies are OR'd and such a policy would let `crawl_worker` past the path check. Also list `crawl_worker`'s privileges across `storage` (`has_table_privilege` / `has_function_privilege` over its tables and functions): INSERT on `objects` and nothing else.
-   - Mint a `crawl_worker` token on the branch (section "The `crawl_worker` token") for a check set to `running`, and through the Storage API upload `{account}/{site}/{check}.part1.json.gz` to `evidence`: it succeeds. A `.v1.json.gz` name, another check's path, the `reports` bucket and an expired token are refused. Through PostgREST, insert a `page_results` row with `Prefer: return=minimal`: it succeeds; a row for another check is refused.
+   - Mint a `crawl_worker` token on the branch (section "The `crawl_worker` token") for a check set to `running`, and through the Storage API upload `{account}/{site}/{check}.part1.json.gz` to `evidence`: it succeeds. A `.v1.json.gz` name, another check's path, the `reports` bucket and an expired token are refused. Through PostgREST, insert a `page_results` row with `Prefer: return=minimal`: it succeeds; a row for another check is refused. If the upload is refused for want of SELECT (an upload that reads its row back), stop and report it. Do not widen the grant without review.
    - `select r, has_schema_privilege(r, 'public', 'CREATE') from unnest(array['anon', 'authenticated', 'service_role', 'crawl_worker']) r`: false for each. The SECURITY DEFINER functions resolve names through `public` before `pg_catalog`, so no client role may create objects in `public`.
-   - If the Storage upload is refused for want of SELECT (an upload that reads its row back), stop and report it. Do not widen the grant without review.
-   - Revert 007, 005 and 003 in that order, then apply all three again.
-3. **Apply window.** One transaction per file, 003 then 005 then 007, then 006b (its own runbook, in 06b), at a quiet hour. Each `alter table` on an existing table (listed under "Columns added to existing tables") takes a brief exclusive lock on it.
-4. **Verify on production.**
-   - `get_advisors` (security): no new finding on the tables or functions these migrations create or change.
-   - Grants, rendered above, against the catalog:
-     ```sql
-     select table_name, column_name, grantee, privilege_type from information_schema.column_privileges
-      where table_schema = 'public' and grantee in ('anon', 'authenticated', 'crawl_worker')
-        and table_name in ('access_tests', 'alert_events', 'alert_rules', 'api_keys', 'changes', 'checks', 'deploy_hooks', 'evidence_blobs', 'fix_events', 'link_edges', 'measurement_lineages', 'page_results', 'report_schedules', 'reports', 'seat_sites', 'share_links', 'site_fixes', 'sites') order by 1, 2, 3, 4;
-     select c.relname, c.relrowsecurity, c.relacl::text from pg_class c
-       join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public' and c.relname in ('access_tests', 'alert_events', 'alert_rules', 'api_keys', 'changes', 'checks', 'deploy_hooks', 'evidence_blobs', 'fix_events', 'link_edges', 'measurement_lineages', 'page_results', 'report_schedules', 'reports', 'seat_sites', 'share_links', 'site_fixes', 'sites') order by 1;
-     select schemaname, tablename, policyname, cmd, roles, qual, with_check from pg_policies
-      where (schemaname = 'public' and tablename in ('access_tests', 'alert_events', 'alert_rules', 'api_keys', 'changes', 'checks', 'deploy_hooks', 'evidence_blobs', 'fix_events', 'link_edges', 'measurement_lineages', 'page_results', 'report_schedules', 'reports', 'seat_sites', 'share_links', 'site_fixes', 'sites')) or schemaname = 'storage' order by 1, 2, 3;
-     ```
-     Expect no `anon` entry, and `authenticated` and `crawl_worker` holding what the tables above show.
-   - The name-free routine check of `docs/deploy/spec51a-stage6-frontier-functions-runbook.md` returns `is_member`, `is_member_for_site` and `member_role`, each with `anon = false` and `authed = true` (PGlite: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-001-entitlement-tables.test.ts -t "routines"`). Any other row is a finding.
-   - `select id, public from storage.buckets where id in ('evidence', 'reports');`: two rows, `public = false`.
-   - `select rolname, rolcanlogin, rolbypassrls from pg_roles where rolname = 'crawl_worker';`: one row, `false`, `false`.
-5. **Revert, if needed:** 006b, then 007, then 005, then 003, each file twice-safe and tested on PGlite and in step 2. 003's revert drops its tables with their rows; take the dump first. 007's revert stops at a bucket that still holds objects: empty it through the Storage API first (Supabase refuses a direct delete of storage rows).
+3. **On production, after an apply.** `get_advisors` (security): no new finding on the tables or functions the change creates or alters.
+4. **007's revert** refuses while either bucket holds objects, and gives the count per bucket: empty them through the Storage API first (Supabase refuses a direct delete of storage rows). It sets `storage.allow_delete_query` for its own transaction, which `storage.protect_delete()` requires before a bucket row can be deleted (`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-007-storage.test.ts -t "allow_delete_query"`).
 
 ## The SQL for approval
 
@@ -3295,7 +3280,7 @@ alter table public.public_reports drop column if exists check_id;
 | File                                                                | sha256                                                             |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `infra/supabase/migrations/20261102000003_v2_007_storage.sql`       | `a42bcf4d1c2b292a27d6cdc60c138880162c5cefc224f550a61d6f1b585723f5` |
-| `infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql` | `61e23b10a1741c5d93a3cf19daf331d150098760e0fdb193454c2506883a0572` |
+| `infra/supabase/rollbacks/20261102000003_v2_007_storage.revert.sql` | `f064cf9173087536291f328fb6a8afb9981a2ea0e908a89291e45225583fbfca` |
 
 <details><summary>Migration SQL</summary>
 
@@ -3488,10 +3473,29 @@ create policy evidence_crawl_worker_part_insert on storage.objects
 -- Revert of infra/supabase/migrations/20261102000003_v2_007_storage.sql.
 --
 -- Removes the crawl_worker role, its grants, functions and policies, and the evidence and reports
--- buckets. A bucket that still holds objects is not deleted: the delete fails and the revert stops,
--- so empty it through the Storage API first (Supabase refuses a direct delete of storage rows).
+-- buckets. While either bucket holds objects the first statement raises with the count per bucket
+-- and nothing runs, so the revert never orphans files: empty them through the Storage API first.
+--
+-- Run it as one transaction (scripts/db/rollback.ts does): `set local` below lasts only until the
+-- transaction ends.
 --
 -- Every statement is re-runnable (v2-007-storage.test.ts runs it twice).
+
+do $$
+declare
+  evidence_count bigint;
+  reports_count bigint;
+begin
+  select count(*) filter (where bucket_id = 'evidence'), count(*) filter (where bucket_id = 'reports')
+    into evidence_count, reports_count
+    from storage.objects
+   where bucket_id in ('evidence', 'reports');
+  if evidence_count + reports_count > 0 then
+    raise exception 'revert stopped: the buckets still hold objects (evidence: %, reports: %); empty them through the Storage API first',
+      evidence_count, reports_count;
+  end if;
+end;
+$$;
 
 drop policy if exists evidence_crawl_worker_part_insert on storage.objects;
 do $$
@@ -3509,6 +3513,8 @@ drop function if exists public.crawl_worker_check_month();
 drop function if exists public.crawl_worker_part_path_ok(text);
 drop function if exists public.crawl_worker_check_id();
 
+-- storage.protect_delete() refuses a direct delete from storage.buckets unless this is set.
+set local storage.allow_delete_query = 'true';
 delete from storage.buckets where id in ('evidence', 'reports');
 
 do $$

@@ -654,18 +654,20 @@ describe('migration 001 RLS, acting as anon and as authenticated', () => {
   });
 
   it('users_self_read still returns only the caller’s own row, now with its default account', async () => {
+    // After 20261106000002 (P2) a signed-in user may read only id, pro_until and stripe_customer_id
+    // of users, so the default account is read as the owner.
     const rows = await asRole(
       w.db,
       'authenticated',
       w.alice,
-      async (tx) =>
-        (
-          await tx.query<{ id: string; default_account_id: string }>(
-            `select id, default_account_id from public.users`,
-          )
-        ).rows,
+      async (tx) => (await tx.query<{ id: string }>(`select id from public.users`)).rows,
     );
-    expect(rows).toEqual([{ id: w.alice, default_account_id: w.aliceAccount }]);
+    expect(rows).toEqual([{ id: w.alice }]);
+    const own = await w.db.query<{ default_account_id: string }>(
+      `select default_account_id from public.users where id = $1`,
+      [w.alice],
+    );
+    expect(own.rows).toEqual([{ default_account_id: w.aliceAccount }]);
   });
 });
 
