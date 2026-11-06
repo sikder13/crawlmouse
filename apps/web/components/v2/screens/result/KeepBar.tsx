@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Button } from '../../Button';
 import { Field } from '../../Field';
 import layout from '../../layout.module.css';
+import { cadenceOf, trialDays } from '../signup/door-copy';
+import { browserZone, rememberPending, SEND_COPY, type LinkRequest } from '../signup/send-link';
+import { useLinkSender } from '../signup/useLinkSender';
 import styles from './ResultScreen.module.css';
 
 export type KeepState = 'waiting' | 'open' | 'dismissed';
@@ -30,6 +33,7 @@ export function KeepBar({
   expires,
   initial,
   inline,
+  checkId,
 }: {
   domain: string;
   /** When the anonymous result expires, as a timestamp, not a countdown. */
@@ -37,8 +41,30 @@ export function KeepBar({
   /** Fix the state, for previews and tests; omitted, the bar follows the reader. */
   initial?: KeepState;
   inline?: InlineKeep;
+  /**
+   * The anonymous check this page shows. With it, "Keep it" asks for a sign-in link that claims the
+   * check (CC-25); without it (the previews) the form stays inert.
+   */
+  checkId?: string;
 }) {
   const [state, setState] = useState<KeepState>(inline ? 'open' : (initial ?? 'waiting'));
+  const onSent = useCallback(
+    (body: LinkRequest) => {
+      rememberPending(body);
+      window.location.assign(`/check-email?kind=from-audit&site=${encodeURIComponent(domain)}`);
+    },
+    [domain],
+  );
+  const sender = useLinkSender(onSent);
+  const refused = sender.state in SEND_COPY ? (sender.state as keyof typeof SEND_COPY) : null;
+
+  // POST, and stopped here, so an email never lands in a URL; the JSON goes to the magic-link route.
+  function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!checkId) return;
+    const email = (e.currentTarget.elements.namedItem('email') as HTMLInputElement).value.trim();
+    sender.request({ email, claimCheckId: checkId, tz: browserZone() });
+  }
   const Wrapper = inline ? 'section' : 'aside';
 
   useEffect(() => {
@@ -82,7 +108,8 @@ export function KeepBar({
                 inline.title
               ) : (
                 <>
-                  Keep this audit. We&apos;ll re-check {domain} monthly and show you what changed.
+                  Keep this audit. We&apos;ll re-check {domain} {cadenceOf('free')} and show you
+                  what changed.
                 </>
               )}
             </div>
@@ -91,18 +118,18 @@ export function KeepBar({
                 inline.sub
               ) : (
                 <>
-                  One email creates a free account and starts 14 days of Pro. Otherwise this page is
-                  kept until {expires}.
+                  One email creates a free account and starts {trialDays} of Pro. Otherwise this
+                  page is kept until {expires}.
                 </>
               )}
             </div>
           </div>
-          {/* Not wired to an account yet. POST, and stopped here, so an email never lands in a URL. */}
           <form
             className={`${layout.row} ${styles.barForm}`}
             aria-label="Keep this audit"
             method="post"
-            onSubmit={(e) => e.preventDefault()}
+            noValidate
+            onSubmit={submit}
           >
             <Field
               id="save-email"
@@ -118,6 +145,7 @@ export function KeepBar({
               type="submit"
               variant={inline?.primary ? 'primary' : 'inverse'}
               className={styles.barButton}
+              disabled={sender.state === 'verifying' || sender.state === 'sending'}
             >
               Keep it
             </Button>
@@ -130,6 +158,10 @@ export function KeepBar({
                 Not now
               </Button>
             )}
+            {sender.widget}
+            <p className={styles.barSub} role="alert" hidden={!refused} data-v2-addition="">
+              {refused ? SEND_COPY[refused] : null}
+            </p>
           </form>
         </div>
       ) : state === 'dismissed' ? (
