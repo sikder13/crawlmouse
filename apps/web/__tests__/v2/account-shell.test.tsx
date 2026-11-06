@@ -9,6 +9,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AccountShell, THEME_CHOICES, ThemeControl, TrialCard } from '../../components/v2';
 import { AccountFrame } from '../../components/v2/screens/account/AccountFrame';
+import { ActionControl } from '../../components/v2/screens/account/ActionControl';
 import { shellPreview } from '../../app/(v2-preview)/v2-preview/_preview/accounts';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -110,12 +111,45 @@ describe('ThemeControl', () => {
     expect(submit.defaultPrevented).toBe(true);
   });
 
+  it('wears the seat’s saved theme when this browser kept none, as its pressed button says', () => {
+    const host = mount(<ThemeControl initial="dark" action="/api/me" />);
+    expect(host.querySelector('button[aria-pressed="true"]')!.textContent).toBe('Dark');
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
   it('starts from the choice this browser kept', () => {
     window.localStorage.setItem('crawlmouse-theme', 'light');
     const host = mount(<ThemeControl initial="dark" action="/api/me" />);
     const pressed = host.querySelector('button[aria-pressed="true"]')!;
     expect(pressed.textContent).toBe('Light');
     expect(document.documentElement.dataset.theme).toBe('light');
+  });
+});
+
+describe('ActionControl', () => {
+  const action = {
+    label: 'Copy fix',
+    route: '/api/fixes/[id]/packet',
+    href: '/api/fixes/f/packet',
+    method: 'get' as const,
+    fields: {},
+    primary: false,
+  };
+
+  it('scrolls itself into view on keyboard focus, and not when a pointer focuses it', () => {
+    const host = mount(<ActionControl action={action} />);
+    const link = host.querySelector('a')!;
+    const scrolled: string[] = [];
+    link.scrollIntoView = () => void scrolled.push('scrolled');
+    const keyboard = (yes: boolean) =>
+      (link.matches = (q: string) => (q === ':focus-visible' ? yes : false));
+    keyboard(false);
+    act(() => link.focus());
+    act(() => link.blur());
+    expect(scrolled).toEqual([]);
+    keyboard(true);
+    act(() => link.focus());
+    expect(scrolled).toEqual(['scrolled']);
   });
 });
 

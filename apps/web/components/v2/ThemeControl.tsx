@@ -38,13 +38,12 @@ export function ThemeControl({ initial, action }: ThemeControlProps) {
   const [choice, setChoice] = useState<ThemeChoice>(initial);
   const labelId = useId();
 
+  // What it shows pressed is what the page wears: this browser's choice, else the seat's.
   useEffect(() => {
-    const kept = stored();
-    if (kept) {
-      setChoice(kept);
-      apply(kept);
-    }
-  }, []);
+    const kept = stored() ?? initial;
+    setChoice(kept);
+    apply(kept);
+  }, [initial]);
 
   const choose = (next: ThemeChoice) => {
     setChoice(next);

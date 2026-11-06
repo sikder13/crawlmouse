@@ -414,11 +414,27 @@ describe('Table, with its headers hidden', () => {
       />,
     );
     expect(out).toMatch(
-      /<thead class="[^"]+" data-v2-sr-only=""><tr><th scope="col"[^>]*>No\.<\/th><th scope="col"[^>]*>Fix<\/th>/,
+      /<thead class="[^"]+"><tr><th scope="col"[^>]*><span[^>]*data-v2-sr-only="">No\.<\/span><\/th>/,
     );
+    // The header row stays a table row: no absolute positioning takes it out of the table.
+    expect(out).not.toMatch(/<thead[^>]*data-v2-sr-only/);
     expect(html(<Table label="x" columns={[{ header: 'a' }]} rows={[]} />)).toContain(
       '<thead><tr>',
     );
+  });
+});
+
+describe('Table, with row headers', () => {
+  it('makes each row’s first cell its header, and only that cell', () => {
+    const out = html(
+      <Table
+        label="Settings"
+        rowHeader
+        columns={[{ header: 'Setting' }, { header: 'Value' }]}
+        rows={[{ key: 's', cells: ['Schedule', 'weekly'] }]}
+      />,
+    );
+    expect(out).toMatch(/<tbody><tr><th scope="row"[^>]*>Schedule<\/th><td[^>]*>weekly<\/td>/);
   });
 });
 
@@ -568,6 +584,23 @@ describe('PageShell', () => {
   });
 });
 
+describe('forced colours on the account controls', () => {
+  it('marks the pressed theme and the switch’s state in system colours, not background alone', () => {
+    const theme = css('ThemeControl');
+    expect(theme).toMatch(
+      /@media \(forced-colors: active\)[\s\S]*aria-pressed='true'[\s\S]*Highlight/,
+    );
+    const site = readFileSync(
+      join(WEB_ROOT, 'components', 'v2', 'screens', 'site', 'SiteScreen.module.css'),
+      'utf8',
+    );
+    expect(site).toMatch(
+      /@media \(forced-colors: active\)[\s\S]*\.switch \{\s*border: 1px solid ButtonText/,
+    );
+    expect(site).toMatch(/aria-checked='true'\] \{[^}]*background: Highlight/);
+  });
+});
+
 describe('AccountShell and TrialCard (behaviour: account-shell.test.tsx)', () => {
   it('shares PageShell’s canvas class, so its colours, type and 600 weight are not copied', () => {
     const src = readFileSync(join(WEB_ROOT, 'components', 'v2', 'AccountShell.tsx'), 'utf8');
@@ -608,6 +641,25 @@ describe('GradeHistory', () => {
     expect([...out.matchAll(/<th scope="row">([^<]*)<\/th>/g)].map((m) => m[1])).toEqual(
       props.dates,
     );
+  });
+
+  it('reads, in its table, every word the drawing writes besides its axis', () => {
+    const out = html(
+      <GradeHistory
+        {...props}
+        series={[
+          { name: 'Technical SEO', values: [79, 79, 80] },
+          { name: 'AI readability', values: [41, 41, 22], dashed: true },
+        ]}
+        note={{ series: 1, text: 'AI readability · 41 since the first audit' }}
+        marker={{ series: 1, index: 2, text: 'ClaudeBot blocked · 22' }}
+      />,
+    );
+    const drawn = [...out.matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map((m) => m[1]!);
+    const axis = new Set([...props.labels, '100', '75', '50', '25']);
+    const caption = out.match(/<caption>([^<]*)<\/caption>/)![1]!;
+    for (const t of drawn.filter((t) => !axis.has(t))) expect(caption).toContain(t);
+    expect(drawn.filter((t) => !axis.has(t))).toHaveLength(2);
   });
 
   it('breaks a line where a check gave no score, and dashes the second series', () => {

@@ -43,3 +43,17 @@
   outline: 2px solid var(--v2-fg);
   outline-offset: 3px;
 }
+
+/* Forced colours repaint backgrounds, so the pressed choice is marked in system colours too. */
+@media (forced-colors: active) {
+  .choice {
+    border: 1px solid ButtonText;
+  }
+
+  .choice[aria-pressed='true'] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+}

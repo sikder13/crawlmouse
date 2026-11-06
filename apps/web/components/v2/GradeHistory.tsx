@@ -159,7 +159,8 @@ export function GradeHistory({
       {/* A table ignores a 1px width; the box around it holds the screen-reader-only size. */}
       <div className={layout.srOnly} data-v2-sr-only="">
         <table className={styles.values}>
-          <caption>{caption}</caption>
+          {/* Everything the drawing writes on itself, besides its axis, is read here too. */}
+          <caption>{[caption, note?.text, marker?.text].filter(Boolean).join('. ')}</caption>
           <thead>
             <tr>
               <th scope="col">Check</th>

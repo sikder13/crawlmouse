@@ -116,3 +116,25 @@
     grid-row: 1 / 3;
   }
 }
+
+/* Forced colours repaint backgrounds: the switch keeps a border, and its knob and on state their own
+   system colours. */
+@media (forced-colors: active) {
+  .switch {
+    border: 1px solid ButtonText;
+  }
+
+  .switch i {
+    forced-color-adjust: none;
+    background: ButtonText;
+  }
+
+  .switch[aria-checked='true'] {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+
+  .switch[aria-checked='true'] i {
+    background: HighlightText;
+  }
+}

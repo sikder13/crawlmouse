@@ -9,7 +9,7 @@ import styles from './AccountScreen.module.css';
  * An account action as the screens render it: a link for a read, or a POST form carrying the verb
  * and ids in hidden fields. Not wired to an account yet: the routes are CC-26b's, so a preview
  * stops the submit, as KeepBar does. The action's own `primary` makes it the orange element.
- * On focus it scrolls itself into view: Chrome leaves a control half outside a table that scrolls
+ * On keyboard focus it scrolls itself into view: Chrome leaves a control half outside a table that scrolls
  * on a phone when it takes focus by Tab, and its focus ring is then cut at the edge.
  */
 export function ActionControl({
@@ -22,8 +22,13 @@ export function ActionControl({
   size?: ButtonSize;
 }) {
   const v: ButtonVariant = action.primary ? 'primary' : variant;
-  const reveal = (e: FocusEvent<HTMLElement>) =>
-    e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  // Keyboard focus only: a tap focuses on press, and scrolling then would move the control away
+  // from the finger before the release, so the tap would land elsewhere.
+  const reveal = (e: FocusEvent<HTMLElement>) => {
+    if (e.target.matches(':focus-visible')) {
+      e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  };
   if (action.method === 'get') {
     return (
       <span className={styles.inlineForm} onFocus={reveal}>

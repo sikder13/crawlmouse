@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ScrollRegion } from './ScrollRegion';
-import layout from './layout.module.css';
+import { VisuallyHidden } from './VisuallyHidden';
 import styles from './Table.module.css';
 
 export interface TableColumn {
@@ -30,14 +30,28 @@ export interface TableProps {
   heading?: ReactNode;
   /**
    * The column headers are read by assistive technology but not drawn, for a table the locked
-   * screen shows without a header row; each column still has its name.
+   * screen shows without a header row; each column still has its name. The header row stays in the
+   * table's layout, zero height, so every cell keeps its header.
    */
   headersHidden?: boolean;
+  /**
+   * The first cell of each row names the row (`<th scope="row">`), so a control later in the row is
+   * read with the row it acts on.
+   */
+  rowHeader?: boolean;
   className?: string;
 }
 
 /** A table of records that scrolls sideways on a phone rather than squeezing (phone rules). */
-export function Table({ label, columns, rows, heading, headersHidden, className }: TableProps) {
+export function Table({
+  label,
+  columns,
+  rows,
+  heading,
+  headersHidden,
+  rowHeader,
+  className,
+}: TableProps) {
   for (const row of rows) {
     if (row.cells.length !== columns.length) {
       throw new Error(
@@ -65,14 +79,11 @@ export function Table({ label, columns, rows, heading, headersHidden, className 
     <ScrollRegion label={label} className={[styles.scroll, className].filter(Boolean).join(' ')}>
       {heading}
       <table className={styles.table} aria-label={label}>
-        <thead
-          className={headersHidden ? layout.srOnly : undefined}
-          {...(headersHidden ? { 'data-v2-sr-only': '' } : {})}
-        >
+        <thead className={headersHidden ? styles.hiddenHead : undefined}>
           <tr>
             {columns.map((c, i) => (
               <th key={i} scope="col" className={headClass(c)} {...numeric(c)}>
-                {c.header}
+                {headersHidden ? <VisuallyHidden>{c.header}</VisuallyHidden> : c.header}
               </th>
             ))}
           </tr>
@@ -86,10 +97,16 @@ export function Table({ label, columns, rows, heading, headersHidden, className 
             >
               {row.cells.map((cell, i) => {
                 const col = columns[i] ?? {};
+                const Cell = rowHeader && i === 0 ? 'th' : 'td';
                 return (
-                  <td key={i} className={cellClass(col)} {...numeric(col)}>
+                  <Cell
+                    key={i}
+                    {...(Cell === 'th' ? { scope: 'row' } : {})}
+                    className={cellClass(col)}
+                    {...numeric(col)}
+                  >
                     {cell}
-                  </td>
+                  </Cell>
                 );
               })}
             </tr>
