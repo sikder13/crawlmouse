@@ -14,7 +14,6 @@ import {
   sameDay,
   weekday,
   weekdayLong,
-  zoneName,
   dayTimeUtc,
   duration,
   listOf,
@@ -122,11 +121,5 @@ describe('the account zone', () => {
     expect(dayDate(daysBefore('2026-11-04T04:30:00Z', 3, IND), IND)).toBe('Sat 31 Oct');
     // Sat 7 Nov 21:41 EST, three days before: Wed 4 Nov 21:41 EST, no change of offset between.
     expect(daysBefore('2026-11-08T02:41:00Z', 3, IND)).toBe('2026-11-05T02:41:00.000Z');
-  });
-
-  it('names the zone for a reader', () => {
-    expect(zoneName(IND)).toBe('Indianapolis time');
-    expect(zoneName('America/New_York')).toBe('New York time');
-    expect(zoneName('UTC')).toBe('UTC');
   });
 });

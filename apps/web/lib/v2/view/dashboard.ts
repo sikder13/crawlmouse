@@ -138,8 +138,8 @@ export interface HistoryView {
   summary: string;
   /** A note beside the AI line where it is flat from the first check. */
   flatNote: string | null;
-  /** A marked point where the AI grade moved at a check that blocked crawlers. */
-  marker: { index: number; label: string } | null;
+  /** A marked point where the AI grade moved at a check that blocked crawlers, and their verdicts. */
+  marker: { index: number; label: string; verdicts: Verdict[] } | null;
 }
 
 export interface CrawlerByCheckView {
@@ -470,11 +470,24 @@ function changeRow(v: AccountView, site: Site, c: Change): ChangeRowView {
     title: c.summary,
     line: parts.filter(Boolean).join(' · '),
     actions: [
-      action('changeLog', 'Diff', {}, { query: `?site=${site.id}&change=${c.id}` }),
+      action(
+        'changeLog',
+        'Diff',
+        {},
+        {
+          query: `?site=${site.id}&change=${c.id}`,
+          context: `for: ${c.summary}`,
+        },
+      ),
       ...(openFix
         ? [
-            action('copyFix', 'Copy fix', { id: fix.id }),
-            action('emailDeveloper', 'Email to my developer', { id: fix.id }),
+            action('copyFix', 'Copy fix', { id: fix.id }, { context: `for: ${c.summary}` }),
+            action(
+              'emailDeveloper',
+              'Email to my developer',
+              { id: fix.id },
+              { context: `about: ${c.summary}` },
+            ),
           ]
         : []),
     ],
@@ -519,6 +532,7 @@ function history(v: AccountView, site: Site): HistoryView | null {
       ? {
           index: markAt,
           label: `${listOf(blockedThere.map((c) => c.ua!))} blocked · ${ai[markAt]}`,
+          verdicts: blockedThere.flatMap((c) => verdictOf(v, c) ?? []),
         }
       : null,
   };
@@ -545,7 +559,12 @@ function setup(v: AccountView, site: Site, firstRun: boolean, trial: boolean): S
   const competitors = v.account.limits.competitors_per_site;
   const items: SetupItemView[] = [];
   const item = (key: string, done: boolean, todo: string, doneLabel: string, act: ActionView) =>
-    items.push({ key, label: done ? doneLabel : todo, done, action: done ? null : act });
+    items.push({
+      key,
+      label: done ? doneLabel : todo,
+      done,
+      action: done ? null : { ...act, context: `: ${todo}` },
+    });
   const settings = (label: string) =>
     action('sitePage', label, { id: site.id }, { query: '#settings' });
   if (g.slack) {
@@ -640,7 +659,14 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
 
   const addSite =
     slots >= limit
-      ? action('pricing', `Add a site · ${slots} of ${limit} on ${plan}`)
+      ? action(
+          'pricing',
+          `Add a site · ${slots} of ${limit} on ${plan}`,
+          {},
+          {
+            context: '(see the plans with more sites)',
+          },
+        )
       : action('addSite', `Add a site · ${slots} of ${limit} on ${plan}`);
   const openAudit = (label: string, primaryAction = false) =>
     action('openAudit', label, { checkId: result!.id }, { primary: primaryAction });
@@ -723,7 +749,7 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
         ),
         other: {
           count: window.filter((c) => c.kind !== 'opened' && c.kind !== 'resolved').length,
-          show: action('changeLog', 'Show'),
+          show: action('changeLog', 'Show', {}, { context: 'the other changes' }),
         },
       };
 

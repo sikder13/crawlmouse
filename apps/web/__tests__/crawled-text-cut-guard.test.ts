@@ -269,6 +269,10 @@ const INVENTORY: [entry: string, why: string][] = [
     "CODE-POINT slice of a URL pathname for the CC-22 crawl screen's log (development-only, never persisted). The receiver is `[...path]`, an array of code points, so a pair cannot be split; a pathname from the URL parser is percent-encoded ASCII in any case. The cut is visible (an ellipsis) and the whole path is rendered beside it for screen readers.",
   ],
   [
+    "apps/web/lib/v2/copy/dashboard.ts :: ? `${kinds.slice(0, -1).join(', ')}, and ${kinds.at(-1)}`",
+    'ARRAY slice over the kinds of email an account gets (clauses the copy writes, no crawled text) in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It joins every kind but the last before ", and", as the locked page lists them.',
+  ],
+  [
     'apps/web/lib/v2/view/dashboard.ts :: const shown = all.slice(-HISTORY_CHECKS);',
     'ARRAY slice over check records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The six latest checks the history chart draws; its title states how many checks there are in all.',
   ],

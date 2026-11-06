@@ -82,7 +82,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
 
   it('shows the site’s settings and the alert rules that fired at its checks', () => {
     expect(v.settings.rows.map((r) => [r.label, r.value])).toEqual([
-      ['Schedule', 'weekly, Fri around 06:00, Indianapolis time'],
+      ['Schedule', 'weekly, Fri around 06:00, America/Indiana/Indianapolis'],
       ['Page cap', '2,000 on Pro · 214 crawled'],
       ['Competitor', 'summitgear.co'],
       ['Staging', 'staging.example-outfitter.dev · on each deploy'],

@@ -5,6 +5,7 @@
 import type { AlertRule } from '@crawlmouse/types/v2';
 import type { Addition, CopyChange } from '../copy-registry';
 import { RECHECK_MINUTES } from '../recheck';
+import { plural } from '../words';
 import { railChanges } from './dashboard';
 
 /** FACTS D1: one line under every crawler table. */
@@ -12,7 +13,7 @@ export const TAGGED_UA_LINE =
   'Tested with tagged user agents from published IPs — crawlmouse.com/bot.';
 
 export const SITE_COPY = {
-  fixesSub: `Mark one done and it is re-checked in about ${RECHECK_MINUTES} minutes; it closes only when the next crawl agrees.`,
+  fixesSub: `Mark one done and it is re-checked in about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}; it closes only when the next crawl agrees.`,
   copyAll: 'Copy all as one prompt',
   removeNote: 'Its history stays in your account in case you add it back',
   noFixes: 'No fixes are open at the latest check.',
@@ -158,14 +159,14 @@ export const SITE_CHANGES: CopyChange[] = [
     rendered:
       '5–15 Eleven more: 7 in Structure and 4 in Content — +7 Technical SEO together; AI effect not yet estimated for 4',
     source:
-      'The fixture’s fixes 5 to 15, counted by section; the topic list is in no record, and the grouped effect is the fixes’ own (groupPoints)',
+      'The fixture’s fixes 5 to 15, counted by section; the locked topic words (anchors, depth, …) are shorthand for the fixes’ titles, which Show all lists in full, and the grouped effect is the fixes’ own (groupPoints)',
   },
   {
     screen: 'site',
     kind: 'facts',
     locked: 'weekly, Fri 06:00 UTC',
-    rendered: 'weekly, Fri around 06:00, Indianapolis time',
-    source: `${ZONE}; "around" is FACTS H4`,
+    rendered: 'weekly, Fri around 06:00, America/Indiana/Indianapolis',
+    source: 'FACTS H4 (Site settings row): "around", and the account’s zone by its own name',
   },
   {
     screen: 'site',

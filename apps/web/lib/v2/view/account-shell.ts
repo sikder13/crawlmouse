@@ -18,6 +18,8 @@ export interface NavItemView {
   /** "5", "3 new"; null when there is nothing to count. */
   count: string | null;
   current: boolean;
+  /** The count names new changes. */
+  fresh: boolean;
 }
 
 export interface TrialCardView {
@@ -115,6 +117,7 @@ export function accountShellView(
             ? `${fresh} new`
             : null,
       current: n.label === current,
+      fresh: n.label === 'Changes' && fresh > 0,
     })),
     trial: trialCard(v),
     theme: seat?.theme ?? 'system',

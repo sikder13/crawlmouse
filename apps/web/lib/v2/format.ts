@@ -178,12 +178,6 @@ export function nextWeekly(
   throw new Error(`No weekly check within eight days of ${now}`);
 }
 
-/** "Indianapolis time", or "UTC": the zone named for a reader, from its IANA name. */
-export function zoneName(timeZone: string): string {
-  if (timeZone === 'UTC') return 'UTC';
-  return `${timeZone.split('/').at(-1)!.replace(/_/g, ' ')} time`;
-}
-
 /** "2 min 11 s", "54 s". */
 export function duration(ms: number): string {
   // Whole seconds elapsed, as the crawl screen's clock counts them, so the two never disagree.

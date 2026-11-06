@@ -146,6 +146,11 @@ export interface ActionView {
   fields: Record<string, string>;
   /** The screen's one orange element (rule 3). */
   primary: boolean;
+  /**
+   * Read after the label by a screen reader only, where the same label recurs on a page: "Diff"
+   * for which change, "Packet" for which fix (WCAG 2.4.4).
+   */
+  context: string | null;
 }
 
 /** An action, its route's parameters filled from `params`. */
@@ -157,7 +162,13 @@ export function action(
     primary = false,
     query = '',
     fields = {},
-  }: { primary?: boolean; query?: string; fields?: Record<string, string> } = {},
+    context = null,
+  }: {
+    primary?: boolean;
+    query?: string;
+    fields?: Record<string, string>;
+    context?: string | null;
+  } = {},
 ): ActionView {
   const spec: RouteSpec = ACCOUNT_ACTIONS[key];
   const href = spec.route.replace(/\[(\w+)\]/g, (_m, name: string) => {
@@ -173,6 +184,7 @@ export function action(
     fields:
       spec.verb === 'GET' || spec.verb === 'POST' ? fields : { _method: spec.verb, ...fields },
     primary,
+    context,
   };
 }
 

@@ -24,7 +24,6 @@ import {
   weekday,
   weekdayLong,
   weekdayTime,
-  zoneName,
 } from '../format';
 import { aiWithheldSummary } from '../sentences';
 
@@ -48,7 +47,7 @@ import { action, type ActionView } from './account-actions';
 import { isFreeFix } from './free-fixes';
 import { points } from './result';
 import { CAUSE_SHORT } from './segment/access';
-import { groupPoints } from './segment/fixes';
+import { groupPoints, packetPrompt } from './segment/fixes';
 import { SEGMENTS } from './segment/frame';
 
 export interface GradeCardView {
@@ -105,11 +104,13 @@ export interface SiteView {
     cards: [GradeCardView, GradeCardView];
     actions: ActionView[];
   };
-  crawlers: { columns: string[]; rows: CrawlerGridRowView[]; note: string };
+  /** `columns` as the axis labels them, `dates` in full for a screen reader. */
+  crawlers: { columns: string[]; dates: string[]; rows: CrawlerGridRowView[]; note: string };
   fixes: {
     title: string;
     sub: string;
-    copyAll: string | null;
+    /** "Copy all as one prompt": the open fixes' packets, one after another. */
+    copyAll: { label: string; text: string } | null;
     rows: FixRowView[];
     rest: {
       numbers: string;
@@ -309,14 +310,20 @@ function fixRow(v: AccountView, result: Check, f: Fix, all: readonly Fix[]): Fix
     effect: points(f, all),
     status: `${STATUS_LABEL[f.status]}${pro ? ' · Pro' : ''}`,
     pro,
-    packet: action('packet', 'Packet', { checkId: result.id, fixId: f.id }),
+    packet: action(
+      'packet',
+      'Packet',
+      { checkId: result.id, fixId: f.id },
+      { context: `for fix ${f.number}` },
+    ),
   };
 }
 
 function scheduleValue(s: Site, zone: string): string {
   const sch = s.schedule;
   if (!sch || s.paused || sch.cadence === 'on_deploy') return scheduleCell(s);
-  return `${scheduleCell(s)} around ${String(sch.hour_local).padStart(2, '0')}:00, ${zoneName(zone)}`;
+  // FACTS H4 (Site settings): the account's zone by its own name.
+  return `${scheduleCell(s)} around ${String(sch.hour_local).padStart(2, '0')}:00, ${zone}`;
 }
 
 export function siteView(d: FixtureDataset, viewer: Viewer, siteId: string): SiteView {
@@ -361,8 +368,11 @@ export function siteView(d: FixtureDataset, viewer: Viewer, siteId: string): Sit
   ]
     .filter(Boolean)
     .join(' · ');
-  const target =
-    [...fresh].sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity))[0] ?? fixes[0];
+  // The reader's next action is a fix still to do: open, reopened, or one we could not verify.
+  const todo = (f: Fix) =>
+    f.status === 'open' || f.status === 'reopened' || f.status === 'unable_to_verify';
+  const byRank = (a: Fix, b: Fix) => (a.rank ?? Infinity) - (b.rank ?? Infinity);
+  const target = [...fresh].filter(todo).sort(byRank)[0] ?? fixes.filter(todo).sort(byRank)[0];
   const openLatest = (primary: boolean) =>
     action('openAudit', 'Open the latest audit', { checkId: result.id }, { primary });
   const targetLabel = target
@@ -373,6 +383,7 @@ export function siteView(d: FixtureDataset, viewer: Viewer, siteId: string): Sit
 
   // ── fixes table ──
   const byNumber = [...fixes].sort((a, b) => a.number - b.number);
+  const withPackets = byNumber.filter((f) => todo(f) && f.packet !== null);
   const rows = byNumber.slice(0, SHOWN_FIXES).map((f) => fixRow(v, result, f, fixes));
   const rest = byNumber.slice(SHOWN_FIXES);
   const sections = Object.entries(
@@ -444,6 +455,7 @@ export function siteView(d: FixtureDataset, viewer: Viewer, siteId: string): Sit
     },
     crawlers: {
       columns: axisLabels(shown, zone),
+      dates: shown.map((c) => dayDate(c.finished_at!, zone)),
       rows: crawlerOrder(result).map((r) => {
         const verdicts = shown.map((c) => c.crawlers.find((y) => y.ua === r.ua)?.verdict ?? null);
         return {
@@ -461,7 +473,13 @@ export function siteView(d: FixtureDataset, viewer: Viewer, siteId: string): Sit
         ? `Fixes · ${fixes.length}, counting the ${fresh.length} new`
         : `Fixes · ${fixes.length}`,
       sub: SITE_COPY.fixesSub,
-      copyAll: v.gates.packets === 'all' && fixes.length ? SITE_COPY.copyAll : null,
+      copyAll:
+        v.gates.packets === 'all' && withPackets.length
+          ? {
+              label: SITE_COPY.copyAll,
+              text: withPackets.map((f) => packetPrompt(f, f.packet!)).join('\n\n---\n\n'),
+            }
+          : null,
       rows,
       rest: rest.length
         ? {

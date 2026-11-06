@@ -27,7 +27,7 @@ export const DASHBOARD_COPY = {
     }. Nothing to compare yet.`,
   topFixesTitle: 'Start with the fix that pays most, estimated',
   topFixesFoot: (rest: number, open: string) =>
-    `Each fix page has "Mark done and re-check now", about ${RECHECK_MINUTES} minutes. The other ${rest} ${plural(rest, 'is', 'are')} ${open}.`,
+    `Each fix page has "Mark done and re-check now", about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}. The other ${rest} ${plural(rest, 'is', 'are')} ${open}.`,
   setupTrialTitle: 'Worth doing while Pro is on',
   setupLeftTitle: (n: number) =>
     n === 0
@@ -362,9 +362,9 @@ const HOME: CopyChange[] = [
     locked:
       'Crawler access by check · ● full ▲ partial ■ blocked GPTBot OAI-SearchBot ClaudeBot PerplexityBot',
     rendered:
-      'Crawler access by check · allowed, thin challenged: the real crawler may pass blocked by robots.txt blocked by a rule OAI-SearchBot ChatGPT-User PerplexityBot Claude-SearchBot GPTBot ClaudeBot',
+      'Crawler access by check · allowed, thin challenged: the real crawler may pass blocked by robots.txt blocked by a rule OAI-SearchBot ChatGPT-User PerplexityBot Claude-SearchBot GPTBot ClaudeBot Tested with tagged user agents from published IPs — crawlmouse.com/bot.',
     source:
-      'FACTS I6 (the six AI crawlers, in the check’s order) and I2 (each verdict in the shared words; a challenge is not "blocked"); the legend lists the verdicts the rows show',
+      'FACTS I6 (the six AI crawlers, in the check’s order) and I2 (each verdict in the shared words; a challenge is not "blocked"); the legend lists the verdicts the rows show; D1 puts its line under this crawler table too',
   },
   {
     screen: 'dashboard',
