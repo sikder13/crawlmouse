@@ -308,7 +308,7 @@ option, with inherit, or without set; or of a role whose name is near one of the
 show `supabase_realtime_admin` owning a table or function, or holding a grant on one, in `public`
 (`pnpm --filter @crawlmouse/scripts exec vitest run db/fingerprint.test.ts -t SUPABASE_MANAGED_MEMBERS`).
 `supabase_realtime_admin` granted _to_ a role is read as any membership is: when that role is one
-the section watches.
+the section watches (`grep -n -A6 'watched_roles as' infra/supabase/checks/fingerprint.sql`).
 
 If Supabase changes what it grants a new branch, the dry run fails on the `roles` section and
 names the lines. An entry is added only on the evidence above: no rows on production, rows on a
