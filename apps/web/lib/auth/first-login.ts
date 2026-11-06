@@ -76,14 +76,20 @@ export interface FirstLoginDeps {
   now: () => Date;
 }
 
-export type TrialOutcome =
-  | 'started'
-  | 'denied'
-  | 'busy'
-  | 'not_first'
-  | 'not_eligible'
-  | 'no_account'
-  | 'no_pepper';
+/** What the hook decided about the trial, each with the case that produces it. The spec lists them. */
+export const TRIAL_OUTCOMES = {
+  started:
+    'the no-card Pro trial started; three ledger rows, or fewer when the device or IP is unknown',
+  denied: 'a ledger row refused it; the account stays Free',
+  busy: 'another first login holds a slot on the same email or device; refused, failing safe',
+  not_first: 'not the verify that confirmed the email, or another run won the version check',
+  not_eligible: 'the account is not Free, or has used its trial',
+  no_account: 'the user has no v2 account (from before migration 001): nothing is done',
+  no_pepper:
+    'TRIAL_LEDGER_PEPPER is missing or short: no ledger read or write, Free, a Sentry signal',
+} as const;
+
+export type TrialOutcome = keyof typeof TRIAL_OUTCOMES;
 
 export interface DoorEvent {
   name: Extract<FunnelEvent, 'trial_started' | 'site_added'>;

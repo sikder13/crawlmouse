@@ -21,10 +21,33 @@ export interface ClaimDeps {
   now: () => Date;
 }
 
-export type ClaimRefusal =
-  | { ok: false; status: 404; code: 'not_found' }
-  | { ok: false; status: 409; code: 'already_claimed' | 'host_kept' | 'site_limit' | 'no_account' }
-  | { ok: false; status: 410; code: 'expired' };
+/** Every way a claim is refused, with its HTTP status. The route answers with these; the spec lists them. */
+export const CLAIM_REFUSALS = {
+  not_found: {
+    status: 404,
+    when: 'no check has that id, or the check is of another account’s site',
+  },
+  already_claimed: {
+    status: 409,
+    when: 'the account owns the check’s site and the check no longer expires',
+  },
+  host_kept: { status: 409, when: 'the account already keeps a site with that host' },
+  site_limit: { status: 409, when: 'the account keeps as many sites as its limit' },
+  no_account: {
+    status: 409,
+    when: 'the caller has no v2 account (a user from before migration 001)',
+  },
+  expired: { status: 410, when: 'the check expired before anyone kept it' },
+} as const;
+
+export type ClaimCode = keyof typeof CLAIM_REFUSALS;
+
+export type ClaimRefusal = {
+  [C in ClaimCode]: { ok: false; status: (typeof CLAIM_REFUSALS)[C]['status']; code: C };
+}[ClaimCode];
+
+const refuse = <C extends ClaimCode>(code: C) =>
+  ({ ok: false, status: CLAIM_REFUSALS[code].status, code }) as Extract<ClaimRefusal, { code: C }>;
 
 export type ClaimResult = { ok: true; siteId: string } | ClaimRefusal;
 
@@ -34,14 +57,13 @@ export async function claimCheck(
 ): Promise<ClaimResult> {
   const { store } = deps;
   const check = await store.loadCheck(input.checkId);
-  if (check === null) return { ok: false, status: 404, code: 'not_found' };
+  if (check === null) return refuse('not_found');
   const member = await store.loadMember(input.userId);
-  if (member === null) return { ok: false, status: 409, code: 'no_account' };
+  if (member === null) return refuse('no_account');
 
   if (check.siteAccountId !== null) {
-    if (check.siteAccountId !== member.accountId)
-      return { ok: false, status: 404, code: 'not_found' };
-    if (check.expiresAt === null) return { ok: false, status: 409, code: 'already_claimed' };
+    if (check.siteAccountId !== member.accountId) return refuse('not_found');
+    if (check.expiresAt === null) return refuse('already_claimed');
     // Our site, but the check still expires: an earlier claim stopped between its two writes.
     await store.clearExpiry(check.checkId);
     return { ok: true, siteId: check.siteId };
@@ -49,23 +71,23 @@ export async function claimCheck(
 
   const now = deps.now();
   if (check.expiresAt !== null && check.expiresAt.getTime() <= now.getTime()) {
-    return { ok: false, status: 410, code: 'expired' };
+    return refuse('expired');
   }
   const kept = await store.countActiveSites(member.accountId);
-  if (kept >= member.siteLimit) return { ok: false, status: 409, code: 'site_limit' };
+  if (kept >= member.siteLimit) return refuse('site_limit');
 
   const taken = await store.takeSite(check.siteId, {
     accountId: member.accountId,
     ownerSeatId: member.ownerSeatId,
     schedule: scheduleFor(effectiveTier(member, now), kept === 0, now, member.timezone),
   });
-  if (taken === 'host_kept') return { ok: false, status: 409, code: 'host_kept' };
+  if (taken === 'host_kept') return refuse('host_kept');
   if (taken === 'not_unowned') {
     // Another claim took the site between our read and our write: answer as if we had read after it.
     const after = await store.loadCheck(input.checkId);
     return after?.siteAccountId === member.accountId
-      ? { ok: false, status: 409, code: 'already_claimed' }
-      : { ok: false, status: 404, code: 'not_found' };
+      ? refuse('already_claimed')
+      : refuse('not_found');
   }
   await store.clearExpiry(check.checkId);
   return { ok: true, siteId: check.siteId };

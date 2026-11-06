@@ -11,7 +11,12 @@ import { turnstileEnforced } from '@/lib/turnstile-policy';
 import { MAGIC_LINK_PER_IP_PER_HOUR, MAGIC_LINK_PER_EMAIL_PER_HOUR } from '@/lib/limits';
 import { safeNextPath } from '@/lib/safe-next-path';
 import { accountDoorEnabled } from '@/lib/auth/flags';
-import { AUTH_LINK_SECONDS, COOKIES, DEVICE_COOKIE_SECONDS } from '@/lib/auth/constants';
+import {
+  AUTH_LINK_SECONDS,
+  COOKIES,
+  DEVICE_COOKIE_SECONDS,
+  V1_NEXT_COOKIE_SECONDS,
+} from '@/lib/auth/constants';
 import {
   claimNext,
   DASHBOARD,
@@ -153,7 +158,7 @@ export async function POST(req: Request) {
       httpOnly: true,
       sameSite: 'lax',
       secure: secure(),
-      maxAge: v2 ? AUTH_LINK_SECONDS : 600,
+      maxAge: v2 ? AUTH_LINK_SECONDS : V1_NEXT_COOKIE_SECONDS,
       path: '/',
     });
   }

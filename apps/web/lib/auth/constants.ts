@@ -40,6 +40,9 @@ export const COOKIES = {
   next: 'post_login_next',
 } as const;
 
+/** v1's return target lives 10 minutes, as it did before the door. */
+export const V1_NEXT_COOKIE_SECONDS = 600;
+
 /** `cm_device` lives a year (SECURITY-DESIGN §5.3). */
 export const DEVICE_COOKIE_SECONDS = 365 * 24 * 60 * 60;
 
