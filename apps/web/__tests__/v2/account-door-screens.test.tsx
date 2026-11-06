@@ -166,3 +166,39 @@ describe('the orange convention, from the registry', () => {
     expect((markup.match(/data-v2-primary=""/g) ?? []).length).toBe(n);
   });
 });
+
+describe('the routes, by the flag (D1)', () => {
+  const pages = async () => ({
+    signup: (await import('../../app/(account)/signup/page')).default,
+    checkEmail: (await import('../../app/(account)/check-email/page')).default,
+  });
+  const params = (p: Record<string, string>) => ({ searchParams: Promise.resolve(p) });
+
+  it('/signup and /check-email are 404s with V2_ACCOUNT_DOOR unset', async () => {
+    delete process.env.V2_ACCOUNT_DOOR;
+    const { signup: Signup, checkEmail: CheckEmail } = await pages();
+    expect(() => Signup()).toThrow(/NEXT_HTTP_ERROR_FALLBACK;404|NEXT_NOT_FOUND/);
+    await expect(CheckEmail(params({ kind: 'signin' }))).rejects.toThrow(
+      /NEXT_HTTP_ERROR_FALLBACK;404|NEXT_NOT_FOUND/,
+    );
+  });
+
+  it('render with V2_ACCOUNT_DOOR=1; a site that is not a hostname reads as the sign-in kind', async () => {
+    process.env.V2_ACCOUNT_DOOR = '1';
+    try {
+      const { signup: Signup, checkEmail: CheckEmail } = await pages();
+      expect(renderToStaticMarkup(Signup())).toContain('Send my sign-in link');
+      const bad = renderToStaticMarkup(
+        await CheckEmail(params({ kind: 'named-site', site: '<script>alert(1)</script>' })),
+      );
+      expect(bad).not.toContain('script');
+      expect(bad).toContain('The link signs you in and opens your dashboard.');
+      const good = renderToStaticMarkup(
+        await CheckEmail(params({ kind: 'from-audit', site: 'Example-Outfitter.com' })),
+      );
+      expect(good).toContain('example-outfitter.com');
+    } finally {
+      delete process.env.V2_ACCOUNT_DOOR;
+    }
+  });
+});
