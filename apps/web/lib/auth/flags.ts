@@ -1,9 +1,8 @@
-import 'server-only';
-
 /**
  * The account door's flags. Read per request on the server; a client component gets the value as a
  * prop from the page that rendered it. Both are on for the value `1` only, whitespace ignored, like
- * CRAWL_PAUSED.
+ * CRAWL_PAUSED. Neither is a NEXT_PUBLIC_ variable, so a client bundle that imported this would read
+ * undefined and see both flags off.
  */
 
 type Env = Readonly<Record<string, string | undefined>>;

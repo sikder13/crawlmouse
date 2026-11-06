@@ -4,7 +4,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // `post_login_next` cookie so /login/verify can send an anon claimer back to their report. Off-origin
 // values are dropped by the real safeNextPath (no open redirect). Deps are mocked; safeNextPath is real.
 const signInWithOtp = vi.fn(async () => ({ error: null }));
-vi.mock('@/lib/supabase/server', () => ({ supabaseServer: async () => ({ auth: { signInWithOtp } }) }));
+vi.mock('@/lib/supabase/server', () => ({
+  supabaseServer: async () => ({ auth: { signInWithOtp } }),
+}));
 vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: async () => ({ allowed: true }) }));
 vi.mock('@/lib/client-ip', () => ({ getClientIp: () => 'unknown' }));
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstileToken: async () => true }));
@@ -13,7 +15,12 @@ vi.mock('@/lib/turnstile-gate', () => ({ turnstileGate: async () => 'ok' }));
 import { POST } from './route';
 
 const call = (body: unknown) =>
-  POST(new Request('http://localhost/api/auth/magic-link', { method: 'POST', body: JSON.stringify(body) }));
+  POST(
+    new Request('http://localhost/api/auth/magic-link', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  );
 const setCookie = (res: Response) => res.headers.get('set-cookie') ?? '';
 
 describe('POST /api/auth/magic-link — post-login return cookie', () => {

@@ -140,3 +140,17 @@ describe('continue-intent', () => {
     expect(decodeSignup('not json')).toBeNull();
   });
 });
+
+describe('requestCookie', () => {
+  it('reads one cookie, decoded, and leaves the body alone', async () => {
+    const { requestCookie } = await import('./request-cookie');
+    const req = new Request('https://x.test/', {
+      method: 'POST',
+      headers: { cookie: 'a=1; cm_device=ab%3Dc; b' },
+      body: '{"k":1}',
+    });
+    expect(requestCookie(req, 'cm_device')).toBe('ab=c');
+    expect(requestCookie(req, 'missing')).toBeUndefined();
+    expect(await req.json()).toEqual({ k: 1 });
+  });
+});

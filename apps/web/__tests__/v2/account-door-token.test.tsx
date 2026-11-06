@@ -12,11 +12,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 const TOKEN = 'tok_LEAKCANARY_9d1e7c3b5a';
 
-// jsdom cannot resolve the `server-only` marker even when mocked; the flags have their own tests.
-vi.mock('@/lib/auth/flags', () => ({
-  accountDoorEnabled: () => process.env.V2_ACCOUNT_DOOR === '1',
-  pipelineEnabled: () => false,
-}));
 vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => ({
