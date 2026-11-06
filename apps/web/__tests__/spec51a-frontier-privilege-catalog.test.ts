@@ -444,9 +444,10 @@ describe('ALTER DEFAULT PRIVILEGES to an unexpected role reaches a later functio
 
   it('CONTROL: without the ADP line the same function produces NO reporting_ro violation', async () => {
     // This is the assertion the two previous versions of R2-D were missing. It is what makes the
-    // statement above load-bearing rather than decorative.
+    // statement above load-bearing rather than decorative. Through 006b: it relies on production's
+    // default privileges granting anon EXECUTE, which 20261106000002 (P2) revoked.
     const db = await freshDb();
-    await applyAllMigrations(db);
+    await applyAllMigrations(db, undefined, (f) => f < '20261106000002');
     await db.exec(`create role reporting_ro;`);
     await db.exec(`create function public.reap_adp(p integer) returns void language sql
                      set search_path = public, pg_catalog as $$ delete from public.frontier $$;`);
@@ -611,8 +612,14 @@ describe('migration-content mistakes, now that the shim models production defaul
   it('catches: the frontier TABLE revoke deleted', async () => {
     // B3's sibling: on stock Postgres that revoke was a no-op all along, so its absence was
     // invisible. With production's defaults modelled, deleting it hands both tables full DML to anon.
+    // Through 006b: 20261106000002 (P2) revokes client privileges on frontier itself, which would
+    // hide the deleted revoke this test exists to catch.
     const db = await freshDb();
-    await applyAllMigrations(db, (sql) => sql.replace(/revoke all on public\.frontier[^;]*;/g, ''));
+    await applyAllMigrations(
+      db,
+      (sql) => sql.replace(/revoke all on public\.frontier[^;]*;/g, ''),
+      (f) => f < '20261106000002',
+    );
     const { rows } = await db.query<{ acl: string | null }>(
       `select c.relacl::text as acl from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relname = 'frontier'`,
