@@ -6,7 +6,8 @@
  *
  * Each is called once, on the same pages and the same links: the detectors read the links as recorded
  * and file a redirected page's under it themselves (detectors/scope.ts); the grade reads them filed by
- * the same rule (filing.ts). build.calls.test.ts counts the calls and compares the two filings. The withheld reasons, refusals and
+ * the same rule (filing.ts). build.calls.test.ts counts the calls and holds the grade's links to
+ * filing.ts over the detectors' input; filing.test.ts holds filing.ts to the detectors' own filing. The withheld reasons, refusals and
  * fix effects are theirs, passed through.
  */
 import type { PageResult } from '@crawlmouse/types/v2';

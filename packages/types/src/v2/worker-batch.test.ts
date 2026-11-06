@@ -101,4 +101,11 @@ describe('BatchResultSchema', () => {
   it('refuses a result of neither kind', () => {
     expect(BatchResultSchema.safeParse({ ...crawl, kind: 'render' }).success).toBe(false);
   });
+
+  it('reads a batch number without leading zeros, so two ids cannot share one', () => {
+    const id = (n: string) =>
+      BatchResultSchema.safeParse({ ...crawl, batch_id: `${CHECK}:${n}` }).success;
+    expect([id('0'), id('7'), id('10')]).toEqual([true, true, true]);
+    expect([id('01'), id('007'), id('')]).toEqual([false, false, false]);
+  });
 });

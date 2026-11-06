@@ -116,22 +116,38 @@ describe('stage 2', () => {
     expect(s.stage2_needed).toBe(true);
   });
 
+  // No homepage among the pages, and four templates, so stage 1 holds four pages.
+  const noHome = ['/a/page-one', '/b/page-one', '/c/page-one', '/d/page-one'].map(ok);
+  const noHomeStage1 = sample(assembled(noHome)).stage1.map((p) => p.url);
+
   it('compares with the first stage-1 page when the homepage is not in the sample', () => {
-    const rows = site.filter((r) => r.url !== HOME);
-    const first = sample(assembled(rows)).stage1.map((p) => p.url);
-    expect(first).not.toContain(HOME);
-    const differ = first[first.length - 1]!;
+    expect(noHomeStage1).toHaveLength(4);
+    expect(noHomeStage1).not.toContain(HOME);
+    // Only the last page differs from the first, so the first is what it is compared with.
+    const last = noHomeStage1[3]!;
     const s = sample(
       assembled(
-        rows,
+        noHome,
         rowsFor(
-          first,
+          noHomeStage1,
           () => 'allowed',
-          (u) => (u === differ ? 'rate_limited' : 'allowed'),
+          (u) => (u === last ? 'rate_limited' : 'allowed'),
         ),
       ),
     );
-    expect(s.stage2_needed).toBe(first.length > 1);
+    expect(s.stage2_needed).toBe(true);
+  });
+
+  it('compares with the reference page only: one with no verdict for a crawler gives nothing to compare', () => {
+    // The reference (the first stage-1 page) has a control row only; the second page differs from
+    // the others, which a comparison with any of them would find.
+    const tests = noHomeStage1.flatMap((u, k) => [
+      accessRow(++id, u, null, 'allowed', 'control'),
+      ...(k === 0
+        ? []
+        : [accessRow(++id, u, 'OAI-SearchBot', k === 1 ? 'rate_limited' : 'allowed')]),
+    ]);
+    expect(sample(assembled(noHome, tests)).stage2_needed).toBe(false);
   });
 
   it('picks the hubs by PageRank, then the deepest, then the newest by lastmod', () => {
@@ -194,6 +210,9 @@ describe('stage 2', () => {
     const rank = new Map(a.pages.map((p) => [p.url, p.pagerank_share ?? -1]));
     const hubs = why('hub').map((u) => rank.get(u)!);
     expect(hubs).toEqual([...hubs].sort((x, y) => y - x));
+    // The hubs are the highest-ranked pages left: every page picked after them ranks no higher.
+    const afterHubs = s.stage2.filter((p) => p.picked_for !== 'hub').map((p) => rank.get(p.url)!);
+    expect(Math.min(...hubs)).toBeGreaterThanOrEqual(Math.max(...afterHubs));
     expect(s.stage2.length).toBeGreaterThan(0);
   });
 });

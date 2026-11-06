@@ -83,7 +83,7 @@ const PAGE_FIELDS: Record<keyof PageResult, string> = {
   check_id: 'the check',
   url: "the crawl row's URL (refused unless canonical)",
   template_key: 'v1 `templateKeyFor(url)`',
-  kind: "v1 `classifyPages`, with the CMS overlay of the homepage's `stack_signals`, the row's `main_text_chars`, `content_simhash` and `noindex`. A page not read whole has neither signal, so it is not thin and not noindex: v1 keeps a page when a signal is absent",
+  kind: "v1 `classifyPages`, with the CMS overlay of the homepage's `stack_signals`, the row's `main_text_chars`, `content_simhash` and `noindex`. A page not read whole has no `main_text_chars`, so it is not thin (v1 keeps a page when the signal is absent); it is noindex only by its X-Robots-Tag header, which the worker reads whether or not it read the page",
   status_code: 'the row',
   depth:
     "v1 `computeDepth` from the homepage over every page and the links filed under the page they were found on (`filing.ts`, the detectors' rule); null for a page no link path reaches, and for every page when the homepage is not a page",

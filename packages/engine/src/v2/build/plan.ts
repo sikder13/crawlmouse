@@ -25,7 +25,7 @@ export const CRAWL_BATCH_URLS = 50;
  * homepage's and the challenged pages' own; at most STAGE1_CHALLENGED challenged pages; and at most
  * STAGE1_MAX_PAGES pages, which `sample` checks before each template page. The page bound is not
  * implied by the other two: challenged pages can share the homepage's template (a template key leaves
- * the query out). plan.property.test.ts generates that case.
+ * the query out). plan.test.ts builds that case.
  */
 export const STAGE1_TEMPLATES = 24;
 export const STAGE1_CHALLENGED = 2;

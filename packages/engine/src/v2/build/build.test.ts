@@ -447,6 +447,23 @@ describe('a check the pipeline did not finish', () => {
     expect(built.check.status).toBe('finished');
   });
 
+  it('counts no crawler on a page where one crawler test of several measured nothing', () => {
+    const page = built.page_results.find((p) => p.sampled && p.crawlers_reached !== null)!;
+    const one = buildCheck(
+      edited((i) => {
+        const rows = accessOf(i)
+          .flatMap((b) => b.access_tests)
+          .filter((t) => t.page_url === page.url && t.identity_role === 'crawler');
+        expect(rows.length).toBeGreaterThan(1);
+        Object.assign(rows[0]!, { verdict: 'not_measured', cause: null, witness: null });
+      }),
+    );
+    expect(one.page_results.find((p) => p.url === page.url)).toMatchObject({
+      crawlers_reached: null,
+      crawlers_reading_text: null,
+    });
+  });
+
   it('counts no crawler on a page whose crawler tests measured nothing, rather than none reaching it', () => {
     const page = built.page_results.find((p) => p.sampled)!;
     const unmeasured = buildCheck(
