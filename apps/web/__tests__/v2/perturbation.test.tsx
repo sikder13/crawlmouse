@@ -28,14 +28,21 @@ import { crawlElement, homeElement, resultElement } from './_lib/screens';
  * than per name, so a changed copy is replayed afresh. `mapDrawing()` returns the map's nodes with
  * no positions and no memo: positions draw no text, and the layout has its own tests.
  */
-const perturbed = vi.hoisted(() => ({ name: null as string | null, dataset: null as unknown }));
+const perturbed = vi.hoisted(() => ({
+  name: null as string | null,
+  dataset: null as unknown,
+  /** Every fixture name `fixture()` was asked for, in order. */
+  read: [] as string[],
+}));
 
 vi.mock('../../lib/v2/fixtures', async (importOriginal) => {
   const real = await importOriginal<typeof import('../../lib/v2/fixtures')>();
   return {
     ...real,
-    fixture: (name: FixtureName) =>
-      name === perturbed.name ? (perturbed.dataset as FixtureDataset) : real.fixture(name),
+    fixture: (name: FixtureName) => {
+      perturbed.read.push(name);
+      return name === perturbed.name ? (perturbed.dataset as FixtureDataset) : real.fixture(name);
+    },
   };
 });
 
@@ -647,8 +654,12 @@ describe('every inventoried value comes from the fixture', () => {
       const s = SHOWN[name];
       expect(findCheck(fixture(name), s.check).id).toBe(s.check);
       if ('notRendered' in s) {
-        // True while it says so: no Result preview is named for it, and no recording records it.
-        expect(Object.keys(RESULT_PREVIEWS)).not.toContain(name);
+        // True while it says so: no Result preview reads the fixture, whatever its key, and no
+        // recording records it.
+        perturbed.read.length = 0;
+        for (const preview of Object.values(RESULT_PREVIEWS)) preview();
+        expect(perturbed.read.length).toBeGreaterThan(0);
+        expect(perturbed.read).not.toContain(name);
         expect(RECORDING_NAMES.filter((r) => recordingSpec(r).fixture === name)).toEqual([]);
       } else {
         expect(text(renderToStaticMarkup(resultElement(s.result)))).not.toBe('');
