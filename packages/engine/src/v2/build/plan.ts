@@ -20,10 +20,17 @@ import type { Seed } from './types.js';
 
 /** URLs per crawl batch: the worker's MAX_URLS_PER_BATCH. */
 export const CRAWL_BATCH_URLS = 50;
-/** Stage 1: at most this many pages, of which at most STAGE1_TEMPLATES templates and STAGE1_CHALLENGED challenged pages. */
-export const STAGE1_MAX_PAGES = 25;
+/**
+ * Stage 1 covers at most STAGE1_TEMPLATES templates, counting the homepage's and the challenged pages'
+ * own, and takes at most STAGE1_CHALLENGED challenged pages. Every page it takes has a template; a
+ * template page is taken only for a template not yet covered, so only challenged pages can share a
+ * template, at most STAGE1_CHALLENGED - 1 beyond the first. The stage therefore holds at most
+ * STAGE1_TEMPLATES + STAGE1_CHALLENGED - 1 pages: STAGE1_MAX_PAGES, ENGINE-GAP §8.4's 25.
+ * plan.property.test.ts holds the bound on generated sites.
+ */
 export const STAGE1_TEMPLATES = 24;
 export const STAGE1_CHALLENGED = 2;
+export const STAGE1_MAX_PAGES = STAGE1_TEMPLATES + STAGE1_CHALLENGED - 1;
 /** Stage 2: the sample grows to this many pages in all, starting with these picks. */
 export const STAGE2_MAX_PAGES = 50;
 export const STAGE2_PICKS = { hubs: 5, deepest: 4, newest: 4 } as const;
@@ -108,8 +115,8 @@ const byRank = (a: PageResult, b: PageResult) =>
  * The staged sample from the crawl. Only pages answering 200 with HTML are tested as crawlers, except
  * the challenged ones, which are the point. Stage 1: the homepage; up to STAGE1_CHALLENGED pages our
  * crawler was challenged on, by URL; then one page of each template, largest template first, its
- * highest-PageRank page, until STAGE1_TEMPLATES templates are covered or the stage holds
- * STAGE1_MAX_PAGES. ENGINE-GAP §8.4's 1 + 24 + 2 can reach 27; the 25-page bound it also states wins.
+ * highest-PageRank page, until STAGE1_TEMPLATES templates are covered (STAGE1_MAX_PAGES says why
+ * that holds the stage to 25 pages).
  *
  * Stage 2 is needed when, on the stage-1 pages, a scored crawler's verdict on some page differs from
  * its verdict on the homepage (on the first stage-1 page when the homepage is not in the sample), or
@@ -138,7 +145,7 @@ export function sample(
     .forEach((p) => take(p, 1, 'challenged'));
   const templates = templatesBySize(eligible);
   for (const [key, members] of templates) {
-    if (picked.length >= STAGE1_MAX_PAGES || covered.size >= STAGE1_TEMPLATES) break;
+    if (covered.size >= STAGE1_TEMPLATES) break;
     if (!covered.has(key)) take(members[0]!, 1, 'template');
   }
   const stage1 = [...picked];

@@ -152,7 +152,7 @@ const ARCH_DIFFERENCES = [
   "ARCH-2 stores the sample in `page_results.in_sample` and `sample_stage`. The contract has `PageResult.sampled` only; the stage is the planner's (`sample`), recomputed from the rows.",
   'ARCH-2 names per-crawler verdict columns on `page_results`. The merged contract keeps verdicts on `AccessTest` rows and the site verdict on `Check.crawlers`.',
   "ARCH-2's `discover` step reads robots.txt and sitemaps for the pipeline. The merged worker reads robots.txt itself for each batch (cached across batches) and requests `/sitemap.xml` for its status and size only; sitemap URLs reach the builder as `seeds`.",
-  "ENGINE-GAP §8.4's stage 1 of homepage, 24 templates and 2 challenged pages can reach 27 pages; its stated bound of 25 wins.",
+  "ENGINE-GAP §8.4 counts stage 1 as the homepage, 24 templates and 2 challenged pages, at most 25. Here the homepage's and the challenged pages' templates count toward the 24, which is what holds the stage to 25.",
 ];
 
 const BRIEF_DIFFERENCES = [
@@ -235,7 +235,9 @@ export function renderBuildSpec(): string {
   const states = (b: BuiltCheck) =>
     [site.ORPHAN, site.DEEP].map((p) => {
       const r = recordOf(b, p === site.ORPHAN ? 'orphan_pages' : 'deep_pages', p)!;
-      return `${code(p)} ${r.state}${r.reason ? ` (${code(r.reason)})` : ''}`;
+      // Grades keeps each record as the grade reads it, which leaves `reason` out of the type.
+      const reason = 'reason' in r && typeof r.reason === 'string' ? r.reason : null;
+      return `${code(p)} ${r.state}${reason ? ` (${code(reason)})` : ''}`;
     });
   const rule = Object.entries(PARTIAL_RULE).map(([reason, r]) => [
     code(reason),
@@ -277,7 +279,7 @@ export function renderBuildSpec(): string {
         ['URLs per crawl batch', `${CRAWL_BATCH_URLS}`],
         [
           'Stage 1',
-          `the homepage, up to ${STAGE1_CHALLENGED} challenged pages, then one page per template largest first, to ${STAGE1_TEMPLATES} templates or ${STAGE1_MAX_PAGES} pages`,
+          `the homepage, up to ${STAGE1_CHALLENGED} challenged pages, then one page per template largest first, to ${STAGE1_TEMPLATES} templates in all; at most ${STAGE1_MAX_PAGES} pages`,
         ],
         [
           'Stage 2',

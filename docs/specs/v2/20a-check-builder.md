@@ -70,7 +70,7 @@ A check is `partial` when a batch carries a reason marked partial below. The str
 | Bound                                | Value                                                                                                                                                                                                   |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | URLs per crawl batch                 | 50                                                                                                                                                                                                      |
-| Stage 1                              | the homepage, up to 2 challenged pages, then one page per template largest first, to 24 templates or 25 pages                                                                                           |
+| Stage 1                              | the homepage, up to 2 challenged pages, then one page per template largest first, to 24 templates in all; at most 25 pages                                                                              |
 | Stage 2                              | when a scored crawler's verdict on a stage-1 page differs from the homepage's, or a browser control was not served: top 5 hubs, 4 deepest, 4 newest by lastmod, then templates round-robin, to 50 pages |
 | Coverage `sample_strategy.max_pages` | 50                                                                                                                                                                                                      |
 | Render candidates                    | the sampled pages; `maxRenders` 25; open fix templates from client-rendered fixes in `open`, `reopened`, `marked_done`                                                                                  |
@@ -167,7 +167,7 @@ Content features: 64 KiB as JSON, 256 JSON-LD nodes of 32 types, a type of 256 c
 - ARCH-2 stores the sample in `page_results.in_sample` and `sample_stage`. The contract has `PageResult.sampled` only; the stage is the planner's (`sample`), recomputed from the rows.
 - ARCH-2 names per-crawler verdict columns on `page_results`. The merged contract keeps verdicts on `AccessTest` rows and the site verdict on `Check.crawlers`.
 - ARCH-2's `discover` step reads robots.txt and sitemaps for the pipeline. The merged worker reads robots.txt itself for each batch (cached across batches) and requests `/sitemap.xml` for its status and size only; sitemap URLs reach the builder as `seeds`.
-- ENGINE-GAP §8.4's stage 1 of homepage, 24 templates and 2 challenged pages can reach 27 pages; its stated bound of 25 wins.
+- ENGINE-GAP §8.4 counts stage 1 as the homepage, 24 templates and 2 challenged pages, at most 25. Here the homepage's and the challenged pages' templates count toward the 24, which is what holds the stage to 25.
 
 ## Differences from the brief
 

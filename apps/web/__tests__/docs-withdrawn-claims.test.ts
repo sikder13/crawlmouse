@@ -69,6 +69,15 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'and 2 challenged pages can reach 27 pages',
+    withdrawnIn:
+      'docs/specs/v2/20a-check-builder.md (Differences from ARCH-2), CC-20a mutation of the stage-1 bound',
+    truth:
+      "The challenged pages' templates count toward stage 1's 24, so stage 1 holds at most " +
+      '24 + 2 - 1 = 25 pages (plan.ts STAGE1_MAX_PAGES); the page check that assumed otherwise could never fire.',
+    allowedIn: [],
+  },
+  {
     text: 'to a redirect chain marks every page that carries it',
     withdrawnIn:
       'docs/specs/v2/17-content-and-grade.md (Technical SEO), owner ruling of 2026-11-05 (second set)',

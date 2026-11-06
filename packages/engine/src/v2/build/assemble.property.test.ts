@@ -184,3 +184,27 @@ describe('assemble, on generated checks', () => {
     );
   });
 });
+
+describe('assemble, when the homepage is not a page', () => {
+  it("gives no page a depth, rather than v1's fallback roots, which would put orphans at depth 0", () => {
+    const rows = [
+      crawlRow({ url: HOME, outcome: 'not_requested' }),
+      crawlRow({ url: pageUrl(1), outcome: 'fetched', status: 200, links_out: 1 }),
+      crawlRow({ url: pageUrl(2), outcome: 'fetched', status: 200 }),
+    ];
+    const built = assemble(
+      {
+        check: { id: CHECK, site_id: SITE, page_cap: 500 } as never,
+        homepage_url: HOME,
+        seeds: [],
+        render: null,
+      },
+      readBatches(
+        [crawlBatch(0, rows, [edge(pageUrl(1), pageUrl(2))])],
+        { id: CHECK, site_id: SITE },
+        'unreleased',
+      ),
+    );
+    expect(built.pages.map((p) => p.depth)).toEqual([null, null]);
+  });
+});
