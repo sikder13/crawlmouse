@@ -155,6 +155,39 @@ describe('a fix’s status at a moment', () => {
   });
 });
 
+describe('viewAt at the fixture’s own moment', () => {
+  it.each([
+    ['bad-site', BAD_ACCOUNT],
+    ['challenged-site', C9],
+  ] as const)('%s: gives back the account’s own records as the fixture holds them', (name, id) => {
+    const d = fixture(name);
+    const v = viewAt(d, { accountId: id, now: d.as_of });
+    const sites = d.sites.filter((s) => s.account_id === id);
+    const siteIds = new Set(sites.map((s) => s.id));
+    const ended = d.checks.filter((c) => siteIds.has(c.site_id) && c.finished_at !== null);
+    const checkIds = new Set(ended.map((c) => c.id));
+    const fixes = d.fixes.filter((f) => checkIds.has(f.first_seen_check_id));
+    const fixIds = new Set(fixes.map((f) => f.id));
+    expect(v.d.sites).toEqual(sites);
+    expect(v.d.checks).toEqual(ended);
+    expect(v.d.fixes).toEqual(fixes);
+    expect(v.d.changes).toEqual(d.changes.filter((c) => checkIds.has(c.check_id)));
+    expect(v.d.fix_events).toEqual(d.fix_events.filter((e) => fixIds.has(e.fix_id)));
+    expect(v.account).toEqual(d.accounts.find((a) => a.id === id));
+  });
+});
+
+describe('an account read during a trial it has since left', () => {
+  it('still carries that trial’s end, so it is a valid account then', () => {
+    // Northwind Digital's agency trial began 17 Sep 14:00Z; it became agency on 1 Oct.
+    const c = fixture('challenged-site');
+    const v = viewAt(c, { accountId: C9, now: '2026-09-20T00:00:00Z' });
+    expect(v.account.state).toBe('agency_trial');
+    expect(v.account.trial_ends_at).toBe('2026-10-01T14:00:00.000Z');
+    expect(() => FixtureDatasetSchema.parse(v.d)).not.toThrow();
+  });
+});
+
 describe('the primary site and its result checks', () => {
   const d = fixture('bad-site');
   const v = viewAt(d, { accountId: BAD_ACCOUNT, now: d.as_of });

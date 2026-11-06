@@ -6,6 +6,7 @@ import {
   clock,
   dateTimeUtc,
   dayDate,
+  daysBefore,
   dayMonth,
   dayOfMonth,
   hourMinute,
@@ -112,6 +113,15 @@ describe('the account zone', () => {
     expect(nextWeekly({ iso_weekday: 7, hour_local: 23 }, '2026-10-30T10:05:00Z', 'UTC')).toBe(
       '2026-11-01T23:00:00.000Z',
     );
+  });
+
+  it('counts days before an instant on the zone’s calendar, keeping its clock time', () => {
+    // Tue 3 Nov 23:30 EST is 04:30Z on the 4th; three calendar days before is Sat 31 Oct 23:30 EDT,
+    // which is 03:30Z on 1 Nov. 72 hours before would be Sun 1 Nov 00:30 EDT.
+    expect(daysBefore('2026-11-04T04:30:00Z', 3, IND)).toBe('2026-11-01T03:30:00.000Z');
+    expect(dayDate(daysBefore('2026-11-04T04:30:00Z', 3, IND), IND)).toBe('Sat 31 Oct');
+    // Sat 7 Nov 21:41 EST, three days before: Wed 4 Nov 21:41 EST, no change of offset between.
+    expect(daysBefore('2026-11-08T02:41:00Z', 3, IND)).toBe('2026-11-05T02:41:00.000Z');
   });
 
   it('names the zone for a reader', () => {

@@ -20,6 +20,7 @@ import { DASHBOARD_COPY as COPY, SETUP_COPY } from '../copy/dashboard';
 import { fixesAsOf } from '../fixtures';
 import {
   calendarDays,
+  daysBefore,
   dayDate,
   dayMonth,
   hourMinute,
@@ -258,6 +259,34 @@ function sinceCheck(v: AccountView): Check | null {
   );
 }
 
+/** The newest result of any site. */
+const newestResult = (v: AccountView) =>
+  v.d.sites
+    .map((s) => latest(v, s.id))
+    .filter((c): c is Check => c !== null)
+    .sort((a, b) => instant(b.finished_at!) - instant(a.finished_at!))[0] ?? null;
+
+/**
+ * How "since" names the earlier check: its weekday ("Thursday", "Thu"), unless a weekday could be
+ * read as another check, when the earlier one is a week or more before now or falls on the same
+ * weekday as the latest result; then its date ("Fri 23 Oct").
+ */
+function sinceName(
+  v: AccountView,
+  prev: Check,
+): { weekday: string; short: string } | { date: string } {
+  const zone = zoneOf(v);
+  const newest = newestResult(v);
+  const ambiguous =
+    calendarDays(prev.finished_at!, v.now, zone) >= 7 ||
+    (newest !== null &&
+      newest.id !== prev.id &&
+      weekday(newest.finished_at!, zone) === weekday(prev.finished_at!, zone));
+  return ambiguous
+    ? { date: dayDate(prev.finished_at!, zone) }
+    : { weekday: weekdayLong(prev.finished_at!, zone), short: weekday(prev.finished_at!, zone) };
+}
+
 /** The verdict a change's crawler had at the check that found it. */
 function verdictOf(v: AccountView, c: Change): Verdict | null {
   if (!c.ua) return null;
@@ -278,6 +307,8 @@ function allBlocked(v: AccountView, changes: readonly Change[]): boolean {
 
 function countOf(v: AccountView, changes: readonly Change[]): CountView {
   const verdicts = changes.flatMap((c) => verdictOf(v, c) ?? []);
+  if (!changes.length) return { count: 0, noun: '', verdicts };
+  // One crawler per change, so the count is a count of crawlers only when every one is blocked.
   if (allBlocked(v, changes)) {
     return {
       count: changes.length,
@@ -286,7 +317,11 @@ function countOf(v: AccountView, changes: readonly Change[]): CountView {
     };
   }
   const subjects = [...new Set(changes.map((c) => SUBJECTS[c.subject]))];
-  return { count: changes.length, noun: subjects.length ? listOf(subjects) : 'none', verdicts };
+  return {
+    count: changes.length,
+    noun: `${plural(changes.length, 'change', 'changes')}: ${listOf(subjects)}`,
+    verdicts,
+  };
 }
 
 function since(v: AccountView, site: Site): SinceCellView {
@@ -381,8 +416,11 @@ function health(d: FixtureDataset, viewer: Viewer, v: AccountView): HealthView {
     const b = meanOf(both.map((id) => now.values.get(id)!));
     if (a !== null && b !== null) {
       const over =
-        both.length === now.values.size ? '' : `, over the ${both.length} sites graded at both`;
-      delta = `${move(a, b)} since ${weekday(prev.finished_at!, zoneOf(v))}${over}`;
+        both.length === now.values.size
+          ? ''
+          : `, over the ${both.length} ${plural(both.length, 'site', 'sites')} graded at both`;
+      const name = sinceName(v, prev);
+      delta = `${move(a, b)} since ${'weekday' in name ? name.short : name.date}${over}`;
       deltaTone = b < a ? 'bad' : 'default';
     }
   }
@@ -638,11 +676,11 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
             : [addSite],
       }
     : {
-        title: COPY.since(weekdayLong(prev!.finished_at!, zone)),
+        title: COPY.since(sinceName(v, prev!)),
         line: [
           dayDate(v.now, zone),
           sitesWord,
-          `last check ${whenAgo(result!.finished_at!, v)}`,
+          `last check ${whenAgo((result ?? newestResult(v))!.finished_at!, v)}`,
           ...flight,
           next ? `next weekly check ${next}` : null,
           trialEnds,
@@ -673,7 +711,7 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
   const strip: StripView | null = firstRun
     ? null
     : {
-        title: COPY.since(weekdayLong(prev!.finished_at!, zone)),
+        title: COPY.since(sinceName(v, prev!)),
         health: health(d, viewer, v),
         opened: countOf(
           v,
@@ -695,6 +733,12 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
     ...new Set((byCheck ?? []).flatMap((r) => r.verdicts).filter((x): x is Verdict => x !== null)),
   ];
   const free = FREE_SCHEDULE[GATES.free.schedule];
+  const kinds = COPY.emailKinds(
+    v.account.email_prefs.change_notes,
+    trial && v.account.email_prefs.trial_reminder
+      ? dayDate(daysBefore(v.account.trial_ends_at!, 3, zone), zone)
+      : null,
+  );
   const daysLeft = trial ? calendarDays(v.now, v.account.trial_ends_at!, zone) : null;
 
   return {
@@ -723,7 +767,7 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
             )
           : null,
       rows,
-      foot: firstRun ? COPY.firstRunNote : null,
+      foot: firstRun ? COPY.firstRunNote(primary.schedule?.cadence ?? null) : null,
     },
     topFixes:
       firstRun && result && fixes.length
@@ -752,22 +796,15 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
     threeKinds:
       firstRun && trial
         ? {
-            lead: COPY.threeKindsLead(3),
-            body: COPY.threeKinds(
-              v.account.email_prefs.trial_reminder
-                ? dayDate(
-                    new Date(instant(v.account.trial_ends_at!) - 3 * 86_400_000).toISOString(),
-                    zone,
-                  )
-                : null,
-            ),
+            lead: COPY.threeKindsLead(kinds.length),
+            body: COPY.threeKinds(kinds),
             settings: action('emailSettings', 'Email settings'),
           }
         : null,
     startPro:
       v.account.state === 'free' && !v.account.state_history.some((h) => h.state.endsWith('_trial'))
         ? {
-            title: COPY.startProTitle(TRIAL_DAYS),
+            title: COPY.startProHeading,
             body: COPY.startProBody(TRIAL_DAYS, GATES.pro.competitorsPerSite, GATES.pro.sites),
             start: action('startTrial', COPY.startProTitle(TRIAL_DAYS)),
           }

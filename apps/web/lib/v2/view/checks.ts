@@ -59,9 +59,9 @@ export function move(from: number, to: number): string {
 }
 
 /**
- * The history axis: the first label carries its month, a label in a new month carries it again,
- * and the last two (the check before and the latest) carry their weekday: "24 Oct · 26 · … · Thu 29
- * · Fri 30".
+ * The history axis: the first label carries its month ("24 Oct"), as does a label in a new month
+ * ("1 Nov"); the others are the day ("26"). The last two carry their weekday ("Thu 29", "Fri 30")
+ * unless they carry their month.
  */
 export function axisLabels(checks: readonly Check[], zone: string): string[] {
   return checks.map((c, i) => {
@@ -83,8 +83,8 @@ export const crawlerOrder = (c: Check): CrawlerResult[] => [
 ];
 
 /**
- * One crawler's verdicts across checks, read aloud: "allowed, thin at five checks, then blocked by
- * robots.txt at the sixth", or "blocked by a rule at all six checks".
+ * Labels for one value per check, read aloud as runs: "41 at checks 1 to 5, then 22 at check 6",
+ * "blocked by a rule at all six checks", "allowed at both checks".
  */
 export function readRuns(labels: readonly string[]): string {
   const runs: { label: string; n: number }[] = [];
@@ -97,8 +97,11 @@ export function readRuns(labels: readonly string[]): string {
     const n = labels.length;
     return n === 1
       ? `${runs[0]!.label} at the one check`
-      : `${runs[0]!.label} at all ${numberWord(n)} checks`;
+      : n === 2
+        ? `${runs[0]!.label} at both checks`
+        : `${runs[0]!.label} at all ${numberWord(n)} checks`;
   }
+
   let at = 0;
   return runs
     .map((r) => {

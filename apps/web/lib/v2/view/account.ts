@@ -18,6 +18,7 @@ import {
   type Tier,
   type TierGates,
 } from '../../entitlement-v2';
+import { TRIAL_DAYS } from '../copy/account';
 
 export interface Viewer {
   /** The account whose screens these are. */
@@ -38,6 +39,28 @@ export interface InFlight {
   siteId: string;
   status: 'queued' | 'running' | 'deferred';
 }
+
+/**
+ * Fields viewAt keeps as the fixture's `as_of` has them, because the contract records no date for a
+ * change to them. The spec lists these; day 0 shows them as they stand at as_of.
+ */
+export const NOT_ROLLED_BACK = [
+  'accounts[].integrations',
+  'accounts[].limits',
+  'accounts[].email_prefs',
+  'accounts[].card_last4',
+  'accounts[].renews_at',
+  'seats[].theme',
+  'sites[].schedule',
+  'sites[].paused',
+  'sites[].competitor_hosts',
+  'sites[].slack_channel',
+  'fixes[].effect',
+  'fixes[].before_after',
+  'fixes[].rank (an open fix read before it resolved sorts after the ranked ones)',
+  'alert_rules[].enabled',
+  'alert_rules[].threshold_points',
+] as const;
 
 export interface AccountView {
   /** The account's own records, none of them later than `now`. A valid FixtureDataset. */
@@ -99,11 +122,17 @@ function accountAt(a: Account, t: number): Account {
   const last = history.at(-1);
   if (!last) throw new Error(`Account ${a.id} did not exist at ${new Date(t).toISOString()}`);
   const trial = last.state === 'pro_trial' || last.state === 'agency_trial';
+  // The account records only its current trial's end; a trial read later in the history ends
+  // TRIAL_DAYS after it began (ARCH-2 §3.1: both trials last 14 days).
+  const current = history.length === a.state_history.length;
+  const ends = current
+    ? a.trial_ends_at
+    : new Date(at(last.since) + TRIAL_DAYS * 86_400_000).toISOString();
   return {
     ...a,
     state: last.state,
     state_history: history,
-    trial_ends_at: trial ? a.trial_ends_at : null,
+    trial_ends_at: trial ? ends : null,
     agency_trial_consent: history.some((h) => h.state === 'agency_trial')
       ? a.agency_trial_consent
       : null,
@@ -166,8 +195,9 @@ function fixAt(
     status,
     // What the measurement found before the later events is not recorded: an open fix was detected.
     last_state: LAST_STATE_AFTER[status] ?? f.last_state,
-    // A resolved fix carries no rank; earlier, while open, it sorts after the site's ranked fixes.
-    rank: unresolved ? (f.rank ?? rankAfter) : null,
+    // A resolved fix carries no rank; earlier, while open, it sorts after the site's ranked fixes,
+    // each at its own place (by number, which is unique within a site).
+    rank: unresolved ? (f.rank ?? rankAfter + f.number) : null,
   };
 }
 
@@ -254,7 +284,7 @@ export function viewAt(d: FixtureDataset, viewer: Viewer): AccountView {
 export function primarySite(v: AccountView): Site {
   const s = v.d.sites
     .filter((x) => x.staging_of_site_id === null)
-    .sort((x, y) => at(x.created_at) - at(y.created_at))[0];
+    .sort((x, y) => at(x.created_at) - at(y.created_at) || x.id.localeCompare(y.id))[0];
   if (!s) throw new Error(`Account ${v.account.id} has no site at ${v.now}`);
   return s;
 }

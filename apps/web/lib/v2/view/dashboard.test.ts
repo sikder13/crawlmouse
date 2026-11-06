@@ -48,7 +48,7 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
   it('counts change records per site window: two opened, one resolved, three other', () => {
     // site 1: changes 1, 2 opened, 3, 4 changed; site 2: 5 resolved; site 3: 8 baseline.
     expect(v.strip!.opened).toMatchObject({ count: 2, noun: 'crawlers blocked' });
-    expect(v.strip!.resolved).toMatchObject({ count: 1, noun: 'orphan pages' });
+    expect(v.strip!.resolved).toMatchObject({ count: 1, noun: 'change: orphan pages' });
     expect(v.strip!.other.count).toBe(3);
     expect(v.changed.map((c) => c.title)).toEqual([
       'Claude-SearchBot is now blocked on example-outfitter.com',
@@ -207,6 +207,31 @@ describe('Dashboard, withheld: challenged-site as Northwind Digital (past_due, A
     expect(v.shell.trial).toBeNull();
     expect(v.sites.note).toBe('2 of 25 on Agency');
     reconciles(v);
+  });
+});
+
+describe('Dashboard home when the sites graded then and now differ (bad-site, Mon 26 Oct 19:02Z)', () => {
+  const v = dashboardView(bad, { accountId: BAD_ACCOUNT, now: '2026-10-26T19:02:00Z' });
+
+  it('means the four grades now, and moves only over the one site graded at both moments', () => {
+    // now: example-outfitter.com 79 + 41 (check 2), nahltech.com 79 + 93 (its first audit): 292 / 4 = 73.
+    // then, its previous check (Sat 24 Oct; read from the account's start, 02:41Z): only
+    // example-outfitter.com, 79 + 41 = 60, and 60 now: no change, over one site.
+    expect(v.strip!.health.value).toBe('73');
+    expect(v.strip!.health.delta).toBe('no change since Sat, over the 1 site graded at both');
+    expect(v.header.title).toBe("Since Saturday's check");
+  });
+});
+
+describe('Dashboard, withheld: a previous check a week or more back is named by its date', () => {
+  const c = fixture('challenged-site');
+  const v = dashboardView(c, { accountId: C9, now: c.as_of });
+
+  it('names Fri 23 Oct, not "Friday", which the latest check also is', () => {
+    // harborlight.example (created 23 Oct, the oldest) is the primary site; its previous result
+    // finished Fri 23 Oct, ten days before Mon 2 Nov, and its latest Fri 30 Oct.
+    expect(v.header.title).toBe('Since the check of Fri 23 Oct');
+    expect(v.strip!.health.delta).toBe('no change since Fri 23 Oct');
   });
 });
 

@@ -1,8 +1,10 @@
 /**
- * viewAt and the dashboard's reconciliation over every moment a viewer can ask about: each record's
- * own timestamp, a millisecond either side of it, and points between. Real records re-read at
- * different moments, not invented ones, so every dataset is one the contract accepts; the counts at
- * the end show each edge the plan names was reached.
+ * viewAt and the dashboard's reconciliation, with the moment varied and the datasets not: the three
+ * contract fixtures, read at each record's own timestamp, a millisecond either side of it, and
+ * points between. What varies is the moment; the records are the fixtures' own, so every dataset is
+ * one the contract accepts. Each property counts the edges it reached and requires each named edge
+ * at least once; edges no fixture holds (a refused Technical SEO score, a site added after the
+ * previous check) are not reached here, and SPEC 26 says so.
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
@@ -92,6 +94,12 @@ describe.each(CASES)('viewAt and the dashboard, $name, at any moment', (c) => {
         expect(v.d.changes.filter((ch) => after(ch.detected_at))).toEqual([]);
         expect(v.d.fix_events.filter((e) => after(e.at))).toEqual([]);
         expect(v.d.sites.filter((s) => after(s.created_at))).toEqual([]);
+        for (const site of v.d.sites) {
+          const ranks = v.d.fixes
+            .filter((f) => f.site_id === site.id && f.rank !== null)
+            .map((f) => f.rank);
+          expect(new Set(ranks).size, `distinct ranks on ${site.host}`).toBe(ranks.length);
+        }
 
         const dash = dashboardView(c.d, viewer);
         const cells = dash.sites.rows.reduce((n, r) => n + r.since.opened + r.since.resolved, 0);
@@ -116,9 +124,7 @@ describe.each(CASES)('viewAt and the dashboard, $name, at any moment', (c) => {
       }),
       { numRuns: 300 },
     );
-  });
-
-  it('reached the edges it is meant to', () => {
+    // The edges this fixture holds, each reached at least once.
     expect(seen.emptyWindow).toBeGreaterThan(0);
     expect(seen.atCheckFinish).toBeGreaterThan(0);
     if (c.name === 'bad-site') {
@@ -126,5 +132,27 @@ describe.each(CASES)('viewAt and the dashboard, $name, at any moment', (c) => {
       expect(seen.inFlight).toBeGreaterThan(0);
     }
     if (c.name === 'challenged-site') expect(seen.withheld).toBeGreaterThan(0);
+  });
+});
+
+describe.each(CASES)('viewAt alone, $name, over the account’s whole history', (c) => {
+  it('stays a valid dataset with nothing from after now, from the account’s first state on', () => {
+    const a = c.viewer.account ?? c.d.accounts.find((x) => x.id === c.viewer.accountId)!;
+    const start = instant(a.state_history[0]!.since);
+    const end = instant(c.d.as_of);
+    const edges = [...a.state_history.map((h) => instant(h.since)), ...stamps(c.d)]
+      .flatMap((t) => [t - 1, t, t + 1])
+      .filter((t) => t >= start && t <= end);
+    fc.assert(
+      fc.property(
+        fc.oneof(fc.constantFrom(...edges), fc.integer({ min: start, max: end })),
+        (t) => {
+          const v = viewAt(c.d, { ...c.viewer, now: new Date(t).toISOString() });
+          FixtureDatasetSchema.parse(v.d);
+          expect(v.d.checks.filter((ch) => instant(ch.finished_at!) > t)).toEqual([]);
+        },
+      ),
+      { numRuns: 200 },
+    );
   });
 });

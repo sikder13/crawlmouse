@@ -1,6 +1,7 @@
 /** The site page's view model against values worked out by hand from the fixtures. */
 import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
+import { axisLabels } from './checks';
 import { siteView } from './site';
 
 const BAD_ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
@@ -116,5 +117,18 @@ describe('Site, withheld: granitepeak.example as Northwind Digital', () => {
   it('draws only the checks that have a result, and names the ones that did not', () => {
     expect(v.crawlers.columns).toHaveLength(2);
     expect(v.header.line).toContain('latest check failed');
+  });
+});
+
+describe('the history axis across a change of month', () => {
+  it('gives the new month its name, and the weekday only to labels without one', () => {
+    const at = (ts: string) => ({ finished_at: ts }) as Parameters<typeof axisLabels>[0][number];
+    const checks = ['2026-10-30T15:00:00Z', '2026-10-31T15:00:00Z', '2026-11-01T15:00:00Z'].map(at);
+    // Fri 30 Oct, Sat 31 Oct, Sun 1 Nov in Indiana.
+    expect(axisLabels(checks, 'America/Indiana/Indianapolis')).toEqual([
+      '30 Oct',
+      'Sat 31',
+      '1 Nov',
+    ]);
   });
 });

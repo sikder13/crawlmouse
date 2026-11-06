@@ -138,9 +138,25 @@ function offsetAt(t: number, timeZone: string): number {
  * change of offset lands on the right instant.
  */
 function atLocalHour(date: number, hour: number, timeZone: string): number {
-  const wall = date + hour * 60 * 60 * 1000;
+  return atLocalTime(date, hour * 60 * 60 * 1000, timeZone);
+}
+
+/** The instant the zone's clock reads `ms` past midnight on a date given as midnight UTC. */
+function atLocalTime(date: number, ms: number, timeZone: string): number {
+  const wall = date + ms;
   const first = wall - offsetAt(wall, timeZone);
   return wall - offsetAt(first, timeZone);
+}
+
+/**
+ * The same clock time `days` calendar days earlier in the zone: "three days before the trial ends"
+ * as the account reads it, which differs from 72 hours across a change of offset.
+ */
+export function daysBefore(ts: string, days: number, timeZone: string): string {
+  const t = Date.parse(ts);
+  const date = localDate(ts, timeZone);
+  const clock = t + offsetAt(t, timeZone) - date;
+  return new Date(atLocalTime(date - days * DAY_MS, clock, timeZone)).toISOString();
 }
 
 /**

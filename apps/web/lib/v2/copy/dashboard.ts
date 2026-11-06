@@ -13,8 +13,18 @@ export const ALERTS_FROM = 'alerts@crawlmouse.com';
 
 export const DASHBOARD_COPY = {
   kept: (host: string) => `${host} is kept.`,
-  since: (weekday: string) => `Since ${weekday}'s check`,
-  firstRunNote: 'Changes appear here after the first weekly check. Nothing to compare yet.',
+  /** "Since Thursday's check", or, where a weekday would be ambiguous, "Since the check of Fri 23 Oct". */
+  since: (name: { weekday: string } | { date: string }) =>
+    'weekday' in name ? `Since ${name.weekday}'s check` : `Since the check of ${name.date}`,
+  /** The first-run note, by when the site is next checked (its schedule, not a promise). */
+  firstRunNote: (cadence: 'weekly' | 'monthly' | 'on_deploy' | null) =>
+    `Changes appear here ${
+      cadence === 'weekly' || cadence === 'monthly'
+        ? `after the first ${cadence} check`
+        : cadence === 'on_deploy'
+          ? 'after the next deploy is audited'
+          : 'once the site is checked again'
+    }. Nothing to compare yet.`,
   topFixesTitle: 'Start with the fix that pays most, estimated',
   topFixesFoot: (rest: number, open: string) =>
     `Each fix page has "Mark done and re-check now", about ${RECHECK_MINUTES} minutes. The other ${rest} ${plural(rest, 'is', 'are')} ${open}.`,
@@ -25,12 +35,24 @@ export const DASHBOARD_COPY = {
       : `${capitalise(numberWord(n))} ${plural(n, 'thing', 'things')} left to set up`,
   setupTrialFoot: (n: number) =>
     `All ${numberWord(n)} stop when the ${TRIAL_DAYS} days end unless you keep Pro. The site, its audits and its monthly check do not.`,
-  threeKinds: (reminder: string | null) =>
-    `a sign-in link when you ask for one, a note from ${ALERTS_FROM} when a check finds a change${
-      reminder ? `, and one reminder on ${reminder}, three days before the trial ends` : ''
+  /** The kinds of email the account gets, each a clause, read from its preferences. */
+  emailKinds: (changeNotes: boolean, reminder: string | null) =>
+    [
+      'a sign-in link when you ask for one',
+      changeNotes ? `a note from ${ALERTS_FROM} when a check finds a change` : null,
+      reminder ? `one reminder on ${reminder}, three days before the trial ends` : null,
+    ].filter((k): k is string => k !== null),
+  /** "a, b, and c", as the locked page lists them; "a and b" for two. */
+  threeKinds: (kinds: readonly string[]) =>
+    `${
+      kinds.length > 2
+        ? `${kinds.slice(0, -1).join(', ')}, and ${kinds.at(-1)}`
+        : kinds.join(' and ')
     }. If you keep Pro, Stripe sends the receipts.`,
-  threeKindsLead: (n: number) => `You will hear from us ${numberWord(n)} ways and no others:`,
+  threeKindsLead: (n: number) =>
+    `You will hear from us ${numberWord(n)} ${plural(n, 'way', 'ways')} and no others:`,
   startProTitle: (days: number) => `Start ${days} days of Pro`,
+  startProHeading: 'Weekly checks and every fix, if you want them',
   startProBody: (days: number, competitors: number, sites: number) =>
     `Weekly checks, every fix with its packet, Slack alerts and ${numberWord(competitors)} ${plural(competitors, 'competitor', 'competitors')} per site, on up to ${sites} sites, for ${days} days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.`,
   sitesFirstRun: (free: string) => `Checked weekly for ${TRIAL_DAYS} days, then ${free} on Free`,
@@ -38,7 +60,7 @@ export const DASHBOARD_COPY = {
 
 /** The Pro set-up items (FACTS l.57), each as an offer and as done. */
 export const SETUP_COPY = {
-  slack: { todo: 'Alerts to Slack, as well as email', done: 'Alerts to email and Slack' },
+  slack: { todo: 'Alerts to Slack, as well as email', done: 'Slack alerts connected' },
   competitor: {
     todo: (n: number) =>
       `Name ${numberWord(n)} ${plural(n, 'competitor', 'competitors')} to audit the same way`,
@@ -207,9 +229,9 @@ const DAY0: CopyChange[] = [
     kind: 'fixture',
     locked:
       'Alerts to Slack, as well as email Connect Name one competitor to audit the same way Add',
-    rendered: 'done Alerts to email and Slack done One competitor added',
+    rendered: 'done Slack alerts connected done One competitor added',
     source:
-      'The contract records no date for an integration or a competitor, so day 0 cannot roll them back: the account has Slack connected and summitgear.co named, shown done',
+      'The contract records no date for an integration or a competitor, so day 0 cannot roll them back: the account has Slack connected and summitgear.co named, shown done. Done, the Slack row names Slack alone, since Free keeps the email alerts (FACTS l.31)',
   },
   {
     screen: 'dashboard-day0',
@@ -282,9 +304,9 @@ const HOME: CopyChange[] = [
     screen: 'dashboard',
     kind: 'ruling',
     locked: 'Opened 1 crawler blocked Resolved 3 orphan pages linked Other changes 17',
-    rendered: 'Opened 2 crawlers blocked Resolved 1 orphan pages Other changes 3',
+    rendered: 'Opened 2 crawlers blocked Resolved 1 change: orphan pages Other changes 3',
     source:
-      'Owner ruling Q5: the strip counts change records in each site’s window: two opened (Claude-SearchBot, ClaudeBot), one resolved (nahltech.com’s orphans), three other (a grade move, a content change, a new baseline), so the headline equals the rows and the sites table',
+      'Owner ruling Q5: the strip counts change records in each site’s window: two opened (Claude-SearchBot, ClaudeBot), one resolved (nahltech.com’s orphans), three other (a grade move, a content change, a new baseline), so the headline equals the rows and the sites table. A count other than crawlers blocked names records ("1 change: orphan pages"), not the pages in them',
   },
   {
     screen: 'dashboard',
@@ -401,6 +423,14 @@ const HOME: CopyChange[] = [
     rendered: 'A- 86 A- 88 no change on each deploy Thu 18:23',
     source:
       'The fixture’s staging check: Technical SEO 86 is A- (letters.ts), finished 22:23:10Z, 18:23 in the account’s zone',
+  },
+  {
+    screen: 'dashboard',
+    kind: 'facts',
+    locked: 'done Alerts to email and Slack',
+    rendered: 'done Slack alerts connected',
+    source:
+      'FACTS l.31: Free keeps "email if changed", so the Pro set-up item is Slack; done, it names Slack alone',
   },
   {
     screen: 'dashboard',
