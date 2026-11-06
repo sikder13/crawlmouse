@@ -2,8 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Check, FixtureDataset } from '@crawlmouse/types/v2';
-import { findCheck, fixture, siteOf, type FixtureName } from '../../lib/v2/fixtures';
-import { CHECKS, type RecordingName } from '../../lib/v2/recordings';
+import { FIXTURE_NAMES, findCheck, fixture, siteOf, type FixtureName } from '../../lib/v2/fixtures';
+import {
+  CHECKS,
+  RECORDING_NAMES,
+  recordingSpec,
+  type RecordingName,
+} from '../../lib/v2/recordings';
+import {
+  RESULT_PREVIEWS,
+  type ResultPreview,
+} from '../../app/(v2-preview)/v2-preview/_preview/screens';
 import type { Recording } from '../../lib/v2/recording';
 import { INVENTORY, type Screen } from '../../lib/v2/view/inventory';
 import { crawlElement, homeElement, resultElement } from './_lib/screens';
@@ -73,8 +82,14 @@ const text = (markup: string) => {
   return parts.join(' ').replace(/\s+/g, ' ');
 };
 
-/** Each fixture's first audit, its Result preview, and its crawl recording. */
-const SHOWN = {
+/**
+ * Each fixture's first audit, its Result preview and its crawl recording; or, for a fixture no
+ * preview renders yet, why not. The test below holds each reason to the preview and recording lists.
+ */
+type Shown =
+  | { check: string; result: ResultPreview; crawl: RecordingName }
+  | { check: string; notRendered: string };
+const SHOWN: Record<FixtureName, Shown> = {
   'bad-site': { check: CHECKS.badFirstAudit, result: 'bad-site', crawl: 'bad-site' },
   'clean-site': { check: CHECKS.cleanFirstAudit, result: 'clean', crawl: 'clean-site' },
   'challenged-site': {
@@ -82,7 +97,20 @@ const SHOWN = {
     result: 'challenged',
     crawl: 'challenged-site',
   },
-} as const;
+  // The check builder's output (CC-20a). Listed in its PR under "Found by the built fixture".
+  'built-site': {
+    check: fixture('built-site').checks[0]!.id,
+    notRendered:
+      'no Result preview and no crawl recording names built-site: RESULT_PREVIEWS and RECORDING_NAMES hold the contract fixtures only',
+  },
+};
+
+/** The previews that render fixture `name`; a fixture none renders throws with its reason. */
+function shownOf(name: FixtureName): Extract<Shown, { result: ResultPreview }> {
+  const s = SHOWN[name];
+  if ('notRendered' in s) throw new Error(`${name} cannot be rendered yet: ${s.notRendered}`);
+  return s;
+}
 
 /** The screens built from `dataset` standing in for fixture `name`; Home shows the bad site only. */
 function screens(name: FixtureName, dataset: FixtureDataset | null): Record<Screen, string> {
@@ -91,8 +119,8 @@ function screens(name: FixtureName, dataset: FixtureDataset | null): Record<Scre
   try {
     return {
       Home: name === 'bad-site' ? text(renderToStaticMarkup(homeElement())) : '',
-      Result: text(renderToStaticMarkup(resultElement(SHOWN[name].result))),
-      Crawl: text(renderToStaticMarkup(crawlElement(SHOWN[name].crawl, 'end'))),
+      Result: text(renderToStaticMarkup(resultElement(shownOf(name).result))),
+      Crawl: text(renderToStaticMarkup(crawlElement(shownOf(name).crawl, 'end'))),
     };
   } finally {
     perturbed.name = null;
@@ -613,6 +641,20 @@ describe('every inventoried value comes from the fixture', () => {
     if (!before.has(name)) before.set(name, screens(name, null));
     return before.get(name)!;
   };
+
+  it('renders each fixture through its previews, or names why none renders it', () => {
+    for (const name of FIXTURE_NAMES) {
+      const s = SHOWN[name];
+      expect(findCheck(fixture(name), s.check).id).toBe(s.check);
+      if ('notRendered' in s) {
+        // True while it says so: no Result preview is named for it, and no recording records it.
+        expect(Object.keys(RESULT_PREVIEWS)).not.toContain(name);
+        expect(RECORDING_NAMES.filter((r) => recordingSpec(r).fixture === name)).toEqual([]);
+      } else {
+        expect(text(renderToStaticMarkup(resultElement(s.result)))).not.toBe('');
+      }
+    }
+  });
 
   it.each(CASES)('$label', ({ fixture: name = 'bad-site', change, expect: shows }) => {
     const d = structuredClone(fixture(name));
