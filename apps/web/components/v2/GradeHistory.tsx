@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { ScrollRegion } from './ScrollRegion';
 import layout from './layout.module.css';
 import styles from './GradeHistory.module.css';
@@ -83,10 +84,11 @@ export function GradeHistory({
   const xs = labels.map((_, i) => X0 + (i * (X1 - X0)) / (n - 1));
   const first = (s: 0 | 1) => series[s].values.find((v): v is number => v !== null);
   const marked = marker ? series[marker.series].values[marker.index] : null;
+  const captionId = useId();
 
   return (
     <div className={styles.history}>
-      <ScrollRegion label={label} className={styles.scroll} startAtEnd>
+      <ScrollRegion label={label} className={styles.scroll} startAtEnd describedBy={captionId}>
         <svg
           className={styles.chart}
           data-v2-chart=""
@@ -163,7 +165,7 @@ export function GradeHistory({
       <div className={layout.srOnly} data-v2-sr-only="">
         <table className={styles.values}>
           {/* Everything the drawing writes on itself, besides its axis, is read here too. */}
-          <caption>
+          <caption id={captionId}>
             {[caption, note?.text].filter(Boolean).join('. ')}
             {marker ? (
               <>

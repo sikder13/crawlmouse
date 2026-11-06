@@ -19,14 +19,14 @@ afterEach(() => {
  * content is wider than it. A child is added afterwards so the region checks again, as a log
  * gaining a line makes it, at the next frame.
  */
-function mount() {
+function mount(describedBy?: string) {
   vi.useFakeTimers();
   const host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
   act(() =>
     root!.render(
-      <ScrollRegion label="Recent fetches">
+      <ScrollRegion label="Recent fetches" describedBy={describedBy}>
         <p>line</p>
       </ScrollRegion>,
     ),
@@ -59,6 +59,15 @@ function mount() {
 }
 
 describe('ScrollRegion', () => {
+  it('points its tab stop at what describes it, while it is one', async () => {
+    const { region, change } = mount('chart-caption');
+    expect(region.getAttribute('aria-describedby')).toBeNull();
+    await change(true);
+    expect(region.getAttribute('aria-describedby')).toBe('chart-caption');
+    await change(false);
+    expect(region.getAttribute('aria-describedby')).toBeNull();
+  });
+
   it('joins the tab order while its content overflows, and leaves it when it fits', async () => {
     const { region, change } = mount();
     expect(region.getAttribute('tabindex')).toBeNull();

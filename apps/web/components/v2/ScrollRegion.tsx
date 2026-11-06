@@ -12,9 +12,15 @@ export function ScrollRegion({
   label,
   className,
   startAtEnd = false,
+  describedBy,
   children,
 }: {
   label: string;
+  /**
+   * The id of text that says what the region holds, for content a screen reader cannot read
+   * itself (a drawing hidden from it): without it the tab stop is a named region with nothing in it.
+   */
+  describedBy?: string;
   className?: string;
   /** Opens scrolled to its far end: a history whose latest point is the one that matters. */
   startAtEnd?: boolean;
@@ -62,7 +68,14 @@ export function ScrollRegion({
       ref={ref}
       className={className}
       data-v2-scroll-region=""
-      {...(scrolls ? { role: 'region', 'aria-label': label, tabIndex: 0 } : {})}
+      {...(scrolls
+        ? {
+            role: 'region',
+            'aria-label': label,
+            tabIndex: 0,
+            ...(describedBy ? { 'aria-describedby': describedBy } : {}),
+          }
+        : {})}
     >
       {children}
     </div>
