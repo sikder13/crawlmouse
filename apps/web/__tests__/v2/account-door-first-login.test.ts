@@ -158,6 +158,16 @@ describe('runFirstLogin', () => {
     expect((await runFirstLogin(deps(), i)).trial).toBe('started');
   });
 
+  it('a network holds no slot: two strangers on one /24 signing up back to back both get the trial', async () => {
+    // Both runs share the real serialisation buckets and the same clock, so a slot taken on the
+    // network would answer the second run `busy`, which is final: first login does not recur.
+    const a = await input('alice@example.com', { device: 'dev-a', ip: '203.0.113.7' });
+    const b = await input('bob@example.org', { device: 'dev-b', ip: '203.0.113.99' });
+    const ra = await runFirstLogin(deps(), a);
+    const rb = await runFirstLogin(deps(), b);
+    expect([ra.trial, rb.trial]).toEqual(['started', 'started']);
+  });
+
   it('a refused account is not offered the trial again at a later login from elsewhere', async () => {
     await priorTrial({ email: 'farm@example.com', device: null, ip: 'unknown' }, 10);
     const i = await input('farm@example.com');
