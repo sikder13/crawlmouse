@@ -229,6 +229,101 @@ describe('each section detects a change of its own kind, and names it', () => {
   });
 });
 
+describe('SUPABASE_MANAGED_MEMBERS: memberships Supabase grants a new branch', () => {
+  // What a branch built on 2026-11-06 held and production did not (docs/ops/db-migrations.md §5).
+  const GRANT_AS_ON_A_BRANCH =
+    'create role supabase_realtime_admin noinherit; ' +
+    'grant anon, authenticated, service_role to supabase_realtime_admin with inherit false';
+  const MANAGED_LINES = ['anon', 'authenticated', 'service_role'].map(
+    (r) => `supabase_realtime_admin member of ${r} admin=f inherit=f set=t`,
+  );
+  const roleLines = (fp: Fingerprint) => fp.get('roles')!.lines;
+
+  it('ignores supabase_realtime_admin as a member of anon, authenticated and service_role', async () => {
+    const after = await withRollback(db, async (tx) => {
+      await tx.exec(GRANT_AS_ON_A_BRANCH);
+      return readFingerprint(tx);
+    });
+    expect(compareFingerprints(base, after)).toEqual([]);
+  });
+
+  it('the exclusion list is what hides them: without its entry the three lines show', async () => {
+    const unlisted = fingerprintSql().replace(
+      "values ('supabase_realtime_admin')",
+      "values ('zz_no_such_role')",
+    );
+    expect(unlisted).not.toEqual(fingerprintSql());
+    const [without, after] = await withRollback(db, async (tx) => {
+      const before = await readFingerprint(tx, unlisted);
+      await tx.exec(GRANT_AS_ON_A_BRANCH);
+      return [before, await readFingerprint(tx, unlisted)] as const;
+    });
+    expect(differingSections(without, after)).toEqual(['roles']);
+    expect(roleLines(after).filter((l) => !roleLines(without).includes(l))).toEqual(MANAGED_LINES);
+  });
+
+  // The list matches the member's name exactly; vary the name to show nothing near it is hidden.
+  it.each([
+    'zz_invented_member',
+    'supabase_realtime_admin_2',
+    'xsupabase_realtime_admin',
+    '"Supabase_Realtime_Admin"',
+    'supabase_admin_realtime',
+  ])('a membership by %s still shows in the roles section', async (member) => {
+    const after = await withRollback(db, async (tx) => {
+      await tx.exec(`create role ${member} noinherit; grant authenticated to ${member}`);
+      return readFingerprint(tx);
+    });
+    expect(differingSections(base, after)).toEqual(['roles']);
+    // The membership line itself, not only the role's own line (which some of these names have).
+    const name = member.replace(/"/g, '');
+    expect(roleLines(after)).toContain(`${name} member of authenticated admin=f inherit=f set=t`);
+  });
+
+  it('supabase_realtime_admin granted to a client role (it is the role, not the member) still shows', async () => {
+    const after = await withRollback(db, async (tx) => {
+      await tx.exec(
+        'create role supabase_realtime_admin; grant supabase_realtime_admin to authenticated',
+      );
+      return readFingerprint(tx);
+    });
+    expect(differingSections(base, after)).toEqual(['roles']);
+  });
+
+  it.each([
+    // The owner's own privileges are part of a table's ACL, so ownership shows in both.
+    [
+      'owning a table',
+      'alter table public.sites owner to supabase_realtime_admin',
+      ['acls', 'relations'],
+    ],
+    [
+      'holding a grant on a table',
+      'grant select on public.sites to supabase_realtime_admin',
+      ['acls'],
+    ],
+    [
+      'holding a grant on a column',
+      'grant update (client_name) on public.sites to supabase_realtime_admin',
+      ['acls'],
+    ],
+    [
+      'holding execute on a function',
+      'grant execute on function public.is_member(uuid) to supabase_realtime_admin',
+      ['acls'],
+    ],
+  ])(
+    'the exclusion is by member name only: supabase_realtime_admin %s is still seen',
+    async (_label, mutation, sections) => {
+      const after = await withRollback(db, async (tx) => {
+        await tx.exec(`${GRANT_AS_ON_A_BRANCH}; ${mutation}`);
+        return readFingerprint(tx);
+      });
+      expect(differingSections(base, after)).toEqual(sections);
+    },
+  );
+});
+
 describe('formatDifferences', () => {
   it('names the section and its lines, and says how many lines it withheld', () => {
     const lines = Array.from({ length: 25 }, (_, i) => `line ${String(i).padStart(2, '0')}`);

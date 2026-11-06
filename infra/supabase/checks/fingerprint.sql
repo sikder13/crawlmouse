@@ -10,7 +10,7 @@
 --     function is in those three schemas, and the grants to the roles below and to PUBLIC;
 --   - the roles the migrations create and the client roles (anon, authenticated, service_role,
 --     authenticator): attributes, settings (values as md5s), and memberships with their admin,
---     inherit and set options;
+--     inherit and set options, except memberships whose member is in SUPABASE_MANAGED_MEMBERS;
 --   - default privileges for all schemas or for the three above; the names of schemas other than
 --     Supabase's own and those an extension creates; the tables of the three schemas in each
 --     publication; and storage bucket rows.
@@ -57,6 +57,13 @@ cross join lateral (
     select oid, nspname from pg_namespace where nspname in ('storage', 'auth')
   ),
   extension_members as (select objid from pg_depend where deptype = 'e'),
+  -- SUPABASE_MANAGED_MEMBERS: roles whose memberships Supabase grants when it creates a project,
+  -- left out of the roles section by the member's exact name. Measured: production held no
+  -- membership with supabase_realtime_admin as the member (2026-11-06 UTC), and a branch created
+  -- from it the same day held three, of anon, authenticated and service_role
+  -- (docs/ops/db-migrations.md §5 has the query). Only the membership lines are left out: a role
+  -- listed here that owns an object or holds a grant in the schemas above is still read.
+  supabase_managed_members(rolname) as (values ('supabase_realtime_admin')),
   watched_roles as (
     select oid, rolname from pg_roles
     where (rolname !~ '^(pg_|supabase_|cli_login_)'
@@ -242,7 +249,8 @@ cross join lateral (
              pg_get_userbyid(m.member), pg_get_userbyid(m.roleid), m.admin_option,
              m.inherit_option, m.set_option)
     from pg_auth_members m
-    where m.roleid in (select oid from watched_roles) or m.member in (select oid from watched_roles)
+    where (m.roleid in (select oid from watched_roles) or m.member in (select oid from watched_roles))
+      and pg_get_userbyid(m.member) not in (select rolname from supabase_managed_members)
 
     union all
     select 'schemas', n.nspname::text
