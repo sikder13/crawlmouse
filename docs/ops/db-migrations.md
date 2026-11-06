@@ -451,6 +451,14 @@ Neither can pass a dry run while pending: the branch would lack production's lin
 fingerprint step. Each reaches production once, by `supabase db push` from this repository's
 checkout, which applies the file's bytes and records its history row. Not the SQL editor.
 
+**Applied on 2026-11-06 through the Supabase MCP, not `supabase db push`:** each file ran as one
+transaction with its history row inserted from its exact bytes (sha256 `560af38b…77050c7` and
+`2ecba08d…fc81e27`; 45 history rows). Checked: P1 left all 15 fingerprint sections unchanged; P2
+removed exactly the fixture's 359 lines and added its 9, the other 13 sections' md5 unchanged;
+`anon` is refused on `audits`, `users` and `public_reports`; `authenticated` reads
+`users.pro_until`, the dashboard's `audits` query and `domain_verifications`; the Postgres logs show
+no permission-denied error.
+
 **P1.** From the `build/cc-db-ops` checkout at commit `6de90b21`, which has P1 and not P2, with
 Node 22, `pnpm install` done, Supabase CLI 2.84.2 on the path (`supabase --version`), and the
 session pooler's connection string from the dashboard's **Connect** dialog. `~/db-apply` holds the
