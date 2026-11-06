@@ -125,6 +125,26 @@ export function firstRunNow(d: FixtureDataset, viewer: Omit<Viewer, 'now'>): str
   return t === begins ? a.state_history[0]!.since : new Date(t).toISOString();
 }
 
+/** The status a fix's last event leaves it in (packages/types/src/v2/fix.ts: status follows events). */
+const STATUS_AFTER: Record<FixtureDataset['fix_events'][number]['kind'], Fix['status']> = {
+  marked_done: 'marked_done',
+  verified: 'verified_resolved',
+  unable_to_verify: 'unable_to_verify',
+  reopened: 'reopened',
+};
+
+/**
+ * What the last measurement found, when a fix is read before its later events. Nothing records it,
+ * so it is the one value the contract allows for that status (LAST_STATE_FOR_STATUS); marked_done
+ * allows any and keeps the fix's own.
+ */
+const LAST_STATE_AFTER: Partial<Record<Fix['status'], Fix['last_state']>> = {
+  open: 'detected',
+  reopened: 'detected',
+  verified_resolved: 'not_detected',
+  unable_to_verify: 'indeterminate',
+};
+
 /** A fix's status at `t`, from its events up to then (the contract says status follows them). */
 function fixAt(
   f: FixtureDataset['fixes'][number],
@@ -138,25 +158,14 @@ function fixAt(
     .filter((e) => at(e.at) <= t)
     .sort((x, y) => at(x.at) - at(y.at))
     .at(-1);
-  const status: Fix['status'] = !last
-    ? 'open'
-    : last.kind === 'marked_done'
-      ? 'marked_done'
-      : last.kind === 'reopened'
-        ? 'reopened'
-        : 'verified_resolved';
+  const status: Fix['status'] = last ? STATUS_AFTER[last.kind] : 'open';
   if (status === f.status) return f;
   const unresolved = status !== 'verified_resolved';
   return {
     ...f,
     status,
     // What the measurement found before the later events is not recorded: an open fix was detected.
-    last_state:
-      status === 'open' || status === 'reopened'
-        ? ('detected' as const)
-        : status === 'verified_resolved'
-          ? ('not_detected' as const)
-          : f.last_state,
+    last_state: LAST_STATE_AFTER[status] ?? f.last_state,
     // A resolved fix carries no rank; earlier, while open, it sorts after the site's ranked fixes.
     rank: unresolved ? (f.rank ?? rankAfter) : null,
   };

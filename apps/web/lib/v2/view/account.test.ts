@@ -98,6 +98,63 @@ describe('viewAt', () => {
   });
 });
 
+describe('a fix’s status at a moment', () => {
+  const VIEWERS = {
+    'bad-site': { accountId: BAD_ACCOUNT },
+    'challenged-site': { accountId: C9 },
+  } as const;
+
+  it.each(Object.keys(VIEWERS) as (keyof typeof VIEWERS)[])(
+    '%s: read at its own as_of, every fix keeps the status, last state and rank the fixture records',
+    (name) => {
+      const d = fixture(name);
+      const v = viewAt(d, { ...VIEWERS[name], now: d.as_of });
+      for (const f of v.d.fixes) {
+        const recorded = d.fixes.find((x) => x.id === f.id)!;
+        expect([f.status, f.last_state, f.rank], `fix ${f.number}`).toEqual([
+          recorded.status,
+          recorded.last_state,
+          recorded.rank,
+        ]);
+      }
+    },
+  );
+
+  // The contract: status follows the fix's last event (packages/types/src/v2/fix.ts). One case per
+  // event kind, so the mapping is checked for each kind, not only those the fixtures happen to hold.
+  it.each([
+    ['marked_done', 'marked_done'],
+    ['verified', 'verified_resolved'],
+    ['unable_to_verify', 'unable_to_verify'],
+    ['reopened', 'reopened'],
+  ] as const)('a last event %s reads as %s', (kind, status) => {
+    const d = structuredClone(fixture('bad-site'));
+    const fix = d.fixes.find((f) => f.number === 3)!; // open, no events of its own
+    const check = 'c0000000-0000-4000-8000-000000000005';
+    d.fix_events.push(
+      kind === 'marked_done'
+        ? {
+            id: 'b0000000-0000-4000-8000-0000000000f0',
+            fix_id: fix.id,
+            at: '2026-10-29T12:42:15Z',
+            kind,
+            by_seat_id: null,
+          }
+        : {
+            id: 'b0000000-0000-4000-8000-0000000000f0',
+            fix_id: fix.id,
+            at: '2026-10-29T12:42:15Z',
+            kind,
+            check_id: check,
+          },
+    );
+    const v = viewAt(d, { accountId: BAD_ACCOUNT, now: '2026-10-29T13:00:00Z' });
+    const seen = v.d.fixes.find((f) => f.id === fix.id)!;
+    expect(seen.status).toBe(status);
+    expect(() => FixtureDatasetSchema.parse(v.d)).not.toThrow();
+  });
+});
+
 describe('the primary site and its result checks', () => {
   const d = fixture('bad-site');
   const v = viewAt(d, { accountId: BAD_ACCOUNT, now: d.as_of });
