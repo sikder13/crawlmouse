@@ -1,14 +1,14 @@
 /**
  * A1: the second grade is AI readability everywhere in v2. No v2 source or fixture names "AI
- * visibility" or "AI readiness" in any spelling, outside the specifiers of imports from v1 modules,
- * whose names stay.
+ * visibility" or "AI readiness" in any spelling, outside the specifiers of imports and `vi.mock`
+ * calls that name v1 modules, whose names stay.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const OLD_NAME = /ai[\s_-]*(?:visibility|readiness)/i;
-/** `from '…'` and `import('…')` specifiers: paths of v1 modules, which keep their names. */
-const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*)(['"])[^'"]*\1/g;
+/** `from '…'`, `import('…')` and `vi.mock('…')` specifiers: paths of v1 modules, which keep their names. */
+const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bvi\.(?:do)?[mM]ock\s*\(\s*)(['"])[^'"]*\1/g;
 
 export function oldNamesIn(source: string): string[] {
   return source
@@ -52,5 +52,11 @@ describe('v2 names the grade AI readability', () => {
     }
     expect(oldNamesIn(`import { X } from '../analysis/ai-readiness/constants.js';`)).toEqual([]);
     expect(oldNamesIn(`const m = await import('../analysis/ai-readiness/x.js');`)).toEqual([]);
+    expect(oldNamesIn(`vi.mock('../analysis/ai-readiness/x.js', async () => ({}));`)).toEqual([]);
+    expect(oldNamesIn(`vi.doMock("../analysis/ai-readiness/x.js");`)).toEqual([]);
+    // only the specifier is left out: an old name elsewhere on the same line is still found
+    expect(
+      oldNamesIn(`vi.mock('../analysis/ai-readiness/x.js', () => ({ aiReadiness: 1 }));`),
+    ).toHaveLength(1);
   });
 });
