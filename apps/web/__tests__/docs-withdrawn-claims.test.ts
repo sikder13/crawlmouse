@@ -69,6 +69,16 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'so it drops the crawler changes whose summaries describe the old ones',
+    withdrawnIn:
+      'docs/specs/v2/26-dashboard-site.md (Known gaps), CC-26 review round 2 (correctness and tests)',
+    truth:
+      'The verdict guard’s account-screen property keeps each crawler change, with a neutral ' +
+      'summary in place of one that describes the old verdict, and counts the runs that reach a ' +
+      'crawler change opened on a verdict that is not a block.',
+    allowedIn: [],
+  },
+  {
     text: 'to a redirect chain marks every page that carries it',
     withdrawnIn:
       'docs/specs/v2/17-content-and-grade.md (Technical SEO), owner ruling of 2026-11-05 (second set)',

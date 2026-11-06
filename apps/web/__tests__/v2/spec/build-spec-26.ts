@@ -173,7 +173,7 @@ function rulesSection(): string {
       ],
     ),
     '',
-    `Fields \`viewAt\` keeps as the fixture’s \`as_of\` has them, because the contract records no date for a change to them (\`NOT_ROLLED_BACK\`, \`lib/v2/view/account.ts\`): ${NOT_ROLLED_BACK.map(code).join(', ')}. Day 0 shows these as they stand at \`as_of\`.`,
+    `Fields \`viewAt\` keeps as the fixture’s \`as_of\` has them, because the contract records no date for a change to them. The list is written by hand from reading the contract, not derived from it (\`NOT_ROLLED_BACK\`, \`lib/v2/view/account.ts\`): ${NOT_ROLLED_BACK.map(code).join(', ')}. Day 0 shows these as they stand at \`as_of\`.`,
     '',
     'The rail’s counts are left out of the lock comparisons with the rest of the rail’s links (`nav[aria-label="Primary"]`, as on every v2 screen); `dashboard.test.tsx` checks the links’ order against the artboards and the counts against the view model. On Final-Dashboard the artboard reads “Changes 2 new”, the build “3 new”: the window holds two opened changes and one resolved.',
   ].join('\n');
@@ -293,7 +293,7 @@ function wiringSection(): string {
 /** What this step leaves open, each in a sentence. */
 export const KNOWN_GAPS_26 = [
   'Visual baselines for the new pages are drawn on CI’s Linux runner (the visual job uploads them when a baseline is missing) and committed from that artifact; none is drawn on a workstation.',
-  'A change’s title is the change record’s own summary. The verdict guard’s account-screen property replaces verdicts at random, so it drops the crawler changes whose summaries describe the old ones; on the fixtures the titles are checked as they are.',
+  'A change’s title is the change record’s own summary. The verdict guard’s account-screen property replaces verdicts at random, so it keeps the crawler changes with a neutral summary (“<crawler> changed on <host>”) rather than ones that describe the old verdicts; the titles as written are checked on the fixtures as given.',
   'The SVG chart’s own labels are hidden from assistive technology and not read by the verdict guard; its table, which is read, carries the same values.',
   'There is no perturbation sweep (CC-22’s `INVENTORY`) for these screens: their fields are pinned by values worked out by hand from the fixtures and by the lock comparisons.',
   'Text the locked pages hide on a phone (the trial card’s note, a fix’s note, the first-run fixes’ effort) is hidden here too, from screen readers as well; at 175% zoom on a desktop it is gone for sighted readers. The artboards decide it; the owner rules on it (accessibility review, round 1).',
@@ -302,6 +302,8 @@ export const KNOWN_GAPS_26 = [
   'The fixes table writes one row’s effect as “+4 SEO” and the grouped row’s as “+7 Technical SEO together”: the grouped wording is the segment pages’ (`groupPoints`), kept so one rule words a group.',
   'States the previews do not reach: a site with no finished check opens no site page (`siteView` throws), and an account with no site has no dashboard (`primarySite` throws). CC-26b decides them with the routes.',
   'The property tests vary the moment over the fixtures’ own records. A refused Technical SEO score, and a site added between two checks of the primary site, are in no fixture and are not reached; the rules for them are read from the code.',
+  'The clean previews read Schedule “not scheduled” for a Free account’s only site, where GATES.free.schedule and FACTS l.31 say monthly. The stand-in Free account adopts an audit no account kept, which has no schedule, and `viewAt` keeps a site’s schedule as the fixture has it (`NOT_ROLLED_BACK`). A real Free account’s first site carries its monthly schedule; CC-26b reads it from the site record.',
+  'The withheld site page’s one orange action is long: “Open the OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot packet · AI not yet estimated”, about 100 characters, wrapping in a phone header. It is computed from the fix and true; shortening it (“Open fix 1’s packet”) is left to the owner (design review, round 2).',
 ];
 
 function gapsSection(): string {
