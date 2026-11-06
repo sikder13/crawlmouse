@@ -30,7 +30,7 @@ vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn() }));
 import { GET, POST } from './route';
 
 const ORIGIN = 'https://crawlmouse.com';
-const TOKEN = 'tok_7f3a9c0e5b2d4a18';
+const CANARY = 'link-canary-one';
 const USER = {
   id: 'u1',
   email: 'ada@example.com',
@@ -54,7 +54,7 @@ function post(
   });
 }
 
-const otp = (value = TOKEN) => JSON.stringify({ kind: 'token_hash', value, type: 'magiclink' });
+const otp = (value = CANARY) => JSON.stringify({ kind: 'token_hash', value, type: 'magiclink' });
 
 function setCookies(res: Response): string[] {
   return res.headers.getSetCookie();
@@ -72,7 +72,9 @@ beforeEach(() => {
 
 describe('GET /login/verify renders, never verifies', () => {
   it('moves the token into a one-shot cookie and sends the browser to a page whose URL has no token', async () => {
-    const res = await GET(new Request(`${ORIGIN}/login/verify?token_hash=${TOKEN}&type=magiclink`));
+    const res = await GET(
+      new Request(`${ORIGIN}/login/verify?token_hash=${CANARY}&type=magiclink`),
+    );
     expect(verifyOtp).not.toHaveBeenCalled();
     expect(exchangeCodeForSession).not.toHaveBeenCalled();
     expect(res.status).toBe(303);
@@ -89,7 +91,7 @@ describe('GET /login/verify renders, never verifies', () => {
   it('marks the cookie Secure in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     try {
-      const res = await GET(new Request(`${ORIGIN}/login/verify?token_hash=${TOKEN}`));
+      const res = await GET(new Request(`${ORIGIN}/login/verify?token_hash=${CANARY}`));
       expect(setCookies(res).find((c) => c.startsWith('cm_auth_otp='))).toMatch(/Secure/);
     } finally {
       vi.unstubAllEnvs();
@@ -127,7 +129,7 @@ describe('POST /login/verify verifies', () => {
       post({ cm_auth_otp: otp() }, { origin: 'null', 'sec-fetch-site': 'same-origin' }),
     );
     expect(res.status).toBe(303);
-    expect(verifyOtp).toHaveBeenCalledWith({ token_hash: TOKEN, type: 'magiclink' });
+    expect(verifyOtp).toHaveBeenCalledWith({ token_hash: CANARY, type: 'magiclink' });
   });
 
   it('signs in, consumes the token cookie, and lands on /dashboard with no-store', async () => {
@@ -249,7 +251,7 @@ describe('POST /login/verify verifies', () => {
       next: '/dashboard',
       events: [{ name: 'trial_started', props: { kind: 'pro', variant: 'no_card' } }],
     });
-    expect(JSON.stringify(body)).not.toContain(TOKEN);
+    expect(JSON.stringify(body)).not.toContain(CANARY);
     expect(res.headers.get('Cache-Control')).toContain('no-store');
   });
 

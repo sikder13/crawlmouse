@@ -12,7 +12,7 @@ import type { AddressInfo } from 'node:net';
 import { COOKIES } from '../../../lib/auth/constants';
 import { sentryServerOptions } from '../../../lib/auth/sentry-scrub';
 
-export const TOKEN = 'pkce_LEAKCANARY_77';
+const CANARY = 'pkce_LEAKCANARY_77';
 
 type SentryNext = {
   init: (o: Record<string, unknown>) => void;
@@ -52,7 +52,7 @@ async function capturedWith(options: Record<string, unknown>): Promise<string> {
   await new Promise<void>((r) => server.listen(0, r));
   port = (server.address() as AddressInfo).port;
   const otp = encodeURIComponent(
-    JSON.stringify({ kind: 'token_hash', value: TOKEN, type: 'magiclink' }),
+    JSON.stringify({ kind: 'token_hash', value: CANARY, type: 'magiclink' }),
   );
   const cookie = [
     `${COOKIES.otp}=${otp}`,

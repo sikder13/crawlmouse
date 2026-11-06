@@ -10,14 +10,14 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const TOKEN = 'tok_LEAKCANARY_9d1e7c3b5a';
+const CANARY = 'tok_LEAKCANARY_9d1e7c3b5a';
 
 vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => ({
     auth: {
       verifyOtp: async ({ token_hash }: { token_hash: string }) =>
-        token_hash === TOKEN
+        token_hash === CANARY
           ? {
               data: {
                 user: {
@@ -81,7 +81,7 @@ describe('the sign-in token', () => {
 
     // 1. The email link.
     const landing = await GET(
-      new Request(`${ORIGIN}/login/verify?token_hash=${TOKEN}&type=magiclink`),
+      new Request(`${ORIGIN}/login/verify?token_hash=${CANARY}&type=magiclink`),
     );
     const location = landing.headers.get('location')!;
     seen.push(location);

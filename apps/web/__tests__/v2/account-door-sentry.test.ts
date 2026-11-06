@@ -14,7 +14,7 @@ import { scrubDoorSecrets } from '../../lib/auth/sentry-scrub';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-const TOKEN = 'pkce_LEAKCANARY_77';
+const CANARY = 'pkce_LEAKCANARY_77';
 
 // The @sentry/core that @sentry/nextjs itself loads: the copy production runs.
 const fromNextjs = createRequire(createRequire(import.meta.url).resolve('@sentry/nextjs'));
@@ -25,7 +25,7 @@ const { httpHeadersToSpanAttributes } = fromNextjs('@sentry/core') as {
 describe('Sentry span attributes', () => {
   it('filter every door cookie by name, with the repo setting sendDefaultPii=false', () => {
     const door = [COOKIES.otp, COOKIES.signup, COOKIES.device];
-    const header = door.map((n) => `${n}=${TOKEN}`).join('; ');
+    const header = door.map((n) => `${n}=${CANARY}`).join('; ');
     const attrs = httpHeadersToSpanAttributes({ cookie: header }, false);
     for (const name of door) {
       expect(attrs[`http.request.header.cookie.${name}`], name).toBe('[Filtered]');
@@ -45,17 +45,17 @@ describe('Sentry span attributes', () => {
 
 describe('scrubDoorSecrets', () => {
   const event = () => ({
-    transaction: `GET /login/verify?token_hash=${TOKEN}&type=magiclink`,
+    transaction: `GET /login/verify?token_hash=${CANARY}&type=magiclink`,
     request: {
-      url: `https://crawlmouse.com/login/verify?token_hash=${TOKEN}&type=magiclink`,
-      query_string: `token_hash=${TOKEN}&type=magiclink`,
+      url: `https://crawlmouse.com/login/verify?token_hash=${CANARY}&type=magiclink`,
+      query_string: `token_hash=${CANARY}&type=magiclink`,
       cookies: { post_login_next: '/api/checks/abc/claim?then=/dashboard', other: 'kept' },
     },
-    contexts: { trace: { data: { 'http.target': `/login/verify?code=${TOKEN}` } } },
+    contexts: { trace: { data: { 'http.target': `/login/verify?code=${CANARY}` } } },
     spans: [
       {
         data: {
-          'http.url': `https://crawlmouse.com/login/verify?type=magiclink&token_hash=${TOKEN}`,
+          'http.url': `https://crawlmouse.com/login/verify?type=magiclink&token_hash=${CANARY}`,
           'http.request.header.cookie.post_login_next': '/api/checks/abc/claim',
           'http.method': 'GET',
         },
@@ -82,10 +82,10 @@ describe('scrubDoorSecrets', () => {
   });
 
   it.each([
-    [`/x?next=%2Flogin%2Fverify%3Ftoken_hash%3D${TOKEN}%26type%3Dmagiclink`],
-    [`/login/verify?TOKEN_HASH=${TOKEN}`],
-    [`a=1;token_hash=${TOKEN}`],
-    [`/login/verify?code=${TOKEN}#x`],
+    [`/x?next=%2Flogin%2Fverify%3Ftoken_hash%3D${CANARY}%26type%3Dmagiclink`],
+    [`/login/verify?TOKEN_HASH=${CANARY}`],
+    [`a=1;token_hash=${CANARY}`],
+    [`/login/verify?code=${CANARY}#x`],
   ])('replaces the token in %s', (url) => {
     expect(scrubDoorSecrets({ url }).url).not.toContain('LEAKCANARY');
   });
