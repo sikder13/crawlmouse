@@ -10,7 +10,7 @@
 --     function is in those three schemas, and the grants to the roles below and to PUBLIC;
 --   - the roles the migrations create and the client roles (anon, authenticated, service_role,
 --     authenticator): attributes, settings (values as md5s), and memberships with their admin,
---     inherit and set options, except memberships whose member is in SUPABASE_MANAGED_MEMBERS;
+--     inherit and set options, except the memberships listed in SUPABASE_MANAGED_MEMBERS;
 --   - default privileges for all schemas or for the three above; the names of schemas other than
 --     Supabase's own and those an extension creates; the tables of the three schemas in each
 --     publication; and storage bucket rows.
@@ -57,14 +57,19 @@ cross join lateral (
     select oid, nspname from pg_namespace where nspname in ('storage', 'auth')
   ),
   extension_members as (select objid from pg_depend where deptype = 'e'),
-  -- SUPABASE_MANAGED_MEMBERS: roles whose memberships Supabase grants when it creates a project,
-  -- left out of the roles section by the member's exact name. Measured: production held no
-  -- membership with supabase_realtime_admin as the member (2026-11-06 UTC), and a branch created
-  -- from it the same day held three, of anon, authenticated and service_role
-  -- (docs/ops/db-migrations.md §5 has the query). Only the membership lines are left out: a role
-  -- listed here that owns a table, view, sequence or function, or holds a grant on one, in the
-  -- schemas above is still read. (No section records the owner of a type, for any role.)
-  supabase_managed_members(rolname) as (values ('supabase_realtime_admin')),
+  -- SUPABASE_MANAGED_MEMBERS: memberships Supabase grants when it creates a project, left out of
+  -- the roles section. Each entry is matched exactly: the role, the member, and the admin,
+  -- inherit and set options. Measured: production held no membership with
+  -- supabase_realtime_admin as the member (2026-11-06 UTC), and a branch created from it the same
+  -- day held these three (docs/ops/db-migrations.md §5 has the query). Any other membership by
+  -- supabase_realtime_admin, or one of these with other options, is read. So is that role owning
+  -- a table, view, sequence or function, or holding a grant on one, in the schemas above. (No
+  -- section records the owner of a type, for any role.)
+  supabase_managed_members(role_name, member_name, admin_option, inherit_option, set_option) as (
+    values ('anon', 'supabase_realtime_admin', false, false, true),
+           ('authenticated', 'supabase_realtime_admin', false, false, true),
+           ('service_role', 'supabase_realtime_admin', false, false, true)
+  ),
   watched_roles as (
     select oid, rolname from pg_roles
     where (rolname !~ '^(pg_|supabase_|cli_login_)'
@@ -251,7 +256,11 @@ cross join lateral (
              m.inherit_option, m.set_option)
     from pg_auth_members m
     where (m.roleid in (select oid from watched_roles) or m.member in (select oid from watched_roles))
-      and pg_get_userbyid(m.member) not in (select rolname from supabase_managed_members)
+      and not exists (
+        select 1 from supabase_managed_members s
+        where s.role_name = pg_get_userbyid(m.roleid) and s.member_name = pg_get_userbyid(m.member)
+          and s.admin_option = m.admin_option and s.inherit_option = m.inherit_option
+          and s.set_option = m.set_option)
 
     union all
     select 'schemas', n.nspname::text

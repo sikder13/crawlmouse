@@ -7,7 +7,6 @@ import {
   readFingerprint,
   type Fingerprint,
 } from './fingerprint';
-import { failed, runChecks } from './check';
 import { migratedDb, partitionOf, pgliteDb, withRollback } from './test-support';
 
 const SECTIONS = [
@@ -230,11 +229,10 @@ describe('each section detects a change of its own kind, and names it', () => {
   });
 });
 
-describe('SUPABASE_MANAGED_MEMBERS: memberships Supabase grants a new branch', () => {
+describe('SUPABASE_MANAGED_MEMBERS: the three memberships Supabase grants a new branch', () => {
   // What a branch built on 2026-11-06 held and production did not (docs/ops/db-migrations.md §5).
-  const GRANT_AS_ON_A_BRANCH =
-    'create role supabase_realtime_admin noinherit; ' +
-    'grant anon, authenticated, service_role to supabase_realtime_admin with inherit false';
+  const CREATE = 'create role supabase_realtime_admin noinherit';
+  const GRANT_AS_ON_A_BRANCH = `${CREATE}; grant anon, authenticated, service_role to supabase_realtime_admin with inherit false`;
   const MANAGED_LINES = ['anon', 'authenticated', 'service_role'].map(
     (r) => `supabase_realtime_admin member of ${r} admin=f inherit=f set=t`,
   );
@@ -248,12 +246,10 @@ describe('SUPABASE_MANAGED_MEMBERS: memberships Supabase grants a new branch', (
     expect(compareFingerprints(base, after)).toEqual([]);
   });
 
-  it('the exclusion list is what hides them: without its entry the three lines show', async () => {
-    const unlisted = fingerprintSql().replace(
-      "values ('supabase_realtime_admin')",
-      "values ('zz_no_such_role')",
-    );
-    expect(unlisted).not.toEqual(fingerprintSql());
+  it('the list is what hides them: without its entries the three lines show', async () => {
+    const entry = "'supabase_realtime_admin', false, false, true)";
+    const unlisted = fingerprintSql().replaceAll(entry, "'zz_no_such_role', false, false, true)");
+    expect(fingerprintSql().split(entry)).toHaveLength(4);
     const [without, after] = await withRollback(db, async (tx) => {
       const before = await readFingerprint(tx, unlisted);
       await tx.exec(GRANT_AS_ON_A_BRANCH);
@@ -263,7 +259,70 @@ describe('SUPABASE_MANAGED_MEMBERS: memberships Supabase grants a new branch', (
     expect(roleLines(after).filter((l) => !roleLines(without).includes(l))).toEqual(MANAGED_LINES);
   });
 
-  // The list matches the member's name exactly; vary the name to show nothing near it is hidden.
+  // Each entry is a role, a member and three options, matched exactly. Vary each one: any other
+  // membership by supabase_realtime_admin, and the same membership with other options, is seen.
+  it.each([
+    [
+      'of crawl_worker',
+      'grant crawl_worker to supabase_realtime_admin with inherit false',
+      'supabase_realtime_admin member of crawl_worker admin=f inherit=f set=t',
+    ],
+    [
+      'of research_retention',
+      'grant research_retention to supabase_realtime_admin with inherit false',
+      'supabase_realtime_admin member of research_retention admin=f inherit=f set=t',
+    ],
+    [
+      'of authenticator',
+      'grant authenticator to supabase_realtime_admin with inherit false',
+      'supabase_realtime_admin member of authenticator admin=f inherit=f set=t',
+    ],
+    [
+      'of service_role with the admin option',
+      'grant service_role to supabase_realtime_admin with admin true, inherit false',
+      'supabase_realtime_admin member of service_role admin=t inherit=f set=t',
+    ],
+    [
+      'of service_role with inherit',
+      'grant service_role to supabase_realtime_admin with inherit true',
+      'supabase_realtime_admin member of service_role admin=f inherit=t set=t',
+    ],
+    [
+      'of service_role without set',
+      'grant service_role to supabase_realtime_admin with inherit false, set false',
+      'supabase_realtime_admin member of service_role admin=f inherit=f set=f',
+    ],
+  ])(
+    'a membership by supabase_realtime_admin %s changes the roles section',
+    async (_l, grant, line) => {
+      const after = await withRollback(db, async (tx) => {
+        await tx.exec(`${CREATE}; ${grant}`);
+        return readFingerprint(tx);
+      });
+      expect(differingSections(base, after)).toEqual(['roles']);
+      expect(roleLines(after)).toContain(line);
+    },
+  );
+
+  // Vary the role's name: a role near anon is not one of the three.
+  it.each(['anon_2', 'xanon', '"Anon"', '"anon "'])(
+    'supabase_realtime_admin as a member of %s still shows',
+    async (role) => {
+      const after = await withRollback(db, async (tx) => {
+        await tx.exec(
+          `create role ${role}; ${CREATE}; grant ${role} to supabase_realtime_admin with inherit false`,
+        );
+        return readFingerprint(tx);
+      });
+      expect(differingSections(base, after)).toEqual(['roles']);
+      const name = role.replace(/"/g, '');
+      expect(roleLines(after)).toContain(
+        `supabase_realtime_admin member of ${name} admin=f inherit=f set=t`,
+      );
+    },
+  );
+
+  // Vary the member's name: a role near supabase_realtime_admin is not it.
   it.each([
     'zz_invented_member',
     'supabase_realtime_admin_2',
@@ -324,7 +383,7 @@ describe('SUPABASE_MANAGED_MEMBERS: memberships Supabase grants a new branch', (
       ['acls', 'functions'],
     ],
   ])(
-    'the exclusion is by member name only: supabase_realtime_admin %s is still seen',
+    'only membership lines are left out: supabase_realtime_admin %s is still seen',
     async (_label, mutation, sections) => {
       const after = await withRollback(db, async (tx) => {
         await tx.exec(`${GRANT_AS_ON_A_BRANCH}; ${mutation}`);
@@ -333,22 +392,6 @@ describe('SUPABASE_MANAGED_MEMBERS: memberships Supabase grants a new branch', (
       expect(differingSections(base, after)).toEqual(sections);
     },
   );
-
-  // The cost of excluding by name, stated in docs/ops/db-migrations.md §5. If the list is narrowed
-  // to the observed memberships, these go red and that paragraph needs rewriting.
-  it.each([
-    'grant crawl_worker to supabase_realtime_admin',
-    'grant research_retention to supabase_realtime_admin',
-    'grant authenticator to supabase_realtime_admin',
-    'grant service_role to supabase_realtime_admin with admin true',
-  ])('what the list costs: %s is not seen, by the fingerprint or the checks', async (mutation) => {
-    const [after, checks] = await withRollback(db, async (tx) => {
-      await tx.exec(`create role supabase_realtime_admin noinherit; ${mutation}`);
-      return [await readFingerprint(tx), await runChecks(tx)] as const;
-    });
-    expect(compareFingerprints(base, after)).toEqual([]);
-    expect(failed(checks)).toBe(false);
-  });
 });
 
 describe('formatDifferences', () => {

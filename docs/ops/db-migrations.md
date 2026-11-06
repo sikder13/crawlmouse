@@ -295,24 +295,19 @@ where m.rolname = 'supabase_realtime_admin'
 order by r.rolname;
 ```
 
-`fingerprint.sql` now leaves them out through `SUPABASE_MANAGED_MEMBERS`, a list of member role
-names matched exactly, holding `supabase_realtime_admin` alone
-(`grep -n 'supabase_managed_members(rolname)' infra/supabase/checks/fingerprint.sql`). Only
-membership lines with a listed member are left out: `supabase_realtime_admin` granted to another
-role, owning a table or function, or holding a grant on one still shows; the tests use objects in
-`public`
+`fingerprint.sql` now leaves out exactly those three memberships, through `SUPABASE_MANAGED_MEMBERS`:
+a list of entries, each a role, a member and the admin, inherit and set options as the branch held
+them, matched exactly
+(`grep -n -A4 'supabase_managed_members(role_name' infra/supabase/checks/fingerprint.sql`). Any
+other membership by `supabase_realtime_admin` changes the `roles` section: of `crawl_worker`,
+`research_retention` or `authenticator`, of `service_role` with the admin option, with inherit, or
+without set, and of a role whose name is near one of the three. So does `supabase_realtime_admin`
+granted to another role, owning a table or function, or holding a grant on one; the tests use
+objects in `public`
 (`pnpm --filter @crawlmouse/scripts exec vitest run db/fingerprint.test.ts -t SUPABASE_MANAGED_MEMBERS`).
-
-What the list costs: a membership _by_ `supabase_realtime_admin` is unseen whichever role it is
-of, including `crawl_worker`, `research_retention`, `authenticator`, and `service_role` with the
-admin option
-(`pnpm --filter @crawlmouse/scripts exec vitest run db/fingerprint.test.ts -t 'what the list costs'`).
-The checks in §6 do not see it either. `03-worker-roles-no-login.sql` is the only one that queries
-memberships directly (`grep -ln 'pg_has_role\|pg_auth_members' infra/supabase/checks/0*.sql`),
-and it asks what the worker roles are members of, not who is a member of them. Checks 01, 04 and 06
-test the effective privileges of the roles they name, which a membership granted _to_
-`supabase_realtime_admin` does not change. Listing the three observed memberships instead
-of the member's name would close this; the list is by name as the owner ruled.
+If Supabase changes what it grants a new branch, the dry run fails on the `roles` section and
+names the lines; an entry is added only on the evidence above: no rows on production, rows on a
+fresh branch.
 
 On 2026-11-06 production was read through the read-only endpoint with this file and with the one
 at `796199b6` (`readFingerprint` with each file's text, then `compareFingerprints`); no section
