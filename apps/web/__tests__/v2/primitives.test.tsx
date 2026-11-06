@@ -403,6 +403,25 @@ describe('Card', () => {
   });
 });
 
+describe('Table, with its headers hidden', () => {
+  it('keeps every column named for a screen reader and draws no header row', () => {
+    const out = html(
+      <Table
+        label="Fixes"
+        headersHidden
+        columns={[{ header: 'No.' }, { header: 'Fix' }]}
+        rows={[{ key: 'a', cells: ['1', 'Link the orphans'] }]}
+      />,
+    );
+    expect(out).toMatch(
+      /<thead class="[^"]+"><tr><th scope="col"[^>]*>No\.<\/th><th scope="col"[^>]*>Fix<\/th>/,
+    );
+    expect(html(<Table label="x" columns={[{ header: 'a' }]} rows={[]} />)).toContain(
+      '<thead><tr>',
+    );
+  });
+});
+
 describe('Table', () => {
   const out = html(
     <Table
