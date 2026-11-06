@@ -140,6 +140,23 @@ describe('POST /login/verify verifies', () => {
     expect(setCookies(res).find((c) => c.startsWith('cm_auth_otp='))).toMatch(/Max-Age=0/);
   });
 
+  it('a new account’s link keeps its type through the cookie: GET then POST verifies as signup', async () => {
+    // The Confirm-signup template links with type=signup (scripts/supabase/auth-config.ts); a carry
+    // that dropped or defaulted the type would verify a signup token as magiclink.
+    const got = await GET(new Request(`${ORIGIN}/login/verify?token_hash=${CANARY}&type=signup`));
+    const carried = setCookies(got).find((c) => c.startsWith('cm_auth_otp='))!;
+    const pair = carried.split(';')[0]!;
+    const res = await POST(
+      new Request(`${ORIGIN}/login/verify`, {
+        method: 'POST',
+        headers: { cookie: pair, origin: ORIGIN },
+      }),
+    );
+    expect(res.status).toBe(303);
+    expect(verifyOtp).toHaveBeenCalledTimes(1);
+    expect(verifyOtp).toHaveBeenCalledWith({ token_hash: CANARY, type: 'signup' });
+  });
+
   it('exchanges a carried PKCE code', async () => {
     await POST(post({ cm_auth_otp: JSON.stringify({ kind: 'code', value: 'pkce_123' }) }));
     expect(exchangeCodeForSession).toHaveBeenCalledWith('pkce_123');
