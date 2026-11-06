@@ -44,6 +44,11 @@ export const FUNNEL_EVENTS = [
   // §10 — the AI section on a shared public report. Distinct from `ai_score_revealed` (the audit page):
   // this one measures the VIRAL surface, where the viewer is usually not the site owner.
   'ai_report_section_viewed',
+  // CC-25 — the account door. Fired by the Continue page after the sign-in POST answers, through
+  // track(), so a visitor's consent decision applies: `trial_started {kind, variant}` when the first
+  // login starts the no-card Pro trial, `site_added {n}` when it attaches the named first site.
+  'trial_started',
+  'site_added',
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];
