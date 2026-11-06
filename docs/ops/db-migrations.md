@@ -274,8 +274,8 @@ rows the branch did not replay:
 - the older `public.apply_entitlement_transition(...)`: the row for 006b, which replaces it, holds
   only a comment.
 
-The `roles` section is the exception, and the repair does not clear it. The branch holds three
-memberships production does not:
+The `roles` section also held three lines that no history row explains, and that the repair would
+not have cleared. The branch held three memberships production did not:
 
 ```text
 + supabase_realtime_admin member of anon admin=f inherit=f set=t
@@ -283,14 +283,52 @@ memberships production does not:
 + supabase_realtime_admin member of service_role admin=f inherit=f set=t
 ```
 
-Production has no membership involving `supabase_realtime_admin` (read 2026-11-06:
-`select count(*) from pg_auth_members a join pg_roles m on m.oid = a.member where m.rolname =
-'supabase_realtime_admin'` returns 0). Supabase granted them when it created the branch, and
-nothing in the repair touches roles, so the next branch is expected to carry them and fail here
-again. Until the fingerprint leaves out memberships Supabase grants to its own roles, the dry run
-cannot pass; this is open, and the pull request that added this tooling says so. The other five `roles` lines are
-`crawl_worker`, `research_retention` and their memberships, which the branch lacks because their
-migrations were not replayed.
+Supabase granted them when it created the branch. On production this query returned no rows
+(2026-11-06 UTC); run it on production and on a branch to re-measure:
+
+```sql
+select m.rolname as member, r.rolname as role, a.admin_option, a.inherit_option, a.set_option
+from pg_auth_members a
+join pg_roles m on m.oid = a.member
+join pg_roles r on r.oid = a.roleid
+where m.rolname = 'supabase_realtime_admin'
+order by r.rolname;
+```
+
+`fingerprint.sql` now leaves them out through `SUPABASE_MANAGED_MEMBERS`, a list of member role
+names matched exactly, holding `supabase_realtime_admin` alone. Only membership lines with a listed
+member are left out: `supabase_realtime_admin` granted to another role, owning an object, or
+holding a grant in `public`, `research` or `partitions` still shows
+(`pnpm --filter @crawlmouse/scripts exec vitest run db/fingerprint.test.ts -t SUPABASE_MANAGED_MEMBERS`).
+Read from production on 2026-11-06 through the read-only endpoint, `compareFingerprints` found no
+difference between this file and the one at `796199b6`. A role added to the list needs the same
+evidence: zero rows on production, rows on a fresh branch.
+
+**The dry run again, with the list.** On a new branch, from commit `a085de0c`, with
+`pnpm exec tsx db/dry-run.ts --branch cc-db-ops-live-2`. Its summary, unedited:
+
+```text
+### Migration dry run: FAILED
+
+Commit `a085de0c`, Supabase branch `cc-db-ops-live-2`, finished 2026-11-06T02:27:51.587Z.
+
+| Step | Result |
+| --- | --- |
+| Create the branch from production | branch pywmdmterbvdisgghzxr |
+| Branch fingerprint equals the production fingerprint | FAILED: sections differ: acls (0 only on the branch, 1033 only on production), buckets (0 only on the branch, 3 only on production), columns (1 only on the branch, 456 only on production), constraints (1 only on the branch, 314 only on production), default_acls (0 only on the branch, 24 only on production), functions (1 only on the branch, 36 only on production), indexes (0 only on the branch, 110 only on production), policies (0 only on the branch, 22 only on production), relations (0 only on the branch, 30 only on production), rls (0 only on the branch, 30 only on production), roles (0 only on the branch, 5 only on production), schemas (0 only on the branch, 2 only on production), triggers (0 only on the branch, 24 only on production); the lines are in the job log |
+
+Files applied, with the sha256 of the bytes production will receive:
+
+_No migration files were pending._
+
+Rollback files run:
+
+_No rollback file was run._
+```
+
+The `roles` section now holds no line only on the branch. Its five lines only on production are
+`crawl_worker` and `research_retention` with their memberships, which 007 and 006b create and whose
+history rows hold only a comment. The other sections' counts match the first run's summary above.
 
 ## 6. The checks
 
