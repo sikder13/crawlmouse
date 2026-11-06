@@ -1,0 +1,39 @@
+<!doctype html>
+<!--
+  A page that tries each request the render must refuse. Every attempt carries
+  data-attempt (what it is) and data-url (the URL the browser would request), so
+  the policy test reads the attempts from this file rather than from a list
+  written beside it.
+-->
+<html>
+  <head>
+    <title>Hostile page</title>
+  </head>
+  <body>
+    <h1>Ordinary heading</h1>
+    <p>Ordinary text, so the page has words of its own.</p>
+    <iframe data-attempt="file" data-url="file:///etc/passwd" src="file:///etc/passwd"></iframe>
+    <img
+      data-attempt="metadata"
+      data-url="http://169.254.169.254/latest/meta-data/"
+      src="http://169.254.169.254/latest/meta-data/"
+      alt=""
+    />
+    <script
+      data-attempt="mapped-loopback"
+      data-url="http://[::ffff:127.0.0.1]/payload.js"
+      src="http://[::ffff:127.0.0.1]/payload.js"
+    ></script>
+    <a data-attempt="download" data-url="https://hostile.example/files/report.zip" href="/files/report.zip" download
+      >Report</a
+    >
+    <script
+      data-attempt="websocket"
+      data-url="wss://hostile.example/socket"
+      data-resource-type="websocket"
+    >
+      new WebSocket('wss://hostile.example/socket');
+      location.href = '/files/report.zip';
+    </script>
+  </body>
+</html>

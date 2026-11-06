@@ -269,6 +269,71 @@ applying (Fly says 5 to 10 minutes): re-run the job. If it ends with "could not 
 seen", read the error lines: the token may not be allowed to open an SSH console (take the reading
 above by hand with an organisation token), or the machine may not be running.
 
+## Browser Run: the render token, limits and cost
+
+The render step (CC-14, `docs/specs/v2/14-render.md`) calls Cloudflare Browser Run's REST `/content`
+endpoint. It is not part of the worker; it runs in whichever process the pipeline (CC-20) gives it,
+and reads these from that process's environment:
+
+- `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account's id.
+- `CLOUDFLARE_BROWSER_RENDERING_TOKEN`: an API token scoped to that account with the one permission
+  `Browser Run - Edit`, as Cloudflare's Quick Actions page named it on 2026-11-05 (Cloudflare
+  dashboard, My Profile, API Tokens, Create Custom Token). Nothing else.
+- `RENDER_MAX_BROWSER_SECONDS_PER_CHECK` and `RENDER_MAX_BROWSER_SECONDS_PER_DAY`: whole seconds.
+  Unset or invalid reads as zero, and zero renders nothing. A page reserves 90 s (two renders at the
+  45 s request timeout) from its check's allowance before it starts, so a cap under 90 renders
+  nothing, and a check has about `cap / 90` pages rendering at once, at most the in-flight limit.
+- `RENDER_MAX_IN_FLIGHT`: requests one check keeps open at once, a whole number from 1 to 10. Unset
+  or anything else reads as 2.
+
+A check asks the day's budget once, before any page, for its allowance: the per-check cap, or 90 s
+for each page it sampled, whichever is less. When the day has less than that left, the check renders
+nothing and records `daily_cap` on each sampled page, even if a few pages would have fitted. After its
+last page the check settles once, at the browser time it counted: that gives back what it did not use,
+or adds what renders reported beyond their reservation. If that settle fails, the outcome carries
+`settle_failed`, and the day may still count the whole allowance, depending on the store.
+
+Without both credentials, or with a zero cap, a check records its sampled pages as not rendered and
+goes on; it does not fail. To stop rendering, unset the token or set either cap to `0`.
+
+Limits on Workers Paid, as Cloudflare's limits page stood on 2026-10-14 (read 2026-11-05): 30 Quick
+Actions requests per second per account, after which Browser Run answers 429; a browser closes after
+60 s without a command. The render step keeps at most 2 requests open per check unless set, up to 10
+(checks running at once each have their own). It retries a 429 no sooner than its `Retry-After`
+asks, in seconds or as a date, backs off from 2 s when it gives neither, and leaves the page
+`rate_limited` after 5 tries, or at once when asked to wait longer than 60 s.
+
+**Production rendering needs Workers Paid before CC-20 switches it on.** The account is on Workers
+Free (the owner's billing page, 2026-11-05). On Free, the same limits page gives one Quick Actions
+request every 10 s per account and 10 browser-minutes a day. Measured on 2026-11-05 with the live
+tests: a request sent at once after another was answered 429; one sent 10 s after a 429 was answered
+200; the 429s carried no `Retry-After` in seconds. Each page sends its two requests back to back, so
+a check exceeds that rate at any in-flight setting, and on Free its pages wait on 429s and can end
+`rate_limited`.
+
+Cost: $0.09 per browser-hour after the 10 browser-hours a month Workers Paid includes. Each reply
+reports its browser time in the `x-browser-ms-used` header. The step counts that against its caps and
+totals it per check as `browser_ms`, using the 45 s request timeout where a reply reports none or no
+reply came. Cloudflare's bill is on the dashboard's Browser Run page; this build has not compared it
+with `browser_ms`. Beyond
+the included hours, 200 counted browser-seconds is about $0.005. A check can end above its cap by
+what renders in flight report beyond their reservation.
+
+To rotate the token: create the new one, set it where the old one is set, redeploy that process, then
+delete the old one in the dashboard.
+
+### Running the render tests
+
+Run one test file at a time, from `packages/engine`:
+`timeout -s KILL 150 node node_modules/vitest/vitest.mjs run src/v2/render/<file>.test.ts --pool=threads`.
+The live tests read the credentials from the environment, or, with `RENDER_LIVE=1`, from
+`~/.config/crawlmouse/render.env` outside the repository. Their console lines print word counts and
+probe output, not the credentials (`grep -n console.info src/v2/render/live.test.ts`):
+`RENDER_LIVE=1 timeout -s KILL 600 node node_modules/vitest/vitest.mjs run src/v2/render/live.test.ts --pool=threads`.
+
+Only ever kill processes started from your own worktree. Another session's tests may be running on
+the same machine, and killing by process name stops them too.
+
 ## What each verdict means
 
 Each tested crawler gets one verdict per sampled page, from the decision table in the spec.
