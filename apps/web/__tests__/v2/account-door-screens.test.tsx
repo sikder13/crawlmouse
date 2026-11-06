@@ -132,7 +132,15 @@ describe('Check-email', () => {
     expect(on).toContain('starts the moment you open it');
     expect(on).toContain(`about ${['zero', 'one', 'two'][FIRST_AUDIT_MINUTES]} minutes`);
     expect(off).not.toContain('starts the moment');
-    expect(off).toContain('becomes your first site when you open it');
+    expect(off).toContain('is added to your account when you open it.');
+    // With nothing running checks, no cadence and no alerts sender is promised (D6).
+    for (const html of [off, checkEmail('from-audit', 'x.com', false)]) {
+      expect(html).not.toContain('re-checked');
+      expect(html).not.toContain('alerts@');
+    }
+    expect(checkEmail('from-audit', 'x.com', true)).toContain('re-checked weekly');
+    expect(signup(false)).not.toContain('Running an audit right now?');
+    expect(signup(true)).toContain('Running an audit right now?');
     expect(signup(false)).not.toContain('first audit starts');
     expect(signup(true)).toContain('first audit starts the moment you open the sign-in link');
   });

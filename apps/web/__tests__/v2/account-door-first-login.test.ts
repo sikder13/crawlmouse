@@ -275,6 +275,23 @@ describe('runFirstLogin', () => {
     expect(await count(db, `select 1 from public.sites where account_id = $1`, [a.id])).toBe(1);
   });
 
+  it('a later sign-in that names a site attaches it, and decides no trial', async () => {
+    const i = await input('returning@example.com', {
+      emailConfirmedAt: '2026-08-01T10:00:00Z',
+      lastSignInAt: '2026-11-05T11:59:59Z',
+      signup: { site: 'another.example.com', tz: 'Asia/Kolkata' },
+    });
+    const store = pgliteDoorStore(db);
+    const priorLedger = vi.spyOn(store, 'priorLedger');
+    const r = await runFirstLogin(deps({ store }), i);
+    expect(r.trial).toBe('not_first');
+    expect(r.siteId).not.toBeNull();
+    expect(r.events).toEqual([{ name: 'site_added', props: { n: 1 } }]);
+    expect(priorLedger).not.toHaveBeenCalled();
+    // The zone is a first-login setting; a later sign-in leaves it.
+    expect((await accountOf(db, i.userId)).timezone).toBe('UTC');
+  });
+
   it('every event name it emits is a funnel event', () => {
     for (const name of ['trial_started', 'site_added']) expect(FUNNEL_EVENTS).toContain(name);
   });

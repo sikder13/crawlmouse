@@ -17,7 +17,8 @@ import { PageShell } from '../../PageShell';
 import layout from '../../layout.module.css';
 import { cadenceOf, trialDays } from '../signup/door-copy';
 import { readPending, SEND_COPY, type LinkRequest } from '../signup/send-link';
-import { useLinkSender } from '../signup/useLinkSender';
+import { useLinkSender, VERIFYING_COPY } from '../signup/useLinkSender';
+import { LiveRegion } from '../signup/LiveRegion';
 import { numberWord } from '@/lib/v2/words';
 import styles from './Door.module.css';
 
@@ -55,6 +56,12 @@ export function CheckEmailScreen({
     if (!fixedEmail) setPending(readPending());
   }, [fixedEmail]);
   const sender = useLinkSender();
+  // The page says to wait a minute before sending again, and the button waits that long.
+  const [canResend, setCanResend] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setCanResend(true), RESEND_HINT_MINUTES * 60_000);
+    return () => window.clearTimeout(t);
+  }, []);
   const masked = pending ? maskEmail(pending.email) : null;
   const fromAudit = kind === 'from-audit';
   const goBack = () => window.history.back();
@@ -93,15 +100,20 @@ export function CheckEmailScreen({
               <div className={styles.cardTitle}>
                 {fromAudit
                   ? 'Opening the link keeps the audit.'
-                  : `Opening the link creates your account and starts ${trialDays} of Pro if it is your first trial.`}
+                  : `Opening the link creates your account, or signs you in to the one you have, and starts ${trialDays} of Pro if it is your first trial.`}
               </div>
               <p className={styles.cardBody}>
-                {fromAudit ? (
+                {fromAudit && pipeline ? (
                   <>
                     From then on, {site} is re-checked {cadenceOf('pro')} for {trialDays} if it is
                     your first trial, and {cadenceOf('free')} after; if a check finds a change, the
                     note comes from <span className={styles.mono}>{ALERTS_SENDER}</span>. Until you
                     open it, the audit stays at its {ANONYMOUS_VISIBLE_HOURS}-hour link.
+                  </>
+                ) : fromAudit ? (
+                  <>
+                    From then on, {site} is kept in your account. Until you open it, the audit stays
+                    at its {ANONYMOUS_VISIBLE_HOURS}-hour link.
                   </>
                 ) : pipeline ? (
                   <>
@@ -113,10 +125,8 @@ export function CheckEmailScreen({
                   </>
                 ) : (
                   <>
-                    <span className={styles.monoStrong}>{site}</span> becomes your first site when
-                    you open it; it is re-checked {cadenceOf('pro')} for {trialDays} if it is your
-                    first trial, and {cadenceOf('free')} after; if a check finds a change, the note
-                    comes from <span className={styles.mono}>{ALERTS_SENDER}</span>.
+                    <span className={styles.monoStrong}>{site}</span> is added to your account when
+                    you open it.
                   </>
                 )}
               </p>
@@ -129,19 +139,28 @@ export function CheckEmailScreen({
               <Button
                 variant="quiet"
                 size="sm"
-                disabled={!pending || sender.state === 'verifying' || sender.state === 'sending'}
+                disabled={
+                  !canResend ||
+                  !pending ||
+                  sender.state === 'verifying' ||
+                  sender.state === 'sending'
+                }
                 onClick={() => pending && sender.request(pending)}
               >
                 Send the link again
               </Button>
             </div>
             {sender.widget}
-            <p className={styles.error} role="alert" data-v2-addition="">
+            <LiveRegion role="alert" className={styles.error}>
               {refused ? SEND_COPY[refused] : null}
-            </p>
-            <p className={styles.message} role="status" data-v2-addition="">
-              {sender.state === 'sent' ? 'Sent again. The earlier link no longer works.' : null}
-            </p>
+            </LiveRegion>
+            <LiveRegion role="status" className={styles.message}>
+              {sender.state === 'sent'
+                ? 'Sent again. The earlier link no longer works.'
+                : sender.state === 'verifying'
+                  ? VERIFYING_COPY
+                  : null}
+            </LiveRegion>
             <div className={styles.rowLine}>
               <span>Wrong address?</span>
               {fromAudit ? (
@@ -160,7 +179,7 @@ export function CheckEmailScreen({
             You can close this tab.{' '}
             {kind === 'signin'
               ? 'The link signs you in and opens your dashboard.'
-              : `Opened in this browser, the link opens your dashboard with ${fromAudit ? 'this audit' : site} as its first site.`}{' '}
+              : `Opened in this browser, the link signs you in and keeps ${fromAudit ? 'this audit' : site} in your account.`}{' '}
             If the link has expired, the sign-in page offers a new one.
           </div>
         </section>

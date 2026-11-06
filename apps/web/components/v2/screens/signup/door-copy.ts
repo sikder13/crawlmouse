@@ -35,7 +35,7 @@ export function signupLead(): string {
 export function siteHelper(pipeline: boolean): string {
   return pipeline
     ? `If you name one, its first audit starts the moment you open the sign-in link, about ${numberWord(FIRST_AUDIT_MINUTES)} minutes.`
-    : 'If you name one, it becomes your first site when you open the sign-in link.';
+    : 'If you name one, it is added to your account when you open the sign-in link.';
 }
 
 const KIND_PHRASE: Record<EmailKind, string> = {

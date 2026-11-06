@@ -67,11 +67,6 @@
   color: var(--v2-fg2);
 }
 
-.error:empty,
-.status:empty {
-  display: none;
-}
-
 .fine {
   margin: 4px 0 0;
   font-size: 13px;

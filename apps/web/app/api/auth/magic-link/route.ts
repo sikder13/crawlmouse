@@ -136,6 +136,13 @@ export async function POST(req: Request) {
   });
 
   if (error) {
+    // Supabase limits sends per address itself; with the door on that reads as our 429.
+    if (door && error.status === 429) {
+      return NextResponse.json(
+        { error: 'Too many sign-in requests. Try again later.', code: 'rate_limited' },
+        { status: 429 },
+      );
+    }
     return NextResponse.json(
       { error: 'Could not send magic link', code: 'send_failed' },
       { status: 500 },

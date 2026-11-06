@@ -6,7 +6,8 @@ import { Field } from '../../Field';
 import layout from '../../layout.module.css';
 import { cadenceOf, trialDays } from '../signup/door-copy';
 import { browserZone, rememberPending, SEND_COPY, type LinkRequest } from '../signup/send-link';
-import { useLinkSender } from '../signup/useLinkSender';
+import { useLinkSender, VERIFYING_COPY } from '../signup/useLinkSender';
+import { LiveRegion } from '../signup/LiveRegion';
 import styles from './ResultScreen.module.css';
 
 export type KeepState = 'waiting' | 'open' | 'dismissed';
@@ -140,6 +141,8 @@ export function KeepBar({
               placeholder="you@company.com"
               autoComplete="email"
               className={styles.barInput}
+              invalid={refused === 'invalid_email'}
+              describedBy={refused ? 'save-email-error' : undefined}
             />
             <Button
               type="submit"
@@ -159,9 +162,12 @@ export function KeepBar({
               </Button>
             )}
             {sender.widget}
-            <p className={styles.barSub} role="alert" hidden={!refused} data-v2-addition="">
+            <LiveRegion role="alert" id="save-email-error" className={styles.barSub}>
               {refused ? SEND_COPY[refused] : null}
-            </p>
+            </LiveRegion>
+            <LiveRegion role="status" className={styles.barSub}>
+              {sender.state === 'verifying' ? VERIFYING_COPY : null}
+            </LiveRegion>
           </form>
         </div>
       ) : state === 'dismissed' ? (

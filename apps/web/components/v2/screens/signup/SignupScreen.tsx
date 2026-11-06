@@ -38,8 +38,11 @@ export function SignupScreen({
             <p className={styles.lead}>{signupLead()}</p>
             <SignupForm pipeline={pipeline} initial={initial} />
             <div className={styles.other}>
-              Already have an account? Use the same form; the link signs you in. Running an audit
-              right now? Keep it from the audit page instead and it becomes your first site.
+              Already have an account? Use the same form; the link signs you in.
+              {/* The audit page keeps an audit once CC-20b serves it, which sets V2_PIPELINE. */}
+              {pipeline
+                ? ' Running an audit right now? Keep it from the audit page instead and it becomes your first site.'
+                : null}
             </div>
           </section>
           <Card as="section" className={styles.aside}>

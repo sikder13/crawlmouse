@@ -1,6 +1,7 @@
 /**
  * The first-login hook (CC-25): on the sign-in that confirms a person's email, decide the no-card Pro
- * trial by the ledger rule, start it, and attach the first site the Sign-up form named.
+ * trial by the ledger rule and start it; and, at any sign-in with room, attach the site the Sign-up
+ * form named.
  *
  * First login is the verify that confirmed the email (D5 as amended on 2026-11-05): Supabase sets
  * `email_confirmed_at` and `last_sign_in_at` in that one verify, and a later sign-in moves only
@@ -15,7 +16,8 @@
  * 3. `applyEntitlementTransition(trial_started)`: the RPC reads the account `for update` and
  *    refuses a stale version, and `next()` refuses a second trial;
  * 4. only when the transition was applied: the ledger rows;
- * 5. the named site, whose `(account_id, host)` unique index makes a second insert a no-op.
+ * 5. the named site (at any sign-in), whose `(account_id, host)` unique index makes a second insert
+ *    a no-op.
  * A crash between 3 and 4 leaves a trial with no ledger rows; that write is reported. CC-06c closes
  * it with one SQL function (docs/specs/v2/25-account-door.md, follow-ups).
  */
@@ -110,22 +112,28 @@ export async function runFirstLogin(
 ): Promise<FirstLoginResult> {
   const account = await deps.store.loadMember(input.userId);
   if (account === null) return { trial: 'no_account', siteId: null, events: [] };
-  if (!isFirstLogin(input.emailConfirmedAt, input.lastSignInAt)) {
-    return { trial: 'not_first', siteId: null, events: [] };
-  }
-
-  const zone = validZone(input.signup?.tz);
-  if (zone !== null) await deps.store.setTimezone(account.accountId, zone);
-
   const events: DoorEvent[] = [];
-  const trial = await decideTrial(deps, input, account);
-  if (trial.outcome === 'started') {
-    events.push({ name: 'trial_started', props: { kind: 'pro', variant: trial.variant } });
+
+  let trial: TrialOutcome = 'not_first';
+  let zone = account.timezone;
+  if (isFirstLogin(input.emailConfirmedAt, input.lastSignInAt)) {
+    const asked = validZone(input.signup?.tz);
+    if (asked !== null) {
+      await deps.store.setTimezone(account.accountId, asked);
+      zone = asked;
+    }
+    const decided = await decideTrial(deps, input, account);
+    trial = decided.outcome;
+    if (trial === 'started') {
+      events.push({ name: 'trial_started', props: { kind: 'pro', variant: decided.variant } });
+    }
   }
 
-  const siteId = await attachFirstSite(deps, input, account, zone ?? account.timezone);
-  if (siteId !== null) events.push({ name: 'site_added', props: { n: 1 } });
-  return { trial: trial.outcome, siteId, events };
+  // A site named on Sign-up is attached at any sign-in that has room: an existing account uses the
+  // same form ("Already have an account? Use the same form").
+  const added = await attachNamedSite(deps, input, account, zone);
+  if (added !== null) events.push({ name: 'site_added', props: { n: added.n } });
+  return { trial, siteId: added?.siteId ?? null, events };
 }
 
 function validZone(zone: string | undefined): string | null {
@@ -184,12 +192,13 @@ async function decideTrial(
   return { outcome: 'started', variant };
 }
 
-async function attachFirstSite(
+/** The named site, and its number among the account's kept sites (`site_added {n}`). */
+async function attachNamedSite(
   deps: FirstLoginDeps,
   input: FirstLoginInput,
   account: MemberAccount,
   zone: string,
-): Promise<string | null> {
+): Promise<{ siteId: string; n: number } | null> {
   const raw = input.signup?.site;
   if (typeof raw !== 'string') return null;
   const host = hostFromSiteInput(raw);
@@ -210,5 +219,5 @@ async function attachFirstSite(
     host,
     schedule: scheduleFor(tier, kept === 0, now, zone),
   });
-  return inserted === 'exists' ? null : inserted.siteId;
+  return inserted === 'exists' ? null : { siteId: inserted.siteId, n: kept + 1 };
 }

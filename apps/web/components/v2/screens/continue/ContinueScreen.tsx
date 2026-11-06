@@ -10,7 +10,8 @@ import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
 import layout from '../../layout.module.css';
 import { SEND_COPY } from '../signup/send-link';
-import { useLinkSender } from '../signup/useLinkSender';
+import { useLinkSender, VERIFYING_COPY } from '../signup/useLinkSender';
+import { LiveRegion } from '../signup/LiveRegion';
 import styles from '../check-email/Door.module.css';
 
 export type ContinueState = 'idle' | 'expired';
@@ -64,7 +65,7 @@ function Idle({ onExpired }: { onExpired: () => void }) {
       <Heading level={1} size="m">
         Continue to Crawlmouse.
       </Heading>
-      <p className={styles.lead}>This link signs you in once. Continue to open your dashboard.</p>
+      <p className={styles.lead}>This link signs you in once. Continue to finish signing in.</p>
       <form method="post" action="/login/verify" onSubmit={submit} className={styles.actions}>
         <Button type="submit" variant="primary" disabled={busy}>
           Continue
@@ -115,14 +116,16 @@ function Expired() {
         <Button type="submit" variant="primary" disabled={busy}>
           Send a new link
         </Button>
-        <p id={`${ids}-error`} className={styles.error} role="alert">
+        <LiveRegion role="alert" id={`${ids}-error`} className={styles.error}>
           {refused ? SEND_COPY[refused] : null}
-        </p>
-        <p className={styles.message} role="status">
+        </LiveRegion>
+        <LiveRegion role="status" className={styles.message}>
           {state === 'sent'
             ? `Sent. Check your email; the new link works for ${AUTH_LINK_MINUTES} minutes.`
-            : null}
-        </p>
+            : state === 'verifying'
+              ? VERIFYING_COPY
+              : null}
+        </LiveRegion>
       </form>
     </>
   );

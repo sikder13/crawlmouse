@@ -6,7 +6,8 @@ import { Button } from '../../Button';
 import { Field } from '../../Field';
 import { emailKindsSentence, siteHelper } from './door-copy';
 import { browserZone, rememberPending, SEND_COPY, type LinkRequest } from './send-link';
-import { useLinkSender, type SendState } from './useLinkSender';
+import { useLinkSender, VERIFYING_COPY, type SendState } from './useLinkSender';
+import { LiveRegion } from './LiveRegion';
 import fieldStyles from '../../Field.module.css';
 import styles from './Signup.module.css';
 
@@ -25,8 +26,8 @@ export function checkEmailHref(body: LinkRequest): string {
 
 /**
  * The Sign-up form. It posts JSON to /api/auth/magic-link (never a query string), keeps what a
- * resend needs in sessionStorage, and moves on to Check-email. Error and status text each have a
- * region from the start, empty until used, so a screen reader is told when text arrives.
+ * resend needs in sessionStorage, and moves on to Check-email. Error and status text each go in a
+ * LiveRegion, in the accessibility tree from the first render.
  */
 export function SignupForm({
   pipeline,
@@ -87,12 +88,12 @@ export function SignupForm({
       <Button type="submit" variant="primary" disabled={busy} className={styles.submit}>
         {state === 'sending' ? 'Sending…' : 'Send my sign-in link'}
       </Button>
-      <p id={`${ids}-error`} className={styles.error} role="alert" data-v2-addition="">
+      <LiveRegion role="alert" id={`${ids}-error`} className={styles.error}>
         {refused ? SEND_COPY[refused] : null}
-      </p>
-      <p className={styles.status} role="status" data-v2-addition="">
-        {state === 'verifying' ? 'One check that you are a person, then the link is sent.' : null}
-      </p>
+      </LiveRegion>
+      <LiveRegion role="status" className={styles.status}>
+        {state === 'verifying' ? VERIFYING_COPY : null}
+      </LiveRegion>
       <p className={styles.fine}>
         {emailKindsSentence()}{' '}
         <a href="/privacy" className={styles.underline}>

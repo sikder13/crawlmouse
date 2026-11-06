@@ -131,7 +131,7 @@ function flagSection(): string {
       ],
     ),
     '',
-    'With `V2_PIPELINE=1` (CC-20b) Sign-up and Check-email say a named site’s first audit starts when the link is opened; without it they say the site is attached (D6). This step starts no check.',
+    'With `V2_PIPELINE=1` (CC-20b) Sign-up and Check-email say a named site’s first audit starts when the link is opened, that a kept site is re-checked and that change notes come from `alerts@`, and Sign-up points to Keep on the audit page; without it they say only that the site is kept (D6). This step starts no check. Before CC-20b sets the flag, those sentences must be true: checks scheduled, and CC-28 sending from `alerts@`.',
   ].join('\n');
 }
 
@@ -150,7 +150,7 @@ function firstLoginSection(): string {
       Object.entries(TRIAL_OUTCOMES).map(([k, v]) => [code(k), v]),
     ),
     '',
-    `A named first site is attached after the SSRF guard (\`validateUrlOrThrow\`), with the owner seat and the tier’s schedule (\`GATES[tier].schedule\`: \`${GATES.pro.schedule}\` on a paid tier, \`${GATES.free.schedule}\` on Free), on the attach weekday at ${String(SCHEDULE_HOUR_LOCAL).padStart(2, '0')}:00 in the account’s zone.`,
+    `A site named on Sign-up is attached at any sign-in with room (a first login or a later one), after the SSRF guard (\`validateUrlOrThrow\`), with the owner seat and the tier’s schedule (\`GATES[tier].schedule\`: \`${GATES.pro.schedule}\` on a paid tier, \`${GATES.free.schedule}\` on Free), on the attach weekday at ${String(SCHEDULE_HOUR_LOCAL).padStart(2, '0')}:00 in the account’s zone.`,
   ].join('\n');
 }
 
@@ -199,6 +199,7 @@ function ownerSection(): string {
   return [
     '## Owner setup, in order',
     '',
+    '0. Before merging: step 2 below. The Continue page ships live for every sign-in and its expired state says a new link works for 15 minutes; production’s `mailer_otp_exp` read 600 on 2026-11-05.',
     '1. Set `TRIAL_LEDGER_PEPPER` in Vercel (Production and Preview, Sensitive): at least 32 random characters, for example `openssl rand -base64 48`.',
     `2. Run \`SUPABASE_PROJECT_REF=<ref> pnpm --filter @crawlmouse/scripts exec tsx supabase/auth-config.ts --apply\`. It sets ${Object.entries(
       body,
@@ -222,7 +223,8 @@ function gapsSection(): string {
     '- **No-JS Continue** signs in and redirects, and fires no PostHog event.',
     '- **The check id is the claim right** (ARCH-2 §4.3): a member who holds an unowned check’s id may claim it. Two claims for two sites can pass the site limit together; the limit has no database constraint.',
     '- **Login CSRF through the link itself**: someone can send a person a sign-in link to the sender’s own account; opening it puts the sender’s token in `cm_auth_otp`, and Continue signs the person in as the sender. The POST refuses cross-site posts, which stops a page from doing this silently; the link itself is inherent to magic links. Signed in as the sender, the person’s anonymous v1 audits in this browser, and a Keep they asked for in the last 15 minutes, are claimed into the sender’s account.',
-    '- **Existing users naming a site on Sign-up**: the site is attached on the first login only; CC-26’s dashboard adds sites after that.',
+    '- **The locked trial sentence stands on the Sign-up lead and the Keep bar** (DESIGN-LOCK’s one-ask wording, "starts 14 days of Pro"): a sign-up the ledger refuses, or an existing account, reads it too. Check-email, shown after the ask, carries the condition.',
+    '- **Fidelity notes**: the Sign-up footnote’s "14-day trial with a card" is text, not a link (the Agency trial page is CC-03’s); the plan card is a `section` (the v2 `Card` takes no `aside`); Check-email’s "Back to the audit" goes back in history (no live v2 audit route yet). The Turnstile widget draws its light theme on dark pages (`components/ui/Turnstile.tsx`, v1’s).',
   ].join('\n');
 }
 
