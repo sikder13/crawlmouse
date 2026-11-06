@@ -94,7 +94,7 @@
     border-bottom: 1px solid var(--v2-line2);
   }
 
-  .settings tr {
+  .settings tbody tr {
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;

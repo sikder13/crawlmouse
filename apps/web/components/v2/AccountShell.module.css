@@ -93,6 +93,11 @@
   font-size: var(--v2-text-small);
 }
 
+/* A row header is the row's first cell, at the row's size: outranks Table's `.table tbody th`. */
+.main table tbody th {
+  font-size: var(--v2-text-small);
+}
+
 .main {
   flex: 999 1 520px;
   min-width: 0;

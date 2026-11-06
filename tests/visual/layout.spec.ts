@@ -294,6 +294,19 @@ for (const width of LAYOUT_WIDTHS) {
         expect(await textThatDoesNotFit(page)).toEqual([]);
       });
 
+      test(`${p.name}: a header row read but not drawn takes no height`, async ({ page }) => {
+        // A page's own cell padding once outranked Table's hidden head, leaving an empty band above
+        // every headerless table on the account screens; no other gate measures row height.
+        await openPreview(page, p.path);
+        const heights = await page.evaluate(() =>
+          [...document.querySelectorAll('thead[data-v2-hidden-head]')].map((t) => ({
+            table: t.closest('table')?.getAttribute('aria-label') ?? '(unnamed)',
+            height: t.getBoundingClientRect().height,
+          })),
+        );
+        expect(heights.filter((h) => h.height > 0.5)).toEqual([]);
+      });
+
       test(`${p.name}: no panel over the stage covers another, or a key page on the map`, async ({
         page,
       }) => {
@@ -495,5 +508,23 @@ for (const width of [960, 1024, 1200, 1280]) {
         expect(await coveredKeyPages(page)).toEqual([]);
       });
     }
+  });
+}
+
+for (const width of LAYOUT_WIDTHS) {
+  test.describe(`the dashboard by-check rows at ${width}px`, () => {
+    test.use({ viewport: { width, height: HEIGHT[width] } });
+    test('are compact, as Final-Dashboard draws them (4px 0)', async ({ page }) => {
+      await openPreview(page, '/v2-preview/screens/dashboard');
+      const pads = await page.evaluate(() =>
+        [
+          ...document.querySelectorAll(
+            'table[aria-label="Crawler access by check"] tbody td, table[aria-label="Crawler access by check"] tbody th',
+          ),
+        ].map((c) => getComputedStyle(c).padding),
+      );
+      expect(pads.length).toBeGreaterThan(0);
+      expect([...new Set(pads)]).toEqual(['4px 0px']);
+    });
   });
 }

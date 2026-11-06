@@ -73,13 +73,14 @@
   margin-bottom: 6px;
 }
 
-/* The locked rows are compact: 4px above and below, the crawler in a 120px column. */
-.byCheckTable td,
-.byCheckTable th {
+/* The locked rows are compact: 4px above and below, the crawler in a 120px column. Two classes deep
+   so it outranks the account shell's `.main table td`. */
+.byCheck .byCheckTable tbody td,
+.byCheck .byCheckTable tbody th {
   padding: 4px 0;
 }
 
-.byCheckTable th {
+.byCheck .byCheckTable tbody th {
   width: 120px;
 }
 

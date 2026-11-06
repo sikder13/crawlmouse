@@ -37,8 +37,9 @@
   font-size: var(--v2-text-ui);
 }
 
-/* A header row read but not drawn: in the table's layout, with no height of its own. */
-.hiddenHead th {
+/* A header row read but not drawn: in the table's layout, with no height of its own. Scoped under
+   .table so it outranks a page's own cell padding (the account shell's `.main table th`). */
+.table .hiddenHead th {
   padding: 0;
   border: 0;
   height: 0;
@@ -61,7 +62,8 @@
   font-size: var(--v2-text-micro);
 }
 
-.muted td,
+.table .muted td,
+.table .muted th,
 .table .mutedCell {
   color: var(--v2-mut);
 }

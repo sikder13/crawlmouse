@@ -414,7 +414,7 @@ describe('Table, with its headers hidden', () => {
       />,
     );
     expect(out).toMatch(
-      /<thead class="[^"]+"><tr><th scope="col"[^>]*><span[^>]*data-v2-sr-only="">No\.<\/span><\/th>/,
+      /<thead class="[^"]+" data-v2-hidden-head=""><tr><th scope="col"[^>]*><span[^>]*data-v2-sr-only="">No\.<\/span><\/th>/,
     );
     // The header row stays a table row: no absolute positioning takes it out of the table.
     expect(out).not.toMatch(/<thead[^>]*data-v2-sr-only/);
@@ -635,7 +635,9 @@ describe('GradeHistory', () => {
 
   it('hides the drawing and gives a table of every value at every check instead (D9)', () => {
     expect(out).toMatch(/<svg [^>]*aria-hidden="true"/);
-    expect(out).toContain(`<caption>${props.caption}</caption>`);
+    expect(out).toContain(`>${props.caption}</caption>`);
+    // The caption is what the scroll region's tab stop points at on a phone (aria-describedby).
+    expect(out).toMatch(/<caption id="[^"]+">/);
     const cells = [...out.matchAll(/<td>([^<]*)<\/td>/g)].map((m) => m[1]);
     expect(cells).toEqual(['79', '41', 'not graded', '41', '80', '22']);
     expect([...out.matchAll(/<th scope="row">([^<]*)<\/th>/g)].map((m) => m[1])).toEqual(
@@ -657,7 +659,7 @@ describe('GradeHistory', () => {
     );
     const drawn = [...out.matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map((m) => m[1]!);
     const axis = new Set([...props.labels, '100', '75', '50', '25']);
-    const caption = out.match(/<caption>([\s\S]*?)<\/caption>/)![1]!.replace(/<[^>]+>/g, '');
+    const caption = out.match(/<caption[^>]*>([\s\S]*?)<\/caption>/)![1]!.replace(/<[^>]+>/g, '');
     for (const t of drawn.filter((t) => !axis.has(t))) expect(caption).toContain(t);
     expect(drawn.filter((t) => !axis.has(t))).toHaveLength(2);
   });

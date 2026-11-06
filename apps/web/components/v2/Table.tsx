@@ -79,7 +79,10 @@ export function Table({
     <ScrollRegion label={label} className={[styles.scroll, className].filter(Boolean).join(' ')}>
       {heading}
       <table className={styles.table} aria-label={label}>
-        <thead className={headersHidden ? styles.hiddenHead : undefined}>
+        <thead
+          className={headersHidden ? styles.hiddenHead : undefined}
+          {...(headersHidden ? { 'data-v2-hidden-head': '' } : {})}
+        >
           <tr>
             {columns.map((c, i) => (
               <th key={i} scope="col" className={headClass(c)} {...numeric(c)}>
