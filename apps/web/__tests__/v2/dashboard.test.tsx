@@ -38,9 +38,9 @@ describe.each([
     expect(railLabels(ours!)).toEqual(railLabels(theirs!));
     const data = dashboardPreview(name);
     for (const n of data.shell.nav) {
-      if (n.count) expect(ours).toContain(`${n.label}<span`);
+      if (n.count) expect(ours).toContain(`${n.label} <span`);
     }
-    expect(ours).toMatch(/aria-current="page"[^>]*>Sites</);
+    expect(ours).toMatch(/aria-current="page"[^>]*>Sites[ <]/);
   });
 
   it('has exactly one orange element, in the header (DESIGN-LOCK §7.5)', () => {

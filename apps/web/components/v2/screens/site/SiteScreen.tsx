@@ -1,4 +1,3 @@
-import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { CheckGlyph } from '../../CheckGlyphRow';
 import { StatusPill } from '../../StatusPill';
@@ -9,7 +8,8 @@ import type { GradeCardView, SiteView } from '../../../../lib/v2/view/site';
 import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
 import { CardHead } from '../account/parts';
-import { spokenRun, verdictCell } from '../account/verdict-cells';
+import { verdictCell } from '../account/verdict-cells';
+import { CopyText } from '../segment/CopyText';
 import { AlertSwitch } from './AlertSwitch';
 import { SITE_COPY } from '../../../../lib/v2/copy/site';
 import shared from '../account/AccountScreen.module.css';
@@ -54,7 +54,7 @@ function GradeHalf({ g }: { g: GradeCardView }) {
 export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }) {
   const { header, grades, crawlers, fixes, settings, alerts } = data;
   return (
-    <AccountFrame shell={shell}>
+    <AccountFrame shell={shell} currentIs="location">
       <header className={shared.header}>
         <div>
           <h1 className={shared.title}>{header.title}</h1>
@@ -81,9 +81,17 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
         <div className={styles.grid}>
           <Table
             label="Crawler access by check"
+            rowHeader
             columns={[
               { header: 'Crawler' },
-              ...crawlers.columns.map((c) => ({ header: c })),
+              ...crawlers.columns.map((c, i) => ({
+                header: (
+                  <>
+                    <span aria-hidden="true">{c}</span>
+                    <VisuallyHidden>{crawlers.dates[i]!}</VisuallyHidden>
+                  </>
+                ),
+              })),
               { header: 'Cause now' },
             ]}
             rows={crawlers.rows.map((r) => {
@@ -91,10 +99,7 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
               return {
                 key: r.ua,
                 cells: [
-                  <span key="u">
-                    {r.changedNow ? <strong>{r.ua}</strong> : r.ua}
-                    <VisuallyHidden>{`: ${spokenRun(cells)}`}</VisuallyHidden>
-                  </span>,
+                  r.changedNow ? <strong key="u">{r.ua}</strong> : r.ua,
                   ...cells.map((c, i) => <CheckGlyph key={i} cell={c} />),
                   <span key="c" className={r.cause === '—' ? shared.muted : undefined}>
                     {r.cause}
@@ -108,11 +113,9 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
       </Card>
 
       <Card as="section" className={shared.panel}>
-        <CardHead title={fixes.title} sub={fixes.sub}>
+        <CardHead title={fixes.title} sub={fixes.rows.length ? fixes.sub : null}>
           {fixes.copyAll ? (
-            <Button type="button" variant="quiet" size="sm">
-              {fixes.copyAll}
-            </Button>
+            <CopyText text={fixes.copyAll.text}>{fixes.copyAll.label}</CopyText>
           ) : null}
         </CardHead>
         {fixes.rows.length ? (
@@ -182,6 +185,7 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
           <Table
             label="Site settings"
             headersHidden
+            rowHeader
             className={styles.settings}
             columns={[
               { header: 'Setting' },
@@ -207,6 +211,7 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
             <Table
               label="Alert rules"
               headersHidden
+              rowHeader
               columns={[
                 { header: 'Rule' },
                 { header: 'Last fired', numeric: true },
@@ -234,7 +239,7 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
           ) : (
             <div className={shared.note}>{SITE_COPY.noAlerts}</div>
           )}
-          <div className={shared.foot}>{alerts.foot}</div>
+          {alerts.rows.length ? <div className={shared.foot}>{alerts.foot}</div> : null}
         </Card>
       </section>
     </AccountFrame>

@@ -183,6 +183,8 @@ describe('verdict copy guard', () => {
     const verdicts = VerdictSchema.options as readonly Verdict[];
     const base = fixture('bad-site');
     const outfitter = '50000000-0000-4000-8000-000000000001';
+    // Runs in which a crawler change opened on a verdict that is not a block: the case the rule is for.
+    let reached = 0;
     fc.assert(
       fc.property(
         fc.array(fc.array(fc.constantFrom(...verdicts), { minLength: 8, maxLength: 8 }), {
@@ -203,6 +205,18 @@ describe('verdict copy guard', () => {
               ? { ...c, summary: `${c.ua} changed on example-outfitter.com` }
               : c,
           );
+          const latest = d.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000006')!;
+          if (
+            d.changes.some(
+              (c) =>
+                c.site_id === outfitter &&
+                c.kind === 'opened' &&
+                c.subject === 'crawler_access' &&
+                !BLOCKING.includes(latest.crawlers.find((r) => r.ua === c.ua)!.verdict),
+            )
+          ) {
+            reached++;
+          }
           const viewer = ACCOUNT_VIEWERS.home();
           const markup = [
             renderToStaticMarkup(<DashboardScreen data={dashboardView(d, viewer)} />),
@@ -218,6 +232,10 @@ describe('verdict copy guard', () => {
       ),
       { numRuns: 40 },
     );
+    expect(
+      reached,
+      'runs with a crawler change opened on a verdict that is not a block',
+    ).toBeGreaterThan(0);
   });
 
   it('gives each of the eleven verdicts a phrase and a status glyph', () => {

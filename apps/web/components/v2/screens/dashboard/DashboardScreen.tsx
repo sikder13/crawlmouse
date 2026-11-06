@@ -38,7 +38,7 @@ function Header({ data }: Props) {
 function Strip({ strip }: { strip: NonNullable<DashboardView['strip']> }) {
   const h = strip.health;
   return (
-    <Card as="section" className={styles.strip} aria-label={strip.title}>
+    <Card className={styles.strip}>
       <div className={styles.cell}>
         <div className={styles.cellLabel}>Health, all sites · mean of both grades</div>
         <div className={styles.cellRow}>
@@ -65,9 +65,11 @@ function Strip({ strip }: { strip: NonNullable<DashboardView['strip']> }) {
           <div className={styles.cellLabel}>{label}</div>
           <div className={styles.cellRow}>
             <span className={styles.big}>{c.count}</span>
-            <span className={styles.noun} data-v2-verdicts={c.verdicts.join(' ')}>
-              {c.noun}
-            </span>
+            {c.noun ? (
+              <span className={styles.noun} data-v2-verdicts={c.verdicts.join(' ')}>
+                {c.noun}
+              </span>
+            ) : null}
           </div>
         </div>
       ))}
@@ -147,7 +149,16 @@ function History({ data }: Props) {
         ]}
         caption={h.summary}
         note={h.flatNote ? { series: 1, text: h.flatNote } : null}
-        marker={h.marker ? { series: 1, index: h.marker.index, text: h.marker.label } : null}
+        marker={
+          h.marker
+            ? {
+                series: 1,
+                index: h.marker.index,
+                text: h.marker.label,
+                verdicts: h.marker.verdicts,
+              }
+            : null
+        }
       />
       {rows.length ? (
         <div className={styles.byCheck}>
@@ -163,6 +174,8 @@ function History({ data }: Props) {
           <Table
             label="Crawler access by check"
             headersHidden
+            rowHeader
+            className={styles.byCheckTable}
             columns={[{ header: 'Crawler' }, { header: 'Access at each check' }]}
             rows={rows.map((r) => {
               const cells = r.verdicts.map((v) => verdictCell(v, r.group));
@@ -172,6 +185,7 @@ function History({ data }: Props) {
               };
             })}
           />
+          <div className={shared.note}>{TAGGED_UA_LINE}</div>
         </div>
       ) : null}
     </Card>
@@ -185,6 +199,7 @@ function CrawlersNow({ data }: Props) {
       <Table
         label="Crawler access"
         headersHidden
+        rowHeader
         columns={[{ header: 'Crawler' }, { header: 'Access', numeric: true }]}
         rows={(data.crawlersNow ?? []).map((r) => ({
           key: r.ua,
@@ -216,6 +231,7 @@ function Sites({ data }: Props) {
       </CardHead>
       <Table
         label="Watched sites"
+        rowHeader
         columns={[
           { header: 'Site', mono: true },
           { header: 'Technical SEO' },
@@ -312,7 +328,7 @@ function Setup({ setup }: { setup: NonNullable<DashboardView['setup']> }) {
                 done
               </StatusPill>
             ) : (
-              ''
+              <VisuallyHidden key="d">not done</VisuallyHidden>
             ),
             i.label,
             i.action ? <ActionControl key="a" action={i.action} /> : '',

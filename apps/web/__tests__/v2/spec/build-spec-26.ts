@@ -8,6 +8,7 @@ import { format, resolveConfig } from 'prettier';
 import { WEB_ROOT } from '../_lib/tokens-css';
 import { ADDITIONS, COPY_CHANGES } from '../../../lib/v2/copy-registry';
 import { ACCOUNT_ACTIONS, type ActionKey } from '../../../lib/v2/view/account-actions';
+import { NOT_ROLLED_BACK } from '../../../lib/v2/view/account';
 import { PREVIEWS } from '../../../app/(v2-preview)/v2-preview/_preview/registry';
 import {
   ACCOUNT_PREVIEWS,
@@ -130,9 +131,9 @@ function rulesSection(): string {
       ['Rule', 'Where', 'Pinned by'],
       [
         [
-          'A viewer sees its own account’s records and none recorded after its moment. Sites by `created_at`, checks that ended by then (one still running is listed in `inFlight`, not in the history), changes by `detected_at`, fix events by `at`, fixes first seen at a check that ended by then, with their status read from the events up to then. An account read before its first state is an error.',
+          'A viewer sees its own account’s records and none recorded after its moment. Sites by `created_at`, checks that ended by then (one still running is listed in `inFlight`, not in the history), changes by `detected_at`, fix events by `at`, fixes first seen at a check that ended by then, each with the status its last event up to then gives it. An account read before its first state is an error; read during a trial it has since left, it carries that trial’s end.',
           '`viewAt` (`lib/v2/view/account.ts`)',
-          '`account.test.ts`; `account.property.test.ts` (every record timestamp and a millisecond either side, re-parsed with the contract schema)',
+          '`account.test.ts` (the fixture given back at its own `as_of`; one case per fix event kind; a past trial); `account.property.test.ts` (every record timestamp and a millisecond either side, re-parsed with the contract schema; the datasets are the fixtures’ own, only the moment varies)',
         ],
         [
           'Day 0 is the moment the account can first be read: its first state, or the end of its first audit if that is later (owner ruling Q9).',
@@ -157,12 +158,12 @@ function rulesSection(): string {
         [
           'Health is the mean of both grades over the sites whose latest result carries both, rounded. The move is the same mean over the sites graded at both moments, at the primary site’s previous result. Sites left out are counted by reason, AI readability withheld first (D5).',
           '`health`, `healthAt` (`lib/v2/view/dashboard.ts`)',
-          '`dashboard.test.ts` (743 / 10 = 74, 758 / 10 = 76; challenged-site (91 + 89) / 2 = 90), `account.property.test.ts` (against the mean worked from the raw dataset)',
+          '`dashboard.test.ts` (743 / 10 = 74, 758 / 10 = 76; challenged-site (91 + 89) / 2 = 90; bad-site at 26 Oct 19:02Z, where only one site is graded at both moments: 73, “over the 1 site graded at both”), `account.property.test.ts` (the value against the mean worked from the raw dataset)',
         ],
         [
-          'Dates and times are the account’s zone; days left are calendar days in it; the reminder is `trial_ends_at` less three days (D4, A8, owner ruling Q4).',
-          '`lib/v2/format.ts`: `dayDate`, `calendarDays`, `nextWeekly`',
-          '`format.test.ts` (vectors worked across the 1 Nov change of offset)',
+          'Dates and times are the account’s zone; days left are calendar days in it; the reminder is three calendar days before the trial ends, at the same clock time (D4, A8, owner ruling Q4). “Since” names the earlier check by its weekday, or by its date where a weekday could mean another check.',
+          '`lib/v2/format.ts`: `dayDate`, `calendarDays`, `nextWeekly`, `daysBefore`; `sinceName` (`dashboard.ts`)',
+          '`format.test.ts` (vectors worked across the 1 Nov change of offset); `dashboard.test.ts` (Wed 4 Nov; “Since the check of Fri 23 Oct” on the withheld dashboard)',
         ],
         [
           '"Blocked" is said only beside `disallowed_by_robots` or `blocked_by_ua_rule`, in what is seen and what is heard (FACTS I2). With no blocking verdict the site page leaves the blocked count out.',
@@ -172,7 +173,9 @@ function rulesSection(): string {
       ],
     ),
     '',
-    'Fields `viewAt` cannot roll back, because the contract records no date for them: an account’s integrations and limits, a site’s competitor hosts, a fix’s rank, effect and before-and-after (a resolved fix seen before it resolved sorts after the site’s ranked fixes), and a seat’s theme. Day 0 shows these as they stand at the fixture’s `as_of`.',
+    `Fields \`viewAt\` keeps as the fixture’s \`as_of\` has them, because the contract records no date for a change to them (\`NOT_ROLLED_BACK\`, \`lib/v2/view/account.ts\`): ${NOT_ROLLED_BACK.map(code).join(', ')}. Day 0 shows these as they stand at \`as_of\`.`,
+    '',
+    'The rail’s counts are left out of the lock comparisons with the rest of the rail’s links (`nav[aria-label="Primary"]`, as on every v2 screen); `dashboard.test.tsx` checks the links’ order against the artboards and the counts against the view model. On Final-Dashboard the artboard reads “Changes 2 new”, the build “3 new”: the window holds two opened changes and one resolved.',
   ].join('\n');
 }
 
@@ -293,6 +296,12 @@ export const KNOWN_GAPS_26 = [
   'A change’s title is the change record’s own summary. The verdict guard’s account-screen property replaces verdicts at random, so it drops the crawler changes whose summaries describe the old ones; on the fixtures the titles are checked as they are.',
   'The SVG chart’s own labels are hidden from assistive technology and not read by the verdict guard; its table, which is read, carries the same values.',
   'There is no perturbation sweep (CC-22’s `INVENTORY`) for these screens: their fields are pinned by values worked out by hand from the fixtures and by the lock comparisons.',
+  'Text the locked pages hide on a phone (the trial card’s note, a fix’s note, the first-run fixes’ effort) is hidden here too, from screen readers as well; at 175% zoom on a desktop it is gone for sighted readers. The artboards decide it; the owner rules on it (accessibility review, round 1).',
+  'The site settings table stacks its rows on a phone with CSS grid on `tr`. Whether every screen reader keeps the table’s header and cell semantics through that is not verified in VoiceOver or NVDA; axe cannot tell.',
+  'The health move counts a site whose latest change is a new baseline (redbirdaviation.com: grading changed, earlier results not compared). FACTS l.39 reads the mean that way; whether a baseline site belongs in the move is an owner ruling.',
+  'The fixes table writes one row’s effect as “+4 SEO” and the grouped row’s as “+7 Technical SEO together”: the grouped wording is the segment pages’ (`groupPoints`), kept so one rule words a group.',
+  'States the previews do not reach: a site with no finished check opens no site page (`siteView` throws), and an account with no site has no dashboard (`primarySite` throws). CC-26b decides them with the routes.',
+  'The property tests vary the moment over the fixtures’ own records. A refused Technical SEO score, and a site added between two checks of the primary site, are in no fixture and are not reached; the rules for them are read from the code.',
 ];
 
 function gapsSection(): string {

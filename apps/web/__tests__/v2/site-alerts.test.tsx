@@ -25,7 +25,7 @@ describe('Final-Site, the alert rules', () => {
     expect(switches).toHaveLength(6);
     for (const s of switches) {
       const row = s.closest('tr')!;
-      expect(row.querySelector('td')!.textContent).toBe(s.getAttribute('aria-label'));
+      expect(row.querySelector('th')!.textContent).toBe(s.getAttribute('aria-label'));
     }
     const anyChange = switches.at(-1)!;
     expect(anyChange.getAttribute('aria-checked')).toBe('false');

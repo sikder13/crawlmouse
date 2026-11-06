@@ -65,12 +65,22 @@
 }
 
 .byCheck {
-  padding: 10px 16px 14px;
+  padding: 10px 16px 0;
   border-top: 1px solid var(--v2-line);
 }
 
 .byCheck .small {
   margin-bottom: 6px;
+}
+
+/* The locked rows are compact: 4px above and below, the crawler in a 120px column. */
+.byCheckTable td,
+.byCheckTable th {
+  padding: 4px 0;
+}
+
+.byCheckTable th {
+  width: 120px;
 }
 
 .legendItem {

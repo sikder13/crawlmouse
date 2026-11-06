@@ -6,11 +6,21 @@ import type { ShellView } from '../../../../lib/v2/view/account-shell';
 import { ActionControl } from './ActionControl';
 
 /** An account screen's frame: the rail, its trial card and theme row, then the page. */
-export function AccountFrame({ shell, children }: { shell: ShellView; children: ReactNode }) {
+export function AccountFrame({
+  shell,
+  currentIs,
+  children,
+}: {
+  shell: ShellView;
+  /** `location` on a page under its rail entry (a site page, under Sites). */
+  currentIs?: 'page' | 'location';
+  children: ReactNode;
+}) {
   const t = shell.trial;
   return (
     <AccountShell
       nav={shell.nav}
+      currentIs={currentIs}
       card={
         t ? (
           <TrialCard

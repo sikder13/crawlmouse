@@ -2,6 +2,7 @@
 
 import type { FocusEvent, FormEvent } from 'react';
 import { Button, type ButtonSize, type ButtonVariant } from '../../Button';
+import { VisuallyHidden } from '../../VisuallyHidden';
 import type { ActionView } from '../../../../lib/v2/view/account-actions';
 import styles from './AccountScreen.module.css';
 
@@ -34,6 +35,7 @@ export function ActionControl({
       <span className={styles.inlineForm} onFocus={reveal}>
         <Button href={action.href} variant={v} size={size}>
           {action.label}
+          {action.context ? <VisuallyHidden>{` ${action.context}`}</VisuallyHidden> : null}
         </Button>
       </span>
     );
@@ -51,6 +53,7 @@ export function ActionControl({
       ))}
       <Button type="submit" variant={v} size={size}>
         {action.label}
+        {action.context ? <VisuallyHidden>{` ${action.context}`}</VisuallyHidden> : null}
       </Button>
     </form>
   );
