@@ -1,6 +1,6 @@
 'use client';
 
-import type { FormEvent } from 'react';
+import type { FocusEvent, FormEvent } from 'react';
 import { Button, type ButtonSize, type ButtonVariant } from '../../Button';
 import type { ActionView } from '../../../../lib/v2/view/account-actions';
 import styles from './AccountScreen.module.css';
@@ -9,6 +9,8 @@ import styles from './AccountScreen.module.css';
  * An account action as the screens render it: a link for a read, or a POST form carrying the verb
  * and ids in hidden fields. Not wired to an account yet: the routes are CC-26b's, so a preview
  * stops the submit, as KeepBar does. The action's own `primary` makes it the orange element.
+ * On focus it scrolls itself into view: Chrome leaves a control half outside a table that scrolls
+ * on a phone when it takes focus by Tab, and its focus ring is then cut at the edge.
  */
 export function ActionControl({
   action,
@@ -20,15 +22,20 @@ export function ActionControl({
   size?: ButtonSize;
 }) {
   const v: ButtonVariant = action.primary ? 'primary' : variant;
+  const reveal = (e: FocusEvent<HTMLElement>) =>
+    e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   if (action.method === 'get') {
     return (
-      <Button href={action.href} variant={v} size={size}>
-        {action.label}
-      </Button>
+      <span className={styles.inlineForm} onFocus={reveal}>
+        <Button href={action.href} variant={v} size={size}>
+          {action.label}
+        </Button>
+      </span>
     );
   }
   return (
     <form
+      onFocus={reveal}
       method="post"
       action={action.href}
       className={styles.inlineForm}

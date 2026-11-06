@@ -156,29 +156,32 @@ export function GradeHistory({
           </g>
         </svg>
       </ScrollRegion>
-      <table className={`${layout.srOnly} ${styles.values}`} data-v2-sr-only="">
-        <caption>{caption}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Check</th>
-            {series.map((s) => (
-              <th key={s.name} scope="col">
-                {s.name}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {dates.map((d, i) => (
-            <tr key={i}>
-              <th scope="row">{d}</th>
+      {/* A table ignores a 1px width; the box around it holds the screen-reader-only size. */}
+      <div className={layout.srOnly} data-v2-sr-only="">
+        <table className={styles.values}>
+          <caption>{caption}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Check</th>
               {series.map((s) => (
-                <td key={s.name}>{s.values[i] ?? 'not graded'}</td>
+                <th key={s.name} scope="col">
+                  {s.name}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {dates.map((d, i) => (
+              <tr key={i}>
+                <th scope="row">{d}</th>
+                {series.map((s) => (
+                  <td key={s.name}>{s.values[i] ?? 'not graded'}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

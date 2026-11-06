@@ -1,5 +1,6 @@
 /* Shared by the account screens' parts (Final-Dashboard, Final-Site). */
 
+/* A form, or a link's focus wrapper: a box the size of its button. */
 .inlineForm {
   display: inline-flex;
   margin: 0;
@@ -41,6 +42,12 @@
 .panel {
   padding: 0;
   overflow: hidden;
+}
+
+/* A control in a table that scrolls on a phone: when focus scrolls it into view, leave room for its
+   2px ring and 2px offset, or the scroll region cuts the ring at its edge. */
+.panel :is(a, button) {
+  scroll-margin: 8px;
 }
 
 .head {

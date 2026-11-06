@@ -2,6 +2,9 @@
 
 .history {
   position: relative;
+  /* Its width comes from where it sits, never from the chart's 520px floor: in a flex column or a
+     grid track sized by content, the chart scrolls inside rather than widening the page. */
+  contain: inline-size;
 }
 
 /* The chart keeps its width on a phone and scrolls inside its card (DESIGN-LOCK §7.7). */
