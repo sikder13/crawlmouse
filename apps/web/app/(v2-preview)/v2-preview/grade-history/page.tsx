@@ -21,7 +21,16 @@ export default function GradeHistoryPreview() {
             ]}
             caption={h.summary}
             note={h.flatNote ? { series: 1, text: h.flatNote } : null}
-            marker={h.marker ? { series: 1, ...h.marker, text: h.marker.label } : null}
+            marker={
+              h.marker
+                ? {
+                    series: 1,
+                    index: h.marker.index,
+                    text: h.marker.label,
+                    verdicts: h.marker.verdicts,
+                  }
+                : null
+            }
           />
         </Card>
       </PreviewSection>

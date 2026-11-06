@@ -93,12 +93,13 @@ The signed-in frame: a rail of the account's pages beside the page itself (Final
 shares PageShell's canvas, type and element defaults, and has no site header or footer. On a
 phone the rail becomes a band across the top.
 
-| Prop       | Type         | Required | Note                                                        |
-| ---------- | ------------ | -------- | ----------------------------------------------------------- |
-| `nav`      | `RailLink[]` | yes      | The rail's links, in order.                                 |
-| `card`     | `ReactNode`  | no       | The plan card under the links (the trial card), or nothing. |
-| `theme`    | `ReactNode`  | no       | The theme row at the foot of the rail.                      |
-| `children` | `ReactNode`  | yes      |                                                             |
+| Prop        | Type                                | Required | Note                                                                                                                      |
+| ----------- | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `nav`       | `RailLink[]`                        | yes      | The rail's links, in order.                                                                                               |
+| `card`      | `ReactNode`                         | no       | The plan card under the links (the trial card), or nothing.                                                               |
+| `theme`     | `ReactNode`                         | no       | The theme row at the foot of the rail.                                                                                    |
+| `currentIs` | `"page" \| "location" \| undefined` | no       | `page` when this page is the rail entry itself (/dashboard); `location` when it sits under it (a site page, under Sites). |
+| `children`  | `ReactNode`                         | yes      |                                                                                                                           |
 
 ### BrandLink
 
@@ -235,15 +236,15 @@ A letter grade and its score out of 100, or a withheld grade that shows neither.
 Two grades across a site's checks, as an inline SVG. The drawing is hidden from assistive
 technology; the table under it, read instead, lists every value at every check (D9).
 
-| Prop      | Type                                                                    | Required | Note                                                                                  |
-| --------- | ----------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------- |
-| `label`   | `string`                                                                | yes      | Names the chart's scroll region and its table.                                        |
-| `labels`  | `readonly string[]`                                                     | yes      | One axis label per check: "24 Oct", "26", "Thu 29".                                   |
-| `dates`   | `readonly string[]`                                                     | yes      | One date per check, in full, for the table the chart is read from.                    |
-| `series`  | `readonly [GradeSeries, GradeSeries]`                                   | yes      |                                                                                       |
-| `caption` | `string`                                                                | yes      | What the chart shows, in a sentence: the table's caption.                             |
-| `note`    | `{ series: 0 \| 1; text: string; } \| null \| undefined`                | no       | A note above a series' first run: "AI readability · 41 since the first audit".        |
-| `marker`  | `{ series: 0 \| 1; index: number; text: string; } \| null \| undefined` | no       | A marked point, drawn in the bad tone: "Claude-SearchBot and ClaudeBot blocked · 22". |
+| Prop      | Type                                                                                                               | Required | Note                                                                                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `label`   | `string`                                                                                                           | yes      | Names the chart's scroll region and its table.                                                                                                                |
+| `labels`  | `readonly string[]`                                                                                                | yes      | One axis label per check: "24 Oct", "26", "Thu 29".                                                                                                           |
+| `dates`   | `readonly string[]`                                                                                                | yes      | One date per check, in full, for the table the chart is read from.                                                                                            |
+| `series`  | `readonly [GradeSeries, GradeSeries]`                                                                              | yes      |                                                                                                                                                               |
+| `caption` | `string`                                                                                                           | yes      | What the chart shows, in a sentence: the table's caption.                                                                                                     |
+| `note`    | `{ series: 0 \| 1; text: string; } \| null \| undefined`                                                           | no       | A note above a series' first run: "AI readability · 41 since the first audit".                                                                                |
+| `marker`  | `{ series: 0 \| 1; index: number; text: string; verdicts?: readonly string[] \| undefined; } \| null \| undefined` | no       | A marked point, drawn in the bad tone: "Claude-SearchBot and ClaudeBot blocked · 22", with the verdicts its words name, so a test can hold "blocked" to them. |
 
 ### Heading
 
@@ -304,14 +305,15 @@ A tinted pill: a status glyph and a short label (rule 7).
 
 A table of records that scrolls sideways on a phone rather than squeezing (phone rules).
 
-| Prop            | Type                   | Required | Note                                                                                                                                                         |
-| --------------- | ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `label`         | `string`               | yes      | Names the table, and the scroll region when it overflows.                                                                                                    |
-| `columns`       | `TableColumn[]`        | yes      |                                                                                                                                                              |
-| `rows`          | `TableRow[]`           | yes      |                                                                                                                                                              |
-| `heading`       | `ReactNode`            | no       | Rendered inside the scroll region, above the table (a heading row with pills).                                                                               |
-| `headersHidden` | `boolean \| undefined` | no       | The column headers are read by assistive technology but not drawn, for a table the locked screen shows without a header row; each column still has its name. |
-| `className`     | `string \| undefined`  | no       |                                                                                                                                                              |
+| Prop            | Type                   | Required | Note                                                                                                                                                                                                                                                  |
+| --------------- | ---------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `label`         | `string`               | yes      | Names the table, and the scroll region when it overflows.                                                                                                                                                                                             |
+| `columns`       | `TableColumn[]`        | yes      |                                                                                                                                                                                                                                                       |
+| `rows`          | `TableRow[]`           | yes      |                                                                                                                                                                                                                                                       |
+| `heading`       | `ReactNode`            | no       | Rendered inside the scroll region, above the table (a heading row with pills).                                                                                                                                                                        |
+| `headersHidden` | `boolean \| undefined` | no       | The column headers are read by assistive technology but not drawn, for a table the locked screen shows without a header row; each column still has its name. The header row stays in the table's layout, zero height, so every cell keeps its header. |
+| `rowHeader`     | `boolean \| undefined` | no       | The first cell of each row names the row (`<th scope="row">`), so a control later in the row is read with the row it acts on.                                                                                                                         |
+| `className`     | `string \| undefined`  | no       |                                                                                                                                                                                                                                                       |
 
 ### ThemeControl
 

@@ -32,9 +32,9 @@ function mount(el: React.ReactElement) {
 }
 
 const NAV = [
-  { label: 'Sites', href: '/dashboard', count: '5', current: true },
-  { label: 'Changes', href: '/changes', count: '3 new', current: false },
-  { label: 'Alerts', href: '/alerts', count: null, current: false },
+  { label: 'Sites', href: '/dashboard', count: '5', current: true, fresh: false },
+  { label: 'Changes', href: '/changes', count: '3 new', current: false, fresh: true },
+  { label: 'Alerts', href: '/alerts', count: null, current: false, fresh: false },
 ];
 
 describe('AccountShell', () => {
@@ -47,7 +47,7 @@ describe('AccountShell', () => {
   it('labels the rail as the primary navigation and marks the current page', () => {
     expect(out).toContain('<nav class');
     expect(out).toMatch(/<nav [^>]*aria-label="Primary"/);
-    expect(out).toMatch(/<a [^>]*aria-current="page"[^>]*>Sites<span[^>]*>5<\/span><\/a>/);
+    expect(out).toMatch(/<a [^>]*aria-current="page"[^>]*>Sites <span[^>]*>5<\/span><\/a>/);
     expect(out.match(/aria-current/g)).toHaveLength(1);
     expect(out).toMatch(/>Alerts<\/a>/);
   });
@@ -134,6 +134,7 @@ describe('ActionControl', () => {
     method: 'get' as const,
     fields: {},
     primary: false,
+    context: null,
   };
 
   it('scrolls itself into view on keyboard focus, and not when a pointer focuses it', () => {

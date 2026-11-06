@@ -53,8 +53,44 @@
   color: var(--v2-mut);
 }
 
+.fresh {
+  color: var(--v2-fg);
+}
+
 .card {
   margin-top: auto;
+}
+
+/* Skip to the page: read first, and drawn only while it has focus. */
+.skip {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 2;
+  padding: 8px 12px;
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-s1);
+  color: var(--v2-fg);
+  clip-path: inset(50%);
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.skip:focus {
+  clip-path: none;
+  width: auto;
+  height: auto;
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+/* The account artboards' tables are tighter than the marketing pages': 10px 14px at 14px. */
+.main table td,
+.main table th {
+  padding: 10px 14px;
+  font-size: var(--v2-text-small);
 }
 
 .main {

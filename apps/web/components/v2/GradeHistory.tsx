@@ -23,8 +23,11 @@ export interface GradeHistoryProps {
   caption: string;
   /** A note above a series' first run: "AI readability · 41 since the first audit". */
   note?: { series: 0 | 1; text: string } | null;
-  /** A marked point, drawn in the bad tone: "Claude-SearchBot and ClaudeBot blocked · 22". */
-  marker?: { series: 0 | 1; index: number; text: string } | null;
+  /**
+   * A marked point, drawn in the bad tone: "Claude-SearchBot and ClaudeBot blocked · 22", with the
+   * verdicts its words name, so a test can hold "blocked" to them.
+   */
+  marker?: { series: 0 | 1; index: number; text: string; verdicts?: readonly string[] } | null;
 }
 
 const W = 640;
@@ -83,7 +86,7 @@ export function GradeHistory({
 
   return (
     <div className={styles.history}>
-      <ScrollRegion label={label} className={styles.scroll}>
+      <ScrollRegion label={label} className={styles.scroll} startAtEnd>
         <svg
           className={styles.chart}
           data-v2-chart=""
@@ -160,7 +163,15 @@ export function GradeHistory({
       <div className={layout.srOnly} data-v2-sr-only="">
         <table className={styles.values}>
           {/* Everything the drawing writes on itself, besides its axis, is read here too. */}
-          <caption>{[caption, note?.text, marker?.text].filter(Boolean).join('. ')}</caption>
+          <caption>
+            {[caption, note?.text].filter(Boolean).join('. ')}
+            {marker ? (
+              <>
+                {'. '}
+                <span data-v2-verdicts={(marker.verdicts ?? []).join(' ')}>{marker.text}</span>
+              </>
+            ) : null}
+          </caption>
           <thead>
             <tr>
               <th scope="col">Check</th>

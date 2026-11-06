@@ -64,7 +64,17 @@
     margin: 0 0 0 auto;
   }
 
+  /* The locked phone strip shows the price as an underlined link, so the strip stays one line. */
   .actions :is(a, button) {
     width: auto;
+    min-height: 0;
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 12px;
+    font-weight: 400;
+    text-decoration: underline;
+    color: var(--v2-fg);
   }
 }

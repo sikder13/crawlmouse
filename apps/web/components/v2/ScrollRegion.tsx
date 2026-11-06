@@ -11,10 +11,13 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 export function ScrollRegion({
   label,
   className,
+  startAtEnd = false,
   children,
 }: {
   label: string;
   className?: string;
+  /** Opens scrolled to its far end: a history whose latest point is the one that matters. */
+  startAtEnd?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -23,6 +26,7 @@ export function ScrollRegion({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    if (startAtEnd) el.scrollLeft = el.scrollWidth;
     // While it holds focus it stays in the tab order, or focus would fall back to the page.
     const check = () =>
       setScrolls(el.scrollWidth > el.clientWidth + 1 || document.activeElement === el);
@@ -51,7 +55,7 @@ export function ScrollRegion({
       mo?.disconnect();
       ro?.disconnect();
     };
-  }, []);
+  }, [startAtEnd]);
 
   return (
     <div

@@ -657,7 +657,7 @@ describe('GradeHistory', () => {
     );
     const drawn = [...out.matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map((m) => m[1]!);
     const axis = new Set([...props.labels, '100', '75', '50', '25']);
-    const caption = out.match(/<caption>([^<]*)<\/caption>/)![1]!;
+    const caption = out.match(/<caption>([\s\S]*?)<\/caption>/)![1]!.replace(/<[^>]+>/g, '');
     for (const t of drawn.filter((t) => !axis.has(t))) expect(caption).toContain(t);
     expect(drawn.filter((t) => !axis.has(t))).toHaveLength(2);
   });
