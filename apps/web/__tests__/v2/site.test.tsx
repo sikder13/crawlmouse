@@ -38,8 +38,13 @@ describe.each(['home', 'clean', 'withheld'] as const)('Site, %s', (name) => {
   it('has exactly one orange element, in the header', () => {
     const html = render(name);
     expect(primaries(html)).toHaveLength(1);
-    expect(primaries(html.slice(html.indexOf('<header'), html.indexOf('</header>')))).toHaveLength(
-      1,
-    );
+    expect(
+      primaries(
+        html.slice(
+          html.indexOf('<header', html.indexOf('<main')),
+          html.indexOf('</header>', html.indexOf('<main')),
+        ),
+      ),
+    ).toHaveLength(1);
   });
 });

@@ -52,11 +52,22 @@ describe('AccountShell', () => {
     expect(out).toMatch(/>Alerts<\/a>/);
   });
 
-  it('puts the page in the one <main>, beside the rail, with no site header or footer', () => {
+  it('puts the page in the one <main>, beside the rail, with no site footer', () => {
     expect(out.match(/<main/g)).toHaveLength(1);
     expect(out).toMatch(/<main[^>]*><h1>page<\/h1><\/main>/);
     expect(out).not.toContain('<footer');
-    expect(out).not.toContain('<header');
+  });
+
+  it('makes the rail the page banner, so everything before <main> sits in a landmark (axe region)', () => {
+    // Round 1 made the rail a div, off the complementary role; axe then found the brand, trial card
+    // and theme row in no landmark. Only the skip link may sit outside the banner.
+    expect(out.match(/<header/g)).toHaveLength(1);
+    const before = out.slice(0, out.indexOf('<main'));
+    expect(before).toMatch(
+      /^<div[^>]*><a href="#account-main"[^>]*>Skip to the page<\/a><header[^>]*>/,
+    );
+    expect(before.endsWith('</header>')).toBe(true);
+    expect(out).not.toContain('<aside');
   });
 });
 

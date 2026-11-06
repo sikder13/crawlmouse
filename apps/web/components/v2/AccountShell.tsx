@@ -46,7 +46,7 @@ export function AccountShell({
       <a href="#account-main" className={styles.skip} data-v2-sr-only="">
         Skip to the page
       </a>
-      <div className={styles.rail}>
+      <header className={styles.rail}>
         <BrandLink />
         <nav className={styles.nav} aria-label="Primary">
           {nav.map((l) => (
@@ -70,7 +70,7 @@ export function AccountShell({
         </nav>
         {card ? <div className={styles.card}>{card}</div> : null}
         {theme ? <div className={styles.theme}>{theme}</div> : null}
-      </div>
+      </header>
       <main id="account-main" className={styles.main}>
         {children}
       </main>

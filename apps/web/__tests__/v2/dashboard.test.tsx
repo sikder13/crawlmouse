@@ -45,7 +45,10 @@ describe.each([
 
   it('has exactly one orange element, in the header (DESIGN-LOCK §7.5)', () => {
     expect(primaries(html)).toHaveLength(1);
-    const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
+    const header = html.slice(
+      html.indexOf('<header', html.indexOf('<main')),
+      html.indexOf('</header>', html.indexOf('<main')),
+    );
     expect(primaries(header)).toHaveLength(1);
   });
 
