@@ -10,21 +10,23 @@
 > return !(v === '0' || v === 'false' || v === 'no' || v === 'off');
 > ```
 >
-> Earlier planning documents (and the Stage-7 handoff) described this as *"before flipping
-> `AI_READINESS_EXTRACTION=1`"* — **opt-in language over opt-out code**. Read literally, that wording
+> Earlier planning documents (and the Stage-7 handoff) described this as _"before flipping
+> `AI_READINESS_EXTRACTION=1`"_ — **opt-in language over opt-out code**. Read literally, that wording
 > implies the merge is dark. It is not. Unless `AI_READINESS_EXTRACTION=0` is present in the Vercel
-> **Production** scope *and* a deployment has already been built with it, the first post-merge
+> **Production** scope _and_ a deployment has already been built with it, the first post-merge
 > production deploy puts the entire SPEC 05 write path in front of **100% of traffic with no canary**.
 >
 > **PRE-MERGE GATE — do this before merging, not after:**
+>
 > 1. Set `AI_READINESS_EXTRACTION=0` in the Vercel **Production** environment scope.
 >
 >    **Do NOT treat Preview as a canary.** An earlier draft of this gate said "Preview stays at `1`, so
 >    previews keep exercising the path" — that is false, and it is a known, already-documented property
 >    of this project: a preview deployment never syncs to Inngest, so a preview `inngest.send()` is
 >    consumed and executed by the **PRODUCTION** environment. Leaving Preview at `1` therefore exercises
->    the write path *nowhere* while reading as though it exercises it safely — which is worse than no
+>    the write path _nowhere_ while reading as though it exercises it safely — which is worse than no
 >    canary at all. The only real canary is the supervised production one (A19).
+>
 > 2. **Redeploy production** — Vercel bakes env vars into a build, so the variable does nothing to
 >    already-running functions until a redeploy. This is not a zero-deploy lever in either direction.
 > 3. Confirm the running deployment observes `0` before merging.
@@ -32,16 +34,16 @@
 > Every subsequent flip — canary on, rollback off — also needs a redeploy (~1 min). Budget for that in
 > the incident path: **you cannot turn this off instantly from the dashboard.**
 >
-> The *security* half of the exposure is independently closed: migration B is applied and verified, so
+> The _security_ half of the exposure is independently closed: migration B is applied and verified, so
 > `ai_signals` is unreadable by `anon`/`authenticated` regardless of the flag. This gate is launch
 > control — blast radius and canary discipline — not a paywall or data-exposure hole.
 
 Two migrations, in this order:
 
-| # | Migration | Status | Gate |
-|---|---|---|---|
-| A | `20260708000001_spec05_ai_readiness.sql` | **APPLIED** 2026-07-08 | — |
-| B | `20260727000001_spec05_pages_ai_signals_privilege.sql` | **APPLIED + VERIFIED 2026-07-29** | merge gate **SATISFIED** — re-verify on merge day |
+| #   | Migration                                              | Status                            | Gate                                              |
+| --- | ------------------------------------------------------ | --------------------------------- | ------------------------------------------------- |
+| A   | `20260708000001_spec05_ai_readiness.sql`               | **APPLIED** 2026-07-08            | —                                                 |
+| B   | `20260727000001_spec05_pages_ai_signals_privilege.sql` | **APPLIED + VERIFIED 2026-07-29** | merge gate **SATISFIED** — re-verify on merge day |
 
 > ## ✅ ORDERING CONSTRAINT — SATISFIED 2026-07-29
 >
@@ -87,6 +89,7 @@ changes, no backfill, no CHECK, no default → metadata-only on PG15 (no table r
 Confirmed via the Supabase MCP (2026-07-08): neither column exists yet.
 
 ## What it does
+
 **Sizing (corrected twice — 2026-07-28, then 2026-07-29).** The original estimate of "~2KB/page ⇒ ≤
 ~1.2MB per 500-page audit" counted UTF-16 code units, not the UTF-8 bytes Postgres stores —
 understating non-Latin pages by ~3x (a Chinese-language page measured 12 947 bytes/row). All caps are
@@ -104,18 +107,18 @@ the behaviour.
 
 The ceiling is now **derived, then confirmed by a fixture**, in that order:
 
-| axis | cap | serialized bytes |
-|---|---|---|
-| `title` | `AI_TITLE_MAX_BYTES` 200 | 402 |
-| `excerpt` | `EXCERPT_MAX_BYTES` 2 000 | 4 002 |
-| `jsonLd.types` | 20 × `JSON_LD_TYPE_MAX_BYTES` 100 | 4 061 |
-| `jsonLd` total | — | 4 121 |
-| `pageClass` / `frameworkMarker` | longest enum members | 10 / 8 |
-| counters | `mainTextChars` ≤ 8 digits, `h1Count` ≤ 7 (safe-fetch's 10 MB cap) | ≤ 15 |
-| **analytic maximum** | | **8 760** |
+| axis                            | cap                                                                | serialized bytes |
+| ------------------------------- | ------------------------------------------------------------------ | ---------------- |
+| `title`                         | `AI_TITLE_MAX_BYTES` 200                                           | 402              |
+| `excerpt`                       | `EXCERPT_MAX_BYTES` 2 000                                          | 4 002            |
+| `jsonLd.types`                  | 20 × `JSON_LD_TYPE_MAX_BYTES` 100                                  | 4 061            |
+| `jsonLd` total                  | —                                                                  | 4 121            |
+| `pageClass` / `frameworkMarker` | longest enum members                                               | 10 / 8           |
+| counters                        | `mainTextChars` ≤ 8 digits, `h1Count` ≤ 7 (safe-fetch's 10 MB cap) | ≤ 15             |
+| **analytic maximum**            |                                                                    | **8 760**        |
 
 Worst character class is `"`/`\` — `JSON.stringify` renders each as two bytes (~1.95× ASCII). Dedupe
-is on the RAW `@type` value, so 20 *distinct* raw values that all truncate to the same 100 quote chars
+is on the RAW `@type` value, so 20 _distinct_ raw values that all truncate to the same 100 quote chars
 each survive and the types axis saturates. `csrSignals` is **not** additive with `excerpt` (it only
 populates below `MIN_MAIN_TEXT_CHARS`), so the `js_blind` branch tops out at 5 231.
 
@@ -127,11 +130,14 @@ passes an upper bound, which is exactly how the wrong number survived a green su
 alter table public.pages   add column if not exists ai_signals   jsonb;  -- PageAiSignals payload (§4)
 alter table public.audits  add column if not exists ai_readiness jsonb;  -- AiReadinessScore (§7)
 ```
+
 Mirrors the `audits.confidence_band jsonb` precedent (`20260629000001`) and the additive-nullable posture of
 the crawl-health migration (`20260617000001`). `public_reports` (frozen-at-mint) is intentionally NOT touched.
 
 ## Step 1 — Dry-run rehearsal (optional, org is Free so no branching)
+
 A transaction-rollback rehearsal proves the DDL parses + applies cleanly with zero persistence:
+
 ```sql
 do $$
 begin
@@ -140,17 +146,21 @@ begin
   raise exception 'ROLLBACK REHEARSAL OK — migration parses + applies; nothing persisted';
 end $$;
 ```
+
 Expect: it errors with `ROLLBACK REHEARSAL OK …` (the RAISE forces a rollback of the whole DO block). Any
 OTHER error means stop and investigate.
 
 ## Step 2 — Apply (owner)
+
 Apply via the Supabase MCP `apply_migration`:
+
 - **name:** `20260708000001_spec05_ai_readiness`
 - **query:** the contents of `infra/supabase/migrations/20260708000001_spec05_ai_readiness.sql`
 
 (Or run the two `alter table … add column if not exists …` statements directly in the SQL editor.)
 
 ## Step 3 — Post-apply verification (Terminal 2 runs these via MCP once you confirm applied)
+
 1. Columns exist + nullable:
    ```sql
    select table_name, column_name, data_type, is_nullable from information_schema.columns
@@ -163,12 +173,14 @@ Apply via the Supabase MCP `apply_migration`:
    (no `user_id` on the wire). I'll verify `pg_policies` + `pg_class.relrowsecurity` are unchanged.
 
 ## After apply — Terminal 2 resumes Stage 4
+
 Persistence (`inngest/persist-helpers.ts` `buildPageRows` → `pages.ai_signals`; `inngest/persist-results.ts`
 → `audits.ai_readiness`) + projection gating in `projectAuditForClient` (FREE: score+ledger+matrix+
 homepageView; Pro-owner GATED: whatAiSees + on-demand aiPackets via `canUseActionPackets`, D4 — never
 persisted) + tests A11 (gating security) / A12 (RLS). This all lands AFTER the columns exist.
 
 ## Rollback
+
 Additive + nullable → safe to leave in place even if the feature is disabled (columns stay NULL). If a hard
 revert is ever needed: `alter table public.pages drop column if exists ai_signals;` /
 `alter table public.audits drop column if exists ai_readiness;` (only when no code reads them).
@@ -227,11 +239,13 @@ begin;
          has_column_privilege('service_role', 'public.pages','ai_signals','SELECT') as svc_ai_signals;
 rollback;
 ```
+
 Expect `false, false, true, true`. Anything else: stop and investigate.
 
 ## Step 2 — Apply (owner)
 
 Supabase MCP `apply_migration`:
+
 - **name:** `20260727000001_spec05_pages_ai_signals_privilege`
 - **query:** the contents of the file above
 
@@ -248,6 +262,7 @@ landing alone and silently breaking every client read of `pages`.
 
 Also confirm service-role is unaffected (the app's own reads are all service-role — `stream/route.ts`,
 `llms-txt/route.ts`, `export/route.ts`, `mint-snapshot.ts`, `persist-results.ts`):
+
 ```sql
 select has_column_privilege('service_role','public.pages','ai_signals','SELECT');   -- MUST be true
 ```
@@ -263,4 +278,5 @@ intended posture — it is exactly what made `audits.ai_readiness` safe by defau
 ```sql
 grant select on public.pages to anon, authenticated;   -- restores the prior, more permissive state
 ```
+
 Note this restores the bypass, so pair it with `AI_READINESS_EXTRACTION=0` + a redeploy.
