@@ -1,0 +1,44 @@
+/**
+ * The account door's constants. The Sign-up, Check-email and Continue pages render these; none of
+ * the numbers or addresses they show is typed in a component.
+ */
+
+/**
+ * How long a sign-in link works. Supabase Auth enforces it (`mailer_otp_exp`), not this code:
+ * `scripts/supabase/auth-config.ts --read` fails when production disagrees.
+ */
+export const AUTH_LINK_MINUTES = 15;
+export const AUTH_LINK_SECONDS = AUTH_LINK_MINUTES * 60;
+
+/**
+ * The address the sign-in link comes from. The Supabase email template sends it from magic@ today;
+ * CC-28 moves the template to signin@crawlmouse.com and changes this constant in the same step.
+ */
+export const SIGNIN_SENDER = 'magic@crawlmouse.com';
+
+/** The address change notes will come from. Nothing sends from it before CC-28. */
+export const ALERTS_SENDER = 'alerts@crawlmouse.com';
+
+/** How long a first audit takes, as the Check-email page says it. Shown only with V2_PIPELINE=1. */
+export const FIRST_AUDIT_MINUTES = 2;
+
+/** How long to wait for the email before checking spam. */
+export const RESEND_HINT_MINUTES = 1;
+
+/** The one trial reminder goes this many days before the trial ends (ARCH-2 §3.2, FACTS A8). */
+export const TRIAL_REMINDER_DAYS_BEFORE_END = 3;
+
+/** Cookie names. Each is httpOnly; their lifetimes are below. */
+export const COOKIES = {
+  /** The sign-in link's token, between the GET that receives it and the POST that verifies it. */
+  otp: 'cm_otp',
+  /** What a sign-up asked for: the first site and the time zone. */
+  signup: 'cm_signup',
+  /** A random per-browser id, one of the trial ledger's signals. */
+  device: 'cm_device',
+  /** The validated return target after sign-in (v1's cookie, shared). */
+  next: 'post_login_next',
+} as const;
+
+/** `cm_device` lives a year (SECURITY-DESIGN §5.3). */
+export const DEVICE_COOKIE_SECONDS = 365 * 24 * 60 * 60;
