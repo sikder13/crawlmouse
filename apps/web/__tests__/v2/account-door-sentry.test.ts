@@ -106,22 +106,30 @@ function capturedWith(mode: 'full' | 'integration' | 'scrubber' | 'none'): strin
   });
 }
 
-const CANARIES = ['LEAKCANARY', '11111111-1111', 'DEVICECANARY', 'SIGNUPCANARY', 'SESSIONCANARY'];
+/** Cookie values whose names Sentry's span filter catches (`auth`, `sb-`). */
+const NAMED_COOKIES = ['LEAKCANARY', 'DEVICECANARY', 'SIGNUPCANARY', 'FORCANARY', 'SESSIONCANARY'];
+/** What only the scrubber removes: v1's cookie and the claim id in span attributes, the URL token, a breadcrumb's filter. */
+const SCRUBBER_ONLY = ['ANONCANARY', '11111111-1111', 'URLCANARY', 'CHECKIDCANARY'];
 
-describe('the server SDK sends no door secret in an event', () => {
-  /** The cookie values; the link token in the request URL is the scrubber's alone to remove. */
-  const URL_TOKEN = 'URLCANARY';
-
+describe('the server SDK sends no door secret in an event or a transaction', () => {
   it.each([
-    ['with sentryServerOptions, as sentry.server.config.ts runs', 'full', [...CANARIES, URL_TOKEN]],
-    ['with the request-data integration alone: no cookie', 'integration', CANARIES],
-    ['with the scrubber alone: no cookie and no URL token', 'scrubber', [...CANARIES, URL_TOKEN]],
+    [
+      'with sentryServerOptions, as sentry.server.config.ts runs',
+      'full',
+      [...NAMED_COOKIES, ...SCRUBBER_ONLY],
+    ],
+    ['with the request-data integration alone: no named cookie', 'integration', NAMED_COOKIES],
+    ['with the scrubber alone: nothing', 'scrubber', [...NAMED_COOKIES, ...SCRUBBER_ONLY]],
   ] as const)(
     '%s',
     (_, mode, absent) => {
       const out = capturedWith(mode);
-      // The capture reached the transport: an empty run cannot pass.
+      // Both a message and a transaction reached the transport: an empty or broken run cannot pass,
+      // and the scrubber did not throw inside the SDK (which would replace the transaction).
       expect(out).toContain('auth.landing-failed');
+      expect(out).toContain('"type":"transaction"');
+      expect(out).toContain('door-transaction');
+      expect(out).not.toContain('Cannot set property');
       for (const canary of absent) expect(out, canary).not.toContain(canary);
     },
     60_000,
@@ -129,8 +137,39 @@ describe('the server SDK sends no door secret in an event', () => {
 
   it('without either, the SDK does send them (the test sees what it guards against)', () => {
     const out = capturedWith('none');
-    for (const canary of [...CANARIES, URL_TOKEN]) expect(out, canary).toContain(canary);
+    for (const canary of [...NAMED_COOKIES, 'ANONCANARY', 'URLCANARY', 'CHECKIDCANARY']) {
+      expect(out, canary).toContain(canary);
+    }
   }, 60_000);
+});
+
+describe('scrubDoorSecrets leaves the SDK’s own objects alone', () => {
+  it('does not walk sdkProcessingMetadata or a class instance, so a getter-only property cannot throw', () => {
+    class Live {
+      get $() {
+        return 'state';
+      }
+    }
+    const live = new Live();
+    const event = {
+      sdkProcessingMetadata: { capturedSpanScope: live },
+      other: live,
+      url: '?code=x',
+    };
+    expect(() => scrubDoorSecrets(event)).not.toThrow();
+    expect(event.sdkProcessingMetadata.capturedSpanScope).toBe(live);
+    expect(event.url).toBe('?code=[Filtered]');
+  });
+
+  it('drops span cookie-header attributes and PostgREST filter values', () => {
+    const out = scrubDoorSecrets({
+      data: {
+        'http.request.header.cookie.crawlmouse_anon': 'x',
+        'http.query': '?id=eq.abc&select=id',
+      },
+    });
+    expect(out.data).toEqual({ 'http.query': '?id=eq.[Filtered]&select=id' });
+  });
 });
 
 describe('scrubDoorSecrets, inside strings', () => {

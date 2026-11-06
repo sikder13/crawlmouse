@@ -1,8 +1,10 @@
 /**
  * Run by __tests__/v2/account-door-sentry.test.ts in a process of its own (the SDK instruments the
  * request path once per process): initialise the real server SDK with the options named by
- * argv[2], handle one request carrying every door cookie and a session cookie, capture a message
- * inside the handler, and print what reached the transport.
+ * argv[2], handle one request carrying every door cookie, v1's anonymous-session cookie and a
+ * session cookie; inside the handler make an outgoing PostgREST-shaped request (an `id=eq.` filter,
+ * which becomes a breadcrumb), finish a forced transaction, and capture a message; then print what
+ * reached the transport.
  */
 import { createRequire } from 'node:module';
 import { createServer, request } from 'node:http';
@@ -14,6 +16,7 @@ export const TOKEN = 'pkce_LEAKCANARY_77';
 
 type SentryNext = {
   init: (o: Record<string, unknown>) => void;
+  startSpan: (o: { name: string; forceTransaction: boolean }, fn: () => void) => void;
   requestDataIntegration: (o: { include: { cookies: false } }) => unknown;
   captureMessage: (m: string) => void;
   flush: (ms: number) => Promise<boolean>;
@@ -33,12 +36,21 @@ async function capturedWith(options: Record<string, unknown>): Promise<string> {
       flush: async () => true,
     }),
   });
-  const server = createServer((_req, res) => {
-    Sentry.captureMessage('auth.landing-failed');
-    res.end('ok');
+  let port = 0;
+  const server = createServer((req, res) => {
+    if (req.url?.startsWith('/rest/')) {
+      res.end('[]');
+      return;
+    }
+    void (async () => {
+      await fetch(`http://127.0.0.1:${port}/rest/v1/checks?select=id&id=eq.CHECKIDCANARY`);
+      Sentry.startSpan({ name: 'door-transaction', forceTransaction: true }, () => {});
+      Sentry.captureMessage('auth.landing-failed');
+      res.end('ok');
+    })();
   });
   await new Promise<void>((r) => server.listen(0, r));
-  const { port } = server.address() as AddressInfo;
+  port = (server.address() as AddressInfo).port;
   const otp = encodeURIComponent(
     JSON.stringify({ kind: 'token_hash', value: TOKEN, type: 'magiclink' }),
   );
@@ -47,6 +59,8 @@ async function capturedWith(options: Record<string, unknown>): Promise<string> {
     `${COOKIES.next}=%2Fapi%2Fchecks%2F11111111-1111-4111-8111-111111111111%2Fclaim`,
     `${COOKIES.device}=DEVICECANARY`,
     `${COOKIES.signup}=SIGNUPCANARY`,
+    `${COOKIES.binding}=FORCANARY`,
+    'crawlmouse_anon=ANONCANARY',
     'sb-abc-auth-token=SESSIONCANARY',
   ].join('; ');
   await new Promise<void>((resolve) =>

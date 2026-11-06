@@ -147,6 +147,15 @@ describe('with V2_ACCOUNT_DOOR=1', () => {
     expect(cookieNamed(again, 'cm_auth_device')).toBeUndefined();
   });
 
+  it('a door request that names no site or zone clears an earlier request’s site cookie', async () => {
+    const res = await call(
+      { email: 'b@b.com', claimCheckId: CHECK },
+      { origin: ORIGIN },
+      'cm_auth_signup=x',
+    );
+    expect(cookieNamed(res, 'cm_auth_signup')).toMatch(/Max-Age=0/);
+  });
+
   it('binds a door request to its address in cm_auth_for, as a hash', async () => {
     const res = await call({ email: 'Ada@Example.com', tz: 'UTC' });
     expect(valueOf(res, 'cm_auth_for')).toMatch(/^[0-9a-f]{64}$/);

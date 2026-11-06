@@ -190,6 +190,9 @@ export async function POST(req: Request) {
         maxAge: AUTH_LINK_SECONDS,
         path: '/',
       });
+    } else {
+      // A request that names nothing replaces an earlier one's ask, which the binding now disowns.
+      res.cookies.set(COOKIES.signup, '', { path: '/', maxAge: 0 });
     }
   }
   // The ledger's device signal, for every sign-in while the door is on: a sign-up through v1's
