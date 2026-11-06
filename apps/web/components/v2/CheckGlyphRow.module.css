@@ -1,0 +1,65 @@
+/* Verdicts by check: glyph-only pills in a grid (Final-Site), glyph runs in a row (Final-Dashboard). */
+
+.cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--v2-pill-h);
+  min-width: 26px;
+  padding: 0 7px;
+  border-radius: var(--v2-radius-pill);
+  box-sizing: border-box;
+}
+
+.glyph {
+  width: 10px;
+  height: 10px;
+  flex: none;
+}
+
+.ok {
+  background: var(--v2-okbg);
+  color: var(--v2-ok);
+}
+
+.warn {
+  background: var(--v2-warnbg);
+  color: var(--v2-warn);
+}
+
+.bad {
+  background: var(--v2-badbg);
+  color: var(--v2-bad);
+}
+
+.unverified,
+.neutral {
+  background: var(--v2-neubg);
+  color: var(--v2-neu);
+}
+
+.row {
+  display: inline-flex;
+}
+
+.glyphs {
+  display: inline-flex;
+  gap: 5px;
+}
+
+.okInk {
+  color: var(--v2-ok);
+}
+
+.warnInk {
+  color: var(--v2-warn);
+}
+
+.badInk {
+  color: var(--v2-bad);
+}
+
+.unverifiedInk,
+.neutralInk {
+  color: var(--v2-neu);
+}

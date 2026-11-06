@@ -8,6 +8,8 @@ import { NO_EXTRAS, contractLimits } from '../../../../lib/entitlement-v2';
 import { fixture } from '../../../../lib/v2/fixtures';
 import { firstRunNow, viewAt, type Viewer } from '../../../../lib/v2/view/account';
 import { accountShellView } from '../../../../lib/v2/view/account-shell';
+import { dashboardView } from '../../../../lib/v2/view/dashboard';
+import { siteView } from '../../../../lib/v2/view/site';
 
 /** example-outfitter.com's owner, on day 9 of the Pro trial (bad-site). */
 export const BAD_ACCOUNT_ID = 'a0000000-0000-4000-8000-000000000001';
@@ -75,3 +77,18 @@ const DATASET = {
 export function shellPreview(name: keyof typeof ACCOUNT_VIEWERS) {
   return accountShellView(viewAt(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]()), 'Sites');
 }
+
+/** The dashboard each preview renders. */
+export const dashboardPreview = (name: keyof typeof ACCOUNT_VIEWERS) =>
+  dashboardView(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]());
+
+/** The site each site preview opens: the account's primary site in every fixture. */
+export const SITE_OF = {
+  home: '50000000-0000-4000-8000-000000000001',
+  clean: cleanSite.id,
+  withheld: '50000000-0000-4000-8000-0000000000c9',
+} as const;
+
+/** The site page each preview renders. */
+export const sitePreview = (name: keyof typeof SITE_OF) =>
+  siteView(fixture(DATASET[name]), ACCOUNT_VIEWERS[name](), SITE_OF[name]);

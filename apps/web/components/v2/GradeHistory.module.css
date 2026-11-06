@@ -1,0 +1,49 @@
+/* The grade history chart (Final-Dashboard .chart): it scrolls on a phone rather than shrinking. */
+
+.history {
+  position: relative;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  min-width: 520px;
+  height: 194px;
+  padding: 8px 8px 0;
+  box-sizing: border-box;
+}
+
+.grid line {
+  stroke: var(--v2-line2);
+  stroke-width: 1;
+}
+
+.ticks text {
+  fill: var(--v2-mut);
+  font-family: var(--v2-font-mono);
+  font-size: 10px;
+}
+
+.first,
+.second {
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.first {
+  stroke: var(--v2-fg);
+}
+
+.second {
+  stroke: var(--v2-fg2);
+}
+
+.note {
+  fill: var(--v2-fg2);
+  font-family: var(--v2-font-body);
+  font-size: 11px;
+}
+
+.marker {
+  fill: var(--v2-bad);
+}

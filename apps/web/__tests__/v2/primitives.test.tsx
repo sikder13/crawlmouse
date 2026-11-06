@@ -7,6 +7,9 @@ import { scoreToLetter } from '../../../../packages/engine/src/grade';
 import {
   Button,
   Card,
+  CheckGlyph,
+  CheckGlyphRow,
+  GradeHistory,
   CoverageLine,
   coverageText,
   EVIDENCE_CLASSES,
@@ -26,6 +29,7 @@ import {
   type Verdict,
 } from '../../components/v2';
 import { WEB_ROOT } from './_lib/tokens-css';
+import { spokenRun, verdictCell } from '../../components/v2/screens/account/verdict-cells';
 
 const html = (el: React.ReactElement) => renderToStaticMarkup(el);
 const css = (name: string) =>
@@ -557,5 +561,85 @@ describe('AccountShell and TrialCard (behaviour: account-shell.test.tsx)', () =>
     const phone = src.slice(src.indexOf('@media (max-width: 760px)'));
     expect(phone).toMatch(/\.note \{\s*display: none;/);
     expect(phone).not.toMatch(/\.actions \{[^}]*display: none/);
+  });
+});
+
+describe('GradeHistory', () => {
+  const props = {
+    label: 'site · 3 checks',
+    labels: ['24 Oct', '26', 'Thu 29'],
+    dates: ['Sat 24 Oct', 'Mon 26 Oct', 'Thu 29 Oct'],
+    caption: 'Technical SEO 79 at all three checks; AI readability 41, then 22',
+  };
+  const out = html(
+    <GradeHistory
+      {...props}
+      series={[
+        { name: 'Technical SEO', values: [79, null, 80] },
+        { name: 'AI readability', values: [41, 41, 22], dashed: true },
+      ]}
+    />,
+  );
+
+  it('hides the drawing and gives a table of every value at every check instead (D9)', () => {
+    expect(out).toMatch(/<svg [^>]*aria-hidden="true"/);
+    expect(out).toContain(`<caption>${props.caption}</caption>`);
+    const cells = [...out.matchAll(/<td>([^<]*)<\/td>/g)].map((m) => m[1]);
+    expect(cells).toEqual(['79', '41', 'not graded', '41', '80', '22']);
+    expect([...out.matchAll(/<th scope="row">([^<]*)<\/th>/g)].map((m) => m[1])).toEqual(
+      props.dates,
+    );
+  });
+
+  it('breaks a line where a check gave no score, and dashes the second series', () => {
+    const lines = [...out.matchAll(/<polyline [^>]*points="([^"]+)"/g)].map((m) => m[1]);
+    expect(lines).toHaveLength(3); // 79 | 80 apart, and the AI line whole
+    expect(out).toMatch(/stroke-dasharray="4 3"/);
+  });
+
+  it('refuses a series that does not match the checks, or a score outside 0 to 100', () => {
+    const bad = (values: (number | null)[]) => () =>
+      html(
+        <GradeHistory
+          {...props}
+          series={[
+            { name: 'a', values },
+            { name: 'b', values: [1, 2, 3] },
+          ]}
+        />,
+      );
+    expect(bad([1, 2])).toThrow(/2 values for 3 checks/);
+    expect(bad([1, 2, 101])).toThrow(/outside 0–100/);
+  });
+});
+
+describe('CheckGlyphRow and CheckGlyph', () => {
+  const cells = [
+    verdictCell('allowed_thin', 'ai_training'),
+    verdictCell('disallowed_by_robots', 'ai_training'),
+  ];
+
+  it('draws one hidden glyph per check and says the run in words', () => {
+    const out = html(<CheckGlyphRow cells={cells} spoken={spokenRun(cells)} />);
+    expect(out.match(/data-v2-glyph=/g)).toHaveLength(2);
+    expect(out).toMatch(/<span [^>]*aria-hidden="true"><svg/);
+    expect(out).toContain('allowed, thin at check 1, then blocked by robots.txt at check 2');
+    expect(out).toContain('data-v2-verdicts="allowed_thin disallowed_by_robots"');
+  });
+
+  it('labels a grid cell with its verdict’s words, so no cell is a bare glyph', () => {
+    const out = html(<CheckGlyph cell={cells[1]!} />);
+    expect(out).toContain('data-v2-verdict="disallowed_by_robots"');
+    expect(out).toMatch(/data-v2-sr-only="">blocked by robots.txt</);
+  });
+
+  it('reads Google and Bing from robots.txt (FACTS B2), and a challenge as a challenge (I2)', () => {
+    expect(verdictCell('allowed', 'search_engine').label).toBe('allowed by robots.txt');
+    expect(verdictCell('allowed', 'ai_search').label).toBe('allowed');
+    expect(verdictCell('challenged_ua', 'ai_search')).toEqual({
+      state: 'unverified',
+      label: VERDICTS.challenged_ua.label,
+      verdict: 'challenged_ua',
+    });
   });
 });

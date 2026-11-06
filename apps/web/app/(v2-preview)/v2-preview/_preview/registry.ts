@@ -28,6 +28,8 @@ export const PREVIEWS: PreviewEntry[] = [
   { path: '/v2-preview/account-shell', name: 'AccountShell', kind: 'primitive' },
   { path: '/v2-preview/trial-card', name: 'TrialCard', kind: 'primitive' },
   { path: '/v2-preview/theme-control', name: 'ThemeControl', kind: 'primitive' },
+  { path: '/v2-preview/grade-history', name: 'GradeHistory', kind: 'primitive' },
+  { path: '/v2-preview/check-glyph-row', name: 'CheckGlyphRow', kind: 'primitive' },
   { path: '/v2-preview/screens/home', name: 'Final-Home', kind: 'screen' },
   {
     path: '/v2-preview/screens/crawl',

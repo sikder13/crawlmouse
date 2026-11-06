@@ -138,6 +138,24 @@ A single object on a hairline surface (rules 2 and 8).
 | `aria-label` | `string \| undefined`                          | no       |                                                                                       |
 | `children`   | `ReactNode`                                    | yes      |                                                                                       |
 
+### CheckGlyph
+
+One check's verdict as a tinted glyph with its words for a screen reader (rule 7).
+
+| Prop   | Type             | Required | Note |
+| ------ | ---------------- | -------- | ---- |
+| `cell` | `CheckGlyphCell` | yes      |      |
+
+### CheckGlyphRow
+
+A crawler's verdicts across checks, one glyph per check, ● ▲ ■ ○ in each state's colour. The
+glyphs are drawn and hidden; `spoken` says the same in words, in order.
+
+| Prop     | Type                        | Required | Note |
+| -------- | --------------------------- | -------- | ---- |
+| `cells`  | `readonly CheckGlyphCell[]` | yes      |      |
+| `spoken` | `string`                    | yes      |      |
+
 ### CookieSettings
 
 Re-opens the consent banner, so a visitor can change or withdraw an analytics decision (GDPR
@@ -211,6 +229,21 @@ A letter grade and its score out of 100, or a withheld grade that shows neither.
 | `size`     | `"md" \| "lg" \| undefined`       | no       |                                                                                           |
 | `withheld` | `boolean \| undefined`            | no       | The evidence cannot support a letter, so none is shown.                                   |
 | `children` | `ReactNode`                       | no       | One or two sentences under the grade.                                                     |
+
+### GradeHistory
+
+Two grades across a site's checks, as an inline SVG. The drawing is hidden from assistive
+technology; the table under it, read instead, lists every value at every check (D9).
+
+| Prop      | Type                                                                    | Required | Note                                                                                  |
+| --------- | ----------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------- |
+| `label`   | `string`                                                                | yes      | Names the chart's scroll region and its table.                                        |
+| `labels`  | `readonly string[]`                                                     | yes      | One axis label per check: "24 Oct", "26", "Thu 29".                                   |
+| `dates`   | `readonly string[]`                                                     | yes      | One date per check, in full, for the table the chart is read from.                    |
+| `series`  | `readonly [GradeSeries, GradeSeries]`                                   | yes      |                                                                                       |
+| `caption` | `string`                                                                | yes      | What the chart shows, in a sentence: the table's caption.                             |
+| `note`    | `{ series: 0 \| 1; text: string; } \| null \| undefined`                | no       | A note above a series' first run: "AI readability · 41 since the first audit".        |
+| `marker`  | `{ series: 0 \| 1; index: number; text: string; } \| null \| undefined` | no       | A marked point, drawn in the bad tone: "Claude-SearchBot and ClaudeBot blocked · 22". |
 
 ### Heading
 
@@ -411,6 +444,8 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | AccountShell                        | `/v2-preview/account-shell`                              | primitive |                                      |
 | TrialCard                           | `/v2-preview/trial-card`                                 | primitive |                                      |
 | ThemeControl                        | `/v2-preview/theme-control`                              | primitive |                                      |
+| GradeHistory                        | `/v2-preview/grade-history`                              | primitive |                                      |
+| CheckGlyphRow                       | `/v2-preview/check-glyph-row`                            | primitive |                                      |
 | Final-Home                          | `/v2-preview/screens/home`                               | screen    |                                      |
 | Final-Crawl                         | `/v2-preview/screens/crawl`                              | screen    | `?at=47000`, `?at=128000`, `?at=end` |
 | Crawl, clean re-run                 | `/v2-preview/screens/crawl/clean`                        | screen    | `?at=end`                            |

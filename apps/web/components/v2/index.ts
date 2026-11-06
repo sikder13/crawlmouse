@@ -29,6 +29,8 @@ export { Heading, type HeadingProps } from './Heading';
 export { PageShell, type PageShellProps } from './PageShell';
 export { AccountShell, type AccountShellProps, type RailLink } from './AccountShell';
 export { TrialCard, type TrialCardProps } from './TrialCard';
+export { GradeHistory, type GradeHistoryProps, type GradeSeries } from './GradeHistory';
+export { CheckGlyph, CheckGlyphRow, type CheckGlyphCell } from './CheckGlyphRow';
 export {
   ThemeControl,
   THEME_CHOICES,
