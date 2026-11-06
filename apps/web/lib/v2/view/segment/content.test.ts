@@ -20,6 +20,13 @@ describe('contentView: headline and tiles', () => {
     );
   });
 
+  it('a section with no score yet shows "not scored yet" in its pill, not a number', () => {
+    const v = view('bad-site', (c) => {
+      c.content = { ...c.content!, score: null, score_withheld: 'no_check_counted' };
+    });
+    expect(v.headline.pill).toEqual({ state: 'neutral', label: 'not scored yet' });
+  });
+
   it('reads the tiles from the checks: all pages, the weakest and strongest sections, schema', () => {
     expect(view('bad-site').tiles).toEqual([
       { label: 'Pages with a quotable opening', value: '52 of 214', note: null },

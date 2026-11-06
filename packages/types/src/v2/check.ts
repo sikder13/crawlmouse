@@ -26,6 +26,7 @@ import {
   CmsNameSchema,
   ConfidenceSchema,
   ContentCheckSchema,
+  ContentScoreWithheldSchema,
   CrawlerGroupSchema,
   DetectionStateSchema,
   EvidenceClassSchema,
@@ -136,23 +137,39 @@ export const StructureSchema = z.strictObject({
   generic_anchor_share: ShareSchema,
 });
 
-export const ContentSummarySchema = z.strictObject({
-  /** "Content an answer engine can quote", 0..100. */
-  score: ScoreSchema,
-  checks: z.array(
-    z.strictObject({
-      check: ContentCheckSchema,
-      /** Templates the check does not apply to are absent ("—" on the screen). */
-      by_template: z.array(
-        z.strictObject({
-          template_key: TemplateKeySchema,
-          passing: CountSchema,
-          total: CountSchema,
-        }),
-      ),
+export const ContentSummarySchema = z
+  .strictObject({
+    /**
+     * "Content an answer engine can quote", 0..100, over the checks marked `counted`; null while it
+     * cannot be given, and then `score_withheld` says why. The checks are reported either way.
+     */
+    score: ScoreSchema.nullable(),
+    score_withheld: ContentScoreWithheldSchema.nullable(),
+    checks: z.array(
+      z.strictObject({
+        check: ContentCheckSchema,
+        /** The check counts toward `score`; a check that does not is reported and scores nothing. */
+        counted: z.boolean(),
+        /** Templates the check does not apply to are absent ("—" on the screen). */
+        by_template: z.array(
+          z.strictObject({
+            template_key: TemplateKeySchema,
+            passing: CountSchema,
+            total: CountSchema,
+          }),
+        ),
+      }),
+    ),
+  })
+  .check(
+    rules((c, rule) => {
+      rule.exactlyWhen(
+        'content_score_withheld',
+        c.score === null,
+        (c.score_withheld ?? null) !== null,
+      );
     }),
-  ),
-});
+  );
 
 export const SignalResultSchema = z.strictObject({
   signal: SignalKindSchema,
@@ -270,10 +287,12 @@ export const CheckSchema = z
       if (sent && instant(c.result_email!.link_expires_at) <= instant(sent)) {
         rule.fail('check_result_link');
       }
-      if (c.ai_readability) {
-        const withheld = scoredCrawlersMeasured(c.crawlers ?? []) < 2;
-        if (withheld && !c.ai_readability.withheld) rule.fail('i4_withheld');
-        if (!withheld && c.ai_readability.withheld) rule.fail('i4_given');
+      // I4, by the contract's count over the crawler rows (scoredCrawlersMeasured): an unwithheld grade
+      // has two measured scored crawlers. The engine decides I4 with its own count (pages per crawler,
+      // a crawler blocked by choice left out), which can differ; the grade names its reasons
+      // (`withheld_reasons`).
+      if (c.ai_readability && !c.ai_readability.withheld) {
+        if (scoredCrawlersMeasured(c.crawlers ?? []) < 2) rule.fail('i4_withheld');
       }
     }),
   );

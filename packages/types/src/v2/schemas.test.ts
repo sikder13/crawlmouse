@@ -30,6 +30,7 @@ import {
   crawledText,
   CrawlerRegistryEntrySchema,
   CrawlerResultSchema,
+  ContentSummarySchema,
   EffectSchema,
   ENTITIES,
   FixEventSchema,
@@ -43,6 +44,7 @@ import {
   TechnicalSeoSchema,
   TimestampSchema,
   UsageEventSchema,
+  WithheldReasonSchema,
   RULE_CHECKS,
   RULES,
   UNMEASURED_VERDICTS,
@@ -334,6 +336,42 @@ const CASES: RuleCase[] = [
     input: () => ({
       ...fixNumbered(bad, 'open').effect,
       ai_readability_pending_on: ['0f1e000000000001'],
+    }),
+  },
+  {
+    rule: 'effect_pending',
+    breaks: 'estimated, and also waiting on a reason',
+    schema: EffectSchema,
+    input: () => ({
+      ...fixNumbered(bad, 'open').effect,
+      ai_readability_pending_on: ['readable_unmeasured'],
+    }),
+  },
+  {
+    rule: 'effect_seo_pending',
+    breaks: 'Technical SEO not estimated, and waiting on nothing',
+    schema: EffectSchema,
+    input: () => ({ ...fixNumbered(bad, 'open').effect, technical_seo: null }),
+  },
+  {
+    rule: 'effect_seo_pending',
+    breaks: 'Technical SEO estimated, and also waiting on a refused grade',
+    schema: EffectSchema,
+    input: () => ({
+      ...fixNumbered(bad, 'open').effect,
+      technical_seo_pending_on: ['grade_refused'],
+    }),
+  },
+  {
+    rule: 'effect_absorbed',
+    breaks: 'absorbed by another fix, with points of its own left',
+    schema: EffectSchema,
+    input: () => ({
+      ...fixNumbered(bad, 'open').effect,
+      technical_seo: 0.5,
+      ai_readability: 0,
+      ai_readability_pending_on: [],
+      absorbed_by: 1,
     }),
   },
   {
@@ -640,12 +678,6 @@ const CASES: RuleCase[] = [
     schema: CheckSchema,
     input: () => ({ ...partial(), ai_readability: finished().ai_readability }),
   },
-  {
-    rule: 'i4_given',
-    breaks: 'a withheld grade on a measured site',
-    schema: CheckSchema,
-    input: () => ({ ...finished(), ai_readability: withheldAi() }),
-  },
   // ── Grades ──────────────────────────────────────────────────────────────────────────────────
   {
     rule: 'score_grade_pair',
@@ -682,10 +714,145 @@ const CASES: RuleCase[] = [
     input: () => ({ ...finished().technical_seo!, score: null, grade: null }),
   },
   {
-    rule: 'access_range_order',
-    breaks: 'min above max',
+    rule: 'withheld_reasons',
+    breaks: 'withheld, naming no reason',
     schema: AiReadabilitySchema,
-    input: () => ({ ...withheldAi()!, access_range: { min: 30, max: 10 } }),
+    input: () => ({ ...withheldAi()!, withheld_reasons: [] }),
+  },
+  {
+    rule: 'withheld_reasons',
+    breaks: 'given, naming a reason',
+    schema: AiReadabilitySchema,
+    input: () => ({ ...finished().ai_readability!, withheld_reasons: ['readable_unmeasured'] }),
+  },
+  {
+    rule: 'component_range',
+    breaks: 'a component without a score and without a range',
+    schema: AiReadabilitySchema,
+    input: () => {
+      const g = withheldAi() as { components: Record<string, object> };
+      return {
+        ...g,
+        withheld_reasons: ['too_few_crawlers_measured', 'readable_unmeasured'],
+        components: {
+          ...g.components,
+          readable: { score: null, max: 30, heuristic: false, range: null },
+        },
+      };
+    },
+  },
+  {
+    rule: 'component_range',
+    breaks: 'a scored component with a range',
+    schema: AiReadabilitySchema,
+    input: () => {
+      const g = withheldAi() as { components: Record<string, object> };
+      return {
+        ...g,
+        components: {
+          ...g.components,
+          readable: { score: 18, max: 30, heuristic: false, range: { min: 0, max: 30 } },
+        },
+      };
+    },
+  },
+  {
+    rule: 'range_order',
+    breaks: 'a component range with min above max',
+    schema: AiReadabilitySchema,
+    input: () => {
+      const g = withheldAi() as { components: Record<string, object> };
+      return {
+        ...g,
+        withheld_reasons: ['too_few_crawlers_measured', 'quotable_unmeasured'],
+        components: {
+          ...g.components,
+          quotable: { score: null, max: 20, heuristic: true, range: { min: 15, max: 5 } },
+        },
+      };
+    },
+  },
+  {
+    rule: 'access_range_mirror',
+    breaks: 'access_range differs from the Access component range',
+    schema: AiReadabilitySchema,
+    input: () => ({ ...withheldAi()!, access_range: { min: 5, max: 30 } }),
+  },
+  {
+    rule: 'withheld_unmeasured',
+    breaks: 'withheld with every component scored',
+    schema: AiReadabilitySchema,
+    input: () => {
+      const g = withheldAi() as { components: Record<string, object> };
+      return {
+        ...g,
+        access_range: null,
+        components: {
+          ...g.components,
+          access: { score: 12, max: 40, heuristic: false, range: null },
+        },
+      };
+    },
+  },
+  {
+    rule: 'withheld_reasons_match',
+    breaks: 'a reason for a component that has a score',
+    schema: AiReadabilitySchema,
+    input: () => ({
+      ...withheldAi()!,
+      withheld_reasons: ['too_few_crawlers_measured', 'signals_unmeasured'],
+    }),
+  },
+  {
+    rule: 'withheld_reasons_match',
+    breaks: 'the same reason twice',
+    schema: AiReadabilitySchema,
+    input: () => ({
+      ...withheldAi()!,
+      withheld_reasons: ['too_few_crawlers_measured', 'too_few_crawlers_measured'],
+    }),
+  },
+  {
+    rule: 'withheld_reasons_match',
+    breaks: "a fix's reason on a grade",
+    schema: AiReadabilitySchema,
+    input: () => ({
+      ...withheldAi()!,
+      withheld_reasons: ['too_few_crawlers_measured', 'crawler_too_few_pages'],
+    }),
+  },
+  {
+    rule: 'withheld_reasons_match',
+    breaks: "a content fix's reason on a grade",
+    schema: AiReadabilitySchema,
+    input: () => ({
+      ...withheldAi()!,
+      withheld_reasons: ['too_few_crawlers_measured', 'check_not_scored'],
+    }),
+  },
+  {
+    rule: 'content_score_withheld',
+    breaks: 'no score, and no reason',
+    schema: ContentSummarySchema,
+    input: () => ({ ...finished().content!, score: null, score_withheld: null }),
+  },
+  {
+    rule: 'content_score_withheld',
+    breaks: 'a score, and a reason it has none',
+    schema: ContentSummarySchema,
+    input: () => ({ ...finished().content!, score_withheld: 'no_check_counted' }),
+  },
+  {
+    rule: 'fewer_crawlers',
+    breaks: 'scored from fewer crawlers, with Access unscored',
+    schema: AiReadabilitySchema,
+    input: () => ({ ...withheldAi()!, scored_from_fewer_crawlers: 1 }),
+  },
+  {
+    rule: 'fewer_crawlers',
+    breaks: 'scored from "fewer" crawlers that are two',
+    schema: AiReadabilitySchema,
+    input: () => ({ ...finished().ai_readability!, scored_from_fewer_crawlers: 2 }),
   },
   {
     rule: 'total_sum',
@@ -1394,6 +1561,14 @@ const BOUNDS: Record<string, string> = {
   'Check.ai_readability.components.signals.score': '[0, 10]',
   'Check.ai_readability.access_range.min': '[0, 40]',
   'Check.ai_readability.access_range.max': '[0, 40]',
+  'Check.ai_readability.components.access.range.min': '[0, 40]',
+  'Check.ai_readability.components.access.range.max': '[0, 40]',
+  'Check.ai_readability.components.readable.range.min': '[0, 30]',
+  'Check.ai_readability.components.readable.range.max': '[0, 30]',
+  'Check.ai_readability.components.quotable.range.min': '[0, 20]',
+  'Check.ai_readability.components.quotable.range.max': '[0, 20]',
+  'Check.ai_readability.components.signals.range.min': '[0, 10]',
+  'Check.ai_readability.components.signals.range.max': '[0, 10]',
   // A mean, so not a whole number.
   'Check.structure.avg_click_depth': '[0, inf)',
   'Check.structure.hub_pagerank_share': '[0, 1]',
@@ -1419,8 +1594,10 @@ const BOUNDS: Record<string, string> = {
   // A count or a share (or a yes/no, which is not a number).
   'Fix.before_after[].today': '[0, inf)',
   'Fix.before_after[].after': '[0, inf)',
-  'Fix.effect.technical_seo': '[0, 100]',
-  'Fix.effect.ai_readability': '[0, 100]',
+  'Fix.effect.technical_seo': '[-100, 100]',
+  'Fix.effect.ai_readability': '[-100, 100]',
+  'Fix.effect.absorbed_by': 'int [1, inf)',
+  'Check.ai_readability.scored_from_fewer_crawlers': 'int [1, inf)',
   'Fix.effort.minutes': 'int [1, inf)',
   'Fix.effort.templates': 'int [1, inf)',
   'Fix.effort.deploys': 'int [1, inf)',
@@ -1572,7 +1749,15 @@ describe('shapes and definitions', () => {
   it('a withheld access range may be a single point', () => {
     const ai = withheldAi()!;
     if (!ai.withheld) throw new Error('the partial check in challenged-site must be withheld');
-    const point = { ...ai, access_range: { min: ai.access_range.min, max: ai.access_range.min } };
+    const min = ai.access_range!.min;
+    const point = {
+      ...ai,
+      access_range: { min, max: min },
+      components: {
+        ...ai.components,
+        access: { ...ai.components.access, range: { min, max: min } },
+      },
+    };
     expect(AiReadabilitySchema.safeParse(point).success).toBe(true);
   });
 
@@ -1788,5 +1973,124 @@ describe('CC-12b contract additions', () => {
     expect(AccessTestSchema.safeParse({ ...t, method: null, http_version: null }).success).toBe(
       true,
     );
+  });
+});
+
+describe('CC-17 contract additions', () => {
+  it('a grade withheld for Readable alone keeps a measured Access score, with no access_range', () => {
+    const g = withheldAi() as { components: Record<string, object> };
+    const readableOnly = {
+      ...g,
+      withheld_reasons: ['readable_unmeasured'],
+      access_range: null,
+      components: {
+        ...g.components,
+        access: { score: 30, max: 40, heuristic: false, range: null },
+        readable: { score: null, max: 30, heuristic: false, range: { min: 0, max: 30 } },
+      },
+    };
+    expect(AiReadabilitySchema.safeParse(readableOnly).success).toBe(true);
+  });
+
+  it('a withheld grade may name several reasons, each with an unmeasured component', () => {
+    const g = withheldAi() as { components: Record<string, { max: number; heuristic: boolean }> };
+    const unmeasured = (max: number, heuristic: boolean) => ({
+      score: null,
+      max,
+      heuristic,
+      range: { min: 0, max },
+    });
+    const all = {
+      ...g,
+      withheld_reasons: [
+        'too_few_crawlers_measured',
+        'readable_unmeasured',
+        'quotable_unmeasured',
+        'signals_unmeasured',
+      ],
+      access_range: { min: 0, max: 40 },
+      components: {
+        access: unmeasured(40, false),
+        readable: unmeasured(30, false),
+        quotable: unmeasured(20, true),
+        signals: unmeasured(10, false),
+      },
+    };
+    expect(AiReadabilitySchema.safeParse(all).success).toBe(true);
+  });
+
+  it('a given grade may not carry a range on any component', () => {
+    const g = finished().ai_readability as { components: Record<string, object> };
+    const ranged = {
+      ...g,
+      components: {
+        ...g.components,
+        signals: { score: 10, max: 10, heuristic: false, range: { min: 0, max: 10 } },
+      },
+    };
+    expect(AiReadabilitySchema.safeParse(ranged).success).toBe(false);
+  });
+
+  const waiting = (pending: unknown[]) => ({
+    technical_seo: 0,
+    technical_seo_pending_on: [],
+    ai_readability: null,
+    ai_readability_pending_on: pending,
+    absorbed_by: null,
+    estimate: true,
+  });
+
+  it('an AI effect not yet estimated may wait on a reason, on fixes, or on both', () => {
+    for (const pending of [
+      ['readable_unmeasured'],
+      ['0f1e000000000001', 'too_few_crawlers_measured'],
+      WithheldReasonSchema.options,
+    ]) {
+      expect(EffectSchema.safeParse(waiting(pending)).success, String(pending)).toBe(true);
+    }
+  });
+
+  it('a refused grade: Technical SEO not estimated, waiting on grade_refused, with the AI effect as it is', () => {
+    const e = {
+      ...waiting(['readable_unmeasured']),
+      technical_seo: null,
+      technical_seo_pending_on: ['grade_refused'],
+    };
+    expect(EffectSchema.safeParse(e).success).toBe(true);
+    expect(
+      EffectSchema.safeParse({ ...e, technical_seo_pending_on: ['readable_unmeasured'] }).success,
+    ).toBe(false);
+  });
+
+  it('an absorbed fix names the number of the fix that took its effect, at zero or below', () => {
+    for (const technical_seo of [0, -0.26]) {
+      const e = { ...waiting(['readable_unmeasured']), technical_seo, absorbed_by: 3 };
+      expect(EffectSchema.safeParse(e).success, String(technical_seo)).toBe(true);
+    }
+    expect(
+      EffectSchema.safeParse({ ...waiting(['readable_unmeasured']), absorbed_by: 0 }).success,
+    ).toBe(false);
+  });
+
+  it('Access scored from one crawler, the rest disallowed by robots.txt, is a scored component', () => {
+    const g = withheldAi() as { components: Record<string, object> };
+    const one = {
+      ...g,
+      withheld_reasons: ['readable_unmeasured'],
+      access_range: null,
+      scored_from_fewer_crawlers: 1,
+      components: {
+        ...g.components,
+        access: { score: 40, max: 40, heuristic: false, range: null },
+        readable: { score: null, max: 30, heuristic: false, range: { min: 0, max: 30 } },
+      },
+    };
+    expect(AiReadabilitySchema.safeParse(one).success).toBe(true);
+  });
+
+  it('a waiting entry that is neither a fingerprint nor a reason is refused', () => {
+    for (const entry of ['readable', '0F1E000000000001', '0f1e00000000001', '']) {
+      expect(EffectSchema.safeParse(waiting([entry])).success, entry).toBe(false);
+    }
   });
 });

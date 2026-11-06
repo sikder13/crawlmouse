@@ -159,177 +159,199 @@ Fixture collection: `checks`.
 | Final-Dashboard     | "Crawler access now"              |
 | Final-Site          | "Grades, six checks"              |
 
-| Field                                          | Type                  | Null | Variant            | Added for           |
-| ---------------------------------------------- | --------------------- | ---- | ------------------ | ------------------- |
-| `id`                                           | `uuid`                | no   |                    |                     |
-| `site_id`                                      | `uuid`                | no   |                    |                     |
-| `previous_check_id`                            | `uuid`                | yes  |                    |                     |
-| `status`                                       | `CheckStatus`         | no   |                    |                     |
-| `trigger`                                      | `CheckTrigger`        | no   |                    | Final-Site          |
-| `grade_version`                                | `string`              | no   |                    |                     |
-| `queued_at`                                    | `timestamp`           | no   |                    | Final-Crawl         |
-| `started_at`                                   | `timestamp`           | yes  |                    | Final-Crawl         |
-| `finished_at`                                  | `timestamp`           | yes  |                    | Final-Home          |
-| `tested_at`                                    | `timestamp`           | yes  |                    | Final-Segment       |
-| `expires_at`                                   | `timestamp`           | yes  |                    | Final-Result        |
-| `deferred_until`                               | `timestamp`           | yes  |                    | brief               |
-| `failure_reason`                               | `string`              | yes  |                    | brief               |
-| `result_email`                                 | `object`              | yes  |                    | Final-Crawl         |
-| `result_email.sent_at`                         | `timestamp`           | yes  |                    |                     |
-| `result_email.link_expires_at`                 | `timestamp`           | no   |                    |                     |
-| `coverage`                                     | `object`              | yes  |                    |                     |
-| `coverage.pages_discovered`                    | `integer`             | no   |                    |                     |
-| `coverage.pages_crawled`                       | `integer`             | no   |                    |                     |
-| `coverage.pages_sampled`                       | `integer`             | no   |                    |                     |
-| `coverage.templates`                           | `object[]`            | no   |                    |                     |
-| `coverage.templates[].template_key`            | `string`              | no   |                    |                     |
-| `coverage.templates[].label`                   | `string`              | no   |                    |                     |
-| `coverage.templates[].pages`                   | `integer`             | no   |                    |                     |
-| `coverage.sample_strategy`                     | `object`              | no   |                    |                     |
-| `coverage.sample_strategy.method`              | `SampleMethod`        | no   |                    |                     |
-| `coverage.sample_strategy.max_pages`           | `integer`             | no   |                    |                     |
-| `coverage.gradeable`                           | `integer`             | no   |                    | brief               |
-| `coverage.excluded`                            | `object[]`            | no   |                    | brief               |
-| `coverage.excluded[].kind`                     | `PageKind`            | no   |                    |                     |
-| `coverage.excluded[].count`                    | `integer`             | no   |                    |                     |
-| `coverage.excluded_by_robots`                  | `integer`             | no   |                    | brief               |
-| `technical_seo`                                | `object`              | yes  |                    |                     |
-| `technical_seo.score`                          | `number`              | yes  |                    |                     |
-| `technical_seo.grade`                          | `GradeLetter`         | yes  |                    |                     |
-| `technical_seo.breakdown`                      | `object`              | no   |                    |                     |
-| `technical_seo.breakdown.orphanRatioScore`     | `number`              | no   |                    |                     |
-| `technical_seo.breakdown.depthScore`           | `number`              | no   |                    |                     |
-| `technical_seo.breakdown.anchorDiversityScore` | `number`              | no   |                    |                     |
-| `technical_seo.breakdown.structureScore`       | `number`              | no   |                    |                     |
-| `technical_seo.refusal`                        | `object`              | no   |                    |                     |
-| `technical_seo.refusal.refused`                | `boolean`             | no   |                    |                     |
-| `technical_seo.refusal.triggers`               | `RefusalTrigger[]`    | no   |                    |                     |
-| `technical_seo.refusal.confidenceCapped`       | `boolean`             | no   |                    |                     |
-| `technical_seo.refusal.unevaluable`            | `RefusalTrigger[]`    | no   |                    |                     |
-| `technical_seo.site_structure_score`           | `number`              | yes  |                    | Final-Seg-Structure |
-| `ai_readability`                               | `one of 2 variants`   | yes  |                    |                     |
-| `ai_readability.withheld`                      | `false`               | no   | `withheld = false` |                     |
-| `ai_readability.total`                         | `number`              | no   | `withheld = false` |                     |
-| `ai_readability.grade`                         | `GradeLetter`         | no   | `withheld = false` |                     |
-| `ai_readability.components`                    | `object`              | no   | `withheld = false` |                     |
-| `ai_readability.components.access`             | `object`              | no   | `withheld = false` |                     |
-| `ai_readability.components.access.score`       | `number`              | no   | `withheld = false` |                     |
-| `ai_readability.components.access.max`         | `40`                  | no   | `withheld = false` |                     |
-| `ai_readability.components.access.heuristic`   | `false`               | no   | `withheld = false` |                     |
-| `ai_readability.components.readable`           | `object`              | no   | `withheld = false` |                     |
-| `ai_readability.components.readable.score`     | `number`              | no   | `withheld = false` |                     |
-| `ai_readability.components.readable.max`       | `30`                  | no   | `withheld = false` |                     |
-| `ai_readability.components.readable.heuristic` | `false`               | no   | `withheld = false` |                     |
-| `ai_readability.components.quotable`           | `object`              | no   | `withheld = false` |                     |
-| `ai_readability.components.quotable.score`     | `number`              | no   | `withheld = false` |                     |
-| `ai_readability.components.quotable.max`       | `20`                  | no   | `withheld = false` |                     |
-| `ai_readability.components.quotable.heuristic` | `true`                | no   | `withheld = false` |                     |
-| `ai_readability.components.signals`            | `object`              | no   | `withheld = false` |                     |
-| `ai_readability.components.signals.score`      | `number`              | no   | `withheld = false` |                     |
-| `ai_readability.components.signals.max`        | `10`                  | no   | `withheld = false` |                     |
-| `ai_readability.components.signals.heuristic`  | `false`               | no   | `withheld = false` |                     |
-| `ai_readability.access_range`                  | `null`                | no   | `withheld = false` |                     |
-| `ai_readability.withheld`                      | `true`                | no   | `withheld = true`  |                     |
-| `ai_readability.total`                         | `null`                | no   | `withheld = true`  |                     |
-| `ai_readability.grade`                         | `null`                | no   | `withheld = true`  |                     |
-| `ai_readability.components`                    | `object`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.access`             | `object`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.access.score`       | `null`                | no   | `withheld = true`  |                     |
-| `ai_readability.components.access.max`         | `40`                  | no   | `withheld = true`  |                     |
-| `ai_readability.components.access.heuristic`   | `false`               | no   | `withheld = true`  |                     |
-| `ai_readability.components.readable`           | `object`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.readable.score`     | `number`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.readable.max`       | `30`                  | no   | `withheld = true`  |                     |
-| `ai_readability.components.readable.heuristic` | `false`               | no   | `withheld = true`  |                     |
-| `ai_readability.components.quotable`           | `object`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.quotable.score`     | `number`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.quotable.max`       | `20`                  | no   | `withheld = true`  |                     |
-| `ai_readability.components.quotable.heuristic` | `true`                | no   | `withheld = true`  |                     |
-| `ai_readability.components.signals`            | `object`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.signals.score`      | `number`              | no   | `withheld = true`  |                     |
-| `ai_readability.components.signals.max`        | `10`                  | no   | `withheld = true`  |                     |
-| `ai_readability.components.signals.heuristic`  | `false`               | no   | `withheld = true`  |                     |
-| `ai_readability.access_range`                  | `object`              | no   | `withheld = true`  |                     |
-| `ai_readability.access_range.min`              | `number`              | no   | `withheld = true`  |                     |
-| `ai_readability.access_range.max`              | `number`              | no   | `withheld = true`  |                     |
-| `structure`                                    | `object`              | yes  |                    | Final-Seg-Structure |
-| `structure.internal_links`                     | `integer`             | no   |                    |                     |
-| `structure.orphan_pages`                       | `integer`             | no   |                    |                     |
-| `structure.js_only_pages`                      | `integer`             | no   |                    |                     |
-| `structure.pages_deeper_than_3`                | `integer`             | no   |                    |                     |
-| `structure.avg_click_depth`                    | `number`              | no   |                    |                     |
-| `structure.hubs`                               | `integer`             | no   |                    |                     |
-| `structure.hub_pagerank_share`                 | `number`              | no   |                    |                     |
-| `structure.generic_anchor_share`               | `number`              | no   |                    |                     |
-| `without_js`                                   | `object`              | yes  |                    | Final-Seg-JS        |
-| `without_js.site_text_share`                   | `number`              | no   |                    |                     |
-| `content`                                      | `object`              | yes  |                    | Final-Seg-Content   |
-| `content.score`                                | `number`              | no   |                    |                     |
-| `content.checks`                               | `object[]`            | no   |                    |                     |
-| `content.checks[].check`                       | `ContentCheck`        | no   |                    |                     |
-| `content.checks[].by_template`                 | `object[]`            | no   |                    |                     |
-| `content.checks[].by_template[].template_key`  | `string`              | no   |                    |                     |
-| `content.checks[].by_template[].passing`       | `integer`             | no   |                    |                     |
-| `content.checks[].by_template[].total`         | `integer`             | no   |                    |                     |
-| `signals`                                      | `object[]`            | no   |                    | Final-Seg-Signals   |
-| `signals[].signal`                             | `SignalKind`          | no   |                    |                     |
-| `signals[].state`                              | `DetectionState`      | no   |                    |                     |
-| `signals[].counts_toward_grade`                | `boolean`             | no   |                    |                     |
-| `signals[].recommendation_class`               | `RecommendationClass` | no   |                    | PR #48              |
-| `signals[].evidence`                           | `string`              | no   |                    |                     |
-| `crawlers`                                     | `object[]`            | no   |                    | Final-Segment       |
-| `crawlers[].ua`                                | `string`              | no   |                    |                     |
-| `crawlers[].group`                             | `CrawlerGroup`        | no   |                    |                     |
-| `crawlers[].scored`                            | `boolean`             | no   |                    |                     |
-| `crawlers[].verdict`                           | `Verdict`             | no   |                    |                     |
-| `crawlers[].evidence_class`                    | `EvidenceClass`       | no   |                    |                     |
-| `crawlers[].status`                            | `integer`             | yes  |                    |                     |
-| `crawlers[].pages_measured`                    | `integer`             | no   |                    |                     |
-| `crawlers[].cause`                             | `AccessCause`         | yes  |                    |                     |
-| `crawlers[].text_share`                        | `number`              | yes  |                    |                     |
-| `crawlers[].confidence`                        | `Confidence`          | no   |                    |                     |
-| `crawlers[].by_template`                       | `object[]`            | no   |                    |                     |
-| `crawlers[].by_template[].template_key`        | `string`              | no   |                    |                     |
-| `crawlers[].by_template[].verdict`             | `Verdict`             | no   |                    |                     |
-| `crawlers[].by_template[].status`              | `integer`             | yes  |                    |                     |
-| `stack`                                        | `object`              | yes  |                    | Final-Fix           |
-| `stack.frontend`                               | `object`              | yes  |                    |                     |
-| `stack.frontend.name`                          | `string`              | no   |                    |                     |
-| `stack.frontend.framework`                     | `PacketFramework`     | no   |                    | PR #49              |
-| `stack.frontend.version`                       | `string`              | yes  |                    |                     |
-| `stack.frontend.router`                        | `string`              | yes  |                    |                     |
-| `stack.frontend.detected_from`                 | `string`              | no   |                    |                     |
-| `stack.backend`                                | `object`              | yes  |                    |                     |
-| `stack.backend.cms`                            | `CmsName`             | no   |                    |                     |
-| `stack.backend.detected_from`                  | `string`              | no   |                    |                     |
-| `stack.edge`                                   | `object`              | yes  |                    |                     |
-| `stack.edge.vendor`                            | `string`              | no   |                    |                     |
-| `stack.edge.detected_from`                     | `string`              | no   |                    |                     |
-| `competitors`                                  | `object[]`            | no   |                    | Final-Seg-Signals   |
-| `competitors[].host`                           | `string`              | no   |                    |                     |
-| `competitors[].crawlers_with_access`           | `integer`             | no   |                    |                     |
-| `competitors[].crawlers_tested`                | `integer`             | no   |                    |                     |
-| `competitors[].text_share`                     | `number`              | no   |                    |                     |
-| `competitors[].product_schema`                 | `boolean`             | no   |                    |                     |
-| `competitors[].technical_seo`                  | `object`              | no   |                    |                     |
-| `competitors[].technical_seo.score`            | `number`              | no   |                    |                     |
-| `competitors[].technical_seo.grade`            | `GradeLetter`         | no   |                    |                     |
-| `competitors[].ai_readability`                 | `object`              | yes  |                    |                     |
-| `competitors[].ai_readability.score`           | `number`              | no   |                    |                     |
-| `competitors[].ai_readability.grade`           | `GradeLetter`         | no   |                    |                     |
-| `competitors[].signals_present`                | `integer`             | yes  |                    |                     |
-| `progress`                                     | `object`              | yes  |                    | Final-Crawl         |
-| `progress.steps`                               | `object[]`            | no   |                    |                     |
-| `progress.steps[].phase`                       | `CheckPhase`          | no   |                    |                     |
-| `progress.steps[].state`                       | `StepState`           | no   |                    |                     |
-| `progress.pages_crawled`                       | `integer`             | no   |                    |                     |
-| `progress.pages_estimated`                     | `integer`             | yes  |                    |                     |
-| `progress.links_found`                         | `integer`             | no   |                    |                     |
-| `progress.elapsed_ms`                          | `integer`             | no   |                    |                     |
-| `progress.recent_fetches`                      | `object[]`            | no   |                    |                     |
-| `progress.recent_fetches[].url`                | `url`                 | no   |                    |                     |
-| `progress.recent_fetches[].status`             | `integer`             | no   |                    |                     |
-| `progress.recent_fetches[].links`              | `integer`             | no   |                    |                     |
+| Field                                          | Type                   | Null | Variant            | Added for           |
+| ---------------------------------------------- | ---------------------- | ---- | ------------------ | ------------------- |
+| `id`                                           | `uuid`                 | no   |                    |                     |
+| `site_id`                                      | `uuid`                 | no   |                    |                     |
+| `previous_check_id`                            | `uuid`                 | yes  |                    |                     |
+| `status`                                       | `CheckStatus`          | no   |                    |                     |
+| `trigger`                                      | `CheckTrigger`         | no   |                    | Final-Site          |
+| `grade_version`                                | `string`               | no   |                    |                     |
+| `queued_at`                                    | `timestamp`            | no   |                    | Final-Crawl         |
+| `started_at`                                   | `timestamp`            | yes  |                    | Final-Crawl         |
+| `finished_at`                                  | `timestamp`            | yes  |                    | Final-Home          |
+| `tested_at`                                    | `timestamp`            | yes  |                    | Final-Segment       |
+| `expires_at`                                   | `timestamp`            | yes  |                    | Final-Result        |
+| `deferred_until`                               | `timestamp`            | yes  |                    | brief               |
+| `failure_reason`                               | `string`               | yes  |                    | brief               |
+| `result_email`                                 | `object`               | yes  |                    | Final-Crawl         |
+| `result_email.sent_at`                         | `timestamp`            | yes  |                    |                     |
+| `result_email.link_expires_at`                 | `timestamp`            | no   |                    |                     |
+| `coverage`                                     | `object`               | yes  |                    |                     |
+| `coverage.pages_discovered`                    | `integer`              | no   |                    |                     |
+| `coverage.pages_crawled`                       | `integer`              | no   |                    |                     |
+| `coverage.pages_sampled`                       | `integer`              | no   |                    |                     |
+| `coverage.templates`                           | `object[]`             | no   |                    |                     |
+| `coverage.templates[].template_key`            | `string`               | no   |                    |                     |
+| `coverage.templates[].label`                   | `string`               | no   |                    |                     |
+| `coverage.templates[].pages`                   | `integer`              | no   |                    |                     |
+| `coverage.sample_strategy`                     | `object`               | no   |                    |                     |
+| `coverage.sample_strategy.method`              | `SampleMethod`         | no   |                    |                     |
+| `coverage.sample_strategy.max_pages`           | `integer`              | no   |                    |                     |
+| `coverage.gradeable`                           | `integer`              | no   |                    | brief               |
+| `coverage.excluded`                            | `object[]`             | no   |                    | brief               |
+| `coverage.excluded[].kind`                     | `PageKind`             | no   |                    |                     |
+| `coverage.excluded[].count`                    | `integer`              | no   |                    |                     |
+| `coverage.excluded_by_robots`                  | `integer`              | no   |                    | brief               |
+| `technical_seo`                                | `object`               | yes  |                    |                     |
+| `technical_seo.score`                          | `number`               | yes  |                    |                     |
+| `technical_seo.grade`                          | `GradeLetter`          | yes  |                    |                     |
+| `technical_seo.breakdown`                      | `object`               | no   |                    |                     |
+| `technical_seo.breakdown.orphanRatioScore`     | `number`               | no   |                    |                     |
+| `technical_seo.breakdown.depthScore`           | `number`               | no   |                    |                     |
+| `technical_seo.breakdown.anchorDiversityScore` | `number`               | no   |                    |                     |
+| `technical_seo.breakdown.structureScore`       | `number`               | no   |                    |                     |
+| `technical_seo.refusal`                        | `object`               | no   |                    |                     |
+| `technical_seo.refusal.refused`                | `boolean`              | no   |                    |                     |
+| `technical_seo.refusal.triggers`               | `RefusalTrigger[]`     | no   |                    |                     |
+| `technical_seo.refusal.confidenceCapped`       | `boolean`              | no   |                    |                     |
+| `technical_seo.refusal.unevaluable`            | `RefusalTrigger[]`     | no   |                    |                     |
+| `technical_seo.site_structure_score`           | `number`               | yes  |                    | Final-Seg-Structure |
+| `ai_readability`                               | `one of 2 variants`    | yes  |                    |                     |
+| `ai_readability.withheld`                      | `false`                | no   | `withheld = false` |                     |
+| `ai_readability.withheld_reasons`              | `WithheldReason[]`     | no   | `withheld = false` |                     |
+| `ai_readability.total`                         | `number`               | no   | `withheld = false` |                     |
+| `ai_readability.grade`                         | `GradeLetter`          | no   | `withheld = false` |                     |
+| `ai_readability.components`                    | `object`               | no   | `withheld = false` |                     |
+| `ai_readability.components.access`             | `object`               | no   | `withheld = false` |                     |
+| `ai_readability.components.access.score`       | `number`               | no   | `withheld = false` |                     |
+| `ai_readability.components.access.max`         | `40`                   | no   | `withheld = false` |                     |
+| `ai_readability.components.access.heuristic`   | `false`                | no   | `withheld = false` |                     |
+| `ai_readability.components.access.range`       | `null`                 | no   | `withheld = false` |                     |
+| `ai_readability.components.readable`           | `object`               | no   | `withheld = false` |                     |
+| `ai_readability.components.readable.score`     | `number`               | no   | `withheld = false` |                     |
+| `ai_readability.components.readable.max`       | `30`                   | no   | `withheld = false` |                     |
+| `ai_readability.components.readable.heuristic` | `false`                | no   | `withheld = false` |                     |
+| `ai_readability.components.readable.range`     | `null`                 | no   | `withheld = false` |                     |
+| `ai_readability.components.quotable`           | `object`               | no   | `withheld = false` |                     |
+| `ai_readability.components.quotable.score`     | `number`               | no   | `withheld = false` |                     |
+| `ai_readability.components.quotable.max`       | `20`                   | no   | `withheld = false` |                     |
+| `ai_readability.components.quotable.heuristic` | `true`                 | no   | `withheld = false` |                     |
+| `ai_readability.components.quotable.range`     | `null`                 | no   | `withheld = false` |                     |
+| `ai_readability.components.signals`            | `object`               | no   | `withheld = false` |                     |
+| `ai_readability.components.signals.score`      | `number`               | no   | `withheld = false` |                     |
+| `ai_readability.components.signals.max`        | `10`                   | no   | `withheld = false` |                     |
+| `ai_readability.components.signals.heuristic`  | `false`                | no   | `withheld = false` |                     |
+| `ai_readability.components.signals.range`      | `null`                 | no   | `withheld = false` |                     |
+| `ai_readability.access_range`                  | `null`                 | no   | `withheld = false` |                     |
+| `ai_readability.scored_from_fewer_crawlers`    | `integer`              | yes  | `withheld = false` |                     |
+| `ai_readability.withheld`                      | `true`                 | no   | `withheld = true`  |                     |
+| `ai_readability.withheld_reasons`              | `WithheldReason[]`     | no   | `withheld = true`  |                     |
+| `ai_readability.total`                         | `null`                 | no   | `withheld = true`  |                     |
+| `ai_readability.grade`                         | `null`                 | no   | `withheld = true`  |                     |
+| `ai_readability.components`                    | `object`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.access`             | `object`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.access.score`       | `number`               | yes  | `withheld = true`  |                     |
+| `ai_readability.components.access.max`         | `40`                   | no   | `withheld = true`  |                     |
+| `ai_readability.components.access.heuristic`   | `false`                | no   | `withheld = true`  |                     |
+| `ai_readability.components.access.range`       | `object`               | yes  | `withheld = true`  |                     |
+| `ai_readability.components.access.range.min`   | `number`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.access.range.max`   | `number`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable`           | `object`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable.score`     | `number`               | yes  | `withheld = true`  |                     |
+| `ai_readability.components.readable.max`       | `30`                   | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable.heuristic` | `false`                | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable.range`     | `object`               | yes  | `withheld = true`  |                     |
+| `ai_readability.components.readable.range.min` | `number`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.readable.range.max` | `number`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable`           | `object`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable.score`     | `number`               | yes  | `withheld = true`  |                     |
+| `ai_readability.components.quotable.max`       | `20`                   | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable.heuristic` | `true`                 | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable.range`     | `object`               | yes  | `withheld = true`  |                     |
+| `ai_readability.components.quotable.range.min` | `number`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.quotable.range.max` | `number`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals`            | `object`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals.score`      | `number`               | yes  | `withheld = true`  |                     |
+| `ai_readability.components.signals.max`        | `10`                   | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals.heuristic`  | `false`                | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals.range`      | `object`               | yes  | `withheld = true`  |                     |
+| `ai_readability.components.signals.range.min`  | `number`               | no   | `withheld = true`  |                     |
+| `ai_readability.components.signals.range.max`  | `number`               | no   | `withheld = true`  |                     |
+| `ai_readability.access_range`                  | `object`               | yes  | `withheld = true`  |                     |
+| `ai_readability.access_range.min`              | `number`               | no   | `withheld = true`  |                     |
+| `ai_readability.access_range.max`              | `number`               | no   | `withheld = true`  |                     |
+| `ai_readability.scored_from_fewer_crawlers`    | `integer`              | yes  | `withheld = true`  |                     |
+| `structure`                                    | `object`               | yes  |                    | Final-Seg-Structure |
+| `structure.internal_links`                     | `integer`              | no   |                    |                     |
+| `structure.orphan_pages`                       | `integer`              | no   |                    |                     |
+| `structure.js_only_pages`                      | `integer`              | no   |                    |                     |
+| `structure.pages_deeper_than_3`                | `integer`              | no   |                    |                     |
+| `structure.avg_click_depth`                    | `number`               | no   |                    |                     |
+| `structure.hubs`                               | `integer`              | no   |                    |                     |
+| `structure.hub_pagerank_share`                 | `number`               | no   |                    |                     |
+| `structure.generic_anchor_share`               | `number`               | no   |                    |                     |
+| `without_js`                                   | `object`               | yes  |                    | Final-Seg-JS        |
+| `without_js.site_text_share`                   | `number`               | no   |                    |                     |
+| `content`                                      | `object`               | yes  |                    | Final-Seg-Content   |
+| `content.score`                                | `number`               | yes  |                    |                     |
+| `content.score_withheld`                       | `ContentScoreWithheld` | yes  |                    |                     |
+| `content.checks`                               | `object[]`             | no   |                    |                     |
+| `content.checks[].check`                       | `ContentCheck`         | no   |                    |                     |
+| `content.checks[].counted`                     | `boolean`              | no   |                    |                     |
+| `content.checks[].by_template`                 | `object[]`             | no   |                    |                     |
+| `content.checks[].by_template[].template_key`  | `string`               | no   |                    |                     |
+| `content.checks[].by_template[].passing`       | `integer`              | no   |                    |                     |
+| `content.checks[].by_template[].total`         | `integer`              | no   |                    |                     |
+| `signals`                                      | `object[]`             | no   |                    | Final-Seg-Signals   |
+| `signals[].signal`                             | `SignalKind`           | no   |                    |                     |
+| `signals[].state`                              | `DetectionState`       | no   |                    |                     |
+| `signals[].counts_toward_grade`                | `boolean`              | no   |                    |                     |
+| `signals[].recommendation_class`               | `RecommendationClass`  | no   |                    | PR #48              |
+| `signals[].evidence`                           | `string`               | no   |                    |                     |
+| `crawlers`                                     | `object[]`             | no   |                    | Final-Segment       |
+| `crawlers[].ua`                                | `string`               | no   |                    |                     |
+| `crawlers[].group`                             | `CrawlerGroup`         | no   |                    |                     |
+| `crawlers[].scored`                            | `boolean`              | no   |                    |                     |
+| `crawlers[].verdict`                           | `Verdict`              | no   |                    |                     |
+| `crawlers[].evidence_class`                    | `EvidenceClass`        | no   |                    |                     |
+| `crawlers[].status`                            | `integer`              | yes  |                    |                     |
+| `crawlers[].pages_measured`                    | `integer`              | no   |                    |                     |
+| `crawlers[].cause`                             | `AccessCause`          | yes  |                    |                     |
+| `crawlers[].text_share`                        | `number`               | yes  |                    |                     |
+| `crawlers[].confidence`                        | `Confidence`           | no   |                    |                     |
+| `crawlers[].by_template`                       | `object[]`             | no   |                    |                     |
+| `crawlers[].by_template[].template_key`        | `string`               | no   |                    |                     |
+| `crawlers[].by_template[].verdict`             | `Verdict`              | no   |                    |                     |
+| `crawlers[].by_template[].status`              | `integer`              | yes  |                    |                     |
+| `stack`                                        | `object`               | yes  |                    | Final-Fix           |
+| `stack.frontend`                               | `object`               | yes  |                    |                     |
+| `stack.frontend.name`                          | `string`               | no   |                    |                     |
+| `stack.frontend.framework`                     | `PacketFramework`      | no   |                    | PR #49              |
+| `stack.frontend.version`                       | `string`               | yes  |                    |                     |
+| `stack.frontend.router`                        | `string`               | yes  |                    |                     |
+| `stack.frontend.detected_from`                 | `string`               | no   |                    |                     |
+| `stack.backend`                                | `object`               | yes  |                    |                     |
+| `stack.backend.cms`                            | `CmsName`              | no   |                    |                     |
+| `stack.backend.detected_from`                  | `string`               | no   |                    |                     |
+| `stack.edge`                                   | `object`               | yes  |                    |                     |
+| `stack.edge.vendor`                            | `string`               | no   |                    |                     |
+| `stack.edge.detected_from`                     | `string`               | no   |                    |                     |
+| `competitors`                                  | `object[]`             | no   |                    | Final-Seg-Signals   |
+| `competitors[].host`                           | `string`               | no   |                    |                     |
+| `competitors[].crawlers_with_access`           | `integer`              | no   |                    |                     |
+| `competitors[].crawlers_tested`                | `integer`              | no   |                    |                     |
+| `competitors[].text_share`                     | `number`               | no   |                    |                     |
+| `competitors[].product_schema`                 | `boolean`              | no   |                    |                     |
+| `competitors[].technical_seo`                  | `object`               | no   |                    |                     |
+| `competitors[].technical_seo.score`            | `number`               | no   |                    |                     |
+| `competitors[].technical_seo.grade`            | `GradeLetter`          | no   |                    |                     |
+| `competitors[].ai_readability`                 | `object`               | yes  |                    |                     |
+| `competitors[].ai_readability.score`           | `number`               | no   |                    |                     |
+| `competitors[].ai_readability.grade`           | `GradeLetter`          | no   |                    |                     |
+| `competitors[].signals_present`                | `integer`              | yes  |                    |                     |
+| `progress`                                     | `object`               | yes  |                    | Final-Crawl         |
+| `progress.steps`                               | `object[]`             | no   |                    |                     |
+| `progress.steps[].phase`                       | `CheckPhase`           | no   |                    |                     |
+| `progress.steps[].state`                       | `StepState`            | no   |                    |                     |
+| `progress.pages_crawled`                       | `integer`              | no   |                    |                     |
+| `progress.pages_estimated`                     | `integer`              | yes  |                    |                     |
+| `progress.links_found`                         | `integer`              | no   |                    |                     |
+| `progress.elapsed_ms`                          | `integer`              | no   |                    |                     |
+| `progress.recent_fetches`                      | `object[]`             | no   |                    |                     |
+| `progress.recent_fetches[].url`                | `url`                  | no   |                    |                     |
+| `progress.recent_fetches[].status`             | `integer`              | no   |                    |                     |
+| `progress.recent_fetches[].links`              | `integer`              | no   |                    |                     |
 
 ### PageResult
 
@@ -479,64 +501,66 @@ Fixture collection: `fixes`.
 | Final-Agencies       | "Link the 7 orphan pages from their collections" |
 | Final-Seg-Content    | "Fixes for quotable content"                     |
 
-| Field                              | Type                  | Null | Variant            | Added for            |
-| ---------------------------------- | --------------------- | ---- | ------------------ | -------------------- |
-| `id`                               | `uuid`                | no   |                    |                      |
-| `site_id`                          | `uuid`                | no   |                    |                      |
-| `fingerprint`                      | `string`              | no   |                    |                      |
-| `number`                           | `integer`             | no   |                    | Final-Site           |
-| `type`                             | `FixType`             | no   |                    |                      |
-| `section`                          | `FixSection`          | no   |                    | Final-Site           |
-| `title`                            | `string`              | no   |                    | Final-Fix            |
-| `detail`                           | `string`              | yes  |                    | Final-Seg-Structure  |
-| `recommendation_class`             | `RecommendationClass` | no   |                    |                      |
-| `status`                           | `FixStatus`           | no   |                    |                      |
-| `last_state`                       | `DetectionState`      | no   |                    |                      |
-| `last_measured_check_id`           | `uuid`                | no   |                    |                      |
-| `first_seen_check_id`              | `uuid`                | no   |                    |                      |
-| `confidence`                       | `Confidence`          | no   |                    |                      |
-| `affected_pages`                   | `integer`             | no   |                    |                      |
-| `template_key`                     | `string`              | yes  |                    |                      |
-| `crawler_uas`                      | `string[]`            | no   |                    | Final-Segment        |
-| `rank`                             | `integer`             | yes  |                    | Final-Dashboard-Day0 |
-| `effect`                           | `object`              | no   |                    |                      |
-| `effect.technical_seo`             | `number`              | no   |                    |                      |
-| `effect.ai_readability`            | `number`              | yes  |                    |                      |
-| `effect.ai_readability_pending_on` | `string[]`            | no   |                    |                      |
-| `effect.estimate`                  | `true`                | no   |                    |                      |
-| `effort`                           | `one of 2 variants`   | yes  |                    | Final-Public         |
-| `effort.kind`                      | `"minutes"`           | no   | `kind = minutes`   |                      |
-| `effort.minutes`                   | `integer`             | no   | `kind = minutes`   |                      |
-| `effort.kind`                      | `"templates"`         | no   | `kind = templates` |                      |
-| `effort.templates`                 | `integer`             | no   | `kind = templates` |                      |
-| `effort.deploys`                   | `integer`             | no   | `kind = templates` |                      |
-| `before_after`                     | `object[]`            | no   |                    | Final-Fix            |
-| `before_after[].measure`           | `FixMeasure`          | no   |                    |                      |
-| `before_after[].today`             | `number or boolean`   | no   |                    |                      |
-| `before_after[].after`             | `number or boolean`   | no   |                    |                      |
-| `before_after[].after_bound`       | `EstimateBound`       | no   |                    |                      |
-| `before_after[].after_is_estimate` | `true`                | no   |                    |                      |
-| `packet`                           | `object`              | yes  |                    | Final-Fix            |
-| `packet.framework`                 | `PacketFramework`     | no   |                    |                      |
-| `packet.frameworks`                | `PacketFramework[]`   | no   |                    |                      |
-| `packet.context`                   | `string[]`            | no   |                    |                      |
-| `packet.change`                    | `string[]`            | no   |                    |                      |
-| `packet.keep`                      | `string[]`            | no   |                    |                      |
-| `packet.verify`                    | `object`              | no   |                    |                      |
-| `packet.verify.command`            | `string`              | no   |                    |                      |
-| `packet.verify.expect`             | `string`              | no   |                    |                      |
-| `packet.verify.ua`                 | `string`              | yes  |                    |                      |
-| `packet.packets`                   | `object[]`            | no   |                    | PR #49               |
-| `packet.packets[].framework`       | `PacketFramework`     | no   |                    |                      |
-| `packet.packets[].context`         | `string[]`            | no   |                    |                      |
-| `packet.packets[].change`          | `string[]`            | no   |                    |                      |
-| `packet.packets[].keep`            | `string[]`            | no   |                    |                      |
-| `packet.packets[].verify`          | `object`              | no   |                    |                      |
-| `packet.packets[].verify.command`  | `string`              | no   |                    |                      |
-| `packet.packets[].verify.expect`   | `string`              | no   |                    |                      |
-| `packet.packets[].verify.ua`       | `string`              | yes  |                    |                      |
-| `gone`                             | `object`              | yes  |                    | PR #47               |
-| `gone.status_code`                 | `integer`             | no   |                    |                      |
+| Field                              | Type                         | Null | Variant            | Added for            |
+| ---------------------------------- | ---------------------------- | ---- | ------------------ | -------------------- |
+| `id`                               | `uuid`                       | no   |                    |                      |
+| `site_id`                          | `uuid`                       | no   |                    |                      |
+| `fingerprint`                      | `string`                     | no   |                    |                      |
+| `number`                           | `integer`                    | no   |                    | Final-Site           |
+| `type`                             | `FixType`                    | no   |                    |                      |
+| `section`                          | `FixSection`                 | no   |                    | Final-Site           |
+| `title`                            | `string`                     | no   |                    | Final-Fix            |
+| `detail`                           | `string`                     | yes  |                    | Final-Seg-Structure  |
+| `recommendation_class`             | `RecommendationClass`        | no   |                    |                      |
+| `status`                           | `FixStatus`                  | no   |                    |                      |
+| `last_state`                       | `DetectionState`             | no   |                    |                      |
+| `last_measured_check_id`           | `uuid`                       | no   |                    |                      |
+| `first_seen_check_id`              | `uuid`                       | no   |                    |                      |
+| `confidence`                       | `Confidence`                 | no   |                    |                      |
+| `affected_pages`                   | `integer`                    | no   |                    |                      |
+| `template_key`                     | `string`                     | yes  |                    |                      |
+| `crawler_uas`                      | `string[]`                   | no   |                    | Final-Segment        |
+| `rank`                             | `integer`                    | yes  |                    | Final-Dashboard-Day0 |
+| `effect`                           | `object`                     | no   |                    |                      |
+| `effect.technical_seo`             | `number`                     | yes  |                    |                      |
+| `effect.technical_seo_pending_on`  | `TechnicalSeoPending[]`      | no   |                    |                      |
+| `effect.ai_readability`            | `number`                     | yes  |                    |                      |
+| `effect.ai_readability_pending_on` | `string or WithheldReason[]` | no   |                    |                      |
+| `effect.absorbed_by`               | `integer`                    | yes  |                    |                      |
+| `effect.estimate`                  | `true`                       | no   |                    |                      |
+| `effort`                           | `one of 2 variants`          | yes  |                    | Final-Public         |
+| `effort.kind`                      | `"minutes"`                  | no   | `kind = minutes`   |                      |
+| `effort.minutes`                   | `integer`                    | no   | `kind = minutes`   |                      |
+| `effort.kind`                      | `"templates"`                | no   | `kind = templates` |                      |
+| `effort.templates`                 | `integer`                    | no   | `kind = templates` |                      |
+| `effort.deploys`                   | `integer`                    | no   | `kind = templates` |                      |
+| `before_after`                     | `object[]`                   | no   |                    | Final-Fix            |
+| `before_after[].measure`           | `FixMeasure`                 | no   |                    |                      |
+| `before_after[].today`             | `number or boolean`          | no   |                    |                      |
+| `before_after[].after`             | `number or boolean`          | no   |                    |                      |
+| `before_after[].after_bound`       | `EstimateBound`              | no   |                    |                      |
+| `before_after[].after_is_estimate` | `true`                       | no   |                    |                      |
+| `packet`                           | `object`                     | yes  |                    | Final-Fix            |
+| `packet.framework`                 | `PacketFramework`            | no   |                    |                      |
+| `packet.frameworks`                | `PacketFramework[]`          | no   |                    |                      |
+| `packet.context`                   | `string[]`                   | no   |                    |                      |
+| `packet.change`                    | `string[]`                   | no   |                    |                      |
+| `packet.keep`                      | `string[]`                   | no   |                    |                      |
+| `packet.verify`                    | `object`                     | no   |                    |                      |
+| `packet.verify.command`            | `string`                     | no   |                    |                      |
+| `packet.verify.expect`             | `string`                     | no   |                    |                      |
+| `packet.verify.ua`                 | `string`                     | yes  |                    |                      |
+| `packet.packets`                   | `object[]`                   | no   |                    | PR #49               |
+| `packet.packets[].framework`       | `PacketFramework`            | no   |                    |                      |
+| `packet.packets[].context`         | `string[]`                   | no   |                    |                      |
+| `packet.packets[].change`          | `string[]`                   | no   |                    |                      |
+| `packet.packets[].keep`            | `string[]`                   | no   |                    |                      |
+| `packet.packets[].verify`          | `object`                     | no   |                    |                      |
+| `packet.packets[].verify.command`  | `string`                     | no   |                    |                      |
+| `packet.packets[].verify.expect`   | `string`                     | no   |                    |                      |
+| `packet.packets[].verify.ua`       | `string`                     | yes  |                    |                      |
+| `gone`                             | `object`                     | yes  |                    | PR #47               |
+| `gone.status_code`                 | `integer`                    | no   |                    |                      |
 
 ### FixEvent
 
@@ -943,148 +967,159 @@ Null when the batch did all it was asked.
 
 Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X exactly when Y") can break in either direction, and has test cases that break it each way.
 
-| Rule                        | Message                                                                                        | Breaks    |
-| --------------------------- | ---------------------------------------------------------------------------------------------- | --------- |
-| `billing_period`            | billing is monthly (1) or annual (12)                                                          | one way   |
-| `history_current`           | the last state_history entry must be the current state                                         | one way   |
-| `history_forward`           | state_history must move forward in time                                                        | one way   |
-| `trial_consent`             | trial consent is recorded exactly when the account has had an Agency trial                     | both ways |
-| `trial_ends`                | trial_ends_at is set exactly while on a trial                                                  | both ways |
-| `branding_dns`              | dns status exists exactly when a report domain is set                                          | both ways |
-| `branding_email_auth`       | email checks exist exactly when a sender is set                                                | both ways |
-| `branding_postal`           | a sender address needs a postal address for the footer                                         | one way   |
-| `time_zone`                 | not an IANA time zone                                                                          | one way   |
-| `crawled_text_budget`       | crawled text is over its UTF-8 byte budget                                                     | one way   |
-| `crawled_text_surrogate`    | crawled text has a lone surrogate, which cannot be stored                                      | one way   |
-| `verification_alone`        | none_published stands alone                                                                    | one way   |
-| `verification_unique`       | verification methods are listed once each                                                      | one way   |
-| `ip_list_url`               | ip_list_url is set exactly when an IP list is published                                        | both ways |
-| `cloudflare_unique`         | Cloudflare's categories are listed once each                                                   | one way   |
-| `effect_pending`            | an AI effect is either estimated, or not yet estimated because of named fixes                  | both ways |
-| `fix_last_state`            | last_state does not fit the status                                                             | one way   |
-| `fix_rank`                  | every live fix has a rank and a resolved fix has none                                          | both ways |
-| `packet_framework`          | the packet framework must be one of its switch options                                         | one way   |
-| `packet_bodies`             | each further packet body is for another framework of the switch, once                          | one way   |
-| `page_gone_status`          | a gone page answered 404 or 410                                                                | one way   |
-| `fix_gone`                  | a fix whose page is gone was last measured indeterminate                                       | one way   |
-| `coverage_gradeable`        | gradeable and excluded pages cannot exceed the pages crawled                                   | one way   |
-| `coverage_crawled`          | pages_crawled cannot exceed pages_discovered                                                   | one way   |
-| `coverage_sampled`          | pages_sampled cannot exceed the crawl or the sample cap                                        | one way   |
-| `coverage_robots`           | pages crawled and pages excluded by robots.txt cannot exceed the pages discovered              | one way   |
-| `crawler_scored`            | exactly the ai_search crawlers are scored (FACTS I6)                                           | both ways |
-| `check_progress`            | progress is present exactly while running                                                      | both ways |
-| `check_not_started`         | not started yet                                                                                | one way   |
-| `check_started`             | started_at is required                                                                         | one way   |
-| `check_finished_at`         | finished_at is set exactly when the check has ended                                            | both ways |
-| `check_deferred_until`      | deferred_until is set exactly when deferred                                                    | both ways |
-| `check_failure_reason`      | failure_reason is set exactly when failed                                                      | both ways |
-| `check_coverage`            | coverage is set exactly when the crawl has finished                                            | both ways |
-| `check_both_grades`         | a finished check carries both grades                                                           | one way   |
-| `check_grades_when_ended`   | only a finished or partial check carries grades                                                | one way   |
-| `check_result_link`         | the result link expires after it is sent                                                       | one way   |
-| `i4_withheld`               | AI readability is withheld when fewer than two scored crawlers were measured (I4)              | one way   |
-| `i4_given`                  | AI readability is given when two or more scored crawlers were measured (I4)                    | one way   |
-| `score_grade_pair`          | score and grade are both present or both null                                                  | both ways |
-| `refusal_score`             | a refused grade has no score; a given one has                                                  | both ways |
-| `access_range_order`        | access_range.min must not exceed max                                                           | one way   |
-| `total_sum`                 | total is not the sum of its components                                                         | one way   |
-| `schedule_timed`            | a timed schedule has a weekday; on_deploy has none                                             | both ways |
-| `schedule_pair`             | a schedule sets its weekday and its hour together                                              | both ways |
-| `unkept_audit`              | an unkept audit has no schedule, client report or owner                                        | one way   |
-| `client_report_cadence`     | client reports go out weekly or monthly                                                        | one way   |
-| `alert_threshold`           | only the text-drop rule has a threshold, and it always has one                                 | both ways |
-| `alert_fired_pair`          | a firing records both when and which check                                                     | both ways |
-| `report_sent`               | sent_at is set exactly when sent                                                               | both ways |
-| `report_send_time`          | a scheduled or held report has a send time                                                     | one way   |
-| `report_slug`               | only a public link has a slug                                                                  | both ways |
-| `report_open_tracking`      | an open is known only with tracking on                                                         | one way   |
-| `observed_owner_logs`       | observed evidence comes from owner logs, and only it does                                      | both ways |
-| `access_request_line`       | the request method and HTTP version are recorded together                                      | both ways |
-| `access_identity_ua`        | an access row names a crawler exactly when it is a crawler row                                 | both ways |
-| `control_untagged`          | the browser control carries no Crawlmouse tag                                                  | one way   |
-| `access_witness`            | a witness is named exactly on a blocked_by_ua_rule row decided by our own requests             | both ways |
-| `witness_other`             | a witness is another identity than the crawler refused                                         | one way   |
-| `fly_region`                | a Fly region is recorded exactly when the request left from Fly                                | both ways |
-| `timing_order`              | a request's recorded phases are in order: DNS, connect, first byte, total                      | one way   |
-| `worker_request`            | signing, verification and the worker release are recorded exactly on the worker's own requests | both ways |
-| `worker_request_whole`      | signing, verification and the worker release are recorded together                             | one way   |
-| `declaration_answer`        | a declaration status is recorded exactly when the request was answered                         | both ways |
-| `declaration_bytes`         | a declaration byte count is recorded exactly when the request was answered                     | both ways |
-| `declaration_media_type`    | a declaration media type is recorded only from an answer                                       | one way   |
-| `declaration_cache_answer`  | a declaration kept from an earlier batch is an answer or its absence                           | one way   |
-| `declaration_not_requested` | why a declaration was not requested is recorded exactly when it was not requested              | both ways |
-| `head_text_absent`          | a title or description the page does not declare has no length and no cut                      | one way   |
-| `usage_billable`            | only a delivered result is billable                                                            | one way   |
-| `change_severity`           | severity is set exactly on an opened or resolved change                                        | both ways |
-| `change_resolved_info`      | a resolved change is info                                                                      | one way   |
-| `change_baseline`           | a baseline row is about the grade, compares no scores and names no fix                         | one way   |
-| `redirect_status`           | a redirect hop answers 301, 302, 303, 307 or 308                                               | one way   |
-| `redirect_loop`             | a redirect loop has at least one hop                                                           | one way   |
-| `canonical_href`            | a resolved canonical needs the href it was resolved from                                       | one way   |
-| `robots_verdict`            | a robots.txt verdict is allowed, disallowed_by_robots or not_measured                          | one way   |
-| `robots_ua_unique`          | each search engine has one robots.txt verdict                                                  | one way   |
-| `links_read_html`           | only an HTML response has its links read                                                       | one way   |
+| Rule                        | Message                                                                                                                                                   | Breaks    |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `billing_period`            | billing is monthly (1) or annual (12)                                                                                                                     | one way   |
+| `history_current`           | the last state_history entry must be the current state                                                                                                    | one way   |
+| `history_forward`           | state_history must move forward in time                                                                                                                   | one way   |
+| `trial_consent`             | trial consent is recorded exactly when the account has had an Agency trial                                                                                | both ways |
+| `trial_ends`                | trial_ends_at is set exactly while on a trial                                                                                                             | both ways |
+| `branding_dns`              | dns status exists exactly when a report domain is set                                                                                                     | both ways |
+| `branding_email_auth`       | email checks exist exactly when a sender is set                                                                                                           | both ways |
+| `branding_postal`           | a sender address needs a postal address for the footer                                                                                                    | one way   |
+| `time_zone`                 | not an IANA time zone                                                                                                                                     | one way   |
+| `crawled_text_budget`       | crawled text is over its UTF-8 byte budget                                                                                                                | one way   |
+| `crawled_text_surrogate`    | crawled text has a lone surrogate, which cannot be stored                                                                                                 | one way   |
+| `verification_alone`        | none_published stands alone                                                                                                                               | one way   |
+| `verification_unique`       | verification methods are listed once each                                                                                                                 | one way   |
+| `ip_list_url`               | ip_list_url is set exactly when an IP list is published                                                                                                   | both ways |
+| `cloudflare_unique`         | Cloudflare's categories are listed once each                                                                                                              | one way   |
+| `effect_pending`            | an AI effect is either estimated, or not yet estimated because of named fixes or reasons                                                                  | both ways |
+| `effect_seo_pending`        | a Technical SEO effect is either estimated, or not estimated because the grade is refused                                                                 | both ways |
+| `effect_absorbed`           | a fix absorbed by a higher-ranked one has no positive effect left                                                                                         | one way   |
+| `content_score_withheld`    | the Content section has a score, or no score and the reason it has none                                                                                   | both ways |
+| `fix_last_state`            | last_state does not fit the status                                                                                                                        | one way   |
+| `fix_rank`                  | every live fix has a rank and a resolved fix has none                                                                                                     | both ways |
+| `packet_framework`          | the packet framework must be one of its switch options                                                                                                    | one way   |
+| `packet_bodies`             | each further packet body is for another framework of the switch, once                                                                                     | one way   |
+| `page_gone_status`          | a gone page answered 404 or 410                                                                                                                           | one way   |
+| `fix_gone`                  | a fix whose page is gone was last measured indeterminate                                                                                                  | one way   |
+| `coverage_gradeable`        | gradeable and excluded pages cannot exceed the pages crawled                                                                                              | one way   |
+| `coverage_crawled`          | pages_crawled cannot exceed pages_discovered                                                                                                              | one way   |
+| `coverage_sampled`          | pages_sampled cannot exceed the crawl or the sample cap                                                                                                   | one way   |
+| `coverage_robots`           | pages crawled and pages excluded by robots.txt cannot exceed the pages discovered                                                                         | one way   |
+| `crawler_scored`            | exactly the ai_search crawlers are scored (FACTS I6)                                                                                                      | both ways |
+| `check_progress`            | progress is present exactly while running                                                                                                                 | both ways |
+| `check_not_started`         | not started yet                                                                                                                                           | one way   |
+| `check_started`             | started_at is required                                                                                                                                    | one way   |
+| `check_finished_at`         | finished_at is set exactly when the check has ended                                                                                                       | both ways |
+| `check_deferred_until`      | deferred_until is set exactly when deferred                                                                                                               | both ways |
+| `check_failure_reason`      | failure_reason is set exactly when failed                                                                                                                 | both ways |
+| `check_coverage`            | coverage is set exactly when the crawl has finished                                                                                                       | both ways |
+| `check_both_grades`         | a finished check carries both grades                                                                                                                      | one way   |
+| `check_grades_when_ended`   | only a finished or partial check carries grades                                                                                                           | one way   |
+| `check_result_link`         | the result link expires after it is sent                                                                                                                  | one way   |
+| `i4_withheld`               | AI readability is withheld when fewer than two scored crawlers were measured (I4)                                                                         | one way   |
+| `score_grade_pair`          | score and grade are both present or both null                                                                                                             | both ways |
+| `refusal_score`             | a refused grade has no score; a given one has                                                                                                             | both ways |
+| `total_sum`                 | total is not the sum of its components                                                                                                                    | one way   |
+| `withheld_reasons`          | a withheld grade names why, and a given one names no reason                                                                                               | both ways |
+| `component_range`           | a component without a score carries the range it could take, and a scored one none                                                                        | both ways |
+| `range_order`               | a component range's min must not exceed its max                                                                                                           | one way   |
+| `access_range_mirror`       | access_range is the Access component's range                                                                                                              | one way   |
+| `withheld_unmeasured`       | a withheld grade has at least one component without a score                                                                                               | one way   |
+| `withheld_reasons_match`    | withheld_reasons names each unscored component once: one Access reason, and readable_unmeasured, quotable_unmeasured or signals_unmeasured for the others | one way   |
+| `fewer_crawlers`            | scored_from_fewer_crawlers is set only when Access has a score, and counts fewer than two crawlers (I4)                                                   | one way   |
+| `schedule_timed`            | a timed schedule has a weekday; on_deploy has none                                                                                                        | both ways |
+| `schedule_pair`             | a schedule sets its weekday and its hour together                                                                                                         | both ways |
+| `unkept_audit`              | an unkept audit has no schedule, client report or owner                                                                                                   | one way   |
+| `client_report_cadence`     | client reports go out weekly or monthly                                                                                                                   | one way   |
+| `alert_threshold`           | only the text-drop rule has a threshold, and it always has one                                                                                            | both ways |
+| `alert_fired_pair`          | a firing records both when and which check                                                                                                                | both ways |
+| `report_sent`               | sent_at is set exactly when sent                                                                                                                          | both ways |
+| `report_send_time`          | a scheduled or held report has a send time                                                                                                                | one way   |
+| `report_slug`               | only a public link has a slug                                                                                                                             | both ways |
+| `report_open_tracking`      | an open is known only with tracking on                                                                                                                    | one way   |
+| `observed_owner_logs`       | observed evidence comes from owner logs, and only it does                                                                                                 | both ways |
+| `access_request_line`       | the request method and HTTP version are recorded together                                                                                                 | both ways |
+| `access_identity_ua`        | an access row names a crawler exactly when it is a crawler row                                                                                            | both ways |
+| `control_untagged`          | the browser control carries no Crawlmouse tag                                                                                                             | one way   |
+| `access_witness`            | a witness is named exactly on a blocked_by_ua_rule row decided by our own requests                                                                        | both ways |
+| `witness_other`             | a witness is another identity than the crawler refused                                                                                                    | one way   |
+| `fly_region`                | a Fly region is recorded exactly when the request left from Fly                                                                                           | both ways |
+| `timing_order`              | a request's recorded phases are in order: DNS, connect, first byte, total                                                                                 | one way   |
+| `worker_request`            | signing, verification and the worker release are recorded exactly on the worker's own requests                                                            | both ways |
+| `worker_request_whole`      | signing, verification and the worker release are recorded together                                                                                        | one way   |
+| `declaration_answer`        | a declaration status is recorded exactly when the request was answered                                                                                    | both ways |
+| `declaration_bytes`         | a declaration byte count is recorded exactly when the request was answered                                                                                | both ways |
+| `declaration_media_type`    | a declaration media type is recorded only from an answer                                                                                                  | one way   |
+| `declaration_cache_answer`  | a declaration kept from an earlier batch is an answer or its absence                                                                                      | one way   |
+| `declaration_not_requested` | why a declaration was not requested is recorded exactly when it was not requested                                                                         | both ways |
+| `head_text_absent`          | a title or description the page does not declare has no length and no cut                                                                                 | one way   |
+| `usage_billable`            | only a delivered result is billable                                                                                                                       | one way   |
+| `change_severity`           | severity is set exactly on an opened or resolved change                                                                                                   | both ways |
+| `change_resolved_info`      | a resolved change is info                                                                                                                                 | one way   |
+| `change_baseline`           | a baseline row is about the grade, compares no scores and names no fix                                                                                    | one way   |
+| `redirect_status`           | a redirect hop answers 301, 302, 303, 307 or 308                                                                                                          | one way   |
+| `redirect_loop`             | a redirect loop has at least one hop                                                                                                                      | one way   |
+| `canonical_href`            | a resolved canonical needs the href it was resolved from                                                                                                  | one way   |
+| `robots_verdict`            | a robots.txt verdict is allowed, disallowed_by_robots or not_measured                                                                                     | one way   |
+| `robots_ua_unique`          | each search engine has one robots.txt verdict                                                                                                             | one way   |
+| `links_read_html`           | only an HTML response has its links read                                                                                                                  | one way   |
 
 ## Enums
 
-| Enum                      | Coverage                                              | Values                                                                                                                                                                                                                                                                           |
-| ------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Verdict`                 | every value in a fixture                              | allowed, allowed_thin, disallowed_by_robots, blocked_by_ua_rule, challenged_ua, refused_unverified, rate_limited, payment_required, edge_blocks_automation, redirected_away, not_measured                                                                                        |
-| `EvidenceClass`           | every value in a fixture                              | declared, simulated, observed                                                                                                                                                                                                                                                    |
-| `CrawlerGroup`            | every value in a fixture                              | search_engine, ai_search, ai_training                                                                                                                                                                                                                                            |
-| `DetectionState`          | every value in a fixture                              | detected, not_detected, indeterminate                                                                                                                                                                                                                                            |
-| `FixStatus`               | every value in a fixture                              | open, marked_done, verified_resolved, unable_to_verify, reopened                                                                                                                                                                                                                 |
-| `RecommendationClass`     | every value in a fixture                              | confirmed_defect, documented_requirement, best_practice, experimental                                                                                                                                                                                                            |
-| `CheckStatus`             | every value in a fixture                              | queued, running, finished, partial, failed, deferred                                                                                                                                                                                                                             |
-| `AccountState`            | every value in a fixture                              | free, pro_trial, pro, agency_trial, agency, past_due                                                                                                                                                                                                                             |
-| `Confidence`              | every value in a fixture                              | confirmed, likely, inconclusive                                                                                                                                                                                                                                                  |
-| `SourceIpClass`           | every value in a fixture                              | fly_egress, browser_rendering, owner_logs, other_egress                                                                                                                                                                                                                          |
-| `GradeName`               | every value in a fixture                              | technical_seo, ai_readability                                                                                                                                                                                                                                                    |
-| `FixSection`              | every value in a fixture                              | crawler_access, without_js, structure, content                                                                                                                                                                                                                                   |
-| `FixType`                 | every value in a fixture                              | robots_txt_blocks_crawler, edge_rule_blocks_crawler, client_rendered_template, orphan_pages, quotable_opening, generic_anchor_text, deep_pages, specs_as_images, missing_author_date, js_only_navigation, redirect_chain, duplicate_pagination, canonical_mismatch, hreflang_gap |
-| `FixMeasure`              | every value in a fixture                              | words_without_js, crawlers_reading_text, quotable_opening, text_share                                                                                                                                                                                                            |
-| `EstimateBound`           | every value in a fixture                              | exact, approx, at_least                                                                                                                                                                                                                                                          |
-| `PacketFramework`         | every value in a fixture                              | nextjs, shopify_liquid, shopify_hydrogen, wordpress, webflow, generic                                                                                                                                                                                                            |
-| `CheckTrigger`            | every value in a fixture                              | first_audit, manual, scheduled, deploy, fix_recheck                                                                                                                                                                                                                              |
-| `CheckPhase`              | every value in a fixture                              | robots_and_sitemap, homepage, crawl, crawler_tests, without_js, grading                                                                                                                                                                                                          |
-| `StepState`               | every value in a fixture                              | done, now, next                                                                                                                                                                                                                                                                  |
-| `SampleMethod`            | every value in a fixture                              | stratified_by_template, census                                                                                                                                                                                                                                                   |
-| `AccessCause`             | every value in a fixture                              | cloudflare_1020, bot_fight_mode, client_rendered_template, robots_txt_disallow, automation_challenge, rate_limit_429, pay_per_crawl_402, cross_host_redirect, verified_bot_only                                                                                                  |
-| `SignalKind`              | every value in a fixture                              | schema_org, content_signals, web_bot_auth, llms_txt, mcp_server_card, markdown_negotiation, agent_skills_index, ucp, rsl, agent_card, llms_full                                                                                                                                  |
-| `ContentCheck`            | every value in a fixture                              | direct_answer_150, question_headings, schema_with_description, author_and_date, specs_as_text                                                                                                                                                                                    |
-| `JsTextState`             | every value in a fixture                              | readable, partial, empty_shell                                                                                                                                                                                                                                                   |
-| `FoundVia`                | every value in a fixture                              | link, sitemap, javascript                                                                                                                                                                                                                                                        |
-| `Cadence`                 | every value in a fixture                              | weekly, monthly, on_deploy                                                                                                                                                                                                                                                       |
-| `ChangeKind`              | every value in a fixture                              | opened, resolved, changed, baseline                                                                                                                                                                                                                                              |
-| `ChangeSubject`           | every value in a fixture                              | crawler_access, text_without_js, grade, orphans, content, structure, deploy                                                                                                                                                                                                      |
-| `Severity`                | every value in a fixture                              | bad, warn, info                                                                                                                                                                                                                                                                  |
-| `Channel`                 | every value in a fixture                              | email, slack                                                                                                                                                                                                                                                                     |
-| `AlertRuleKind`           | every value in a fixture                              | crawler_blocked, text_drop, grade_letter_moved, new_orphans, fix_regressed, any_change                                                                                                                                                                                           |
-| `ReportKind`              | every value in a fixture                              | audit_pdf, compare, raw_export, public_link, client_report, prospect_one_pager                                                                                                                                                                                                   |
-| `ReportFormat`            | every value in a fixture                              | pdf, csv, json, edge_list, html                                                                                                                                                                                                                                                  |
-| `ReportStatus`            | every value in a fixture                              | ready, scheduled, held, sent                                                                                                                                                                                                                                                     |
-| `ReportMaker`             | every value in a fixture                              | user, scheduled_check, report_schedule                                                                                                                                                                                                                                           |
-| `SeatRole`                | every value in a fixture                              | owner, account_manager, developer                                                                                                                                                                                                                                                |
-| `Theme`                   | every value in a fixture                              | system, light, dark                                                                                                                                                                                                                                                              |
-| `IntegrationKind`         | every value in a fixture                              | slack, search_console, vercel, cloudflare_analytics, vercel_drain                                                                                                                                                                                                                |
-| `WithheldCollection`      | every value in a fixture                              | page_results, link_edges, access_tests                                                                                                                                                                                                                                           |
-| `UsageKind`               | every value in a fixture                              | check_finished, export, api_call                                                                                                                                                                                                                                                 |
-| `UsageResult`             | every value in a fixture                              | delivered, refused, withheld, failed                                                                                                                                                                                                                                             |
-| `IdentityRole`            | every value in a fixture                              | control, crawler, canary, render                                                                                                                                                                                                                                                 |
-| `WitnessRole`             | every value in a fixture                              | crawler, canary                                                                                                                                                                                                                                                                  |
-| `RequestSigning`          | every value in a fixture                              | unsigned                                                                                                                                                                                                                                                                         |
-| `SignatureVerification`   | every value in a fixture                              | not_observable                                                                                                                                                                                                                                                                   |
-| `GradeLetter`             | pinned to v1 or the engine                            | A, A-, B+, B, B-, C+, C, C-, D+, D, D-, F                                                                                                                                                                                                                                        |
-| `PageKind`                | pinned to v1 or the engine                            | content, auth, search, pagination, archive, feed, status, utility, duplicate, thin                                                                                                                                                                                               |
-| `CmsName`                 | pinned to v1 or the engine                            | shopify, wordpress, webflow, wix, squarespace, framer, ghost, custom                                                                                                                                                                                                             |
-| `RefusalTrigger`          | pinned to v1 or the engine                            | too_few_gradeable_pages, site_too_small_to_measure, too_few_gradeable_after_exclusion, nothing_read, no_observed_links                                                                                                                                                           |
-| `VerificationMethod`      | registry seed only                                    | ip_list, reverse_dns, none_published                                                                                                                                                                                                                                             |
-| `CloudflareCategory`      | registry seed only                                    | search, agent, training                                                                                                                                                                                                                                                          |
-| `MeasurementStatus`       | computed by a function, every value from the fixtures | measured, not_measurable, unevaluable, withheld                                                                                                                                                                                                                                  |
-| `BatchPartialReason`      | worker batch result, pinned by the worker             | budget_requests, budget_bytes, budget_seconds, site_stopped, robots_unreachable, robots_too_large, site_refused, crawl_delay_over_limit, crawl_delay_10s_or_more, result_size                                                                                                    |
-| `DeclarationPath`         | worker batch result, pinned by the worker             | /llms.txt, /llms-full.txt, /.well-known/ucp, /.well-known/mcp, /.well-known/agent-card.json, /rsl.xml, /sitemap.xml                                                                                                                                                              |
-| `DeclarationState`        | worker batch result, pinned by the worker             | answered, no_response, not_requested                                                                                                                                                                                                                                             |
-| `DeclarationNotRequested` | worker batch result, pinned by the worker             | robots_disallowed, budget, site_stopped, site_blocked                                                                                                                                                                                                                            |
+| Enum                      | Coverage                                              | Values                                                                                                                                                                                                                                                                                                                             |
+| ------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Verdict`                 | every value in a fixture                              | allowed, allowed_thin, disallowed_by_robots, blocked_by_ua_rule, challenged_ua, refused_unverified, rate_limited, payment_required, edge_blocks_automation, redirected_away, not_measured                                                                                                                                          |
+| `EvidenceClass`           | every value in a fixture                              | declared, simulated, observed                                                                                                                                                                                                                                                                                                      |
+| `CrawlerGroup`            | every value in a fixture                              | search_engine, ai_search, ai_training                                                                                                                                                                                                                                                                                              |
+| `DetectionState`          | every value in a fixture                              | detected, not_detected, indeterminate                                                                                                                                                                                                                                                                                              |
+| `FixStatus`               | every value in a fixture                              | open, marked_done, verified_resolved, unable_to_verify, reopened                                                                                                                                                                                                                                                                   |
+| `RecommendationClass`     | every value in a fixture                              | confirmed_defect, documented_requirement, best_practice, experimental                                                                                                                                                                                                                                                              |
+| `CheckStatus`             | every value in a fixture                              | queued, running, finished, partial, failed, deferred                                                                                                                                                                                                                                                                               |
+| `AccountState`            | every value in a fixture                              | free, pro_trial, pro, agency_trial, agency, past_due                                                                                                                                                                                                                                                                               |
+| `Confidence`              | every value in a fixture                              | confirmed, likely, inconclusive                                                                                                                                                                                                                                                                                                    |
+| `SourceIpClass`           | every value in a fixture                              | fly_egress, browser_rendering, owner_logs, other_egress                                                                                                                                                                                                                                                                            |
+| `GradeName`               | every value in a fixture                              | technical_seo, ai_readability                                                                                                                                                                                                                                                                                                      |
+| `FixSection`              | every value in a fixture                              | crawler_access, without_js, structure, content                                                                                                                                                                                                                                                                                     |
+| `FixType`                 | every value in a fixture                              | robots_txt_blocks_crawler, edge_rule_blocks_crawler, client_rendered_template, orphan_pages, quotable_opening, generic_anchor_text, deep_pages, specs_as_images, missing_author_date, js_only_navigation, redirect_chain, duplicate_pagination, canonical_mismatch, hreflang_gap, missing_schema_description, no_question_headings |
+| `FixMeasure`              | every value in a fixture                              | words_without_js, crawlers_reading_text, quotable_opening, text_share                                                                                                                                                                                                                                                              |
+| `EstimateBound`           | every value in a fixture                              | exact, approx, at_least                                                                                                                                                                                                                                                                                                            |
+| `PacketFramework`         | every value in a fixture                              | nextjs, shopify_liquid, shopify_hydrogen, wordpress, webflow, generic                                                                                                                                                                                                                                                              |
+| `CheckTrigger`            | every value in a fixture                              | first_audit, manual, scheduled, deploy, fix_recheck                                                                                                                                                                                                                                                                                |
+| `CheckPhase`              | every value in a fixture                              | robots_and_sitemap, homepage, crawl, crawler_tests, without_js, grading                                                                                                                                                                                                                                                            |
+| `StepState`               | every value in a fixture                              | done, now, next                                                                                                                                                                                                                                                                                                                    |
+| `SampleMethod`            | every value in a fixture                              | stratified_by_template, census                                                                                                                                                                                                                                                                                                     |
+| `AccessCause`             | every value in a fixture                              | cloudflare_1020, bot_fight_mode, client_rendered_template, robots_txt_disallow, automation_challenge, rate_limit_429, pay_per_crawl_402, cross_host_redirect, verified_bot_only                                                                                                                                                    |
+| `SignalKind`              | every value in a fixture                              | schema_org, content_signals, web_bot_auth, llms_txt, mcp_server_card, markdown_negotiation, agent_skills_index, ucp, rsl, agent_card, llms_full                                                                                                                                                                                    |
+| `ContentCheck`            | every value in a fixture                              | direct_answer_150, question_headings, schema_with_description, author_and_date, specs_as_text                                                                                                                                                                                                                                      |
+| `JsTextState`             | every value in a fixture                              | readable, partial, empty_shell                                                                                                                                                                                                                                                                                                     |
+| `FoundVia`                | every value in a fixture                              | link, sitemap, javascript                                                                                                                                                                                                                                                                                                          |
+| `Cadence`                 | every value in a fixture                              | weekly, monthly, on_deploy                                                                                                                                                                                                                                                                                                         |
+| `ChangeKind`              | every value in a fixture                              | opened, resolved, changed, baseline                                                                                                                                                                                                                                                                                                |
+| `ChangeSubject`           | every value in a fixture                              | crawler_access, text_without_js, grade, orphans, content, structure, deploy                                                                                                                                                                                                                                                        |
+| `Severity`                | every value in a fixture                              | bad, warn, info                                                                                                                                                                                                                                                                                                                    |
+| `Channel`                 | every value in a fixture                              | email, slack                                                                                                                                                                                                                                                                                                                       |
+| `AlertRuleKind`           | every value in a fixture                              | crawler_blocked, text_drop, grade_letter_moved, new_orphans, fix_regressed, any_change                                                                                                                                                                                                                                             |
+| `ReportKind`              | every value in a fixture                              | audit_pdf, compare, raw_export, public_link, client_report, prospect_one_pager                                                                                                                                                                                                                                                     |
+| `ReportFormat`            | every value in a fixture                              | pdf, csv, json, edge_list, html                                                                                                                                                                                                                                                                                                    |
+| `ReportStatus`            | every value in a fixture                              | ready, scheduled, held, sent                                                                                                                                                                                                                                                                                                       |
+| `ReportMaker`             | every value in a fixture                              | user, scheduled_check, report_schedule                                                                                                                                                                                                                                                                                             |
+| `SeatRole`                | every value in a fixture                              | owner, account_manager, developer                                                                                                                                                                                                                                                                                                  |
+| `Theme`                   | every value in a fixture                              | system, light, dark                                                                                                                                                                                                                                                                                                                |
+| `IntegrationKind`         | every value in a fixture                              | slack, search_console, vercel, cloudflare_analytics, vercel_drain                                                                                                                                                                                                                                                                  |
+| `WithheldCollection`      | every value in a fixture                              | page_results, link_edges, access_tests                                                                                                                                                                                                                                                                                             |
+| `UsageKind`               | every value in a fixture                              | check_finished, export, api_call                                                                                                                                                                                                                                                                                                   |
+| `UsageResult`             | every value in a fixture                              | delivered, refused, withheld, failed                                                                                                                                                                                                                                                                                               |
+| `IdentityRole`            | every value in a fixture                              | control, crawler, canary, render                                                                                                                                                                                                                                                                                                   |
+| `WitnessRole`             | every value in a fixture                              | crawler, canary                                                                                                                                                                                                                                                                                                                    |
+| `RequestSigning`          | every value in a fixture                              | unsigned                                                                                                                                                                                                                                                                                                                           |
+| `SignatureVerification`   | every value in a fixture                              | not_observable                                                                                                                                                                                                                                                                                                                     |
+| `GradeLetter`             | pinned to v1 or the engine                            | A, A-, B+, B, B-, C+, C, C-, D+, D, D-, F                                                                                                                                                                                                                                                                                          |
+| `PageKind`                | pinned to v1 or the engine                            | content, auth, search, pagination, archive, feed, status, utility, duplicate, thin                                                                                                                                                                                                                                                 |
+| `CmsName`                 | pinned to v1 or the engine                            | shopify, wordpress, webflow, wix, squarespace, framer, ghost, custom                                                                                                                                                                                                                                                               |
+| `RefusalTrigger`          | pinned to v1 or the engine                            | too_few_gradeable_pages, site_too_small_to_measure, too_few_gradeable_after_exclusion, nothing_read, no_observed_links                                                                                                                                                                                                             |
+| `WithheldReason`          | pinned to v1 or the engine                            | too_few_crawlers_measured, blocked_by_choice, readable_unmeasured, quotable_unmeasured, signals_unmeasured, crawler_too_few_pages, check_not_scored                                                                                                                                                                                |
+| `TechnicalSeoPending`     | pinned to v1 or the engine                            | grade_refused                                                                                                                                                                                                                                                                                                                      |
+| `ContentScoreWithheld`    | pinned to v1 or the engine                            | no_check_counted, pages_not_read, no_check_applied                                                                                                                                                                                                                                                                                 |
+| `VerificationMethod`      | registry seed only                                    | ip_list, reverse_dns, none_published                                                                                                                                                                                                                                                                                               |
+| `CloudflareCategory`      | registry seed only                                    | search, agent, training                                                                                                                                                                                                                                                                                                            |
+| `MeasurementStatus`       | computed by a function, every value from the fixtures | measured, not_measurable, unevaluable, withheld                                                                                                                                                                                                                                                                                    |
+| `BatchPartialReason`      | worker batch result, pinned by the worker             | budget_requests, budget_bytes, budget_seconds, site_stopped, robots_unreachable, robots_too_large, site_refused, crawl_delay_over_limit, crawl_delay_10s_or_more, result_size                                                                                                                                                      |
+| `DeclarationPath`         | worker batch result, pinned by the worker             | /llms.txt, /llms-full.txt, /.well-known/ucp, /.well-known/mcp, /.well-known/agent-card.json, /rsl.xml, /sitemap.xml                                                                                                                                                                                                                |
+| `DeclarationState`        | worker batch result, pinned by the worker             | answered, no_response, not_requested                                                                                                                                                                                                                                                                                               |
+| `DeclarationNotRequested` | worker batch result, pinned by the worker             | robots_disallowed, budget, site_stopped, site_blocked                                                                                                                                                                                                                                                                              |
 
 ## Open items for the engine stream
 
@@ -1100,6 +1135,6 @@ Records per collection in each frozen fixture under `apps/web/lib/fixtures/v2/`.
 
 | Fixture                | as_of                | accounts | seats | sites | checks | page_results | link_edges | access_tests | fixes | fix_events | changes | alert_rules | reports | engine_derived |
 | ---------------------- | -------------------- | -------- | ----- | ----- | ------ | ------------ | ---------- | ------------ | ----- | ---------- | ------- | ----------- | ------- | -------------- |
-| `bad-site.json`        | 2026-10-30T10:05:00Z | 1        | 1     | 5     | 15     | 16           | 11         | 13           | 15    | 4          | 8       | 6           | 4       | 185            |
+| `bad-site.json`        | 2026-10-30T10:05:00Z | 1        | 1     | 5     | 15     | 16           | 11         | 13           | 17    | 4          | 8       | 6           | 4       | 185            |
 | `clean-site.json`      | 2026-10-27T15:42:00Z | 0        | 0     | 1     | 2      | 2            | 2          | 2            | 0     | 0          | 0       | 0           | 0       | 6              |
 | `challenged-site.json` | 2026-11-02T12:00:00Z | 2        | 5     | 3     | 7      | 1            | 0          | 9            | 2     | 3          | 1       | 2           | 6       | 10             |

@@ -111,4 +111,33 @@ describe('sectionFixes: a row that groups several fixes', () => {
       '+2 Technical SEO, +3 AI readability together; AI effect not yet estimated for 1',
     );
   });
+
+  it('with no effect estimated on either grade, says so', () => {
+    const { d, check } = edited('bad-site', (_, ds) => {
+      for (const f of ds.fixes) {
+        f.effect.technical_seo = null;
+        f.effect.technical_seo_pending_on = ['grade_refused'];
+        f.effect.ai_readability = null;
+        f.effect.ai_readability_pending_on = ['readable_unmeasured'];
+      }
+    });
+    const rest = sectionFixes(d, check, 'structure').pro.at(-1)!;
+    expect(rest.points).toBe(
+      `no estimated effect; Technical SEO effect not estimated for ${rest.count}; AI effect not yet estimated for ${rest.count}`,
+    );
+  });
+
+  it('on a refused grade, counts the fixes whose Technical SEO effect is not estimated, and shows no +0', () => {
+    const { d, check } = edited('bad-site', (_, ds) => {
+      for (const f of ds.fixes) {
+        f.effect.technical_seo = null;
+        f.effect.technical_seo_pending_on = ['grade_refused'];
+      }
+    });
+    const rest = sectionFixes(d, check, 'structure').pro.at(-1)!;
+    // their AI effects are estimated, at 0 on these fixtures, so that estimate is what shows
+    expect(rest.points).toBe(
+      `+0 AI readability together; Technical SEO effect not estimated for ${rest.count}`,
+    );
+  });
 });

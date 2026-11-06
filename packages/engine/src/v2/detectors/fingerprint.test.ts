@@ -1,6 +1,6 @@
 import { FingerprintSchema } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
-import { fingerprintKey, fingerprintOf, KEY_PREFIX } from './fingerprint.js';
+import { fingerprintKey, fingerprintOf, KEY_PREFIX, subjectOfKey } from './fingerprint.js';
 
 describe('fingerprints', () => {
   it('keys each structure fix type as ENGINE-GAP §5 names it', () => {
@@ -31,5 +31,12 @@ describe('fingerprints', () => {
     for (const p of prints) expect(FingerprintSchema.safeParse(p).success).toBe(true);
     expect(new Set(prints).size).toBe(3);
     expect(fingerprintOf(keys[0]!)).toBe(prints[0]);
+  });
+});
+
+describe('subjectOfKey', () => {
+  it('is what follows the prefix, a URL with its own colons included', () => {
+    expect(subjectOfKey('orphan:https://a.test/x:y')).toBe('https://a.test/x:y');
+    expect(subjectOfKey('answer:/blog/{slug}')).toBe('/blog/{slug}');
   });
 });

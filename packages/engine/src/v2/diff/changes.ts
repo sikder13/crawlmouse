@@ -64,7 +64,7 @@ function withId(row: Row): Change {
 function row(
   ctx: RowContext,
   fields: Omit<Row, keyof Omit<RowContext, 'pages_crawled'> | 'notified' | 'severity'>,
-  fix: Pick<Fix, 'effect'> | null = null,
+  fix: Pick<Fix, 'effect' | 'type'> | null = null,
 ): Change {
   const { site_id, check_id, previous_check_id, detected_at } = ctx;
   const { kind, ...rest } = fields;

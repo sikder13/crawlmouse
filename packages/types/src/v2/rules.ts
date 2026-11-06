@@ -51,7 +51,14 @@ export const RULES = {
   cloudflare_unique: one("Cloudflare's categories are listed once each"),
   // Fix
   effect_pending: two(
-    'an AI effect is either estimated, or not yet estimated because of named fixes',
+    'an AI effect is either estimated, or not yet estimated because of named fixes or reasons',
+  ),
+  effect_seo_pending: two(
+    'a Technical SEO effect is either estimated, or not estimated because the grade is refused',
+  ),
+  effect_absorbed: one('a fix absorbed by a higher-ranked one has no positive effect left'),
+  content_score_withheld: two(
+    'the Content section has a score, or no score and the reason it has none',
   ),
   fix_last_state: one('last_state does not fit the status'),
   fix_rank: two('every live fix has a rank and a resolved fix has none'),
@@ -81,12 +88,23 @@ export const RULES = {
   i4_withheld: one(
     'AI readability is withheld when fewer than two scored crawlers were measured (I4)',
   ),
-  i4_given: one('AI readability is given when two or more scored crawlers were measured (I4)'),
   // Grades
   score_grade_pair: two('score and grade are both present or both null'),
   refusal_score: two('a refused grade has no score; a given one has'),
-  access_range_order: one('access_range.min must not exceed max'),
   total_sum: one('total is not the sum of its components'),
+  withheld_reasons: two('a withheld grade names why, and a given one names no reason'),
+  component_range: two(
+    'a component without a score carries the range it could take, and a scored one none',
+  ),
+  range_order: one("a component range's min must not exceed its max"),
+  access_range_mirror: one("access_range is the Access component's range"),
+  withheld_unmeasured: one('a withheld grade has at least one component without a score'),
+  withheld_reasons_match: one(
+    'withheld_reasons names each unscored component once: one Access reason, and readable_unmeasured, quotable_unmeasured or signals_unmeasured for the others',
+  ),
+  fewer_crawlers: one(
+    'scored_from_fewer_crawlers is set only when Access has a score, and counts fewer than two crawlers (I4)',
+  ),
   // Site
   schedule_timed: two('a timed schedule has a weekday; on_deploy has none'),
   schedule_pair: two('a schedule sets its weekday and its hour together'),

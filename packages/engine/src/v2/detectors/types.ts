@@ -113,6 +113,8 @@ export const CONDITIONS = [
   'linked_under_non_canonical',
   'hreflang_missing_self',
   'hreflang_missing_return',
+  'hreflang_alternate_redirects',
+  'hreflang_alternate_gone',
   'hreflang_missing_x_default',
   'hreflang_invalid_code',
 ] as const;

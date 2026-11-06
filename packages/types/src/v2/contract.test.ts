@@ -26,6 +26,7 @@ import {
   V1_PINNED_ENUMS,
   V2_FIXTURE_ENUMS,
   VerdictSchema,
+  WithheldReasonSchema,
   aiReadabilityStatus,
   detectionStatus,
   instant,
@@ -642,8 +643,9 @@ describe.each(FIXTURE_NAMES)('%s.json is coherent', (name) => {
   });
 
   it('a fix whose AI effect waits on other fixes names fixes that exist on the same site', () => {
+    const reasons: readonly string[] = WithheldReasonSchema.options;
     for (const fix of data().fixes) {
-      for (const fp of fix.effect.ai_readability_pending_on) {
+      for (const fp of fix.effect.ai_readability_pending_on.filter((p) => !reasons.includes(p))) {
         const target = data().fixes.find((f) => f.fingerprint === fp);
         expect(target?.site_id, `${fix.id} waits on ${fp}`).toBe(fix.site_id);
       }
@@ -740,9 +742,9 @@ describe('bad-site.json carries the FACTS numbers', () => {
 
   it('the free three are the three largest open fixes of the latest check (FACTS), so fix 0 joins fixes 1 and 2', () => {
     expect(FACTS).toContain('Free shows the three largest open fixes of the latest check');
-    // "Largest" read as estimated points on both grades; an AI effect not yet estimated counts as 0.
-    const size = (f: { effect: { technical_seo: number; ai_readability: number | null } }) =>
-      f.effect.technical_seo + (f.effect.ai_readability ?? 0);
+    // "Largest" read as estimated points on both grades; an effect not yet estimated counts as 0.
+    const size = (f: { effect: { technical_seo: number | null; ai_readability: number | null } }) =>
+      (f.effect.technical_seo ?? 0) + (f.effect.ai_readability ?? 0);
     const live = data()
       .fixes.filter((f) => f.site_id === site().id && f.rank !== null)
       .sort((a, b) => a.rank! - b.rank!);
@@ -760,7 +762,7 @@ describe('bad-site.json carries the FACTS numbers', () => {
     const m = FACTS.match(/must sum to the overview's \+(\d+) \/ \+(\d+) \/ \+(\d+) SEO/)!;
     const target = Number(m[1]) + Number(m[2]) + Number(m[3]);
     const pro = data().fixes.filter((f) => f.first_seen_check_id === first().id && f.number > 3);
-    expect(pro.reduce((sum, f) => sum + f.effect.technical_seo, 0)).toBe(target);
+    expect(pro.reduce((sum, f) => sum + (f.effect.technical_seo ?? 0), 0)).toBe(target);
   });
 
   it('Claude-SearchBot, which is scored, carries the 41 to 22 drop; ClaudeBot stays visible and unscored', () => {
