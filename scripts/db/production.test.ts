@@ -10,7 +10,12 @@ import {
 import { rollbackOrderProblem } from './rollback';
 import { parseSummary, type DryRunSummary } from './summary';
 
-const pending = listMigrations().filter((f) => f.version > '20261101000001');
+// The v2 set as it stood when production recorded 006b. Later files are left out: P1
+// (20261106000001_service_role_parity) is applied to production before any dry run sees it, and its
+// rollback is deliberately empty, so it cannot be a pending file here.
+const pending = listMigrations().filter(
+  (f) => f.version > '20261101000001' && f.version <= '20261103000001',
+);
 const PRODUCTION = { acls: 'a'.repeat(32), columns: 'b'.repeat(32) };
 const summary = (over: Partial<DryRunSummary> = {}): DryRunSummary => ({
   passed: true,

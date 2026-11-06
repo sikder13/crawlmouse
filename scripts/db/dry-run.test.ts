@@ -8,7 +8,10 @@ import { renderDryRun } from './summary';
 import { HISTORY_TABLE, migratedDb, pgliteDb } from './test-support';
 
 const THROUGH_001 = (f: string) => f.slice(0, 14) <= '20261101000001';
-const files = listMigrations();
+// The v2 set as it stood when production recorded 006b. Later files are left out: P1
+// (20261106000001_service_role_parity) is applied to production before any dry run sees it, and its
+// rollback is deliberately empty, so it cannot be a pending file here.
+const files = listMigrations().filter((f) => f.version <= '20261103000001');
 
 /**
  * A stand-in for production with migrations still to apply: migrated through 001, with a clean
@@ -106,7 +109,7 @@ async function harness(
 describe('the dry run', () => {
   it('passes on a copy of production, lists the four files with their sha256, and deletes the branch', async () => {
     const h = await harness();
-    const summary = await dryRun(h.deps, { branch: 'pr-1', commit: 'abc' });
+    const summary = await dryRun(h.deps, { files, branch: 'pr-1', commit: 'abc' });
     expect(summary.steps.filter((s) => s.result.startsWith('FAILED'))).toEqual([]);
     expect(summary.passed).toBe(true);
     expect(summary.steps.map((s) => s.step)).toEqual([
@@ -138,7 +141,7 @@ describe('the dry run', () => {
 
   it('fails before any push when the branch is not a copy of production, naming the section', async () => {
     const h = await harness({ branchSetup: 'grant select on public.accounts to anon' });
-    const summary = await dryRun(h.deps, { branch: 'pr-2', commit: 'abc' });
+    const summary = await dryRun(h.deps, { files, branch: 'pr-2', commit: 'abc' });
     expect(summary.passed).toBe(false);
     const failure = summary.steps.at(-1)!;
     expect(failure.step).toBe('Branch fingerprint equals the production fingerprint');
@@ -169,7 +172,7 @@ describe('the dry run', () => {
     "fails before any push while production's history needs the repair: %s",
     async (_label, setup, named) => {
       const h = await harness({ bothSetup: setup });
-      const summary = await dryRun(h.deps, { branch: 'pr-3', commit: 'abc' });
+      const summary = await dryRun(h.deps, { files, branch: 'pr-3', commit: 'abc' });
       expect(summary.passed).toBe(false);
       expect(summary.steps.at(-1)!.result).toContain('needs the repair');
       expect(summary.steps.at(-1)!.result).toContain(named);
@@ -181,6 +184,7 @@ describe('the dry run', () => {
   it('fails when the pull request changes a migration that is already applied', async () => {
     const h = await harness();
     const summary = await dryRun(h.deps, {
+      files,
       branch: 'pr-6',
       commit: 'abc',
       changed: ['infra/supabase/migrations/20260524000001_init_users.sql'],
@@ -195,6 +199,7 @@ describe('the dry run', () => {
   it('reverts and re-applies from an applied migration whose rollback the pull request changes', async () => {
     const h = await harness();
     const summary = await dryRun(h.deps, {
+      files,
       branch: 'pr-7',
       commit: 'abc',
       changed: ['infra/supabase/rollbacks/20261101000001_v2_001_entitlement_tables.revert.sql'],
@@ -236,7 +241,7 @@ describe('the dry run', () => {
 
   it('fails when the CLI would push other files than the pending ones', async () => {
     const h = await harness({ cliList: (pending) => pending.slice(1) });
-    const summary = await dryRun(h.deps, { branch: 'pr-5', commit: 'abc' });
+    const summary = await dryRun(h.deps, { files, branch: 'pr-5', commit: 'abc' });
     expect(summary.passed).toBe(false);
     expect(summary.steps.at(-1)!.step).toBe('supabase db push');
     expect(summary.steps.at(-1)!.result).toContain('the CLI would push');
@@ -247,7 +252,7 @@ describe('the dry run', () => {
       productionSetup: `insert into supabase_migrations.schema_migrations (version, name, statements)
         values ('20261104000001', 'zz_needs_a_hand_made_table', array['select * from public.zz_made_by_hand'])`,
     });
-    const summary = await dryRun(h.deps, { branch: 'pr-8', commit: 'abc' });
+    const summary = await dryRun(h.deps, { files, branch: 'pr-8', commit: 'abc' });
     expect(summary.passed).toBe(false);
     const failure = summary.steps.at(-1)!;
     expect(failure.step).toBe('Branch replayed every recorded migration');
@@ -267,7 +272,7 @@ describe('the dry run', () => {
     const h = await harness({
       branchSetup: `delete from supabase_migrations.schema_migrations where version >= '20261101000001'`,
     });
-    const summary = await dryRun(h.deps, { branch: 'pr-11', commit: 'abc' });
+    const summary = await dryRun(h.deps, { files, branch: 'pr-11', commit: 'abc' });
     const failure = summary.steps.at(-1)!;
     expect(failure.step).toBe('Branch replayed every recorded migration');
     expect(failure.result).toContain('first missing: 20261101000001 v2_001_entitlement_tables');
@@ -286,7 +291,7 @@ describe('the dry run', () => {
       branchSetup: `delete from supabase_migrations.schema_migrations where version >= '20261101000001'`,
       replayLog: log,
     });
-    const summary = await dryRun(h.deps, { branch: 'pr-9', commit: 'abc' });
+    const summary = await dryRun(h.deps, { files, branch: 'pr-9', commit: 'abc' });
     const failure = summary.steps.at(-1)!;
     expect(failure.step).toBe('Branch replayed every recorded migration');
     expect(failure.result).toContain(
@@ -312,7 +317,7 @@ describe('the dry run', () => {
     'fails at the replay step on %s, before the fingerprint',
     async (_label, replay, said) => {
       const h = await harness({ replay });
-      const summary = await dryRun(h.deps, { branch: 'pr-10', commit: 'abc' });
+      const summary = await dryRun(h.deps, { files, branch: 'pr-10', commit: 'abc' });
       expect(summary.passed).toBe(false);
       const failure = summary.steps.at(-1)!;
       expect(failure.step).toBe('Branch replayed every recorded migration');

@@ -21,7 +21,7 @@ const pending = migrations.filter((m) => PENDING.includes(m.version));
 /** A database migrated through 001, and one with 003, 005, 007 and 006b applied after it. */
 async function databases() {
   const before = await migratedDb((f) => f.slice(0, 14) <= '20261101000001');
-  const after = await migratedDb();
+  const after = await migratedDb((f) => f.slice(0, 14) <= '20261103000001');
   for (const pg of [before, after]) await pg.exec(HISTORY_TABLE);
   for (const m of pending) {
     await after.query(

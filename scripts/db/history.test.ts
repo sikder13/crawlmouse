@@ -81,7 +81,8 @@ const productionRows = (): HistoryRow[] =>
 const versions = (files: { version: string }[]) => files.map((f) => f.version);
 
 describe('the history diff, against production as read on 2026-11-05 (36 rows)', () => {
-  const files = listMigrations();
+  // The files as they stood that day; files added since are not part of that reading.
+  const files = listMigrations().filter((f) => f.version <= '20261103000001');
   const diff = diffHistory(files, productionRows());
 
   it('finds the 19 rows recorded under the time they were applied, each paired with its file', () => {
