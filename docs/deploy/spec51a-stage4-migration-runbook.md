@@ -9,7 +9,7 @@ change, no rewrite, no drops.
 > and both deleted in the same commit. Owner-ruled: one migration, applied once, not three times.
 >
 > **The superseded file's storage note was WRONG** — it claimed "~120 KB worst case" for the
-> fingerprint by reasoning from the page cap. The real bound is the *pre-selection discovered set*.
+> fingerprint by reasoning from the page cap. The real bound is the _pre-selection discovered set_.
 > See §6.
 
 Migrations are owner-applied only. This file is the exact SQL to approve, the rehearsal to run
@@ -43,7 +43,7 @@ Use the txn-rollback-on-live rehearsal this project already uses for additive mi
 DDL inside a transaction, assert the post-state, then force a rollback so nothing persists.
 
 **Expected outcome: `ERROR: REHEARSAL COMPLETE — rolling back deliberately`.** Any other error means
-stop and report. Anything that *succeeds without erroring* also means stop — the rollback did not fire.
+stop and report. Anything that _succeeds without erroring_ also means stop — the rollback did not fire.
 
 ```sql
 do $$
@@ -191,7 +191,7 @@ order by completed_at desc limit 5;
 
 > ⚠ **`sitemapUnreached` RESIDUE (gate 9 / FC-7).** This query used to select
 > `coverage->>'sitemapUnreached'`, and the rehearsal payload above used to contain it. **D4 was CUT
-> from 5.1a** (`packages/types/src/audit.ts:162` — *"USED TO LIVE HERE AND IS DELIBERATELY GONE"*), so
+> from 5.1a** (`packages/types/src/audit.ts:162` — _"USED TO LIVE HERE AND IS DELIBERATELY GONE"_), so
 > nothing ever writes that key and the column would have read NULL on every audit forever — an
 > operator would either rubber-stamp it or read it as a broken write path. Both are corrected here.
 >
@@ -255,13 +255,13 @@ and every surface already treats them as optional (`undefined` on the v1 path).
 >
 > #### What each candidate remedy actually does — measured on `main@69b039f`
 >
-> | # | remedy | what main renders | verdict |
-> |---|---|---|---|
-> | A | *(do nothing)* | `scoreDelta -81.39` → **"Down 81 points since your last visit — worth a look"** | the hazard |
-> | B | **drop the `refusal`/`coverage` columns** | `scoreDelta -81.39` → **identical** | ❌ **DOES NOTHING** |
-> | C | **expire the refused rows** | the previous graded audit, B/81.39, "Holding steady" | ✅ **works** |
-> | D | null `previous_audit_id` on refused rows | `grade ""`, `score 0`, "Holding steady" | ❌ trades one fabrication for another |
-> | E | delete the refused rows | the previous graded audit, B/81.39 | ✅ works, destructive |
+> | #   | remedy                                    | what main renders                                                               | verdict                               |
+> | --- | ----------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------- |
+> | A   | _(do nothing)_                            | `scoreDelta -81.39` → **"Down 81 points since your last visit — worth a look"** | the hazard                            |
+> | B   | **drop the `refusal`/`coverage` columns** | `scoreDelta -81.39` → **identical**                                             | ❌ **DOES NOTHING**                   |
+> | C   | **expire the refused rows**               | the previous graded audit, B/81.39, "Holding steady"                            | ✅ **works**                          |
+> | D   | null `previous_audit_id` on refused rows  | `grade ""`, `score 0`, "Holding steady"                                         | ❌ trades one fabrication for another |
+> | E   | delete the refused rows                   | the previous graded audit, B/81.39                                              | ✅ works, destructive                 |
 >
 > **B was this document's recommended remedy and it is wrong.** `main@69b039f:apps/web/lib/dashboard.ts`
 > never selects `refusal` — `git grep -c refusal 69b039f -- apps/web` returns one unrelated hit — so the
@@ -290,7 +290,7 @@ and every surface already treats them as optional (`undefined` on the v1 path).
 >
 > **(2) ⚠ THE UNDO IS NOT A RESTORE, AND THIS SECTION PREVIOUSLY SAID IT WAS.** The roll-forward used
 > to read `set expires_at = null`, described as "non-destructive and reversible". It is not: `null`
-> means *never expires*, and **free/anonymous audits do not start that way** —
+> means _never expires_, and **free/anonymous audits do not start that way** —
 > `apps/web/app/api/audits/start/route.ts:97` writes `expiresAt = proUser ? null : now + AUDIT_TTL_DAYS`.
 > Measured live 2026-08-08: **190 of 212 completed audits carry a non-null `expires_at`**. Nulling them
 > would permanently exempt those rows from TTL cleanup — voiding the 30-day retention promise and the
@@ -325,16 +325,16 @@ and every surface already treats them as optional (`undefined` on the v1 path).
 Anchors measured live **2026-08-04**: 231 audit rows · `audits` relation 904 kB · database 226 MB ·
 avg `confidence_band` 231 B · avg `ai_readiness` 13.3 kB (max 30.7 kB).
 
-| column | size | basis |
-|---|---|---|
-| `refusal` | ~150–250 B | shape comparable to `confidence_band` |
-| `coverage` | ~300–500 B | scalars + at most 9 `PageKind` exclusion rows |
-| `fingerprint` | **~34 kB worst case on disk** (bounded) | 100 strata × 256 B cap; typical ~1–2 kB |
+| column        | size                                    | basis                                         |
+| ------------- | --------------------------------------- | --------------------------------------------- |
+| `refusal`     | ~150–250 B                              | shape comparable to `confidence_band`         |
+| `coverage`    | ~300–500 B                              | scalars + at most 9 `PageKind` exclusion rows |
+| `fingerprint` | **~34 kB worst case on disk** (bounded) | 100 strata × 256 B cap; typical ~1–2 kB       |
 
 > ⚠ **THIS ROW READ "~6.5 kB worst case (bounded) — 100 strata × ~60 B", AND THAT FIGURE IS WITHDRAWN.**
 > It assumed ~60-byte keys. Intermediate URL segments are kept literal, so a crawled key can be far
 > longer; a per-string 256-byte cap was added at the persist boundary, and the honest post-cap worst
-> case is **~57 kB on the wire** or **~34 kB on disk** — measured on two *different* hostile payloads
+> case is **~57 kB on the wire** or **~34 kB on disk** — measured on two _different_ hostile payloads
 > (quote-maximal maximises the wire and compresses to ~1 kB on disk; high-entropy maximises disk at
 > ~34 kB and is ~31 kB on the wire). JSON escaping doubles `"` and `\`, which the UTF-8 byte budget
 > does not count. Registered in `apps/web/__tests__/docs-withdrawn-claims.test.ts`, which is what
