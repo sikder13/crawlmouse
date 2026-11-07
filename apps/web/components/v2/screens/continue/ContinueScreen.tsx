@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from 'react';
 import { track } from '@/lib/analytics';
 import type { DoorEvent } from '@/lib/auth/first-login';
 import { AUTH_LINK_MINUTES } from '@/lib/auth/constants';
+import { safeNextPath } from '@/lib/safe-next-path';
 import { Button } from '../../Button';
 import { Field } from '../../Field';
 import { Heading } from '../../Heading';
@@ -15,6 +16,12 @@ import { LiveRegion } from '../signup/LiveRegion';
 import styles from '../check-email/Door.module.css';
 
 export type ContinueState = 'idle' | 'expired';
+
+/**
+ * Where a signed-in browser goes when the server's target is refused: `DASHBOARD` in
+ * lib/auth/continue-intent.ts, which this client module cannot import (it loads node:crypto).
+ */
+const SIGNED_IN_FALLBACK = '/dashboard';
 
 /**
  * The sign-in landing (CC-25 D3). The link's token is already in an httpOnly cookie when this page
@@ -48,10 +55,14 @@ function Idle({ onExpired }: { onExpired: () => void }) {
         headers: { Accept: 'application/json' },
       });
       const body = (await res.json()) as { next?: unknown; events?: DoorEvent[] };
-      if (typeof body.next !== 'string' || !body.next.startsWith('/')) throw new Error('no target');
+      if (typeof body.next !== 'string') throw new Error('no target');
       for (const ev of body.events ?? []) track(ev.name, ev.props);
-      if (body.next.startsWith('/login/verify/continue')) onExpired();
-      else window.location.assign(body.next);
+      // The server sends a same-origin path; this holds the browser to the rule the server applies
+      // (safeNextPath: no `//host`, no `/\`). The sign-in has already happened by now, so a refused
+      // target goes to the dashboard rather than back through a spent link.
+      const next = safeNextPath(body.next) ?? SIGNED_IN_FALLBACK;
+      if (next.startsWith('/login/verify/continue')) onExpired();
+      else window.location.assign(next);
     } catch {
       // Fall back to the plain post: the server answers it with a redirect.
       form.submit();

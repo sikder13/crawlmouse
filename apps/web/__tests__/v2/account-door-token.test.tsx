@@ -58,6 +58,7 @@ vi.mock('posthog-js', () => ({
 import { GET, POST } from '../../app/login/verify/route';
 import ContinuePage from '../../app/(account)/login/verify/continue/page';
 import { ContinueScreen } from '../../components/v2/screens/continue/ContinueScreen';
+import { DASHBOARD } from '../../lib/auth/continue-intent';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const ORIGIN = 'https://crawlmouse.com';
@@ -135,5 +136,36 @@ describe('the sign-in token', () => {
     expect(jar).toContain('LEAKCANARY');
     for (const [i, text] of seen.entries()) expect(`${i}: ${text}`).not.toContain('LEAKCANARY');
     expect(new URL(location).search).toBe('');
+  });
+});
+
+describe('the Continue page’s navigation', () => {
+  async function continueTo(next: string): Promise<string[]> {
+    const assigned: string[] = [];
+    vi.stubGlobal('location', { ...window.location, assign: (u: string) => assigned.push(u) });
+    vi.stubGlobal('fetch', async () => Response.json({ next, events: [] }));
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => root!.render(<ContinueScreen state="idle" />));
+    await act(async () => {
+      host
+        .querySelector('form')!
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    act(() => root?.unmount());
+    root = null;
+    return assigned;
+  }
+
+  it('refuses a target the server rule refuses (//host, /\\host, absolute, dot segments), and goes to the dashboard', async () => {
+    for (const evil of ['//evil.com', '/\\evil.com', 'https://evil.com', '/.//evil.com']) {
+      expect(await continueTo(evil), evil).toEqual([DASHBOARD]);
+    }
+  });
+
+  it('follows a same-origin path as sent', async () => {
+    expect(await continueTo('/r/abc?x=1')).toEqual(['/r/abc?x=1']);
   });
 });
