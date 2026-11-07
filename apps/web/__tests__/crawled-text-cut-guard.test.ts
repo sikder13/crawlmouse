@@ -77,6 +77,25 @@ const isCut = (line: string): boolean =>
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
   [
+    'packages/engine/src/v2/build/plan.ts :: .slice(0, STAGE1_CHALLENGED)',
+    'ARRAY slice of PageResult rows: the first STAGE1_CHALLENGED challenged pages, in URL order, for the ' +
+      'stage-1 access sample (CC-20a). No string is indexed.',
+  ],
+  [
+    'packages/engine/src/v2/build/plan.ts :: list.slice(0, n).forEach((p) => room() && take(p, 2, why));',
+    'ARRAY slice of PageResult rows: the first n of a ranked list (hubs, deepest, newest) for the ' +
+      'stage-2 sample (CC-20a). No string is indexed.',
+  ],
+  [
+    'packages/engine/src/v2/build/plan.ts :: return { stage1, stage2_needed, stage2: picked.slice(stage1.length) };',
+    'ARRAY slice of the sampled-page records: the ones taken after stage 1 (CC-20a). No string is indexed.',
+  ],
+  [
+    'packages/engine/src/v2/build/record.ts :: const top = ranks.slice(0, hubs).reduce((n, v) => n + v, 0);',
+    "ARRAY slice of PageRank numbers, sorted high to low: v1's top hub tier, summed for Check.structure " +
+      '(CC-20a). No string is indexed.',
+  ],
+  [
     'apps/web/lib/refusal-copy.ts :: const named = kinds.slice(0, 3);',
     'ARRAY slice bounding the refusal copy to the three largest exclusion kinds so the sentence stays ' +
       'readable. Elements are `{ kind: PageKind; count: number }` — a closed enum from our own ' +

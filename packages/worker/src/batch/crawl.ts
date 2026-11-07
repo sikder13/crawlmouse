@@ -31,7 +31,7 @@ import type { ReaderNotRead } from '../verdict/limitations.js';
 import { readResponse, type ResponseClass } from '../verdict/response.js';
 import { LOCAL_VANTAGE, type Vantage } from '../vantage.js';
 import type { Findings } from './findings.js';
-import { isNotRead, type PageRead, type PageReader } from '../reader/read.js';
+import { isNotRead, type PageRead, type PageReader, type StackHeaders } from '../reader/read.js';
 import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
 import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 
@@ -92,7 +92,7 @@ export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<
     while (!failed && next < urls.length) {
       const i = next++;
       try {
-        outcomes[i] = await crawlPage(run, urls[i]!, room);
+        outcomes[i] = await crawlPage(run, urls[i]!, room, i === 0);
       } catch (e) {
         failed = true;
         run.ctx.abort.abort();
@@ -114,6 +114,7 @@ async function crawlPage(
   run: CrawlRun,
   url: string,
   room: { bytes: number },
+  first: boolean,
 ): Promise<PageOutcome> {
   const path = pathOf(url);
   const without = (
@@ -210,7 +211,15 @@ async function crawlPage(
     };
   }
 
-  const pageRead = await readPage(run, f.body, f.bodyCut, f.finalUrl);
+  // The stack is read on the batch's first URL only, from its HTML and its raw response headers: the
+  // CMS signatures name headers (x-shopid, ...) the row's evidence headers do not keep.
+  const pageRead = await readPage(
+    run,
+    f.body,
+    f.bodyCut,
+    f.finalUrl,
+    first ? stackHeaders(f) : null,
+  );
   if (typeof pageRead === 'string') limitations.push(say.NOT_READ[pageRead]);
   else if (pageRead.note) limitations.push(pageRead.note);
   if (typeof pageRead === 'string' || !pageRead.read) {
@@ -256,6 +265,7 @@ async function crawlPage(
     );
   }
   const rawText = read.rawText;
+  if (read.featuresNote) limitations.push(read.featuresNote);
   // Cut to the URL cap on the reader: null there when it was over it.
   const canonical = extracted.canonicalUrl ?? null;
   if (extracted.canonicalUrl === null) {
@@ -281,8 +291,10 @@ async function crawlPage(
     !inPart &&
     fromUrl !== null &&
     extracted.notRead.tooLong + edges.tooLong + extracted.notRead.pastLimit === 0;
+  const featuresBytes = read.features ? Buffer.byteLength(JSON.stringify(read.features)) : 0;
   const cost =
     Buffer.byteLength(rawText) +
+    featuresBytes +
     edges.kept.reduce((n, e) => n + edgeBytes(e), 0) +
     hreflang.links.reduce(
       (n, l) => n + Buffer.byteLength(l.hreflang) + Buffer.byteLength(l.href),
@@ -293,7 +305,7 @@ async function crawlPage(
   else {
     run.findings.resultSizeLimit(MAX_RESULT_TEXT_BYTES);
     limitations.push(
-      `The text, links and hreflang alternates of this page were not recorded: the batch had used its ${MAX_RESULT_TEXT_BYTES / (1024 * 1024)} MiB for them.`,
+      `The text, links, content features and hreflang alternates of this page were not recorded: the batch had used its ${MAX_RESULT_TEXT_BYTES / (1024 * 1024)} MiB for them.`,
     );
   }
   const page = pageRow(run, url, 'fetched', reading.class, f, limitations, 'simulated', {
@@ -310,6 +322,10 @@ async function crawlPage(
     robots_search: search,
     title: read.title,
     meta_description: read.description,
+    content_features: recorded ? read.features : null,
+    stack_signals: read.stack ? { cms: read.stack.cms, detected_from: STACK_SOURCE } : null,
+    main_text_chars: read.mainTextChars,
+    noindex: headerNoindex(f) || read.metaNoindex,
   });
   return { page, edges: recorded ? edges.kept : [], complete: true, landed };
 }
@@ -366,8 +382,9 @@ async function readPage(
   body: string,
   bodyCut: boolean,
   finalUrl: string,
+  stack: StackHeaders | null,
 ): Promise<PageRead | ReaderNotRead> {
-  const r = await run.reader.page(body, bodyCut, finalUrl).catch(() => null);
+  const r = await run.reader.page(body, bodyCut, finalUrl, stack).catch(() => null);
   if (r !== null && !isNotRead(r)) return r;
   const why = r?.failed ?? 'reader_error';
   run.findings.notRead(why);
@@ -390,6 +407,10 @@ type ReadFields = Pick<
   | 'robots_search'
   | 'title'
   | 'meta_description'
+  | 'content_features'
+  | 'stack_signals'
+  | 'main_text_chars'
+  | 'noindex'
 >;
 
 /**
@@ -413,7 +434,41 @@ function notRead(f: FetchOutcome | null, search: SearchRobots): ReadFields {
     robots_search: search,
     title: null,
     meta_description: null,
+    content_features: null,
+    stack_signals: null,
+    main_text_chars: null,
+    // The header is read whenever a response came back; the meta tags only from a page read whole.
+    noindex: f !== null && headerNoindex(f) ? true : null,
   };
+}
+
+/** What a row's stack signals were read from. */
+const STACK_SOURCE = 'HTML and response headers';
+
+/** The response headers as v1's detectCms reads them: lower-cased names, repeated values joined. */
+function stackHeaders(f: FetchOutcome): StackHeaders {
+  const out: StackHeaders = {};
+  for (const [name, v] of Object.entries(f.headers)) {
+    if (v !== undefined) out[name.toLowerCase()] = Array.isArray(v) ? v.join(', ') : String(v);
+  }
+  return out;
+}
+
+/**
+ * v1's readHeaderNoindex (packages/engine/src/crawler.ts, private to the crawler, which loads crawlee):
+ * an X-Robots-Tag value, each comma-separated token with any `agent:` prefix removed, that is
+ * `noindex` or `none`.
+ */
+export function headerNoindex(f: Pick<FetchOutcome, 'headers'>): boolean {
+  const raw = f.headers['x-robots-tag'];
+  if (!raw) return false;
+  for (const v of Array.isArray(raw) ? raw : [raw]) {
+    for (const part of String(v).toLowerCase().split(',')) {
+      const token = part.includes(':') ? part.slice(part.indexOf(':') + 1) : part;
+      if (token.trim() === 'noindex' || token.trim() === 'none') return true;
+    }
+  }
+  return false;
 }
 
 function pageRow(

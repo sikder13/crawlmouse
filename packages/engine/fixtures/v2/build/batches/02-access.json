@@ -1,0 +1,3111 @@
+{
+  "batch_id": "b0000000-0000-4000-8000-0000000000c1:2",
+  "check_id": "b0000000-0000-4000-8000-0000000000c1",
+  "site_id": "b0000000-0000-4000-8000-0000000000a1",
+  "started_at": "2026-11-05T02:30:34.500Z",
+  "finished_at": "2026-11-05T02:30:55.500Z",
+  "requests": 42,
+  "bytes": 111578,
+  "coverage": {
+    "urls_requested": 6,
+    "urls_complete": 6
+  },
+  "partial": null,
+  "findings": [],
+  "robots": [
+    {
+      "origin": "https://built-site.test",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "state": "rules",
+      "why": null,
+      "status": 200,
+      "final_url": "https://built-site.test/robots.txt",
+      "fetched_at": "2026-11-05T02:30:00.000Z",
+      "from_cache": true,
+      "crawl_delay_s": null,
+      "body_excerpt": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\n# Content-Signal: search=yes, ai-input=yes, ai-train=no\nSitemap: /sitemap.xml\n",
+      "body": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\n# Content-Signal: search=yes, ai-input=yes, ai-train=no\nSitemap: /sitemap.xml\n",
+      "body_complete": true
+    }
+  ],
+  "declarations": [],
+  "kind": "access",
+  "access_tests": [
+    {
+      "id": "e0000000-0000-4000-8000-000000000001",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test",
+      "template_key": "/",
+      "tested_at": "2026-11-05T02:30:35.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "An untagged browser-identity control request: it shows what the server sends before scripts run."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 5490,
+      "word_count": 235,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Built Site outdoor shop</title><meta name=\"description\" content=\"Built Site outdoor shop at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>Outdoor gear for every trip</h1><p>Outdoor gear for every trip is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>outdoorgearforeverytrippack0 outdoorgearforeverytrippack1 outdoorgearforeverytrippack2 outdoorgearforeverytrippack3 outdoorgearforeverytrippack4 outdoorgearforeverytrippack5 outdoorgearforeverytrippack6 outdoorgearforeverytrippack7 outdoorgearforeverytrippack8. outdoorgearforeverytrippack9 outdoorgearforeverytrippack10 outdoorgearforeverytrippack11 outdoorgearforeverytrippack12 outdoorgearforeverytrippack13 outdoorgearforeverytrippack14 outdoorgearforeverytrippack15 outdoorgearforeverytrippack16 outdoorgearforeverytrippack17. outdoorgearforeverytrippack18 outdoorgearforeverytrippack19 outdoorgearforeverytrippack20 outdoorgearforeverytrippack21 outdoorgearforeverytrippack22 outdoorgearforeverytrippack23 outdoorgearforeverytrippack24 outdoorgearforeverytrippack25 outdoorgearforeverytrippack26. outdoorgearforeverytrippack27 outdoorgearforeverytrippack28 outdoorgearforeverytrippack29 outdoorgearforeverytrippack30 outdoorgearforeverytrippack31 outdoorgearforeverytrippack32 outdoorgearforeverytrippack33 outdoorgearforeverytrippack34 outdoorgearforeverytrippack35. outdoorgearforeverytrippack36 outdoorgearforeverytrippack37 outdoorgearforeverytrippack38 outdoorgearforeverytrippack39 outdoorgearforeverytrippack40 outdoorgearforeverytrippack41 outdoorgearforeverytrippack42 outdoorgearforeverytrippack43 outdoorgearforeverytrippack44. outdoorgearforeverytrippack45 outdoorgearforeverytrippack46 outdoorgearforeverytrippack47 outdoorgearforeverytrippack48 outdoorgearforeverytrippack49 outdoorgearfore",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "control",
+      "tagged": false,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000002",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "OAI-SearchBot",
+      "page_url": "https://built-site.test",
+      "template_key": "/",
+      "tested_at": "2026-11-05T02:30:35.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 5490,
+      "word_count": 235,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Built Site outdoor shop</title><meta name=\"description\" content=\"Built Site outdoor shop at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>Outdoor gear for every trip</h1><p>Outdoor gear for every trip is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>outdoorgearforeverytrippack0 outdoorgearforeverytrippack1 outdoorgearforeverytrippack2 outdoorgearforeverytrippack3 outdoorgearforeverytrippack4 outdoorgearforeverytrippack5 outdoorgearforeverytrippack6 outdoorgearforeverytrippack7 outdoorgearforeverytrippack8. outdoorgearforeverytrippack9 outdoorgearforeverytrippack10 outdoorgearforeverytrippack11 outdoorgearforeverytrippack12 outdoorgearforeverytrippack13 outdoorgearforeverytrippack14 outdoorgearforeverytrippack15 outdoorgearforeverytrippack16 outdoorgearforeverytrippack17. outdoorgearforeverytrippack18 outdoorgearforeverytrippack19 outdoorgearforeverytrippack20 outdoorgearforeverytrippack21 outdoorgearforeverytrippack22 outdoorgearforeverytrippack23 outdoorgearforeverytrippack24 outdoorgearforeverytrippack25 outdoorgearforeverytrippack26. outdoorgearforeverytrippack27 outdoorgearforeverytrippack28 outdoorgearforeverytrippack29 outdoorgearforeverytrippack30 outdoorgearforeverytrippack31 outdoorgearforeverytrippack32 outdoorgearforeverytrippack33 outdoorgearforeverytrippack34 outdoorgearforeverytrippack35. outdoorgearforeverytrippack36 outdoorgearforeverytrippack37 outdoorgearforeverytrippack38 outdoorgearforeverytrippack39 outdoorgearforeverytrippack40 outdoorgearforeverytrippack41 outdoorgearforeverytrippack42 outdoorgearforeverytrippack43 outdoorgearforeverytrippack44. outdoorgearforeverytrippack45 outdoorgearforeverytrippack46 outdoorgearforeverytrippack47 outdoorgearforeverytrippack48 outdoorgearforeverytrippack49 outdoorgearfore",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000003",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ChatGPT-User",
+      "page_url": "https://built-site.test",
+      "template_key": "/",
+      "tested_at": "2026-11-05T02:30:36.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 5490,
+      "word_count": 235,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Built Site outdoor shop</title><meta name=\"description\" content=\"Built Site outdoor shop at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>Outdoor gear for every trip</h1><p>Outdoor gear for every trip is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>outdoorgearforeverytrippack0 outdoorgearforeverytrippack1 outdoorgearforeverytrippack2 outdoorgearforeverytrippack3 outdoorgearforeverytrippack4 outdoorgearforeverytrippack5 outdoorgearforeverytrippack6 outdoorgearforeverytrippack7 outdoorgearforeverytrippack8. outdoorgearforeverytrippack9 outdoorgearforeverytrippack10 outdoorgearforeverytrippack11 outdoorgearforeverytrippack12 outdoorgearforeverytrippack13 outdoorgearforeverytrippack14 outdoorgearforeverytrippack15 outdoorgearforeverytrippack16 outdoorgearforeverytrippack17. outdoorgearforeverytrippack18 outdoorgearforeverytrippack19 outdoorgearforeverytrippack20 outdoorgearforeverytrippack21 outdoorgearforeverytrippack22 outdoorgearforeverytrippack23 outdoorgearforeverytrippack24 outdoorgearforeverytrippack25 outdoorgearforeverytrippack26. outdoorgearforeverytrippack27 outdoorgearforeverytrippack28 outdoorgearforeverytrippack29 outdoorgearforeverytrippack30 outdoorgearforeverytrippack31 outdoorgearforeverytrippack32 outdoorgearforeverytrippack33 outdoorgearforeverytrippack34 outdoorgearforeverytrippack35. outdoorgearforeverytrippack36 outdoorgearforeverytrippack37 outdoorgearforeverytrippack38 outdoorgearforeverytrippack39 outdoorgearforeverytrippack40 outdoorgearforeverytrippack41 outdoorgearforeverytrippack42 outdoorgearforeverytrippack43 outdoorgearforeverytrippack44. outdoorgearforeverytrippack45 outdoorgearforeverytrippack46 outdoorgearforeverytrippack47 outdoorgearforeverytrippack48 outdoorgearforeverytrippack49 outdoorgearfore",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000004",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "PerplexityBot",
+      "page_url": "https://built-site.test",
+      "template_key": "/",
+      "tested_at": "2026-11-05T02:30:36.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 5490,
+      "word_count": 235,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Built Site outdoor shop</title><meta name=\"description\" content=\"Built Site outdoor shop at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>Outdoor gear for every trip</h1><p>Outdoor gear for every trip is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>outdoorgearforeverytrippack0 outdoorgearforeverytrippack1 outdoorgearforeverytrippack2 outdoorgearforeverytrippack3 outdoorgearforeverytrippack4 outdoorgearforeverytrippack5 outdoorgearforeverytrippack6 outdoorgearforeverytrippack7 outdoorgearforeverytrippack8. outdoorgearforeverytrippack9 outdoorgearforeverytrippack10 outdoorgearforeverytrippack11 outdoorgearforeverytrippack12 outdoorgearforeverytrippack13 outdoorgearforeverytrippack14 outdoorgearforeverytrippack15 outdoorgearforeverytrippack16 outdoorgearforeverytrippack17. outdoorgearforeverytrippack18 outdoorgearforeverytrippack19 outdoorgearforeverytrippack20 outdoorgearforeverytrippack21 outdoorgearforeverytrippack22 outdoorgearforeverytrippack23 outdoorgearforeverytrippack24 outdoorgearforeverytrippack25 outdoorgearforeverytrippack26. outdoorgearforeverytrippack27 outdoorgearforeverytrippack28 outdoorgearforeverytrippack29 outdoorgearforeverytrippack30 outdoorgearforeverytrippack31 outdoorgearforeverytrippack32 outdoorgearforeverytrippack33 outdoorgearforeverytrippack34 outdoorgearforeverytrippack35. outdoorgearforeverytrippack36 outdoorgearforeverytrippack37 outdoorgearforeverytrippack38 outdoorgearforeverytrippack39 outdoorgearforeverytrippack40 outdoorgearforeverytrippack41 outdoorgearforeverytrippack42 outdoorgearforeverytrippack43 outdoorgearforeverytrippack44. outdoorgearforeverytrippack45 outdoorgearforeverytrippack46 outdoorgearforeverytrippack47 outdoorgearforeverytrippack48 outdoorgearforeverytrippack49 outdoorgearfore",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000005",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "Claude-SearchBot",
+      "page_url": "https://built-site.test",
+      "template_key": "/",
+      "tested_at": "2026-11-05T02:30:37.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 5490,
+      "word_count": 235,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Built Site outdoor shop</title><meta name=\"description\" content=\"Built Site outdoor shop at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>Outdoor gear for every trip</h1><p>Outdoor gear for every trip is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>outdoorgearforeverytrippack0 outdoorgearforeverytrippack1 outdoorgearforeverytrippack2 outdoorgearforeverytrippack3 outdoorgearforeverytrippack4 outdoorgearforeverytrippack5 outdoorgearforeverytrippack6 outdoorgearforeverytrippack7 outdoorgearforeverytrippack8. outdoorgearforeverytrippack9 outdoorgearforeverytrippack10 outdoorgearforeverytrippack11 outdoorgearforeverytrippack12 outdoorgearforeverytrippack13 outdoorgearforeverytrippack14 outdoorgearforeverytrippack15 outdoorgearforeverytrippack16 outdoorgearforeverytrippack17. outdoorgearforeverytrippack18 outdoorgearforeverytrippack19 outdoorgearforeverytrippack20 outdoorgearforeverytrippack21 outdoorgearforeverytrippack22 outdoorgearforeverytrippack23 outdoorgearforeverytrippack24 outdoorgearforeverytrippack25 outdoorgearforeverytrippack26. outdoorgearforeverytrippack27 outdoorgearforeverytrippack28 outdoorgearforeverytrippack29 outdoorgearforeverytrippack30 outdoorgearforeverytrippack31 outdoorgearforeverytrippack32 outdoorgearforeverytrippack33 outdoorgearforeverytrippack34 outdoorgearforeverytrippack35. outdoorgearforeverytrippack36 outdoorgearforeverytrippack37 outdoorgearforeverytrippack38 outdoorgearforeverytrippack39 outdoorgearforeverytrippack40 outdoorgearforeverytrippack41 outdoorgearforeverytrippack42 outdoorgearforeverytrippack43 outdoorgearforeverytrippack44. outdoorgearforeverytrippack45 outdoorgearforeverytrippack46 outdoorgearforeverytrippack47 outdoorgearforeverytrippack48 outdoorgearforeverytrippack49 outdoorgearfore",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000006",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "GPTBot",
+      "page_url": "https://built-site.test",
+      "template_key": "/",
+      "tested_at": "2026-11-05T02:30:00.000Z",
+      "verdict": "disallowed_by_robots",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Read from robots.txt: the crawler is told not to fetch this path, so nothing was requested as it."
+      ],
+      "cause": "robots_txt_disallow",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/robots.txt",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/plain"
+        }
+      ],
+      "byte_count": 134,
+      "word_count": null,
+      "body_excerpt": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\n# Content-Signal: search=yes, ai-input=yes, ai-train=no\nSitemap: /sitemap.xml\n",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": 0,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000007",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ClaudeBot",
+      "page_url": "https://built-site.test",
+      "template_key": "/",
+      "tested_at": "2026-11-05T02:30:37.500Z",
+      "verdict": "blocked_by_ua_rule",
+      "evidence_class": "simulated",
+      "identity_sent": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
+        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 403,
+      "final_url": "https://built-site.test",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html"
+        }
+      ],
+      "byte_count": 35,
+      "word_count": null,
+      "body_excerpt": "<html><body>Forbidden</body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": {
+        "role": "crawler",
+        "ua": "OAI-SearchBot"
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000008",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test",
+      "template_key": "/",
+      "tested_at": "2026-11-05T02:30:38.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "A tagged Googlebot request made only to tell whether this site checks crawler IP addresses. It is not a Googlebot result."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 5490,
+      "word_count": 235,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Built Site outdoor shop</title><meta name=\"description\" content=\"Built Site outdoor shop at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>Outdoor gear for every trip</h1><p>Outdoor gear for every trip is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>outdoorgearforeverytrippack0 outdoorgearforeverytrippack1 outdoorgearforeverytrippack2 outdoorgearforeverytrippack3 outdoorgearforeverytrippack4 outdoorgearforeverytrippack5 outdoorgearforeverytrippack6 outdoorgearforeverytrippack7 outdoorgearforeverytrippack8. outdoorgearforeverytrippack9 outdoorgearforeverytrippack10 outdoorgearforeverytrippack11 outdoorgearforeverytrippack12 outdoorgearforeverytrippack13 outdoorgearforeverytrippack14 outdoorgearforeverytrippack15 outdoorgearforeverytrippack16 outdoorgearforeverytrippack17. outdoorgearforeverytrippack18 outdoorgearforeverytrippack19 outdoorgearforeverytrippack20 outdoorgearforeverytrippack21 outdoorgearforeverytrippack22 outdoorgearforeverytrippack23 outdoorgearforeverytrippack24 outdoorgearforeverytrippack25 outdoorgearforeverytrippack26. outdoorgearforeverytrippack27 outdoorgearforeverytrippack28 outdoorgearforeverytrippack29 outdoorgearforeverytrippack30 outdoorgearforeverytrippack31 outdoorgearforeverytrippack32 outdoorgearforeverytrippack33 outdoorgearforeverytrippack34 outdoorgearforeverytrippack35. outdoorgearforeverytrippack36 outdoorgearforeverytrippack37 outdoorgearforeverytrippack38 outdoorgearforeverytrippack39 outdoorgearforeverytrippack40 outdoorgearforeverytrippack41 outdoorgearforeverytrippack42 outdoorgearforeverytrippack43 outdoorgearforeverytrippack44. outdoorgearforeverytrippack45 outdoorgearforeverytrippack46 outdoorgearforeverytrippack47 outdoorgearforeverytrippack48 outdoorgearforeverytrippack49 outdoorgearfore",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "canary",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000009",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "template_key": "/products/{slug}",
+      "tested_at": "2026-11-05T02:30:38.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "An untagged browser-identity control request: it shows what the server sends before scripts run."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3433,
+      "word_count": 175,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen item 1</title><meta name=\"description\" content=\"camp kitchen item 1 at the Built Site outdoor shop.\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"Product\",\"name\":\"camp kitchen item 1\",\"description\":\"The camp kitchen item 1.\"}</script></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen item 1</h1><p>The camp kitchen item 1 is a reliable piece of kit for weekend trips and longer journeys.</p><table><tr><td>Weight: 1.2 kg</td></tr><tr><td>Packed size: 40 cm</td></tr></table><p>campkitchenitem10 campkitchenitem11 campkitchenitem12 campkitchenitem13 campkitchenitem14 campkitchenitem15 campkitchenitem16 campkitchenitem17 campkitchenitem18. campkitchenitem19 campkitchenitem110 campkitchenitem111 campkitchenitem112 campkitchenitem113 campkitchenitem114 campkitchenitem115 campkitchenitem116 campkitchenitem117. campkitchenitem118 campkitchenitem119 campkitchenitem120 campkitchenitem121 campkitchenitem122 campkitchenitem123 campkitchenitem124 campkitchenitem125 campkitchenitem126. campkitchenitem127 campkitchenitem128 campkitchenitem129 campkitchenitem130 campkitchenitem131 campkitchenitem132 campkitchenitem133 campkitchenitem134 campkitchenitem135. campkitchenitem136 campkitchenitem137 campkitchenitem138 campkitchenitem139 campkitchenitem140 campkitchenitem141 campkitchenitem142 campkitchenitem143 campkitchenitem144. campkitchenitem145 campkitchenitem146 campkitchenitem147 campkitchenitem148 campkitchenitem149 campkitchenitem150 campkitchenitem151 campkitchenitem152 campkitchenitem153. campkitchenitem154 campkitchenitem155 campkitchenitem156 campkitchenitem157 campkitchenitem158 campkitchenitem159 campkitchenitem160 campkitchenitem161 campkitchenitem162. campkitchenitem163 campkitchenitem164 campkitchenitem165 campkitchenitem166 campkitchenitem167 campkitchenitem168 campkitchenitem169 campkitchenitem170 campkitchenitem171. campkitchenitem172 campkitche",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "control",
+      "tagged": false,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000010",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "OAI-SearchBot",
+      "page_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "template_key": "/products/{slug}",
+      "tested_at": "2026-11-05T02:30:39.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3433,
+      "word_count": 175,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen item 1</title><meta name=\"description\" content=\"camp kitchen item 1 at the Built Site outdoor shop.\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"Product\",\"name\":\"camp kitchen item 1\",\"description\":\"The camp kitchen item 1.\"}</script></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen item 1</h1><p>The camp kitchen item 1 is a reliable piece of kit for weekend trips and longer journeys.</p><table><tr><td>Weight: 1.2 kg</td></tr><tr><td>Packed size: 40 cm</td></tr></table><p>campkitchenitem10 campkitchenitem11 campkitchenitem12 campkitchenitem13 campkitchenitem14 campkitchenitem15 campkitchenitem16 campkitchenitem17 campkitchenitem18. campkitchenitem19 campkitchenitem110 campkitchenitem111 campkitchenitem112 campkitchenitem113 campkitchenitem114 campkitchenitem115 campkitchenitem116 campkitchenitem117. campkitchenitem118 campkitchenitem119 campkitchenitem120 campkitchenitem121 campkitchenitem122 campkitchenitem123 campkitchenitem124 campkitchenitem125 campkitchenitem126. campkitchenitem127 campkitchenitem128 campkitchenitem129 campkitchenitem130 campkitchenitem131 campkitchenitem132 campkitchenitem133 campkitchenitem134 campkitchenitem135. campkitchenitem136 campkitchenitem137 campkitchenitem138 campkitchenitem139 campkitchenitem140 campkitchenitem141 campkitchenitem142 campkitchenitem143 campkitchenitem144. campkitchenitem145 campkitchenitem146 campkitchenitem147 campkitchenitem148 campkitchenitem149 campkitchenitem150 campkitchenitem151 campkitchenitem152 campkitchenitem153. campkitchenitem154 campkitchenitem155 campkitchenitem156 campkitchenitem157 campkitchenitem158 campkitchenitem159 campkitchenitem160 campkitchenitem161 campkitchenitem162. campkitchenitem163 campkitchenitem164 campkitchenitem165 campkitchenitem166 campkitchenitem167 campkitchenitem168 campkitchenitem169 campkitchenitem170 campkitchenitem171. campkitchenitem172 campkitche",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000011",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ChatGPT-User",
+      "page_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "template_key": "/products/{slug}",
+      "tested_at": "2026-11-05T02:30:39.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3433,
+      "word_count": 175,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen item 1</title><meta name=\"description\" content=\"camp kitchen item 1 at the Built Site outdoor shop.\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"Product\",\"name\":\"camp kitchen item 1\",\"description\":\"The camp kitchen item 1.\"}</script></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen item 1</h1><p>The camp kitchen item 1 is a reliable piece of kit for weekend trips and longer journeys.</p><table><tr><td>Weight: 1.2 kg</td></tr><tr><td>Packed size: 40 cm</td></tr></table><p>campkitchenitem10 campkitchenitem11 campkitchenitem12 campkitchenitem13 campkitchenitem14 campkitchenitem15 campkitchenitem16 campkitchenitem17 campkitchenitem18. campkitchenitem19 campkitchenitem110 campkitchenitem111 campkitchenitem112 campkitchenitem113 campkitchenitem114 campkitchenitem115 campkitchenitem116 campkitchenitem117. campkitchenitem118 campkitchenitem119 campkitchenitem120 campkitchenitem121 campkitchenitem122 campkitchenitem123 campkitchenitem124 campkitchenitem125 campkitchenitem126. campkitchenitem127 campkitchenitem128 campkitchenitem129 campkitchenitem130 campkitchenitem131 campkitchenitem132 campkitchenitem133 campkitchenitem134 campkitchenitem135. campkitchenitem136 campkitchenitem137 campkitchenitem138 campkitchenitem139 campkitchenitem140 campkitchenitem141 campkitchenitem142 campkitchenitem143 campkitchenitem144. campkitchenitem145 campkitchenitem146 campkitchenitem147 campkitchenitem148 campkitchenitem149 campkitchenitem150 campkitchenitem151 campkitchenitem152 campkitchenitem153. campkitchenitem154 campkitchenitem155 campkitchenitem156 campkitchenitem157 campkitchenitem158 campkitchenitem159 campkitchenitem160 campkitchenitem161 campkitchenitem162. campkitchenitem163 campkitchenitem164 campkitchenitem165 campkitchenitem166 campkitchenitem167 campkitchenitem168 campkitchenitem169 campkitchenitem170 campkitchenitem171. campkitchenitem172 campkitche",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000012",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "PerplexityBot",
+      "page_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "template_key": "/products/{slug}",
+      "tested_at": "2026-11-05T02:30:40.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3433,
+      "word_count": 175,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen item 1</title><meta name=\"description\" content=\"camp kitchen item 1 at the Built Site outdoor shop.\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"Product\",\"name\":\"camp kitchen item 1\",\"description\":\"The camp kitchen item 1.\"}</script></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen item 1</h1><p>The camp kitchen item 1 is a reliable piece of kit for weekend trips and longer journeys.</p><table><tr><td>Weight: 1.2 kg</td></tr><tr><td>Packed size: 40 cm</td></tr></table><p>campkitchenitem10 campkitchenitem11 campkitchenitem12 campkitchenitem13 campkitchenitem14 campkitchenitem15 campkitchenitem16 campkitchenitem17 campkitchenitem18. campkitchenitem19 campkitchenitem110 campkitchenitem111 campkitchenitem112 campkitchenitem113 campkitchenitem114 campkitchenitem115 campkitchenitem116 campkitchenitem117. campkitchenitem118 campkitchenitem119 campkitchenitem120 campkitchenitem121 campkitchenitem122 campkitchenitem123 campkitchenitem124 campkitchenitem125 campkitchenitem126. campkitchenitem127 campkitchenitem128 campkitchenitem129 campkitchenitem130 campkitchenitem131 campkitchenitem132 campkitchenitem133 campkitchenitem134 campkitchenitem135. campkitchenitem136 campkitchenitem137 campkitchenitem138 campkitchenitem139 campkitchenitem140 campkitchenitem141 campkitchenitem142 campkitchenitem143 campkitchenitem144. campkitchenitem145 campkitchenitem146 campkitchenitem147 campkitchenitem148 campkitchenitem149 campkitchenitem150 campkitchenitem151 campkitchenitem152 campkitchenitem153. campkitchenitem154 campkitchenitem155 campkitchenitem156 campkitchenitem157 campkitchenitem158 campkitchenitem159 campkitchenitem160 campkitchenitem161 campkitchenitem162. campkitchenitem163 campkitchenitem164 campkitchenitem165 campkitchenitem166 campkitchenitem167 campkitchenitem168 campkitchenitem169 campkitchenitem170 campkitchenitem171. campkitchenitem172 campkitche",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000013",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "Claude-SearchBot",
+      "page_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "template_key": "/products/{slug}",
+      "tested_at": "2026-11-05T02:30:40.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3433,
+      "word_count": 175,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen item 1</title><meta name=\"description\" content=\"camp kitchen item 1 at the Built Site outdoor shop.\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"Product\",\"name\":\"camp kitchen item 1\",\"description\":\"The camp kitchen item 1.\"}</script></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen item 1</h1><p>The camp kitchen item 1 is a reliable piece of kit for weekend trips and longer journeys.</p><table><tr><td>Weight: 1.2 kg</td></tr><tr><td>Packed size: 40 cm</td></tr></table><p>campkitchenitem10 campkitchenitem11 campkitchenitem12 campkitchenitem13 campkitchenitem14 campkitchenitem15 campkitchenitem16 campkitchenitem17 campkitchenitem18. campkitchenitem19 campkitchenitem110 campkitchenitem111 campkitchenitem112 campkitchenitem113 campkitchenitem114 campkitchenitem115 campkitchenitem116 campkitchenitem117. campkitchenitem118 campkitchenitem119 campkitchenitem120 campkitchenitem121 campkitchenitem122 campkitchenitem123 campkitchenitem124 campkitchenitem125 campkitchenitem126. campkitchenitem127 campkitchenitem128 campkitchenitem129 campkitchenitem130 campkitchenitem131 campkitchenitem132 campkitchenitem133 campkitchenitem134 campkitchenitem135. campkitchenitem136 campkitchenitem137 campkitchenitem138 campkitchenitem139 campkitchenitem140 campkitchenitem141 campkitchenitem142 campkitchenitem143 campkitchenitem144. campkitchenitem145 campkitchenitem146 campkitchenitem147 campkitchenitem148 campkitchenitem149 campkitchenitem150 campkitchenitem151 campkitchenitem152 campkitchenitem153. campkitchenitem154 campkitchenitem155 campkitchenitem156 campkitchenitem157 campkitchenitem158 campkitchenitem159 campkitchenitem160 campkitchenitem161 campkitchenitem162. campkitchenitem163 campkitchenitem164 campkitchenitem165 campkitchenitem166 campkitchenitem167 campkitchenitem168 campkitchenitem169 campkitchenitem170 campkitchenitem171. campkitchenitem172 campkitche",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000014",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "GPTBot",
+      "page_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "template_key": "/products/{slug}",
+      "tested_at": "2026-11-05T02:30:00.000Z",
+      "verdict": "disallowed_by_robots",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Read from robots.txt: the crawler is told not to fetch this path, so nothing was requested as it."
+      ],
+      "cause": "robots_txt_disallow",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/robots.txt",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/plain"
+        }
+      ],
+      "byte_count": 134,
+      "word_count": null,
+      "body_excerpt": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\n# Content-Signal: search=yes, ai-input=yes, ai-train=no\nSitemap: /sitemap.xml\n",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": 0,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000015",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ClaudeBot",
+      "page_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "template_key": "/products/{slug}",
+      "tested_at": "2026-11-05T02:30:41.000Z",
+      "verdict": "blocked_by_ua_rule",
+      "evidence_class": "simulated",
+      "identity_sent": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
+        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 403,
+      "final_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html"
+        }
+      ],
+      "byte_count": 35,
+      "word_count": null,
+      "body_excerpt": "<html><body>Forbidden</body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": {
+        "role": "crawler",
+        "ua": "OAI-SearchBot"
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000016",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "template_key": "/products/{slug}",
+      "tested_at": "2026-11-05T02:30:41.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "A tagged Googlebot request made only to tell whether this site checks crawler IP addresses. It is not a Googlebot result."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/products/camp-kitchen-item-1",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3433,
+      "word_count": 175,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen item 1</title><meta name=\"description\" content=\"camp kitchen item 1 at the Built Site outdoor shop.\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"Product\",\"name\":\"camp kitchen item 1\",\"description\":\"The camp kitchen item 1.\"}</script></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen item 1</h1><p>The camp kitchen item 1 is a reliable piece of kit for weekend trips and longer journeys.</p><table><tr><td>Weight: 1.2 kg</td></tr><tr><td>Packed size: 40 cm</td></tr></table><p>campkitchenitem10 campkitchenitem11 campkitchenitem12 campkitchenitem13 campkitchenitem14 campkitchenitem15 campkitchenitem16 campkitchenitem17 campkitchenitem18. campkitchenitem19 campkitchenitem110 campkitchenitem111 campkitchenitem112 campkitchenitem113 campkitchenitem114 campkitchenitem115 campkitchenitem116 campkitchenitem117. campkitchenitem118 campkitchenitem119 campkitchenitem120 campkitchenitem121 campkitchenitem122 campkitchenitem123 campkitchenitem124 campkitchenitem125 campkitchenitem126. campkitchenitem127 campkitchenitem128 campkitchenitem129 campkitchenitem130 campkitchenitem131 campkitchenitem132 campkitchenitem133 campkitchenitem134 campkitchenitem135. campkitchenitem136 campkitchenitem137 campkitchenitem138 campkitchenitem139 campkitchenitem140 campkitchenitem141 campkitchenitem142 campkitchenitem143 campkitchenitem144. campkitchenitem145 campkitchenitem146 campkitchenitem147 campkitchenitem148 campkitchenitem149 campkitchenitem150 campkitchenitem151 campkitchenitem152 campkitchenitem153. campkitchenitem154 campkitchenitem155 campkitchenitem156 campkitchenitem157 campkitchenitem158 campkitchenitem159 campkitchenitem160 campkitchenitem161 campkitchenitem162. campkitchenitem163 campkitchenitem164 campkitchenitem165 campkitchenitem166 campkitchenitem167 campkitchenitem168 campkitchenitem169 campkitchenitem170 campkitchenitem171. campkitchenitem172 campkitche",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "canary",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000017",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test/blog/tent-care-guide",
+      "template_key": "/blog/{slug}",
+      "tested_at": "2026-11-05T02:30:42.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "An untagged browser-identity control request: it shows what the server sends before scripts run."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/blog/tent-care-guide",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3153,
+      "word_count": 173,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>tent care guide</title><meta name=\"description\" content=\"tent care guide at the Built Site outdoor shop.\"><link rel=\"alternate\" hreflang=\"en\" href=\"/blog/tent-care-guide\"><link rel=\"alternate\" hreflang=\"fr\" href=\"/blog/tent-care-guide-fr\"><link rel=\"alternate\" hreflang=\"x-default\" href=\"/blog/tent-care-guide\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>Tent care guide</h1><p>Tent care guide is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>tentcareguidepack0 tentcareguidepack1 tentcareguidepack2 tentcareguidepack3 tentcareguidepack4 tentcareguidepack5 tentcareguidepack6 tentcareguidepack7 tentcareguidepack8. tentcareguidepack9 tentcareguidepack10 tentcareguidepack11 tentcareguidepack12 tentcareguidepack13 tentcareguidepack14 tentcareguidepack15 tentcareguidepack16 tentcareguidepack17. tentcareguidepack18 tentcareguidepack19 tentcareguidepack20 tentcareguidepack21 tentcareguidepack22 tentcareguidepack23 tentcareguidepack24 tentcareguidepack25 tentcareguidepack26. tentcareguidepack27 tentcareguidepack28 tentcareguidepack29 tentcareguidepack30 tentcareguidepack31 tentcareguidepack32 tentcareguidepack33 tentcareguidepack34 tentcareguidepack35. tentcareguidepack36 tentcareguidepack37 tentcareguidepack38 tentcareguidepack39 tentcareguidepack40 tentcareguidepack41 tentcareguidepack42 tentcareguidepack43 tentcareguidepack44. tentcareguidepack45 tentcareguidepack46 tentcareguidepack47 tentcareguidepack48 tentcareguidepack49 tentcareguidepack50 tentcareguidepack51 tentcareguidepack52 tentcareguidepack53. tentcareguidepack54 tentcareguidepack55 tentcareguidepack56 tentcareguidepack57 tentcareguidepack58 tentcareguidepack59</p><h2>How do you keep it dry?</h2><p>tentcareguidedry0 tentcareguidedry1 tentcareguidedry2 tentcareguidedry3 tentcareguidedry4 tentcareguidedry5 ten",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "control",
+      "tagged": false,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000018",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "OAI-SearchBot",
+      "page_url": "https://built-site.test/blog/tent-care-guide",
+      "template_key": "/blog/{slug}",
+      "tested_at": "2026-11-05T02:30:42.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/blog/tent-care-guide",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3153,
+      "word_count": 173,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>tent care guide</title><meta name=\"description\" content=\"tent care guide at the Built Site outdoor shop.\"><link rel=\"alternate\" hreflang=\"en\" href=\"/blog/tent-care-guide\"><link rel=\"alternate\" hreflang=\"fr\" href=\"/blog/tent-care-guide-fr\"><link rel=\"alternate\" hreflang=\"x-default\" href=\"/blog/tent-care-guide\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>Tent care guide</h1><p>Tent care guide is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>tentcareguidepack0 tentcareguidepack1 tentcareguidepack2 tentcareguidepack3 tentcareguidepack4 tentcareguidepack5 tentcareguidepack6 tentcareguidepack7 tentcareguidepack8. tentcareguidepack9 tentcareguidepack10 tentcareguidepack11 tentcareguidepack12 tentcareguidepack13 tentcareguidepack14 tentcareguidepack15 tentcareguidepack16 tentcareguidepack17. tentcareguidepack18 tentcareguidepack19 tentcareguidepack20 tentcareguidepack21 tentcareguidepack22 tentcareguidepack23 tentcareguidepack24 tentcareguidepack25 tentcareguidepack26. tentcareguidepack27 tentcareguidepack28 tentcareguidepack29 tentcareguidepack30 tentcareguidepack31 tentcareguidepack32 tentcareguidepack33 tentcareguidepack34 tentcareguidepack35. tentcareguidepack36 tentcareguidepack37 tentcareguidepack38 tentcareguidepack39 tentcareguidepack40 tentcareguidepack41 tentcareguidepack42 tentcareguidepack43 tentcareguidepack44. tentcareguidepack45 tentcareguidepack46 tentcareguidepack47 tentcareguidepack48 tentcareguidepack49 tentcareguidepack50 tentcareguidepack51 tentcareguidepack52 tentcareguidepack53. tentcareguidepack54 tentcareguidepack55 tentcareguidepack56 tentcareguidepack57 tentcareguidepack58 tentcareguidepack59</p><h2>How do you keep it dry?</h2><p>tentcareguidedry0 tentcareguidedry1 tentcareguidedry2 tentcareguidedry3 tentcareguidedry4 tentcareguidedry5 ten",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000019",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ChatGPT-User",
+      "page_url": "https://built-site.test/blog/tent-care-guide",
+      "template_key": "/blog/{slug}",
+      "tested_at": "2026-11-05T02:30:43.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/blog/tent-care-guide",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3153,
+      "word_count": 173,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>tent care guide</title><meta name=\"description\" content=\"tent care guide at the Built Site outdoor shop.\"><link rel=\"alternate\" hreflang=\"en\" href=\"/blog/tent-care-guide\"><link rel=\"alternate\" hreflang=\"fr\" href=\"/blog/tent-care-guide-fr\"><link rel=\"alternate\" hreflang=\"x-default\" href=\"/blog/tent-care-guide\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>Tent care guide</h1><p>Tent care guide is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>tentcareguidepack0 tentcareguidepack1 tentcareguidepack2 tentcareguidepack3 tentcareguidepack4 tentcareguidepack5 tentcareguidepack6 tentcareguidepack7 tentcareguidepack8. tentcareguidepack9 tentcareguidepack10 tentcareguidepack11 tentcareguidepack12 tentcareguidepack13 tentcareguidepack14 tentcareguidepack15 tentcareguidepack16 tentcareguidepack17. tentcareguidepack18 tentcareguidepack19 tentcareguidepack20 tentcareguidepack21 tentcareguidepack22 tentcareguidepack23 tentcareguidepack24 tentcareguidepack25 tentcareguidepack26. tentcareguidepack27 tentcareguidepack28 tentcareguidepack29 tentcareguidepack30 tentcareguidepack31 tentcareguidepack32 tentcareguidepack33 tentcareguidepack34 tentcareguidepack35. tentcareguidepack36 tentcareguidepack37 tentcareguidepack38 tentcareguidepack39 tentcareguidepack40 tentcareguidepack41 tentcareguidepack42 tentcareguidepack43 tentcareguidepack44. tentcareguidepack45 tentcareguidepack46 tentcareguidepack47 tentcareguidepack48 tentcareguidepack49 tentcareguidepack50 tentcareguidepack51 tentcareguidepack52 tentcareguidepack53. tentcareguidepack54 tentcareguidepack55 tentcareguidepack56 tentcareguidepack57 tentcareguidepack58 tentcareguidepack59</p><h2>How do you keep it dry?</h2><p>tentcareguidedry0 tentcareguidedry1 tentcareguidedry2 tentcareguidedry3 tentcareguidedry4 tentcareguidedry5 ten",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000020",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "PerplexityBot",
+      "page_url": "https://built-site.test/blog/tent-care-guide",
+      "template_key": "/blog/{slug}",
+      "tested_at": "2026-11-05T02:30:43.500Z",
+      "verdict": "blocked_by_ua_rule",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
+        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 403,
+      "final_url": "https://built-site.test/blog/tent-care-guide",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html"
+        }
+      ],
+      "byte_count": 35,
+      "word_count": null,
+      "body_excerpt": "<html><body>Forbidden</body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": {
+        "role": "crawler",
+        "ua": "OAI-SearchBot"
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000021",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "Claude-SearchBot",
+      "page_url": "https://built-site.test/blog/tent-care-guide",
+      "template_key": "/blog/{slug}",
+      "tested_at": "2026-11-05T02:30:44.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/blog/tent-care-guide",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3153,
+      "word_count": 173,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>tent care guide</title><meta name=\"description\" content=\"tent care guide at the Built Site outdoor shop.\"><link rel=\"alternate\" hreflang=\"en\" href=\"/blog/tent-care-guide\"><link rel=\"alternate\" hreflang=\"fr\" href=\"/blog/tent-care-guide-fr\"><link rel=\"alternate\" hreflang=\"x-default\" href=\"/blog/tent-care-guide\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>Tent care guide</h1><p>Tent care guide is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>tentcareguidepack0 tentcareguidepack1 tentcareguidepack2 tentcareguidepack3 tentcareguidepack4 tentcareguidepack5 tentcareguidepack6 tentcareguidepack7 tentcareguidepack8. tentcareguidepack9 tentcareguidepack10 tentcareguidepack11 tentcareguidepack12 tentcareguidepack13 tentcareguidepack14 tentcareguidepack15 tentcareguidepack16 tentcareguidepack17. tentcareguidepack18 tentcareguidepack19 tentcareguidepack20 tentcareguidepack21 tentcareguidepack22 tentcareguidepack23 tentcareguidepack24 tentcareguidepack25 tentcareguidepack26. tentcareguidepack27 tentcareguidepack28 tentcareguidepack29 tentcareguidepack30 tentcareguidepack31 tentcareguidepack32 tentcareguidepack33 tentcareguidepack34 tentcareguidepack35. tentcareguidepack36 tentcareguidepack37 tentcareguidepack38 tentcareguidepack39 tentcareguidepack40 tentcareguidepack41 tentcareguidepack42 tentcareguidepack43 tentcareguidepack44. tentcareguidepack45 tentcareguidepack46 tentcareguidepack47 tentcareguidepack48 tentcareguidepack49 tentcareguidepack50 tentcareguidepack51 tentcareguidepack52 tentcareguidepack53. tentcareguidepack54 tentcareguidepack55 tentcareguidepack56 tentcareguidepack57 tentcareguidepack58 tentcareguidepack59</p><h2>How do you keep it dry?</h2><p>tentcareguidedry0 tentcareguidedry1 tentcareguidedry2 tentcareguidedry3 tentcareguidedry4 tentcareguidedry5 ten",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000022",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "GPTBot",
+      "page_url": "https://built-site.test/blog/tent-care-guide",
+      "template_key": "/blog/{slug}",
+      "tested_at": "2026-11-05T02:30:00.000Z",
+      "verdict": "disallowed_by_robots",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Read from robots.txt: the crawler is told not to fetch this path, so nothing was requested as it."
+      ],
+      "cause": "robots_txt_disallow",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/robots.txt",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/plain"
+        }
+      ],
+      "byte_count": 134,
+      "word_count": null,
+      "body_excerpt": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\n# Content-Signal: search=yes, ai-input=yes, ai-train=no\nSitemap: /sitemap.xml\n",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": 0,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000023",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ClaudeBot",
+      "page_url": "https://built-site.test/blog/tent-care-guide",
+      "template_key": "/blog/{slug}",
+      "tested_at": "2026-11-05T02:30:44.500Z",
+      "verdict": "blocked_by_ua_rule",
+      "evidence_class": "simulated",
+      "identity_sent": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
+        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 403,
+      "final_url": "https://built-site.test/blog/tent-care-guide",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html"
+        }
+      ],
+      "byte_count": 35,
+      "word_count": null,
+      "body_excerpt": "<html><body>Forbidden</body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": {
+        "role": "crawler",
+        "ua": "OAI-SearchBot"
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000024",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test/blog/tent-care-guide",
+      "template_key": "/blog/{slug}",
+      "tested_at": "2026-11-05T02:30:45.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "A tagged Googlebot request made only to tell whether this site checks crawler IP addresses. It is not a Googlebot result."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/blog/tent-care-guide",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3153,
+      "word_count": 173,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>tent care guide</title><meta name=\"description\" content=\"tent care guide at the Built Site outdoor shop.\"><link rel=\"alternate\" hreflang=\"en\" href=\"/blog/tent-care-guide\"><link rel=\"alternate\" hreflang=\"fr\" href=\"/blog/tent-care-guide-fr\"><link rel=\"alternate\" hreflang=\"x-default\" href=\"/blog/tent-care-guide\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>Tent care guide</h1><p>Tent care guide is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>tentcareguidepack0 tentcareguidepack1 tentcareguidepack2 tentcareguidepack3 tentcareguidepack4 tentcareguidepack5 tentcareguidepack6 tentcareguidepack7 tentcareguidepack8. tentcareguidepack9 tentcareguidepack10 tentcareguidepack11 tentcareguidepack12 tentcareguidepack13 tentcareguidepack14 tentcareguidepack15 tentcareguidepack16 tentcareguidepack17. tentcareguidepack18 tentcareguidepack19 tentcareguidepack20 tentcareguidepack21 tentcareguidepack22 tentcareguidepack23 tentcareguidepack24 tentcareguidepack25 tentcareguidepack26. tentcareguidepack27 tentcareguidepack28 tentcareguidepack29 tentcareguidepack30 tentcareguidepack31 tentcareguidepack32 tentcareguidepack33 tentcareguidepack34 tentcareguidepack35. tentcareguidepack36 tentcareguidepack37 tentcareguidepack38 tentcareguidepack39 tentcareguidepack40 tentcareguidepack41 tentcareguidepack42 tentcareguidepack43 tentcareguidepack44. tentcareguidepack45 tentcareguidepack46 tentcareguidepack47 tentcareguidepack48 tentcareguidepack49 tentcareguidepack50 tentcareguidepack51 tentcareguidepack52 tentcareguidepack53. tentcareguidepack54 tentcareguidepack55 tentcareguidepack56 tentcareguidepack57 tentcareguidepack58 tentcareguidepack59</p><h2>How do you keep it dry?</h2><p>tentcareguidedry0 tentcareguidedry1 tentcareguidedry2 tentcareguidedry3 tentcareguidedry4 tentcareguidedry5 ten",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "canary",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000025",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test/collections/camp-kitchen",
+      "template_key": "/collections/{slug}",
+      "tested_at": "2026-11-05T02:30:45.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "An untagged browser-identity control request: it shows what the server sends before scripts run."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/collections/camp-kitchen",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 2982,
+      "word_count": 187,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen</title><meta name=\"description\" content=\"camp kitchen at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen</h1><p>camp kitchen is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>campkitchenpack0 campkitchenpack1 campkitchenpack2 campkitchenpack3 campkitchenpack4 campkitchenpack5 campkitchenpack6 campkitchenpack7 campkitchenpack8. campkitchenpack9 campkitchenpack10 campkitchenpack11 campkitchenpack12 campkitchenpack13 campkitchenpack14 campkitchenpack15 campkitchenpack16 campkitchenpack17. campkitchenpack18 campkitchenpack19 campkitchenpack20 campkitchenpack21 campkitchenpack22 campkitchenpack23 campkitchenpack24 campkitchenpack25 campkitchenpack26. campkitchenpack27 campkitchenpack28 campkitchenpack29 campkitchenpack30 campkitchenpack31 campkitchenpack32 campkitchenpack33 campkitchenpack34 campkitchenpack35. campkitchenpack36 campkitchenpack37 campkitchenpack38 campkitchenpack39 campkitchenpack40 campkitchenpack41 campkitchenpack42 campkitchenpack43 campkitchenpack44. campkitchenpack45 campkitchenpack46 campkitchenpack47 campkitchenpack48 campkitchenpack49 campkitchenpack50 campkitchenpack51 campkitchenpack52 campkitchenpack53. campkitchenpack54 campkitchenpack55 campkitchenpack56 campkitchenpack57 campkitchenpack58 campkitchenpack59</p><h2>How do you keep it dry?</h2><p>campkitchendry0 campkitchendry1 campkitchendry2 campkitchendry3 campkitchendry4 campkitchendry5 campkitchendry6 campkitchendry7 campkitchendry8. campkitchendry9 campkitchendry10 campkitchendry11 campkitchendry12 campkitchendry13 campkitchendry14 campkitchendry15 campkitchendry16 campkitchendry17. campkitchendry18 campkitchendry19 campkitchendry20 campkitchendry21 campkitchendry22 campkitchendry23 campkitchendry24 campkitchendry25 campkitchendry",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "control",
+      "tagged": false,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000026",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "OAI-SearchBot",
+      "page_url": "https://built-site.test/collections/camp-kitchen",
+      "template_key": "/collections/{slug}",
+      "tested_at": "2026-11-05T02:30:46.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/collections/camp-kitchen",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 2982,
+      "word_count": 187,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen</title><meta name=\"description\" content=\"camp kitchen at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen</h1><p>camp kitchen is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>campkitchenpack0 campkitchenpack1 campkitchenpack2 campkitchenpack3 campkitchenpack4 campkitchenpack5 campkitchenpack6 campkitchenpack7 campkitchenpack8. campkitchenpack9 campkitchenpack10 campkitchenpack11 campkitchenpack12 campkitchenpack13 campkitchenpack14 campkitchenpack15 campkitchenpack16 campkitchenpack17. campkitchenpack18 campkitchenpack19 campkitchenpack20 campkitchenpack21 campkitchenpack22 campkitchenpack23 campkitchenpack24 campkitchenpack25 campkitchenpack26. campkitchenpack27 campkitchenpack28 campkitchenpack29 campkitchenpack30 campkitchenpack31 campkitchenpack32 campkitchenpack33 campkitchenpack34 campkitchenpack35. campkitchenpack36 campkitchenpack37 campkitchenpack38 campkitchenpack39 campkitchenpack40 campkitchenpack41 campkitchenpack42 campkitchenpack43 campkitchenpack44. campkitchenpack45 campkitchenpack46 campkitchenpack47 campkitchenpack48 campkitchenpack49 campkitchenpack50 campkitchenpack51 campkitchenpack52 campkitchenpack53. campkitchenpack54 campkitchenpack55 campkitchenpack56 campkitchenpack57 campkitchenpack58 campkitchenpack59</p><h2>How do you keep it dry?</h2><p>campkitchendry0 campkitchendry1 campkitchendry2 campkitchendry3 campkitchendry4 campkitchendry5 campkitchendry6 campkitchendry7 campkitchendry8. campkitchendry9 campkitchendry10 campkitchendry11 campkitchendry12 campkitchendry13 campkitchendry14 campkitchendry15 campkitchendry16 campkitchendry17. campkitchendry18 campkitchendry19 campkitchendry20 campkitchendry21 campkitchendry22 campkitchendry23 campkitchendry24 campkitchendry25 campkitchendry",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000027",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ChatGPT-User",
+      "page_url": "https://built-site.test/collections/camp-kitchen",
+      "template_key": "/collections/{slug}",
+      "tested_at": "2026-11-05T02:30:46.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/collections/camp-kitchen",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 2982,
+      "word_count": 187,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen</title><meta name=\"description\" content=\"camp kitchen at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen</h1><p>camp kitchen is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>campkitchenpack0 campkitchenpack1 campkitchenpack2 campkitchenpack3 campkitchenpack4 campkitchenpack5 campkitchenpack6 campkitchenpack7 campkitchenpack8. campkitchenpack9 campkitchenpack10 campkitchenpack11 campkitchenpack12 campkitchenpack13 campkitchenpack14 campkitchenpack15 campkitchenpack16 campkitchenpack17. campkitchenpack18 campkitchenpack19 campkitchenpack20 campkitchenpack21 campkitchenpack22 campkitchenpack23 campkitchenpack24 campkitchenpack25 campkitchenpack26. campkitchenpack27 campkitchenpack28 campkitchenpack29 campkitchenpack30 campkitchenpack31 campkitchenpack32 campkitchenpack33 campkitchenpack34 campkitchenpack35. campkitchenpack36 campkitchenpack37 campkitchenpack38 campkitchenpack39 campkitchenpack40 campkitchenpack41 campkitchenpack42 campkitchenpack43 campkitchenpack44. campkitchenpack45 campkitchenpack46 campkitchenpack47 campkitchenpack48 campkitchenpack49 campkitchenpack50 campkitchenpack51 campkitchenpack52 campkitchenpack53. campkitchenpack54 campkitchenpack55 campkitchenpack56 campkitchenpack57 campkitchenpack58 campkitchenpack59</p><h2>How do you keep it dry?</h2><p>campkitchendry0 campkitchendry1 campkitchendry2 campkitchendry3 campkitchendry4 campkitchendry5 campkitchendry6 campkitchendry7 campkitchendry8. campkitchendry9 campkitchendry10 campkitchendry11 campkitchendry12 campkitchendry13 campkitchendry14 campkitchendry15 campkitchendry16 campkitchendry17. campkitchendry18 campkitchendry19 campkitchendry20 campkitchendry21 campkitchendry22 campkitchendry23 campkitchendry24 campkitchendry25 campkitchendry",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000028",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "PerplexityBot",
+      "page_url": "https://built-site.test/collections/camp-kitchen",
+      "template_key": "/collections/{slug}",
+      "tested_at": "2026-11-05T02:30:47.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/collections/camp-kitchen",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 2982,
+      "word_count": 187,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen</title><meta name=\"description\" content=\"camp kitchen at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen</h1><p>camp kitchen is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>campkitchenpack0 campkitchenpack1 campkitchenpack2 campkitchenpack3 campkitchenpack4 campkitchenpack5 campkitchenpack6 campkitchenpack7 campkitchenpack8. campkitchenpack9 campkitchenpack10 campkitchenpack11 campkitchenpack12 campkitchenpack13 campkitchenpack14 campkitchenpack15 campkitchenpack16 campkitchenpack17. campkitchenpack18 campkitchenpack19 campkitchenpack20 campkitchenpack21 campkitchenpack22 campkitchenpack23 campkitchenpack24 campkitchenpack25 campkitchenpack26. campkitchenpack27 campkitchenpack28 campkitchenpack29 campkitchenpack30 campkitchenpack31 campkitchenpack32 campkitchenpack33 campkitchenpack34 campkitchenpack35. campkitchenpack36 campkitchenpack37 campkitchenpack38 campkitchenpack39 campkitchenpack40 campkitchenpack41 campkitchenpack42 campkitchenpack43 campkitchenpack44. campkitchenpack45 campkitchenpack46 campkitchenpack47 campkitchenpack48 campkitchenpack49 campkitchenpack50 campkitchenpack51 campkitchenpack52 campkitchenpack53. campkitchenpack54 campkitchenpack55 campkitchenpack56 campkitchenpack57 campkitchenpack58 campkitchenpack59</p><h2>How do you keep it dry?</h2><p>campkitchendry0 campkitchendry1 campkitchendry2 campkitchendry3 campkitchendry4 campkitchendry5 campkitchendry6 campkitchendry7 campkitchendry8. campkitchendry9 campkitchendry10 campkitchendry11 campkitchendry12 campkitchendry13 campkitchendry14 campkitchendry15 campkitchendry16 campkitchendry17. campkitchendry18 campkitchendry19 campkitchendry20 campkitchendry21 campkitchendry22 campkitchendry23 campkitchendry24 campkitchendry25 campkitchendry",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000029",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "Claude-SearchBot",
+      "page_url": "https://built-site.test/collections/camp-kitchen",
+      "template_key": "/collections/{slug}",
+      "tested_at": "2026-11-05T02:30:47.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/collections/camp-kitchen",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 2982,
+      "word_count": 187,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen</title><meta name=\"description\" content=\"camp kitchen at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen</h1><p>camp kitchen is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>campkitchenpack0 campkitchenpack1 campkitchenpack2 campkitchenpack3 campkitchenpack4 campkitchenpack5 campkitchenpack6 campkitchenpack7 campkitchenpack8. campkitchenpack9 campkitchenpack10 campkitchenpack11 campkitchenpack12 campkitchenpack13 campkitchenpack14 campkitchenpack15 campkitchenpack16 campkitchenpack17. campkitchenpack18 campkitchenpack19 campkitchenpack20 campkitchenpack21 campkitchenpack22 campkitchenpack23 campkitchenpack24 campkitchenpack25 campkitchenpack26. campkitchenpack27 campkitchenpack28 campkitchenpack29 campkitchenpack30 campkitchenpack31 campkitchenpack32 campkitchenpack33 campkitchenpack34 campkitchenpack35. campkitchenpack36 campkitchenpack37 campkitchenpack38 campkitchenpack39 campkitchenpack40 campkitchenpack41 campkitchenpack42 campkitchenpack43 campkitchenpack44. campkitchenpack45 campkitchenpack46 campkitchenpack47 campkitchenpack48 campkitchenpack49 campkitchenpack50 campkitchenpack51 campkitchenpack52 campkitchenpack53. campkitchenpack54 campkitchenpack55 campkitchenpack56 campkitchenpack57 campkitchenpack58 campkitchenpack59</p><h2>How do you keep it dry?</h2><p>campkitchendry0 campkitchendry1 campkitchendry2 campkitchendry3 campkitchendry4 campkitchendry5 campkitchendry6 campkitchendry7 campkitchendry8. campkitchendry9 campkitchendry10 campkitchendry11 campkitchendry12 campkitchendry13 campkitchendry14 campkitchendry15 campkitchendry16 campkitchendry17. campkitchendry18 campkitchendry19 campkitchendry20 campkitchendry21 campkitchendry22 campkitchendry23 campkitchendry24 campkitchendry25 campkitchendry",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000030",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "GPTBot",
+      "page_url": "https://built-site.test/collections/camp-kitchen",
+      "template_key": "/collections/{slug}",
+      "tested_at": "2026-11-05T02:30:00.000Z",
+      "verdict": "disallowed_by_robots",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Read from robots.txt: the crawler is told not to fetch this path, so nothing was requested as it."
+      ],
+      "cause": "robots_txt_disallow",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/robots.txt",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/plain"
+        }
+      ],
+      "byte_count": 134,
+      "word_count": null,
+      "body_excerpt": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\n# Content-Signal: search=yes, ai-input=yes, ai-train=no\nSitemap: /sitemap.xml\n",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": 0,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000031",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ClaudeBot",
+      "page_url": "https://built-site.test/collections/camp-kitchen",
+      "template_key": "/collections/{slug}",
+      "tested_at": "2026-11-05T02:30:48.000Z",
+      "verdict": "blocked_by_ua_rule",
+      "evidence_class": "simulated",
+      "identity_sent": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
+        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 403,
+      "final_url": "https://built-site.test/collections/camp-kitchen",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html"
+        }
+      ],
+      "byte_count": 35,
+      "word_count": null,
+      "body_excerpt": "<html><body>Forbidden</body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": {
+        "role": "crawler",
+        "ua": "OAI-SearchBot"
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000032",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test/collections/camp-kitchen",
+      "template_key": "/collections/{slug}",
+      "tested_at": "2026-11-05T02:30:48.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "A tagged Googlebot request made only to tell whether this site checks crawler IP addresses. It is not a Googlebot result."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/collections/camp-kitchen",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 2982,
+      "word_count": 187,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>camp kitchen</title><meta name=\"description\" content=\"camp kitchen at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>camp kitchen</h1><p>camp kitchen is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>campkitchenpack0 campkitchenpack1 campkitchenpack2 campkitchenpack3 campkitchenpack4 campkitchenpack5 campkitchenpack6 campkitchenpack7 campkitchenpack8. campkitchenpack9 campkitchenpack10 campkitchenpack11 campkitchenpack12 campkitchenpack13 campkitchenpack14 campkitchenpack15 campkitchenpack16 campkitchenpack17. campkitchenpack18 campkitchenpack19 campkitchenpack20 campkitchenpack21 campkitchenpack22 campkitchenpack23 campkitchenpack24 campkitchenpack25 campkitchenpack26. campkitchenpack27 campkitchenpack28 campkitchenpack29 campkitchenpack30 campkitchenpack31 campkitchenpack32 campkitchenpack33 campkitchenpack34 campkitchenpack35. campkitchenpack36 campkitchenpack37 campkitchenpack38 campkitchenpack39 campkitchenpack40 campkitchenpack41 campkitchenpack42 campkitchenpack43 campkitchenpack44. campkitchenpack45 campkitchenpack46 campkitchenpack47 campkitchenpack48 campkitchenpack49 campkitchenpack50 campkitchenpack51 campkitchenpack52 campkitchenpack53. campkitchenpack54 campkitchenpack55 campkitchenpack56 campkitchenpack57 campkitchenpack58 campkitchenpack59</p><h2>How do you keep it dry?</h2><p>campkitchendry0 campkitchendry1 campkitchendry2 campkitchendry3 campkitchendry4 campkitchendry5 campkitchendry6 campkitchendry7 campkitchendry8. campkitchendry9 campkitchendry10 campkitchendry11 campkitchendry12 campkitchendry13 campkitchendry14 campkitchendry15 campkitchendry16 campkitchendry17. campkitchendry18 campkitchendry19 campkitchendry20 campkitchendry21 campkitchendry22 campkitchendry23 campkitchendry24 campkitchendry25 campkitchendry",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "canary",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000033",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test/guides/getting-started-camping",
+      "template_key": "/guides/{slug}",
+      "tested_at": "2026-11-05T02:30:49.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "An untagged browser-identity control request: it shows what the server sends before scripts run."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/guides/getting-started-camping",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 206,
+      "word_count": 0,
+      "body_excerpt": "<!doctype html><html><head><title>Guide</title><script src=\"/static/app.js\" defer></script></head><body><div id=\"root\"></div><noscript>You need to enable JavaScript to run this app.</noscript></body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "control",
+      "tagged": false,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000034",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "OAI-SearchBot",
+      "page_url": "https://built-site.test/guides/getting-started-camping",
+      "template_key": "/guides/{slug}",
+      "tested_at": "2026-11-05T02:30:49.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/guides/getting-started-camping",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 206,
+      "word_count": 0,
+      "body_excerpt": "<!doctype html><html><head><title>Guide</title><script src=\"/static/app.js\" defer></script></head><body><div id=\"root\"></div><noscript>You need to enable JavaScript to run this app.</noscript></body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000035",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ChatGPT-User",
+      "page_url": "https://built-site.test/guides/getting-started-camping",
+      "template_key": "/guides/{slug}",
+      "tested_at": "2026-11-05T02:30:50.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/guides/getting-started-camping",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 206,
+      "word_count": 0,
+      "body_excerpt": "<!doctype html><html><head><title>Guide</title><script src=\"/static/app.js\" defer></script></head><body><div id=\"root\"></div><noscript>You need to enable JavaScript to run this app.</noscript></body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000036",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "PerplexityBot",
+      "page_url": "https://built-site.test/guides/getting-started-camping",
+      "template_key": "/guides/{slug}",
+      "tested_at": "2026-11-05T02:30:50.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/guides/getting-started-camping",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 206,
+      "word_count": 0,
+      "body_excerpt": "<!doctype html><html><head><title>Guide</title><script src=\"/static/app.js\" defer></script></head><body><div id=\"root\"></div><noscript>You need to enable JavaScript to run this app.</noscript></body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000037",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "Claude-SearchBot",
+      "page_url": "https://built-site.test/guides/getting-started-camping",
+      "template_key": "/guides/{slug}",
+      "tested_at": "2026-11-05T02:30:51.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/guides/getting-started-camping",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 206,
+      "word_count": 0,
+      "body_excerpt": "<!doctype html><html><head><title>Guide</title><script src=\"/static/app.js\" defer></script></head><body><div id=\"root\"></div><noscript>You need to enable JavaScript to run this app.</noscript></body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000038",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "GPTBot",
+      "page_url": "https://built-site.test/guides/getting-started-camping",
+      "template_key": "/guides/{slug}",
+      "tested_at": "2026-11-05T02:30:00.000Z",
+      "verdict": "disallowed_by_robots",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Read from robots.txt: the crawler is told not to fetch this path, so nothing was requested as it."
+      ],
+      "cause": "robots_txt_disallow",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/robots.txt",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/plain"
+        }
+      ],
+      "byte_count": 134,
+      "word_count": null,
+      "body_excerpt": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\n# Content-Signal: search=yes, ai-input=yes, ai-train=no\nSitemap: /sitemap.xml\n",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": 0,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000039",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ClaudeBot",
+      "page_url": "https://built-site.test/guides/getting-started-camping",
+      "template_key": "/guides/{slug}",
+      "tested_at": "2026-11-05T02:30:51.500Z",
+      "verdict": "blocked_by_ua_rule",
+      "evidence_class": "simulated",
+      "identity_sent": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
+        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 403,
+      "final_url": "https://built-site.test/guides/getting-started-camping",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html"
+        }
+      ],
+      "byte_count": 35,
+      "word_count": null,
+      "body_excerpt": "<html><body>Forbidden</body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": {
+        "role": "crawler",
+        "ua": "OAI-SearchBot"
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000040",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test/guides/getting-started-camping",
+      "template_key": "/guides/{slug}",
+      "tested_at": "2026-11-05T02:30:52.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "A tagged Googlebot request made only to tell whether this site checks crawler IP addresses. It is not a Googlebot result."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/guides/getting-started-camping",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 206,
+      "word_count": 0,
+      "body_excerpt": "<!doctype html><html><head><title>Guide</title><script src=\"/static/app.js\" defer></script></head><body><div id=\"root\"></div><noscript>You need to enable JavaScript to run this app.</noscript></body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "canary",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000041",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test/journal/peg-materials-compared",
+      "template_key": "/journal/{slug}",
+      "tested_at": "2026-11-05T02:30:52.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "An untagged browser-identity control request: it shows what the server sends before scripts run."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/journal/peg-materials-compared",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3817,
+      "word_count": 172,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>peg materials compared</title><meta name=\"description\" content=\"peg materials compared at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>peg materials compared</h1><p>peg materials compared is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>pegmaterialscomparedpack0 pegmaterialscomparedpack1 pegmaterialscomparedpack2 pegmaterialscomparedpack3 pegmaterialscomparedpack4 pegmaterialscomparedpack5 pegmaterialscomparedpack6 pegmaterialscomparedpack7 pegmaterialscomparedpack8. pegmaterialscomparedpack9 pegmaterialscomparedpack10 pegmaterialscomparedpack11 pegmaterialscomparedpack12 pegmaterialscomparedpack13 pegmaterialscomparedpack14 pegmaterialscomparedpack15 pegmaterialscomparedpack16 pegmaterialscomparedpack17. pegmaterialscomparedpack18 pegmaterialscomparedpack19 pegmaterialscomparedpack20 pegmaterialscomparedpack21 pegmaterialscomparedpack22 pegmaterialscomparedpack23 pegmaterialscomparedpack24 pegmaterialscomparedpack25 pegmaterialscomparedpack26. pegmaterialscomparedpack27 pegmaterialscomparedpack28 pegmaterialscomparedpack29 pegmaterialscomparedpack30 pegmaterialscomparedpack31 pegmaterialscomparedpack32 pegmaterialscomparedpack33 pegmaterialscomparedpack34 pegmaterialscomparedpack35. pegmaterialscomparedpack36 pegmaterialscomparedpack37 pegmaterialscomparedpack38 pegmaterialscomparedpack39 pegmaterialscomparedpack40 pegmaterialscomparedpack41 pegmaterialscomparedpack42 pegmaterialscomparedpack43 pegmaterialscomparedpack44. pegmaterialscomparedpack45 pegmaterialscomparedpack46 pegmaterialscomparedpack47 pegmaterialscomparedpack48 pegmaterialscomparedpack49 pegmaterialscomparedpack50 pegmaterialscomparedpack51 pegmaterialscomparedpack52 pegmaterialscomparedpack53. pegmaterialscomparedpack54 pegmaterialscomparedpack55 pegmaterialsco",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "control",
+      "tagged": false,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000042",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "OAI-SearchBot",
+      "page_url": "https://built-site.test/journal/peg-materials-compared",
+      "template_key": "/journal/{slug}",
+      "tested_at": "2026-11-05T02:30:53.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/journal/peg-materials-compared",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3817,
+      "word_count": 172,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>peg materials compared</title><meta name=\"description\" content=\"peg materials compared at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>peg materials compared</h1><p>peg materials compared is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>pegmaterialscomparedpack0 pegmaterialscomparedpack1 pegmaterialscomparedpack2 pegmaterialscomparedpack3 pegmaterialscomparedpack4 pegmaterialscomparedpack5 pegmaterialscomparedpack6 pegmaterialscomparedpack7 pegmaterialscomparedpack8. pegmaterialscomparedpack9 pegmaterialscomparedpack10 pegmaterialscomparedpack11 pegmaterialscomparedpack12 pegmaterialscomparedpack13 pegmaterialscomparedpack14 pegmaterialscomparedpack15 pegmaterialscomparedpack16 pegmaterialscomparedpack17. pegmaterialscomparedpack18 pegmaterialscomparedpack19 pegmaterialscomparedpack20 pegmaterialscomparedpack21 pegmaterialscomparedpack22 pegmaterialscomparedpack23 pegmaterialscomparedpack24 pegmaterialscomparedpack25 pegmaterialscomparedpack26. pegmaterialscomparedpack27 pegmaterialscomparedpack28 pegmaterialscomparedpack29 pegmaterialscomparedpack30 pegmaterialscomparedpack31 pegmaterialscomparedpack32 pegmaterialscomparedpack33 pegmaterialscomparedpack34 pegmaterialscomparedpack35. pegmaterialscomparedpack36 pegmaterialscomparedpack37 pegmaterialscomparedpack38 pegmaterialscomparedpack39 pegmaterialscomparedpack40 pegmaterialscomparedpack41 pegmaterialscomparedpack42 pegmaterialscomparedpack43 pegmaterialscomparedpack44. pegmaterialscomparedpack45 pegmaterialscomparedpack46 pegmaterialscomparedpack47 pegmaterialscomparedpack48 pegmaterialscomparedpack49 pegmaterialscomparedpack50 pegmaterialscomparedpack51 pegmaterialscomparedpack52 pegmaterialscomparedpack53. pegmaterialscomparedpack54 pegmaterialscomparedpack55 pegmaterialsco",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000043",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ChatGPT-User",
+      "page_url": "https://built-site.test/journal/peg-materials-compared",
+      "template_key": "/journal/{slug}",
+      "tested_at": "2026-11-05T02:30:53.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/journal/peg-materials-compared",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3817,
+      "word_count": 172,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>peg materials compared</title><meta name=\"description\" content=\"peg materials compared at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>peg materials compared</h1><p>peg materials compared is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>pegmaterialscomparedpack0 pegmaterialscomparedpack1 pegmaterialscomparedpack2 pegmaterialscomparedpack3 pegmaterialscomparedpack4 pegmaterialscomparedpack5 pegmaterialscomparedpack6 pegmaterialscomparedpack7 pegmaterialscomparedpack8. pegmaterialscomparedpack9 pegmaterialscomparedpack10 pegmaterialscomparedpack11 pegmaterialscomparedpack12 pegmaterialscomparedpack13 pegmaterialscomparedpack14 pegmaterialscomparedpack15 pegmaterialscomparedpack16 pegmaterialscomparedpack17. pegmaterialscomparedpack18 pegmaterialscomparedpack19 pegmaterialscomparedpack20 pegmaterialscomparedpack21 pegmaterialscomparedpack22 pegmaterialscomparedpack23 pegmaterialscomparedpack24 pegmaterialscomparedpack25 pegmaterialscomparedpack26. pegmaterialscomparedpack27 pegmaterialscomparedpack28 pegmaterialscomparedpack29 pegmaterialscomparedpack30 pegmaterialscomparedpack31 pegmaterialscomparedpack32 pegmaterialscomparedpack33 pegmaterialscomparedpack34 pegmaterialscomparedpack35. pegmaterialscomparedpack36 pegmaterialscomparedpack37 pegmaterialscomparedpack38 pegmaterialscomparedpack39 pegmaterialscomparedpack40 pegmaterialscomparedpack41 pegmaterialscomparedpack42 pegmaterialscomparedpack43 pegmaterialscomparedpack44. pegmaterialscomparedpack45 pegmaterialscomparedpack46 pegmaterialscomparedpack47 pegmaterialscomparedpack48 pegmaterialscomparedpack49 pegmaterialscomparedpack50 pegmaterialscomparedpack51 pegmaterialscomparedpack52 pegmaterialscomparedpack53. pegmaterialscomparedpack54 pegmaterialscomparedpack55 pegmaterialsco",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000044",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "PerplexityBot",
+      "page_url": "https://built-site.test/journal/peg-materials-compared",
+      "template_key": "/journal/{slug}",
+      "tested_at": "2026-11-05T02:30:54.000Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/journal/peg-materials-compared",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3817,
+      "word_count": 172,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>peg materials compared</title><meta name=\"description\" content=\"peg materials compared at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>peg materials compared</h1><p>peg materials compared is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>pegmaterialscomparedpack0 pegmaterialscomparedpack1 pegmaterialscomparedpack2 pegmaterialscomparedpack3 pegmaterialscomparedpack4 pegmaterialscomparedpack5 pegmaterialscomparedpack6 pegmaterialscomparedpack7 pegmaterialscomparedpack8. pegmaterialscomparedpack9 pegmaterialscomparedpack10 pegmaterialscomparedpack11 pegmaterialscomparedpack12 pegmaterialscomparedpack13 pegmaterialscomparedpack14 pegmaterialscomparedpack15 pegmaterialscomparedpack16 pegmaterialscomparedpack17. pegmaterialscomparedpack18 pegmaterialscomparedpack19 pegmaterialscomparedpack20 pegmaterialscomparedpack21 pegmaterialscomparedpack22 pegmaterialscomparedpack23 pegmaterialscomparedpack24 pegmaterialscomparedpack25 pegmaterialscomparedpack26. pegmaterialscomparedpack27 pegmaterialscomparedpack28 pegmaterialscomparedpack29 pegmaterialscomparedpack30 pegmaterialscomparedpack31 pegmaterialscomparedpack32 pegmaterialscomparedpack33 pegmaterialscomparedpack34 pegmaterialscomparedpack35. pegmaterialscomparedpack36 pegmaterialscomparedpack37 pegmaterialscomparedpack38 pegmaterialscomparedpack39 pegmaterialscomparedpack40 pegmaterialscomparedpack41 pegmaterialscomparedpack42 pegmaterialscomparedpack43 pegmaterialscomparedpack44. pegmaterialscomparedpack45 pegmaterialscomparedpack46 pegmaterialscomparedpack47 pegmaterialscomparedpack48 pegmaterialscomparedpack49 pegmaterialscomparedpack50 pegmaterialscomparedpack51 pegmaterialscomparedpack52 pegmaterialscomparedpack53. pegmaterialscomparedpack54 pegmaterialscomparedpack55 pegmaterialsco",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000045",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "Claude-SearchBot",
+      "page_url": "https://built-site.test/journal/peg-materials-compared",
+      "template_key": "/journal/{slug}",
+      "tested_at": "2026-11-05T02:30:54.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Claude-SearchBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/journal/peg-materials-compared",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3817,
+      "word_count": 172,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>peg materials compared</title><meta name=\"description\" content=\"peg materials compared at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>peg materials compared</h1><p>peg materials compared is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>pegmaterialscomparedpack0 pegmaterialscomparedpack1 pegmaterialscomparedpack2 pegmaterialscomparedpack3 pegmaterialscomparedpack4 pegmaterialscomparedpack5 pegmaterialscomparedpack6 pegmaterialscomparedpack7 pegmaterialscomparedpack8. pegmaterialscomparedpack9 pegmaterialscomparedpack10 pegmaterialscomparedpack11 pegmaterialscomparedpack12 pegmaterialscomparedpack13 pegmaterialscomparedpack14 pegmaterialscomparedpack15 pegmaterialscomparedpack16 pegmaterialscomparedpack17. pegmaterialscomparedpack18 pegmaterialscomparedpack19 pegmaterialscomparedpack20 pegmaterialscomparedpack21 pegmaterialscomparedpack22 pegmaterialscomparedpack23 pegmaterialscomparedpack24 pegmaterialscomparedpack25 pegmaterialscomparedpack26. pegmaterialscomparedpack27 pegmaterialscomparedpack28 pegmaterialscomparedpack29 pegmaterialscomparedpack30 pegmaterialscomparedpack31 pegmaterialscomparedpack32 pegmaterialscomparedpack33 pegmaterialscomparedpack34 pegmaterialscomparedpack35. pegmaterialscomparedpack36 pegmaterialscomparedpack37 pegmaterialscomparedpack38 pegmaterialscomparedpack39 pegmaterialscomparedpack40 pegmaterialscomparedpack41 pegmaterialscomparedpack42 pegmaterialscomparedpack43 pegmaterialscomparedpack44. pegmaterialscomparedpack45 pegmaterialscomparedpack46 pegmaterialscomparedpack47 pegmaterialscomparedpack48 pegmaterialscomparedpack49 pegmaterialscomparedpack50 pegmaterialscomparedpack51 pegmaterialscomparedpack52 pegmaterialscomparedpack53. pegmaterialscomparedpack54 pegmaterialscomparedpack55 pegmaterialsco",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000046",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "GPTBot",
+      "page_url": "https://built-site.test/journal/peg-materials-compared",
+      "template_key": "/journal/{slug}",
+      "tested_at": "2026-11-05T02:30:00.000Z",
+      "verdict": "disallowed_by_robots",
+      "evidence_class": "declared",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Read from robots.txt: the crawler is told not to fetch this path, so nothing was requested as it."
+      ],
+      "cause": "robots_txt_disallow",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/robots.txt",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/plain"
+        }
+      ],
+      "byte_count": 134,
+      "word_count": null,
+      "body_excerpt": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\n# Content-Signal: search=yes, ai-input=yes, ai-train=no\nSitemap: /sitemap.xml\n",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": 0,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000047",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": "ClaudeBot",
+      "page_url": "https://built-site.test/journal/peg-materials-compared",
+      "template_key": "/journal/{slug}",
+      "tested_at": "2026-11-05T02:30:55.000Z",
+      "verdict": "blocked_by_ua_rule",
+      "evidence_class": "simulated",
+      "identity_sent": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
+        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "ClaudeBot Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 403,
+      "final_url": "https://built-site.test/journal/peg-materials-compared",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html"
+        }
+      ],
+      "byte_count": 35,
+      "word_count": null,
+      "body_excerpt": "<html><body>Forbidden</body></html>",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "crawler",
+      "tagged": true,
+      "witness": {
+        "role": "crawler",
+        "ua": "OAI-SearchBot"
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000048",
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "ua": null,
+      "page_url": "https://built-site.test/journal/peg-materials-compared",
+      "template_key": "/journal/{slug}",
+      "tested_at": "2026-11-05T02:30:55.500Z",
+      "verdict": "allowed",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [
+        "A tagged Googlebot request made only to tell whether this site checks crawler IP addresses. It is not a Googlebot result."
+      ],
+      "cause": null,
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "raw_status": 200,
+      "final_url": "https://built-site.test/journal/peg-materials-compared",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3817,
+      "word_count": 172,
+      "body_excerpt": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>peg materials compared</title><meta name=\"description\" content=\"peg materials compared at the Built Site outdoor shop.\"></head><body><nav><a href=\"/\">Home</a></nav><main><h1>peg materials compared</h1><p>peg materials compared is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn.</p><h2>What should you pack first?</h2><p>pegmaterialscomparedpack0 pegmaterialscomparedpack1 pegmaterialscomparedpack2 pegmaterialscomparedpack3 pegmaterialscomparedpack4 pegmaterialscomparedpack5 pegmaterialscomparedpack6 pegmaterialscomparedpack7 pegmaterialscomparedpack8. pegmaterialscomparedpack9 pegmaterialscomparedpack10 pegmaterialscomparedpack11 pegmaterialscomparedpack12 pegmaterialscomparedpack13 pegmaterialscomparedpack14 pegmaterialscomparedpack15 pegmaterialscomparedpack16 pegmaterialscomparedpack17. pegmaterialscomparedpack18 pegmaterialscomparedpack19 pegmaterialscomparedpack20 pegmaterialscomparedpack21 pegmaterialscomparedpack22 pegmaterialscomparedpack23 pegmaterialscomparedpack24 pegmaterialscomparedpack25 pegmaterialscomparedpack26. pegmaterialscomparedpack27 pegmaterialscomparedpack28 pegmaterialscomparedpack29 pegmaterialscomparedpack30 pegmaterialscomparedpack31 pegmaterialscomparedpack32 pegmaterialscomparedpack33 pegmaterialscomparedpack34 pegmaterialscomparedpack35. pegmaterialscomparedpack36 pegmaterialscomparedpack37 pegmaterialscomparedpack38 pegmaterialscomparedpack39 pegmaterialscomparedpack40 pegmaterialscomparedpack41 pegmaterialscomparedpack42 pegmaterialscomparedpack43 pegmaterialscomparedpack44. pegmaterialscomparedpack45 pegmaterialscomparedpack46 pegmaterialscomparedpack47 pegmaterialscomparedpack48 pegmaterialscomparedpack49 pegmaterialscomparedpack50 pegmaterialscomparedpack51 pegmaterialscomparedpack52 pegmaterialscomparedpack53. pegmaterialscomparedpack54 pegmaterialscomparedpack55 pegmaterialsco",
+      "method": "GET",
+      "http_version": "1.1",
+      "identity_role": "canary",
+      "tagged": true,
+      "witness": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      }
+    }
+  ]
+}

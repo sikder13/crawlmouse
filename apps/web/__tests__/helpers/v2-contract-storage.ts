@@ -290,6 +290,7 @@ export const RULES_NOT_THIS_STEP: Record<string, string> = {
   declaration_media_type: 'worker batch result (no table)',
   declaration_cache_answer: 'worker batch result (no table)',
   declaration_not_requested: 'worker batch result (no table)',
+  robots_body: 'worker batch result (no table)',
   billing_period: 'Account (CC-01)',
   history_current: 'Account (CC-01)',
   history_forward: 'Account (CC-01)',

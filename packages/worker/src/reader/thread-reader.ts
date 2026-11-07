@@ -1,5 +1,12 @@
 import { Worker, type ResourceLimits } from 'node:worker_threads';
-import type { NotRead, PageRead, PageReader, ReaderFailure, WordCount } from './read.js';
+import type {
+  NotRead,
+  PageRead,
+  PageReader,
+  ReaderFailure,
+  StackHeaders,
+  WordCount,
+} from './read.js';
 
 /**
  * The page reader on one thread, created once per process. Reads are answered in the order sent, so
@@ -28,7 +35,14 @@ export const READ_DEADLINE_MS = 20_000;
 
 export type ReadMessage =
   | { id: number; kind: 'words'; body: ArrayBuffer; bodyCut: boolean }
-  | { id: number; kind: 'page'; body: ArrayBuffer; bodyCut: boolean; finalUrl: string };
+  | {
+      id: number;
+      kind: 'page';
+      body: ArrayBuffer;
+      bodyCut: boolean;
+      finalUrl: string;
+      stackHeaders: StackHeaders | null;
+    };
 
 export type ReadReply =
   | { id: number; result: WordCount | PageRead }
@@ -37,7 +51,7 @@ export type ReadyMessage = { ready: true };
 
 type Ask =
   | { kind: 'words'; bodyCut: boolean }
-  | { kind: 'page'; bodyCut: boolean; finalUrl: string };
+  | { kind: 'page'; bodyCut: boolean; finalUrl: string; stackHeaders: StackHeaders | null };
 
 interface Read {
   id: number;
@@ -88,8 +102,15 @@ export class ThreadReader implements PageReader {
     return this.send({ kind: 'words', bodyCut }, body) as Promise<WordCount | NotRead>;
   }
 
-  page(body: string, bodyCut: boolean, finalUrl: string): Promise<PageRead | NotRead> {
-    return this.send({ kind: 'page', bodyCut, finalUrl }, body) as Promise<PageRead | NotRead>;
+  page(
+    body: string,
+    bodyCut: boolean,
+    finalUrl: string,
+    stackHeaders: StackHeaders | null = null,
+  ): Promise<PageRead | NotRead> {
+    return this.send({ kind: 'page', bodyCut, finalUrl, stackHeaders }, body) as Promise<
+      PageRead | NotRead
+    >;
   }
 
   async close(): Promise<void> {

@@ -1,0 +1,1770 @@
+{
+  "batch_id": "b0000000-0000-4000-8000-0000000000c1:1",
+  "check_id": "b0000000-0000-4000-8000-0000000000c1",
+  "site_id": "b0000000-0000-4000-8000-0000000000a1",
+  "started_at": "2026-11-05T02:30:28.500Z",
+  "finished_at": "2026-11-05T02:30:34.500Z",
+  "requests": 12,
+  "bytes": 33053,
+  "coverage": {
+    "urls_requested": 10,
+    "urls_complete": 10
+  },
+  "partial": null,
+  "findings": [],
+  "robots": [
+    {
+      "origin": "https://built-site.test",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "state": "rules",
+      "why": null,
+      "status": 200,
+      "final_url": "https://built-site.test/robots.txt",
+      "fetched_at": "2026-11-05T02:30:00.000Z",
+      "from_cache": true,
+      "crawl_delay_s": null,
+      "body_excerpt": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\n# Content-Signal: search=yes, ai-input=yes, ai-train=no\nSitemap: /sitemap.xml\n",
+      "body": "User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\n\n# Content-Signal: search=yes, ai-input=yes, ai-train=no\nSitemap: /sitemap.xml\n",
+      "body_complete": true
+    }
+  ],
+  "declarations": [
+    {
+      "origin": "https://built-site.test",
+      "path": "/llms.txt",
+      "state": "answered",
+      "status": 404,
+      "media_type": null,
+      "bytes": 9,
+      "bytes_complete": true,
+      "not_requested": null,
+      "from_cache": true
+    },
+    {
+      "origin": "https://built-site.test",
+      "path": "/llms-full.txt",
+      "state": "answered",
+      "status": 404,
+      "media_type": null,
+      "bytes": 9,
+      "bytes_complete": true,
+      "not_requested": null,
+      "from_cache": true
+    },
+    {
+      "origin": "https://built-site.test",
+      "path": "/.well-known/ucp",
+      "state": "answered",
+      "status": 404,
+      "media_type": null,
+      "bytes": 9,
+      "bytes_complete": true,
+      "not_requested": null,
+      "from_cache": true
+    },
+    {
+      "origin": "https://built-site.test",
+      "path": "/.well-known/mcp",
+      "state": "answered",
+      "status": 404,
+      "media_type": null,
+      "bytes": 9,
+      "bytes_complete": true,
+      "not_requested": null,
+      "from_cache": true
+    },
+    {
+      "origin": "https://built-site.test",
+      "path": "/.well-known/agent-card.json",
+      "state": "answered",
+      "status": 404,
+      "media_type": null,
+      "bytes": 9,
+      "bytes_complete": true,
+      "not_requested": null,
+      "from_cache": true
+    },
+    {
+      "origin": "https://built-site.test",
+      "path": "/rsl.xml",
+      "state": "answered",
+      "status": 404,
+      "media_type": null,
+      "bytes": 9,
+      "bytes_complete": true,
+      "not_requested": null,
+      "from_cache": true
+    },
+    {
+      "origin": "https://built-site.test",
+      "path": "/sitemap.xml",
+      "state": "answered",
+      "status": 200,
+      "media_type": "application/xml",
+      "bytes": 2864,
+      "bytes_complete": true,
+      "not_requested": null,
+      "from_cache": true
+    }
+  ],
+  "kind": "crawl",
+  "pages": [
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "url": "https://built-site.test/products/sleeping-bags-item-4",
+      "outcome": "fetched",
+      "response": "served",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [],
+      "fetched_at": "2026-11-05T02:30:29.000Z",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "status_code": 200,
+      "final_url": "https://built-site.test/products/sleeping-bags-item-4",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3581,
+      "word_count": 175,
+      "raw_text": "Home sleeping bags item 4 The sleeping bags item 4 is a reliable piece of kit for weekend trips and longer journeys. Weight: 1.2 kg Packed size: 40 cm sleepingbagsitem40 sleepingbagsitem41 sleepingbagsitem42 sleepingbagsitem43 sleepingbagsitem44 sleepingbagsitem45 sleepingbagsitem46 sleepingbagsitem47 sleepingbagsitem48. sleepingbagsitem49 sleepingbagsitem410 sleepingbagsitem411 sleepingbagsitem412 sleepingbagsitem413 sleepingbagsitem414 sleepingbagsitem415 sleepingbagsitem416 sleepingbagsitem417. sleepingbagsitem418 sleepingbagsitem419 sleepingbagsitem420 sleepingbagsitem421 sleepingbagsitem422 sleepingbagsitem423 sleepingbagsitem424 sleepingbagsitem425 sleepingbagsitem426. sleepingbagsitem427 sleepingbagsitem428 sleepingbagsitem429 sleepingbagsitem430 sleepingbagsitem431 sleepingbagsitem432 sleepingbagsitem433 sleepingbagsitem434 sleepingbagsitem435. sleepingbagsitem436 sleepingbagsitem437 sleepingbagsitem438 sleepingbagsitem439 sleepingbagsitem440 sleepingbagsitem441 sleepingbagsitem442 sleepingbagsitem443 sleepingbagsitem444. sleepingbagsitem445 sleepingbagsitem446 sleepingbagsitem447 sleepingbagsitem448 sleepingbagsitem449 sleepingbagsitem450 sleepingbagsitem451 sleepingbagsitem452 sleepingbagsitem453. sleepingbagsitem454 sleepingbagsitem455 sleepingbagsitem456 sleepingbagsitem457 sleepingbagsitem458 sleepingbagsitem459 sleepingbagsitem460 sleepingbagsitem461 sleepingbagsitem462. sleepingbagsitem463 sleepingbagsitem464 sleepingbagsitem465 sleepingbagsitem466 sleepingbagsitem467 sleepingbagsitem468 sleepingbagsitem469 sleepingbagsitem470 sleepingbagsitem471. sleepingbagsitem472 sleepingbagsitem473 sleepingbagsitem474 sleepingbagsitem475 sleepingbagsitem476 sleepingbagsitem477 sleepingbagsitem478 sleepingbagsitem479 sleepingbagsitem480. sleepingbagsitem481 sleepingbagsitem482 sleepingbagsitem483 sleepingbagsitem484 sleepingbagsitem485 sleepingbagsitem486 sleepingbagsitem487 sleepingbagsitem488 sleepingbagsitem489. sleepingbagsitem490 sleepingbagsitem491 sleepingbagsitem492 sleepingbagsitem493 sleepingbagsitem494 sleepingbagsitem495 sleepingbagsitem496 sleepingbagsitem497 sleepingbagsitem498. sleepingbagsitem499 sleepingbagsitem4100 sleepingbagsitem4101 sleepingbagsitem4102 sleepingbagsitem4103 sleepingbagsitem4104 sleepingbagsitem4105 sleepingbagsitem4106 sleepingbagsitem4107. sleepingbagsitem4108 sleepingbagsitem4109 sleepingbagsitem4110 sleepingbagsitem4111 sleepingbagsitem4112 sleepingbagsitem4113 sleepingbagsitem4114 sleepingbagsitem4115 sleepingbagsitem4116. sleepingbagsitem4117 sleepingbagsitem4118 sleepingbagsitem4119 sleepingbagsitem4120 sleepingbagsitem4121 sleepingbagsitem4122 sleepingbagsitem4123 sleepingbagsitem4124 sleepingbagsitem4125. sleepingbagsitem4126 sleepingbagsitem4127 sleepingbagsitem4128 sleepingbagsitem4129 sleepingbagsitem4130 sleepingbagsitem4131 sleepingbagsitem4132 sleepingbagsitem4133 sleepingbagsitem4134. sleepingbagsitem4135 sleepingbagsitem4136 sleepingbagsitem4137 sleepingbagsitem4138 sleepingbagsitem4139 sleeping bags Built Site outdoor shop",
+      "canonical_url": null,
+      "links_out": 2,
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": null,
+        "url": null
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "6d42bf8b11f1973f",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ],
+      "title": {
+        "text": "sleeping bags item 4",
+        "chars": 20,
+        "cut": false
+      },
+      "meta_description": {
+        "text": "sleeping bags item 4 at the Built Site outdoor shop.",
+        "chars": 52,
+        "cut": false
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      },
+      "content_features": {
+        "client_rendered": false,
+        "has_h1": true,
+        "words_after_h1": 166,
+        "opening": [
+          {
+            "tag": "p",
+            "words": 17,
+            "answer_sentences": 1,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 3,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 4,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "p",
+            "words": 140,
+            "answer_sentences": 15,
+            "question": false
+          }
+        ],
+        "headings": {
+          "count": 0,
+          "questions": 0,
+          "section_questions": 0
+        },
+        "json_ld": [
+          {
+            "types": [
+              "Product"
+            ],
+            "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          }
+        ],
+        "byline": {
+          "meta_author": false,
+          "published_time": false,
+          "rel_author": false,
+          "itemprop_author": false,
+          "itemprop_date": false,
+          "time_datetime": false
+        },
+        "specs": {
+          "structured": 1,
+          "label_value_lines": 2,
+          "spec_images": 0
+        }
+      },
+      "stack_signals": {
+        "cms": "custom",
+        "detected_from": "HTML and response headers"
+      },
+      "main_text_chars": 2999,
+      "noindex": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "url": "https://built-site.test/products/sleeping-bags-item-5",
+      "outcome": "fetched",
+      "response": "served",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [],
+      "fetched_at": "2026-11-05T02:30:29.500Z",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "status_code": 200,
+      "final_url": "https://built-site.test/products/sleeping-bags-item-5",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3581,
+      "word_count": 175,
+      "raw_text": "Home sleeping bags item 5 The sleeping bags item 5 is a reliable piece of kit for weekend trips and longer journeys. Weight: 1.2 kg Packed size: 40 cm sleepingbagsitem50 sleepingbagsitem51 sleepingbagsitem52 sleepingbagsitem53 sleepingbagsitem54 sleepingbagsitem55 sleepingbagsitem56 sleepingbagsitem57 sleepingbagsitem58. sleepingbagsitem59 sleepingbagsitem510 sleepingbagsitem511 sleepingbagsitem512 sleepingbagsitem513 sleepingbagsitem514 sleepingbagsitem515 sleepingbagsitem516 sleepingbagsitem517. sleepingbagsitem518 sleepingbagsitem519 sleepingbagsitem520 sleepingbagsitem521 sleepingbagsitem522 sleepingbagsitem523 sleepingbagsitem524 sleepingbagsitem525 sleepingbagsitem526. sleepingbagsitem527 sleepingbagsitem528 sleepingbagsitem529 sleepingbagsitem530 sleepingbagsitem531 sleepingbagsitem532 sleepingbagsitem533 sleepingbagsitem534 sleepingbagsitem535. sleepingbagsitem536 sleepingbagsitem537 sleepingbagsitem538 sleepingbagsitem539 sleepingbagsitem540 sleepingbagsitem541 sleepingbagsitem542 sleepingbagsitem543 sleepingbagsitem544. sleepingbagsitem545 sleepingbagsitem546 sleepingbagsitem547 sleepingbagsitem548 sleepingbagsitem549 sleepingbagsitem550 sleepingbagsitem551 sleepingbagsitem552 sleepingbagsitem553. sleepingbagsitem554 sleepingbagsitem555 sleepingbagsitem556 sleepingbagsitem557 sleepingbagsitem558 sleepingbagsitem559 sleepingbagsitem560 sleepingbagsitem561 sleepingbagsitem562. sleepingbagsitem563 sleepingbagsitem564 sleepingbagsitem565 sleepingbagsitem566 sleepingbagsitem567 sleepingbagsitem568 sleepingbagsitem569 sleepingbagsitem570 sleepingbagsitem571. sleepingbagsitem572 sleepingbagsitem573 sleepingbagsitem574 sleepingbagsitem575 sleepingbagsitem576 sleepingbagsitem577 sleepingbagsitem578 sleepingbagsitem579 sleepingbagsitem580. sleepingbagsitem581 sleepingbagsitem582 sleepingbagsitem583 sleepingbagsitem584 sleepingbagsitem585 sleepingbagsitem586 sleepingbagsitem587 sleepingbagsitem588 sleepingbagsitem589. sleepingbagsitem590 sleepingbagsitem591 sleepingbagsitem592 sleepingbagsitem593 sleepingbagsitem594 sleepingbagsitem595 sleepingbagsitem596 sleepingbagsitem597 sleepingbagsitem598. sleepingbagsitem599 sleepingbagsitem5100 sleepingbagsitem5101 sleepingbagsitem5102 sleepingbagsitem5103 sleepingbagsitem5104 sleepingbagsitem5105 sleepingbagsitem5106 sleepingbagsitem5107. sleepingbagsitem5108 sleepingbagsitem5109 sleepingbagsitem5110 sleepingbagsitem5111 sleepingbagsitem5112 sleepingbagsitem5113 sleepingbagsitem5114 sleepingbagsitem5115 sleepingbagsitem5116. sleepingbagsitem5117 sleepingbagsitem5118 sleepingbagsitem5119 sleepingbagsitem5120 sleepingbagsitem5121 sleepingbagsitem5122 sleepingbagsitem5123 sleepingbagsitem5124 sleepingbagsitem5125. sleepingbagsitem5126 sleepingbagsitem5127 sleepingbagsitem5128 sleepingbagsitem5129 sleepingbagsitem5130 sleepingbagsitem5131 sleepingbagsitem5132 sleepingbagsitem5133 sleepingbagsitem5134. sleepingbagsitem5135 sleepingbagsitem5136 sleepingbagsitem5137 sleepingbagsitem5138 sleepingbagsitem5139 sleeping bags Built Site outdoor shop",
+      "canonical_url": null,
+      "links_out": 2,
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": null,
+        "url": null
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "6a4784086661453f",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ],
+      "title": {
+        "text": "sleeping bags item 5",
+        "chars": 20,
+        "cut": false
+      },
+      "meta_description": {
+        "text": "sleeping bags item 5 at the Built Site outdoor shop.",
+        "chars": 52,
+        "cut": false
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      },
+      "content_features": {
+        "client_rendered": false,
+        "has_h1": true,
+        "words_after_h1": 166,
+        "opening": [
+          {
+            "tag": "p",
+            "words": 17,
+            "answer_sentences": 1,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 3,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 4,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "p",
+            "words": 140,
+            "answer_sentences": 15,
+            "question": false
+          }
+        ],
+        "headings": {
+          "count": 0,
+          "questions": 0,
+          "section_questions": 0
+        },
+        "json_ld": [
+          {
+            "types": [
+              "Product"
+            ],
+            "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          }
+        ],
+        "byline": {
+          "meta_author": false,
+          "published_time": false,
+          "rel_author": false,
+          "itemprop_author": false,
+          "itemprop_date": false,
+          "time_datetime": false
+        },
+        "specs": {
+          "structured": 1,
+          "label_value_lines": 2,
+          "spec_images": 0
+        }
+      },
+      "stack_signals": null,
+      "main_text_chars": 2999,
+      "noindex": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "url": "https://built-site.test/products/trail-backpacks-item-1",
+      "outcome": "fetched",
+      "response": "served",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [],
+      "fetched_at": "2026-11-05T02:30:30.000Z",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "status_code": 200,
+      "final_url": "https://built-site.test/products/trail-backpacks-item-1",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3877,
+      "word_count": 175,
+      "raw_text": "Home trail backpacks item 1 The trail backpacks item 1 is a reliable piece of kit for weekend trips and longer journeys. Weight: 1.2 kg Packed size: 40 cm trailbackpacksitem10 trailbackpacksitem11 trailbackpacksitem12 trailbackpacksitem13 trailbackpacksitem14 trailbackpacksitem15 trailbackpacksitem16 trailbackpacksitem17 trailbackpacksitem18. trailbackpacksitem19 trailbackpacksitem110 trailbackpacksitem111 trailbackpacksitem112 trailbackpacksitem113 trailbackpacksitem114 trailbackpacksitem115 trailbackpacksitem116 trailbackpacksitem117. trailbackpacksitem118 trailbackpacksitem119 trailbackpacksitem120 trailbackpacksitem121 trailbackpacksitem122 trailbackpacksitem123 trailbackpacksitem124 trailbackpacksitem125 trailbackpacksitem126. trailbackpacksitem127 trailbackpacksitem128 trailbackpacksitem129 trailbackpacksitem130 trailbackpacksitem131 trailbackpacksitem132 trailbackpacksitem133 trailbackpacksitem134 trailbackpacksitem135. trailbackpacksitem136 trailbackpacksitem137 trailbackpacksitem138 trailbackpacksitem139 trailbackpacksitem140 trailbackpacksitem141 trailbackpacksitem142 trailbackpacksitem143 trailbackpacksitem144. trailbackpacksitem145 trailbackpacksitem146 trailbackpacksitem147 trailbackpacksitem148 trailbackpacksitem149 trailbackpacksitem150 trailbackpacksitem151 trailbackpacksitem152 trailbackpacksitem153. trailbackpacksitem154 trailbackpacksitem155 trailbackpacksitem156 trailbackpacksitem157 trailbackpacksitem158 trailbackpacksitem159 trailbackpacksitem160 trailbackpacksitem161 trailbackpacksitem162. trailbackpacksitem163 trailbackpacksitem164 trailbackpacksitem165 trailbackpacksitem166 trailbackpacksitem167 trailbackpacksitem168 trailbackpacksitem169 trailbackpacksitem170 trailbackpacksitem171. trailbackpacksitem172 trailbackpacksitem173 trailbackpacksitem174 trailbackpacksitem175 trailbackpacksitem176 trailbackpacksitem177 trailbackpacksitem178 trailbackpacksitem179 trailbackpacksitem180. trailbackpacksitem181 trailbackpacksitem182 trailbackpacksitem183 trailbackpacksitem184 trailbackpacksitem185 trailbackpacksitem186 trailbackpacksitem187 trailbackpacksitem188 trailbackpacksitem189. trailbackpacksitem190 trailbackpacksitem191 trailbackpacksitem192 trailbackpacksitem193 trailbackpacksitem194 trailbackpacksitem195 trailbackpacksitem196 trailbackpacksitem197 trailbackpacksitem198. trailbackpacksitem199 trailbackpacksitem1100 trailbackpacksitem1101 trailbackpacksitem1102 trailbackpacksitem1103 trailbackpacksitem1104 trailbackpacksitem1105 trailbackpacksitem1106 trailbackpacksitem1107. trailbackpacksitem1108 trailbackpacksitem1109 trailbackpacksitem1110 trailbackpacksitem1111 trailbackpacksitem1112 trailbackpacksitem1113 trailbackpacksitem1114 trailbackpacksitem1115 trailbackpacksitem1116. trailbackpacksitem1117 trailbackpacksitem1118 trailbackpacksitem1119 trailbackpacksitem1120 trailbackpacksitem1121 trailbackpacksitem1122 trailbackpacksitem1123 trailbackpacksitem1124 trailbackpacksitem1125. trailbackpacksitem1126 trailbackpacksitem1127 trailbackpacksitem1128 trailbackpacksitem1129 trailbackpacksitem1130 trailbackpacksitem1131 trailbackpacksitem1132 trailbackpacksitem1133 trailbackpacksitem1134. trailbackpacksitem1135 trailbackpacksitem1136 trailbackpacksitem1137 trailbackpacksitem1138 trailbackpacksitem1139 trail backpacks Built Site outdoor shop",
+      "canonical_url": null,
+      "links_out": 2,
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": null,
+        "url": null
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "9c70b0faac518531",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ],
+      "title": {
+        "text": "trail backpacks item 1",
+        "chars": 22,
+        "cut": false
+      },
+      "meta_description": {
+        "text": "trail backpacks item 1 at the Built Site outdoor shop.",
+        "chars": 54,
+        "cut": false
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      },
+      "content_features": {
+        "client_rendered": false,
+        "has_h1": true,
+        "words_after_h1": 166,
+        "opening": [
+          {
+            "tag": "p",
+            "words": 17,
+            "answer_sentences": 1,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 3,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 4,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "p",
+            "words": 140,
+            "answer_sentences": 15,
+            "question": false
+          }
+        ],
+        "headings": {
+          "count": 0,
+          "questions": 0,
+          "section_questions": 0
+        },
+        "json_ld": [
+          {
+            "types": [
+              "Product"
+            ],
+            "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          }
+        ],
+        "byline": {
+          "meta_author": false,
+          "published_time": false,
+          "rel_author": false,
+          "itemprop_author": false,
+          "itemprop_date": false,
+          "time_datetime": false
+        },
+        "specs": {
+          "structured": 1,
+          "label_value_lines": 2,
+          "spec_images": 0
+        }
+      },
+      "stack_signals": null,
+      "main_text_chars": 3285,
+      "noindex": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "url": "https://built-site.test/products/trail-backpacks-item-2",
+      "outcome": "fetched",
+      "response": "served",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [],
+      "fetched_at": "2026-11-05T02:30:30.500Z",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "status_code": 200,
+      "final_url": "https://built-site.test/products/trail-backpacks-item-2",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3877,
+      "word_count": 175,
+      "raw_text": "Home trail backpacks item 2 The trail backpacks item 2 is a reliable piece of kit for weekend trips and longer journeys. Weight: 1.2 kg Packed size: 40 cm trailbackpacksitem20 trailbackpacksitem21 trailbackpacksitem22 trailbackpacksitem23 trailbackpacksitem24 trailbackpacksitem25 trailbackpacksitem26 trailbackpacksitem27 trailbackpacksitem28. trailbackpacksitem29 trailbackpacksitem210 trailbackpacksitem211 trailbackpacksitem212 trailbackpacksitem213 trailbackpacksitem214 trailbackpacksitem215 trailbackpacksitem216 trailbackpacksitem217. trailbackpacksitem218 trailbackpacksitem219 trailbackpacksitem220 trailbackpacksitem221 trailbackpacksitem222 trailbackpacksitem223 trailbackpacksitem224 trailbackpacksitem225 trailbackpacksitem226. trailbackpacksitem227 trailbackpacksitem228 trailbackpacksitem229 trailbackpacksitem230 trailbackpacksitem231 trailbackpacksitem232 trailbackpacksitem233 trailbackpacksitem234 trailbackpacksitem235. trailbackpacksitem236 trailbackpacksitem237 trailbackpacksitem238 trailbackpacksitem239 trailbackpacksitem240 trailbackpacksitem241 trailbackpacksitem242 trailbackpacksitem243 trailbackpacksitem244. trailbackpacksitem245 trailbackpacksitem246 trailbackpacksitem247 trailbackpacksitem248 trailbackpacksitem249 trailbackpacksitem250 trailbackpacksitem251 trailbackpacksitem252 trailbackpacksitem253. trailbackpacksitem254 trailbackpacksitem255 trailbackpacksitem256 trailbackpacksitem257 trailbackpacksitem258 trailbackpacksitem259 trailbackpacksitem260 trailbackpacksitem261 trailbackpacksitem262. trailbackpacksitem263 trailbackpacksitem264 trailbackpacksitem265 trailbackpacksitem266 trailbackpacksitem267 trailbackpacksitem268 trailbackpacksitem269 trailbackpacksitem270 trailbackpacksitem271. trailbackpacksitem272 trailbackpacksitem273 trailbackpacksitem274 trailbackpacksitem275 trailbackpacksitem276 trailbackpacksitem277 trailbackpacksitem278 trailbackpacksitem279 trailbackpacksitem280. trailbackpacksitem281 trailbackpacksitem282 trailbackpacksitem283 trailbackpacksitem284 trailbackpacksitem285 trailbackpacksitem286 trailbackpacksitem287 trailbackpacksitem288 trailbackpacksitem289. trailbackpacksitem290 trailbackpacksitem291 trailbackpacksitem292 trailbackpacksitem293 trailbackpacksitem294 trailbackpacksitem295 trailbackpacksitem296 trailbackpacksitem297 trailbackpacksitem298. trailbackpacksitem299 trailbackpacksitem2100 trailbackpacksitem2101 trailbackpacksitem2102 trailbackpacksitem2103 trailbackpacksitem2104 trailbackpacksitem2105 trailbackpacksitem2106 trailbackpacksitem2107. trailbackpacksitem2108 trailbackpacksitem2109 trailbackpacksitem2110 trailbackpacksitem2111 trailbackpacksitem2112 trailbackpacksitem2113 trailbackpacksitem2114 trailbackpacksitem2115 trailbackpacksitem2116. trailbackpacksitem2117 trailbackpacksitem2118 trailbackpacksitem2119 trailbackpacksitem2120 trailbackpacksitem2121 trailbackpacksitem2122 trailbackpacksitem2123 trailbackpacksitem2124 trailbackpacksitem2125. trailbackpacksitem2126 trailbackpacksitem2127 trailbackpacksitem2128 trailbackpacksitem2129 trailbackpacksitem2130 trailbackpacksitem2131 trailbackpacksitem2132 trailbackpacksitem2133 trailbackpacksitem2134. trailbackpacksitem2135 trailbackpacksitem2136 trailbackpacksitem2137 trailbackpacksitem2138 trailbackpacksitem2139 trail backpacks Built Site outdoor shop",
+      "canonical_url": null,
+      "links_out": 2,
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": null,
+        "url": null
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "e463309f05e95e0a",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ],
+      "title": {
+        "text": "trail backpacks item 2",
+        "chars": 22,
+        "cut": false
+      },
+      "meta_description": {
+        "text": "trail backpacks item 2 at the Built Site outdoor shop.",
+        "chars": 54,
+        "cut": false
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      },
+      "content_features": {
+        "client_rendered": false,
+        "has_h1": true,
+        "words_after_h1": 166,
+        "opening": [
+          {
+            "tag": "p",
+            "words": 17,
+            "answer_sentences": 1,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 3,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 4,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "p",
+            "words": 140,
+            "answer_sentences": 15,
+            "question": false
+          }
+        ],
+        "headings": {
+          "count": 0,
+          "questions": 0,
+          "section_questions": 0
+        },
+        "json_ld": [
+          {
+            "types": [
+              "Product"
+            ],
+            "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          }
+        ],
+        "byline": {
+          "meta_author": false,
+          "published_time": false,
+          "rel_author": false,
+          "itemprop_author": false,
+          "itemprop_date": false,
+          "time_datetime": false
+        },
+        "specs": {
+          "structured": 1,
+          "label_value_lines": 2,
+          "spec_images": 0
+        }
+      },
+      "stack_signals": null,
+      "main_text_chars": 3285,
+      "noindex": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "url": "https://built-site.test/products/trail-backpacks-item-3",
+      "outcome": "fetched",
+      "response": "served",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [],
+      "fetched_at": "2026-11-05T02:30:31.000Z",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "status_code": 200,
+      "final_url": "https://built-site.test/products/trail-backpacks-item-3",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3877,
+      "word_count": 175,
+      "raw_text": "Home trail backpacks item 3 The trail backpacks item 3 is a reliable piece of kit for weekend trips and longer journeys. Weight: 1.2 kg Packed size: 40 cm trailbackpacksitem30 trailbackpacksitem31 trailbackpacksitem32 trailbackpacksitem33 trailbackpacksitem34 trailbackpacksitem35 trailbackpacksitem36 trailbackpacksitem37 trailbackpacksitem38. trailbackpacksitem39 trailbackpacksitem310 trailbackpacksitem311 trailbackpacksitem312 trailbackpacksitem313 trailbackpacksitem314 trailbackpacksitem315 trailbackpacksitem316 trailbackpacksitem317. trailbackpacksitem318 trailbackpacksitem319 trailbackpacksitem320 trailbackpacksitem321 trailbackpacksitem322 trailbackpacksitem323 trailbackpacksitem324 trailbackpacksitem325 trailbackpacksitem326. trailbackpacksitem327 trailbackpacksitem328 trailbackpacksitem329 trailbackpacksitem330 trailbackpacksitem331 trailbackpacksitem332 trailbackpacksitem333 trailbackpacksitem334 trailbackpacksitem335. trailbackpacksitem336 trailbackpacksitem337 trailbackpacksitem338 trailbackpacksitem339 trailbackpacksitem340 trailbackpacksitem341 trailbackpacksitem342 trailbackpacksitem343 trailbackpacksitem344. trailbackpacksitem345 trailbackpacksitem346 trailbackpacksitem347 trailbackpacksitem348 trailbackpacksitem349 trailbackpacksitem350 trailbackpacksitem351 trailbackpacksitem352 trailbackpacksitem353. trailbackpacksitem354 trailbackpacksitem355 trailbackpacksitem356 trailbackpacksitem357 trailbackpacksitem358 trailbackpacksitem359 trailbackpacksitem360 trailbackpacksitem361 trailbackpacksitem362. trailbackpacksitem363 trailbackpacksitem364 trailbackpacksitem365 trailbackpacksitem366 trailbackpacksitem367 trailbackpacksitem368 trailbackpacksitem369 trailbackpacksitem370 trailbackpacksitem371. trailbackpacksitem372 trailbackpacksitem373 trailbackpacksitem374 trailbackpacksitem375 trailbackpacksitem376 trailbackpacksitem377 trailbackpacksitem378 trailbackpacksitem379 trailbackpacksitem380. trailbackpacksitem381 trailbackpacksitem382 trailbackpacksitem383 trailbackpacksitem384 trailbackpacksitem385 trailbackpacksitem386 trailbackpacksitem387 trailbackpacksitem388 trailbackpacksitem389. trailbackpacksitem390 trailbackpacksitem391 trailbackpacksitem392 trailbackpacksitem393 trailbackpacksitem394 trailbackpacksitem395 trailbackpacksitem396 trailbackpacksitem397 trailbackpacksitem398. trailbackpacksitem399 trailbackpacksitem3100 trailbackpacksitem3101 trailbackpacksitem3102 trailbackpacksitem3103 trailbackpacksitem3104 trailbackpacksitem3105 trailbackpacksitem3106 trailbackpacksitem3107. trailbackpacksitem3108 trailbackpacksitem3109 trailbackpacksitem3110 trailbackpacksitem3111 trailbackpacksitem3112 trailbackpacksitem3113 trailbackpacksitem3114 trailbackpacksitem3115 trailbackpacksitem3116. trailbackpacksitem3117 trailbackpacksitem3118 trailbackpacksitem3119 trailbackpacksitem3120 trailbackpacksitem3121 trailbackpacksitem3122 trailbackpacksitem3123 trailbackpacksitem3124 trailbackpacksitem3125. trailbackpacksitem3126 trailbackpacksitem3127 trailbackpacksitem3128 trailbackpacksitem3129 trailbackpacksitem3130 trailbackpacksitem3131 trailbackpacksitem3132 trailbackpacksitem3133 trailbackpacksitem3134. trailbackpacksitem3135 trailbackpacksitem3136 trailbackpacksitem3137 trailbackpacksitem3138 trailbackpacksitem3139 trail backpacks Built Site outdoor shop",
+      "canonical_url": null,
+      "links_out": 2,
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": null,
+        "url": null
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "27c18830f6739708",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ],
+      "title": {
+        "text": "trail backpacks item 3",
+        "chars": 22,
+        "cut": false
+      },
+      "meta_description": {
+        "text": "trail backpacks item 3 at the Built Site outdoor shop.",
+        "chars": 54,
+        "cut": false
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      },
+      "content_features": {
+        "client_rendered": false,
+        "has_h1": true,
+        "words_after_h1": 166,
+        "opening": [
+          {
+            "tag": "p",
+            "words": 17,
+            "answer_sentences": 1,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 3,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 4,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "p",
+            "words": 140,
+            "answer_sentences": 15,
+            "question": false
+          }
+        ],
+        "headings": {
+          "count": 0,
+          "questions": 0,
+          "section_questions": 0
+        },
+        "json_ld": [
+          {
+            "types": [
+              "Product"
+            ],
+            "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          }
+        ],
+        "byline": {
+          "meta_author": false,
+          "published_time": false,
+          "rel_author": false,
+          "itemprop_author": false,
+          "itemprop_date": false,
+          "time_datetime": false
+        },
+        "specs": {
+          "structured": 1,
+          "label_value_lines": 2,
+          "spec_images": 0
+        }
+      },
+      "stack_signals": null,
+      "main_text_chars": 3285,
+      "noindex": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "url": "https://built-site.test/products/trail-backpacks-item-4",
+      "outcome": "fetched",
+      "response": "served",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [],
+      "fetched_at": "2026-11-05T02:30:31.500Z",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "status_code": 200,
+      "final_url": "https://built-site.test/products/trail-backpacks-item-4",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3877,
+      "word_count": 175,
+      "raw_text": "Home trail backpacks item 4 The trail backpacks item 4 is a reliable piece of kit for weekend trips and longer journeys. Weight: 1.2 kg Packed size: 40 cm trailbackpacksitem40 trailbackpacksitem41 trailbackpacksitem42 trailbackpacksitem43 trailbackpacksitem44 trailbackpacksitem45 trailbackpacksitem46 trailbackpacksitem47 trailbackpacksitem48. trailbackpacksitem49 trailbackpacksitem410 trailbackpacksitem411 trailbackpacksitem412 trailbackpacksitem413 trailbackpacksitem414 trailbackpacksitem415 trailbackpacksitem416 trailbackpacksitem417. trailbackpacksitem418 trailbackpacksitem419 trailbackpacksitem420 trailbackpacksitem421 trailbackpacksitem422 trailbackpacksitem423 trailbackpacksitem424 trailbackpacksitem425 trailbackpacksitem426. trailbackpacksitem427 trailbackpacksitem428 trailbackpacksitem429 trailbackpacksitem430 trailbackpacksitem431 trailbackpacksitem432 trailbackpacksitem433 trailbackpacksitem434 trailbackpacksitem435. trailbackpacksitem436 trailbackpacksitem437 trailbackpacksitem438 trailbackpacksitem439 trailbackpacksitem440 trailbackpacksitem441 trailbackpacksitem442 trailbackpacksitem443 trailbackpacksitem444. trailbackpacksitem445 trailbackpacksitem446 trailbackpacksitem447 trailbackpacksitem448 trailbackpacksitem449 trailbackpacksitem450 trailbackpacksitem451 trailbackpacksitem452 trailbackpacksitem453. trailbackpacksitem454 trailbackpacksitem455 trailbackpacksitem456 trailbackpacksitem457 trailbackpacksitem458 trailbackpacksitem459 trailbackpacksitem460 trailbackpacksitem461 trailbackpacksitem462. trailbackpacksitem463 trailbackpacksitem464 trailbackpacksitem465 trailbackpacksitem466 trailbackpacksitem467 trailbackpacksitem468 trailbackpacksitem469 trailbackpacksitem470 trailbackpacksitem471. trailbackpacksitem472 trailbackpacksitem473 trailbackpacksitem474 trailbackpacksitem475 trailbackpacksitem476 trailbackpacksitem477 trailbackpacksitem478 trailbackpacksitem479 trailbackpacksitem480. trailbackpacksitem481 trailbackpacksitem482 trailbackpacksitem483 trailbackpacksitem484 trailbackpacksitem485 trailbackpacksitem486 trailbackpacksitem487 trailbackpacksitem488 trailbackpacksitem489. trailbackpacksitem490 trailbackpacksitem491 trailbackpacksitem492 trailbackpacksitem493 trailbackpacksitem494 trailbackpacksitem495 trailbackpacksitem496 trailbackpacksitem497 trailbackpacksitem498. trailbackpacksitem499 trailbackpacksitem4100 trailbackpacksitem4101 trailbackpacksitem4102 trailbackpacksitem4103 trailbackpacksitem4104 trailbackpacksitem4105 trailbackpacksitem4106 trailbackpacksitem4107. trailbackpacksitem4108 trailbackpacksitem4109 trailbackpacksitem4110 trailbackpacksitem4111 trailbackpacksitem4112 trailbackpacksitem4113 trailbackpacksitem4114 trailbackpacksitem4115 trailbackpacksitem4116. trailbackpacksitem4117 trailbackpacksitem4118 trailbackpacksitem4119 trailbackpacksitem4120 trailbackpacksitem4121 trailbackpacksitem4122 trailbackpacksitem4123 trailbackpacksitem4124 trailbackpacksitem4125. trailbackpacksitem4126 trailbackpacksitem4127 trailbackpacksitem4128 trailbackpacksitem4129 trailbackpacksitem4130 trailbackpacksitem4131 trailbackpacksitem4132 trailbackpacksitem4133 trailbackpacksitem4134. trailbackpacksitem4135 trailbackpacksitem4136 trailbackpacksitem4137 trailbackpacksitem4138 trailbackpacksitem4139 trail backpacks Built Site outdoor shop",
+      "canonical_url": null,
+      "links_out": 2,
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": null,
+        "url": null
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "696cc4ea6db18d79",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ],
+      "title": {
+        "text": "trail backpacks item 4",
+        "chars": 22,
+        "cut": false
+      },
+      "meta_description": {
+        "text": "trail backpacks item 4 at the Built Site outdoor shop.",
+        "chars": 54,
+        "cut": false
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      },
+      "content_features": {
+        "client_rendered": false,
+        "has_h1": true,
+        "words_after_h1": 166,
+        "opening": [
+          {
+            "tag": "p",
+            "words": 17,
+            "answer_sentences": 1,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 3,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 4,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "p",
+            "words": 140,
+            "answer_sentences": 15,
+            "question": false
+          }
+        ],
+        "headings": {
+          "count": 0,
+          "questions": 0,
+          "section_questions": 0
+        },
+        "json_ld": [
+          {
+            "types": [
+              "Product"
+            ],
+            "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          }
+        ],
+        "byline": {
+          "meta_author": false,
+          "published_time": false,
+          "rel_author": false,
+          "itemprop_author": false,
+          "itemprop_date": false,
+          "time_datetime": false
+        },
+        "specs": {
+          "structured": 1,
+          "label_value_lines": 2,
+          "spec_images": 0
+        }
+      },
+      "stack_signals": null,
+      "main_text_chars": 3285,
+      "noindex": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "url": "https://built-site.test/products/trail-backpacks-item-5",
+      "outcome": "fetched",
+      "response": "served",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [],
+      "fetched_at": "2026-11-05T02:30:32.000Z",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "status_code": 200,
+      "final_url": "https://built-site.test/products/trail-backpacks-item-5",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3877,
+      "word_count": 175,
+      "raw_text": "Home trail backpacks item 5 The trail backpacks item 5 is a reliable piece of kit for weekend trips and longer journeys. Weight: 1.2 kg Packed size: 40 cm trailbackpacksitem50 trailbackpacksitem51 trailbackpacksitem52 trailbackpacksitem53 trailbackpacksitem54 trailbackpacksitem55 trailbackpacksitem56 trailbackpacksitem57 trailbackpacksitem58. trailbackpacksitem59 trailbackpacksitem510 trailbackpacksitem511 trailbackpacksitem512 trailbackpacksitem513 trailbackpacksitem514 trailbackpacksitem515 trailbackpacksitem516 trailbackpacksitem517. trailbackpacksitem518 trailbackpacksitem519 trailbackpacksitem520 trailbackpacksitem521 trailbackpacksitem522 trailbackpacksitem523 trailbackpacksitem524 trailbackpacksitem525 trailbackpacksitem526. trailbackpacksitem527 trailbackpacksitem528 trailbackpacksitem529 trailbackpacksitem530 trailbackpacksitem531 trailbackpacksitem532 trailbackpacksitem533 trailbackpacksitem534 trailbackpacksitem535. trailbackpacksitem536 trailbackpacksitem537 trailbackpacksitem538 trailbackpacksitem539 trailbackpacksitem540 trailbackpacksitem541 trailbackpacksitem542 trailbackpacksitem543 trailbackpacksitem544. trailbackpacksitem545 trailbackpacksitem546 trailbackpacksitem547 trailbackpacksitem548 trailbackpacksitem549 trailbackpacksitem550 trailbackpacksitem551 trailbackpacksitem552 trailbackpacksitem553. trailbackpacksitem554 trailbackpacksitem555 trailbackpacksitem556 trailbackpacksitem557 trailbackpacksitem558 trailbackpacksitem559 trailbackpacksitem560 trailbackpacksitem561 trailbackpacksitem562. trailbackpacksitem563 trailbackpacksitem564 trailbackpacksitem565 trailbackpacksitem566 trailbackpacksitem567 trailbackpacksitem568 trailbackpacksitem569 trailbackpacksitem570 trailbackpacksitem571. trailbackpacksitem572 trailbackpacksitem573 trailbackpacksitem574 trailbackpacksitem575 trailbackpacksitem576 trailbackpacksitem577 trailbackpacksitem578 trailbackpacksitem579 trailbackpacksitem580. trailbackpacksitem581 trailbackpacksitem582 trailbackpacksitem583 trailbackpacksitem584 trailbackpacksitem585 trailbackpacksitem586 trailbackpacksitem587 trailbackpacksitem588 trailbackpacksitem589. trailbackpacksitem590 trailbackpacksitem591 trailbackpacksitem592 trailbackpacksitem593 trailbackpacksitem594 trailbackpacksitem595 trailbackpacksitem596 trailbackpacksitem597 trailbackpacksitem598. trailbackpacksitem599 trailbackpacksitem5100 trailbackpacksitem5101 trailbackpacksitem5102 trailbackpacksitem5103 trailbackpacksitem5104 trailbackpacksitem5105 trailbackpacksitem5106 trailbackpacksitem5107. trailbackpacksitem5108 trailbackpacksitem5109 trailbackpacksitem5110 trailbackpacksitem5111 trailbackpacksitem5112 trailbackpacksitem5113 trailbackpacksitem5114 trailbackpacksitem5115 trailbackpacksitem5116. trailbackpacksitem5117 trailbackpacksitem5118 trailbackpacksitem5119 trailbackpacksitem5120 trailbackpacksitem5121 trailbackpacksitem5122 trailbackpacksitem5123 trailbackpacksitem5124 trailbackpacksitem5125. trailbackpacksitem5126 trailbackpacksitem5127 trailbackpacksitem5128 trailbackpacksitem5129 trailbackpacksitem5130 trailbackpacksitem5131 trailbackpacksitem5132 trailbackpacksitem5133 trailbackpacksitem5134. trailbackpacksitem5135 trailbackpacksitem5136 trailbackpacksitem5137 trailbackpacksitem5138 trailbackpacksitem5139 trail backpacks Built Site outdoor shop",
+      "canonical_url": null,
+      "links_out": 2,
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": null,
+        "url": null
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "2d0f5e1cfc9bcf5b",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ],
+      "title": {
+        "text": "trail backpacks item 5",
+        "chars": 22,
+        "cut": false
+      },
+      "meta_description": {
+        "text": "trail backpacks item 5 at the Built Site outdoor shop.",
+        "chars": 54,
+        "cut": false
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      },
+      "content_features": {
+        "client_rendered": false,
+        "has_h1": true,
+        "words_after_h1": 166,
+        "opening": [
+          {
+            "tag": "p",
+            "words": 17,
+            "answer_sentences": 1,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 3,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 4,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "p",
+            "words": 140,
+            "answer_sentences": 15,
+            "question": false
+          }
+        ],
+        "headings": {
+          "count": 0,
+          "questions": 0,
+          "section_questions": 0
+        },
+        "json_ld": [
+          {
+            "types": [
+              "Product"
+            ],
+            "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          }
+        ],
+        "byline": {
+          "meta_author": false,
+          "published_time": false,
+          "rel_author": false,
+          "itemprop_author": false,
+          "itemprop_date": false,
+          "time_datetime": false
+        },
+        "specs": {
+          "structured": 1,
+          "label_value_lines": 2,
+          "spec_images": 0
+        }
+      },
+      "stack_signals": null,
+      "main_text_chars": 3285,
+      "noindex": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "url": "https://built-site.test/products/retired-tent",
+      "outcome": "fetched",
+      "response": "gone",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [],
+      "fetched_at": "2026-11-05T02:30:32.500Z",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "status_code": 404,
+      "final_url": "https://built-site.test/products/retired-tent",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html"
+        }
+      ],
+      "byte_count": 35,
+      "word_count": null,
+      "raw_text": null,
+      "canonical_url": null,
+      "links_out": null,
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": null,
+      "hreflang": null,
+      "content_simhash": null,
+      "is_html": true,
+      "links_read": false,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ],
+      "title": null,
+      "meta_description": null,
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      },
+      "content_features": null,
+      "stack_signals": null,
+      "main_text_chars": null,
+      "noindex": null
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "url": "https://built-site.test/collections/camping-tents?page=2",
+      "outcome": "fetched",
+      "response": "served",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [],
+      "fetched_at": "2026-11-05T02:30:33.000Z",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "status_code": 200,
+      "final_url": "https://built-site.test/collections/camping-tents?page=2",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3249,
+      "word_count": 194,
+      "raw_text": "Home camping tents camping tents is something every camper asks about before a first trip. This guide explains what to look for, what to avoid, and how long it takes to learn. What should you pack first? campingtentspack0 campingtentspack1 campingtentspack2 campingtentspack3 campingtentspack4 campingtentspack5 campingtentspack6 campingtentspack7 campingtentspack8. campingtentspack9 campingtentspack10 campingtentspack11 campingtentspack12 campingtentspack13 campingtentspack14 campingtentspack15 campingtentspack16 campingtentspack17. campingtentspack18 campingtentspack19 campingtentspack20 campingtentspack21 campingtentspack22 campingtentspack23 campingtentspack24 campingtentspack25 campingtentspack26. campingtentspack27 campingtentspack28 campingtentspack29 campingtentspack30 campingtentspack31 campingtentspack32 campingtentspack33 campingtentspack34 campingtentspack35. campingtentspack36 campingtentspack37 campingtentspack38 campingtentspack39 campingtentspack40 campingtentspack41 campingtentspack42 campingtentspack43 campingtentspack44. campingtentspack45 campingtentspack46 campingtentspack47 campingtentspack48 campingtentspack49 campingtentspack50 campingtentspack51 campingtentspack52 campingtentspack53. campingtentspack54 campingtentspack55 campingtentspack56 campingtentspack57 campingtentspack58 campingtentspack59 How do you keep it dry? campingtentsdry0 campingtentsdry1 campingtentsdry2 campingtentsdry3 campingtentsdry4 campingtentsdry5 campingtentsdry6 campingtentsdry7 campingtentsdry8. campingtentsdry9 campingtentsdry10 campingtentsdry11 campingtentsdry12 campingtentsdry13 campingtentsdry14 campingtentsdry15 campingtentsdry16 campingtentsdry17. campingtentsdry18 campingtentsdry19 campingtentsdry20 campingtentsdry21 campingtentsdry22 campingtentsdry23 campingtentsdry24 campingtentsdry25 campingtentsdry26. campingtentsdry27 campingtentsdry28 campingtentsdry29 campingtentsdry30 campingtentsdry31 campingtentsdry32 campingtentsdry33 campingtentsdry34 campingtentsdry35. campingtentsdry36 campingtentsdry37 campingtentsdry38 campingtentsdry39 campingtentsdry40 campingtentsdry41 campingtentsdry42 campingtentsdry43 campingtentsdry44. campingtentsdry45 campingtentsdry46 campingtentsdry47 campingtentsdry48 campingtentsdry49 campingtentsdry50 campingtentsdry51 campingtentsdry52 campingtentsdry53. campingtentsdry54 campingtentsdry55 campingtentsdry56 campingtentsdry57 campingtentsdry58 campingtentsdry59 camping tents item 1 camping tents item 2 camping tents item 3 camping tents item 4 camping tents item 5 camping tents page 2 old dome tent Built Site outdoor shop",
+      "canonical_url": null,
+      "links_out": 7,
+      "redirect": {
+        "hops": [],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": null,
+        "url": null
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "8c3f3ec005769d1a",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ],
+      "title": {
+        "text": "camping tents",
+        "chars": 13,
+        "cut": false
+      },
+      "meta_description": {
+        "text": "camping tents at the Built Site outdoor shop.",
+        "chars": 45,
+        "cut": false
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      },
+      "content_features": {
+        "client_rendered": false,
+        "has_h1": true,
+        "words_after_h1": 187,
+        "opening": [
+          {
+            "tag": "p",
+            "words": 29,
+            "answer_sentences": 2,
+            "question": false
+          },
+          {
+            "tag": "h2",
+            "words": 5,
+            "answer_sentences": 0,
+            "question": true
+          },
+          {
+            "tag": "p",
+            "words": 60,
+            "answer_sentences": 6,
+            "question": false
+          },
+          {
+            "tag": "h2",
+            "words": 6,
+            "answer_sentences": 0,
+            "question": true
+          },
+          {
+            "tag": "p",
+            "words": 60,
+            "answer_sentences": 6,
+            "question": false
+          }
+        ],
+        "headings": {
+          "count": 2,
+          "questions": 2,
+          "section_questions": 2
+        },
+        "json_ld": [],
+        "byline": {
+          "meta_author": false,
+          "published_time": false,
+          "rel_author": false,
+          "itemprop_author": false,
+          "itemprop_date": false,
+          "time_datetime": false
+        },
+        "specs": {
+          "structured": 0,
+          "label_value_lines": 0,
+          "spec_images": 0
+        }
+      },
+      "stack_signals": null,
+      "main_text_chars": 2562,
+      "noindex": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "url": "https://built-site.test/products/old-dome-tent",
+      "outcome": "fetched",
+      "response": "served",
+      "evidence_class": "simulated",
+      "identity_sent": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)",
+      "source_ip_class": "other_egress",
+      "limitations": [],
+      "fetched_at": "2026-11-05T02:30:34.500Z",
+      "request_headers": [
+        {
+          "name": "Host",
+          "value": "built-site.test"
+        },
+        {
+          "name": "User-Agent",
+          "value": "Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)"
+        },
+        {
+          "name": "Accept",
+          "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        },
+        {
+          "name": "Accept-Encoding",
+          "value": "gzip, deflate, br"
+        },
+        {
+          "name": "From",
+          "value": "bot@crawlmouse.com"
+        }
+      ],
+      "status_code": 200,
+      "final_url": "https://built-site.test/products/dome-tent-classic",
+      "headers": [
+        {
+          "name": "content-type",
+          "value": "text/html; charset=utf-8"
+        }
+      ],
+      "byte_count": 3222,
+      "word_count": 171,
+      "raw_text": "Home dome tent classic The dome tent classic is a reliable piece of kit for weekend trips and longer journeys. Weight: 1.2 kg Packed size: 40 cm dometentclassic0 dometentclassic1 dometentclassic2 dometentclassic3 dometentclassic4 dometentclassic5 dometentclassic6 dometentclassic7 dometentclassic8. dometentclassic9 dometentclassic10 dometentclassic11 dometentclassic12 dometentclassic13 dometentclassic14 dometentclassic15 dometentclassic16 dometentclassic17. dometentclassic18 dometentclassic19 dometentclassic20 dometentclassic21 dometentclassic22 dometentclassic23 dometentclassic24 dometentclassic25 dometentclassic26. dometentclassic27 dometentclassic28 dometentclassic29 dometentclassic30 dometentclassic31 dometentclassic32 dometentclassic33 dometentclassic34 dometentclassic35. dometentclassic36 dometentclassic37 dometentclassic38 dometentclassic39 dometentclassic40 dometentclassic41 dometentclassic42 dometentclassic43 dometentclassic44. dometentclassic45 dometentclassic46 dometentclassic47 dometentclassic48 dometentclassic49 dometentclassic50 dometentclassic51 dometentclassic52 dometentclassic53. dometentclassic54 dometentclassic55 dometentclassic56 dometentclassic57 dometentclassic58 dometentclassic59 dometentclassic60 dometentclassic61 dometentclassic62. dometentclassic63 dometentclassic64 dometentclassic65 dometentclassic66 dometentclassic67 dometentclassic68 dometentclassic69 dometentclassic70 dometentclassic71. dometentclassic72 dometentclassic73 dometentclassic74 dometentclassic75 dometentclassic76 dometentclassic77 dometentclassic78 dometentclassic79 dometentclassic80. dometentclassic81 dometentclassic82 dometentclassic83 dometentclassic84 dometentclassic85 dometentclassic86 dometentclassic87 dometentclassic88 dometentclassic89. dometentclassic90 dometentclassic91 dometentclassic92 dometentclassic93 dometentclassic94 dometentclassic95 dometentclassic96 dometentclassic97 dometentclassic98. dometentclassic99 dometentclassic100 dometentclassic101 dometentclassic102 dometentclassic103 dometentclassic104 dometentclassic105 dometentclassic106 dometentclassic107. dometentclassic108 dometentclassic109 dometentclassic110 dometentclassic111 dometentclassic112 dometentclassic113 dometentclassic114 dometentclassic115 dometentclassic116. dometentclassic117 dometentclassic118 dometentclassic119 dometentclassic120 dometentclassic121 dometentclassic122 dometentclassic123 dometentclassic124 dometentclassic125. dometentclassic126 dometentclassic127 dometentclassic128 dometentclassic129 dometentclassic130 dometentclassic131 dometentclassic132 dometentclassic133 dometentclassic134. dometentclassic135 dometentclassic136 dometentclassic137 dometentclassic138 dometentclassic139 Built Site outdoor shop",
+      "canonical_url": null,
+      "links_out": 1,
+      "redirect": {
+        "hops": [
+          {
+            "from": "https://built-site.test/products/old-dome-tent",
+            "status": 301,
+            "location": "https://built-site.test/products/older-dome-tent"
+          },
+          {
+            "from": "https://built-site.test/products/older-dome-tent",
+            "status": 301,
+            "location": "https://built-site.test/products/dome-tent-classic"
+          }
+        ],
+        "loop": false
+      },
+      "canonical_declared": {
+        "href": null,
+        "url": null
+      },
+      "hreflang": {
+        "links": [],
+        "complete": true
+      },
+      "content_simhash": "be83b7c65cc09ff9",
+      "is_html": true,
+      "links_read": true,
+      "robots_search": [
+        {
+          "ua": "Googlebot",
+          "verdict": "allowed"
+        },
+        {
+          "ua": "Bingbot",
+          "verdict": "allowed"
+        }
+      ],
+      "title": {
+        "text": "dome tent classic",
+        "chars": 17,
+        "cut": false
+      },
+      "meta_description": {
+        "text": "dome tent classic at the Built Site outdoor shop.",
+        "chars": 49,
+        "cut": false
+      },
+      "fly_region": null,
+      "request_signing": "unsigned",
+      "signature_verified": "not_observable",
+      "worker_release": "unreleased",
+      "timing": {
+        "dns_ms": null,
+        "connect_ms": null,
+        "ttfb_ms": 0,
+        "total_ms": 0
+      },
+      "content_features": {
+        "client_rendered": false,
+        "has_h1": true,
+        "words_after_h1": 163,
+        "opening": [
+          {
+            "tag": "p",
+            "words": 16,
+            "answer_sentences": 1,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 3,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "td",
+            "words": 4,
+            "answer_sentences": 0,
+            "question": false
+          },
+          {
+            "tag": "p",
+            "words": 140,
+            "answer_sentences": 15,
+            "question": false
+          }
+        ],
+        "headings": {
+          "count": 0,
+          "questions": 0,
+          "section_questions": 0
+        },
+        "json_ld": [
+          {
+            "types": [
+              "Product"
+            ],
+            "has_description": true,
+            "has_author": false,
+            "has_dated_publication": false
+          }
+        ],
+        "byline": {
+          "meta_author": false,
+          "published_time": false,
+          "rel_author": false,
+          "itemprop_author": false,
+          "itemprop_date": false,
+          "time_datetime": false
+        },
+        "specs": {
+          "structured": 1,
+          "label_value_lines": 2,
+          "spec_images": 0
+        }
+      },
+      "stack_signals": null,
+      "main_text_chars": 2700,
+      "noindex": false
+    }
+  ],
+  "link_edges": [
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/sleeping-bags-item-4",
+      "to_url": "https://built-site.test",
+      "anchor_text": "Home",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/sleeping-bags-item-4",
+      "to_url": "https://built-site.test/collections/sleeping-bags",
+      "anchor_text": "sleeping bags",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/sleeping-bags-item-5",
+      "to_url": "https://built-site.test",
+      "anchor_text": "Home",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/sleeping-bags-item-5",
+      "to_url": "https://built-site.test/collections/sleeping-bags",
+      "anchor_text": "sleeping bags",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/trail-backpacks-item-1",
+      "to_url": "https://built-site.test",
+      "anchor_text": "Home",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/trail-backpacks-item-1",
+      "to_url": "https://built-site.test/collections/trail-backpacks",
+      "anchor_text": "trail backpacks",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/trail-backpacks-item-2",
+      "to_url": "https://built-site.test",
+      "anchor_text": "Home",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/trail-backpacks-item-2",
+      "to_url": "https://built-site.test/collections/trail-backpacks",
+      "anchor_text": "trail backpacks",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/trail-backpacks-item-3",
+      "to_url": "https://built-site.test",
+      "anchor_text": "Home",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/trail-backpacks-item-3",
+      "to_url": "https://built-site.test/collections/trail-backpacks",
+      "anchor_text": "trail backpacks",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/trail-backpacks-item-4",
+      "to_url": "https://built-site.test",
+      "anchor_text": "Home",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/trail-backpacks-item-4",
+      "to_url": "https://built-site.test/collections/trail-backpacks",
+      "anchor_text": "trail backpacks",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/trail-backpacks-item-5",
+      "to_url": "https://built-site.test",
+      "anchor_text": "Home",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/trail-backpacks-item-5",
+      "to_url": "https://built-site.test/collections/trail-backpacks",
+      "anchor_text": "trail backpacks",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/collections/camping-tents?page=2",
+      "to_url": "https://built-site.test",
+      "anchor_text": "Home",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/collections/camping-tents?page=2",
+      "to_url": "https://built-site.test/products/camping-tents-item-1",
+      "anchor_text": "camping tents item 1",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/collections/camping-tents?page=2",
+      "to_url": "https://built-site.test/products/camping-tents-item-2",
+      "anchor_text": "camping tents item 2",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/collections/camping-tents?page=2",
+      "to_url": "https://built-site.test/products/camping-tents-item-3",
+      "anchor_text": "camping tents item 3",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/collections/camping-tents?page=2",
+      "to_url": "https://built-site.test/products/camping-tents-item-4",
+      "anchor_text": "camping tents item 4",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/collections/camping-tents?page=2",
+      "to_url": "https://built-site.test/products/camping-tents-item-5",
+      "anchor_text": "camping tents item 5",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/collections/camping-tents?page=2",
+      "to_url": "https://built-site.test/products/old-dome-tent",
+      "anchor_text": "old dome tent",
+      "is_generic_anchor": false,
+      "js_only": false
+    },
+    {
+      "check_id": "b0000000-0000-4000-8000-0000000000c1",
+      "from_url": "https://built-site.test/products/dome-tent-classic",
+      "to_url": "https://built-site.test",
+      "anchor_text": "Home",
+      "is_generic_anchor": false,
+      "js_only": false
+    }
+  ],
+  "discovered_urls": [
+    "https://built-site.test",
+    "https://built-site.test/collections/sleeping-bags",
+    "https://built-site.test/collections/trail-backpacks",
+    "https://built-site.test/products/camping-tents-item-1",
+    "https://built-site.test/products/camping-tents-item-2",
+    "https://built-site.test/products/camping-tents-item-3",
+    "https://built-site.test/products/camping-tents-item-4",
+    "https://built-site.test/products/camping-tents-item-5"
+  ]
+}

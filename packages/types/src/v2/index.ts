@@ -29,4 +29,5 @@ export * from './crawler-registry.js';
 export * from './measurement.js';
 export * from './usage-event.js';
 export * from './fixture.js';
+export * from './worker-batch.js';
 export { ENTITIES, type EntityDoc } from './entities.js';
