@@ -1,16 +1,23 @@
 -- The client roles hold exactly the declared privileges on the v1 tables and functions.
 -- On the 18 v1 tables in `v1_tables` and the 2 functions in `v1_functions`, anon holds nothing and
--- authenticated holds SELECT on the columns in `declared` and nothing else, as
--- 20261106000002_v1_client_grant_hardening.sql left them. Privileges are read as the roles hold them
--- (has_table_privilege and its siblings), so a grant reaching them through PUBLIC or a role they are
--- members of counts too: any other privilege is a finding, one row per privilege, and so is a
--- declared column authenticated cannot read. A v1 table or function that does not exist is a finding
--- rather than a skip, so the check cannot pass by reading nothing. postgres's default privileges in
--- public, or in every schema, must grant anon, authenticated and PUBLIC nothing, except what Postgres
--- writes into an every-schema row itself when one is created: PUBLIC's EXECUTE on functions and USAGE
--- on types, which every new function and type gets whether or not such a row exists (check 06 governs
--- who may execute the functions in our schemas).
-with
+-- authenticated holds SELECT on the columns in `declared`, without grant option, and nothing else,
+-- as 20261106000002_v1_client_grant_hardening.sql left them. Privileges are read as the roles hold
+-- them (has_table_privilege and its siblings), so a grant reaching them through PUBLIC or through a
+-- role they inherit from counts; a membership granted without INHERIT is not read. Any other
+-- privilege is a finding, one row per privilege, and so is a declared column authenticated cannot
+-- read, and so is any privilege the client roles hold on a view or materialized view that reads a
+-- v1 table, directly or through other views. A v1 table or function that does not exist is a finding
+-- rather than a skip, and a missing postgres, anon or authenticated role makes the check error, so
+-- it cannot pass by reading nothing.
+-- postgres's default privileges in public, or in every schema, must grant anon, authenticated,
+-- PUBLIC and any role either inherits from nothing, except what Postgres writes into an every-schema
+-- row itself when one is created: PUBLIC's EXECUTE on functions and USAGE on types, which new
+-- functions and types get anyway unless such a row revokes them (check 06 governs who may execute
+-- the functions in our schemas). Default privileges of other owners, supabase_admin's among them,
+-- are not read.
+-- A migration that changes these grants, or drops or renames a v1 table or function, changes these
+-- lists in the same pull request.
+with recursive
 v1_tables(name) as (
   values
     ('audits'), ('benchmark_cohorts'), ('domain_verifications'), ('email_events'), ('embed_badges'),
@@ -45,6 +52,23 @@ tables as (
 ),
 funcs as (
   select f.signature, to_regprocedure(f.signature) as oid from v1_functions f
+),
+-- Views and materialized views reading a v1 table, found by dependency, not by name: a view's rule
+-- depends on each relation it reads, and a view over such a view is found the same way.
+v1_views(view_oid, base) as (
+  select rw.ev_class, t.name
+  from tables t
+  join pg_depend d on d.refobjid = t.oid and d.refclassid = 'pg_class'::regclass
+                  and d.classid = 'pg_rewrite'::regclass
+  join pg_rewrite rw on rw.oid = d.objid
+  where rw.ev_class <> t.oid
+  union
+  select rw.ev_class, v.base
+  from v1_views v
+  join pg_depend d on d.refobjid = v.view_oid and d.refclassid = 'pg_class'::regclass
+                  and d.classid = 'pg_rewrite'::regclass
+  join pg_rewrite rw on rw.oid = d.objid
+  where rw.ev_class <> v.view_oid
 )
 select format('public.%s', t.name) as object, 'a v1 table this check reads does not exist' as problem
 from tables t
@@ -76,12 +100,41 @@ where t.oid is not null
                   where a.attrelid = t.oid and a.attname = d.column_name and not a.attisdropped
                     and has_column_privilege('authenticated', t.oid, a.attnum, 'SELECT'))
 union all
+select format('public.%s.%s', d.table_name, d.column_name),
+       'authenticated holds SELECT on the column with grant option'
+from declared d
+join tables t on t.name = d.table_name
+join pg_attribute a on a.attrelid = t.oid and a.attname = d.column_name and not a.attisdropped
+where has_column_privilege('authenticated', t.oid, a.attnum, 'SELECT WITH GRANT OPTION')
+  and not has_table_privilege('authenticated', t.oid, 'SELECT')
+union all
 select f.signature, format('%s may execute it', r.role)
 from funcs f cross join client_roles r
 where f.oid is not null and has_function_privilege(r.role, f.oid, 'EXECUTE')
 union all
+select distinct format('%s.%s', vn.nspname, vc.relname),
+       format('reads public.%s, and %s holds %s on it', v.base, r.role, p.privilege)
+from v1_views v
+join pg_class vc on vc.oid = v.view_oid
+join pg_namespace vn on vn.oid = vc.relnamespace
+cross join client_roles r cross join table_privileges p
+where has_table_privilege(r.role, v.view_oid, p.privilege)
+union all
+select distinct format('%s.%s', vn.nspname, vc.relname),
+       format('reads public.%s, and %s holds %s on some of its columns', v.base, r.role, p.privilege)
+from v1_views v
+join pg_class vc on vc.oid = v.view_oid
+join pg_namespace vn on vn.oid = vc.relnamespace
+cross join client_roles r cross join column_privileges p
+where has_any_column_privilege(r.role, v.view_oid, p.privilege)
+  and not has_table_privilege(r.role, v.view_oid, p.privilege)
+union all
 select format('default privileges of postgres in %s', coalesce(n.nspname, 'every schema')),
-       format('%s gets %s on new %s', coalesce(g.rolname::text, 'PUBLIC'), x.privilege_type,
+       format('%s gets %s on new %s',
+              case when x.grantee = 0 then 'PUBLIC'
+                   when g.rolname in ('anon', 'authenticated') then g.rolname::text
+                   else format('%s, which %s inherits from,', g.rolname, heirs.names) end,
+              x.privilege_type,
               case d.defaclobjtype when 'r' then 'tables' when 'S' then 'sequences'
                                    when 'f' then 'functions' when 'T' then 'types'
                                    when 'n' then 'schemas' else d.defaclobjtype::text end)
@@ -89,9 +142,14 @@ from pg_default_acl d
 left join pg_namespace n on n.oid = d.defaclnamespace
 cross join lateral aclexplode(d.defaclacl) x
 left join pg_roles g on g.oid = x.grantee
-where d.defaclrole = (select oid from pg_roles where rolname = 'postgres')
+cross join lateral (
+  select string_agg(c.role, ' and ' order by c.role) as names
+  from client_roles c
+  where x.grantee <> 0 and pg_has_role(c.role, x.grantee, 'USAGE')
+) heirs
+where d.defaclrole = 'postgres'::regrole
   and (d.defaclnamespace = 0 or n.nspname = 'public')
-  and (x.grantee = 0 or g.rolname in ('anon', 'authenticated'))
+  and (x.grantee = 0 or heirs.names is not null)
   and not (d.defaclnamespace = 0 and x.grantee = 0
            and ((d.defaclobjtype = 'f' and x.privilege_type = 'EXECUTE')
                 or (d.defaclobjtype = 'T' and x.privilege_type = 'USAGE')))

@@ -5,8 +5,15 @@ import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { failed, formatResults, listChecks, runChecks } from './check';
 import { readFileSync } from 'node:fs';
-import { CHECKS_DIR } from './files';
-import { migratedDb, partitionOf, pgliteDb, withRollback } from './test-support';
+import { CHECKS_DIR, listMigrations } from './files';
+import {
+  migratedDb,
+  partitionOf,
+  pgliteDb,
+  V1_FUNCTIONS,
+  V1_TABLES,
+  withRollback,
+} from './test-support';
 
 const checks = listChecks();
 const byFile = (prefix: string) => checks.filter((c) => c.file.startsWith(prefix));
@@ -57,7 +64,7 @@ describe('the check files', () => {
     for (const c of checks) expect(c.title.length, c.file).toBeGreaterThan(10);
   });
 
-  it('all pass on a database migrated through 006b', async () => {
+  it('all pass on a database with every migration applied', async () => {
     const results = await runChecks(pgliteDb(db));
     expect(formatResults(results)).not.toContain('FAIL');
     expect(failed(results)).toBe(false);
@@ -69,7 +76,9 @@ describe('the check files', () => {
     const v1 = results.filter((r) => r.check.file === '08-v1-client-grants.sql');
     expect(formatResults(results.filter((r) => !v1.includes(r)))).not.toContain('FAIL');
     // The v1 tables existed long before 001, with the broad client grants P2 removed.
-    expect(v1[0]!.findings.length).toBeGreaterThan(0);
+    const lines = v1[0]!.findings.map((row) => Object.values(row).join(': '));
+    expect(lines).toContain('public.audits: anon holds TRUNCATE on the table');
+    expect(lines).toContain('public.users: authenticated holds SELECT on the table');
   }, 180_000);
 });
 
@@ -267,6 +276,70 @@ describe('check 08: the client roles hold exactly the declared privileges on the
       ['default privileges of postgres in public: PUBLIC gets USAGE on new sequences'],
     ],
     ['drop table public.waitlist', ['public.waitlist: a v1 table this check reads does not exist']],
+    [
+      'alter function public.increment_rate_limit(text, timestamptz) rename to zz_moved',
+      [
+        'public.increment_rate_limit(text, timestamp with time zone): a v1 function this check reads does not exist',
+      ],
+    ],
+    [
+      'grant maintain on public.audits to anon',
+      ['public.audits: anon holds MAINTAIN on the table'],
+    ],
+    [
+      'grant trigger on public.audits to authenticated',
+      ['public.audits: authenticated holds TRIGGER on the table'],
+    ],
+    [
+      'grant references (email) on public.users to authenticated',
+      ['public.users.email: authenticated holds REFERENCES on the column'],
+    ],
+    // A declared column is declared for SELECT only: a signed-in user setting their own Pro date.
+    [
+      'grant update (pro_until) on public.users to authenticated',
+      ['public.users.pro_until: authenticated holds UPDATE on the column'],
+    ],
+    [
+      'grant select (id) on public.users to authenticated with grant option',
+      ['public.users.id: authenticated holds SELECT on the column with grant option'],
+    ],
+    [
+      'alter default privileges for role postgres grant select on tables to public',
+      ['default privileges of postgres in every schema: PUBLIC gets SELECT on new tables'],
+    ],
+    // An every-schema row for types starts with PUBLIC's USAGE, which Postgres writes itself.
+    [
+      'alter default privileges for role postgres grant usage on types to anon',
+      ['default privileges of postgres in every schema: anon gets USAGE on new types'],
+    ],
+    [
+      `create role zz_heir; grant zz_heir to anon;
+       alter default privileges for role postgres in schema public grant select on tables to zz_heir`,
+      [
+        'default privileges of postgres in public: zz_heir, which anon inherits from, gets SELECT on new tables',
+      ],
+    ],
+    // Views are found by what they read, whatever they are called and wherever they live.
+    [
+      'create view public.zz_any_name as select id from public.audits; grant select on public.zz_any_name to anon',
+      ['public.zz_any_name: reads public.audits, and anon holds SELECT on it'],
+    ],
+    [
+      `create schema zz_s; grant usage on schema zz_s to authenticated;
+       create view zz_s.inner_v as select * from public.users;
+       create view zz_s.outer_v as select * from zz_s.inner_v;
+       grant select on zz_s.outer_v to authenticated`,
+      ['zz_s.outer_v: reads public.users, and authenticated holds SELECT on it'],
+    ],
+    [
+      'create materialized view public.zz_mv as select id from public.pages; grant select on public.zz_mv to anon',
+      ['public.zz_mv: reads public.pages, and anon holds SELECT on it'],
+    ],
+    [
+      'create view public.zz_cv as select id, url from public.audits; grant select (url) on public.zz_cv to authenticated',
+      ['public.zz_cv: reads public.audits, and authenticated holds SELECT on some of its columns'],
+    ],
+    ['create view public.zz_quiet as select id from public.audits', []],
   ])('08: %s', async (mutation, expected) => {
     expect(await findingsAfter('08-', mutation)).toEqual(expected);
   });
@@ -275,6 +348,49 @@ describe('check 08: the client roles hold exactly the declared privileges on the
     const findings = await findingsAfter('08-', 'grant service_role to authenticated');
     expect(findings).toContain('public.audits: authenticated holds DELETE on the table');
     expect(findings).toContain('public.users: authenticated holds TRUNCATE on the table');
+  });
+});
+
+describe("check 08's lists are the ones P2 and the tests use", () => {
+  const sql = readFileSync(join(CHECKS_DIR, '08-v1-client-grants.sql'), 'utf8');
+  const block = (name: string) => {
+    const start = sql.indexOf(`${name}(`);
+    return sql.slice(start, sql.indexOf('\n),', start));
+  };
+  const p2 = () => listMigrations().find((m) => m.name === 'v1_client_grant_hardening')!.sql;
+
+  it('v1_tables is the list P2 revokes on', () => {
+    const tables = [...block('v1_tables').matchAll(/\('(\w+)'\)/g)].map((m) => m[1]);
+    expect(tables).toEqual(V1_TABLES);
+    expect(p2()).toContain(`revoke all on table ${V1_TABLES.map((t) => `public.${t}`).join(', ')}`);
+  });
+
+  it('declared is exactly what P2 grants back', () => {
+    const declared = [...block('declared').matchAll(/\('(\w+)', '(\w+)'\)/g)]
+      .map((m) => `${m[1]}.${m[2]}`)
+      .sort();
+    const granted = [
+      ...p2().matchAll(/^grant select \(([^)]+)\) on table public\.(\w+) to authenticated;$/gm),
+    ]
+      .flatMap((m) => m[1]!.split(', ').map((c) => `${m[2]}.${c}`))
+      .sort();
+    expect(declared).toEqual(granted);
+    expect(declared).toHaveLength(18);
+  });
+
+  it('v1_functions names the functions P2 revokes on', async () => {
+    const signatures = [...block('v1_functions').matchAll(/\('([^']+)'\)/g)].map((m) => m[1]!);
+    expect(p2()).toContain(`revoke all on function ${V1_FUNCTIONS.join(', ')}`);
+    // Resolved in the database and rendered with their argument names, as P2 names them.
+    const { rows } = await db.query<{ named: string }>(
+      `select format('%s.%s(%s)', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid)) as named
+         from unnest($1::text[]) with ordinality as s(signature, i)
+         join pg_proc p on p.oid = to_regprocedure(s.signature)
+         join pg_namespace n on n.oid = p.pronamespace
+        order by s.i`,
+      [signatures],
+    );
+    expect(rows.map((r) => r.named)).toEqual(V1_FUNCTIONS);
   });
 });
 
