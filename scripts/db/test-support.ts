@@ -102,7 +102,10 @@ export function grantSql(lines: string[]): string {
     .join('\n');
 }
 
-/** The 18 tables and 2 functions the v1 migrations created, as 20261106000002 names them. */
+/**
+ * The tables and functions the v1 migrations created, as 20261106000002 names them; check.test.ts
+ * compares these with P2's revokes and with check 08's lists.
+ */
 export const V1_TABLES = [
   'audits',
   'benchmark_cohorts',
@@ -133,25 +136,38 @@ export const BEFORE_P1 = '20261103000001';
 
 /**
  * Production as it stood before P1 and P2, for the dry run: migrated through 006b with each file
- * recorded under its version, and with what production held then that the migrations do not give.
- * Each is set from what was read from production, not written by hand:
- *   - the client roles' privileges on the v1 tables and functions, and the default privileges
- *     naming them (scripts/db/fixtures/20261106000002-expected-change.json, `before`);
- *   - service_role's default privileges on sequences, read from production on 2026-11-07
- *     ({service_role=rwU/postgres}; the stand-ins already give its table and function defaults);
- *   - the report-logos bucket, made by hand (scripts/db/fixtures/2026-11-06-settled-branch-vs-
- *     production.json).
- * Every file after 006b is pending against it.
+ * recorded under its version, plus what production held then that a replay of the migrations does
+ * not give. The added lines are built from measured fixtures, not written here:
+ *   - the client roles' privileges on the v1 tables and functions, and the default privileges naming
+ *     them: 20261106000002-expected-change.json, `before`. The revokes first make this hold whatever
+ *     the stand-ins grant; with today's stand-ins the migrations already give the same acls lines;
+ *   - service_role's default privileges on sequences, and the report-logos bucket made by hand:
+ *     2026-11-06-settled-branch-vs-production.json, the lines only production held. (Its table and
+ *     function defaults for service_role come from the stand-ins.)
+ * Every file after 006b is pending against it. The dry-run harness clones this database as the
+ * branch, so it does not model what a real branch lacks (Supabase creates a branch without default
+ * privileges on public); the live dry run does.
  */
 export async function productionBeforeP1(): Promise<PGlite> {
   const { readFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const { listMigrations } = await import('./files');
-  const before = (
-    JSON.parse(
-      readFileSync(join(__dirname, 'fixtures/20261106000002-expected-change.json'), 'utf8'),
-    ) as { before: { acls: string[]; default_acls: string[] } }
-  ).before;
+  const fixture = (name: string) =>
+    JSON.parse(readFileSync(join(__dirname, 'fixtures', name), 'utf8')) as Record<
+      string,
+      Record<string, string[]>
+    >;
+  const before = fixture('20261106000002-expected-change.json').before!;
+  const settled = fixture('2026-11-06-settled-branch-vs-production.json').only_on_production!;
+  const sequenceDefaults = settled.default_acls!.filter((l) =>
+    l.startsWith('postgres in public on S: service_role '),
+  );
+  const [bucket] = settled.buckets!;
+  const b = /^(\S+) name=(\S+) public=(t|f) file_size_limit=(\d+) allowed_mime_types=(.+)$/.exec(
+    bucket!,
+  );
+  if (!b || sequenceDefaults.length === 0) throw new Error('the settled fixture changed shape');
+  const mimes = JSON.parse(b[5]!) as string[];
   const pg = await migratedDb((f) => f.slice(0, 14) <= BEFORE_P1);
   await pg.exec(HISTORY_TABLE);
   for (const m of listMigrations().filter((f) => f.version <= BEFORE_P1)) {
@@ -165,10 +181,11 @@ export async function productionBeforeP1(): Promise<PGlite> {
     revoke all on function ${V1_FUNCTIONS.join(', ')} from anon, authenticated;
     alter default privileges for role postgres in schema public revoke all on tables from anon, authenticated;
     alter default privileges for role postgres in schema public revoke all on sequences from anon, authenticated;
-    alter default privileges for role postgres in schema public revoke all on functions from anon, authenticated;
-    alter default privileges for role postgres in schema public grant select, update, usage on sequences to service_role;
-    insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-      values ('report-logos', 'report-logos', true, 204800, array['image/png', 'image/jpeg', 'image/webp']);`);
-  await pg.exec(grantSql([...before.acls, ...before.default_acls]));
+    alter default privileges for role postgres in schema public revoke all on functions from anon, authenticated;`);
+  await pg.query(
+    'insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ($1, $2, $3, $4, $5)',
+    [b[1], b[2], b[3] === 't', Number(b[4]), mimes],
+  );
+  await pg.exec(grantSql([...before.acls!, ...before.default_acls!, ...sequenceDefaults]));
   return pg;
 }

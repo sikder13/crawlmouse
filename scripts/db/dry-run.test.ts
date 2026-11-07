@@ -9,14 +9,29 @@ import { renderDryRun } from './summary';
 import { HISTORY_TABLE, migratedDb, pgliteDb, productionBeforeP1 } from './test-support';
 
 const THROUGH_001 = (f: string) => f.slice(0, 14) <= '20261101000001';
-// The v2 set as it stood when production recorded 006b. Later files are left out: P1
-// (20261106000001_service_role_parity) is applied to production before any dry run sees it, and its
-// rollback is deliberately empty, so it cannot be a pending file here.
+// The v2 set as it stood when production recorded 006b, pending against production migrated
+// through 001. Later files are left out of this fixture: P1's rollback is deliberately empty, so it
+// cannot restore a database that lacked what P1 adds. The fixture of production before P1 and P2,
+// below, is the one where they and every later file are pending.
 const files = listMigrations().filter((f) => f.version <= '20261103000001');
 // Check 08 asserts the client grants as 20261106000002 (P2) left them, which this fixture predates:
 // its v1 tables carry the broad grants production had then. The fixture of production before P1 and
 // P2, below, runs every check.
 const V2_SET_CHECKS = listChecks().filter((c) => c.file !== '08-v1-client-grants.sql');
+
+describe('the v2-set fixture', () => {
+  it('runs checks 01 to 07, every check but 08', () => {
+    expect(V2_SET_CHECKS.map((c) => c.file)).toEqual([
+      '01-client-table-privileges.sql',
+      '02-partitions-rls-owner-only.sql',
+      '03-worker-roles-no-login.sql',
+      '04-private-schemas.sql',
+      '05-private-buckets.sql',
+      '06-client-functions.sql',
+      '07-partition-triggers.sql',
+    ]);
+  });
+});
 
 /**
  * A stand-in for production with migrations still to apply: migrated through 001, with a clean
@@ -467,7 +482,8 @@ describe('the dry run', () => {
     300_000,
   );
   it('passes on production as it stood before P1 and P2, with every file after 006b pending and every check', async () => {
-    // A migration added after these is pending here too, so this run exercises it as well.
+    // A migration added after these is pending here too, so this run exercises it as well. The
+    // branch is a clone of this database: what a real branch lacks is the live dry run's to show.
     const all = listMigrations();
     const after006b = all.filter((f) => f.version > '20261103000001');
     expect(after006b.map((f) => f.version)).toEqual(
