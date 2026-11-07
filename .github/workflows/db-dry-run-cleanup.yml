@@ -1,0 +1,36 @@
+name: DB dry run clean-up
+
+# Deletes a pull request's Supabase branch when the pull request closes. The dry run deletes its
+# branch when it finishes; this catches one left by a run that was cancelled. A workflow of its
+# own, so db-apply-prod.yml's search for a pull request's dry run never finds this run.
+
+on:
+  pull_request:
+    types: [closed]
+    paths:
+      - 'infra/supabase/**'
+      - 'scripts/db/**'
+      - '.github/workflows/db-*.yml'
+      - '.github/actions/supabase-cli/**'
+
+permissions:
+  contents: read
+
+jobs:
+  delete-branch:
+    # As in db-dry-run.yml: Renovate's pull requests never get a branch, and never get the token.
+    if: github.event.pull_request.user.login != 'renovate[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: db-dry-run
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Delete the pull request's Supabase branch
+        working-directory: scripts
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          BRANCH: pr-${{ github.event.pull_request.number }}
+        run: pnpm exec tsx db/delete-branch.ts --name "$BRANCH"

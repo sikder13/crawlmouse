@@ -58,6 +58,8 @@ export const PLATFORM_SHIM = `
     id text primary key,
     name text not null unique,
     public boolean default false,
+    file_size_limit bigint,
+    allowed_mime_types text[],
     created_at timestamptz default now()
   );
   create table storage.objects (
@@ -71,6 +73,21 @@ export const PLATFORM_SHIM = `
   alter table storage.buckets enable row level security;
   alter table storage.objects enable row level security;
   grant all on storage.buckets, storage.objects to anon, authenticated, service_role;
+  -- Supabase refuses a direct DELETE on either table unless the transaction sets
+  -- storage.allow_delete_query. Function and triggers as read from ezspnfeyzwsisymytssm on 2026-11-05.
+  create function storage.protect_delete() returns trigger language plpgsql as $shim$
+  begin
+    if coalesce(current_setting('storage.allow_delete_query', true), 'false') != 'true' then
+      raise exception 'Direct deletion from storage tables is not allowed. Use the Storage API instead.'
+        using hint = 'This prevents accidental data loss from orphaned objects.', errcode = '42501';
+    end if;
+    return null;
+  end;
+  $shim$;
+  create trigger protect_buckets_delete before delete on storage.buckets
+    for each statement execute function storage.protect_delete();
+  create trigger protect_objects_delete before delete on storage.objects
+    for each statement execute function storage.protect_delete();
 
   -- ⚠ PRODUCTION'S DEFAULT PRIVILEGES. Without these the sandbox is STRICTLY SAFER than production,
   -- which is the one direction that manufactures false greens on a security control (gate 7 / B3).

@@ -2,7 +2,7 @@
 
 > **Read this first.** This is the single source of truth for _what Crawlmouse is, why it was built the way
 > it was, how it works end to end, and where it stands._ It's written so a new contributor (or a fresh AI
-> session) can get the full picture without spelunking through commits. Last updated **2026-10-27**.
+> session) can get the full picture without spelunking through commits. Last updated **2026-11-05**.
 >
 > **Status:** Crawlmouse v1.0 is **live in production at [crawlmouse.com](https://crawlmouse.com)**, billing is
 > live, it is legally compliant, and it is already serving real organic traffic.
@@ -187,7 +187,17 @@ Postgres on Supabase (`ezspnfeyzwsisymytssm`). Core tables: **users** (entitleme
 for one-query viral reads), **embed_badges**, **stripe_events** (idempotency ledger), **email_events**,
 **rate_limits**, **waitlist**, **benchmark_cohorts**. A `handle_new_user` trigger provisions `public.users` on
 signup. **RLS is deny-by-default**; anonymous audit reads go through capability-URL admin reads (no `user_id`
-ever on the wire), not open RLS. Migrations are applied via the Supabase MCP / Management API.
+ever on the wire), not open RLS.
+
+**Migrations** go through three workflows (`docs/ops/db-migrations.md`). `db-dry-run.yml` applies a pull
+request's pending files on a Supabase branch made from production, after requiring that branch's fingerprint
+(`infra/supabase/checks/fingerprint.sql`) to equal production's; it re-runs and rolls back the files and runs
+the catalog checks. `db-apply-prod.yml` runs `supabase db push` on production after the owner approves the
+`production` environment, and only for files whose sha256 a passed dry run applied
+(`pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts`). `db-rollback-prod.yml`
+runs one rollback file behind the same approval. The CLI reads `infra/supabase/migrations` in place
+(`--workdir infra`). Production's history table needs a one-time repair before the first automated apply
+(`scripts/db/history.ts`, §5 of that doc).
 
 ---
 
@@ -227,6 +237,9 @@ ever on the wire), not open RLS. Migrations are applied via the Supabase MCP / M
   them: `grep -v '^#' .gitleaksignore | grep -c .`.
 - **Dependencies.** osv-scanner checks `pnpm-lock.yaml` against the baseline in `osv-scanner.toml`. Its entries
   expire on the date in the file header. An advisory not listed fails the job, as the unlisted set did in CI run 40592209306.
+- **Workflow lint and the migration CLI.** `actionlint` (with shellcheck) runs over `.github/workflows`; it ignores
+  two findings `nightly.yml` already had. `db-cli-files` runs the pinned Supabase CLI against an empty Postgres
+  and requires its list to equal `infra/supabase/migrations`. The `db-*.yml` workflows are §8's.
 - **Nightly.** GitHub runs scheduled workflows from the default branch (`main`), so the nightly first fires
   after merge. The Lighthouse and cross-browser job is a skipped placeholder.
 
@@ -352,6 +365,11 @@ pnpm smoke -- --url=https://example.com   # engine smoke (direct crawl)
   To reproduce the build job: `cd apps/web && set -a && . ./.env.ci && set +a && pnpm build`.
 - **Pause new audits:** set `CRAWL_PAUSED=1` in Vercel and redeploy; unset it and redeploy to resume (§6).
 - **Health check:** `curl -s https://crawlmouse.com/api/health`.
+- **Migrations:** add the file and its rollback, open a pull request, read the dry run's comment, merge, approve
+  the `production` deployment (§8, `docs/ops/db-migrations.md`). The catalog checks against a database:
+  `DB_URL=... pnpm --filter @crawlmouse/scripts exec tsx db/check.ts --db-url-env DB_URL`. The history diff:
+  `pnpm --filter @crawlmouse/scripts exec tsx db/history.ts --project-ref <ref>` (`--yes-production` for
+  production). Tests: `pnpm --filter @crawlmouse/scripts exec vitest run db`.
 
 - **Every code change → TDD + the 3-reviewer adversarial review gate** (independent reviewers across
   correctness / security / deploy-safety / test-quality lenses, fix-loop to ≥9, 0 blocking; mutation-verify

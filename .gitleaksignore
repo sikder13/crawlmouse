@@ -9,3 +9,12 @@
 # The CC-00 gitleaks probe: a FAKE Stripe test key planted on purpose in a31e8a0 to prove the scan fails
 # (CI run 40596783234 went red on it), then removed in the next commit. Kept in history as evidence.
 a31e8a02243d67812d558b3ea4468c13648c4567:ci-gitleaks-probe.txt:stripe-access-token:3
+
+# test canary, not a credential (CC-25, owner-approved 2026-11-06); renamed to CANARY in 5ca3d9de
+f86db1bfe91dcd7b971c20d9e9045a32aa9a022b:apps/web/__tests__/v2/_lib/sentry-capture.ts:generic-api-key:13
+# test canary, not a credential (CC-25, owner-approved 2026-11-06); renamed to CANARY in 5ca3d9de
+f62128e5b7b5e65c023247edc1a41ca39a73f7ca:apps/web/__tests__/v2/account-door-sentry.test.ts:generic-api-key:12
+# test canary, not a credential (CC-25, owner-approved 2026-11-06); renamed to CANARY in 5ca3d9de
+beaf30fbee32eecef329da720dd42139040ff6e3:apps/web/__tests__/v2/account-door-token.test.tsx:generic-api-key:13
+# test canary, not a credential (CC-25, owner-approved 2026-11-06); renamed to CANARY in 5ca3d9de
+beaf30fbee32eecef329da720dd42139040ff6e3:apps/web/app/login/verify/route.test.ts:generic-api-key:33
