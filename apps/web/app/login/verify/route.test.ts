@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const verifyOtp = vi.fn();
 const exchangeCodeForSession = vi.fn();
 const getUser = vi.fn(async () => ({ data: { user: null } }));
+// The anon claim's query, as the route builds it: the table, the update, and each filter in order.
 const anonUpdate = vi.fn();
 
 vi.mock('server-only', () => ({}));
@@ -14,18 +15,30 @@ vi.mock('@/lib/supabase/server', () => ({
 }));
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
-    from: () => ({ update: (v: unknown) => ({ eq: () => ({ is: async () => anonUpdate(v) }) }) }),
+    from: (table: string) => ({
+      update: (v: unknown) => ({
+        eq: (eqCol: string, eqVal: unknown) => ({
+          is: async (isCol: string, isVal: unknown) =>
+            anonUpdate({ table, update: v, eq: [eqCol, eqVal], is: [isCol, isVal] }),
+        }),
+      }),
+    }),
   }),
 }));
-const anon = { id: null as string | null };
+const anon = { id: null as string | null, throws: false };
+const clearAnonSession = vi.fn(async () => {});
 vi.mock('@/lib/anon-session', () => ({
-  readAnonSessionId: async () => anon.id,
-  clearAnonSession: async () => {},
+  readAnonSessionId: async () => {
+    if (anon.throws) throw new Error('cookie store unavailable');
+    return anon.id;
+  },
+  clearAnonSession: () => clearAnonSession(),
 }));
 const afterSignIn = vi.fn();
 vi.mock('@/lib/auth/landing', () => ({ afterSignIn: (...a: unknown[]) => afterSignIn(...a) }));
 vi.mock('@/lib/auth/door-deps', () => ({ doorDeps: () => ({ firstLogin: {}, claim: {} }) }));
-vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn() }));
+const { captureMessage } = vi.hoisted(() => ({ captureMessage: vi.fn() }));
+vi.mock('@sentry/nextjs', () => ({ captureMessage }));
 
 import { GET, POST } from './route';
 
@@ -67,6 +80,9 @@ beforeEach(() => {
   anonUpdate.mockReset().mockResolvedValue({ error: null });
   afterSignIn.mockReset().mockResolvedValue({ dest: null, events: [] });
   anon.id = null;
+  anon.throws = false;
+  clearAnonSession.mockClear();
+  captureMessage.mockClear();
   delete process.env.V2_ACCOUNT_DOOR;
 });
 
@@ -199,7 +215,31 @@ describe('POST /login/verify verifies', () => {
   it('still claims the anonymous v1 audits of this browser', async () => {
     anon.id = 'anon-1';
     await POST(post({ cm_auth_otp: otp() }));
-    expect(anonUpdate).toHaveBeenCalledWith({ user_id: 'u1' });
+    expect(anonUpdate).toHaveBeenCalledTimes(1);
+    expect(anonUpdate.mock.calls[0]![0]).toMatchObject({
+      table: 'audits',
+      update: { user_id: 'u1' },
+      eq: ['anonymous_session_id', 'anon-1'],
+    });
+  });
+
+  it('claims only audits no account owns yet: the update is filtered on user_id is null', async () => {
+    anon.id = 'anon-1';
+    await POST(post({ cm_auth_otp: otp() }));
+    expect(anonUpdate.mock.calls[0]![0].is).toEqual(['user_id', null]);
+  });
+
+  it('ends the anonymous session after claiming it, and not before a sign-in', async () => {
+    anon.id = 'anon-1';
+    await POST(post({ cm_auth_otp: otp() }));
+    expect(clearAnonSession).toHaveBeenCalledTimes(1);
+    clearAnonSession.mockClear();
+    verifyOtp.mockResolvedValue({
+      data: { user: null },
+      error: { status: 403, code: 'otp_expired' },
+    });
+    await POST(post({ cm_auth_otp: otp() }));
+    expect(clearAnonSession).not.toHaveBeenCalled();
   });
 
   it('with the door off, the v2 hook never runs, and a claim-shaped `next` lands on /dashboard', async () => {
