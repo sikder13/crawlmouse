@@ -340,9 +340,37 @@ describe('check 08: the client roles hold exactly the declared privileges on the
       ['public.zz_cv: reads public.audits, and authenticated holds SELECT on some of its columns'],
     ],
     ['create view public.zz_quiet as select id from public.audits', []],
+    // A rule on a v1 table is read by the table arms; it does not make the table a reader of others.
+    [
+      'create rule zz_r as on update to public.users do also delete from public.findings where false',
+      [],
+    ],
+    [
+      `create role zz_both; grant zz_both to anon, authenticated;
+       alter default privileges for role postgres in schema public grant select on tables to zz_both`,
+      [
+        'default privileges of postgres in public: zz_both, which anon and authenticated inherit from, gets SELECT on new tables',
+      ],
+    ],
+    // A rule's action runs with the table owner's rights: a client inserting runs it.
+    [
+      `create table public.zz_t (x int);
+       create rule zz_r as on insert to public.zz_t do also delete from public.findings where false;
+       grant insert on public.zz_t to anon`,
+      ['public.zz_t: reads public.findings, and anon holds INSERT on it'],
+    ],
   ])('08: %s', async (mutation, expected) => {
     expect(await findingsAfter('08-', mutation)).toEqual(expected);
   });
+
+  it.each(['anon', 'authenticated'])(
+    '08 errors, rather than passing, when the role %s is missing',
+    async (role) => {
+      await expect(findingsAfter('08-', `alter role ${role} rename to zz_gone`)).rejects.toThrow(
+        new RegExp(`role "${role}" does not exist`),
+      );
+    },
+  );
 
   it('08 reads privileges as held, through role membership too', async () => {
     const findings = await findingsAfter('08-', 'grant service_role to authenticated');

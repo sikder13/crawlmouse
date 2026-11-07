@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import { listChecks } from './check';
 import { dryRun, replayError, type DryRunDeps } from './dry-run';
 import { listMigrations, type MigrationFile } from './files';
+import { readFingerprint } from './fingerprint';
 import { diffHistory, readHistory } from './history';
 import type { ReplayState } from './supabase-api';
 import { renderDryRun } from './summary';
@@ -18,6 +21,27 @@ const files = listMigrations().filter((f) => f.version <= '20261103000001');
 // its v1 tables carry the broad grants production had then. The fixture of production before P1 and
 // P2, below, runs every check.
 const V2_SET_CHECKS = listChecks().filter((c) => c.file !== '08-v1-client-grants.sql');
+
+describe('the fixture of production before P1 and P2 holds what was measured there', () => {
+  it('the bucket, the service_role sequence defaults and the client lines, read back by the fingerprint', async () => {
+    const read = (name: string) =>
+      JSON.parse(readFileSync(join(__dirname, 'fixtures', name), 'utf8')) as Record<
+        string,
+        Record<string, string[]>
+      >;
+    const settled = read('2026-11-06-settled-branch-vs-production.json').only_on_production!;
+    const before = read('20261106000002-expected-change.json').before!;
+    const fp = await readFingerprint(pgliteDb(await productionBeforeP1()));
+    expect(fp.get('buckets')!.lines).toContain(settled.buckets![0]);
+    const defaults = fp.get('default_acls')!.lines;
+    for (const line of settled.default_acls!.filter((l) => / service_role /.test(l)))
+      expect(defaults).toContain(line);
+    const clientDefaults = defaults.filter((l) => /: (anon|authenticated) [A-Z]+$/.test(l)).sort();
+    expect(clientDefaults).toEqual([...before.default_acls!].sort());
+    const acls = new Set(fp.get('acls')!.lines);
+    for (const line of before.acls!) expect(acls.has(line), line).toBe(true);
+  }, 300_000);
+});
 
 describe('the v2-set fixture', () => {
   it('runs checks 01 to 07, every check but 08', () => {

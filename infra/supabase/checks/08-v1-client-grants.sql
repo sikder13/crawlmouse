@@ -4,9 +4,11 @@
 -- as 20261106000002_v1_client_grant_hardening.sql left them. Privileges are read as the roles hold
 -- them (has_table_privilege and its siblings), so a grant reaching them through PUBLIC or through a
 -- role they inherit from counts; a membership granted without INHERIT is not read. Any other
--- privilege is a finding, one row per privilege, and so is a declared column authenticated cannot
--- read, and so is any privilege the client roles hold on a view or materialized view that reads a
--- v1 table, directly or through other views. A v1 table or function that does not exist is a finding
+-- privilege is a finding, one row per privilege (per v1 table read, for a relation with a rule), and
+-- so is a declared column authenticated cannot
+-- read, and so is any privilege the client roles hold on a relation with a rule that reads a v1
+-- table: a view, a materialized view, or a table whose rule's action does, directly or through other
+-- such relations. A v1 table or function that does not exist is a finding
 -- rather than a skip, and a missing postgres, anon or authenticated role makes the check error, so
 -- it cannot pass by reading nothing.
 -- postgres's default privileges in public, or in every schema, must grant anon, authenticated,
@@ -53,8 +55,10 @@ tables as (
 funcs as (
   select f.signature, to_regprocedure(f.signature) as oid from v1_functions f
 ),
--- Views and materialized views reading a v1 table, found by dependency, not by name: a view's rule
--- depends on each relation it reads, and a view over such a view is found the same way.
+-- Relations whose rules read a v1 table, found by dependency, not by name: a rule depends on each
+-- relation it reads, and a view's own query is a rule, so a view over such a view is found the same
+-- way. A rule on an ordinary table, whose action runs with the table owner's rights, is found too; a
+-- rule on a v1 table is not, as the arms above read that table's privileges already.
 v1_views(view_oid, base) as (
   select rw.ev_class, t.name
   from tables t
@@ -62,6 +66,7 @@ v1_views(view_oid, base) as (
                   and d.classid = 'pg_rewrite'::regclass
   join pg_rewrite rw on rw.oid = d.objid
   where rw.ev_class <> t.oid
+    and rw.ev_class not in (select oid from tables where oid is not null)
   union
   select rw.ev_class, v.base
   from v1_views v
@@ -69,6 +74,7 @@ v1_views(view_oid, base) as (
                   and d.classid = 'pg_rewrite'::regclass
   join pg_rewrite rw on rw.oid = d.objid
   where rw.ev_class <> v.view_oid
+    and rw.ev_class not in (select oid from tables where oid is not null)
 )
 select format('public.%s', t.name) as object, 'a v1 table this check reads does not exist' as problem
 from tables t
@@ -133,7 +139,9 @@ select format('default privileges of postgres in %s', coalesce(n.nspname, 'every
        format('%s gets %s on new %s',
               case when x.grantee = 0 then 'PUBLIC'
                    when g.rolname in ('anon', 'authenticated') then g.rolname::text
-                   else format('%s, which %s inherits from,', g.rolname, heirs.names) end,
+                   else format('%s, which %s %s from,', g.rolname, heirs.names,
+                               case when heirs.names like '% and %' then 'inherit' else 'inherits' end)
+              end,
               x.privilege_type,
               case d.defaclobjtype when 'r' then 'tables' when 'S' then 'sequences'
                                    when 'f' then 'functions' when 'T' then 'types'
