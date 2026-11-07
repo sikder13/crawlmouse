@@ -584,20 +584,33 @@ function setup(v: AccountView, site: Site, firstRun: boolean, trial: boolean): S
     v.account.integrations.some((i) => kinds.includes(i.kind) && i.connected);
   const competitors = v.account.limits.competitors_per_site;
   const items: SetupItemView[] = [];
-  const item = (key: string, done: boolean, todo: string, doneLabel: string, act: ActionView) =>
+  // Two rows can share a control's label ("Connect", "Add"), and the table has no row header, so
+  // each control is named for its row's subject, taken from the row's own words.
+  const item = (
+    key: string,
+    done: boolean,
+    subject: string,
+    todo: string,
+    doneLabel: string,
+    act: ActionView,
+  ) => {
+    if (!todo.includes(subject)) {
+      throw new Error(`set-up item ${key}: its row does not name its subject "${subject}"`);
+    }
     items.push({
       key,
       label: done ? doneLabel : todo,
       done,
-      // The row's header cell already names the item, so the control carries no context of its own.
-      action: done ? null : act,
+      action: done ? null : { ...act, context: `for ${subject}` },
     });
+  };
   const settings = (label: string) =>
     action('sitePage', label, { id: site.id }, { query: '#settings' });
   if (g.slack) {
     item(
       'slack',
       connected('slack'),
+      SETUP_COPY.slack.subject,
       SETUP_COPY.slack.todo,
       SETUP_COPY.slack.done,
       action('integrations', 'Connect'),
@@ -608,6 +621,7 @@ function setup(v: AccountView, site: Site, firstRun: boolean, trial: boolean): S
     item(
       'competitor',
       n > 0,
+      SETUP_COPY.competitor.subject(competitors),
       SETUP_COPY.competitor.todo(competitors),
       SETUP_COPY.competitor.done(n),
       settings('Add'),
@@ -617,6 +631,7 @@ function setup(v: AccountView, site: Site, firstRun: boolean, trial: boolean): S
     item(
       'search_console',
       connected('search_console'),
+      SETUP_COPY.searchConsole.subject,
       SETUP_COPY.searchConsole.todo,
       SETUP_COPY.searchConsole.done,
       action('integrations', 'Connect'),
@@ -624,12 +639,20 @@ function setup(v: AccountView, site: Site, firstRun: boolean, trial: boolean): S
   }
   if (g.stagingAndDeployHooks) {
     const done = v.d.sites.some((s) => s.staging_of_site_id === site.id);
-    item('staging', done, SETUP_COPY.staging.todo, SETUP_COPY.staging.done, settings('Add'));
+    item(
+      'staging',
+      done,
+      SETUP_COPY.staging.subject,
+      SETUP_COPY.staging.todo,
+      SETUP_COPY.staging.done,
+      settings('Add'),
+    );
   }
   if (g.observedCrawlerActivity) {
     item(
       'observed',
       connected('cloudflare_analytics', 'vercel_drain'),
+      SETUP_COPY.observed.subject,
       SETUP_COPY.observed.todo,
       SETUP_COPY.observed.done,
       action('integrations', 'Connect'),

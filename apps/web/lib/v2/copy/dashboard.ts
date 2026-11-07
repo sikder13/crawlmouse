@@ -59,24 +59,42 @@ export const DASHBOARD_COPY = {
 };
 
 /** The Pro set-up items (FACTS l.57), each as an offer and as done. */
+/**
+ * Each set-up item's `subject` is what its row is about, and its to-do text is written around it.
+ * The row's control is named for the subject ("Connect for Search Console"), so the control's name
+ * comes from the words the row shows.
+ */
+const competitorsOf = (n: number) => `${numberWord(n)} ${plural(n, 'competitor', 'competitors')}`;
+const SLACK = 'Slack';
+const SEARCH_CONSOLE = 'Search Console';
+const STAGING = 'a staging URL';
+const OBSERVED = 'Cloudflare Analytics or a Vercel Drain';
+
 export const SETUP_COPY = {
-  slack: { todo: 'Alerts to Slack, as well as email', done: 'Slack alerts connected' },
+  slack: {
+    subject: SLACK,
+    todo: `Alerts to ${SLACK}, as well as email`,
+    done: 'Slack alerts connected',
+  },
   competitor: {
-    todo: (n: number) =>
-      `Name ${numberWord(n)} ${plural(n, 'competitor', 'competitors')} to audit the same way`,
+    subject: competitorsOf,
+    todo: (n: number) => `Name ${competitorsOf(n)} to audit the same way`,
     done: (n: number) =>
       `${capitalise(numberWord(n))} ${plural(n, 'competitor', 'competitors')} added`,
   },
   searchConsole: {
-    todo: "Connect Search Console to lay Google's impressions and clicks by page over the audit, and its AI-feature breakdown when its API exposes it",
+    subject: SEARCH_CONSOLE,
+    todo: `Connect ${SEARCH_CONSOLE} to lay Google's impressions and clicks by page over the audit, and its AI-feature breakdown when its API exposes it`,
     done: 'Search Console connected',
   },
   staging: {
-    todo: 'Add a staging URL so audits run before each deploy',
+    subject: STAGING,
+    todo: `Add ${STAGING} so audits run before each deploy`,
     done: 'Staging audited on each deploy',
   },
   observed: {
-    todo: 'Connect Cloudflare Analytics or a Vercel Drain to see what the AI crawlers actually fetched',
+    subject: OBSERVED,
+    todo: `Connect ${OBSERVED} to see what the AI crawlers actually fetched`,
     done: 'Observed crawler activity connected',
   },
   schedule: (when: string) => `Choose the day and hour the weekly check runs (now ${when})`,
