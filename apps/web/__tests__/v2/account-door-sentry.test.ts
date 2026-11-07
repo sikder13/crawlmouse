@@ -108,8 +108,17 @@ function capturedWith(mode: 'full' | 'integration' | 'scrubber' | 'none'): strin
 
 /** Cookie values whose names Sentry's span filter catches (`auth`, `sb-`). */
 const NAMED_COOKIES = ['LEAKCANARY', 'DEVICECANARY', 'SIGNUPCANARY', 'FORCANARY', 'SESSIONCANARY'];
-/** What only the scrubber removes: v1's cookie and the claim id in span attributes, the URL token, a breadcrumb's filter. */
-const SCRUBBER_ONLY = ['ANONCANARY', '11111111-1111', 'URLCANARY', 'CHECKIDCANARY'];
+/**
+ * What only the scrubber removes: v1's cookie and the claim id in span attributes, the URL token, a
+ * breadcrumb's filter, and the check id in the claim route's path and Referer.
+ */
+const SCRUBBER_ONLY = [
+  'ANONCANARY',
+  '11111111-1111',
+  'URLCANARY',
+  'CHECKIDCANARY',
+  'c4ec4c4e-c4ec',
+];
 
 describe('the server SDK sends no door secret in an event or a transaction', () => {
   it.each([
@@ -137,7 +146,13 @@ describe('the server SDK sends no door secret in an event or a transaction', () 
 
   it('without either, the SDK does send them (the test sees what it guards against)', () => {
     const out = capturedWith('none');
-    for (const canary of [...NAMED_COOKIES, 'ANONCANARY', 'URLCANARY', 'CHECKIDCANARY']) {
+    for (const canary of [
+      ...NAMED_COOKIES,
+      'ANONCANARY',
+      'URLCANARY',
+      'CHECKIDCANARY',
+      'c4ec4c4e-c4ec',
+    ]) {
       expect(out, canary).toContain(canary);
     }
   }, 60_000);
@@ -173,6 +188,25 @@ describe('scrubDoorSecrets leaves the SDK’s own objects alone', () => {
 });
 
 describe('scrubDoorSecrets, inside strings', () => {
+  it('replaces a check id in a claim path, a check page and their URL-encoded forms, and keeps the rest', () => {
+    const id = '0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11';
+    const out = scrubDoorSecrets({
+      transaction: `POST /api/checks/${id}/claim`,
+      request: {
+        url: `https://crawlmouse.com/api/checks/${id}/claim`,
+        headers: { referer: `https://crawlmouse.com/check/${id}?tab=fix` },
+      },
+      breadcrumbs: [{ message: `next=%2Fapi%2Fchecks%2F${id.toUpperCase()}%2Fclaim` }],
+      user: { id },
+    });
+    expect(out.transaction).toBe('POST /api/checks/[Filtered]/claim');
+    expect(out.request.url).toBe('https://crawlmouse.com/api/checks/[Filtered]/claim');
+    expect(out.request.headers.referer).toBe('https://crawlmouse.com/check/[Filtered]?tab=fix');
+    expect(out.breadcrumbs[0]!.message).toBe('next=%2Fapi%2Fchecks%2F[Filtered]%2Fclaim');
+    // An id that is not in a check path is not a claim right: a user id stays readable.
+    expect(out.user.id).toBe(id);
+  });
+
   it('replaces a post_login_next value in a cookie header string', () => {
     const out = scrubDoorSecrets({
       request: { headers: { 'x-raw': 'post_login_next=/api/checks/abc/claim; x=1' } },

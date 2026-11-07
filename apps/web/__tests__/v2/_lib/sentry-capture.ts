@@ -2,9 +2,10 @@
  * Run by __tests__/v2/account-door-sentry.test.ts in a process of its own (the SDK instruments the
  * request path once per process): initialise the real server SDK with the options named by
  * argv[2], handle one request carrying every door cookie, v1's anonymous-session cookie and a
- * session cookie; inside the handler make an outgoing PostgREST-shaped request (an `id=eq.` filter,
- * which becomes a breadcrumb), finish a forced transaction, and capture a message; then print what
- * reached the transport.
+ * session cookie, and a second to the claim route, whose path and Referer hold a check id; inside
+ * the handler make an outgoing PostgREST-shaped request (an `id=eq.` filter, which becomes a
+ * breadcrumb), finish a forced transaction, and capture a message; then print what reached the
+ * transport.
  */
 import { createRequire } from 'node:module';
 import { createServer, request } from 'node:http';
@@ -13,6 +14,8 @@ import { COOKIES } from '../../../lib/auth/constants';
 import { sentryServerOptions } from '../../../lib/auth/sentry-scrub';
 
 const CANARY = 'pkce_LEAKCANARY_77';
+/** A check id: the right to claim that check. */
+const CHECK_ID = 'c4ec4c4e-c4ec-4c4e-8c4e-c4ec4c4ec4ec';
 
 type SentryNext = {
   init: (o: Record<string, unknown>) => void;
@@ -66,6 +69,20 @@ async function capturedWith(options: Record<string, unknown>): Promise<string> {
   await new Promise<void>((resolve) =>
     request(
       { port, path: '/login/verify?token_hash=URLCANARY_55', method: 'POST', headers: { cookie } },
+      (res) => {
+        res.resume();
+        res.on('end', resolve);
+      },
+    ).end(),
+  );
+  await new Promise<void>((resolve) =>
+    request(
+      {
+        port,
+        path: `/api/checks/${CHECK_ID}/claim`,
+        method: 'POST',
+        headers: { referer: `http://localhost:${port}/check/${CHECK_ID}` },
+      },
       (res) => {
         res.resume();
         res.on('end', resolve);
