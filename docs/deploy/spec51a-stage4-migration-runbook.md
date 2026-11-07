@@ -148,11 +148,11 @@ moved.
 
 ```sql
 select
-  -- INTENDED READABLE: user-facing by design.
-  has_column_privilege('authenticated','public.audits','refusal','SELECT')      as authed_refusal,      -- true
-  has_column_privilege('anon',         'public.audits','refusal','SELECT')      as anon_refusal,        -- true
-  has_column_privilege('authenticated','public.audits','coverage','SELECT')     as authed_coverage,     -- true
-  has_column_privilege('anon',         'public.audits','coverage','SELECT')     as anon_coverage,       -- true
+  -- READABLE WHEN THIS RAN, NOT SINCE 20261106000002 (P2): no client code reads them.
+  has_column_privilege('authenticated','public.audits','refusal','SELECT')      as authed_refusal,      -- false
+  has_column_privilege('anon',         'public.audits','refusal','SELECT')      as anon_refusal,        -- false
+  has_column_privilege('authenticated','public.audits','coverage','SELECT')     as authed_coverage,     -- false
+  has_column_privilege('anon',         'public.audits','coverage','SELECT')     as anon_coverage,       -- false
   -- INTERNAL: must be UNREADABLE by both client roles.
   has_column_privilege('authenticated','public.audits','fingerprint','SELECT')  as authed_fingerprint,  -- FALSE
   has_column_privilege('anon',         'public.audits','fingerprint','SELECT')  as anon_fingerprint,    -- FALSE
@@ -160,11 +160,15 @@ select
   has_table_privilege ('authenticated','public.audits','SELECT')                as authed_table_audits, -- false
   has_column_privilege('authenticated','public.audits','ai_readiness','SELECT') as authed_ai_readiness, -- false
   has_column_privilege('authenticated','public.audits','grade','SELECT')        as authed_grade,        -- true
-  has_column_privilege('anon',         'public.audits','grade','SELECT')        as anon_grade,          -- true
+  has_column_privilege('anon',         'public.audits','grade','SELECT')        as anon_grade,          -- false
   has_column_privilege('authenticated','public.pages','ai_signals','SELECT')    as authed_ai_signals;   -- false
 ```
 
-**Expected:** `true, true, true, true, false, false, false, false, true, true, false`.
+**Expected, on production since `20261106000002_v1_client_grant_hardening.sql` (P2):**
+`false, false, false, false, false, false, false, false, true, false, false`. P2 left `authenticated`
+nine columns of `audits`, `grade` among them, and `anon` none; when this migration was applied, the
+first four and `anon_grade` read true. Its own check of the client grants on the v1 tables is
+`infra/supabase/checks/08-v1-client-grants.sql`.
 
 Also confirm no RLS policy moved — this migration creates, alters and drops none. Compare against the
 pre-apply count:

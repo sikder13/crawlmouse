@@ -232,6 +232,25 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       'evidence/2026-08-08-gate9-reports.md',
     ],
   },
+  {
+    text: 'true, true, true, true, false, false, false, false, true, true, false',
+    withdrawnIn:
+      'docs/deploy/spec51a-stage4-migration-runbook.md (4b), after 20261106000002_v1_client_grant_hardening.sql',
+    truth:
+      'Since P2 the stage 4 column check reads false, false, false, false, false, false, false, ' +
+      'false, true, false, false: authenticated keeps nine audits columns, grade among them, and ' +
+      'anon none (infra/supabase/checks/08-v1-client-grants.sql).',
+    allowedIn: [],
+  },
+  {
+    text: 'INTENDED READABLE: user-facing by design',
+    withdrawnIn:
+      'docs/deploy/spec51a-stage4-migration-runbook.md (4b), after 20261106000002_v1_client_grant_hardening.sql',
+    truth:
+      'audits.refusal and audits.coverage are not readable by anon or authenticated since P2: no ' +
+      'client code reads them.',
+    allowedIn: [],
+  },
 ];
 
 /**
