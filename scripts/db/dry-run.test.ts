@@ -1,17 +1,22 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
+import { listChecks } from './check';
 import { dryRun, replayError, type DryRunDeps } from './dry-run';
 import { listMigrations, type MigrationFile } from './files';
 import { diffHistory, readHistory } from './history';
 import type { ReplayState } from './supabase-api';
 import { renderDryRun } from './summary';
-import { HISTORY_TABLE, migratedDb, pgliteDb } from './test-support';
+import { HISTORY_TABLE, migratedDb, pgliteDb, productionBeforeP1 } from './test-support';
 
 const THROUGH_001 = (f: string) => f.slice(0, 14) <= '20261101000001';
 // The v2 set as it stood when production recorded 006b. Later files are left out: P1
 // (20261106000001_service_role_parity) is applied to production before any dry run sees it, and its
 // rollback is deliberately empty, so it cannot be a pending file here.
 const files = listMigrations().filter((f) => f.version <= '20261103000001');
+// Check 08 asserts the client grants as 20261106000002 (P2) left them, which this fixture predates:
+// its v1 tables carry the broad grants production had then. The fixture of production before P1 and
+// P2, below, runs every check.
+const V2_SET_CHECKS = listChecks().filter((c) => c.file !== '08-v1-client-grants.sql');
 
 /**
  * A stand-in for production with migrations still to apply: migrated through 001, with a clean
@@ -53,12 +58,14 @@ async function harness(
     fileList?: MigrationFile[];
     replay?: ReplayState;
     replayLog?: string | null;
+    /** Production and the branch as one stands built from the other: productionLike by default. */
+    database?: () => Promise<PGlite>;
     /** What createBranch returns, when a test needs other than the default branch. */
     created?: { ref: string; url: string };
   } = {},
 ): Promise<Harness> {
-  const production = await productionLike();
-  const branch = await productionLike();
+  const production = await (options.database ?? productionLike)();
+  const branch = await (options.database ?? productionLike)();
   if (options.bothSetup) {
     await production.exec(options.bothSetup);
     await branch.exec(options.bothSetup);
@@ -111,7 +118,12 @@ async function harness(
 describe('the dry run', () => {
   it('passes on a copy of production, lists the four files with their sha256, and deletes the branch', async () => {
     const h = await harness();
-    const summary = await dryRun(h.deps, { files, branch: 'pr-1', commit: 'abc' });
+    const summary = await dryRun(h.deps, {
+      files,
+      checkFiles: V2_SET_CHECKS,
+      branch: 'pr-1',
+      commit: 'abc',
+    });
     expect(summary.steps.filter((s) => s.result.startsWith('FAILED'))).toEqual([]);
     expect(summary.passed).toBe(true);
     expect(summary.steps.map((s) => s.step)).toEqual([
@@ -143,7 +155,12 @@ describe('the dry run', () => {
 
   it('fails before any push when the branch is not a copy of production, naming the section', async () => {
     const h = await harness({ branchSetup: 'grant select on public.accounts to anon' });
-    const summary = await dryRun(h.deps, { files, branch: 'pr-2', commit: 'abc' });
+    const summary = await dryRun(h.deps, {
+      files,
+      checkFiles: V2_SET_CHECKS,
+      branch: 'pr-2',
+      commit: 'abc',
+    });
     expect(summary.passed).toBe(false);
     const failure = summary.steps.at(-1)!;
     expect(failure.step).toBe('Branch fingerprint equals the production fingerprint');
@@ -174,7 +191,12 @@ describe('the dry run', () => {
     "fails before any push while production's history needs the repair: %s",
     async (_label, setup, named) => {
       const h = await harness({ bothSetup: setup });
-      const summary = await dryRun(h.deps, { files, branch: 'pr-3', commit: 'abc' });
+      const summary = await dryRun(h.deps, {
+        files,
+        checkFiles: V2_SET_CHECKS,
+        branch: 'pr-3',
+        commit: 'abc',
+      });
       expect(summary.passed).toBe(false);
       expect(summary.steps.at(-1)!.result).toContain('needs the repair');
       expect(summary.steps.at(-1)!.result).toContain(named);
@@ -193,6 +215,7 @@ describe('the dry run', () => {
     const h = await harness({ fileList: edited });
     const summary = await dryRun(h.deps, {
       files: edited,
+      checkFiles: V2_SET_CHECKS,
       branch: 'pr-6',
       commit: 'abc',
       changed: ['infra/supabase/migrations/20260524000001_init_users.sql'],
@@ -219,6 +242,7 @@ describe('the dry run', () => {
       const h = await harness({ fileList: edited });
       const summary = await dryRun(h.deps, {
         files: edited,
+        checkFiles: V2_SET_CHECKS,
         branch: 'pr-6b',
         commit: 'abc',
         changed: ['infra/supabase/migrations/20260524000001_init_users.sql'],
@@ -242,6 +266,7 @@ describe('the dry run', () => {
     });
     const summary = await dryRun(h.deps, {
       files,
+      checkFiles: V2_SET_CHECKS,
       branch: 'pr-6c',
       commit: 'abc',
       changed: ['infra/supabase/migrations/20260524000001_init_users.sql'],
@@ -257,6 +282,7 @@ describe('the dry run', () => {
     const h = await harness();
     const summary = await dryRun(h.deps, {
       files,
+      checkFiles: V2_SET_CHECKS,
       branch: 'pr-7',
       commit: 'abc',
       changed: ['infra/supabase/rollbacks/20261101000001_v2_001_entitlement_tables.revert.sql'],
@@ -288,6 +314,7 @@ describe('the dry run', () => {
       branch: 'pr-4',
       commit: 'abc',
       files: [...files, extra],
+      checkFiles: V2_SET_CHECKS,
     });
     expect(summary.passed).toBe(false);
     expect(summary.steps.at(-1)!.result).toContain(
@@ -298,7 +325,12 @@ describe('the dry run', () => {
 
   it('fails when the CLI would push other files than the pending ones', async () => {
     const h = await harness({ cliList: (pending) => pending.slice(1) });
-    const summary = await dryRun(h.deps, { files, branch: 'pr-5', commit: 'abc' });
+    const summary = await dryRun(h.deps, {
+      files,
+      checkFiles: V2_SET_CHECKS,
+      branch: 'pr-5',
+      commit: 'abc',
+    });
     expect(summary.passed).toBe(false);
     expect(summary.steps.at(-1)!.step).toBe('supabase db push');
     expect(summary.steps.at(-1)!.result).toContain('the CLI would push');
@@ -309,7 +341,12 @@ describe('the dry run', () => {
       productionSetup: `insert into supabase_migrations.schema_migrations (version, name, statements)
         values ('20261104000001', 'zz_needs_a_hand_made_table', array['select * from public.zz_made_by_hand'])`,
     });
-    const summary = await dryRun(h.deps, { files, branch: 'pr-8', commit: 'abc' });
+    const summary = await dryRun(h.deps, {
+      files,
+      checkFiles: V2_SET_CHECKS,
+      branch: 'pr-8',
+      commit: 'abc',
+    });
     expect(summary.passed).toBe(false);
     const failure = summary.steps.at(-1)!;
     expect(failure.step).toBe('Branch replayed every recorded migration');
@@ -329,7 +366,12 @@ describe('the dry run', () => {
     const h = await harness({
       branchSetup: `delete from supabase_migrations.schema_migrations where version >= '20261101000001'`,
     });
-    const summary = await dryRun(h.deps, { files, branch: 'pr-11', commit: 'abc' });
+    const summary = await dryRun(h.deps, {
+      files,
+      checkFiles: V2_SET_CHECKS,
+      branch: 'pr-11',
+      commit: 'abc',
+    });
     const failure = summary.steps.at(-1)!;
     expect(failure.step).toBe('Branch replayed every recorded migration');
     expect(failure.result).toContain('first missing: 20261101000001 v2_001_entitlement_tables');
@@ -350,7 +392,12 @@ describe('the dry run', () => {
       branchSetup: `delete from supabase_migrations.schema_migrations where version >= '20261101000001'`,
       replayLog: log,
     });
-    const summary = await dryRun(h.deps, { files, branch: 'pr-9', commit: 'abc' });
+    const summary = await dryRun(h.deps, {
+      files,
+      checkFiles: V2_SET_CHECKS,
+      branch: 'pr-9',
+      commit: 'abc',
+    });
     const failure = summary.steps.at(-1)!;
     expect(failure.step).toBe('Branch replayed every recorded migration');
     expect(failure.result).toContain(
@@ -377,7 +424,12 @@ describe('the dry run', () => {
     'fails at the replay step on %s, before the fingerprint',
     async (_label, replay, said) => {
       const h = await harness({ replay });
-      const summary = await dryRun(h.deps, { files, branch: 'pr-10', commit: 'abc' });
+      const summary = await dryRun(h.deps, {
+        files,
+        checkFiles: V2_SET_CHECKS,
+        branch: 'pr-10',
+        commit: 'abc',
+      });
       expect(summary.passed).toBe(false);
       const failure = summary.steps.at(-1)!;
       expect(failure.step).toBe('Branch replayed every recorded migration');
@@ -399,7 +451,12 @@ describe('the dry run', () => {
     'refuses a branch whose %s names production, before connecting to it',
     async (_l, created) => {
       const h = await harness({ created });
-      const summary = await dryRun(h.deps, { files, branch: 'pr-12', commit: 'abc' });
+      const summary = await dryRun(h.deps, {
+        files,
+        checkFiles: V2_SET_CHECKS,
+        branch: 'pr-12',
+        commit: 'abc',
+      });
       expect(summary.passed).toBe(false);
       expect(summary.steps).toHaveLength(1);
       expect(summary.steps[0]!.result).toContain(
@@ -409,6 +466,25 @@ describe('the dry run', () => {
     },
     300_000,
   );
+  it('passes on production as it stood before P1 and P2, with every file after 006b pending and every check', async () => {
+    // A migration added after these is pending here too, so this run exercises it as well.
+    const all = listMigrations();
+    const after006b = all.filter((f) => f.version > '20261103000001');
+    expect(after006b.map((f) => f.version)).toEqual(
+      expect.arrayContaining(['20261106000001', '20261106000002']),
+    );
+    const h = await harness({ database: productionBeforeP1, fileList: all });
+    const summary = await dryRun(h.deps, { files: all, branch: 'pr-13', commit: 'abc' });
+    expect(summary.steps.filter((s) => s.result.startsWith('FAILED'))).toEqual([]);
+    expect(summary.passed).toBe(true);
+    expect(summary.files).toEqual(after006b.map((f) => ({ file: f.file, sha256: f.sha256 })));
+    expect(summary.rollbacks.map((r) => r.file)).toEqual(
+      [...after006b].reverse().map((f) => f.file.replace(/\.sql$/, '.revert.sql')),
+    );
+    const checks = summary.steps.find((s) => s.step === 'Checks')!;
+    expect(checks.result).toBe(`${listChecks().length} checks pass`);
+    expect(listChecks().map((c) => c.file)).toContain('08-v1-client-grants.sql');
+  }, 300_000);
 });
 
 describe('replayError runs recorded statements on the branch and keeps nothing', () => {
