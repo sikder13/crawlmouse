@@ -5,12 +5,11 @@
 -- them (has_table_privilege and its siblings), so a grant reaching them through PUBLIC or through a
 -- role they inherit from counts; a membership granted without INHERIT is not read. Any other
 -- privilege is a finding, one row per privilege (per v1 table read, for a relation with a rule), and
--- so is a declared column authenticated cannot
--- read, and so is any privilege the client roles hold on a relation with a rule that reads a v1
--- table: a view, a materialized view, or a table whose rule's action does, directly or through other
--- such relations. A v1 table or function that does not exist is a finding
--- rather than a skip, and a missing postgres, anon or authenticated role makes the check error, so
--- it cannot pass by reading nothing.
+-- so is a declared column authenticated cannot read, and so is any privilege the client roles hold
+-- on a relation with a rule that reads a v1 table: a view, a materialized view, or a table whose
+-- rule's action does, directly or through other such relations. A v1 table or function that does
+-- not exist is a finding rather than a skip, and a missing postgres, anon or authenticated role
+-- makes the check error, so it cannot pass by reading nothing.
 -- postgres's default privileges in public, or in every schema, must grant anon, authenticated,
 -- PUBLIC and any role either inherits from nothing, except what Postgres writes into an every-schema
 -- row itself when one is created: PUBLIC's EXECUTE on functions and USAGE on types, which new

@@ -346,6 +346,11 @@ describe('check 08: the client roles hold exactly the declared privileges on the
       [],
     ],
     [
+      `create view public.zz_v as select id from public.audits;
+       create rule zz_r as on update to public.users do also select 1 from public.zz_v`,
+      [],
+    ],
+    [
       `create role zz_both; grant zz_both to anon, authenticated;
        alter default privileges for role postgres in schema public grant select on tables to zz_both`,
       [
