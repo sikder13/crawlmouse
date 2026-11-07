@@ -9,6 +9,14 @@ import type { z } from 'zod';
 import { ENTITIES } from '../entities.js';
 import { BatchPartialSchema, DeclarationFetchSchema } from '../declaration.js';
 import {
+  AccessBatchResultSchema,
+  CrawlBatchResultSchema,
+  CrawlPageSchema,
+  FindingSchema,
+  RobotsEvidenceSchema,
+  WORKER_BATCH_ENUMS,
+} from '../worker-batch.js';
+import {
   BATCH_RESULT_ENUMS,
   DERIVED_ENUMS,
   REGISTRY_ONLY_ENUMS,
@@ -235,6 +243,25 @@ export function renderContractSpec(fixtures: Record<string, FixtureDataset>): st
     '### BatchPartial',
     'Null when the batch did all it was asked.',
     fieldsTable(BatchPartialSchema.unwrap()),
+    'The whole result (`worker-batch.ts`), parsed with `BatchResultSchema`: one of two kinds, each strict, so a field not named here is refused.',
+    '### Crawl batch result',
+    fieldsTable(CrawlBatchResultSchema),
+    '### Access batch result',
+    'The rows are `AccessTest` (above).',
+    fieldsTable(AccessBatchResultSchema),
+    '### CrawlPage',
+    'One URL of a crawl batch, as our crawler fetched it; the check builder assembles `PageResult` from these rows.',
+    fieldsTable(CrawlPageSchema),
+    '### RobotsEvidence',
+    fieldsTable(RobotsEvidenceSchema),
+    '### Finding',
+    'What limited a batch, once each; `kind` names the variant.',
+    fieldsTable(FindingSchema),
+    '### Batch result values',
+    table(
+      ['Enum', 'Values'],
+      Object.entries(WORKER_BATCH_ENUMS).map(([name, e]) => [name, e.options.map(code).join(', ')]),
+    ),
     '## Fields added beyond the brief',
     addedSection(),
     '## Rules',

@@ -304,7 +304,7 @@ describe('readRobots: what a reading keeps', () => {
     expect(oursAllow(r.rules, '/s')).toBe(false);
   });
 
-  it('holds what it keeps, not the file it was read from', () => {
+  it('holds the file once, as kept, and nothing of the body it was read from', () => {
     // Near the size cap, almost all of it rules for an agent the worker does not read.
     // The kept rule is long enough that V8 would hold a slice of it as a view into the file.
     let body =
@@ -322,8 +322,12 @@ describe('readRobots: what a reading keeps', () => {
     gc();
     const held = (process.memoryUsage().heapUsed - before) / 1048576;
     expect(readings.every((r) => r.state === 'rules')).toBe(true);
-    // Each file is 0.5 MiB; parsed whole, 20 of them held 20 MiB or more.
-    expect(held).toBeLessThan(2);
+    // A reading keeps its file whole for the check builder (CC-20a), so 20 readings hold the 20 files,
+    // about 10 MiB, and room for their kept rules. Parsed whole, as before the rules were copied out,
+    // 20 of them held 20 MiB or more beside the files.
+    const files = readings.reduce((n, r) => n + (r.state === 'rules' ? r.file!.length : 0), 0);
+    expect(files / 1048576).toBeGreaterThan(9);
+    expect(held).toBeLessThan(files / 1048576 + 2);
   });
 });
 

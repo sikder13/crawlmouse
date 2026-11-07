@@ -6,6 +6,9 @@ node_modules
 .env.*.local
 dist
 build
+# The check builder's source and fixtures are named build (CC-20a); they are not build output.
+!packages/engine/src/v2/build/
+!packages/engine/fixtures/v2/build/
 coverage
 *.log
 .DS_Store
