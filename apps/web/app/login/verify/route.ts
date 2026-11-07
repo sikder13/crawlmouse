@@ -103,64 +103,79 @@ export async function POST(request: Request) {
 
   if (carry === null) return respond(EXPIRED);
 
-  const sb = await supabaseServer();
-  const { data, error } =
-    carry.kind === 'token_hash'
-      ? await sb.auth.verifyOtp({ token_hash: carry.value, type: carry.type })
-      : await sb.auth.exchangeCodeForSession(carry.value);
-  if (error) {
-    console.error('[verify] sign-in failed:', { status: error.status, code: error.code });
+  // A throw anywhere below still answers through `respond`, so the token cookie is cleared on that
+  // exit too. Sentry gets the step that threw, not the error, which may hold request data.
+  let stage: 'verify' | 'anon-claim' | 'landing-redirect' = 'verify';
+  try {
+    const sb = await supabaseServer();
+    const { data, error } =
+      carry.kind === 'token_hash'
+        ? await sb.auth.verifyOtp({ token_hash: carry.value, type: carry.type })
+        : await sb.auth.exchangeCodeForSession(carry.value);
+    if (error) {
+      console.error('[verify] sign-in failed:', { status: error.status, code: error.code });
+      return respond(EXPIRED);
+    }
+    const user: User | null = data.user ?? (await sb.auth.getUser()).data.user;
+
+    // Claim the audits this browser ran anonymously before signing in (v1, as /api/auth/claim). The
+    // anon-session id is an httpOnly capability cookie, so a browser only claims its own unclaimed
+    // audits.
+    stage = 'anon-claim';
+    const anonId = await readAnonSessionId();
+    if (user && anonId) {
+      const admin = supabaseAdmin();
+      await admin
+        .from('audits')
+        .update({ user_id: user.id })
+        .eq('anonymous_session_id', anonId)
+        .is('user_id', null);
+      await clearAnonSession();
+    }
+
+    // Return the user to a validated same-origin target (R1 fold-in), re-validated here against a
+    // tampered cookie; absent or invalid falls back to /dashboard. A Keep's claim target is never
+    // followed as a URL: the door runs the claim itself, and with the door off it lands on /dashboard.
+    stage = 'landing-redirect';
+    const next = req.cookies.get(COOKIES.next)?.value;
+    let dest = claimFromNext(next) !== null ? DASHBOARD : (safeNextPath(next) ?? DASHBOARD);
+    let events: DoorEvent[] = [];
+
+    if (user && accountDoorEnabled()) {
+      try {
+        const landing = await afterSignIn(
+          { ...doorDeps(), report: sentryReport((m, ctx) => Sentry.captureMessage(m, ctx)) },
+          {
+            user,
+            next,
+            boundTo: req.cookies.get(COOKIES.binding)?.value,
+            signup: decodeSignup(req.cookies.get(COOKIES.signup)?.value),
+            device: req.cookies.get(COOKIES.device)?.value ?? null,
+            ip: getClientIp(request),
+          },
+        );
+        if (landing.dest !== null) dest = landing.dest;
+        events = landing.events;
+      } catch {
+        Sentry.captureMessage('auth.landing-failed', {
+          level: 'warning',
+          tags: { signal: 'landing-failed' },
+          extra: { userId: user.id },
+        });
+      }
+    }
+
+    const res = respond(dest, events);
+    res.cookies.set(COOKIES.next, '', { path: '/', maxAge: 0 });
+    res.cookies.set(COOKIES.signup, '', { path: '/', maxAge: 0 });
+    res.cookies.set(COOKIES.binding, '', { path: '/', maxAge: 0 });
+    return res;
+  } catch {
+    Sentry.captureMessage('auth.verify-threw', {
+      level: 'warning',
+      tags: { signal: 'verify-threw' },
+      extra: { stage },
+    });
     return respond(EXPIRED);
   }
-  const user: User | null = data.user ?? (await sb.auth.getUser()).data.user;
-
-  // Claim the audits this browser ran anonymously before signing in (v1, as /api/auth/claim). The
-  // anon-session id is an httpOnly capability cookie, so a browser only claims its own unclaimed audits.
-  const anonId = await readAnonSessionId();
-  if (user && anonId) {
-    const admin = supabaseAdmin();
-    await admin
-      .from('audits')
-      .update({ user_id: user.id })
-      .eq('anonymous_session_id', anonId)
-      .is('user_id', null);
-    await clearAnonSession();
-  }
-
-  // Return the user to a validated same-origin target (R1 fold-in), re-validated here against a
-  // tampered cookie; absent or invalid falls back to /dashboard. A Keep's claim target is never
-  // followed as a URL: the door runs the claim itself, and with the door off it lands on /dashboard.
-  const next = req.cookies.get(COOKIES.next)?.value;
-  let dest = claimFromNext(next) !== null ? DASHBOARD : (safeNextPath(next) ?? DASHBOARD);
-  let events: DoorEvent[] = [];
-
-  if (user && accountDoorEnabled()) {
-    try {
-      const landing = await afterSignIn(
-        { ...doorDeps(), report: sentryReport((m, ctx) => Sentry.captureMessage(m, ctx)) },
-        {
-          user,
-          next,
-          boundTo: req.cookies.get(COOKIES.binding)?.value,
-          signup: decodeSignup(req.cookies.get(COOKIES.signup)?.value),
-          device: req.cookies.get(COOKIES.device)?.value ?? null,
-          ip: getClientIp(request),
-        },
-      );
-      if (landing.dest !== null) dest = landing.dest;
-      events = landing.events;
-    } catch {
-      Sentry.captureMessage('auth.landing-failed', {
-        level: 'warning',
-        tags: { signal: 'landing-failed' },
-        extra: { userId: user.id },
-      });
-    }
-  }
-
-  const res = respond(dest, events);
-  res.cookies.set(COOKIES.next, '', { path: '/', maxAge: 0 });
-  res.cookies.set(COOKIES.signup, '', { path: '/', maxAge: 0 });
-  res.cookies.set(COOKIES.binding, '', { path: '/', maxAge: 0 });
-  return res;
 }

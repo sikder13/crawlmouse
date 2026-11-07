@@ -242,6 +242,40 @@ describe('POST /login/verify verifies', () => {
     expect(clearAnonSession).not.toHaveBeenCalled();
   });
 
+  it('a throw clears the token cookie and lands on the expired state, never a bare 500', async () => {
+    const throwers: Array<[string, () => void]> = [
+      ['verify', () => verifyOtp.mockRejectedValue(new Error('network'))],
+      ['anon-claim', () => (anon.throws = true)],
+      ['anon-claim', () => anonUpdate.mockRejectedValue(new Error('db'))],
+    ];
+    for (const [stage, arm] of throwers) {
+      verifyOtp.mockReset().mockResolvedValue({ data: { user: USER }, error: null });
+      anonUpdate.mockReset().mockResolvedValue({ error: null });
+      anon.throws = false;
+      anon.id = 'anon-1';
+      captureMessage.mockClear();
+      arm();
+      for (const accept of [undefined, 'application/json']) {
+        const res = await POST(
+          post({ cm_auth_otp: otp() }, accept ? { origin: ORIGIN, accept } : { origin: ORIGIN }),
+        );
+        expect(res.status, `${stage}, ${accept ?? 'form'}`).toBe(accept ? 200 : 303);
+        const dest = accept
+          ? (await res.json()).next
+          : new URL(res.headers.get('location')!).pathname +
+            new URL(res.headers.get('location')!).search;
+        expect(dest).toBe('/login/verify/continue?state=expired');
+        expect(setCookies(res).find((c) => c.startsWith('cm_auth_otp='))).toMatch(/Max-Age=0/);
+      }
+      const reported = captureMessage.mock.calls.filter((c) => c[0] === 'auth.verify-threw');
+      expect(reported.map((c) => (c[1] as { extra: { stage: string } }).extra.stage)).toEqual([
+        stage,
+        stage,
+      ]);
+      expect(JSON.stringify(reported)).not.toContain(CANARY);
+    }
+  });
+
   it('with the door off, the v2 hook never runs, and a claim-shaped `next` lands on /dashboard', async () => {
     const res = await POST(
       post({
