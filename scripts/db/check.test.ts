@@ -43,7 +43,7 @@ async function expectFinding(prefix: string, mutation: string, expected: string)
 }
 
 describe('the check files', () => {
-  it('are the six of the brief and the partition-trigger check, each with a title', () => {
+  it('are the six of the brief, the partition-trigger check and the v1 client-grant check, each with a title', () => {
     expect(checks.map((c) => c.file)).toEqual([
       '01-client-table-privileges.sql',
       '02-partitions-rls-owner-only.sql',
@@ -52,6 +52,7 @@ describe('the check files', () => {
       '05-private-buckets.sql',
       '06-client-functions.sql',
       '07-partition-triggers.sql',
+      '08-v1-client-grants.sql',
     ]);
     for (const c of checks) expect(c.title.length, c.file).toBeGreaterThan(10);
   });
@@ -62,10 +63,13 @@ describe('the check files', () => {
     expect(failed(results)).toBe(false);
   });
 
-  it('all pass on a database migrated through 001 only, before any table they check exists', async () => {
+  it('all but 08 pass on a database migrated through 001 only, and 08 fails there: it predates 20261106000002', async () => {
     const early = await migratedDb((f) => f <= '20261101000001_v2_001_entitlement_tables.sql');
     const results = await runChecks(pgliteDb(early));
-    expect(formatResults(results)).not.toContain('FAIL');
+    const v1 = results.filter((r) => r.check.file === '08-v1-client-grants.sql');
+    expect(formatResults(results.filter((r) => !v1.includes(r)))).not.toContain('FAIL');
+    // The v1 tables existed long before 001, with the broad client grants P2 removed.
+    expect(v1[0]!.findings.length).toBeGreaterThan(0);
   }, 180_000);
 });
 
@@ -203,6 +207,74 @@ describe('each check fails on what it guards', () => {
     ],
   ])('06: %s', async (mutation, expected) => {
     await expectFinding('06-', mutation, expected);
+  });
+});
+
+describe('check 08: the client roles hold exactly the declared privileges on the v1 tables', () => {
+  // The two the owner named: each is one line, and the only line.
+  it.each([
+    [
+      'grant truncate on public.audits to anon',
+      ['public.audits: anon holds TRUNCATE on the table'],
+    ],
+    [
+      'grant select (email) on public.users to authenticated',
+      ['public.users.email: authenticated holds SELECT on the column'],
+    ],
+    [
+      'grant truncate, references on public.audits to anon',
+      [
+        'public.audits: anon holds REFERENCES on the table',
+        'public.audits: anon holds TRUNCATE on the table',
+      ],
+    ],
+    [
+      'revoke select (pro_until) on public.users from authenticated',
+      ['public.users.pro_until: authenticated is declared to hold SELECT and does not'],
+    ],
+    [
+      'grant select (refusal) on public.audits to anon',
+      ['public.audits.refusal: anon holds SELECT on the column'],
+    ],
+    [
+      'grant execute on function public.handle_new_user() to anon',
+      ['public.handle_new_user(): anon may execute it'],
+    ],
+    [
+      'grant insert on public.waitlist to public',
+      [
+        'public.waitlist: anon holds INSERT on the table',
+        'public.waitlist: authenticated holds INSERT on the table',
+      ],
+    ],
+    [
+      'alter default privileges for role postgres in schema public grant select on tables to anon',
+      ['default privileges of postgres in public: anon gets SELECT on new tables'],
+    ],
+    [
+      'alter default privileges for role postgres grant execute on functions to authenticated',
+      [
+        'default privileges of postgres in every schema: authenticated gets EXECUTE on new functions',
+      ],
+    ],
+    [
+      // A PUBLIC grant in a public-schema row is not Postgres's built-in default: it is a finding.
+      'alter default privileges for role postgres in schema public grant execute on functions to public',
+      ['default privileges of postgres in public: PUBLIC gets EXECUTE on new functions'],
+    ],
+    [
+      'alter default privileges for role postgres in schema public grant usage on sequences to public',
+      ['default privileges of postgres in public: PUBLIC gets USAGE on new sequences'],
+    ],
+    ['drop table public.waitlist', ['public.waitlist: a v1 table this check reads does not exist']],
+  ])('08: %s', async (mutation, expected) => {
+    expect(await findingsAfter('08-', mutation)).toEqual(expected);
+  });
+
+  it('08 reads privileges as held, through role membership too', async () => {
+    const findings = await findingsAfter('08-', 'grant service_role to authenticated');
+    expect(findings).toContain('public.audits: authenticated holds DELETE on the table');
+    expect(findings).toContain('public.users: authenticated holds TRUNCATE on the table');
   });
 });
 
