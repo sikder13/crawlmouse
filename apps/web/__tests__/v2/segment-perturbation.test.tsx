@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { FixtureDataset } from '@crawlmouse/types/v2';
-import { findCheck, fixture, type FixtureName } from '../../lib/v2/fixtures';
+import { FIXTURE_NAMES, findCheck, fixture, type FixtureName } from '../../lib/v2/fixtures';
 import type { SegmentKey } from '../../lib/v2/view/segment/frame';
 import { SEGMENT_INVENTORY } from '../../lib/v2/view/segment/inventory';
 import {
@@ -48,11 +48,27 @@ const TABLE: PerturbTable = {
   ...CHANGES_PERTURB,
 };
 
-const VARIANT: Record<FixtureName, SegmentVariant> = {
+/**
+ * The segment preview that renders each fixture's first audit; or, for a fixture none renders yet,
+ * why not. The test below holds each reason to SEGMENT_SOURCES.
+ */
+const VARIANT: Record<FixtureName, SegmentVariant | { notRendered: string }> = {
   'bad-site': 'bad-site',
   'clean-site': 'clean',
   'challenged-site': 'challenged',
+  // The check builder's output (CC-20a). Listed in its PR under "Found by the built fixture".
+  'built-site': {
+    notRendered:
+      'no segment preview names built-site: SEGMENT_SOURCES holds the contract fixtures only',
+  },
 };
+
+/** The segment preview for fixture `name`; a fixture none renders throws with its reason. */
+function variantOf(name: FixtureName): SegmentVariant {
+  const v = VARIANT[name];
+  if (typeof v !== 'string') throw new Error(`${name} cannot be rendered yet: ${v.notRendered}`);
+  return v;
+}
 
 /** The visible text, each text node set apart by a space, as a reader would scan it. */
 const text = (markup: string) => {
@@ -72,7 +88,7 @@ function page(segment: SegmentKey, c: SegmentChange, dataset: FixtureDataset | n
   try {
     return text(
       renderToStaticMarkup(
-        c.history ? changesHistoryElement(c.history) : segmentElement(segment, VARIANT[name]),
+        c.history ? changesHistoryElement(c.history) : segmentElement(segment, variantOf(name)),
       ),
     );
   } finally {
@@ -84,10 +100,22 @@ function page(segment: SegmentKey, c: SegmentChange, dataset: FixtureDataset | n
 function changed(c: SegmentChange): FixtureDataset {
   const name = c.history ? HISTORY_SOURCES[c.history].fixture : (c.fixture ?? 'bad-site');
   const d = structuredClone(fixture(name));
-  const id = c.history ? HISTORY_SOURCES[c.history].check : SEGMENT_SOURCES[VARIANT[name]].check;
+  const id = c.history ? HISTORY_SOURCES[c.history].check : SEGMENT_SOURCES[variantOf(name)].check;
   c.change(findCheck(d, id), d);
   return d;
 }
+
+describe('the segment previews, against the fixtures', () => {
+  it('renders each fixture through its segment preview, or names why none renders it', () => {
+    for (const name of FIXTURE_NAMES) {
+      const v = VARIANT[name];
+      const sources = Object.entries(SEGMENT_SOURCES).filter(([, s]) => s.fixture === name);
+      if (typeof v === 'string') expect(SEGMENT_SOURCES[v].fixture).toBe(name);
+      // True while it says so: no segment preview takes its data from the fixture.
+      else expect(sources).toEqual([]);
+    }
+  });
+});
 
 describe('the segment inventory, against the fixture', () => {
   it('has a change for every field of every entry, and none for anything it does not list', () => {

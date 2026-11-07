@@ -18,7 +18,15 @@ port.on('message', (m: ReadMessage) => {
     reply =
       m.kind === 'words'
         ? { id: m.id, result: readWords({ body, bodyCut: m.bodyCut }) }
-        : { id: m.id, result: readPage({ body, bodyCut: m.bodyCut, finalUrl: m.finalUrl }) };
+        : {
+            id: m.id,
+            result: readPage({
+              body,
+              bodyCut: m.bodyCut,
+              finalUrl: m.finalUrl,
+              stackHeaders: m.stackHeaders,
+            }),
+          };
   } catch (e) {
     reply = { id: m.id, error: e instanceof Error ? e.message : String(e) };
   }

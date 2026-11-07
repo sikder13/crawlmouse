@@ -42,46 +42,48 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 
 ## Limits
 
-| Limit                                                    | Value                                                                              |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Batches at once                                          | 2 unless `BATCH_CONCURRENCY` says otherwise, at most 4; past it, `busy`            |
-| Page reader thread old space                             | 192 MB                                                                             |
-| One page read on the reader thread                       | 20 s from when the thread reaches it                                               |
-| Element nesting read                                     | 512 deep; the parse stops past it                                                  |
-| URLs per batch                                           | 50                                                                                 |
-| Request budget ceiling                                   | 5000 requests                                                                      |
-| Byte budget ceiling                                      | 256 MiB                                                                            |
-| Time budget ceiling                                      | 1800 s                                                                             |
-| Request body                                             | 1 MiB, arriving within 5 s of the headers                                          |
-| Signature window                                         | 5 min either side                                                                  |
-| Nonce memory                                             | 10 min                                                                             |
-| JWT lifetime                                             | 60 min at most; issued up to 60 s ahead                                            |
-| Result kept after a batch finishes                       | 60 min                                                                             |
-| Results kept                                             | 500 batches, 64 MiB in all                                                         |
-| Response body per request (decoded)                      | read to the first 2 MiB, then reading stops; 10 MiB ceiling                        |
-| Time per request                                         | 30 s in all, 10 s idle                                                             |
-| Redirects followed per request                           | 5                                                                                  |
-| robots.txt read                                          | 500 KiB of UTF-8 after any byte order mark; a larger file is too large to evaluate |
-| Rules in one robots.txt group the worker obeys           | 5000; more makes the file too large to evaluate                                    |
-| Rules in a search engine's robots.txt group              | 5000; more leaves that engine's verdicts `not_measured`                            |
-| robots.txt origins read per batch                        | 8                                                                                  |
-| robots.txt reading reused                                | 10 min                                                                             |
-| robots.txt readings cached                               | 2000 origins, 16 MiB in all                                                        |
-| Body excerpt on a row                                    | 2000 bytes                                                                         |
-| Body read for the challenge tiebreak                     | 8192 characters                                                                    |
-| Served text on a crawl row                               | 64 KiB                                                                             |
-| Tags read per page                                       | 200000, counting every `<`                                                         |
-| Element nesting read                                     | 512 levels                                                                         |
-| Links read per page                                      | the first 2000 in page order, nested ones included                                 |
-| Anchor text kept per link                                | 2000 bytes                                                                         |
-| Link edges per page                                      | 1000                                                                               |
-| URL length read or linked from                           | 2048 characters                                                                    |
-| Text, link edges and hreflang alternates per crawl batch | 8 MiB                                                                              |
-| Redirect hops recorded per request                       | 6                                                                                  |
-| Declared canonical href kept                             | 2048 characters, as written                                                        |
-| hreflang alternates kept per page                        | the first 256 in page order                                                        |
-| hreflang value kept                                      | 64 characters, as written                                                          |
-| Main content hashed per page                             | its first 65536 characters; the hash reads at most 5000 tokens and none under 100  |
+| Limit                                                                      | Value                                                                                                                         |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Batches at once                                                            | 2 unless `BATCH_CONCURRENCY` says otherwise, at most 4; past it, `busy`                                                       |
+| Page reader thread old space                                               | 192 MB                                                                                                                        |
+| One page read on the reader thread                                         | 20 s from when the thread reaches it                                                                                          |
+| Element nesting read                                                       | 512 deep; the parse stops past it                                                                                             |
+| URLs per batch                                                             | 50                                                                                                                            |
+| Request budget ceiling                                                     | 5000 requests                                                                                                                 |
+| Byte budget ceiling                                                        | 256 MiB                                                                                                                       |
+| Time budget ceiling                                                        | 1800 s                                                                                                                        |
+| Request body                                                               | 1 MiB, arriving within 5 s of the headers                                                                                     |
+| Signature window                                                           | 5 min either side                                                                                                             |
+| Nonce memory                                                               | 10 min                                                                                                                        |
+| JWT lifetime                                                               | 60 min at most; issued up to 60 s ahead                                                                                       |
+| Result kept after a batch finishes                                         | 60 min                                                                                                                        |
+| Results kept                                                               | 500 batches, 64 MiB in all                                                                                                    |
+| Response body per request (decoded)                                        | read to the first 2 MiB, then reading stops; 10 MiB ceiling                                                                   |
+| Time per request                                                           | 30 s in all, 10 s idle                                                                                                        |
+| Redirects followed per request                                             | 5                                                                                                                             |
+| robots.txt read                                                            | 500 KiB of UTF-8 after any byte order mark; a larger file is too large to evaluate                                            |
+| Rules in one robots.txt group the worker obeys                             | 5000; more makes the file too large to evaluate                                                                               |
+| Rules in a search engine's robots.txt group                                | 5000; more leaves that engine's verdicts `not_measured`                                                                       |
+| robots.txt origins read per batch                                          | 8                                                                                                                             |
+| robots.txt reading reused                                                  | 10 min                                                                                                                        |
+| robots.txt readings cached                                                 | 2000 origins, 16 MiB in all                                                                                                   |
+| Body excerpt on a row                                                      | 2000 bytes                                                                                                                    |
+| Body read for the challenge tiebreak                                       | 8192 characters                                                                                                               |
+| Served text on a crawl row                                                 | 64 KiB                                                                                                                        |
+| Tags read per page                                                         | 200000, counting every `<`                                                                                                    |
+| Element nesting read                                                       | 512 levels                                                                                                                    |
+| Links read per page                                                        | the first 2000 in page order, nested ones included                                                                            |
+| Anchor text kept per link                                                  | 2000 bytes                                                                                                                    |
+| Link edges per page                                                        | 1000                                                                                                                          |
+| URL length read or linked from                                             | 2048 characters                                                                                                               |
+| Text, link edges, content features and hreflang alternates per crawl batch | 8 MiB                                                                                                                         |
+| Content features kept per page (CC-20a)                                    | 64 KiB as JSON, 256 JSON-LD nodes of 32 types each, a type of 256 UTF-8 bytes as written; past any, none, and the row says so |
+| robots.txt kept whole for the check builder (CC-20a)                       | up to 500 KiB, from a file read as rules, as written; otherwise `body` is null and `body_complete` false                      |
+| Redirect hops recorded per request                                         | 6                                                                                                                             |
+| Declared canonical href kept                                               | 2048 characters, as written                                                                                                   |
+| hreflang alternates kept per page                                          | the first 256 in page order                                                                                                   |
+| hreflang value kept                                                        | 64 characters, as written                                                                                                     |
+| Main content hashed per page                                               | its first 65536 characters; the hash reads at most 5000 tokens and none under 100                                             |
 
 ## Identities
 

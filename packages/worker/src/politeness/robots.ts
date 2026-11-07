@@ -72,6 +72,8 @@ export type RobotsReading =
   | {
       state: 'rules';
       rules: ParsedRobots;
+      /** The whole file as served: null when the body was cut, or cannot be stored as written (CAPS.robotsFile). */
+      file: string | null;
       /**
        * The search engines' groups (lower case) left out of `rules` because one held more than
        * MAX_ROBOTS_RULES rules: their verdicts are not measured. Every other group is kept or absent.
@@ -214,7 +216,13 @@ export function readRobots(received: FetchOutcome): RobotsReading {
     // name it. The file is within its parse limit (checked above), so it reads all of it.
     const kept = keptGroups(parseRobotsTxt(received.body));
     return kept
-      ? { state: 'rules', rules: kept.rules, unevaluated: kept.unevaluated, fetch }
+      ? {
+          state: 'rules',
+          rules: kept.rules,
+          unevaluated: kept.unevaluated,
+          file: received.bodyCut ? null : bounded(received.body, CAPS.robotsFile),
+          fetch,
+        }
       : { state: 'too_large', why: 'rules', fetch };
   }
   return { state: 'unreachable', why: 'redirect_status', fetch };

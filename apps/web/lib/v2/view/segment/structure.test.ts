@@ -3,6 +3,18 @@ import { FIXTURE_NAMES, type FixtureName } from '../../fixtures';
 import { structureView } from './structure';
 import { asFirstSeen, edited } from './test-helpers';
 
+/**
+ * Fixtures the structure view has no map drawing of yet, and why; null for one it draws. Listed in
+ * CC-20a's PR under "Found by the built fixture", for CC-20b.
+ */
+const UNDRAWN: Record<FixtureName, string | null> = {
+  'bad-site': null,
+  'clean-site': null,
+  'challenged-site': null,
+  'built-site':
+    'no drawing is stored for a built check: drawingOf finds a drawing through the synthesised crawl recordings only',
+};
+
 const view = (name: FixtureName, edit?: Parameters<typeof edited>[1]) => {
   const { d, id } = edited(name, edit);
   return structureView(d, id, { asFirstSeen: asFirstSeen(name) });
@@ -71,6 +83,11 @@ describe('structureView: the map', () => {
   it('counts the drawing’s orphan and JavaScript-only pages as the check does', () => {
     for (const name of FIXTURE_NAMES) {
       const v = view(name);
+      // A fixture listed with a reason still has no drawing; when it gains one, the entry goes.
+      if (UNDRAWN[name] !== null) {
+        expect(v.map, `${name}: ${UNDRAWN[name]}`).toBeNull();
+        continue;
+      }
       const kinds = (k: string) => v.map!.nodes.filter((n) => n.kind === k).length;
       expect(kinds('orphan'), name).toBe(v.map!.legend.orphans);
       expect(kinds('js_only'), name).toBe(v.map!.legend.jsOnly);

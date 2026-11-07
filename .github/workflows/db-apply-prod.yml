@@ -1,0 +1,157 @@
+name: DB apply to production
+
+# Applies pending migration files to production, after the owner approves. docs/ops/db-migrations.md
+# is the runbook.
+#
+#   plan    no approval needed, read-only: finds the merged pull request and its passed dry run,
+#           reads production's pending files and refuses any the dry run did not apply byte for
+#           byte. The job summary lists each pending file with its sha256, next to the dry run's.
+#   apply   bound to the `production` environment, so it waits for the owner's approval. It
+#           re-checks the files against the approved manifest and production's fingerprint against
+#           the one the plan read, runs `supabase db push`, the checks
+#           and the fingerprint. It never retries and never runs a rollback.
+#   report  opens an issue when either job fails.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/supabase/migrations/**'
+  workflow_dispatch:
+    inputs:
+      dry_run_pr:
+        description: The merged pull request whose passed dry run covers the pending files
+        required: true
+        type: number
+
+permissions:
+  contents: read
+
+# One production apply at a time, and none cancelled midway.
+concurrency:
+  group: db-production
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Holds SUPABASE_ACCESS_TOKEN, used here only through the read-only query endpoint.
+    environment: db-dry-run
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      manifest: ${{ steps.plan.outputs.manifest }}
+      production: ${{ steps.plan.outputs.production }}
+      pending: ${{ steps.plan.outputs.pending }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Find the pull request's passed dry run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+          INPUT_PR: ${{ inputs.dry_run_pr }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "push" ]; then
+            pr=$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '[.[] | select(.merged_at != null)][0].number // empty')
+          else
+            pr="$INPUT_PR"
+          fi
+          if ! [[ "$pr" =~ ^[0-9]+$ ]]; then
+            echo "::error::no merged pull request for $SHA; dispatch with dry_run_pr"
+            exit 1
+          fi
+          state=$(gh pr view "$pr" --repo "$REPO" --json state --jq .state)
+          head=$(gh pr view "$pr" --repo "$REPO" --json headRefOid --jq .headRefOid)
+          if [ "$state" != "MERGED" ]; then
+            echo "::error::pull request #$pr is $state, not merged"
+            exit 1
+          fi
+          # The newest completed dry run at the pull request's head must be the one that passed.
+          latest=$(gh run list --repo "$REPO" --workflow db-dry-run.yml --commit "$head" \
+            --event pull_request --status completed --limit 1 --json databaseId,conclusion \
+            --jq '.[0] // empty | "\(.databaseId) \(.conclusion)"')
+          run="${latest%% *}"
+          conclusion="${latest#* }"
+          if [ -z "$latest" ] || [ "$conclusion" != "success" ]; then
+            echo "::error::the newest dry run for pull request #$pr at $head did not pass (${latest:-none})"
+            exit 1
+          fi
+          echo "pull request #$pr, dry run https://github.com/$REPO/actions/runs/$run"
+          gh run download "$run" --repo "$REPO" -n db-dry-run-summary -D "$RUNNER_TEMP/dry-run"
+      - name: Pending files, checked against the dry run
+        id: plan
+        working-directory: scripts
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          pnpm exec tsx db/production.ts plan --yes-production \
+            --dry-run-summary "$RUNNER_TEMP/dry-run/db-dry-run-summary.json" \
+            --manifest-out "$RUNNER_TEMP/manifest.json" \
+            --production-out "$RUNNER_TEMP/production.json"
+          manifest=$(cat "$RUNNER_TEMP/manifest.json")
+          pending=$(jq length "$RUNNER_TEMP/manifest.json")
+          production=$(cat "$RUNNER_TEMP/production.json")
+          {
+            echo "manifest=$manifest"
+            echo "production=$production"
+            echo "pending=$pending"
+          } >> "$GITHUB_OUTPUT"
+
+  apply:
+    needs: plan
+    if: needs.plan.outputs.pending != '0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Required reviewer: the owner. Deployment branches: main only.
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/supabase-cli
+      - name: supabase db push to production
+        working-directory: scripts
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          MANIFEST: ${{ needs.plan.outputs.manifest }}
+          PRODUCTION: ${{ needs.plan.outputs.production }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$MANIFEST" > "$RUNNER_TEMP/manifest.json"
+          printf '%s' "$PRODUCTION" > "$RUNNER_TEMP/production.json"
+          pnpm exec tsx db/production.ts apply --yes-production \
+            --manifest "$RUNNER_TEMP/manifest.json" --expect-production "$RUNNER_TEMP/production.json"
+
+  report:
+    needs: [plan, apply]
+    if: ${{ failure() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+        run: |
+          gh issue create --repo "$REPO" \
+            --title "Production migration run failed at ${SHA:0:8}" \
+            --body "The production migration workflow failed: $RUN_URL. Nothing is retried. docs/ops/db-migrations.md says how to read the job summary."

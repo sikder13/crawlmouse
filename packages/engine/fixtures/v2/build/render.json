@@ -1,0 +1,315 @@
+{
+  "pages": [
+    {
+      "url": "https://built-site.test/products/camp-kitchen-item-1",
+      "template_key": "/products/{slug}",
+      "picked_for": "template",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 170,
+        "rendered_words": 170,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/tent-care-guide",
+      "template_key": "/blog/{slug}",
+      "picked_for": "template",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 168,
+        "rendered_words": 168,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/collections/camp-kitchen",
+      "template_key": "/collections/{slug}",
+      "picked_for": "template",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 182,
+        "rendered_words": 182,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/journal/peg-materials-compared",
+      "template_key": "/journal/{slug}",
+      "picked_for": "template",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 167,
+        "rendered_words": 167,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test",
+      "template_key": "/",
+      "picked_for": "template",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 230,
+        "rendered_words": 230,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/collections/camp-lighting",
+      "template_key": "/collections/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 182,
+        "rendered_words": 182,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/collections/rain-jackets",
+      "template_key": "/collections/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 182,
+        "rendered_words": 182,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/collections/sleeping-bags",
+      "template_key": "/collections/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 182,
+        "rendered_words": 182,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/collections/trail-backpacks",
+      "template_key": "/collections/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 182,
+        "rendered_words": 182,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/collections/camping-tents",
+      "template_key": "/collections/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 189,
+        "rendered_words": 189,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/camp-cooking-ideas",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 164,
+        "rendered_words": 164,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/campfire-safety-basics",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 164,
+        "rendered_words": 164,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/first-night-outdoors",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 166,
+        "rendered_words": 166,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/how-to-pitch-a-tent",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 171,
+        "rendered_words": 171,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/layering-for-cold-nights",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 166,
+        "rendered_words": 166,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/leave-no-trace-rules",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 166,
+        "rendered_words": 166,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/packing-light-tips",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 164,
+        "rendered_words": 164,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/rainy-day-camping",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 164,
+        "rendered_words": 164,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/reading-a-trail-map",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 166,
+        "rendered_words": 166,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/water-on-the-trail",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 166,
+        "rendered_words": 166,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/tent-care-guide-fr",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 167,
+        "rendered_words": 167,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/blog/choosing-tent-pegs",
+      "template_key": "/blog/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 167,
+        "rendered_words": 167,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/products/camp-kitchen-item-2",
+      "template_key": "/products/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 170,
+        "rendered_words": 170,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/products/camp-kitchen-item-3",
+      "template_key": "/products/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 170,
+        "rendered_words": 170,
+        "text_share": 1,
+        "state": "readable"
+      }
+    },
+    {
+      "url": "https://built-site.test/products/camp-kitchen-item-4",
+      "template_key": "/products/{slug}",
+      "picked_for": "pagerank",
+      "rendered": true,
+      "without_js": {
+        "raw_words": 170,
+        "rendered_words": 170,
+        "text_share": 1,
+        "state": "readable"
+      }
+    }
+  ],
+  "browser_ms": 90000,
+  "estimate": {
+    "site_text_share": 1,
+    "measured_pages": 25,
+    "templates_measured": 5,
+    "templates_total": 5,
+    "unrendered_share": 0,
+    "single_render_weight": 0.06666666666666667,
+    "label": "estimated from 25 measured pages across 5 of 5 templates; 7 % of the estimate's weight rests on one measured page per template"
+  },
+  "settle_failed": false
+}

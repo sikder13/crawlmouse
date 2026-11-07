@@ -62,6 +62,13 @@ import {
 } from '../politeness/sites.js';
 import { BODY_EXCERPT_BYTES, EVIDENCE_HEADERS } from '../rows/evidence.js';
 import { RAW_TEXT_BYTES } from '../rows/crawl-page.js';
+import { ROBOTS_PARSE_LIMIT_BYTES } from '@crawlmouse/engine/worker';
+import {
+  CONTENT_FEATURES_BYTES,
+  JSON_LD_TYPE_BYTES,
+  MAX_JSON_LD_NODES,
+  MAX_JSON_LD_TYPES,
+} from '@crawlmouse/types/v2';
 import {
   ANCHOR_TEXT_BYTES,
   HASHED_TEXT_CHARS,
@@ -192,7 +199,18 @@ export function renderSpec(): string {
     ['Anchor text kept per link', `${ANCHOR_TEXT_BYTES} bytes`],
     ['Link edges per page', `${MAX_EDGES_PER_PAGE}`],
     ['URL length read or linked from', `${MAX_URL_LENGTH} characters`],
-    ['Text, link edges and hreflang alternates per crawl batch', kib(MAX_RESULT_TEXT_BYTES)],
+    [
+      'Text, link edges, content features and hreflang alternates per crawl batch',
+      kib(MAX_RESULT_TEXT_BYTES),
+    ],
+    [
+      'Content features kept per page (CC-20a)',
+      `${kib(CONTENT_FEATURES_BYTES)} as JSON, ${MAX_JSON_LD_NODES} JSON-LD nodes of ${MAX_JSON_LD_TYPES} types each, a type of ${JSON_LD_TYPE_BYTES} UTF-8 bytes as written; past any, none, and the row says so`,
+    ],
+    [
+      'robots.txt kept whole for the check builder (CC-20a)',
+      `up to ${kib(ROBOTS_PARSE_LIMIT_BYTES)}, from a file read as rules, as written; otherwise \`body\` is null and \`body_complete\` false`,
+    ],
     ['Redirect hops recorded per request', `${MAX_REDIRECT_HOPS}`],
     ['Declared canonical href kept', `${MAX_URL_LENGTH} characters, as written`],
     ['hreflang alternates kept per page', `the first ${MAX_HREFLANG_LINKS} in page order`],

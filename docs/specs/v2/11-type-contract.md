@@ -783,6 +783,447 @@ Null when the batch did all it was asked.
 | --------- | ---------------------- | ---- |
 | `reasons` | `BatchPartialReason[]` | no   |
 
+The whole result (`worker-batch.ts`), parsed with `BatchResultSchema`: one of two kinds, each strict, so a field not named here is refused.
+
+### Crawl batch result
+
+| Field                                                      | Type                      | Null |
+| ---------------------------------------------------------- | ------------------------- | ---- |
+| `batch_id`                                                 | `string`                  | no   |
+| `check_id`                                                 | `uuid`                    | no   |
+| `site_id`                                                  | `uuid`                    | no   |
+| `started_at`                                               | `timestamp`               | no   |
+| `finished_at`                                              | `timestamp`               | no   |
+| `requests`                                                 | `integer`                 | no   |
+| `bytes`                                                    | `integer`                 | no   |
+| `coverage`                                                 | `object`                  | no   |
+| `coverage.urls_requested`                                  | `integer`                 | no   |
+| `coverage.urls_complete`                                   | `integer`                 | no   |
+| `partial`                                                  | `object`                  | yes  |
+| `partial.reasons`                                          | `BatchPartialReason[]`    | no   |
+| `findings`                                                 | `one of 8 variants[]`     | no   |
+| `findings[].kind`                                          | `"site_stopped"`          | no   |
+| `findings[].site`                                          | `string`                  | no   |
+| `findings[].reason`                                        | `enum`                    | no   |
+| `findings[].at`                                            | `timestamp`               | no   |
+| `findings[].until`                                         | `timestamp`               | no   |
+| `findings[].requests_refused`                              | `boolean`                 | no   |
+| `findings[].kind`                                          | `"budget_spent"`          | no   |
+| `findings[].budget`                                        | `enum`                    | no   |
+| `findings[].kind`                                          | `"robots_unreachable"`    | no   |
+| `findings[].origin`                                        | `string`                  | no   |
+| `findings[].why`                                           | `enum`                    | no   |
+| `findings[].kind`                                          | `"robots_too_large"`      | no   |
+| `findings[].origin`                                        | `string`                  | no   |
+| `findings[].why`                                           | `enum`                    | no   |
+| `findings[].kind`                                          | `"site_refused"`          | no   |
+| `findings[].origin`                                        | `string`                  | no   |
+| `findings[].kind`                                          | `"crawl_delay"`           | no   |
+| `findings[].origin`                                        | `string`                  | no   |
+| `findings[].declared_s`                                    | `number`                  | no   |
+| `findings[].honoured`                                      | `boolean`                 | no   |
+| `findings[].kind`                                          | `"result_size_limit"`     | no   |
+| `findings[].limit_bytes`                                   | `integer`                 | no   |
+| `findings[].kind`                                          | `"not_read"`              | no   |
+| `findings[].reason`                                        | `enum`                    | no   |
+| `findings[].responses`                                     | `integer`                 | no   |
+| `robots`                                                   | `object[]`                | no   |
+| `robots[].origin`                                          | `string`                  | no   |
+| `robots[].identity_sent`                                   | `string`                  | no   |
+| `robots[].state`                                           | `enum`                    | no   |
+| `robots[].why`                                             | `enum`                    | yes  |
+| `robots[].status`                                          | `integer`                 | yes  |
+| `robots[].final_url`                                       | `url`                     | yes  |
+| `robots[].fetched_at`                                      | `timestamp`               | no   |
+| `robots[].from_cache`                                      | `boolean`                 | no   |
+| `robots[].crawl_delay_s`                                   | `number`                  | yes  |
+| `robots[].body_excerpt`                                    | `string`                  | yes  |
+| `robots[].body`                                            | `string`                  | yes  |
+| `robots[].body_complete`                                   | `boolean`                 | no   |
+| `declarations`                                             | `object[]`                | no   |
+| `declarations[].origin`                                    | `url`                     | no   |
+| `declarations[].path`                                      | `DeclarationPath`         | no   |
+| `declarations[].state`                                     | `DeclarationState`        | no   |
+| `declarations[].status`                                    | `integer`                 | yes  |
+| `declarations[].media_type`                                | `string`                  | yes  |
+| `declarations[].bytes`                                     | `integer`                 | yes  |
+| `declarations[].bytes_complete`                            | `boolean`                 | yes  |
+| `declarations[].not_requested`                             | `DeclarationNotRequested` | yes  |
+| `declarations[].from_cache`                                | `boolean`                 | no   |
+| `kind`                                                     | `"crawl"`                 | no   |
+| `pages`                                                    | `object[]`                | no   |
+| `pages[].check_id`                                         | `uuid`                    | no   |
+| `pages[].url`                                              | `url`                     | no   |
+| `pages[].outcome`                                          | `enum`                    | no   |
+| `pages[].response`                                         | `enum`                    | yes  |
+| `pages[].evidence_class`                                   | `EvidenceClass`           | no   |
+| `pages[].identity_sent`                                    | `string`                  | no   |
+| `pages[].source_ip_class`                                  | `SourceIpClass`           | no   |
+| `pages[].limitations`                                      | `string[]`                | no   |
+| `pages[].fetched_at`                                       | `timestamp`               | no   |
+| `pages[].request_headers`                                  | `object[]`                | no   |
+| `pages[].request_headers[].name`                           | `string`                  | no   |
+| `pages[].request_headers[].value`                          | `string`                  | no   |
+| `pages[].status_code`                                      | `integer`                 | yes  |
+| `pages[].final_url`                                        | `url`                     | yes  |
+| `pages[].headers`                                          | `object[]`                | no   |
+| `pages[].headers[].name`                                   | `string`                  | no   |
+| `pages[].headers[].value`                                  | `string`                  | no   |
+| `pages[].byte_count`                                       | `integer`                 | yes  |
+| `pages[].word_count`                                       | `integer`                 | yes  |
+| `pages[].raw_text`                                         | `string`                  | yes  |
+| `pages[].canonical_url`                                    | `url`                     | yes  |
+| `pages[].links_out`                                        | `integer`                 | yes  |
+| `pages[].redirect`                                         | `object`                  | yes  |
+| `pages[].redirect.hops`                                    | `object[]`                | no   |
+| `pages[].redirect.hops[].from`                             | `url`                     | no   |
+| `pages[].redirect.hops[].status`                           | `integer`                 | no   |
+| `pages[].redirect.hops[].location`                         | `url`                     | yes  |
+| `pages[].redirect.loop`                                    | `boolean`                 | no   |
+| `pages[].canonical_declared`                               | `object`                  | yes  |
+| `pages[].canonical_declared.href`                          | `string`                  | yes  |
+| `pages[].canonical_declared.url`                           | `url`                     | yes  |
+| `pages[].hreflang`                                         | `object`                  | yes  |
+| `pages[].hreflang.links`                                   | `object[]`                | no   |
+| `pages[].hreflang.links[].hreflang`                        | `string`                  | no   |
+| `pages[].hreflang.links[].href`                            | `url`                     | no   |
+| `pages[].hreflang.complete`                                | `boolean`                 | no   |
+| `pages[].content_simhash`                                  | `string`                  | yes  |
+| `pages[].is_html`                                          | `boolean`                 | no   |
+| `pages[].links_read`                                       | `boolean`                 | no   |
+| `pages[].robots_search`                                    | `object[]`                | no   |
+| `pages[].robots_search[].ua`                               | `string`                  | no   |
+| `pages[].robots_search[].verdict`                          | `Verdict`                 | no   |
+| `pages[].title`                                            | `object`                  | yes  |
+| `pages[].title.text`                                       | `string`                  | yes  |
+| `pages[].title.chars`                                      | `integer`                 | no   |
+| `pages[].title.cut`                                        | `boolean`                 | no   |
+| `pages[].meta_description`                                 | `object`                  | yes  |
+| `pages[].meta_description.text`                            | `string`                  | yes  |
+| `pages[].meta_description.chars`                           | `integer`                 | no   |
+| `pages[].meta_description.cut`                             | `boolean`                 | no   |
+| `pages[].fly_region`                                       | `string`                  | yes  |
+| `pages[].request_signing`                                  | `RequestSigning`          | no   |
+| `pages[].signature_verified`                               | `SignatureVerification`   | no   |
+| `pages[].worker_release`                                   | `string`                  | no   |
+| `pages[].timing`                                           | `object`                  | yes  |
+| `pages[].timing.dns_ms`                                    | `integer`                 | yes  |
+| `pages[].timing.connect_ms`                                | `integer`                 | yes  |
+| `pages[].timing.ttfb_ms`                                   | `integer`                 | yes  |
+| `pages[].timing.total_ms`                                  | `integer`                 | no   |
+| `pages[].content_features`                                 | `object`                  | yes  |
+| `pages[].content_features.client_rendered`                 | `boolean`                 | no   |
+| `pages[].content_features.has_h1`                          | `boolean`                 | no   |
+| `pages[].content_features.words_after_h1`                  | `integer`                 | no   |
+| `pages[].content_features.opening`                         | `object[]`                | no   |
+| `pages[].content_features.opening[].tag`                   | `string`                  | no   |
+| `pages[].content_features.opening[].words`                 | `integer`                 | no   |
+| `pages[].content_features.opening[].answer_sentences`      | `integer`                 | no   |
+| `pages[].content_features.opening[].question`              | `boolean`                 | no   |
+| `pages[].content_features.headings`                        | `object`                  | no   |
+| `pages[].content_features.headings.count`                  | `integer`                 | no   |
+| `pages[].content_features.headings.questions`              | `integer`                 | no   |
+| `pages[].content_features.headings.section_questions`      | `integer`                 | no   |
+| `pages[].content_features.json_ld`                         | `object[]`                | no   |
+| `pages[].content_features.json_ld[].types`                 | `string[]`                | no   |
+| `pages[].content_features.json_ld[].has_description`       | `boolean`                 | no   |
+| `pages[].content_features.json_ld[].has_author`            | `boolean`                 | no   |
+| `pages[].content_features.json_ld[].has_dated_publication` | `boolean`                 | no   |
+| `pages[].content_features.byline`                          | `object`                  | no   |
+| `pages[].content_features.byline.meta_author`              | `boolean`                 | no   |
+| `pages[].content_features.byline.published_time`           | `boolean`                 | no   |
+| `pages[].content_features.byline.rel_author`               | `boolean`                 | no   |
+| `pages[].content_features.byline.itemprop_author`          | `boolean`                 | no   |
+| `pages[].content_features.byline.itemprop_date`            | `boolean`                 | no   |
+| `pages[].content_features.byline.time_datetime`            | `boolean`                 | no   |
+| `pages[].content_features.specs`                           | `object`                  | no   |
+| `pages[].content_features.specs.structured`                | `integer`                 | no   |
+| `pages[].content_features.specs.label_value_lines`         | `integer`                 | no   |
+| `pages[].content_features.specs.spec_images`               | `integer`                 | no   |
+| `pages[].stack_signals`                                    | `object`                  | yes  |
+| `pages[].stack_signals.cms`                                | `CmsName`                 | no   |
+| `pages[].stack_signals.detected_from`                      | `string`                  | no   |
+| `pages[].main_text_chars`                                  | `integer`                 | yes  |
+| `pages[].noindex`                                          | `boolean`                 | yes  |
+| `link_edges`                                               | `object[]`                | no   |
+| `link_edges[].check_id`                                    | `uuid`                    | no   |
+| `link_edges[].from_url`                                    | `url`                     | no   |
+| `link_edges[].to_url`                                      | `url`                     | no   |
+| `link_edges[].anchor_text`                                 | `string`                  | no   |
+| `link_edges[].is_generic_anchor`                           | `boolean`                 | no   |
+| `link_edges[].js_only`                                     | `boolean`                 | no   |
+| `discovered_urls`                                          | `url[]`                   | no   |
+
+### Access batch result
+
+The rows are `AccessTest` (above).
+
+| Field                                    | Type                      | Null |
+| ---------------------------------------- | ------------------------- | ---- |
+| `batch_id`                               | `string`                  | no   |
+| `check_id`                               | `uuid`                    | no   |
+| `site_id`                                | `uuid`                    | no   |
+| `started_at`                             | `timestamp`               | no   |
+| `finished_at`                            | `timestamp`               | no   |
+| `requests`                               | `integer`                 | no   |
+| `bytes`                                  | `integer`                 | no   |
+| `coverage`                               | `object`                  | no   |
+| `coverage.urls_requested`                | `integer`                 | no   |
+| `coverage.urls_complete`                 | `integer`                 | no   |
+| `partial`                                | `object`                  | yes  |
+| `partial.reasons`                        | `BatchPartialReason[]`    | no   |
+| `findings`                               | `one of 8 variants[]`     | no   |
+| `findings[].kind`                        | `"site_stopped"`          | no   |
+| `findings[].site`                        | `string`                  | no   |
+| `findings[].reason`                      | `enum`                    | no   |
+| `findings[].at`                          | `timestamp`               | no   |
+| `findings[].until`                       | `timestamp`               | no   |
+| `findings[].requests_refused`            | `boolean`                 | no   |
+| `findings[].kind`                        | `"budget_spent"`          | no   |
+| `findings[].budget`                      | `enum`                    | no   |
+| `findings[].kind`                        | `"robots_unreachable"`    | no   |
+| `findings[].origin`                      | `string`                  | no   |
+| `findings[].why`                         | `enum`                    | no   |
+| `findings[].kind`                        | `"robots_too_large"`      | no   |
+| `findings[].origin`                      | `string`                  | no   |
+| `findings[].why`                         | `enum`                    | no   |
+| `findings[].kind`                        | `"site_refused"`          | no   |
+| `findings[].origin`                      | `string`                  | no   |
+| `findings[].kind`                        | `"crawl_delay"`           | no   |
+| `findings[].origin`                      | `string`                  | no   |
+| `findings[].declared_s`                  | `number`                  | no   |
+| `findings[].honoured`                    | `boolean`                 | no   |
+| `findings[].kind`                        | `"result_size_limit"`     | no   |
+| `findings[].limit_bytes`                 | `integer`                 | no   |
+| `findings[].kind`                        | `"not_read"`              | no   |
+| `findings[].reason`                      | `enum`                    | no   |
+| `findings[].responses`                   | `integer`                 | no   |
+| `robots`                                 | `object[]`                | no   |
+| `robots[].origin`                        | `string`                  | no   |
+| `robots[].identity_sent`                 | `string`                  | no   |
+| `robots[].state`                         | `enum`                    | no   |
+| `robots[].why`                           | `enum`                    | yes  |
+| `robots[].status`                        | `integer`                 | yes  |
+| `robots[].final_url`                     | `url`                     | yes  |
+| `robots[].fetched_at`                    | `timestamp`               | no   |
+| `robots[].from_cache`                    | `boolean`                 | no   |
+| `robots[].crawl_delay_s`                 | `number`                  | yes  |
+| `robots[].body_excerpt`                  | `string`                  | yes  |
+| `robots[].body`                          | `string`                  | yes  |
+| `robots[].body_complete`                 | `boolean`                 | no   |
+| `declarations`                           | `object[]`                | no   |
+| `declarations[].origin`                  | `url`                     | no   |
+| `declarations[].path`                    | `DeclarationPath`         | no   |
+| `declarations[].state`                   | `DeclarationState`        | no   |
+| `declarations[].status`                  | `integer`                 | yes  |
+| `declarations[].media_type`              | `string`                  | yes  |
+| `declarations[].bytes`                   | `integer`                 | yes  |
+| `declarations[].bytes_complete`          | `boolean`                 | yes  |
+| `declarations[].not_requested`           | `DeclarationNotRequested` | yes  |
+| `declarations[].from_cache`              | `boolean`                 | no   |
+| `kind`                                   | `"access"`                | no   |
+| `access_tests`                           | `object[]`                | no   |
+| `access_tests[].id`                      | `uuid`                    | no   |
+| `access_tests[].check_id`                | `uuid`                    | no   |
+| `access_tests[].ua`                      | `string`                  | yes  |
+| `access_tests[].page_url`                | `url`                     | no   |
+| `access_tests[].template_key`            | `string`                  | no   |
+| `access_tests[].tested_at`               | `timestamp`               | no   |
+| `access_tests[].verdict`                 | `Verdict`                 | no   |
+| `access_tests[].evidence_class`          | `EvidenceClass`           | no   |
+| `access_tests[].identity_sent`           | `string`                  | no   |
+| `access_tests[].source_ip_class`         | `SourceIpClass`           | no   |
+| `access_tests[].limitations`             | `string[]`                | no   |
+| `access_tests[].cause`                   | `AccessCause`             | yes  |
+| `access_tests[].request_headers`         | `object[]`                | no   |
+| `access_tests[].request_headers[].name`  | `string`                  | no   |
+| `access_tests[].request_headers[].value` | `string`                  | no   |
+| `access_tests[].raw_status`              | `integer`                 | yes  |
+| `access_tests[].final_url`               | `url`                     | yes  |
+| `access_tests[].headers`                 | `object[]`                | no   |
+| `access_tests[].headers[].name`          | `string`                  | no   |
+| `access_tests[].headers[].value`         | `string`                  | no   |
+| `access_tests[].byte_count`              | `integer`                 | yes  |
+| `access_tests[].word_count`              | `integer`                 | yes  |
+| `access_tests[].body_excerpt`            | `string`                  | yes  |
+| `access_tests[].method`                  | `"GET"`                   | yes  |
+| `access_tests[].http_version`            | `"1.1"`                   | yes  |
+| `access_tests[].identity_role`           | `IdentityRole`            | no   |
+| `access_tests[].tagged`                  | `boolean`                 | no   |
+| `access_tests[].witness`                 | `object`                  | yes  |
+| `access_tests[].witness.role`            | `WitnessRole`             | no   |
+| `access_tests[].witness.ua`              | `string`                  | no   |
+| `access_tests[].fly_region`              | `string`                  | yes  |
+| `access_tests[].request_signing`         | `RequestSigning`          | yes  |
+| `access_tests[].signature_verified`      | `SignatureVerification`   | yes  |
+| `access_tests[].worker_release`          | `string`                  | yes  |
+| `access_tests[].timing`                  | `object`                  | yes  |
+| `access_tests[].timing.dns_ms`           | `integer`                 | yes  |
+| `access_tests[].timing.connect_ms`       | `integer`                 | yes  |
+| `access_tests[].timing.ttfb_ms`          | `integer`                 | yes  |
+| `access_tests[].timing.total_ms`         | `integer`                 | no   |
+
+### CrawlPage
+
+One URL of a crawl batch, as our crawler fetched it; the check builder assembles `PageResult` from these rows.
+
+| Field                                              | Type                    | Null |
+| -------------------------------------------------- | ----------------------- | ---- |
+| `check_id`                                         | `uuid`                  | no   |
+| `url`                                              | `url`                   | no   |
+| `outcome`                                          | `enum`                  | no   |
+| `response`                                         | `enum`                  | yes  |
+| `evidence_class`                                   | `EvidenceClass`         | no   |
+| `identity_sent`                                    | `string`                | no   |
+| `source_ip_class`                                  | `SourceIpClass`         | no   |
+| `limitations`                                      | `string[]`              | no   |
+| `fetched_at`                                       | `timestamp`             | no   |
+| `request_headers`                                  | `object[]`              | no   |
+| `request_headers[].name`                           | `string`                | no   |
+| `request_headers[].value`                          | `string`                | no   |
+| `status_code`                                      | `integer`               | yes  |
+| `final_url`                                        | `url`                   | yes  |
+| `headers`                                          | `object[]`              | no   |
+| `headers[].name`                                   | `string`                | no   |
+| `headers[].value`                                  | `string`                | no   |
+| `byte_count`                                       | `integer`               | yes  |
+| `word_count`                                       | `integer`               | yes  |
+| `raw_text`                                         | `string`                | yes  |
+| `canonical_url`                                    | `url`                   | yes  |
+| `links_out`                                        | `integer`               | yes  |
+| `redirect`                                         | `object`                | yes  |
+| `redirect.hops`                                    | `object[]`              | no   |
+| `redirect.hops[].from`                             | `url`                   | no   |
+| `redirect.hops[].status`                           | `integer`               | no   |
+| `redirect.hops[].location`                         | `url`                   | yes  |
+| `redirect.loop`                                    | `boolean`               | no   |
+| `canonical_declared`                               | `object`                | yes  |
+| `canonical_declared.href`                          | `string`                | yes  |
+| `canonical_declared.url`                           | `url`                   | yes  |
+| `hreflang`                                         | `object`                | yes  |
+| `hreflang.links`                                   | `object[]`              | no   |
+| `hreflang.links[].hreflang`                        | `string`                | no   |
+| `hreflang.links[].href`                            | `url`                   | no   |
+| `hreflang.complete`                                | `boolean`               | no   |
+| `content_simhash`                                  | `string`                | yes  |
+| `is_html`                                          | `boolean`               | no   |
+| `links_read`                                       | `boolean`               | no   |
+| `robots_search`                                    | `object[]`              | no   |
+| `robots_search[].ua`                               | `string`                | no   |
+| `robots_search[].verdict`                          | `Verdict`               | no   |
+| `title`                                            | `object`                | yes  |
+| `title.text`                                       | `string`                | yes  |
+| `title.chars`                                      | `integer`               | no   |
+| `title.cut`                                        | `boolean`               | no   |
+| `meta_description`                                 | `object`                | yes  |
+| `meta_description.text`                            | `string`                | yes  |
+| `meta_description.chars`                           | `integer`               | no   |
+| `meta_description.cut`                             | `boolean`               | no   |
+| `fly_region`                                       | `string`                | yes  |
+| `request_signing`                                  | `RequestSigning`        | no   |
+| `signature_verified`                               | `SignatureVerification` | no   |
+| `worker_release`                                   | `string`                | no   |
+| `timing`                                           | `object`                | yes  |
+| `timing.dns_ms`                                    | `integer`               | yes  |
+| `timing.connect_ms`                                | `integer`               | yes  |
+| `timing.ttfb_ms`                                   | `integer`               | yes  |
+| `timing.total_ms`                                  | `integer`               | no   |
+| `content_features`                                 | `object`                | yes  |
+| `content_features.client_rendered`                 | `boolean`               | no   |
+| `content_features.has_h1`                          | `boolean`               | no   |
+| `content_features.words_after_h1`                  | `integer`               | no   |
+| `content_features.opening`                         | `object[]`              | no   |
+| `content_features.opening[].tag`                   | `string`                | no   |
+| `content_features.opening[].words`                 | `integer`               | no   |
+| `content_features.opening[].answer_sentences`      | `integer`               | no   |
+| `content_features.opening[].question`              | `boolean`               | no   |
+| `content_features.headings`                        | `object`                | no   |
+| `content_features.headings.count`                  | `integer`               | no   |
+| `content_features.headings.questions`              | `integer`               | no   |
+| `content_features.headings.section_questions`      | `integer`               | no   |
+| `content_features.json_ld`                         | `object[]`              | no   |
+| `content_features.json_ld[].types`                 | `string[]`              | no   |
+| `content_features.json_ld[].has_description`       | `boolean`               | no   |
+| `content_features.json_ld[].has_author`            | `boolean`               | no   |
+| `content_features.json_ld[].has_dated_publication` | `boolean`               | no   |
+| `content_features.byline`                          | `object`                | no   |
+| `content_features.byline.meta_author`              | `boolean`               | no   |
+| `content_features.byline.published_time`           | `boolean`               | no   |
+| `content_features.byline.rel_author`               | `boolean`               | no   |
+| `content_features.byline.itemprop_author`          | `boolean`               | no   |
+| `content_features.byline.itemprop_date`            | `boolean`               | no   |
+| `content_features.byline.time_datetime`            | `boolean`               | no   |
+| `content_features.specs`                           | `object`                | no   |
+| `content_features.specs.structured`                | `integer`               | no   |
+| `content_features.specs.label_value_lines`         | `integer`               | no   |
+| `content_features.specs.spec_images`               | `integer`               | no   |
+| `stack_signals`                                    | `object`                | yes  |
+| `stack_signals.cms`                                | `CmsName`               | no   |
+| `stack_signals.detected_from`                      | `string`                | no   |
+| `main_text_chars`                                  | `integer`               | yes  |
+| `noindex`                                          | `boolean`               | yes  |
+
+### RobotsEvidence
+
+| Field           | Type        | Null |
+| --------------- | ----------- | ---- |
+| `origin`        | `string`    | no   |
+| `identity_sent` | `string`    | no   |
+| `state`         | `enum`      | no   |
+| `why`           | `enum`      | yes  |
+| `status`        | `integer`   | yes  |
+| `final_url`     | `url`       | yes  |
+| `fetched_at`    | `timestamp` | no   |
+| `from_cache`    | `boolean`   | no   |
+| `crawl_delay_s` | `number`    | yes  |
+| `body_excerpt`  | `string`    | yes  |
+| `body`          | `string`    | yes  |
+| `body_complete` | `boolean`   | no   |
+
+### Finding
+
+What limited a batch, once each; `kind` names the variant.
+
+| Field              | Type                   | Null |
+| ------------------ | ---------------------- | ---- |
+| `kind`             | `"site_stopped"`       | no   |
+| `site`             | `string`               | no   |
+| `reason`           | `enum`                 | no   |
+| `at`               | `timestamp`            | no   |
+| `until`            | `timestamp`            | no   |
+| `requests_refused` | `boolean`              | no   |
+| `kind`             | `"budget_spent"`       | no   |
+| `budget`           | `enum`                 | no   |
+| `kind`             | `"robots_unreachable"` | no   |
+| `origin`           | `string`               | no   |
+| `why`              | `enum`                 | no   |
+| `kind`             | `"robots_too_large"`   | no   |
+| `origin`           | `string`               | no   |
+| `why`              | `enum`                 | no   |
+| `kind`             | `"site_refused"`       | no   |
+| `origin`           | `string`               | no   |
+| `kind`             | `"crawl_delay"`        | no   |
+| `origin`           | `string`               | no   |
+| `declared_s`       | `number`               | no   |
+| `honoured`         | `boolean`              | no   |
+| `kind`             | `"result_size_limit"`  | no   |
+| `limit_bytes`      | `integer`              | no   |
+| `kind`             | `"not_read"`           | no   |
+| `reason`           | `enum`                 | no   |
+| `responses`        | `integer`              | no   |
+
+### Batch result values
+
+| Enum           | Values                                                                                                                                  |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| CrawlOutcome   | `fetched`, `robots_disallowed`, `not_requested`, `failed`                                                                               |
+| CrawlResponse  | `served`, `refused`, `gone`, `challenged`, `rate_limited`, `payment`, `redirected_away`, `error`                                        |
+| RobotsState    | `rules`, `none`, `unreachable`, `too_large`, `refused`                                                                                  |
+| RobotsWhy      | `client_error`, `html_soft_404`, `server_error`, `timeout`, `network`, `challenged`, `byte_budget`, `redirect_status`, `bytes`, `rules` |
+| SiteStopReason | `three_429_responses`, `four_consecutive_challenged_pages`                                                                              |
+| BudgetKind     | `requests`, `bytes`, `seconds`                                                                                                          |
+| NotReadReason  | `parse_depth_exceeded`, `reader_thread_crashed`, `reader_deadline`, `reader_error`                                                      |
+
 ## Fields added beyond the brief
 
 | Entity               | Field                                  | Added for            |
@@ -1056,6 +1497,7 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `robots_verdict`            | a robots.txt verdict is allowed, disallowed_by_robots or not_measured                                                                                     | one way   |
 | `robots_ua_unique`          | each search engine has one robots.txt verdict                                                                                                             | one way   |
 | `links_read_html`           | only an HTML response has its links read                                                                                                                  | one way   |
+| `robots_body`               | a robots.txt body is kept exactly when the whole file was read                                                                                            | both ways |
 
 ## Enums
 

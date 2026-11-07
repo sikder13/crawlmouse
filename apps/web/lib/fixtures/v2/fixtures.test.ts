@@ -12,8 +12,13 @@ const DIR = new URL('./', import.meta.url);
 const files = readdirSync(DIR).filter((f) => f.endsWith('.json'));
 
 describe('v2 fixtures', () => {
-  it('holds the three contract fixtures', () => {
-    expect(files.sort()).toEqual(['bad-site.json', 'challenged-site.json', 'clean-site.json']);
+  it('holds the three contract fixtures and the built one', () => {
+    expect(files.sort()).toEqual([
+      'bad-site.json',
+      'built-site.json',
+      'challenged-site.json',
+      'clean-site.json',
+    ]);
   });
 
   it.each(files)('%s parses with FixtureDatasetSchema', (file) => {

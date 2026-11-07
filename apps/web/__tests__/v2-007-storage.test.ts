@@ -497,14 +497,30 @@ describe('migration 007 applies, re-applies and reverts', () => {
     for (const section of Object.keys(pre)) expect(post[section], section).toEqual(pre[section]);
   }, 120_000);
 
-  it('the revert refuses to drop a bucket that still holds objects', async () => {
+  it('the revert refuses, with the count per bucket, while a bucket holds objects, and changes nothing', async () => {
     const db2 = await freshDb();
     await applyAllMigrations(db2, undefined, through(MIGRATION_007));
     await db2.exec(
-      `insert into storage.objects (bucket_id, name) values ('evidence', 'kept.json.gz')`,
+      `insert into storage.objects (bucket_id, name)
+       values ('evidence', 'a.json.gz'), ('evidence', 'b.json.gz'), ('reports', 'r.pdf')`,
     );
+    const held = await catalogSnapshot(db2);
     await expect(db2.exec(readRollback(ROLLBACK))).rejects.toThrow(
-      /foreign key|still holds objects/,
+      /still hold objects \(evidence: 2, reports: 1\)/,
     );
+    expect(await catalogSnapshot(db2)).toEqual(held);
+    const buckets = await db2.query<{ id: string }>(`select id from storage.buckets order by id`);
+    expect(buckets.rows.map((r) => r.id)).toEqual(['evidence', 'reports']);
+  }, 120_000);
+
+  it('the revert deletes the buckets only because it sets storage.allow_delete_query', async () => {
+    const withoutGuc = readRollback(ROLLBACK).replace(
+      /^set local storage\.allow_delete_query = 'true';$/m,
+      '',
+    );
+    expect(withoutGuc).not.toEqual(readRollback(ROLLBACK));
+    const db2 = await freshDb();
+    await applyAllMigrations(db2, undefined, through(MIGRATION_007));
+    await expect(db2.exec(withoutGuc)).rejects.toThrow(/Direct deletion from storage tables/);
   }, 120_000);
 });

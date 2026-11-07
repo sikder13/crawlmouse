@@ -10,6 +10,8 @@ export const FIRST_AUDIT: Record<FixtureName, string> = {
   'bad-site': CHECKS.badFirstAudit,
   'clean-site': CHECKS.cleanFirstAudit,
   'challenged-site': CHECKS.challengedFirstAudit,
+  // The check builder's one check (CC-20a), read from the fixture rather than repeated here.
+  'built-site': fixture('built-site').checks[0]!.id,
 };
 
 /** A copy of fixture `name` with `edit` applied to its first audit, and that audit's id. */

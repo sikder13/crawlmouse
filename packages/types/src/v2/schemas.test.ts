@@ -18,6 +18,7 @@ import { z } from 'zod';
 import {
   AccessTestSchema,
   DeclarationFetchSchema,
+  RobotsEvidenceSchema,
   PageTitleSchema,
   AccountSchema,
   AgencyBrandingSchema,
@@ -159,6 +160,21 @@ interface RuleCase {
   schema: z.ZodType;
   input: () => unknown;
 }
+
+const robotsEvidence = () => ({
+  origin: 'https://a.test',
+  identity_sent: 'Crawlmouse/2.0',
+  state: 'rules',
+  why: null,
+  status: 200,
+  final_url: 'https://a.test/robots.txt',
+  fetched_at: '2026-11-05T10:00:00Z',
+  from_cache: false,
+  crawl_delay_s: null,
+  body_excerpt: 'User-agent: *',
+  body: 'User-agent: *',
+  body_complete: true,
+});
 
 const CASES: RuleCase[] = [
   // ── Account ──────────────────────────────────────────────────────────────────────────────────
@@ -1122,6 +1138,19 @@ const CASES: RuleCase[] = [
     breaks: 'a worker request with its release missing',
     schema: AccessTestSchema,
     input: () => ({ ...blockedRow(), worker_release: null }),
+  },
+  // ── RobotsEvidence ──────────────────────────────────────────────────────────────────────────
+  {
+    rule: 'robots_body',
+    breaks: 'a body kept from a file not read whole',
+    schema: RobotsEvidenceSchema,
+    input: () => ({ ...robotsEvidence(), body: 'User-agent: *', body_complete: false }),
+  },
+  {
+    rule: 'robots_body',
+    breaks: 'a file read whole with no body kept',
+    schema: RobotsEvidenceSchema,
+    input: () => ({ ...robotsEvidence(), body: null, body_complete: true }),
   },
   // ── DeclarationFetch ────────────────────────────────────────────────────────────────────────
   {

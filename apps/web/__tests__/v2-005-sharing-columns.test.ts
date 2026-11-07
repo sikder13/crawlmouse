@@ -294,8 +294,10 @@ describe('embed_badges.account_id: a client may set only an account it is a memb
   let ids: Ids;
   let foreign: string;
   beforeAll(async () => {
+    // Through 006b: after 20261106000002 (P2) no client may write embed_badges at all, so the
+    // trigger is tested where one still could (scripts/db/hardening.test.ts asserts the refusal).
     db = await freshDb();
-    await applyAllMigrations(db);
+    await applyAllMigrations(db, undefined, (f) => f < '20261106000002');
     ids = await seedV1(db);
     foreign = (await personalAccount(db, ids.otherUserId)).accountId;
   }, 120_000);
