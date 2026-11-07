@@ -1,5 +1,6 @@
 /**
- * The three CC-11 contract fixtures, parsed once, and the lookups the view models share.
+ * The three CC-11 contract fixtures and the built one (CC-20a), parsed once, and the lookups the view
+ * models share.
  * Server-side only: the datasets are large and the screens receive view models, not datasets.
  */
 import {
@@ -13,6 +14,7 @@ import {
 import badSite from '../fixtures/v2/bad-site.json';
 import cleanSite from '../fixtures/v2/clean-site.json';
 import challengedSite from '../fixtures/v2/challenged-site.json';
+import builtSite from '../fixtures/v2/built-site.json';
 
 import { type FixtureName } from './fixture-names';
 
@@ -22,6 +24,7 @@ const RAW: Record<FixtureName, unknown> = {
   'bad-site': badSite,
   'clean-site': cleanSite,
   'challenged-site': challengedSite,
+  'built-site': builtSite,
 };
 
 const parsed = new Map<FixtureName, FixtureDataset>();

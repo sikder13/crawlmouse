@@ -94,9 +94,13 @@ function parseRecordAt(data: unknown, path: Path): boolean {
 // ─── 1. Parsing ────────────────────────────────────────────────────────────────────────────────
 
 describe('every fixture parses with its schema', () => {
-  it('the fixture folder holds exactly the three contract fixtures', () => {
+  it('the fixture folder holds the three contract fixtures and the built one', () => {
+    // built-site.json is the check builder's output (CC-20a), not a contract fixture: the engine's
+    // build.test.ts holds it to the builder, and the web suite renders it.
     const json = readdirSync(new URL(FIXTURE_DIR, ROOT)).filter((f) => f.endsWith('.json'));
-    expect(json.sort()).toEqual(FIXTURE_NAMES.map((n) => `${n}.json`).sort());
+    expect(json.sort()).toEqual(
+      [...FIXTURE_NAMES.map((n) => `${n}.json`), 'built-site.json'].sort(),
+    );
   });
 
   it.each(FIXTURE_NAMES)('%s.json parses with FixtureDatasetSchema', (name) => {

@@ -1,0 +1,98 @@
+name: DB dry run
+
+# Every pull request that changes the database, or the tooling that applies it, gets a dry run on a
+# Supabase preview branch made from production: scripts/db/dry-run.ts lists the steps. Its summary,
+# with the sha256 of every file it applied, is posted on the pull request and kept as an artifact;
+# db-apply-prod.yml refuses to apply a file that a passed dry run did not apply byte for byte.
+# docs/ops/db-migrations.md is the runbook.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'infra/supabase/**'
+      - 'scripts/db/**'
+      - '.github/workflows/db-*.yml'
+      - '.github/actions/supabase-cli/**'
+
+permissions:
+  contents: read
+
+# One run per pull request at a time, queued rather than cancelled: a cancelled run would leave
+# its branch behind.
+concurrency:
+  group: db-dry-run-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  dry-run:
+    # Renovate's pull requests would run updated third-party code with the access token before
+    # review (docs/ops/db-migrations.md §7).
+    if: github.event.pull_request.user.login != 'renovate[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # Holds SUPABASE_ACCESS_TOKEN. A pull request from a fork receives no secrets, so its run fails
+    # at the first step that needs the token.
+    environment: db-dry-run
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit and its first parent, the base it merged against.
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/supabase-cli
+      - name: Files the pull request changes
+        run: |
+          set -euo pipefail
+          git diff --name-only HEAD^1 HEAD -- infra/supabase > "$RUNNER_TEMP/changed.txt"
+          cat "$RUNNER_TEMP/changed.txt"
+      - name: Dry run on a branch of production
+        working-directory: scripts
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          BRANCH: pr-${{ github.event.pull_request.number }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          pnpm exec tsx db/dry-run.ts --branch "$BRANCH" --commit "$COMMIT" \
+            --summary-json "$RUNNER_TEMP/db-dry-run-summary.json" \
+            --summary-md "$RUNNER_TEMP/db-dry-run-summary.md" \
+            --changed "$RUNNER_TEMP/changed.txt"
+      - name: Keep the summary for the production apply
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: db-dry-run-summary
+          path: ${{ runner.temp }}/db-dry-run-summary.json
+          retention-days: 90
+          overwrite: true
+          if-no-files-found: error
+      # The artifact above is the evidence the gate reads; a failure to comment must not fail it.
+      - name: Post the summary on the pull request
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        # One comment per pull request, found by its marker line and edited in place.
+        run: |
+          set -euo pipefail
+          body="$RUNNER_TEMP/db-dry-run-summary.md"
+          [ -f "$body" ] || exit 0
+          printf '\n<!-- db-dry-run -->\n' >> "$body"
+          # Every marker comment's id, one per line (jq runs per page); the first is ours. sed reads
+          # all of its input, so gh never writes to a closed pipe.
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- db-dry-run -->"))) | .id' \
+            | sed -n 1p)
+          if [ -n "$id" ]; then
+            jq -n --rawfile body "$body" '{body: $body}' \
+              | gh api --method PATCH "repos/$REPO/issues/comments/$id" --input - > /dev/null
+          else
+            gh pr comment "$PR" --repo "$REPO" --body-file "$body"
+          fi
