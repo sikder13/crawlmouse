@@ -1,0 +1,97 @@
+{
+  "firewallEnabled": true,
+  "rules": [
+    {
+      "name": "Rate limit: sign-in links",
+      "description": "POST /api/auth/magic-link: 30 a minute per IP, then deny. The app allows 5 an hour per IP and answers with its own copy first.",
+      "active": true,
+      "conditionGroup": [
+        {
+          "conditions": [
+            { "type": "path", "op": "re", "value": "^/api/auth/magic-link/?$" },
+            { "type": "method", "op": "eq", "value": "POST" }
+          ]
+        }
+      ],
+      "action": {
+        "mitigate": {
+          "action": "rate_limit",
+          "rateLimit": {
+            "algo": "fixed_window",
+            "window": 60,
+            "limit": 30,
+            "keys": ["ip"],
+            "action": "deny"
+          },
+          "actionDuration": null
+        }
+      }
+    },
+    {
+      "name": "Rate limit: audit starts",
+      "description": "POST /api/audits/start: 60 per 10 minutes per IP, then deny. The app allows at most 40 a day per IP before Turnstile.",
+      "active": true,
+      "conditionGroup": [
+        {
+          "conditions": [
+            { "type": "path", "op": "re", "value": "^/api/audits/start/?$" },
+            { "type": "method", "op": "eq", "value": "POST" }
+          ]
+        }
+      ],
+      "action": {
+        "mitigate": {
+          "action": "rate_limit",
+          "rateLimit": {
+            "algo": "fixed_window",
+            "window": 600,
+            "limit": 60,
+            "keys": ["ip"],
+            "action": "deny"
+          },
+          "actionDuration": null
+        }
+      }
+    },
+    {
+      "name": "Rate limit: check claims",
+      "description": "POST /api/checks/<id>/claim: 30 a minute per IP, then deny. The app has no per-IP limit here.",
+      "active": true,
+      "conditionGroup": [
+        {
+          "conditions": [
+            { "type": "path", "op": "re", "value": "^/api/checks/[^/]+/claim/?$" },
+            { "type": "method", "op": "eq", "value": "POST" }
+          ]
+        }
+      ],
+      "action": {
+        "mitigate": {
+          "action": "rate_limit",
+          "rateLimit": {
+            "algo": "fixed_window",
+            "window": 60,
+            "limit": 30,
+            "keys": ["ip"],
+            "action": "deny"
+          },
+          "actionDuration": null
+        }
+      }
+    },
+    {
+      "name": "Challenge: sign-in pages",
+      "description": "GET /login and /signup get Vercel's browser challenge. /login/verify, where the email link lands, does not.",
+      "active": true,
+      "conditionGroup": [
+        {
+          "conditions": [
+            { "type": "path", "op": "re", "value": "^/(login|signup)/?$" },
+            { "type": "method", "op": "eq", "value": "GET" }
+          ]
+        }
+      ],
+      "action": { "mitigate": { "action": "challenge" } }
+    }
+  ]
+}
