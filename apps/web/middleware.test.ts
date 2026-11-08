@@ -51,6 +51,22 @@ describe('middleware (exported entrypoint)', () => {
     expect(res).toBeDefined();
     expect(res.cookies.get(CONSENT_REQUIRED_COOKIE)).toBeDefined();
   });
+
+  it('hands each refusal report to waitUntil, so it is sent after the response', async () => {
+    const waitUntil = vi.fn();
+    const res = await middleware(
+      new NextRequest(
+        new Request('https://crawlmouse.com/api/billing/portal', {
+          method: 'POST',
+          headers: { origin: 'https://evil.example' },
+        }),
+      ),
+      { waitUntil } as unknown as NextFetchEvent,
+    );
+    expect(res.status).toBe(403);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    expect(waitUntil.mock.calls[0]![0]).toBeInstanceOf(Promise);
+  });
 });
 
 // ─── Cross-site refusal on the API (D4) ─────────────────────────────────────────────────────────────
@@ -77,8 +93,21 @@ const lenient = ROUTE_POLICIES.filter((p) => p.origin === 'lenient');
 const passes = (res: NextResponse) => res.headers.get('x-middleware-next') === '1';
 
 describe('a state-changing API request from another site is refused before the route runs', () => {
-  it('guards the routes the registry marks (anti-vacuity)', () => {
-    expect(guarded.length).toBeGreaterThanOrEqual(12);
+  it('guards exactly the twelve strict routes, named here', () => {
+    expect(guarded.map((p) => p.route).sort()).toEqual([
+      'api/audits/[id]/cancel',
+      'api/audits/[id]/reaudit',
+      'api/auth/logout',
+      'api/billing/checkout',
+      'api/billing/portal',
+      'api/checks/[id]/claim',
+      'api/reports/[slug]/claim',
+      'api/reports/[slug]/logo',
+      'api/reports/[slug]/visibility',
+      'api/reports/[slug]/white-label',
+      'api/verify/check/[id]',
+      'api/verify/start',
+    ]);
   });
 
   it.each(
@@ -132,9 +161,39 @@ describe('a state-changing API request from another site is refused before the r
     '/api//billing/portal',
     '/api/billing/%70ortal',
     '/%61pi/billing/portal',
+    '/api/reports/a%2Fb/claim',
+    '/api/audits/6f1c2a8e%2Fx/cancel',
   ])('refuses a cross-site POST to another spelling of the route: %s', async (path) => {
     const { res } = await run(path, 'POST', { origin: 'https://evil.example' });
     expect(res.status).toBe(403);
+  });
+
+  it.each(['/api/no/such/route', '/api/audits/%ZZ/cancel', '/%61pi/nothing'])(
+    'a state change to %s, which reaches no registered route, gets 404 here',
+    async (path) => {
+      const { res, refusals } = await run(path, 'POST', {
+        origin: SITE,
+        'content-type': 'application/json',
+      });
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: 'Not found', code: 'not_found' });
+      expect(refusals).toEqual([
+        { reason: 'no_route', route: '(none)', class: 'none', method: 'POST', status: 404 },
+      ]);
+    },
+  );
+
+  it('a read of an unregistered API path passes through, for the router to answer', async () => {
+    const { res } = await run('/api/no/such/route', 'GET', {});
+    expect(passes(res)).toBe(true);
+  });
+
+  it('a method token outside HTTP is refused and reported as OTHER', async () => {
+    const { res, refusals } = await run('/api/billing/portal', 'X'.repeat(40), {
+      origin: 'https://evil.example',
+    });
+    expect(res.status).toBe(403);
+    expect(refusals.map((r) => r.method)).toEqual(['OTHER']);
   });
 
   it('a cross-site GET to a guarded route passes: reads are not state changes', async () => {
@@ -163,10 +222,11 @@ describe('a state-changing API request from another site is refused before the r
 describe('a public route that reads JSON refuses another site and a body not declared JSON', () => {
   const JSON_TYPE = { 'content-type': 'application/json' };
 
-  it('covers the six public JSON routes (anti-vacuity)', () => {
+  it('covers the public JSON routes (anti-vacuity)', () => {
     expect(lenient.map((p) => p.route).sort()).toEqual([
       'api/audits/[id]/notify',
       'api/audits/start',
+      'api/auth/magic-link',
       'api/developers',
       'api/reports/hide',
       'api/reports/mint',

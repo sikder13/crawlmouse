@@ -1,23 +1,32 @@
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
 import { CONSENT_REQUIRED_COOKIE, isConsentRequiredCountry } from '@/lib/consent';
-import { reportRefusal, type Refusal } from '@/lib/security/refusal-event';
-import { isStateChanging, normalizePath, policyForPath } from '@/lib/security/route-policy';
+import { reportRefusal, reportedMethod, type Refusal } from '@/lib/security/refusal-event';
+import { isApiPath, isStateChanging, policyForPath } from '@/lib/security/route-policy';
 import { isCrossSite, isJsonBody, isSameOrigin } from '@/lib/security/same-origin';
 import { updateSession } from '@/lib/supabase/middleware';
 
 /**
  * API requests: a state change to a route the registry guards (lib/security/route-policy.ts) is
  * refused here, before the route runs, when its origin fails the route's rule (403) or, for a route
- * that reads JSON, when the body is not declared JSON (415). Every other API request passes through
- * untouched: no session refresh, no cookie.
+ * that reads JSON, when the body is not declared JSON (415). A state change to a path that reaches no
+ * registered route, or does not decode, is refused too (404), so a spelling the lookup does not
+ * understand fails closed. Every other API request passes through untouched: no session refresh, no
+ * cookie.
  */
 export function guardApi(req: NextRequest, report: (r: Refusal) => void): NextResponse {
+  if (!isStateChanging(req.method)) return NextResponse.next();
   const policy = policyForPath(req.nextUrl.pathname);
-  if (!policy || !isStateChanging(req.method)) return NextResponse.next();
   const refuse = (reason: Refusal['reason'], status: Refusal['status'], body: object) => {
-    report({ reason, route: policy.route, class: policy.class, method: req.method, status });
+    report({
+      reason,
+      route: policy?.route ?? '(none)',
+      class: policy?.class ?? 'none',
+      method: reportedMethod(req.method),
+      status,
+    });
     return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
   };
+  if (!policy) return refuse('no_route', 404, { error: 'Not found', code: 'not_found' });
   const origin = req.nextUrl.origin;
   if (
     (policy.origin === 'strict' && !isSameOrigin(req, origin)) ||
@@ -46,7 +55,7 @@ export async function handleEdge(
   refresh: (req: NextRequest) => Promise<NextResponse> = updateSession,
   report: (r: Refusal) => void = (r) => void reportRefusal(r),
 ): Promise<NextResponse> {
-  if (normalizePath(req.nextUrl.pathname)?.startsWith('/api/')) return guardApi(req, report);
+  if (isApiPath(req.nextUrl.pathname)) return guardApi(req, report);
 
   const res = await refresh(req);
 

@@ -90,7 +90,8 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     methods: ['POST'],
     class: 'public',
     reason: 'the sign-in request itself; Turnstile and per-IP and per-email limits',
-    origin: 'any',
+    origin: 'lenient',
+    jsonBody: true,
   },
   { route: 'api/billing/checkout', methods: ['POST'], class: 'user', origin: 'strict' },
   { route: 'api/billing/portal', methods: ['POST'], class: 'user', origin: 'strict' },
@@ -212,33 +213,52 @@ export function isStateChanging(method: string): boolean {
   return !SAFE_METHODS.has(method.toUpperCase());
 }
 
-function patternFor(route: string): RegExp {
-  const segments = route
-    .split('/')
-    .filter((s) => !/^\(.*\)$/.test(s)) // a route group adds no URL segment
-    .map((s) => (/^\[[^\]]+\]$/.test(s) ? '[^/]+' : s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  return new RegExp(`^/${segments.join('/')}$`);
+/** A route's URL segments, as written on disk: a route group adds none. */
+const routeSegments = (route: string) => route.split('/').filter((s) => !/^\(.*\)$/.test(s));
+
+/** Whether a route's segments match a request's. Catch-alls are always the last route segment. */
+function matches(route: readonly string[], path: readonly string[]): boolean {
+  const [head, ...rest] = route;
+  if (head === undefined) return path.length === 0;
+  if (/^\[\[\.\.\.[^\]]+\]\]$/.test(head)) return true;
+  if (/^\[\.\.\.[^\]]+\]$/.test(head)) return path.length > 0;
+  if (path.length === 0) return false;
+  if (head !== path[0] && !/^\[[^\]]+\]$/.test(head)) return false;
+  return matches(rest, path.slice(1));
 }
 
-const COMPILED = ROUTE_POLICIES.map((policy) => ({ policy, pattern: patternFor(policy.route) }));
+const COMPILED = ROUTE_POLICIES.map((policy) => ({
+  policy,
+  segments: routeSegments(policy.route),
+}));
 
 /**
- * A request path percent-decoded, with repeated slashes collapsed and a trailing slash dropped, so
- * the spellings that can reach one route handler find the same row. Undefined when it does not decode.
+ * A request path's segments: split on `/` with empty segments dropped (a repeated or trailing slash),
+ * then each segment percent-decoded on its own, the way Next decodes a dynamic segment's value, so an
+ * encoded slash stays inside its segment. A static segment is decoded too, which can only make more
+ * spellings match a row. Undefined when a segment does not decode.
  */
-export function normalizePath(pathname: string): string | undefined {
-  let path: string;
-  try {
-    path = decodeURIComponent(pathname);
-  } catch {
-    return undefined;
+export function pathSegments(pathname: string): string[] | undefined {
+  const segments: string[] = [];
+  for (const raw of pathname.split('/')) {
+    if (raw === '') continue;
+    try {
+      segments.push(decodeURIComponent(raw));
+    } catch {
+      return undefined;
+    }
   }
-  path = path.replace(/\/{2,}/g, '/');
-  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
+  return segments;
 }
 
-/** The policy of the route a request path reaches, or undefined. */
+/** Whether a path is under /api, decoded or not: a path that does not decode counts if it starts so. */
+export function isApiPath(pathname: string): boolean {
+  const segments = pathSegments(pathname);
+  return segments === undefined ? pathname.startsWith('/api/') : segments[0] === 'api';
+}
+
+/** The policy of the route a request path reaches, or undefined (no such route, or it does not decode). */
 export function policyForPath(pathname: string): RoutePolicy | undefined {
-  const path = normalizePath(pathname);
-  return path === undefined ? undefined : COMPILED.find((c) => c.pattern.test(path))?.policy;
+  const path = pathSegments(pathname);
+  return path === undefined ? undefined : COMPILED.find((c) => matches(c.segments, path))?.policy;
 }

@@ -9,15 +9,26 @@ import { DEFAULT_SINKS, type Refusal } from '../../lib/security/refusal-event';
 
 const CAPABILITY = '6f1c2a8e-0000-4000-8000-0000000c0ffe';
 const sent: Sentry.ErrorEvent[] = [];
+/** Every envelope the transport is handed: headers and items, as they would go on the wire. */
+const envelopes: unknown[] = [];
 
 beforeAll(() => {
   Sentry.init({
     dsn: 'https://k@o0.ingest.sentry.invalid/0',
     defaultIntegrations: Sentry.getDefaultIntegrations({}),
+    tracesSampleRate: 1,
     beforeSend: (event) => {
       sent.push(event);
-      return null; // nothing leaves the test
+      return event;
     },
+    // Nothing leaves the test: the transport keeps what it is given.
+    transport: () => ({
+      send: async (envelope: unknown) => {
+        envelopes.push(envelope);
+        return {};
+      },
+      flush: async () => true,
+    }),
   });
 });
 afterAll(() => Sentry.close());
@@ -51,7 +62,10 @@ describe('security.refused in Sentry carries the refusal and nothing of the requ
         category: 'fetch',
         data: { url: `https://crawlmouse.com/api/audits/${CAPABILITY}` },
       });
-      DEFAULT_SINKS.sentry(REFUSAL);
+      // Inside a span named after the path, as an SDK's request span can be.
+      Sentry.startSpan({ name: `middleware POST /api/audits/${CAPABILITY}/cancel` }, () =>
+        DEFAULT_SINKS.sentry(REFUSAL),
+      );
     });
     await Sentry.flush(2000);
 
@@ -67,5 +81,11 @@ describe('security.refused in Sentry carries the refusal and nothing of the requ
     for (const leak of [CAPABILITY, 'Paris', '203.0.113.9', 'referer', 'x=1']) {
       expect(text, leak).not.toContain(leak);
     }
+    // The envelope as sent: its headers (the trace context) and every item, the span's included.
+    const refusalEnvelopes = envelopes.filter((e) =>
+      JSON.stringify(e).includes('security.refused'),
+    );
+    expect(refusalEnvelopes).toHaveLength(1);
+    expect(JSON.stringify(refusalEnvelopes[0])).not.toContain(CAPABILITY);
   });
 });

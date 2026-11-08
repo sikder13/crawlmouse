@@ -8,12 +8,21 @@ import type { RouteClass } from './route-policy';
  * IP, user id or header value. Edge-safe.
  */
 export interface Refusal {
-  reason: 'cross_site' | 'not_json';
-  /** The route's registry row (`audits/[id]/cancel`), not the path that was requested. */
+  reason: 'cross_site' | 'not_json' | 'no_route';
+  /** The route's registry row (`api/audits/[id]/cancel`), not the path that was requested. */
   route: string;
-  class: RouteClass;
-  method: string;
-  status: 403 | 415;
+  class: RouteClass | 'none';
+  method: ReportedMethod;
+  status: 403 | 404 | 415;
+}
+
+const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
+export type ReportedMethod = (typeof METHODS)[number] | 'OTHER';
+
+/** The request's method as telemetry records it: one of the HTTP methods, or OTHER for any token. */
+export function reportedMethod(method: string): ReportedMethod {
+  const m = method.toUpperCase();
+  return (METHODS as readonly string[]).includes(m) ? (m as ReportedMethod) : 'OTHER';
 }
 
 /** The share of refusals sent. Counts stay proportional, so a spike is still a spike. */
@@ -35,9 +44,9 @@ export interface RefusalSinks {
 export const DEFAULT_SINKS: RefusalSinks = {
   sentry: (r) => {
     Sentry.withScope((scope) => {
-      // In the middleware the SDK puts the request on the scope and names the transaction after the
-      // path. This event says which route refused what, so all of that is dropped before it is sent:
-      // the path can hold an audit id, the headers the visitor's referrer and location.
+      // In the middleware the SDK puts the request (its URL, which can hold an audit id, and headers
+      // with the visitor's referrer and location) on the scope, and a transaction name can carry the
+      // path. This event says which route refused what, so all of that is dropped before it is sent.
       scope.addEventProcessor((event) => {
         delete event.request;
         delete event.user;
@@ -46,16 +55,20 @@ export const DEFAULT_SINKS: RefusalSinks = {
         if (event.sdkProcessingMetadata) delete event.sdkProcessingMetadata.normalizedRequest;
         return event;
       });
-      Sentry.captureMessage('security.refused', {
-        level: 'warning',
-        tags: {
-          reason: r.reason,
-          route: r.route,
-          class: r.class,
-          method: r.method,
-          status: String(r.status),
-        },
-      });
+      // A trace of its own, so no span around the call becomes the event's parent or names the
+      // envelope's trace header.
+      Sentry.startNewTrace(() =>
+        Sentry.captureMessage('security.refused', {
+          level: 'warning',
+          tags: {
+            reason: r.reason,
+            route: r.route,
+            class: r.class,
+            method: r.method,
+            status: String(r.status),
+          },
+        }),
+      );
     });
   },
   posthog: async (r) => {

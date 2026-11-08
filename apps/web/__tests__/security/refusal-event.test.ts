@@ -10,6 +10,7 @@ import {
 
 const sentry = vi.hoisted(() => ({
   captureMessage: vi.fn(),
+  startNewTrace: (fn: () => unknown) => fn(),
   withScope: (fn: (scope: { addEventProcessor: () => void }) => void) =>
     fn({ addEventProcessor: () => {} }),
 }));
