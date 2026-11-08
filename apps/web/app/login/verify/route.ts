@@ -169,9 +169,13 @@ export async function POST(request: Request) {
     }
 
     const res = respond(dest, events);
-    res.cookies.set(COOKIES.next, '', { path: '/', maxAge: 0 });
-    res.cookies.set(COOKIES.signup, '', { path: '/', maxAge: 0 });
-    res.cookies.set(COOKIES.binding, '', { path: '/', maxAge: 0 });
+    // Someone else's link leaves this browser's own door request in place until it expires, so the
+    // owner's link still finds it and a second foreign link is still recognised as one.
+    if (!foreign) {
+      res.cookies.set(COOKIES.next, '', { path: '/', maxAge: 0 });
+      res.cookies.set(COOKIES.signup, '', { path: '/', maxAge: 0 });
+      res.cookies.set(COOKIES.binding, '', { path: '/', maxAge: 0 });
+    }
     return res;
   } catch {
     Sentry.captureMessage('auth.verify-threw', {

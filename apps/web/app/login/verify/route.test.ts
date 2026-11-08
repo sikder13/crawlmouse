@@ -237,6 +237,27 @@ describe('POST /login/verify verifies', () => {
     expect(clearAnonSession).not.toHaveBeenCalled();
   });
 
+  it("keeps this browser's own door request (binding, named site, return target) after someone else's link", async () => {
+    const jar = {
+      cm_auth_otp: otp(),
+      cm_auth_for: emailBinding('someone-else@example.com'),
+      cm_auth_signup: JSON.stringify({ site: 'mine.example' }),
+      post_login_next: '/r/abc',
+    };
+    const kept = setCookies(await POST(post(jar)));
+    for (const name of ['cm_auth_for', 'cm_auth_signup', 'post_login_next'])
+      expect(
+        kept.find((c) => c.startsWith(`${name}=`)),
+        name,
+      ).toBeUndefined();
+    const own = setCookies(await POST(post({ ...jar, cm_auth_for: emailBinding(USER.email) })));
+    for (const name of ['cm_auth_for', 'cm_auth_signup', 'post_login_next'])
+      expect(
+        own.find((c) => c.startsWith(`${name}=`)),
+        name,
+      ).toMatch(/Max-Age=0/);
+  });
+
   it('claims as before when the binding is the verified address, or there is none', async () => {
     anon.id = 'anon-1';
     await POST(post({ cm_auth_otp: otp(), cm_auth_for: emailBinding(USER.email) }));
@@ -314,7 +335,7 @@ describe('POST /login/verify verifies', () => {
           cookie: cookieHeader({
             cm_auth_otp: otp(),
             cm_auth_signup: JSON.stringify({ site: 'acme.com', tz: 'Europe/Kyiv' }),
-            cm_auth_for: 'binding-hash',
+            cm_auth_for: emailBinding(USER.email),
             cm_auth_device: 'dev-1',
           }),
         },
@@ -325,7 +346,7 @@ describe('POST /login/verify verifies', () => {
       expect.objectContaining({
         user: USER,
         signup: { site: 'acme.com', tz: 'Europe/Kyiv' },
-        boundTo: 'binding-hash',
+        boundTo: emailBinding(USER.email),
         device: 'dev-1',
         ip: '203.0.113.9',
       }),
