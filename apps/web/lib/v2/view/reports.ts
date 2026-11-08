@@ -125,7 +125,8 @@ export function reportsView(
     sites.find((s) => s.id === query.site) ?? (primarySites(v).length ? primarySite(v) : sites[0]);
   const results = chosen ? resultChecks(v, chosen.id) : [];
   const latest = results.at(-1);
-  const pair = results.slice(-2);
+  // The two latest results, the pair a compare starts from.
+  const pair = results.length > 1 ? [results.at(-2)!, results.at(-1)!] : [];
   const twoDates = ([a, b]: Check[]) => {
     const [x, y] = [a!.finished_at!, b!.finished_at!];
     const month = (ts: string) => dayMonth(ts, zone).replace(/^\d+ /, '');

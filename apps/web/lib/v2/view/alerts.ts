@@ -138,9 +138,8 @@ export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
     });
     if (c.subject === 'deploy' && !deltas.length) return COPY.noGradeChange;
     // The summary may begin with the site's host, which the Site column already shows.
-    const summary = c.summary.startsWith(`${host}: `)
-      ? c.summary.slice(host.length + 2)
-      : c.summary;
+    const prefix = `${host}: `;
+    const summary = c.summary.startsWith(prefix) ? c.summary.replace(prefix, '') : c.summary;
     return [summary, ...deltas].join(' · ');
   };
 
