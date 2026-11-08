@@ -211,13 +211,9 @@ begin
     raise exception 'start_trial_with_ledger: p_transition is not a no-card trial start for this account'
       using errcode = '22023';
   end if;
+  -- A number that is not an integer ('1.5') or does not fit one fails its cast, which this block
+  -- turns into 22023.
   begin
-    if (p_transition ->> 'p_expected_version') ~ '[.eE]'
-       or (p_transition ->> 'p_seat_limit') ~ '[.eE]'
-       or (p_transition ->> 'p_site_limit') ~ '[.eE]'
-       or (p_transition ->> 'p_competitor_limit') ~ '[.eE]' then
-      raise exception 'not an integer' using errcode = '22023';
-    end if;
     v_version := (p_transition ->> 'p_expected_version')::integer;
     v_seat_limit := (p_transition ->> 'p_seat_limit')::integer;
     v_site_limit := (p_transition ->> 'p_site_limit')::integer;

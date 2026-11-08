@@ -67,6 +67,11 @@ async function freshAccount(d: PGlite, tag: string) {
 }
 
 type Outcome = { outcome: string; hits: string[] };
+/** JSON text sent as it is, for a value JavaScript cannot hold (a 64-digit number). */
+class Raw {
+  constructor(readonly json: string) {}
+}
+const asJson = (v: unknown) => (v instanceof Raw ? v.json : JSON.stringify(v));
 async function start(
   d: PGlite,
   accountId: string,
@@ -76,7 +81,7 @@ async function start(
   const { rows } = await asRole(d, 'service_role', null, (tx) =>
     tx.query<{ r: Outcome }>(
       `select public.start_trial_with_ledger($1, $2::jsonb, $3::jsonb) as r`,
-      [accountId, JSON.stringify(hashes), JSON.stringify(transition)],
+      [accountId, asJson(hashes), asJson(transition)],
     ),
   );
   return rows[0]!.r;
@@ -342,10 +347,21 @@ describe('the ledger rule over generated ledgers', () => {
       .date({ min: new Date('2024-01-01T00:00:00Z'), max: new Date('2027-12-31T00:00:00Z') })
       .filter((d) => !Number.isNaN(d.getTime()));
     const kindArb = fc.constantFrom<LedgerRow['kind']>('email', 'device', 'ip24', 'hostname');
-    const hashArb = fc.constantFrom(EMAIL, DEVICE, IP, other).map((x) => x.value_hash);
+    const sentHash: Record<LedgerRow['kind'], string> = {
+      email: EMAIL.value_hash,
+      device: DEVICE.value_hash,
+      ip24: IP.value_hash,
+      hostname: EMAIL.value_hash,
+    };
+    const anyHash = fc.constantFrom(EMAIL, DEVICE, IP, other).map((x) => x.value_hash);
+    // Mostly the hash sent for the row's kind, so rows that the rule counts, at the window edges,
+    // come up often; sometimes any hash, so rows it must not count do too.
     const rowArb = fc.record({
       kind: kindArb,
-      value_hash: hashArb,
+      value_hash: fc.oneof(
+        { weight: 4, arbitrary: fc.constant<string | null>(null) },
+        { weight: 1, arbitrary: anyHash },
+      ),
       age: ageArb,
       edge: fc.constantFrom(...edgeOffsets),
     });
@@ -357,7 +373,8 @@ describe('the ledger rule over generated ledgers', () => {
         fc.constantFrom('UTC', 'America/New_York', 'Pacific/Auckland'),
         async (now, gen, extra, zone) => {
           const hashes = [EMAIL, ...extra];
-          const rows: LedgerRow[] = gen.map((g) => {
+          const rows: LedgerRow[] = gen.map((g0) => {
+            const g = { ...g0, value_hash: g0.value_hash ?? sentHash[g0.kind] };
             if (g.age === 'year-edge') {
               const y = now.getUTCFullYear() - 1;
               const last = new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).getUTCDate();
@@ -420,7 +437,9 @@ describe('start_trial_with_ledger starts the trial and writes its rows in one ca
     expect(await ledgerOf(db, id)).toEqual([]);
   });
 
-  it("the windows are read at the database's own clock", async () => {
+  it("the windows are read at the database's own clock, not the app's p_at", async () => {
+    // p_at is five days ahead of the database: a rule that read it would leave both rows outside.
+    const ahead = new Date(Date.now() + 5 * DAY);
     const id1 = await freshAccount(db, 'clock-in');
     const d1 = h('device', 'clock-in');
     await priorRows(db, [
@@ -428,7 +447,8 @@ describe('start_trial_with_ledger starts the trial and writes its rows in one ca
       { hash: d1, age: '30 days -1 minute' },
     ]);
     expect(
-      (await start(db, id1, [h('email', 'clock-in'), d1], await transitionFor(db, id1))).outcome,
+      (await start(db, id1, [h('email', 'clock-in'), d1], await transitionFor(db, id1, ahead)))
+        .outcome,
     ).toBe('refused');
     const id2 = await freshAccount(db, 'clock-out');
     const d2 = h('device', 'clock-out');
@@ -437,7 +457,8 @@ describe('start_trial_with_ledger starts the trial and writes its rows in one ca
       { hash: d2, age: '30 days 1 minute' },
     ]);
     expect(
-      (await start(db, id2, [h('email', 'clock-out'), d2], await transitionFor(db, id2))).outcome,
+      (await start(db, id2, [h('email', 'clock-out'), d2], await transitionFor(db, id2, ahead)))
+        .outcome,
     ).toBe('started');
   });
 
@@ -566,61 +587,93 @@ describe('input validation: each malformed input raises 22023 and writes nothing
     ]);
   });
 
-  const hashCases: [string, unknown][] = [
-    ['an unknown kind', [E, { kind: 'hostname', value_hash: D.value_hash }]],
-    ['an uppercase hash', [{ kind: 'email', value_hash: E.value_hash.toUpperCase() }]],
-    ['a 63-character hash', [{ kind: 'email', value_hash: E.value_hash.slice(1) }]],
-    ['a hash that is not a string', [{ kind: 'email', value_hash: 7 }]],
-    ['two rows of one kind', [E, D, { ...D, value_hash: hex('another') }]],
-    ['four rows', [E, D, I, E]],
-    ['no rows', []],
-    ['no email row', [D, I]],
+  // Each case names the check that must refuse it, by its message, so a case cannot pass on a
+  // neighbouring check.
+  const SIZE = /an array of 1 to 3 rows/;
+  const ROW = /a p_hashes row is not \{kind, value_hash\}/;
+  const hashCases: [string, unknown, RegExp][] = [
+    ['an unknown kind', [E, { kind: 'hostname', value_hash: D.value_hash }], ROW],
+    ['an uppercase hash', [{ kind: 'email', value_hash: E.value_hash.toUpperCase() }], ROW],
+    ['a 63-character hash', [{ kind: 'email', value_hash: E.value_hash.slice(1) }], ROW],
+    ['a hash that is a small number', [{ kind: 'email', value_hash: 7 }], ROW],
+    // 64 decimal digits as a JSON number: the hash pattern alone would accept its text.
+    [
+      'a hash that is a 64-digit number',
+      new Raw(`[{"kind": "email", "value_hash": ${'1'.repeat(64)}}]`),
+      ROW,
+    ],
+    ['a kind that is not a string', [{ kind: ['email'], value_hash: E.value_hash }], ROW],
+    ['two rows of one kind', [E, D, { ...D, value_hash: hex('another') }], /holds a kind twice/],
+    ['four rows', [E, D, I, E], SIZE],
+    ['no rows', [], SIZE],
+    ['no email row', [D, I], /has no email row/],
     [
       'an element with an extra key',
       [{ ...E, account_id: '00000000-0000-4000-8000-000000000001' }],
+      ROW,
     ],
-    ['an element missing value_hash', [{ kind: 'email' }]],
-    ['an element that is not an object', ['email']],
-    ['not an array', { kind: 'email', value_hash: E.value_hash }],
-    ['null', null],
+    ['an element missing value_hash', [{ kind: 'email' }], ROW],
+    ['an element whose second key is misspelt', [{ kind: 'email', valuehash: E.value_hash }], ROW],
+    ['an element that is not an object', ['email'], ROW],
+    ['not an array', { kind: 'email', value_hash: E.value_hash }, SIZE],
+    ['null', null, SIZE],
   ];
-  it.each(hashCases)('p_hashes: %s', async (_name, hashes) => {
+  it.each(hashCases)('p_hashes: %s', async (_name, hashes, message) => {
     const before = await accountRow(db, id);
-    await expect(start(db, id, hashes, t)).rejects.toMatchObject({ code: '22023' });
+    await expect(start(db, id, hashes, t)).rejects.toMatchObject({
+      code: '22023',
+      message: expect.stringMatching(message),
+    });
     expect(await accountRow(db, id)).toEqual(before);
     expect(await ledgerOf(db, id)).toEqual([]);
   });
 
-  const transitionCases: [string, (t: Record<string, unknown>) => unknown][] = [
-    ['another event', (t) => ({ ...t, event: 'checkout_completed' })],
-    ['no event', ({ event: _e, ...rest }) => rest],
-    ['another account', (t) => ({ ...t, p_account_id: '00000000-0000-4000-8000-000000000000' })],
-    ['another state', (t) => ({ ...t, p_state: 'pro' })],
-    ['another tier', (t) => ({ ...t, p_tier: 'agency' })],
-    ['the card variant', (t) => ({ ...t, p_trial_variant: 'card_required' })],
-    ['a subscription id', (t) => ({ ...t, p_subscription_id: 'sub_123' })],
-    ['a past-due tier', (t) => ({ ...t, p_past_due_tier: 'pro' })],
-    ['a past-due date', (t) => ({ ...t, p_past_due_since: '2026-01-01T00:00:00.000Z' })],
-    ['a dispute date', (t) => ({ ...t, p_disputed_at: '2026-01-01T00:00:00.000Z' })],
-    ['no trial end', (t) => ({ ...t, p_trial_ends_at: null })],
-    ['no trial-used date', (t) => ({ ...t, p_trial_used_at: null })],
-    ['a trial end that is not a date', (t) => ({ ...t, p_trial_ends_at: 'soon' })],
-    ['a trial end of infinity', (t) => ({ ...t, p_trial_ends_at: 'infinity' })],
-    ['a trial end written as epoch', (t) => ({ ...t, p_trial_ends_at: 'epoch' })],
-    ['a trial end before p_at', (t) => ({ ...t, p_trial_ends_at: '2000-01-01T00:00:00.000Z' })],
-    ['p_at written as now', (t) => ({ ...t, p_at: 'now' })],
-    ['a p_changed_at of infinity', (t) => ({ ...t, p_changed_at: 'infinity' })],
-    ['a version that is not an integer', (t) => ({ ...t, p_expected_version: 1.5 })],
-    ['a version given as a string', (t) => ({ ...t, p_expected_version: '0' })],
-    ['a limit too large for an integer', (t) => ({ ...t, p_site_limit: 1e12 })],
-    ['a missing key', ({ p_seat_limit: _s, ...rest }) => rest],
-    ['an extra key', (t) => ({ ...t, p_extra: 1 })],
-    ['not an object', () => ['trial_started']],
-    ['null', () => null],
+  const SHAPE = /p_transition is not a no-card trial start for this account/;
+  const CAST = /a p_transition value does not read as its type/;
+  const transitionCases: [string, (t: Record<string, unknown>) => unknown, RegExp][] = [
+    ['another event', (t) => ({ ...t, event: 'checkout_completed' }), SHAPE],
+    ['no event', ({ event: _e, ...rest }) => rest, SHAPE],
+    [
+      'another account',
+      (t) => ({ ...t, p_account_id: '00000000-0000-4000-8000-000000000000' }),
+      SHAPE,
+    ],
+    ['another state', (t) => ({ ...t, p_state: 'pro' }), SHAPE],
+    ['another tier', (t) => ({ ...t, p_tier: 'agency' }), SHAPE],
+    ['the card variant', (t) => ({ ...t, p_trial_variant: 'card_required' }), SHAPE],
+    ['a subscription id', (t) => ({ ...t, p_subscription_id: 'sub_123' }), SHAPE],
+    ['a past-due tier', (t) => ({ ...t, p_past_due_tier: 'pro' }), SHAPE],
+    ['a past-due date', (t) => ({ ...t, p_past_due_since: '2026-01-01T00:00:00.000Z' }), SHAPE],
+    ['a dispute date', (t) => ({ ...t, p_disputed_at: '2026-01-01T00:00:00.000Z' }), SHAPE],
+    ['no trial end', (t) => ({ ...t, p_trial_ends_at: null }), SHAPE],
+    ['no trial-used date', (t) => ({ ...t, p_trial_used_at: null }), SHAPE],
+    ['no p_at', (t) => ({ ...t, p_at: null }), SHAPE],
+    ['a p_changed_at that is a number', (t) => ({ ...t, p_changed_at: 0 }), SHAPE],
+    ['a trial end that is not a date', (t) => ({ ...t, p_trial_ends_at: 'soon' }), SHAPE],
+    ['a trial end of infinity', (t) => ({ ...t, p_trial_ends_at: 'infinity' }), SHAPE],
+    ['a trial end written as epoch', (t) => ({ ...t, p_trial_ends_at: 'epoch' }), SHAPE],
+    ['p_at written as now', (t) => ({ ...t, p_at: 'now' }), SHAPE],
+    ['a p_changed_at of infinity', (t) => ({ ...t, p_changed_at: 'infinity' }), SHAPE],
+    [
+      'a trial end before p_at',
+      (t) => ({ ...t, p_trial_ends_at: '2000-01-01T00:00:00.000Z' }),
+      /ends before it starts/,
+    ],
+    ['a version given as a string', (t) => ({ ...t, p_expected_version: '0' }), SHAPE],
+    ['a limit given as a string', (t) => ({ ...t, p_site_limit: '5' }), SHAPE],
+    ['a version that is not an integer', (t) => ({ ...t, p_expected_version: 1.5 }), CAST],
+    ['a limit too large for an integer', (t) => ({ ...t, p_site_limit: 1e12 }), CAST],
+    ['a missing key', ({ p_seat_limit: _s, ...rest }) => rest, SHAPE],
+    ['an extra key', (t) => ({ ...t, p_extra: 1 }), SHAPE],
+    ['not an object', () => ['trial_started'], SHAPE],
+    ['null', () => null, SHAPE],
   ];
-  it.each(transitionCases)('p_transition: %s', async (_name, edit) => {
+  it.each(transitionCases)('p_transition: %s', async (_name, edit, message) => {
     const before = await accountRow(db, id);
-    await expect(start(db, id, [E], edit(t))).rejects.toMatchObject({ code: '22023' });
+    await expect(start(db, id, [E], edit(t))).rejects.toMatchObject({
+      code: '22023',
+      message: expect.stringMatching(message),
+    });
     expect(await accountRow(db, id)).toEqual(before);
     expect(await ledgerOf(db, id)).toEqual([]);
   });
@@ -661,7 +714,9 @@ describe('the locks are held for the whole call, in one order', () => {
         `select xmax::text = txid_current()::text as locked from public.accounts where id = $1`,
         [id],
       );
-      expect(row.rows[0]!.locked, 'the account row is locked FOR UPDATE').toBe(true);
+      // Any row lock sets xmax; that it is FOR UPDATE, which a KEY SHARE cannot pass, is
+      // scripts/db/trial-race.test.ts's to show.
+      expect(row.rows[0]!.locked, 'the account row is locked').toBe(true);
       await tx.rollback();
     });
   });
@@ -940,7 +995,9 @@ describe('migration 006c applies, re-applies and reverts', () => {
       await applyAllMigrations(d, undefined, through(MIGRATION));
       await seedWorld(d, 'revert-006c');
       await d.exec(`update public.site_fixes set type = 'no_question_headings'`);
+      const applied = await catalogSnapshot(d);
       await expect(d.exec(readRollback(ROLLBACK))).rejects.toMatchObject({ code: '23514' });
+      expect(await catalogSnapshot(d), 'the failed revert changed nothing').toEqual(applied);
     } finally {
       await d.close();
     }
