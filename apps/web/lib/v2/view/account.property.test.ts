@@ -74,8 +74,93 @@ function rawHealth(d: FixtureDataset, accountId: string, adopt: readonly string[
   };
 }
 
+/**
+ * The health move and the sites on a first baseline, worked from the raw records (owner ruling
+ * 2026-11-08): the earlier moment is the primary site's previous result (or, while it has one, the
+ * latest previous result of any site), no earlier than the account's start; a site graded now is
+ * new when it had no result then, or a `baseline` change came after then. The move is the rounded
+ * mean of both grades over the other sites graded at both moments.
+ */
+function rawMove(
+  d: FixtureDataset,
+  accountId: string,
+  adopt: readonly string[],
+  now: number,
+  start: number,
+) {
+  const mine = d.sites.filter(
+    (s) => (s.account_id === accountId || adopt.includes(s.id)) && instant(s.created_at) <= now,
+  );
+  const results = (id: string, until: number) =>
+    d.checks
+      .filter((c) => c.site_id === id && c.finished_at && instant(c.finished_at) <= until)
+      .filter((c) => c.status === 'finished' || c.status === 'partial')
+      .sort((a, b) => instant(a.finished_at!) - instant(b.finished_at!));
+  const pair = (id: string, until: number): [number, number] | null => {
+    const c = results(id, until).at(-1);
+    const seo = c?.technical_seo?.score ?? null;
+    const ai = c?.ai_readability;
+    return seo === null || !ai || ai.withheld || ai.total === null ? null : [seo, ai.total];
+  };
+  const primary = mine
+    .filter((s) => s.staging_of_site_id === null)
+    .sort((x, y) => instant(x.created_at) - instant(y.created_at) || x.id.localeCompare(y.id))[0];
+  if (!primary) return null;
+  const prev =
+    results(primary.id, now).at(-2) ??
+    mine
+      .map((s) => results(s.id, now).at(-2))
+      .filter((c) => c !== undefined)
+      .sort((a, b) => instant(b.finished_at!) - instant(a.finished_at!))[0];
+  if (!prev) return null;
+  const at = Math.max(instant(prev.finished_at!), start);
+  const graded = mine.filter((s) => pair(s.id, now) !== null).map((s) => s.id);
+  const fresh = graded.filter(
+    (id) =>
+      results(id, at).length === 0 ||
+      d.changes.some(
+        (c) =>
+          c.site_id === id &&
+          c.kind === 'baseline' &&
+          instant(c.detected_at) > at &&
+          instant(c.detected_at) <= now,
+      ),
+  );
+  const both = graded.filter(
+    (id) =>
+      !fresh.includes(id) &&
+      instant(d.sites.find((s) => s.id === id)!.created_at) <= at &&
+      pair(id, at) !== null,
+  );
+  const mean = (until: number) => {
+    const all = both.flatMap((id) => pair(id, until)!);
+    return all.length ? Math.round(all.reduce((a, b) => a + b, 0) / all.length) : null;
+  };
+  const a = mean(at);
+  const b = mean(now);
+  return {
+    move: a === null || b === null ? null : b - a,
+    fresh: fresh.length,
+    rebased: fresh.filter((id) => results(id, at).length > 0).length,
+  };
+}
+
+/** "−2 since Thu" → −2; "no change since Fri 23 Oct" → 0. */
+const moveIn = (delta: string) => {
+  const m = delta.match(/^(no change|[+−]\d+)/)![1]!;
+  return m === 'no change' ? 0 : Number(m.replace('−', '-'));
+};
+
 describe.each(CASES)('viewAt and the dashboard, $name, at any moment', (c) => {
-  const seen = { emptyWindow: 0, rows: 0, atCheckFinish: 0, inFlight: 0, withheld: 0 };
+  const seen = {
+    emptyWindow: 0,
+    rows: 0,
+    atCheckFinish: 0,
+    inFlight: 0,
+    withheld: 0,
+    fresh: 0,
+    rebased: 0,
+  };
   const finishes = new Set(
     c.d.checks.flatMap((ch) => (ch.finished_at ? [instant(ch.finished_at)] : [])),
   );
@@ -116,6 +201,23 @@ describe.each(CASES)('viewAt and the dashboard, $name, at any moment', (c) => {
           } else {
             expect(dash.strip.health.excluded ?? '').not.toMatch(/withheld/);
           }
+          const raw = rawMove(
+            c.d,
+            c.viewer.accountId,
+            c.viewer.adopt ?? [],
+            t,
+            instant(firstRunNow(c.d, c.viewer)),
+          );
+          if (raw?.move !== null && raw !== null && truth.value !== null) {
+            expect(moveIn(dash.strip.health.delta!), `move at ${now}`).toBe(raw.move);
+            expect(dash.strip.health.fresh, `new at ${now}`).toBe(
+              raw.fresh ? `${raw.fresh} new` : null,
+            );
+            if (raw.fresh) seen.fresh++;
+            if (raw.rebased) seen.rebased++;
+          } else {
+            expect(dash.strip.health.delta, `no move at ${now}`).toBeNull();
+          }
         }
         if (dash.changed.length) seen.rows++;
         else seen.emptyWindow++;
@@ -130,6 +232,9 @@ describe.each(CASES)('viewAt and the dashboard, $name, at any moment', (c) => {
     if (c.name === 'bad-site') {
       expect(seen.rows).toBeGreaterThan(0);
       expect(seen.inFlight).toBeGreaterThan(0);
+      // redbirdaviation.com's new baseline, and sites added after the earlier check.
+      expect(seen.fresh).toBeGreaterThan(0);
+      expect(seen.rebased).toBeGreaterThan(0);
     }
     if (c.name === 'challenged-site') expect(seen.withheld).toBeGreaterThan(0);
   });

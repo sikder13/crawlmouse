@@ -44,10 +44,13 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     );
   });
 
-  it('means both grades over the five sites: 743 / 10 = 74.3, and 758 / 10 = 75.8 at Thursday’s check', () => {
-    // now: 79+22 · 84+93 · 74+78 · 73+66 · 86+88; Thursday: 80+41 · 79+93 · 74+78 · 73+66 · 86+88.
+  it('means both grades over the five sites, 743 / 10 = 74, and moves over the four with a previous result', () => {
+    // now: 79+22 · 84+93 · 74+78 · 73+66 · 86+88 = 743 / 10 = 74.3.
+    // The move leaves out redbirdaviation.com (74+78 at both), on a new baseline since Thursday:
+    // Thursday 80+41 · 79+93 · 73+66 · 86+88 = 606 / 8 = 75.75 → 76; now 591 / 8 = 73.875 → 74.
     expect(v.strip!.health.value).toBe('74');
     expect(v.strip!.health.delta).toBe('−2 since Thu');
+    expect(v.strip!.health.fresh).toBe('1 new');
     expect(v.strip!.health.excluded).toBeNull();
   });
 
@@ -223,12 +226,14 @@ describe('Dashboard, withheld: challenged-site as Northwind Digital (past_due, A
 describe('Dashboard home when the sites graded then and now differ (bad-site, Mon 26 Oct 19:02Z)', () => {
   const v = dashboardView(bad, { accountId: BAD_ACCOUNT, now: '2026-10-26T19:02:00Z' });
 
-  it('means the four grades now, and moves only over the one site graded at both moments', () => {
+  it('means the four grades now, and moves over the one site with a previous result, nahltech.com new', () => {
     // now: example-outfitter.com 79 + 41 (check 2), nahltech.com 79 + 93 (its first audit): 292 / 4 = 73.
     // then, its previous check (Sat 24 Oct; read from the account's start, 02:41Z): only
-    // example-outfitter.com, 79 + 41 = 60, and 60 now: no change, over one site.
+    // example-outfitter.com, 79 + 41 = 60, and 60 now: no change. nahltech.com had no result then:
+    // it is on its first baseline, out of the move, and said beside it.
     expect(v.strip!.health.value).toBe('73');
-    expect(v.strip!.health.delta).toBe('no change since Sat, over the 1 site graded at both');
+    expect(v.strip!.health.delta).toBe('no change since Sat');
+    expect(v.strip!.health.fresh).toBe('1 new');
     expect(v.header.title).toBe("Since Saturday's check");
   });
 });
@@ -317,5 +322,28 @@ describe('The first-run note follows the site’s schedule', () => {
     expect(dashboardView(fixture('clean-site'), CLEAN_VIEWER).sites.foot).toBe(
       'Changes appear here once the site is checked again. Nothing to compare yet.',
     );
+  });
+});
+
+describe('A site on its first baseline is left out of the health move (owner ruling 2026-11-08)', () => {
+  // A copy of bad-site in which redbirdaviation.com's re-graded check (the new baseline, Fri 30 Oct)
+  // scores 100 and 100. Worked by hand, earlier moment Thu 29 Oct 12:42Z:
+  //   the four other sites: Thursday 80+41 · 79+93 · 73+66 · 86+88 = 606 / 8 = 75.75 → 76;
+  //                         now      79+22 · 84+93 · 73+66 · 86+88 = 591 / 8 = 73.875 → 74: −2.
+  //   counting redbird too: Thursday 606 + 74+78 = 758 / 10 = 75.8 → 76;
+  //                         now      591 + 100+100 = 791 / 10 = 79.1 → 79: +3, the other sign.
+  const copy = structuredClone(bad);
+  const rebased = copy.checks.find((c) => c.id === 'c0000000-0000-4000-8000-000000000016')!;
+  rebased.technical_seo!.score = 100;
+  rebased.ai_readability!.total = 100;
+  const h = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).strip!.health;
+
+  it('keeps the move at −2 where counting the new site would make it +3', () => {
+    expect(h.delta).toBe('−2 since Thu');
+    expect(h.fresh).toBe('1 new');
+  });
+
+  it('still means every graded site in the value: 791 / 10 = 79', () => {
+    expect(h.value).toBe('79');
   });
 });
