@@ -93,8 +93,12 @@
   font-size: var(--v2-text-small);
 }
 
-/* A row header is the row's first cell, at the row's size: outranks Table's `.table tbody th`. */
+/* On the account screens a row header reads as the row's first cell, not as a column header: the
+   row's colour, weight and size, outranking Table's `.table th`. Kept here, not on Table, because
+   the audit screens' row headers (CC-23's content grid) keep the column-header face. */
 .main table tbody th {
+  color: inherit;
+  font-weight: 400;
   font-size: var(--v2-text-small);
 }
 

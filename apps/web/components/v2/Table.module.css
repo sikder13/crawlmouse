@@ -30,13 +30,6 @@
   font-size: var(--v2-text-micro);
 }
 
-/* A row header reads as the row's first cell, not as a column header. */
-.table tbody th {
-  color: inherit;
-  font-weight: 400;
-  font-size: var(--v2-text-ui);
-}
-
 /* A header row read but not drawn: in the table's layout, with no height of its own. Scoped under
    .table so it outranks a page's own cell padding (the account shell's `.main table th`). */
 .table .hiddenHead th {
