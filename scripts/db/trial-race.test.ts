@@ -91,8 +91,9 @@ async function race(sql: Sql, a: Call, b: Call) {
   const tb = await sql.reserve();
   try {
     const call = (t: postgres.ReservedSql, c: Call) =>
-      t`select public.start_trial_with_ledger(${c.accountId}::uuid, ${JSON.stringify(c.hashes)}::jsonb,
-                                              ${JSON.stringify(c.transition)}::jsonb) as r`;
+      // sql.json sends the value as jsonb; a JSON.stringify'd string would be sent as a jsonb string.
+      t`select public.start_trial_with_ledger(${c.accountId}::uuid, ${t.json(c.hashes as never)},
+                                              ${t.json(c.transition as never)}) as r`;
     const [{ pid }] = (await tb`select pg_backend_pid() as pid`) as unknown as [{ pid: number }];
     await ta`begin`;
     await ta`set local role service_role`;
@@ -112,8 +113,11 @@ async function race(sql: Sql, a: Call, b: Call) {
     await tb`commit`;
     return { a: (ra!.r as { outcome: string }).outcome, b: rb.outcome, waited };
   } finally {
-    ta.release();
-    tb.release();
+    // A failed race leaves a transaction open; end it before the connection goes back to the pool.
+    for (const t of [ta, tb]) {
+      await t`rollback`.catch(() => {});
+      t.release();
+    }
   }
 }
 
