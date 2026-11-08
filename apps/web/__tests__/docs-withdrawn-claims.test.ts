@@ -250,6 +250,26 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       'evidence/2026-08-08-gate9-reports.md',
     ],
   },
+  {
+    // SPEC 25 said the scrubber removed the claim target everywhere; it removed only keys of that
+    // name, and the request-data integration copied the raw Cookie header onto every event (CC-25).
+    text: 'and `post_login_next` from every Sentry event',
+    withdrawnIn: 'apps/web/lib/auth/sentry-scrub.ts and SPEC 25 (CC-25 review round 2)',
+    truth:
+      'Sentry events carry no cookie: the request-data integration runs with cookies off, and the ' +
+      'scrubber drops cookie, cookies, set-cookie and post_login_next keys and post_login_next= values.',
+    allowedIn: [],
+  },
+  {
+    // SPEC 25 implied a call more than half a slot window later is never refused; two calls up to a
+    // full window apart can still share a cell (CC-25).
+    text: 'a later one finds the first’s ledger rows once they are written',
+    withdrawnIn: 'apps/web/lib/auth/stores.ts (gridSerialize) and SPEC 25 (CC-25 review round 2)',
+    truth:
+      'Within half a window the second call is always refused; up to a full window apart it may be; ' +
+      'beyond that it is not, and the ledger lookup decides.',
+    allowedIn: [],
+  },
 ];
 
 /**

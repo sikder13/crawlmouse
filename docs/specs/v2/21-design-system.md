@@ -414,3 +414,11 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Link map, clean bill                | `/v2-preview/screens/map/clean`                          | screen    |                                      |
 | Link map, withheld                  | `/v2-preview/screens/map/challenged`                     | screen    |                                      |
 | Link map, 2,000 pages               | `/v2-preview/screens/map/large`                          | screen    |                                      |
+| Final-Signup                        | `/v2-preview/screens/signup`                             | screen    |                                      |
+| Sign-up, sending                    | `/v2-preview/screens/signup/submitting`                  | screen    |                                      |
+| Sign-up, rate limited               | `/v2-preview/screens/signup/rate-limited`                | screen    |                                      |
+| Final-CheckEmail                    | `/v2-preview/screens/check-email/from-audit`             | screen    |                                      |
+| Final-CheckEmail-NoAudit            | `/v2-preview/screens/check-email/named-site`             | screen    |                                      |
+| Check-email, sign-in                | `/v2-preview/screens/check-email/signin`                 | screen    |                                      |
+| Continue                            | `/v2-preview/screens/continue`                           | screen    |                                      |
+| Continue, link expired              | `/v2-preview/screens/continue/expired`                   | screen    |                                      |

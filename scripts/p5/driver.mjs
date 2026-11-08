@@ -9,8 +9,12 @@ const { createClient } = require('@supabase/supabase-js');
 
 const env = Object.fromEntries(
   readFileSync(ROOT + '/apps/web/.env.local', 'utf8')
-    .split('\n').filter((l) => l.includes('=') && !l.trim().startsWith('#'))
-    .map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }),
+    .split('\n')
+    .filter((l) => l.includes('=') && !l.trim().startsWith('#'))
+    .map((l) => {
+      const i = l.indexOf('=');
+      return [l.slice(0, i).trim(), l.slice(i + 1).trim()];
+    }),
 );
 const BASE = 'http://localhost:3000';
 const admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -18,9 +22,18 @@ const admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_RO
 });
 const out = (o) => console.log(JSON.stringify(o));
 const jarPath = (key) => `/tmp/p5jar_${key.replace(/[^a-z0-9]/gi, '_')}.json`;
-function loadJar(key) { const p = jarPath(key); return existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : {}; }
-function saveJar(key, jar) { writeFileSync(jarPath(key), JSON.stringify(jar)); }
-function cookieHeader(jar) { return Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; '); }
+function loadJar(key) {
+  const p = jarPath(key);
+  return existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : {};
+}
+function saveJar(key, jar) {
+  writeFileSync(jarPath(key), JSON.stringify(jar));
+}
+function cookieHeader(jar) {
+  return Object.entries(jar)
+    .map(([k, v]) => `${k}=${v}`)
+    .join('; ');
+}
 function mergeSetCookies(jar, setCookies) {
   for (const sc of setCookies) {
     const first = sc.split(';')[0];
@@ -38,16 +51,35 @@ const [cmd, ...args] = process.argv.slice(2);
 
 async function login(email) {
   const { data, error } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
-  if (error) { out({ error: 'genlink: ' + error.message }); process.exit(1); }
+  if (error) {
+    out({ error: 'genlink: ' + error.message });
+    process.exit(1);
+  }
   const tokenHash = data.properties.hashed_token;
   const jar = {};
-  const res = await fetch(`${BASE}/login/verify?token_hash=${tokenHash}&type=magiclink`, { redirect: 'manual' });
+  // GET /login/verify only carries the token to the Continue page (CC-25); the POST signs in.
+  const landing = await fetch(`${BASE}/login/verify?token_hash=${tokenHash}&type=magiclink`, {
+    redirect: 'manual',
+  });
+  mergeSetCookies(jar, landing.headers.getSetCookie());
+  const res = await fetch(`${BASE}/login/verify`, {
+    method: 'POST',
+    redirect: 'manual',
+    headers: { origin: BASE, cookie: cookieHeader(jar) },
+  });
   mergeSetCookies(jar, res.headers.getSetCookie());
   saveJar(email, jar);
   // verify
   const st = await fetch(`${BASE}/api/billing/status`, { headers: { cookie: cookieHeader(jar) } });
   const body = await st.json().catch(() => ({}));
-  out({ email, verify_status: res.status, location: res.headers.get('location'), cookies: Object.keys(jar), billing_status: st.status, pro: body.pro });
+  out({
+    email,
+    verify_status: res.status,
+    location: res.headers.get('location'),
+    cookies: Object.keys(jar),
+    billing_status: st.status,
+    pro: body.pro,
+  });
 }
 
 async function status(email) {
@@ -59,9 +91,14 @@ async function status(email) {
 async function start(who, url, xff) {
   const headers = { 'content-type': 'application/json' };
   if (who !== 'anon') headers.cookie = cookieHeader(loadJar(who));
-  if (xff) { headers['x-forwarded-for'] = xff; headers['x-real-ip'] = xff; }
+  if (xff) {
+    headers['x-forwarded-for'] = xff;
+    headers['x-real-ip'] = xff;
+  }
   const res = await fetch(`${BASE}/api/audits/start`, {
-    method: 'POST', headers, body: JSON.stringify({ url }),
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ url }),
   });
   out({ http: res.status, body: await res.json().catch(() => null) });
 }
@@ -73,7 +110,8 @@ async function streamCmd(who, id) {
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = '';
-  let done = null; let lastEvent = null;
+  let done = null;
+  let lastEvent = null;
   const events = [];
   const deadline = Date.now() + 60000;
   outer: while (Date.now() < deadline) {
@@ -82,7 +120,8 @@ async function streamCmd(who, id) {
     buf += dec.decode(value, { stream: true });
     let idx;
     while ((idx = buf.indexOf('\n\n')) >= 0) {
-      const chunk = buf.slice(0, idx); buf = buf.slice(idx + 2);
+      const chunk = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
       const ev = (chunk.match(/^event: (.*)$/m) || [])[1];
       const dl = (chunk.match(/^data: (.*)$/m) || [])[1];
       if (!ev) continue;
@@ -90,7 +129,9 @@ async function streamCmd(who, id) {
       events.push(ev);
       if (ev === 'done' || ev === 'error') {
         done = dl ? JSON.parse(dl) : null;
-        try { await reader.cancel(); } catch {}
+        try {
+          await reader.cancel();
+        } catch {}
         break outer;
       }
     }
@@ -113,7 +154,8 @@ async function exportCmd(who, id) {
 async function checkout(email, priceId) {
   const jar = loadJar(email);
   const res = await fetch(`${BASE}/api/billing/checkout`, {
-    method: 'POST', headers: { 'content-type': 'application/json', cookie: cookieHeader(jar) },
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie: cookieHeader(jar) },
     body: JSON.stringify({ priceId }),
   });
   out({ http: res.status, body: await res.json().catch(() => null) });
@@ -126,7 +168,10 @@ try {
   else if (cmd === 'stream') await streamCmd(args[0], args[1]);
   else if (cmd === 'export') await exportCmd(args[0], args[1]);
   else if (cmd === 'checkout') await checkout(args[0], args[1]);
-  else { out({ error: 'unknown cmd ' + cmd }); process.exit(1); }
+  else {
+    out({ error: 'unknown cmd ' + cmd });
+    process.exit(1);
+  }
 } catch (e) {
   out({ error: String((e && e.message) || e), stack: e && e.stack });
   process.exit(1);

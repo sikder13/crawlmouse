@@ -210,9 +210,15 @@ function recordingSection(): string {
 }
 
 /** The segment pages' entries are SPEC 23's. */
-/** Screens with specs of their own: the segment pages (SPEC 23), the fix page and the explorer (SPEC 24). */
+/** Screens with specs of their own: the segment pages (SPEC 23), the fix page and the explorer (SPEC 24), the account door (SPEC 25). */
 const isSegment = (screen: string) =>
-  screen.startsWith('segment-') || screen === 'fix' || screen === 'link-map';
+  screen.startsWith('segment-') ||
+  screen === 'fix' ||
+  screen === 'link-map' ||
+  isAccountDoor(screen);
+/** The account door's screens are SPEC 25's. */
+const isAccountDoor = (screen: string) =>
+  screen === 'signup' || screen === 'check-email' || screen === 'check-email-no-audit';
 
 function copySection(): string {
   return [
