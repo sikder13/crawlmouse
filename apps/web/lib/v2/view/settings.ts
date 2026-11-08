@@ -56,7 +56,7 @@ export const CC27B_ROUTES = {
     route: '/api/account/email',
     owner: 'CC-27b',
     guard:
-      'Signed-in owner; sends a confirmation link to the new address (GET renders, POST confirms); writes `account_events`.',
+      'Signed-in owner; sends a confirmation link to the new address (GET renders, POST confirms) and a notice to the old one, so a change made from a stolen session is seen; writes `account_events`.',
   },
   deleteConfirm: {
     verb: 'GET',
@@ -122,6 +122,11 @@ export type Cc27bKey = keyof typeof CC27B_ROUTES;
  * the route table; nothing in the previews enforces them.
  */
 export const CC27B_REQUIREMENTS = [
+  {
+    what: 'Cross-site requests',
+    rule: 'Every CC-27b route that changes state (POST, PUT, PATCH, DELETE, the `_method` forms included) checks the request’s `Origin` against the site’s own, as `app/api/checks/[id]/claim` does, besides the SameSite cookie; a mismatch is refused with 403.',
+    source: 'CC-27 review round 2 (correctness and security)',
+  },
   {
     what: 'Slack webhook URLs',
     rule: 'Stored in `alert_rules.destination` through Supabase Vault (`vault.create_secret`) and decrypted only inside `alertFn`; if Vault is not enabled, AES-GCM with `SLACK_SECRET_KEY` in app code. Never granted to a client role (the column grant leaves it out); the screens show its last four characters.',
@@ -300,6 +305,8 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
   const graceEnds = new Date(
     Date.parse(pastDueSince) + PAST_DUE_GRACE_DAYS * 86_400_000,
   ).toISOString();
+  const keepShown = (trial && !cardTrial) || v.tier === 'free';
+  const monthly = v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY;
   const cancel = routeAction('cancelPlan', COPY.cancelAction);
   const portal = routeAction('billingPortal', COPY.portalAction);
 
@@ -350,10 +357,12 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
       left: days === null ? null : COPY.daysLeft(days),
       note: trial
         ? `${COPY.ends(date(a.trial_ends_at!))} ${
-            card === null ? COPY.noCardTerms : COPY.cardTerms(card)
+            card === null ? COPY.noCardTerms(plan) : COPY.cardTerms(card)
           }`
         : pastDue
-          ? COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
+          ? v.tier === 'free'
+            ? COPY.pastDueEnded(date(pastDueSince), date(graceEnds))
+            : COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
           : paid
             ? null
             : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
@@ -383,10 +392,20 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
                   fields: { plan: 'pro', interval: 'month' },
                 },
               ),
-      other:
-        v.tier === 'agency'
-          ? COPY.otherYearly(yearly)
-          : COPY.other(yearly, AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats),
+      // "Or …" follows a Keep; where the card has none, the plan's own prices lead.
+      other: [
+        keepShown
+          ? v.tier === 'agency'
+            ? COPY.otherYearly(yearly)
+            : COPY.other(yearly, AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats).replace(
+                /^(Or \$\d+ a year\.) /,
+                '$1 ',
+              )
+          : COPY.prices(plan, monthly, yearly),
+        ...(!keepShown && v.tier !== 'agency'
+          ? [COPY.agencyLine(AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats)]
+          : []),
+      ].join(' '),
       compare: action('pricing', COPY.compare),
       termsLabel: COPY.tables.terms,
       terms: [
@@ -409,7 +428,11 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
             : paid
               ? {
                   label: COPY.cancel,
-                  text: COPY.cancelPaid(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
+                  text: COPY.cancelPaid(
+                    CANCEL_CLICKS,
+                    EVIDENCE_CONDENSED_AFTER_DAYS,
+                    a.billing_period_months === 12 ? 'year' : 'month',
+                  ),
                   action: cancel,
                 }
               : { label: COPY.cancel, text: COPY.cancelFree, action: null },
@@ -428,6 +451,7 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
 export interface DeleteStepView {
   shell: ShellView;
   header: { title: string; line: string };
+  cardTitle: string;
   /** What deleting removes, and how long the sign-in email can undo it (FACTS E6). */
   text: string;
   /** How it goes from here: the link to the sign-in address, sign-in stopping, the restore. */
@@ -447,12 +471,14 @@ export interface DeleteStepView {
 export function deleteStepView(d: FixtureDataset, viewer: Viewer): DeleteStepView {
   const v = viewAt(d, viewer);
   const a = v.account;
-  const expected = primarySites(v).length ? primarySite(v).host : a.email;
+  const site = primarySites(v).length ? primarySite(v) : null;
+  const expected = site ? site.host : a.email;
   return {
-    shell: accountShellView(v, 'Settings', { plan: 'page' }),
+    shell: accountShellView(v, 'Settings'),
     header: { title: COPY.deleteLabel, line: a.email },
+    cardTitle: COPY.deleteCardTitle,
     text: COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS),
-    steps: COPY.deleteSteps(a.email, DELETE_GRACE_DAYS),
+    steps: COPY.deleteSteps(site ? COPY.hostnameNoun : COPY.emailNoun, a.email, DELETE_GRACE_DAYS),
     field: {
       id: 'delete-hostname',
       label: COPY.retype(expected),

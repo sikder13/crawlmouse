@@ -69,6 +69,21 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'that guard does not run on them in the suite',
+    withdrawnIn:
+      'docs/specs/v2/27-account-screens.md (Known gaps), CC-27 review round 2 (accessibility and deploy safety)',
+    truth:
+      'account-control-names.test.tsx reads ACCOUNT_ELEMENTS and CC27_ELEMENTS and requires their ' +
+      'paths to equal the account previews the registry lists, so the guard runs on every CC-27 preview.',
+    allowedIn: [],
+  },
+  {
+    text: 'CC-27 does not edit that file',
+    withdrawnIn: 'apps/web/__tests__/v2/_lib/screens.tsx, CC-27 review round 2',
+    truth: 'CC-27 extended account-control-names.test.tsx with the owner’s approval.',
+    allowedIn: [],
+  },
+  {
     text: 'so it drops the crawler changes whose summaries describe the old ones',
     withdrawnIn:
       'docs/specs/v2/26-dashboard-site.md (Known gaps), CC-26 review round 2 (correctness and tests)',

@@ -30,7 +30,7 @@ describe('Trial ending against Final-TrialEnd', () => {
     expect(rail).not.toContain('email you');
   });
 
-  it('marks no rail entry as this page: it is none of them', () => {
-    expect(html).not.toContain('aria-current');
+  it('sits under Sites in the rail, as Final-TrialEnd marks it', () => {
+    expect(html).toMatch(/aria-current="location"[^>]*>Sites[ <]/);
   });
 });

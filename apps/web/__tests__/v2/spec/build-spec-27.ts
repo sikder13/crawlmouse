@@ -423,10 +423,10 @@ function wiringSection(): string {
 
 /** What this step leaves open, each in a sentence. */
 export const KNOWN_GAPS_27 = [
+  'The phone-stacked settings tables restyle rows to grid and cells to block. Chromium keeps their table semantics (accessibility review, round 2); WebKit has dropped them on such changes before, and no WebKit browser was run here.',
   'The keep action posts to `/api/billing/checkout` (`ACCOUNT_ACTIONS.keepPlan`, built). Today that route takes a JSON `priceId`, does no check of the account’s state and charges when the checkout completes, so the guard text describes the route still to be built. Owner ruling 13: this is CC-03’s (billing). Trial ending says the charge comes when the plan is chosen, which is what the built route does.',
   'On a loaded machine the engine’s timing tests (`reproducibility-deep-chain`, `crawl-stall-retries`) failed on base and head alike; run alone they pass on both. Owner ruling 14: load, not this step.',
   '“Trial ending, withheld” is not built (owner ruling 2): no fixture account has a trial that overlaps a withheld result. A trial with a card is read by `trial-end.test.ts` on Kestrel; it has no preview.',
-  '`account-control-names.test.tsx` (CC-26) pins `ACCOUNT_ELEMENTS` at seven previews, so CC-27’s previews sit in `CC27_ELEMENTS` and that guard does not run on them in the suite; it was run on them once, from a copy, and passed. Request to CC-26: read the count from the registry and include `CC27_ELEMENTS`.',
   'CC-27b’s action builder (`routeAction` in `settings.ts`) repeats `action()`’s path filling, because `action()` takes only `ACCOUNT_ACTIONS` keys. Folding the two needs an `actionFor(spec, …)` export from CC-26’s `account-actions.ts`.',
   'Alerts’ first row is not drawn on the artboard’s `--s2` background: the Table primitive has no row emphasis. Its Open is a bordered button, as the artboard draws it, and the others quiet.',
   'Alerts names a change by FACTS’ labels (“crawler blocked”, “grade moved”, “deploy audited”, ruling 4); the Changes log keeps CC-23’s kind labels (“opened”, “changed”). The same change reads differently on the two screens.',

@@ -62,6 +62,9 @@ export function ReportsScreen({ data }: { data: ReportsView }) {
               <div className={styles.optionTitle}>{make.compare.title}</div>
               <div className={styles.optionText}>{make.compare.text}</div>
             </div>
+            {make.compare.action ? (
+              <ActionControl action={make.compare.action} variant="quiet" />
+            ) : null}
           </div>
           <div className={styles.option}>
             <div>

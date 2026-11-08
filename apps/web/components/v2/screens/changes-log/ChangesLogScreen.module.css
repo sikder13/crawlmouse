@@ -27,10 +27,12 @@
   color: var(--v2-fg2);
 }
 
+/* The choice in force: heavier, in the text colour, and underlined, so it is told apart by more than
+   colour. */
 .link[aria-current='true'] {
   color: var(--v2-fg);
   font-weight: 600;
-  text-decoration: none;
+  text-decoration: underline;
 }
 
 .link:focus-visible {

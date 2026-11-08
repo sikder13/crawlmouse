@@ -92,7 +92,8 @@ describe('docs/specs/v2/27-account-screens.md', () => {
     const { COPY_CHANGES } = await import('../../lib/v2/copy-registry');
     const spec = await buildSpec27();
     for (const r of Object.values(CC27B_ROUTES)) expect(spec).toContain(`\`${r.route}\``);
-    for (const r of CC27B_REQUIREMENTS) expect(spec).toMatch(new RegExp(`^\\| ${r.what} +\\|`, 'm'));
+    for (const r of CC27B_REQUIREMENTS)
+      expect(spec).toMatch(new RegExp(`^\\| ${r.what} +\\|`, 'm'));
     const ours = COPY_CHANGES.filter((c) =>
       ['alerts', 'reports', 'settings', 'trial-end'].includes(c.screen),
     );

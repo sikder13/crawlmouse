@@ -87,8 +87,8 @@ export const ACCOUNT_ELEMENTS: Record<string, () => React.ReactElement> = {
 };
 
 /**
- * CC-27's account screens, apart from CC-26's: account-control-names.test.tsx pins the length of
- * ACCOUNT_ELEMENTS, and CC-27 does not edit that file. The verdict-copy guard reads both maps.
+ * CC-27's account screens, listed apart from CC-26's so each step's previews are named by the step.
+ * The verdict-copy guard and account-control-names.test.tsx read both maps.
  */
 export const CC27_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/changes-log': () => <ChangesLogScreen data={changesLogPreview()} />,

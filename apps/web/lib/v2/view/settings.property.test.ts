@@ -39,7 +39,9 @@ describe('Settings, generated', () => {
             ? 'Removes the account and its reports.'
             : live.length === 1
               ? 'Removes the site,'
-              : `Removes all ${numberWord(live.length)} sites,`,
+              : live.length === 2
+                ? 'Removes both sites,'
+                : `Removes all ${numberWord(live.length)} sites,`,
         );
         expect(v.email.rows.map((r) => r.kind)).toEqual([...EMAIL_KINDS]);
         reached.add(live.length === 0 ? 'no site' : live.length === 1 ? 'one site' : 'sites');

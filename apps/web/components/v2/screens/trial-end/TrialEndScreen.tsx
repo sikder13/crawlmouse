@@ -44,13 +44,14 @@ function List({
 
 /**
  * Final-TrialEnd, read at the reminder three days before the trial ends: what changes and what does
- * not, what the trial did, and the two choices. The one orange element keeps the plan; the rail's
- * trial card leaves the plan to this page (`plan: 'page'`).
+ * not, what the trial did, and the two choices. On a trial with no card the orange element keeps the
+ * plan; a trial with a card becomes the plan by itself and has none. The rail's trial card leaves the
+ * plan to this page (`plan: 'page'`).
  */
 export function TrialEndScreen({ data }: { data: TrialEndView }) {
   const { header, banner, did, columns, tables } = data;
   return (
-    <AccountFrame shell={data.shell}>
+    <AccountFrame shell={data.shell} currentIs="location">
       <header className={shared.header}>
         <div>
           <h1 className={shared.title}>{header.title}</h1>

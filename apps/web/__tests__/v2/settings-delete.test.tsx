@@ -21,7 +21,7 @@ describe('the delete step, as data', () => {
       expected: 'example-outfitter.com',
     });
     expect(v.steps).toBe(
-      'Type the hostname below and we send a confirmation link to you@company.com. Opening it deletes the account: sign-in stops at once, and for seven days a sign-in link from that address restores it.',
+      'Type the hostname below and we send a confirmation link to you@company.com. The link opens a page where you confirm the deletion; sign-in then stops at once, and for seven days a sign-in link from that address restores the account.',
     );
     expect(v.text).toMatch(/^Removes all five sites, their history and reports\. /);
   });
@@ -60,5 +60,24 @@ describe('the delete step, rendered', () => {
     const d = fixture('clean-site');
     const v = deleteStepView(d, { ...CLEAN_VIEWER, adopt: [] });
     expect(v.field.expected).toBe('owner@trailhead.example');
+  });
+});
+
+describe('the delete step, which site it asks for', () => {
+  it('asks for the primary site, not the first one listed', () => {
+    // The staging copy listed first: the primary site is still the oldest site that copies none.
+    const d = fixture('bad-site');
+    const staging = d.sites.find((s) => s.staging_of_site_id !== null)!;
+    const reordered = { ...d, sites: [staging, ...d.sites.filter((s) => s.id !== staging.id)] };
+    expect(deleteStepView(reordered, ACCOUNT_VIEWERS.home()).field.expected).toBe(
+      'example-outfitter.com',
+    );
+  });
+
+  it('with no site, names the sign-in address in its steps as well as its field', () => {
+    const v = deleteStepView(fixture('clean-site'), { ...CLEAN_VIEWER, adopt: [] });
+    expect(v.steps).toMatch(
+      /^Type the sign-in address below and we send a confirmation link to owner@trailhead\.example\. /,
+    );
   });
 });

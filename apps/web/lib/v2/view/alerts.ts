@@ -60,6 +60,8 @@ export interface MessageView {
 export interface ChannelRowView {
   label: string;
   value: string;
+  /** The value is data (an address, a workspace), set in the data face; prose is not. */
+  data: boolean;
   state: { state: 'ok' | 'neutral'; label: string } | null;
   action: ActionView | null;
 }
@@ -147,8 +149,10 @@ export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
 
   const pillOf = (c: Change): FiredRowView['pill'] => {
     const label = ALERT_PILLS[c.kind]?.[c.subject] ?? c.kind;
-    // A block is drawn ■ whatever its severity (DESIGN-LOCK rule 7: the square is "blocked").
-    if (c.kind === 'opened') return { label, state: 'bad' };
+    // A block is drawn ■ whatever its severity (DESIGN-LOCK rule 7: the square is "blocked"); any
+    // other change opened keeps the shape its severity gives it.
+    if (c.kind === 'opened' && c.subject === 'crawler_access') return { label, state: 'bad' };
+    if (c.kind === 'opened') return { label, state: c.severity === 'warn' ? 'warn' : 'bad' };
     if (c.subject === 'grade') {
       const fell = c.grade_deltas.some((g) => g.to_score < g.from_score);
       return { label, state: fell ? 'bad' : 'ok' };
@@ -265,6 +269,7 @@ export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
     {
       label: COPY.email,
       value: v.account.email,
+      data: true,
       state: v.account.email_prefs.change_notes
         ? { state: 'ok', label: COPY.on }
         : { state: 'neutral', label: COPY.off },
@@ -277,6 +282,7 @@ export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
         : slack?.connected
           ? (slack.label ?? COPY.slack)
           : COPY.slackNotConnected,
+      data: Boolean(v.gates.slack && slack?.connected && slack.label),
       state:
         v.gates.slack && slack?.connected
           ? { state: 'ok', label: COPY.on }
@@ -286,6 +292,7 @@ export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
     {
       label: COPY.slackPerSite,
       value: COPY.slackPerSiteValue,
+      data: false,
       state: null,
       action: primary ? action('sitePage', COPY.openSite, { id: primary.id }) : null,
     },

@@ -5,7 +5,10 @@
  * deploy check c…29, sent to Slack only on Tue 27 Oct 18:13:20Z.
  */
 import { describe, expect, it } from 'vitest';
-import { CLEAN_VIEWER } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
+import {
+  ACCOUNT_VIEWERS,
+  CLEAN_VIEWER,
+} from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
 import { fixture } from '../fixtures';
 import { alertsView } from './alerts';
 
@@ -155,7 +158,7 @@ describe('Alerts, on the stand-in Free account (clean-site)', () => {
     expect(v.header.actions).toEqual([]);
     expect(v.fired.rows).toEqual([]);
     expect(v.fired.empty).toBe(
-      'Nothing has been sent yet. A check that finds a change sends one email.',
+      'Nothing has been sent yet. A check that finds a change your rules cover sends one email per site.',
     );
     expect(v.rules.rows).toEqual([]);
     expect(v.rules.empty).toBe('No alert rules yet.');
@@ -195,5 +198,13 @@ describe('Alerts, a site notified at two checks', () => {
       ['example-outfitter.com', '001', 1],
     ]);
     expect(v.header.line).toMatch(/^3 emails since /);
+  });
+});
+
+describe('Alerts, an opened change that is not a block', () => {
+  it('keeps the shape its severity gives it: Northwind’s text drop is ▲, not ■', () => {
+    const v = alertsView(fixture('challenged-site'), ACCOUNT_VIEWERS.withheld());
+    const row = v.fired.rows.find((r) => r.pill.label === 'opened')!;
+    expect(row.pill).toEqual({ label: 'opened', state: 'warn' });
   });
 });

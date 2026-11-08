@@ -26,7 +26,7 @@ export function DeleteScreen({ data }: { data: DeleteStepView }) {
         </div>
       </header>
       <Card as="section" className={shared.panel}>
-        <CardHead title={header.title} sub={data.text} />
+        <CardHead title={data.cardTitle} sub={data.text} />
         <StoppedForm action={data.submit.href} className={styles.form}>
           {Object.entries(data.submit.fields).map(([name, value]) => (
             <input key={name} type="hidden" name={name} value={value} />

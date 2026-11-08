@@ -163,7 +163,7 @@ describe('Reports, on Northwind’s Agency account (challenged-site)', () => {
         'granitepeak.example',
         'Client report',
         'ops@granitepeak.example',
-        'held',
+        'held back',
       ],
     ]);
     expect(v.scheduled.sub).toBe('2 reports to send');

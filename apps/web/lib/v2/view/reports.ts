@@ -46,7 +46,8 @@ export interface ScheduledRowView {
   site: string;
   type: string;
   to: string;
-  status: Report['status'];
+  /** In words: "scheduled", or "held back" for a report waiting on a check that could not run. */
+  status: string;
 }
 
 export interface ReportsView {
@@ -60,7 +61,8 @@ export interface ReportsView {
     selected: string;
     pick: { href: string; label: string; show: string };
     pdf: { title: string; text: string; action: ActionView | null };
-    compare: { title: string; text: string };
+    /** The latest two results' compare: no route chooses another pair (owner ruling 6). */
+    compare: { title: string; text: string; action: ActionView | null };
     raw: { title: string; text: string; actions: ActionView[] };
   };
   made: { title: string; sub: string; rows: MadeRowView[]; foot: string; empty: string | null };
@@ -236,6 +238,10 @@ export function reportsView(
       compare: {
         title: COPY.compareTitle,
         text: pair.length === 2 ? `${twoDates(pair)} ${COPY.compareBody}` : COPY.compareNeedsTwo,
+        action:
+          canMake && pair.length === 2
+            ? make('compare', COPY.makeCompare, { previousCheckId: pair[0]!.id })
+            : null,
       },
       raw: {
         title: COPY.rawTitle,
@@ -268,7 +274,7 @@ export function reportsView(
         site: host.get(r.site_id) ?? '',
         type: typeOf(r),
         to: r.recipient_email ?? '',
-        status: r.status,
+        status: COPY.statusWords[r.status as 'scheduled' | 'held'],
       })),
       foot: branding?.sender_email ? COPY.sentFrom(branding.sender_email) : COPY.scheduledFoot,
       compare: v.gates.agencyBranding ? null : pricing,

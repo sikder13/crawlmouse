@@ -52,21 +52,27 @@ export const SETTINGS_COPY = {
         ? 'Removes the account and its reports'
         : sites === 1
           ? 'Removes the site, its history and reports'
-          : `Removes all ${numberWord(sites)} sites, their history and reports`
+          : sites === 2
+            ? 'Removes both sites, their history and reports'
+            : `Removes all ${numberWord(sites)} sites, their history and reports`
     }. Takes effect after a confirmation link. For ${numberWord(grace)} days the sign-in email can undo it; after that nothing is kept.`,
   deleteAction: 'Delete…',
   /** The confirmation step (owner ruling 12). */
-  deleteSteps: (email: string, grace: number) =>
-    `Type the hostname below and we send a confirmation link to ${email}. Opening it deletes the account: sign-in stops at once, and for ${numberWord(grace)} days a sign-in link from that address restores it.`,
+  deleteSteps: (what: string, email: string, grace: number) =>
+    `Type the ${what} below and we send a confirmation link to ${email}. The link opens a page where you confirm the deletion; sign-in then stops at once, and for ${numberWord(grace)} days a sign-in link from that address restores the account.`,
+  hostnameNoun: 'hostname',
+  emailNoun: 'sign-in address',
   retype: (expected: string) => `Type ${expected} to confirm`,
-  retypeHint: 'Nothing is deleted until you open the link we send.',
+  retypeHint: 'Nothing is deleted until you confirm on the page the link opens.',
   sendDeleteLink: 'Send the confirmation link',
+  deleteCardTitle: 'What deleting removes',
   keepAccount: 'Keep the account',
   planTitle: 'Plan',
   trialName: (plan: string) => `${plan}, trial`,
   daysLeft: (n: number) => `${count(n)} ${plural(n, 'day', 'days')} left`,
   ends: (date: string) => `Ends ${date}.`,
-  noCardTerms: 'No card on file; nothing is charged unless you add one and choose Pro.',
+  noCardTerms: (plan: string) =>
+    `No card on file; nothing is charged unless you add one and choose ${plan}.`,
   cardTerms: (last4: string) => `The card ending ${last4} is charged then unless you cancel.`,
   freeNote: (schedule: string, fixes: number) =>
     `One site, ${schedule} checks, the ${numberWord(fixes)} largest fixes of each audit.`,
@@ -78,7 +84,14 @@ export const SETTINGS_COPY = {
   other: (yearly: number, agency: number, sites: number, seats: number) =>
     `Or $${yearly} a year. Agency, $${agency} a month: ${count(sites)} sites, ${count(seats)} seats, reports under your brand.`,
   otherYearly: (yearly: number) => `Or $${yearly} a year.`,
+  agencyLine: (agency: number, sites: number, seats: number) =>
+    `Agency, $${agency} a month: ${count(sites)} sites, ${count(seats)} seats, reports under your brand.`,
+  /** The plan's prices where the card has no Keep before them. */
+  prices: (plan: string, monthly: number, yearly: number) =>
+    `${plan} is $${monthly} a month, or $${yearly} a year.`,
   /** A past_due account keeps its plan for the grace days (ARCH-2 §3.1, DECISION-LOG J3). */
+  pastDueEnded: (failed: string, ended: string) =>
+    `The last payment failed on ${failed}, and the grace days ended on ${ended}: the account is on Free. Update the card in the billing portal to choose a plan again.`,
   pastDue: (failed: string, until: string, plan: string) =>
     `The last payment failed on ${failed}. ${plan} stays until ${until}; update the card in the billing portal to keep it.`,
   compare: 'Compare',
@@ -89,8 +102,8 @@ export const SETTINGS_COPY = {
   /** A trial with a card becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
   cancelCardTrial: (date: string, clicks: number, days: number) =>
     `The trial ends ${date} and the card is charged unless you cancel: ${numberWord(clicks)} clicks, effective when the trial ends. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
-  cancelPaid: (clicks: number, days: number) =>
-    `${capitalise(numberWord(clicks))} clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  cancelPaid: (clicks: number, days: number, period: 'month' | 'year') =>
+    `${capitalise(numberWord(clicks))} clicks, effective at the end of the paid ${period}. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
   cancelAction: 'Cancel, back to Free',
   cancelFree: 'Nothing to cancel on Free.',
   receipts: 'Receipts',

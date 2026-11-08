@@ -94,7 +94,7 @@ describe('Trial ending, what Pro did', () => {
         'Checks run',
         '13',
         // The first audit finished at 02:34Z, seven minutes before the trial began: not counted.
-        '5 on example-outfitter.com: Mon 26 Oct, Tue 27 Oct, the re-check Wed 28 Oct after fix 2, Thu 29 Oct and Fri 30 Oct · 8 across the other four sites',
+        '5 on example-outfitter.com: Mon 26 Oct, Tue 27 Oct, the re-check Wed 28 Oct after fix 2, Thu 29 Oct and Fri 30 Oct · 8 across the other three sites and the staging copy',
       ],
       [
         'Changes caught',
@@ -188,5 +188,39 @@ describe('Trial ending, the window’s edges', () => {
     };
     const row = trialEndView(d, trialEndViewer(d, BAD)).did.rows[2]!;
     expect([row.value, row.detail]).toEqual(['0', 'none']);
+  });
+});
+
+describe('Trial ending, the card decides, not the plan', () => {
+  const withCard = (d: ReturnType<typeof fixture>, id: string, card: string | null) => ({
+    ...d,
+    accounts: d.accounts.map((a) => (a.id === id ? { ...a, card_last4: card } : a)),
+  });
+
+  it('a Pro trial with a card: no checkout, a cancel, “If you do nothing”', () => {
+    const d = withCard(bad, BAD, '4242');
+    const t = trialEndView(d, trialEndViewer(d, BAD));
+    expect(t.banner.keep).toBeNull();
+    expect(t.banner.end).toMatchObject({
+      label: 'Cancel before Sat 7 Nov',
+      href: '/settings/plan',
+    });
+    expect([t.keepTitle, t.endTitle]).toEqual(['If you do nothing', 'If you cancel']);
+    expect(t.keepText).toMatch(
+      /^The card ending 4242 is charged \$19 on Sat 7 Nov, then each month\. /,
+    );
+  });
+
+  it('an Agency trial with no card: the checkout, and letting it end', () => {
+    const ch = fixture('challenged-site');
+    const K = 'a0000000-0000-4000-8000-0000000000ca';
+    const d = withCard(ch, K, null);
+    const t = trialEndView(d, trialEndViewer(d, K));
+    expect(t.banner.keep).toMatchObject({
+      label: 'Keep Agency, $99 a month · add a card',
+      primary: true,
+    });
+    expect(t.banner.end).toMatchObject({ label: 'Let it end on Mon 16 Nov', href: '/dashboard' });
+    expect([t.keepTitle, t.endTitle]).toEqual(['If you keep Agency', 'If you let it end']);
   });
 });

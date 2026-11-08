@@ -54,6 +54,8 @@ export const REPORTS_COPY = {
   comparePair: (a: string, b: string) => `${a} vs ${b}.`,
   compareBody: 'What moved and why, with the evidence for each change.',
   compareNeedsTwo: 'Needs two finished checks of this site.',
+  makeCompare: 'Compare these two',
+  statusWords: { scheduled: 'scheduled', held: 'held back' },
   rawTitle: 'Raw data',
   rawBody: 'Every response as CSV, JSON or the link map as an edge list.',
   comparePlans: 'Compare plans',
@@ -126,8 +128,9 @@ export const REPORTS_CHANGES: CopyChange[] = [
     screen: 'reports',
     kind: 'ruling',
     locked: 'Choose checks',
-    rendered: '',
-    source: 'Owner ruling 6: no route chooses the two checks of a compare; a CC-27b candidate',
+    rendered: 'Compare these two',
+    source:
+      'Owner ruling 6: no route chooses the two checks of a compare (a CC-27b candidate), so the card makes the compare of the latest pair it names',
   },
   {
     screen: 'reports',

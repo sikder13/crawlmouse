@@ -40,7 +40,8 @@ export const ALERTS_COPY = {
   firedTitle: 'Fired',
   firedSub: (sender: string) =>
     `Everything that was sent, newest first. One email per site per check that found something, from ${sender}.`,
-  firedEmpty: 'Nothing has been sent yet. A check that finds a change sends one email.',
+  firedEmpty:
+    'Nothing has been sent yet. A check that finds a change your rules cover sends one email per site.',
   allPages: 'all pages',
   pages: (n: number) => `${count(n)} ${plural(n, 'page', 'pages')}`,
   causeChanged: (where: string, when: string) => `${where} changed ${when}`,
@@ -88,7 +89,7 @@ export const ALERTS_COPY = {
 
 /** The tables' names and column headers (the artboard names its tables in `aria-label`). */
 export const ALERTS_TABLES = {
-  fired: 'Alerts',
+  fired: 'Alerts sent',
   when: 'When',
   site: 'Site',
   what: 'What',

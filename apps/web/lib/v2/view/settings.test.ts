@@ -138,7 +138,8 @@ describe('Settings, on a trial with a card and on a plan past due (challenged-si
     expect(p.name).toBe('Agency, trial');
     expect(p.note).toBe('Ends Mon 16 Nov. The card ending 4242 is charged then unless you cancel.');
     expect(p.keep).toBeNull();
-    expect(p.other).toBe('Or $990 a year.');
+    // No Keep on a card trial, so the plan's own prices lead.
+    expect(p.other).toBe('Agency is $99 a month, or $990 a year.');
     expect(p.terms.map((t) => [t.label, t.action?.label ?? null, t.action?.href ?? null])).toEqual([
       ['Cancel', 'Cancel, back to Free', '/api/billing/cancel'],
       ['Receipts', 'Billing portal', '/api/billing/portal'],
@@ -159,5 +160,51 @@ describe('Settings, on a trial with a card and on a plan past due (challenged-si
       'Cancel, back to Free',
       'Billing portal',
     ]);
+  });
+});
+
+describe('Settings, the card decides, not the plan (the matcher keys on card_last4)', () => {
+  // The fixtures pair card and plan (bad-site: Pro, no card; Kestrel: Agency, a card), so each is
+  // read here with the other: a Pro trial with a card, an Agency trial without one.
+  const bad = fixture('bad-site');
+  const ch = fixture('challenged-site');
+  const withCard = (d: typeof bad, id: string, card: string | null) => ({
+    ...d,
+    accounts: d.accounts.map((a) => (a.id === id ? { ...a, card_last4: card } : a)),
+  });
+  const BAD = 'a0000000-0000-4000-8000-000000000001';
+  const KESTREL = 'a0000000-0000-4000-8000-0000000000ca';
+
+  it('a Pro trial with a card: no Keep, a cancel, the portal', () => {
+    const p = settingsView(withCard(bad, BAD, '4242'), ACCOUNT_VIEWERS.home()).plan;
+    expect(p.keep).toBeNull();
+    expect(p.terms.map((t) => t.action?.href ?? null)).toEqual([
+      '/api/billing/cancel',
+      '/api/billing/portal',
+    ]);
+    expect(p.other).toBe(
+      'Pro is $19 a month, or $190 a year. Agency, $99 a month: 25 sites, 5 seats, reports under your brand.',
+    );
+  });
+
+  it('an Agency trial with no card: its Keep, no cancel, no portal', () => {
+    const p = settingsView(withCard(ch, KESTREL, null), { accountId: KESTREL, now: ch.as_of }).plan;
+    expect(p.keep).toMatchObject({ label: 'Keep Agency, $99 a month' });
+    expect(p.note).toBe(
+      'Ends Mon 16 Nov. No card on file; nothing is charged unless you add one and choose Agency.',
+    );
+    expect(p.terms.map((t) => t.action)).toEqual([null, null]);
+  });
+
+  it('past due after the grace days: on Free, and says so', () => {
+    // past_due since 1 Nov 14:00Z; the seven days end 8 Nov 14:00Z.
+    const p = settingsView(ch, {
+      accountId: 'a0000000-0000-4000-8000-0000000000c9',
+      now: '2026-11-08T14:00:00Z',
+    }).plan;
+    expect(p.name).toBe('Free');
+    expect(p.note).toBe(
+      'The last payment failed on Sun 1 Nov, and the grace days ended on Sun 8 Nov: the account is on Free. Update the card in the billing portal to choose a plan again.',
+    );
   });
 });

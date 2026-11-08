@@ -90,7 +90,7 @@ export function AlertsScreen({ data }: { data: AlertsView }) {
               key: r.label,
               cells: [
                 r.label,
-                <span key="v" className={r.state ? shared.mono : shared.muted}>
+                <span key="v" className={r.data ? shared.mono : shared.muted}>
                   {r.value}
                 </span>,
                 r.state ? (

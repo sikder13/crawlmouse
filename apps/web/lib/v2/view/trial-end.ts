@@ -154,7 +154,7 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
   const alertsByEmail =
     emails && v.d.alert_rules.some((r) => r.enabled && r.channels.includes('email'));
   const stays: TrialRowView[] = [
-    { what: site.host, how: COPY.stays.site(free, emails) },
+    { what: site.host, how: COPY.stays.site(free, alertsByEmail) },
     { what: COPY.stays.evidence, how: COPY.stays.kept(EVIDENCE_CONDENSED_AFTER_DAYS) },
     ...(freeThree.length
       ? [
@@ -202,7 +202,14 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
           },
         ]
       : []),
-    ...(features.length ? [{ what: features.join(', '), how: COPY.pauses.featuresHow }] : []),
+    ...(features.length
+      ? [
+          {
+            what: features.join(', '),
+            how: alertsByEmail ? COPY.pauses.featuresHow : COPY.pauses.featuresOff,
+          },
+        ]
+      : []),
   ];
 
   // ── what Pro did, between the trial's start and now ──
@@ -213,7 +220,11 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
     .sort((x, y) => at(x.finished_at!) - at(y.finished_at!));
   const onSite = checks.filter((c) => c.site_id === site.id);
   const elsewhere = checks.filter((c) => c.site_id !== site.id);
-  const elsewhereSites = new Set(elsewhere.map((c) => c.site_id)).size;
+  const stagingIds = new Set(staging.map((s) => s.id));
+  const elsewherePrimary = new Set(
+    elsewhere.filter((c) => !stagingIds.has(c.site_id)).map((c) => c.site_id),
+  ).size;
+  const elsewhereStaging = elsewhere.some((c) => stagingIds.has(c.site_id));
   const fixOfRecheck = (checkId: string) => {
     const e = v.d.fix_events.find((x) => 'check_id' in x && x.check_id === checkId);
     return e ? (v.d.fixes.find((f) => f.id === e.fix_id)?.number ?? null) : null;
@@ -246,7 +257,8 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
   const closed = caught.filter((c) => c.kind === 'resolved' && c.fix_id !== null);
 
   return {
-    shell: accountShellView(v, null, { plan: 'page' }),
+    // Reached from the dashboard's banner: it sits under Sites, as Final-TrialEnd marks it.
+    shell: accountShellView(v, 'Sites', { plan: 'page' }),
     header: {
       title: COPY.title(days, plan),
       line,
@@ -294,7 +306,9 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
           detail:
             [
               ...(onSite.length ? [COPY.checksOn(onSite.length, site.host, checkDates)] : []),
-              ...(elsewhere.length ? [COPY.checksElsewhere(elsewhere.length, elsewhereSites)] : []),
+              ...(elsewhere.length
+                ? [COPY.checksElsewhere(elsewhere.length, elsewherePrimary, elsewhereStaging)]
+                : []),
             ].join(' · ') || COPY.none,
           verdicts: [],
         },
@@ -326,11 +340,13 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
         {
           label: COPY.openWithPackets,
           value: count(withPacket.length),
-          detail: COPY.openDetail(
-            freeWithPacket.length,
-            withPacket.length - freeWithPacket.length,
-            open.length - withPacket.length,
-          ),
+          detail: open.length
+            ? COPY.openDetail(
+                freeWithPacket.length,
+                withPacket.length - freeWithPacket.length,
+                open.length - withPacket.length,
+              )
+            : COPY.none,
           verdicts: [],
         },
       ],
@@ -339,7 +355,12 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
     keepText: [
       card === null
         ? COPY.keepNoCardText(price, yearly)
-        : COPY.keepCardText(card, price, dayDate(end, zone)),
+        : COPY.keepCardText(
+            card,
+            a.billing_period_months === 12 ? yearly : price,
+            dayDate(end, zone),
+            a.billing_period_months === 12 ? 'year' : 'month',
+          ),
       COPY.terms(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
     ].join(' '),
     endTitle: card === null ? COPY.endTitle : COPY.cancelTitle,

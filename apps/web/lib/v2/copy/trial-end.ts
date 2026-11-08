@@ -56,6 +56,7 @@ export const TRIAL_END_COPY = {
       exports: 'exports',
     },
     featuresHow: 'off; email alerts continue',
+    featuresOff: 'off',
   },
   didTitle: (plan: string, days: number) =>
     `What ${plan} did for you in ${count(days)} ${plural(days, 'day', 'days')}`,
@@ -66,8 +67,12 @@ export const TRIAL_END_COPY = {
   recheck: (date: string, fix: number | null) =>
     fix === null ? `the re-check ${date}` : `the re-check ${date} after fix ${fix}`,
   /** "8 across the other four sites": the sites those checks ran on, counted from the checks. */
-  checksElsewhere: (n: number, sites: number) =>
-    `${count(n)} across the other ${numberWord(sites)} ${plural(sites, 'site', 'sites')}`,
+  checksElsewhere: (n: number, sites: number, staging: boolean) =>
+    `${count(n)} across ${
+      sites
+        ? `the other ${numberWord(sites)} ${plural(sites, 'site', 'sites')}${staging ? ' and the staging copy' : ''}`
+        : 'the staging copy'
+    }`,
   changesCaught: 'Changes caught',
   blocked: (uas: readonly string[], date: string) => `${listOf(uas)} blocked ${date}`,
   after: (where: string, when: string) => `after ${where} changed ${when}`,
@@ -90,8 +95,8 @@ export const TRIAL_END_COPY = {
   /** Keeping a no-card trial is a checkout, which charges when it is made (`/api/billing/checkout`). */
   keepNoCardText: (monthly: number, yearly: number) =>
     `$${monthly} a month, or $${yearly} a year, charged when you choose it and then each month or year.`,
-  keepCardText: (last4: string, monthly: number, date: string) =>
-    `The card ending ${last4} is charged $${monthly} on ${date}, then each month.`,
+  keepCardText: (last4: string, price: number, date: string, period: 'month' | 'year') =>
+    `The card ending ${last4} is charged $${price} on ${date}, then each ${period}.`,
   endTitle: 'If you let it end',
   cancelTitle: 'If you cancel',
   endNothing: (date: string) => `Nothing to do. On ${date} the account is Free:`,
@@ -212,7 +217,7 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
     locked:
       'Checks run 21 8 on example-outfitter.com: 25–29 Oct daily, Fri 30, the re-check Sat 31 after fix 0, and today · 13 across the other four sites',
     rendered:
-      'Checks run 13 5 on example-outfitter.com: Mon 26 Oct, Tue 27 Oct, the re-check Wed 28 Oct after fix 2, Thu 29 Oct and Fri 30 Oct · 8 across the other four sites',
+      'Checks run 13 5 on example-outfitter.com: Mon 26 Oct, Tue 27 Oct, the re-check Wed 28 Oct after fix 2, Thu 29 Oct and Fri 30 Oct · 8 across the other three sites and the staging copy',
     source:
       'The fixture’s checks finished between the trial’s start and now: the first audit finished seven minutes before the trial began; fix 2’s re-check is recorded on its reopened event',
   },

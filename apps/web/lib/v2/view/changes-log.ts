@@ -49,7 +49,7 @@ export interface ChangesLogView {
   /** The rail's new count in words; null while a filter is set or nothing is new. */
   newNote: string | null;
   /** The three filters, each with its name, in the order the page draws them. */
-  filters: { name: string; label: string; links: FilterLinkView[] }[];
+  filters: { name: string; links: FilterLinkView[] }[];
   filtersLabel: string;
   /** CC-23's rows, each naming its site. */
   rows: ChangeRowView[];
@@ -137,7 +137,6 @@ export function changesLogView(
     filters: [
       {
         name: COPY.groups.site,
-        label: COPY.filterBy(COPY.groups.site),
         links: [
           { label: COPY.allSites, href: href({ site: null }), current: site === null },
           ...sites.map((s) => ({
@@ -149,7 +148,6 @@ export function changesLogView(
       },
       {
         name: COPY.groups.kind,
-        label: COPY.filterBy(COPY.groups.kind),
         links: [
           { label: COPY.allKinds, href: href({ kind: null }), current: kind === null },
           ...kinds.map((k) => ({ label: k, href: href({ kind: k }), current: kind === k })),
@@ -157,7 +155,6 @@ export function changesLogView(
       },
       {
         name: COPY.groups.since,
-        label: COPY.filterBy(COPY.groups.since),
         links: CHANGES_LOG_SINCE.map((s) => ({
           label: s.label,
           href: href({ since: s.key }),

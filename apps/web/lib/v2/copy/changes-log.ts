@@ -18,14 +18,11 @@ export const CHANGES_LOG_COPY = {
    */
   newNote: (n: number) =>
     `${capitalise(numberWord(n))} ${plural(n, 'was', 'were')} opened or resolved at a site’s latest check.`,
-  noChanges:
-    'No changes yet. A change is something a check finds that differs from the check before.',
+  noChanges: 'No changes yet.',
   noMatch: 'No change matches these filters.',
   allSites: 'All sites',
   allKinds: 'All kinds',
-  groups: { site: 'Site', kind: 'Kind', since: 'Since' },
+  groups: { site: 'Site', kind: 'Kind', since: 'Time' },
   filtersLabel: 'Filters',
-  /** A filter group's name for a screen reader: "Filter by site". */
-  filterBy: (name: string) => `Filter by ${name.toLowerCase()}`,
   table: 'Changes across the account',
 };

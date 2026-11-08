@@ -60,4 +60,10 @@
   .switch[aria-checked='true'] i {
     background: HighlightText;
   }
+
+  /* The checked track opts out of repainting, which takes its outline with it: the ring is drawn
+     in the system's text colour, so it shows whichever theme the page and the system each use. */
+  .switch:focus-visible {
+    outline-color: CanvasText;
+  }
 }

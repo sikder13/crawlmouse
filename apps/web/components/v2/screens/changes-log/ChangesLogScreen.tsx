@@ -6,30 +6,20 @@ import shared from '../account/AccountScreen.module.css';
 import styles from './ChangesLogScreen.module.css';
 
 /** One filter: its name, then its choices as links, the one in force marked. */
-function FilterGroup({
-  name,
-  label,
-  links,
-}: {
-  name: string;
-  label: string;
-  links: FilterLinkView[];
-}) {
+function FilterGroup({ name, links }: { name: string; links: FilterLinkView[] }) {
   return (
-    <nav aria-label={label}>
-      <ul className={styles.group}>
-        <li className={styles.groupName} aria-hidden="true">
-          {name}
+    <ul className={styles.group} aria-label={name}>
+      <li className={styles.groupName} aria-hidden="true">
+        {name}
+      </li>
+      {links.map((l) => (
+        <li key={l.href}>
+          <a href={l.href} className={styles.link} aria-current={l.current ? 'true' : undefined}>
+            {l.label}
+          </a>
         </li>
-        {links.map((l) => (
-          <li key={l.href}>
-            <a href={l.href} className={styles.link} aria-current={l.current ? 'true' : undefined}>
-              {l.label}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
+      ))}
+    </ul>
   );
 }
 
@@ -52,12 +42,12 @@ export function ChangesLogScreen({ data }: { data: ChangesLogView }) {
           ) : null}
         </div>
       </header>
-      <Card as="section" className={shared.panel} aria-label={data.filtersLabel}>
-        <div className={styles.filters}>
+      <Card className={shared.panel}>
+        <nav className={styles.filters} aria-label={data.filtersLabel}>
           {data.filters.map((f) => (
-            <FilterGroup key={f.name} name={f.name} label={f.label} links={f.links} />
+            <FilterGroup key={f.name} name={f.name} links={f.links} />
           ))}
-        </div>
+        </nav>
       </Card>
       <Card as="section" className={shared.panel}>
         {data.rows.length ? (
