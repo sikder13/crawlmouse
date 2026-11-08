@@ -1,8 +1,8 @@
 /**
  * The account door's stores over PGlite with every migration applied, for the first-login and claim
  * tests. Each call is its own transaction as the service role, as each PostgREST request is, so the
- * tests interleave calls the way two concurrent requests would. PGlite has one connection: a
- * `for update` never waits here, so these tests cover interleavings between calls, not inside one.
+ * tests interleave calls the way two concurrent requests would. PGlite has one connection: a lock
+ * never waits here, so these tests cover interleavings between calls, not inside one.
  */
 import type { PGlite } from '@electric-sql/pglite';
 import {
@@ -11,8 +11,8 @@ import {
   type AccountRow,
   type EntitlementStore,
 } from '../../../lib/billing/state-machine-apply';
-import type { DoorStore, LedgerHash, MemberAccount, Serialize } from '../../../lib/auth/door-store';
-import { gridSerialize, type IncrementCell } from '../../../lib/auth/stores';
+import type { DoorStore, MemberAccount } from '../../../lib/auth/door-store';
+import { parseTrialDecision } from '../../../lib/auth/trial-decision';
 import { applyAllMigrations, asRole, freshDb } from '../../helpers/pglite-migrations';
 
 let template: Promise<PGlite> | null = null;
@@ -195,28 +195,14 @@ export function pgliteDoorStore(db: PGlite): DoorStore {
         ]),
       );
     },
-    async priorLedger(hashes: readonly LedgerHash[], since) {
-      if (hashes.length === 0) return [];
+    async startTrial(accountId, hashes, transition) {
       const { rows } = await svc(db, (tx) =>
-        tx.query<{ kind: LedgerHash['kind']; created_at: Date }>(
-          `select l.kind, l.created_at from public.trial_ledger l
-             join jsonb_to_recordset($1::jsonb) as h(kind text, value_hash text)
-               on h.kind = l.kind and h.value_hash = l.value_hash
-            where l.created_at > $2`,
-          [JSON.stringify(hashes), since],
+        tx.query<{ r: unknown }>(
+          `select public.start_trial_with_ledger($1, $2::jsonb, $3::jsonb) as r`,
+          [accountId, JSON.stringify(hashes), JSON.stringify(transition)],
         ),
       );
-      return rows;
-    },
-    async insertLedger(accountId, hashes) {
-      await svc(db, (tx) =>
-        tx.query(
-          `insert into public.trial_ledger (kind, value_hash, account_id, trial_kind)
-           select h.kind, h.value_hash, $2, 'pro'
-             from jsonb_to_recordset($1::jsonb) as h(kind text, value_hash text)`,
-          [JSON.stringify(hashes), accountId],
-        ),
-      );
+      return parseTrialDecision(rows[0]!.r);
     },
     async countActiveSites(accountId) {
       const { rows } = await svc(db, (tx) =>
@@ -308,25 +294,4 @@ export function pgliteDoorStore(db: PGlite): DoorStore {
       );
     },
   };
-}
-
-/** `increment_rate_limit` itself, as the service role. */
-export function pgliteIncrement(db: PGlite): IncrementCell {
-  return async (key, windowStart) => {
-    const { rows } = await svc(db, (tx) =>
-      tx.query<{ n: number }>(`select public.increment_rate_limit($1, $2) as n`, [
-        key,
-        windowStart,
-      ]),
-    );
-    return rows[0]!.n;
-  };
-}
-
-/** The production slot, over the real RPC, at a moment the test chooses. */
-export function pgliteSerialize(
-  db: PGlite,
-  now = () => new Date('2026-11-05T12:00:00Z'),
-): Serialize {
-  return gridSerialize(pgliteIncrement(db), now);
 }

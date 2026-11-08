@@ -1,39 +1,35 @@
 /**
  * The first-login hook (CC-25): on the sign-in that confirms a person's email, decide the no-card Pro
- * trial by the ledger rule and start it; and, at any sign-in with room, attach the site the Sign-up
- * form named.
+ * trial and start it; and, at any sign-in with room, attach the site the Sign-up form named.
  *
  * First login is the verify that confirmed the email (D5 as amended on 2026-11-05): Supabase sets
  * `email_confirmed_at` and `last_sign_in_at` in that one verify, and a later sign-in moves only
  * `last_sign_in_at`. Both are read from the verify's own response. This depends on Supabase Auth's
  * auto-confirm being off, which `scripts/supabase/auth-config.ts --read` asserts.
  *
- * Order, and what makes it once:
- * 1. a slot on the email and the device hash (`gridSerialize` in stores.ts): of two first logins
- *    sharing either within half a slot window of each other, the second is always refused (failing
- *    safe); further apart, the ledger lookup decides;
- * 2. the ledger lookup;
- * 3. `applyEntitlementTransition(trial_started)`: the RPC reads the account `for update` and
- *    refuses a stale version, and `next()` refuses a second trial;
- * 4. only when the transition was applied: the ledger rows;
- * 5. the named site (at any sign-in), whose `(account_id, host)` unique index makes a second insert
- *    a no-op.
- * A crash between 3 and 4 leaves a trial with no ledger rows; that write is reported. CC-06c closes
- * it with one SQL function (docs/specs/v2/25-account-door.md, follow-ups).
+ * The trial, in order:
+ * 1. the account must be Free with no trial used, and the pepper set;
+ * 2. the ledger hashes are computed here (the pepper never reaches the database);
+ * 3. `next()` computes `trial_started {variant: 'no_card'}` from the account as read;
+ * 4. `start_trial_with_ledger` (migration 006c) does the rest in one transaction: it locks the
+ *    account and the hashes, applies the ledger rule, and either refuses or applies the transition
+ *    and writes the ledger rows. Its version check refuses a stale read (`not_first`).
+ * A decision the function cannot make is reported as `auth.trial-decision-failed` and leaves the
+ * account Free; it is not retried (docs/specs/v2/06c-trial-function.md, known gaps).
+ * The named site (at any sign-in) follows; its `(account_id, host)` unique index makes a second
+ * insert a no-op.
  */
-import {
-  applyEntitlementTransition,
-  EntitlementConflictError,
-  type EntitlementStore,
-} from '../billing/state-machine-apply';
+import { next } from '../billing/state-machine';
+import { toTransitionParams, type EntitlementStore } from '../billing/state-machine-apply';
 import { effectiveTier } from '../entitlement-v2';
 import type { FunnelEvent } from '../analytics-events';
 import { TimeZoneSchema } from '@crawlmouse/types/v2';
-import type { DoorStore, LedgerHash, MemberAccount, Report, Serialize } from './door-store';
-import { hashLedgerValue, ledgerDecision, ledgerValues, oldestRelevant, slotKey } from './ledger';
+import type { DoorStore, LedgerHash, MemberAccount, Report } from './door-store';
+import { hashLedgerValue, ledgerValues } from './ledger';
 import { scheduleFor } from './schedule';
 import { siteLimitAt } from './site-limit';
 import { hostFromSiteInput } from './site-host';
+import { MalformedTrialDecisionError, type TrialDecision } from './trial-decision';
 import { trialVariantFor } from './trial-variant';
 
 /** The confirmation and the sign-in are one verify when they are this close. */
@@ -70,8 +66,8 @@ export interface FirstLoginInput {
 
 export interface FirstLoginDeps {
   store: DoorStore;
+  /** Reads the account's entitlement snapshot and version for `next()`. */
   entitlement: EntitlementStore;
-  serialize: Serialize;
   /** The SSRF guard for a named site (`admitSiteHost`). */
   admit: (host: string) => Promise<boolean>;
   report: Report;
@@ -83,11 +79,13 @@ export interface FirstLoginDeps {
 /** What the hook decided about the trial, each with the case that produces it. The spec lists them. */
 export const TRIAL_OUTCOMES = {
   started:
-    'the no-card Pro trial started; three ledger rows, or fewer when the device or IP is unknown',
+    'the no-card Pro trial started; three ledger rows, or fewer when the device or IP is unknown or the device is not sent',
   denied: 'a ledger row refused it; the account stays Free',
-  busy: 'another first login holds a slot on the same email or device; refused, failing safe',
   not_first: 'not the verify that confirmed the email, or another run won the version check',
-  not_eligible: 'the account is not Free, or has used its trial',
+  not_eligible:
+    'the account is not Free, or has used its trial, or the state machine gives it none',
+  failed:
+    'the trial function errored, timed out on a lock, or answered something unreadable: Free, `auth.trial-decision-failed`, not retried',
   no_account: 'the user has no v2 account (from before migration 001): nothing is done',
   no_pepper:
     'TRIAL_LEDGER_PEPPER is missing or short: no ledger read or write, Free, a Sentry signal',
@@ -158,38 +156,40 @@ async function decideTrial(
     value_hash: hashLedgerValue(pepper, v.kind, v.value),
   }));
 
-  for (const h of hashes) {
-    if (h.kind === 'ip24') continue; // a network is shared by strangers; it never holds a slot
-    if (!(await deps.serialize(slotKey(pepper, h.kind, h.value_hash))))
-      return { outcome: 'busy', variant };
-  }
-
+  const stored = await deps.entitlement.load(account.accountId);
+  if (stored === null) return { outcome: 'not_eligible', variant };
   const now = deps.now();
-  const decision = ledgerDecision(await deps.store.priorLedger(hashes, oldestRelevant(now)), now);
-  if (decision.deny) {
+  const planned = next(stored.snapshot, { type: 'trial_started', at: now, variant });
+  if (planned.outcome !== 'applied') return { outcome: 'not_eligible', variant };
+  const transition = {
+    event: 'trial_started' as const,
+    ...toTransitionParams(account.accountId, stored.version, planned.state, now),
+  };
+
+  let decision: TrialDecision;
+  try {
+    decision = await deps.store.startTrial(account.accountId, hashes, transition);
+  } catch (e) {
+    const code = (e as { code?: unknown }).code;
+    if (code === '40001') return { outcome: 'not_first', variant };
+    deps.report('trial-decision-failed', {
+      accountId: account.accountId,
+      ...failureOf(e, code),
+    });
+    return { outcome: 'failed', variant };
+  }
+  if (decision.outcome === 'refused') {
     console.info(JSON.stringify({ event: 'trial.fingerprint_hit', kinds: decision.hits }));
     return { outcome: 'denied', variant };
   }
+  return { outcome: decision.outcome, variant };
+}
 
-  let applied;
-  try {
-    applied = await applyEntitlementTransition(deps.entitlement, account.accountId, {
-      type: 'trial_started',
-      at: now,
-      variant,
-    });
-  } catch (e) {
-    if (e instanceof EntitlementConflictError) return { outcome: 'not_first', variant };
-    throw e;
-  }
-  if (applied.transition.outcome !== 'applied') return { outcome: 'not_eligible', variant };
-
-  try {
-    await deps.store.insertLedger(account.accountId, hashes);
-  } catch {
-    deps.report('trial-ledger-write-failed', { accountId: account.accountId });
-  }
-  return { outcome: 'started', variant };
+/** Why the trial function gave no decision: a lock timeout, an unreadable answer, or an error. */
+function failureOf(e: unknown, code: unknown): Record<string, string> {
+  if (e instanceof MalformedTrialDecisionError) return { reason: 'malformed_result' };
+  if (code === '55P03') return { reason: 'lock_timeout' };
+  return typeof code === 'string' ? { reason: 'rpc_error', code } : { reason: 'rpc_error' };
 }
 
 /** The named site, and its number among the account's kept sites (`site_added {n}`). */

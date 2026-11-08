@@ -1,82 +1,9 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import {
-  hashLedgerValue,
-  ip24,
-  ledgerDecision,
-  ledgerValues,
-  pepperFrom,
-  slotKey,
-  twelveMonthsBefore,
-  type PriorLedgerRow,
-} from './ledger';
+import { hashLedgerValue, ip24, ledgerValues, pepperFrom } from './ledger';
 
-const NOW = new Date('2026-11-05T12:00:00.000Z');
-const DAY = 86_400_000;
-const ago = (ms: number) => new Date(NOW.getTime() - ms);
-const row = (kind: PriorLedgerRow['kind'], at: Date): PriorLedgerRow => ({ kind, created_at: at });
-
-describe('ledgerDecision: the D4 rule as amended (email 12 months; device and IP per SECURITY §5.3)', () => {
-  it('allows when nothing matches', () => {
-    expect(ledgerDecision([], NOW)).toEqual({ deny: false, hits: [] });
-  });
-
-  it('denies on one email row younger than 12 months, and allows on one exactly 12 months old', () => {
-    expect(ledgerDecision([row('email', ago(DAY))], NOW).deny).toBe(true);
-    expect(
-      ledgerDecision([row('email', new Date(twelveMonthsBefore(NOW).getTime() + 1))], NOW).deny,
-    ).toBe(true);
-    expect(ledgerDecision([row('email', twelveMonthsBefore(NOW))], NOW).deny).toBe(false);
-  });
-
-  it('12 months is calendar months, clamped at the month end', () => {
-    expect(twelveMonthsBefore(new Date('2028-02-29T10:00:00.000Z')).toISOString()).toBe(
-      '2027-02-28T10:00:00.000Z',
-    );
-    expect(twelveMonthsBefore(NOW).toISOString()).toBe('2025-11-05T12:00:00.000Z');
-  });
-
-  it('a device denies on the third trial in 30 days: two prior rows deny, one does not', () => {
-    expect(ledgerDecision([row('device', ago(DAY))], NOW).deny).toBe(false);
-    expect(ledgerDecision([row('device', ago(DAY)), row('device', ago(29 * DAY))], NOW)).toEqual({
-      deny: true,
-      hits: ['device'],
-    });
-    // A row older than 30 days does not count.
-    expect(ledgerDecision([row('device', ago(DAY)), row('device', ago(30 * DAY))], NOW).deny).toBe(
-      false,
-    );
-  });
-
-  it('IP alone never denies, however many rows it has', () => {
-    const many = Array.from({ length: 50 }, (_, i) => row('ip24', ago(i * 1000)));
-    expect(ledgerDecision(many, NOW).deny).toBe(false);
-  });
-
-  it('IP at its threshold denies together with a device seen in the same 30 days', () => {
-    const ip = [row('ip24', ago(DAY)), row('ip24', ago(2 * DAY))];
-    expect(ledgerDecision([...ip, row('device', ago(3 * DAY))], NOW)).toEqual({
-      deny: true,
-      hits: ['ip24'],
-    });
-    expect(ledgerDecision([row('ip24', ago(DAY)), row('device', ago(3 * DAY))], NOW).deny).toBe(
-      false,
-    );
-  });
-
-  it('rows of the kinds CC-04 owns are not read here', () => {
-    const rows = [
-      { kind: 'hostname', created_at: ago(DAY) },
-      { kind: 'card_fingerprint', created_at: ago(DAY) },
-    ] as unknown as PriorLedgerRow[];
-    expect(ledgerDecision(rows, NOW).deny).toBe(false);
-  });
-
-  it('a future-dated row counts as recent (clock skew must not open a hole)', () => {
-    expect(ledgerDecision([row('email', new Date(NOW.getTime() + DAY))], NOW).deny).toBe(true);
-  });
-});
+// The ledger rule itself is SQL since 006c; its tests are __tests__/v2-006c-trial-function.test.ts.
 
 describe('hashLedgerValue', () => {
   it('is HMAC-SHA256 of kind:value under the pepper, as 64 lowercase hex', () => {
@@ -99,17 +26,6 @@ describe('hashLedgerValue', () => {
         },
       ),
     );
-  });
-});
-
-describe('slotKey', () => {
-  it('names the slot by a separate HMAC, so it never equals the ledger hash it guards', () => {
-    const pepper = 'p'.repeat(32);
-    const hash = hashLedgerValue(pepper, 'email', 'a@b.co');
-    const key = slotKey(pepper, 'email', hash);
-    expect(key).toMatch(/^trial:email:[0-9a-f]{64}$/);
-    expect(key).not.toContain(hash);
-    expect(slotKey(pepper, 'device', hash)).not.toBe(key);
   });
 });
 

@@ -118,7 +118,7 @@ async function priorRows(d: PGlite, rows: { hash: Hash; age: string }[]) {
 // ─── The ledger rule, `trial_ledger_refusals(p_hashes, p_now)` ─────────────────────────────────────
 
 interface LedgerRow {
-  kind: Kind | 'hostname';
+  kind: Kind | 'hostname' | 'card_fingerprint';
   value_hash: string;
   at: Date;
 }
@@ -244,11 +244,23 @@ describe('the ledger rule at its edges, by hand', () => {
     expect(await refusals([EMAIL, IP], r, now)).toEqual([]);
   });
 
-  it('a row of another kind under the same hash never counts; hostname rows are not read', async () => {
+  it('ip24: the network alone never refuses, however many rows it has', async () => {
+    const now = at('2025-06-15T12:00:00.000Z');
+    const many = Array.from({ length: 50 }, (_, i) => row(IP, ms(now, -(i + 1) * SEC)));
+    expect(await refusals(ALL, many, now)).toEqual([]);
+  });
+
+  it('a row dated after now still counts, so clock skew cannot open a hole', async () => {
+    const now = at('2025-06-15T12:00:00.000Z');
+    expect(await refusals(ALL, [row(EMAIL, ms(now, DAY))], now)).toEqual(['email']);
+  });
+
+  it('a row of another kind under the same hash never counts; the kinds CC-04 owns are not read', async () => {
     const now = at('2025-06-15T12:00:00.000Z');
     const r: LedgerRow[] = [
       { kind: 'device', value_hash: EMAIL.value_hash, at: ms(now, -DAY) },
       { kind: 'hostname', value_hash: EMAIL.value_hash, at: ms(now, -DAY) },
+      { kind: 'card_fingerprint', value_hash: EMAIL.value_hash, at: ms(now, -DAY) },
       { kind: 'email', value_hash: DEVICE.value_hash, at: ms(now, -DAY) },
       { kind: 'email', value_hash: DEVICE.value_hash, at: ms(now, -2 * DAY) },
     ];

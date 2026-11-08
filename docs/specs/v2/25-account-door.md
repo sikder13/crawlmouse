@@ -47,17 +47,17 @@ First login is the verify that confirmed the email: in that verify’s response 
 
 The ledger rule (D4 as amended, with SECURITY-DESIGN §5.3): the trial is refused when `trial_ledger` holds, under the same hash, an `email` row younger than 12 calendar months; or 2 `device` rows in the last 30 days; or 2 `ip24` rows in the last 30 days together with a `device` row in the same window. An IP alone never refuses. IPv4 is keyed by its /24, IPv6 by its /48. Values are HMAC-SHA256 under `TRIAL_LEDGER_PEPPER` over `kind:value`; a pepper shorter than 32 characters reads as none, and then nothing is read or written, the account stays Free and Sentry gets `auth.trial-ledger-no-pepper`. CC-04 owns the `hostname` and `card_fingerprint` kinds and the 13-month sweep.
 
-Before the lookup, a slot is taken on the email and the device hash (`gridSerialize`, `lib/auth/stores.ts`): one `increment_rate_limit` count in each of two grids of 10 minutes, the second shifted by half a window. Of two first logins sharing either less than 5 minutes apart, the second is always refused; up to 10 minutes apart it may be; further apart the ledger lookup decides. Two that arrive within milliseconds can both be refused (`busy`, which is final: first login happens once). A count the store cannot make refuses. The slot’s key is its own HMAC, never the ledger hash. The trial is `trial_started {variant: 'no_card'}` through `applyEntitlementTransition`; the ledger rows are written only when that transition was applied.
+The trial is decided in one call, `start_trial_with_ledger` (migration 006c, `docs/specs/v2/06c-trial-function.md`), and the rule above is SQL in it (`trial_ledger_refusals`); the numbers here are the ones `lib/auth/ledger.ts` names, and `__tests__/v2-006c-trial-function.test.ts` runs vectors built from them through the SQL. The hook computes the hashes (the pepper never leaves the app) and `trial_started {variant: 'no_card'}` with `next()`. The function, in one transaction, locks the account and each hash, applies the rule, and either refuses or applies the transition through `apply_entitlement_transition` and writes the ledger rows. A decision it cannot make (an error, a lock timeout, an answer that is not a decision) is reported to Sentry as `auth.trial-decision-failed` with its `reason`, and the account stays Free.
 
-| Outcome        | Meaning                                                                                     |
-| -------------- | ------------------------------------------------------------------------------------------- |
-| `started`      | the no-card Pro trial started; three ledger rows, or fewer when the device or IP is unknown |
-| `denied`       | a ledger row refused it; the account stays Free                                             |
-| `busy`         | another first login holds a slot on the same email or device; refused, failing safe         |
-| `not_first`    | not the verify that confirmed the email, or another run won the version check               |
-| `not_eligible` | the account is not Free, or has used its trial                                              |
-| `no_account`   | the user has no v2 account (from before migration 001): nothing is done                     |
-| `no_pepper`    | TRIAL_LEDGER_PEPPER is missing or short: no ledger read or write, Free, a Sentry signal     |
+| Outcome        | Meaning                                                                                                                            |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `started`      | the no-card Pro trial started; three ledger rows, or fewer when the device or IP is unknown or the device is not sent              |
+| `denied`       | a ledger row refused it; the account stays Free                                                                                    |
+| `not_first`    | not the verify that confirmed the email, or another run won the version check                                                      |
+| `not_eligible` | the account is not Free, or has used its trial, or the state machine gives it none                                                 |
+| `failed`       | the trial function errored, timed out on a lock, or answered something unreadable: Free, `auth.trial-decision-failed`, not retried |
+| `no_account`   | the user has no v2 account (from before migration 001): nothing is done                                                            |
+| `no_pepper`    | TRIAL_LEDGER_PEPPER is missing or short: no ledger read or write, Free, a Sentry signal                                            |
 
 A site named on Sign-up is attached at any sign-in with room (a first login or a later one), after the SSRF guard (`validateUrlOrThrow`), with the owner seat and the tier’s schedule (`GATES[tier].schedule`: `weekly` on a paid tier, `monthly_first_site_only` on Free), on the attach weekday at 06:00 in the account’s zone.
 
@@ -141,10 +141,12 @@ From `apps/web/lib/v2/copy/account-door.ts`, applied by the lock comparison in `
 2. Run `SUPABASE_PROJECT_REF=<ref> pnpm --filter @crawlmouse/scripts exec tsx supabase/auth-config.ts --apply`. It sets `mailer_otp_exp = 900` and `mailer_secure_email_change_enabled = true`, then reads back and checks `mailer_autoconfirm = false`, `site_url = https://crawlmouse.com` and that the magic-link and confirmation templates link to `{{ .SiteURL }}/login/verify?token_hash={{ .TokenHash }}&type=magiclink` and `{{ .SiteURL }}/login/verify?token_hash={{ .TokenHash }}&type=signup`.
 3. Set `V2_ACCOUNT_DOOR=1` for Preview deployments only, and redeploy.
 4. Production gets `V2_ACCOUNT_DOOR=1` when CC-20b and CC-26 ship, not in this step.
+5. Before Production gets `V2_ACCOUNT_DOOR=1`: `db-apply-prod` has applied `20261108000001_v2_006c_trial_function_and_checks.sql` and the owner has verified it (`docs/specs/v2/06c-trial-function.md`, "After the apply"). The first-login hook calls `start_trial_with_ledger` and has no other path, so without it every first login fails and stays Free. The door goes off in Production before any rollback of that migration.
 
 ## Known gaps and follow-ups
 
-- **CC-06c: `start_trial_with_ledger(account_id, hashes[])`**, one SQL function, owner-applied; `hashes` is the array of `(kind, value_hash)` pairs the hook computes. Today the trial and its ledger rows are two PostgREST calls: a crash between them leaves a trial with no ledger rows (reported to Sentry as `auth.trial-ledger-write-failed`). The function does, in one transaction: lock the account `for update`; refuse unless `state = 'free' and trial_used_at is null`; read `trial_ledger` for the hashes under the rule above; apply the transition `apply_entitlement_transition` applies for `trial_started`; insert the rows; return the outcome. `lib/auth/first-login.ts` then calls it in place of steps 2 to 4.
+- **The trial and its ledger rows are one transaction (CC-06c, closed).** `start_trial_with_ledger` replaced the separate ledger read, transition and insert, and the rate-limit slot before them; `auth.trial-ledger-write-failed` no longer exists. Its own known gaps are in `docs/specs/v2/06c-trial-function.md`.
+- **A failed trial decision is not retried** (CC-06c D11). First login is detected once; a sign-up whose decision failed stays Free, and Sentry has `auth.trial-decision-failed` for it.
 - **Cross-device.** The named site and a Keep’s claim ride cookies in the browser that asked for the link. Opened on another device, the link signs in and the trial is decided, but no site is attached and no audit claimed; the copy says "opened in this browser".
 - **The ledger is decided after Check-email is shown.** A refused sign-up reads "if it is your first trial" there; CC-26 shows the reason category on the dashboard.
 - **No-JS Continue** signs in and redirects, and fires no PostHog event.
