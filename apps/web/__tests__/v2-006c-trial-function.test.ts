@@ -352,6 +352,7 @@ describe('the ledger rule over generated ledgers', () => {
       device: DEVICE.value_hash,
       ip24: IP.value_hash,
       hostname: EMAIL.value_hash,
+      card_fingerprint: EMAIL.value_hash,
     };
     const anyHash = fc.constantFrom(EMAIL, DEVICE, IP, other).map((x) => x.value_hash);
     // Mostly the hash sent for the row's kind, so rows that the rule counts, at the window edges,
