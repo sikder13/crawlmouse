@@ -123,8 +123,10 @@ function rootOf(node: ts.Expression): string | undefined {
 }
 
 /**
- * The verifier runs before the route does anything with the request through imported code: no call
- * rooted at an imported binding (the verifier's own call aside), and no `JSON.parse`, comes first.
+ * The verifier runs before the route does anything with the request: before it, no call is rooted at an
+ * imported binding or at a local name bound to one (the verifier's own call aside), no `JSON.parse` runs,
+ * and nothing calls `.json()` or `.formData()` (on the request, a clone of it, or anything else but the
+ * Response classes). Anywhere in the handler, the request parameter is never parsed with those either.
  */
 function verifiedFirst(sf: ts.SourceFile, verifier: string): string[] {
   const at = first(callPositions(sf, verifier));
@@ -132,16 +134,36 @@ function verifiedFirst(sf: ts.SourceFile, verifier: string): string[] {
   const problems: string[] = [];
   if (bodyReads(sf).length) problems.push('parses the request body with json() or formData()');
   const imported = importedNames(sf);
+  const bindAliases = (node: ts.Node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      node.getStart(sf) < at
+    ) {
+      const root = rootOf(node.initializer);
+      if (root && imported.has(root)) imported.add(node.name.text);
+    }
+    ts.forEachChild(node, bindAliases);
+  };
+  bindAliases(sf);
   const visit = (node: ts.Node) => {
     if (ts.isCallExpression(node) && node.getStart(sf) < at) {
       const text = node.expression.getText(sf);
       const root = rootOf(node.expression);
-      const isVerifier = ts.isPropertyAccessExpression(node.expression)
-        ? node.expression.name.text === verifier
-        : text === verifier;
+      const name = ts.isPropertyAccessExpression(node.expression)
+        ? node.expression.name.text
+        : text;
       if (text === 'JSON.parse') problems.push(`calls JSON.parse() before ${verifier}()`);
-      else if (root && imported.has(root) && !isVerifier)
+      else if (
+        (name === 'json' || name === 'formData') &&
+        root !== 'NextResponse' &&
+        root !== 'Response'
+      ) {
         problems.push(`calls ${text}() before ${verifier}()`);
+      } else if (root && imported.has(root) && name !== verifier) {
+        problems.push(`calls ${text}() before ${verifier}()`);
+      }
     }
     ts.forEachChild(node, visit);
   };
