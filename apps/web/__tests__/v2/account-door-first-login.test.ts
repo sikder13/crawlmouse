@@ -1,8 +1,8 @@
 /**
- * The first-login hook (CC-25 D4 as amended, D5 as amended, D6) against every applied migration in
- * PGlite: the trigger that makes the account, `apply_entitlement_transition`, `trial_ledger`, the
- * sites constraints and `increment_rate_limit`. Each store call is its own transaction, as a
- * PostgREST request is.
+ * The first-login hook (CC-25 D4 as amended, D5 as amended, D6; CC-06c) against every applied
+ * migration in PGlite: the trigger that makes the account, `start_trial_with_ledger`, `trial_ledger`
+ * and the sites constraints. Each store call is its own transaction, as a PostgREST request is.
+ * Prior ledger rows are dated from the database's clock, which the trial function reads.
  */
 import type { PGlite } from '@electric-sql/pglite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +11,7 @@ import { GATES } from '../../lib/entitlement-v2';
 import { FUNNEL_EVENTS } from '../../lib/analytics-events';
 import { TRIAL_DAYS } from '../../lib/billing/state-machine';
 import { hashLedgerValue, ledgerValues } from '../../lib/auth/ledger';
+import { MalformedTrialDecisionError } from '../../lib/auth/trial-decision';
 import {
   isFirstLogin,
   runFirstLogin,
@@ -23,7 +24,6 @@ import {
   doorDb,
   pgliteDoorStore,
   pgliteEntitlementStore,
-  pgliteSerialize,
   signUp,
 } from './_lib/door-pglite';
 
@@ -50,7 +50,6 @@ function deps(
   return {
     store: pgliteDoorStore(db),
     entitlement: pgliteEntitlementStore(db),
-    serialize: pgliteSerialize(db),
     admit: async () => true,
     report: vi.fn(),
     pepper: PEPPER,
@@ -75,19 +74,18 @@ async function input(email: string, over: Partial<FirstLoginInput> = {}): Promis
 const ledgerRows = (accountId: string) =>
   count(db, `select 1 from public.trial_ledger where account_id = $1`, [accountId]);
 
-/** A prior trial on these values, recorded by another account `daysAgo` days ago. */
+/** A prior trial on these values, recorded by another account `daysAgo` days before the database's now(). */
 async function priorTrial(
   values: { email: string; device: string | null; ip: string },
   daysAgo: number,
 ) {
   const other = await signUp(db, `prior-${Math.random()}@example.org`);
   const { id } = await accountOf(db, other);
-  const at = new Date(NOW.getTime() - daysAgo * 86_400_000);
   for (const v of ledgerValues(values)) {
     await db.query(
       `insert into public.trial_ledger (kind, value_hash, account_id, trial_kind, created_at)
-       values ($1, $2, $3, 'pro', $4)`,
-      [v.kind, hashLedgerValue(PEPPER, v.kind, v.value), id, at],
+       values ($1, $2, $3, 'pro', now() - make_interval(days => $4))`,
+      [v.kind, hashLedgerValue(PEPPER, v.kind, v.value), id, daysAgo],
     );
   }
 }
@@ -158,9 +156,8 @@ describe('runFirstLogin', () => {
     expect((await runFirstLogin(deps(), i)).trial).toBe('started');
   });
 
-  it('a network holds no slot: two strangers on one /24 signing up back to back both get the trial', async () => {
-    // Both runs share the real serialisation buckets and the same clock, so a slot taken on the
-    // network would answer the second run `busy`, which is final: first login does not recur.
+  it('two strangers on one /24 signing up back to back both get the trial', async () => {
+    // The network's rows refuse nothing without a row of this browser's device.
     const a = await input('alice@example.com', { device: 'dev-a', ip: '203.0.113.7' });
     const b = await input('bob@example.org', { device: 'dev-b', ip: '203.0.113.99' });
     const ra = await runFirstLogin(deps(), a);
@@ -202,13 +199,11 @@ describe('runFirstLogin', () => {
   it('without a pepper: no ledger read or write, no trial, a Sentry signal with ids only', async () => {
     const i = await input('nopepper@example.com');
     const store = pgliteDoorStore(db);
-    const priorLedger = vi.spyOn(store, 'priorLedger');
-    const insertLedger = vi.spyOn(store, 'insertLedger');
+    const startTrial = vi.spyOn(store, 'startTrial');
     const d = deps({ pepper: null, store });
     const r = await runFirstLogin(d, i);
     expect(r.trial).toBe('no_pepper');
-    expect(priorLedger).not.toHaveBeenCalled();
-    expect(insertLedger).not.toHaveBeenCalled();
+    expect(startTrial).not.toHaveBeenCalled();
     expect((await accountOf(db, i.userId)).state).toBe('free');
     expect(d.report).toHaveBeenCalledWith('trial-ledger-no-pepper', {
       accountId: (await accountOf(db, i.userId)).id,
@@ -297,12 +292,12 @@ describe('runFirstLogin', () => {
       signup: { site: 'another.example.com', tz: 'Asia/Kolkata' },
     });
     const store = pgliteDoorStore(db);
-    const priorLedger = vi.spyOn(store, 'priorLedger');
+    const startTrial = vi.spyOn(store, 'startTrial');
     const r = await runFirstLogin(deps({ store }), i);
     expect(r.trial).toBe('not_first');
     expect(r.siteId).not.toBeNull();
     expect(r.events).toEqual([{ name: 'site_added', props: { n: 1 } }]);
-    expect(priorLedger).not.toHaveBeenCalled();
+    expect(startTrial).not.toHaveBeenCalled();
     // The zone is a first-login setting; a later sign-in leaves it.
     expect((await accountOf(db, i.userId)).timezone).toBe('UTC');
   });
@@ -342,7 +337,105 @@ describe('runFirstLogin', () => {
   });
 });
 
-describe('runFirstLogin under interleaving (JS-level; PGlite never contends on a lock)', () => {
+describe('a trial decision that cannot be made is reported, and the account stays Free (D10)', () => {
+  async function failing(startTrial: () => Promise<never>) {
+    const i = await input(`fail-${Math.random()}@example.com`);
+    const store = { ...pgliteDoorStore(db), startTrial };
+    const d = deps({ store });
+    const r = await runFirstLogin(d, i);
+    const a = await accountOf(db, i.userId);
+    return { r, d, a };
+  }
+  const sqlError = (code: string) => () =>
+    Promise.reject(Object.assign(new Error('rpc failed'), { code }));
+
+  it('a lock timeout: trial-decision-failed with reason lock_timeout', async () => {
+    const { r, d, a } = await failing(sqlError('55P03'));
+    expect(r.trial).toBe('failed');
+    expect(r.events).toEqual([]);
+    expect(a.state).toBe('free');
+    expect(d.report).toHaveBeenCalledWith('trial-decision-failed', {
+      accountId: a.id,
+      reason: 'lock_timeout',
+    });
+  });
+
+  it('any other error: reason rpc_error, with its SQLSTATE', async () => {
+    const { r, d, a } = await failing(sqlError('PGRST202'));
+    expect(r.trial).toBe('failed');
+    expect(a.state).toBe('free');
+    expect(d.report).toHaveBeenCalledWith('trial-decision-failed', {
+      accountId: a.id,
+      reason: 'rpc_error',
+      code: 'PGRST202',
+    });
+  });
+
+  it('an answer that is not a decision: reason malformed_result', async () => {
+    const { r, d, a } = await failing(() => Promise.reject(new MalformedTrialDecisionError()));
+    expect(r.trial).toBe('failed');
+    expect(a.state).toBe('free');
+    expect(d.report).toHaveBeenCalledWith('trial-decision-failed', {
+      accountId: a.id,
+      reason: 'malformed_result',
+    });
+  });
+
+  it('a revoked grant, through the real function: reason rpc_error, code 42501', async () => {
+    await db.exec(
+      `revoke execute on function public.start_trial_with_ledger(uuid, jsonb, jsonb) from service_role`,
+    );
+    const i = await input('revoked@example.com');
+    const d = deps();
+    const r = await runFirstLogin(d, i);
+    const a = await accountOf(db, i.userId);
+    expect(r.trial).toBe('failed');
+    expect(a.state).toBe('free');
+    expect(await ledgerRows(a.id)).toBe(0);
+    expect(d.report).toHaveBeenCalledWith('trial-decision-failed', {
+      accountId: a.id,
+      reason: 'rpc_error',
+      code: '42501',
+    });
+  });
+
+  it('a stale version is a lost race, not a failure: not_first, nothing reported', async () => {
+    const i = await input('stale@example.com');
+    const base = pgliteDoorStore(db);
+    const store = {
+      ...base,
+      async startTrial(...args: Parameters<typeof base.startTrial>) {
+        await db.query(
+          `update public.accounts set entitlement_version = entitlement_version + 1 where id = $1`,
+          [args[0]],
+        );
+        return base.startTrial(...args);
+      },
+    };
+    const d = deps({ store });
+    const r = await runFirstLogin(d, i);
+    expect(r.trial).toBe('not_first');
+    expect(d.report).not.toHaveBeenCalled();
+    expect((await accountOf(db, i.userId)).state).toBe('free');
+  });
+
+  it('an account next() will not give a trial (disputed) is not_eligible, and the function is not called', async () => {
+    const i = await input('disputed@example.com');
+    await db.query(`update public.accounts set disputed_at = now() where id = $1`, [
+      (await accountOf(db, i.userId)).id,
+    ]);
+    const store = pgliteDoorStore(db);
+    const startTrial = vi.spyOn(store, 'startTrial');
+    const r = await runFirstLogin(deps({ store }), i);
+    expect(r.trial).toBe('not_eligible');
+    expect(startTrial).not.toHaveBeenCalled();
+  });
+});
+
+describe('runFirstLogin under interleaving of its calls', () => {
+  // JS-level only. PGlite runs each call as one serial transaction, so these stay green with the
+  // function's locks removed: two transactions racing inside the function are
+  // scripts/db/trial-race.test.ts, against CI's Postgres service.
   /** Two runs whose store calls the scheduler interleaves in any order. */
   async function interleave(
     s: fc.Scheduler,
@@ -355,7 +448,6 @@ describe('runFirstLogin under interleaving (JS-level; PGlite never contends on a
       ...d,
       store: wrap(d.store, s),
       entitlement: wrap(d.entitlement, s),
-      serialize: s.scheduleFunction(d.serialize),
     });
     // waitFor keeps releasing scheduled calls until both runs settle.
     return s.waitFor(
@@ -365,20 +457,6 @@ describe('runFirstLogin under interleaving (JS-level; PGlite never contends on a
       ]),
     );
   }
-
-  it('with the buckets bypassed, the version check alone still gives one trial and three rows', async () => {
-    await fc.assert(
-      fc.asyncProperty(fc.scheduler(), async (s) => {
-        await db?.close();
-        db = await doorDb();
-        const i = await input('cas@example.com');
-        const results = await interleave(s, i, i, { serialize: async () => true });
-        expect(results.filter((r) => r.trial === 'started')).toHaveLength(1);
-        expect(await ledgerRows((await accountOf(db, i.userId)).id)).toBe(3);
-      }),
-      { numRuns: 12 },
-    );
-  }, 600_000);
 
   it('two runs for one account: one trial, one site, one set of ledger rows', async () => {
     await fc.assert(
@@ -398,7 +476,7 @@ describe('runFirstLogin under interleaving (JS-level; PGlite never contends on a
     );
   }, 600_000);
 
-  it('two accounts whose emails normalise to one, on different devices: at most one trial', async () => {
+  it('two accounts whose emails normalise to one, on different devices: one trial', async () => {
     await fc.assert(
       fc.asyncProperty(fc.scheduler(), async (s) => {
         await db?.close();
@@ -406,27 +484,23 @@ describe('runFirstLogin under interleaving (JS-level; PGlite never contends on a
         const a = await input('ada.lovelace@gmail.com', { device: 'dev-a', ip: 'unknown' });
         const b = await input('adalovelace+2@gmail.com', { device: 'dev-b', ip: 'unknown' });
         await interleave(s, a, b);
-        expect(
-          await count(db, `select 1 from public.accounts where state = 'pro_trial'`),
-        ).toBeLessThanOrEqual(1);
+        expect(await count(db, `select 1 from public.accounts where state = 'pro_trial'`)).toBe(1);
       }),
       { numRuns: 12 },
     );
   }, 600_000);
 
-  it('two accounts sharing a device: at most one trial', async () => {
+  it('two accounts sharing a device that has one trial already: one more trial', async () => {
     await fc.assert(
       fc.asyncProperty(fc.scheduler(), async (s) => {
         await db?.close();
         db = await doorDb();
-        // One prior trial on the device: a second would be refused, so a third concurrent one must be too.
+        // One prior trial on the device: the first of these two is allowed and the second refused.
         await priorTrial({ email: 'first@example.org', device: 'shared', ip: 'unknown' }, 2);
         const a = await input('a@example.com', { device: 'shared' });
         const b = await input('b@example.com', { device: 'shared' });
         await interleave(s, a, b);
-        expect(
-          await count(db, `select 1 from public.accounts where state = 'pro_trial'`),
-        ).toBeLessThanOrEqual(1);
+        expect(await count(db, `select 1 from public.accounts where state = 'pro_trial'`)).toBe(1);
       }),
       { numRuns: 12 },
     );

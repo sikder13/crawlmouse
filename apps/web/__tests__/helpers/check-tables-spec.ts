@@ -5,12 +5,20 @@ import type { PGlite } from '@electric-sql/pglite';
 import { ENTITIES } from '@crawlmouse/types/v2';
 import { format, resolveConfig } from 'prettier';
 import { REPO_ROOT } from './accounts-spec-catalog';
-import { MIGRATIONS_DIR, ROLLBACKS_DIR, applyAllMigrations, freshDb } from './pglite-migrations';
+import {
+  MIGRATIONS_DIR,
+  ROLLBACKS_DIR,
+  applyAllMigrations,
+  freshDb,
+  migrationFiles,
+  readMigration,
+} from './pglite-migrations';
 import {
   MIGRATION_003,
   MIGRATION_005,
   MIGRATION_007,
   before,
+  constraints,
   revertFile,
   through,
 } from './v2-check-tables';
@@ -253,8 +261,86 @@ async function databaseOnlyColumns(db: PGlite): Promise<string[][]> {
   return rows.sort((x, y) => x[0]!.localeCompare(y[0]!));
 }
 
+/** A CHECK on one of these tables that a migration after 007 added, changed or dropped. */
+interface LaterCheck {
+  table: string;
+  name: string;
+  change: 'added' | 'changed' | 'dropped';
+  migration: string;
+  def: string | null;
+}
+
+/**
+ * The CHECKs on `tables` as each migration after 007 leaves them, compared one migration at a time,
+ * so each change is named with the file that made it.
+ */
+async function laterChecks(db007: PGlite, tables: string[]): Promise<LaterCheck[]> {
+  const d = (await db007.clone()) as PGlite;
+  try {
+    const read = async () => {
+      const out = new Map<string, string>();
+      for (const t of tables)
+        for (const c of await constraints(d, t)) out.set(`${t}\u0000${c.name}`, c.def);
+      return out;
+    };
+    const found: LaterCheck[] = [];
+    let prev = await read();
+    for (const file of migrationFiles().filter((f) => f > MIGRATION_007)) {
+      await d.exec(readMigration(file));
+      const now = await read();
+      const migration = file.replace(/\.sql$/, '');
+      for (const [key, def] of now) {
+        const [t, name] = key.split('\u0000') as [string, string];
+        if (!prev.has(key)) found.push({ table: t, name, change: 'added', migration, def });
+        else if (prev.get(key) !== def)
+          found.push({ table: t, name, change: 'changed', migration, def });
+      }
+      for (const key of prev.keys()) {
+        if (now.has(key)) continue;
+        const [t, name] = key.split('\u0000') as [string, string];
+        found.push({ table: t, name, change: 'dropped', migration, def: null });
+      }
+      prev = now;
+    }
+    return found;
+  } finally {
+    await d.close();
+  }
+}
+
+function laterChecksSection(later: LaterCheck[]): string {
+  if (later.length === 0)
+    return 'No migration after 007 adds, changes or drops a CHECK on these tables.';
+  return [
+    'The tables above are as 007 leaves them. These CHECKs on them were added, changed or dropped by a later migration, read by applying each later file in turn:',
+    '',
+    table(
+      ['Table', 'Constraint', 'Change', 'Migration', 'Definition after it'],
+      later.map((c) => [
+        code(c.table),
+        code(c.name),
+        c.change,
+        code(c.migration),
+        c.def === null ? '' : code(c.def),
+      ]),
+    ),
+  ].join('\n');
+}
+
+/** The site_fixes CHECKs that read inside a jsonb column, with the migration that made each. */
+async function jsonbFixChecks(db007: PGlite, later: LaterCheck[]): Promise<string> {
+  const reads = (def: string) => def.includes('->');
+  const at007 = (await constraints(db007, 'site_fixes'))
+    .filter((c) => reads(c.def))
+    .map((c) => `${code(c.name)} (by 007)`);
+  const after = later
+    .filter((c) => c.table === 'site_fixes' && c.change === 'added' && c.def && reads(c.def))
+    .map((c) => `${code(c.name)} (${code(c.migration)})`);
+  return [...at007, ...after].join(', ');
+}
+
 /** The storage declarations the contract guard verifies, as lists. */
-function contractLists(): string {
+function contractLists(jsonbChecks: string): string {
   return [
     '### Contract rules held as CHECKs',
     '',
@@ -283,7 +369,7 @@ function contractLists(): string {
     '',
     '### Contract rules the database does not check',
     '',
-    'Where a rule reads inside jsonb on a table only the server writes, it is the writer’s (owner ruling 1); `site_fixes_packet_framework` and `site_fixes_effect_pending` also read jsonb on such a table, but were CHECKs before the ruling and stay. The table gives the reason for each rule here. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).',
+    `Where a rule reads inside jsonb on a table only the server writes, it is the writer’s (owner ruling 1). The site_fixes CHECKs that read inside jsonb are the exceptions, each with the migration that made it: ${jsonbChecks}. Those there by 007 were CHECKs before the ruling and stay; those added later are CC-17’s effect rules, which the owner ruled CHECKs for CC-06c (2026-11-08; docs/specs/v2/06c-trial-function.md). The table gives the reason for each rule here. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).`,
     '',
     table(
       ['Rule', 'Why not a CHECK'],
@@ -545,10 +631,15 @@ export async function buildCheckTablesSpec(): Promise<string> {
   const db = await freshDb();
   await applyAllMigrations(db, undefined, through(MIGRATION_007));
   const cat = await readCatalog(pre, db);
+  const later = await laterChecks(db, cat.newTables);
 
   const parts = [intro(cat.newTables), '## Tables', ''];
   for (const t of cat.newTables) parts.push(await tableSection(db, t));
   parts.push(
+    '## CHECKs changed by later migrations',
+    '',
+    laterChecksSection(later),
+    '',
     '## Columns added to existing tables',
     '',
     table(
@@ -573,7 +664,7 @@ export async function buildCheckTablesSpec(): Promise<string> {
     TOKEN,
     '## How the contract is stored',
     '',
-    contractLists(),
+    contractLists(await jsonbFixChecks(db, later)),
     DIFFERENCES,
     OPEN_QUESTIONS,
     FOLLOW_UPS_HEAD,

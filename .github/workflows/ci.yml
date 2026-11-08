@@ -397,7 +397,8 @@ jobs:
 
   # The real Supabase CLI, against an empty Postgres, lists exactly the files of
   # infra/supabase/migrations (scripts/db/verify-cli-files.ts). The unit test pins the wrapper's
-  # list; this pins what the CLI itself reads.
+  # list; this pins what the CLI itself reads. The same Postgres then hosts the 006c race test, which
+  # needs two real transactions open at once (PGlite has one backend).
   db-cli-files:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -423,3 +424,11 @@ jobs:
           # The CLI opens with TLS unless told not to; the service container has none.
           PGSSLMODE: disable
         run: pnpm exec tsx db/verify-cli-files.ts
+      - name: Two transactions race in start_trial_with_ledger (006c)
+        working-directory: scripts
+        env:
+          TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          # Fail, rather than skip, if the URL ever goes missing.
+          TRIAL_RACE_REQUIRED: '1'
+        # A renamed or missing file must fail the step, not pass it with no tests.
+        run: pnpm exec vitest run db/trial-race.test.ts --passWithNoTests=false

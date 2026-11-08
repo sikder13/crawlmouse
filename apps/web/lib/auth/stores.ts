@@ -1,20 +1,13 @@
 /**
  * The door's stores for the routes: the service-role supabase-js client (`sb` must be
- * `supabaseAdmin()`), the rate-limit bucket as the serialiser, and Sentry as the reporter.
+ * `supabaseAdmin()`), and Sentry as the reporter.
  * PostgREST reports a Postgres error's SQLSTATE as `error.code`; 23505 (unique violation) is read
  * here as "already there".
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type {
-  CheckForClaim,
-  DoorStore,
-  MemberAccount,
-  NewSite,
-  Report,
-  Serialize,
-} from './door-store';
-import type { PriorLedgerRow } from './ledger';
+import type { CheckForClaim, DoorStore, MemberAccount, NewSite, Report } from './door-store';
 import type { SiteSchedule } from './schedule';
+import { parseTrialDecision } from './trial-decision';
 
 type PgError = { code?: string; message: string } | null;
 
@@ -82,35 +75,14 @@ export function supabaseDoorStore(sb: SupabaseClient): DoorStore {
       if (error) fail('accounts timezone write', error);
     },
 
-    async priorLedger(hashes, since) {
-      if (hashes.length === 0) return [];
-      const { data, error } = await sb
-        .from('trial_ledger')
-        .select('kind, value_hash, created_at')
-        .in(
-          'value_hash',
-          hashes.map((h) => h.value_hash),
-        )
-        .gt('created_at', since.toISOString());
-      if (error) fail('trial_ledger read', error);
-      const wanted = new Set(hashes.map((h) => `${h.kind}:${h.value_hash}`));
-      return (
-        (data ?? []) as { kind: PriorLedgerRow['kind']; value_hash: string; created_at: string }[]
-      )
-        .filter((r) => wanted.has(`${r.kind}:${r.value_hash}`))
-        .map((r) => ({ kind: r.kind, created_at: new Date(r.created_at) }));
-    },
-
-    async insertLedger(accountId, hashes) {
-      const { error } = await sb.from('trial_ledger').insert(
-        hashes.map((h) => ({
-          kind: h.kind,
-          value_hash: h.value_hash,
-          account_id: accountId,
-          trial_kind: 'pro',
-        })),
-      );
-      if (error) fail('trial_ledger write', error);
+    async startTrial(accountId, hashes, transition) {
+      const { data, error } = await sb.rpc('start_trial_with_ledger', {
+        p_account_id: accountId,
+        p_hashes: hashes,
+        p_transition: transition,
+      });
+      if (error) fail('start_trial_with_ledger', error);
+      return parseTrialDecision(data);
     },
 
     async countActiveSites(accountId) {
@@ -188,52 +160,6 @@ export function supabaseDoorStore(sb: SupabaseClient): DoorStore {
       const { error } = await sb.from('checks').update({ expires_at: null }).eq('id', checkId);
       if (error) fail('checks expiry write', error);
     },
-  };
-}
-
-/** The slot window. */
-export const SERIALIZE_WINDOW_MS = 10 * 60 * 1000;
-
-/**
- * One atomic count for a key in a window: the `increment_rate_limit` RPC's contract (migration
- * 20260524000005), returning the count after this call, or null when the store cannot say.
- */
-export type IncrementCell = (key: string, windowStart: Date) => Promise<number | null>;
-
-/**
- * The slot over two grids of `SERIALIZE_WINDOW_MS`, the second shifted by half a window. A call
- * counts itself in the cell of each grid that holds its moment, and holds the slot only when it is
- * the first in both. Of two calls less than half a window apart, a grid boundary can fall between
- * them in at most one grid, so they share a cell in the other and the second is always refused. Up
- * to a full window apart they may still share a cell, and the second may be refused; further apart
- * they never do, and the ledger lookup decides. Two calls a few milliseconds apart can each count
- * first in one grid, and then both are refused. A cell the store cannot count refuses (fail closed).
- */
-export function gridSerialize(increment: IncrementCell, now: () => Date): Serialize {
-  return async (key) => {
-    const t = now().getTime();
-    const w = SERIALIZE_WINDOW_MS;
-    let first = true;
-    for (const [grid, shift] of [
-      [0, 0],
-      [1, w / 2],
-    ] as const) {
-      const start = new Date(Math.floor((t + shift) / w) * w - shift);
-      const count = await increment(`${key}:g${grid}`, start);
-      if (count === null || count > 1) first = false;
-    }
-    return first;
-  };
-}
-
-/** `increment_rate_limit` through the service-role client. A failed call reads as null. */
-export function supabaseIncrement(sb: SupabaseClient): IncrementCell {
-  return async (key, windowStart) => {
-    const { data, error } = await sb.rpc('increment_rate_limit', {
-      p_bucket_key: key,
-      p_window_start: windowStart.toISOString(),
-    });
-    return error || typeof data !== 'number' ? null : data;
   };
 }
 

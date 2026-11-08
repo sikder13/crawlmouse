@@ -7,6 +7,7 @@
  */
 import { claimCheck, type ClaimDeps } from './claim';
 import {
+  bindingMismatch,
   claimFromNext,
   claimRefusedDest,
   DASHBOARD,
@@ -52,6 +53,9 @@ export async function afterSignIn(
     input.boundTo !== undefined &&
     user.email !== undefined &&
     input.boundTo === emailBinding(user.email);
+  // Another address's link opened in a browser that asked for one: this browser's device id is the
+  // victim's, and recording it under the other account would refuse the victim's own trial later.
+  const device = bindingMismatch(input.boundTo, user.email) ? null : input.device;
   if (user.email) {
     try {
       const r = await runFirstLogin(deps.firstLogin, {
@@ -59,7 +63,7 @@ export async function afterSignIn(
         email: user.email,
         emailConfirmedAt: user.email_confirmed_at ?? null,
         lastSignInAt: user.last_sign_in_at ?? null,
-        device: input.device,
+        device,
         ip: input.ip,
         signup: bound ? input.signup : null,
       });
