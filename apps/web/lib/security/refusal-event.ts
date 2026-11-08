@@ -18,6 +18,8 @@ export interface Refusal {
 
 /** The share of refusals sent. Counts stay proportional, so a spike is still a spike. */
 export const REFUSAL_SAMPLE_RATE = 0.1;
+/** At most this many sent per minute by one instance, so a flood cannot buy unbounded events. */
+export const REFUSALS_PER_MINUTE = 30;
 
 const POSTHOG_CAPTURE_URL = 'https://us.i.posthog.com/i/v0/e/';
 
@@ -26,6 +28,7 @@ export interface RefusalSinks {
   posthog: (refusal: Refusal) => Promise<void>;
   random: () => number;
   rate: number;
+  now: () => number;
 }
 
 /** Where refusals go in production; tests pass their own. */
@@ -58,17 +61,34 @@ export const DEFAULT_SINKS: RefusalSinks = {
   },
   random: Math.random,
   rate: REFUSAL_SAMPLE_RATE,
+  now: Date.now,
 };
 
+let windowMinute = -1;
+let sentThisMinute = 0;
+
+/** Takes one of this minute's sends, or returns false when the minute's allowance is spent. */
+function takeSend(nowMs: number): boolean {
+  const minute = Math.floor(nowMs / 60_000);
+  if (minute !== windowMinute) {
+    windowMinute = minute;
+    sentThisMinute = 0;
+  }
+  if (sentThisMinute >= REFUSALS_PER_MINUTE) return false;
+  sentThisMinute += 1;
+  return true;
+}
+
 /**
- * Sends the refusal when it falls inside the sample. Resolves once PostHog has answered (or failed,
- * which is swallowed: telemetry never changes a response), so a caller can hand it to `waitUntil`.
+ * Sends the refusal when it falls inside the sample and this instance's minute allowance is not
+ * spent. Resolves once PostHog has answered (or failed, which is swallowed: telemetry never changes a
+ * response), so a caller can hand it to `waitUntil`.
  */
 export async function reportRefusal(
   refusal: Refusal,
   sinks: RefusalSinks = DEFAULT_SINKS,
 ): Promise<void> {
-  if (sinks.random() >= sinks.rate) return;
+  if (sinks.random() >= sinks.rate || !takeSend(sinks.now())) return;
   sinks.sentry(refusal);
   await sinks.posthog(refusal);
 }

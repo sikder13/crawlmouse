@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_SINKS,
+  REFUSALS_PER_MINUTE,
   REFUSAL_SAMPLE_RATE,
   reportRefusal,
   type Refusal,
@@ -18,7 +19,11 @@ const REFUSAL: Refusal = {
   status: 403,
 };
 
-function sinks(random: number, rate = REFUSAL_SAMPLE_RATE) {
+// Each test starts in a minute of its own, so the per-minute allowance starts fresh.
+let minute = 1_000_000;
+const freshMinute = () => (minute += 2) * 60_000;
+
+function sinks(random: number, rate = REFUSAL_SAMPLE_RATE, at = freshMinute()) {
   const sent: string[] = [];
   const s: RefusalSinks = {
     sentry: () => sent.push('sentry'),
@@ -27,6 +32,7 @@ function sinks(random: number, rate = REFUSAL_SAMPLE_RATE) {
     },
     random: () => random,
     rate,
+    now: () => at,
   };
   return { s, sent };
 }
@@ -57,13 +63,34 @@ describe('security.refused is sampled', () => {
   });
 });
 
+describe('security.refused is capped per instance per minute', () => {
+  it(`sends at most ${REFUSALS_PER_MINUTE} in one minute, and again in the next`, async () => {
+    const at = freshMinute();
+    const { s, sent } = sinks(0, 1, at);
+    for (let i = 0; i < REFUSALS_PER_MINUTE + 5; i++) await reportRefusal(REFUSAL, s);
+    expect(sent.filter((x) => x === 'sentry')).toHaveLength(REFUSALS_PER_MINUTE);
+    const next = sinks(0, 1, at + 60_000);
+    await reportRefusal(REFUSAL, next.s);
+    expect(next.sent).toEqual(['sentry', 'posthog']);
+  });
+
+  it('a draw outside the sample does not spend the allowance', async () => {
+    const at = freshMinute();
+    for (let i = 0; i < REFUSALS_PER_MINUTE * 2; i++)
+      await reportRefusal(REFUSAL, sinks(0.5, 0.1, at).s);
+    const { s, sent } = sinks(0, 1, at);
+    await reportRefusal(REFUSAL, s);
+    expect(sent).toEqual(['sentry', 'posthog']);
+  });
+});
+
 describe('what each sink receives', () => {
-  const always = { random: () => 0, rate: 1 };
+  const always = () => ({ random: () => 0, rate: 1, now: freshMinute });
 
   it('Sentry: one warning named security.refused, the fields as tags', async () => {
     const fetchSpy = vi.fn(async () => new Response(null));
     vi.stubGlobal('fetch', fetchSpy);
-    await reportRefusal(REFUSAL, { ...DEFAULT_SINKS, ...always });
+    await reportRefusal(REFUSAL, { ...DEFAULT_SINKS, ...always() });
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
     expect(sentry.captureMessage).toHaveBeenCalledWith('security.refused', {
       level: 'warning',
@@ -81,7 +108,7 @@ describe('what each sink receives', () => {
     vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'test-project-key');
     const fetchSpy = vi.fn(async () => new Response(null));
     vi.stubGlobal('fetch', fetchSpy);
-    await reportRefusal(REFUSAL, { ...DEFAULT_SINKS, ...always });
+    await reportRefusal(REFUSAL, { ...DEFAULT_SINKS, ...always() });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://us.i.posthog.com/i/v0/e/');
@@ -99,10 +126,12 @@ describe('what each sink receives', () => {
       throw new Error('network');
     });
     vi.stubGlobal('fetch', fetchSpy);
-    await reportRefusal(REFUSAL, { ...DEFAULT_SINKS, ...always });
+    await reportRefusal(REFUSAL, { ...DEFAULT_SINKS, ...always() });
     expect(fetchSpy).not.toHaveBeenCalled();
     vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'test-project-key');
-    await expect(reportRefusal(REFUSAL, { ...DEFAULT_SINKS, ...always })).resolves.toBeUndefined();
+    await expect(
+      reportRefusal(REFUSAL, { ...DEFAULT_SINKS, ...always() }),
+    ).resolves.toBeUndefined();
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });
