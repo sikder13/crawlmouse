@@ -89,7 +89,9 @@ export function gate(sarifs, { baseline, now = new Date() } = {}) {
       if (result.baselineState === 'absent') continue;
       const rule = ruleOf(run, result);
       if (!rule) {
-        problems.push(`a result names a rule the SARIF does not describe: ${result.ruleId ?? result.rule?.id}`);
+        problems.push(
+          `a result names a rule the SARIF does not describe: ${result.ruleId ?? result.rule?.id}`,
+        );
         continue;
       }
       const severity = Number(rule.properties?.['security-severity'] ?? 0);
