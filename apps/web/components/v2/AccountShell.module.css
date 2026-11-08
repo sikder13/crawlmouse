@@ -1,6 +1,9 @@
 /* The account frame (Final-Dashboard .rail and main): a 200px rail beside the page. */
 
-.frame {
+/* Doubled so it outweighs PageShell's `.shell` (a column, the same element) whatever order the build
+   emits the two stylesheets in: at equal weight the production build put `.shell` last, and the rail
+   became a band across the top of every account screen. */
+.frame.frame {
   flex-direction: row;
   flex-wrap: wrap;
   font-size: var(--v2-text-small);
