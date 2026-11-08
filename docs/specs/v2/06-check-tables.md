@@ -1039,6 +1039,16 @@ Policies:
 
 Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
+## CHECKs changed by later migrations
+
+The tables above are as 007 leaves them. These CHECKs on them were added, changed or dropped by a later migration, read by applying each later file in turn:
+
+| Table        | Constraint                      | Change  | Migration                                          | Definition after it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------ | ------------------------------- | ------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `site_fixes` | `site_fixes_effect_absorbed`    | added   | `20261108000001_v2_006c_trial_function_and_checks` | `CHECK ((NOT ((COALESCE((effect -> 'absorbed_by'::text), 'null'::jsonb) <> 'null'::jsonb) AND ((COALESCE(((effect ->> 'technical_seo'::text))::numeric, (0)::numeric) + COALESCE(((effect ->> 'ai_readability'::text))::numeric, (0)::numeric)) > (0)::numeric))))`                                                                                                                                                                                                                                |
+| `site_fixes` | `site_fixes_effect_seo_pending` | added   | `20261108000001_v2_006c_trial_function_and_checks` | `CHECK (((COALESCE((effect -> 'technical_seo'::text), 'null'::jsonb) = 'null'::jsonb) = (jsonb_array_length(COALESCE((effect -> 'technical_seo_pending_on'::text), '[]'::jsonb)) > 0)))`                                                                                                                                                                                                                                                                                                           |
+| `site_fixes` | `site_fixes_type_check`         | changed | `20261108000001_v2_006c_trial_function_and_checks` | `CHECK ((type = ANY (ARRAY['robots_txt_blocks_crawler'::text, 'edge_rule_blocks_crawler'::text, 'client_rendered_template'::text, 'orphan_pages'::text, 'quotable_opening'::text, 'generic_anchor_text'::text, 'deep_pages'::text, 'specs_as_images'::text, 'missing_author_date'::text, 'js_only_navigation'::text, 'redirect_chain'::text, 'duplicate_pagination'::text, 'canonical_mismatch'::text, 'hreflang_gap'::text, 'missing_schema_description'::text, 'no_question_headings'::text])))` |
+
 ## Columns added to existing tables
 
 | Table                  | Column             | Type    | Null | Default |
@@ -1148,6 +1158,8 @@ The Fly worker is meant to reach Supabase with this token and nothing else. It n
 | `report_slug`             | `reports`.`reports_slug`                                    |
 | `report_open_tracking`    | `reports`.`reports_open_tracking`                           |
 | `fix_gone`                | `site_fixes`.`site_fixes_gone`                              |
+| `effect_seo_pending`      | `site_fixes`.`site_fixes_effect_seo_pending`                |
+| `effect_absorbed`         | `site_fixes`.`site_fixes_effect_absorbed`                   |
 | `access_request_line`     | `access_tests`.`access_tests_request_line`                  |
 | `change_severity`         | `changes`.`changes_severity`                                |
 | `change_resolved_info`    | `changes`.`changes_resolved_info`                           |
@@ -1190,7 +1202,7 @@ The Fly worker is meant to reach Supabase with this token and nothing else. It n
 
 ### Contract rules the database does not check
 
-Where a rule reads inside jsonb on a table only the server writes, it is the writer’s (owner ruling 1); `site_fixes_packet_framework` and `site_fixes_effect_pending` also read jsonb on such a table, but were CHECKs before the ruling and stay. The table gives the reason for each rule here. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).
+Where a rule reads inside jsonb on a table only the server writes, it is the writer’s (owner ruling 1). The site_fixes CHECKs that read inside jsonb are the exceptions, each with the migration that made it: `site_fixes_effect_pending` (by 007), `site_fixes_packet_framework` (by 007), `site_fixes_effect_absorbed` (`20261108000001_v2_006c_trial_function_and_checks`), `site_fixes_effect_seo_pending` (`20261108000001_v2_006c_trial_function_and_checks`). Those there by 007 were CHECKs before the ruling and stay; those added later are CC-17’s effect rules, which the owner ruled CHECKs for CC-06c (2026-11-08; docs/specs/v2/06c-trial-function.md). The table gives the reason for each rule here. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).
 
 | Rule                     | Why not a CHECK                                                                                                                                                                                    |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1211,8 +1223,6 @@ Where a rule reads inside jsonb on a table only the server writes, it is the wri
 | `withheld_reasons_match` | compares the reasons with the components inside checks.ai_readability                                                                                                                              |
 | `fewer_crawlers`         | reads the Access component inside checks.ai_readability                                                                                                                                            |
 | `content_score_withheld` | compares two fields inside checks.content                                                                                                                                                          |
-| `effect_seo_pending`     | inside site_fixes.effect; added by CC-17 after the v2-003 migration, and a CHECK like site_fixes_effect_pending needs a migration, which the owner applies                                         |
-| `effect_absorbed`        | sums two numbers inside site_fixes.effect; added by CC-17 after the v2-003 migration, which the owner applies                                                                                      |
 | `time_zone`              | a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses                                                                        |
 | `coverage_robots`        | compares counts inside checks.coverage                                                                                                                                                             |
 | `packet_bodies`          | per element of site_fixes.packet.packets                                                                                                                                                           |
