@@ -1,16 +1,11 @@
 /**
- * The trial ledger rule (CC-25, D4 as amended on 2026-11-05).
- *
- * A first login is refused the no-card Pro trial when a `trial_ledger` row with the same hash says:
- * - `email`: a trial on this normalised email in the last 12 months;
- * - `device`: two trials from this browser's `cm_auth_device` id in the last 30 days (this would be the
- *   third, SECURITY-DESIGN §5.3);
- * - `ip24`: two trials from this /24 (IPv4) or /48 (IPv6) in the last 30 days AND at least one from
- *   this device in the same 30 days: the IP never refuses a trial on its own (§5.3, shared networks).
+ * The trial ledger's values (CC-25, D4 as amended on 2026-11-05). The rule that reads them is SQL:
+ * `public.trial_ledger_refusals`, called by `start_trial_with_ledger` (migration 006c,
+ * docs/specs/v2/06c-trial-function.md). This module computes what that function is given.
  *
  * Values are stored as HMAC-SHA256 under `TRIAL_LEDGER_PEPPER`, keyed by kind, so a row says nothing
- * readable and a hash of one kind never matches another. CC-04 owns the `hostname` and
- * `card_fingerprint` kinds and the 13-month sweep; rows of those kinds are not read here.
+ * readable and a hash of one kind never matches another. The pepper never leaves this process.
+ * CC-04 owns the `hostname` and `card_fingerprint` kinds and the 13-month sweep.
  */
 import { createHmac } from 'node:crypto';
 import { isIP } from 'node:net';
@@ -24,18 +19,13 @@ export interface LedgerValue {
   value: string;
 }
 
-export interface PriorLedgerRow {
-  kind: LedgerKind;
-  created_at: Date;
-}
-
-export interface LedgerDecision {
-  deny: boolean;
-  /** The kinds that refused the trial, in LEDGER_KINDS order; empty when it is allowed. */
-  hits: LedgerKind[];
-}
-
-const DAY_MS = 86_400_000;
+/*
+ * The rule's numbers, as spec 25 states them. The SQL holds its own copy, and
+ * __tests__/v2-006c-trial-function.test.ts runs vectors built from these through it, so the two
+ * cannot differ without that test failing.
+ */
+/** The window of the email rule, in calendar months. */
+export const EMAIL_MONTHS = 12;
 /** The window of the device and IP rules. */
 export const RECENT_DAYS = 30;
 /** Prior trials from one device (or one network) that refuse the next. */
@@ -43,48 +33,8 @@ export const RECENT_TRIALS_REFUSED_AT = 2;
 /** A pepper shorter than this is treated as unset. */
 export const MIN_PEPPER_LENGTH = 32;
 
-/** The same instant 12 calendar months earlier, clamped to the month's last day (Postgres's rule). */
-export function twelveMonthsBefore(now: Date): Date {
-  const d = new Date(now.getTime());
-  const day = d.getUTCDate();
-  d.setUTCDate(1);
-  d.setUTCFullYear(d.getUTCFullYear() - 1);
-  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
-  d.setUTCDate(Math.min(day, lastDay));
-  return d;
-}
-
-/** The earliest `created_at` any rule reads: rows older than this cannot change the decision. */
-export function oldestRelevant(now: Date): Date {
-  return twelveMonthsBefore(now);
-}
-
-export function ledgerDecision(rows: readonly PriorLedgerRow[], now: Date): LedgerDecision {
-  const yearStart = twelveMonthsBefore(now).getTime();
-  const recentStart = now.getTime() - RECENT_DAYS * DAY_MS;
-  const count = (kind: LedgerKind, since: number) =>
-    rows.filter((r) => r.kind === kind && r.created_at.getTime() > since).length;
-
-  const email = count('email', yearStart) > 0;
-  const devices = count('device', recentStart);
-  const device = devices >= RECENT_TRIALS_REFUSED_AT;
-  const ip = count('ip24', recentStart) >= RECENT_TRIALS_REFUSED_AT && devices > 0;
-
-  const hits = LEDGER_KINDS.filter((k) => ({ email, device, ip24: ip })[k]);
-  return { deny: hits.length > 0, hits };
-}
-
 export function hashLedgerValue(pepper: string, kind: LedgerKind, value: string): string {
   return createHmac('sha256', pepper).update(`${kind}:${value}`).digest('hex');
-}
-
-/**
- * The name of the one-shot slot a first login takes on a ledger value. A separate HMAC label, so the
- * slot's key (stored in `rate_limits`) never equals the
- * ledger row's `value_hash`, and the two cannot be joined.
- */
-export function slotKey(pepper: string, kind: LedgerKind, valueHash: string): string {
-  return `trial:${kind}:${createHmac('sha256', pepper).update(`slot:${kind}:${valueHash}`).digest('hex')}`;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;

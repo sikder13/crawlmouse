@@ -6,8 +6,9 @@
 import type { AccountState } from '@crawlmouse/types/v2';
 import type { PaidTier, Tier } from '../entitlement-v2';
 import type { TrialVariant } from '../billing/state-machine';
-import type { LedgerKind, PriorLedgerRow } from './ledger';
+import type { LedgerKind } from './ledger';
 import type { SiteSchedule } from './schedule';
+import type { TrialDecision, TrialTransition } from './trial-decision';
 
 /** A user's default account, with what the door needs of it. */
 export interface MemberAccount {
@@ -50,9 +51,16 @@ export interface DoorStore {
   /** The user's default account and its active owner seat, or null when the user has none. */
   loadMember(userId: string): Promise<MemberAccount | null>;
   setTimezone(accountId: string, zone: string): Promise<void>;
-  /** Ledger rows of these kinds and hashes created after `since`, from any account. */
-  priorLedger(hashes: readonly LedgerHash[], since: Date): Promise<PriorLedgerRow[]>;
-  insertLedger(accountId: string, hashes: readonly LedgerHash[]): Promise<void>;
+  /**
+   * `start_trial_with_ledger` (migration 006c): the ledger rule, the trial and its ledger rows in one
+   * transaction. Throws with the SQLSTATE as `code` on an error, and MalformedTrialDecisionError on
+   * an answer that is not a decision.
+   */
+  startTrial(
+    accountId: string,
+    hashes: readonly LedgerHash[],
+    transition: TrialTransition,
+  ): Promise<TrialDecision>;
   /** Kept, not removed, primary (not staging) sites of the account. */
   countActiveSites(accountId: string): Promise<number>;
   /** 'exists' when the account already keeps that host (`sites_account_host_uq`). */
@@ -62,13 +70,6 @@ export interface DoorStore {
   takeSite(siteId: string, site: Omit<NewSite, 'host'>): Promise<TakeSiteResult>;
   clearExpiry(checkId: string): Promise<void>;
 }
-
-/**
- * Takes the slot named by `key` (stores.ts `gridSerialize`). False when another caller took it
- * recently (always within half a slot window), or when the store cannot say: the caller then
- * refuses, never allows.
- */
-export type Serialize = (key: string) => Promise<boolean>;
 
 /** A Sentry signal: a name, and ids only (never an email or a ledger value). */
 export type Report = (signal: string, extra: Record<string, string>) => void;

@@ -853,6 +853,34 @@ const RULE_CASES: Record<
       },
     }),
   },
+  site_fixes_effect_seo_pending: {
+    table: 'site_fixes',
+    row: async () => ({
+      ...(await freshRow('site_fixes')),
+      effect: {
+        technical_seo: null,
+        technical_seo_pending_on: [],
+        ai_readability: 1,
+        ai_readability_pending_on: [],
+        absorbed_by: null,
+        estimate: true,
+      },
+    }),
+  },
+  site_fixes_effect_absorbed: {
+    table: 'site_fixes',
+    row: async () => ({
+      ...(await freshRow('site_fixes')),
+      effect: {
+        technical_seo: 2,
+        technical_seo_pending_on: [],
+        ai_readability: 1,
+        ai_readability_pending_on: [],
+        absorbed_by: 3,
+        estimate: true,
+      },
+    }),
+  },
   fix_events_kind_fields: {
     table: 'fix_events',
     row: async () => ({ ...(await freshRow('fix_events')), check_id: null }),
@@ -1147,6 +1175,22 @@ const OTHER_WAY: {
         technical_seo: 2,
         ai_readability: 1,
         ai_readability_pending_on: ['0123456789abcdef'],
+        estimate: true,
+      },
+    }),
+  },
+  {
+    constraint: 'site_fixes_effect_seo_pending',
+    table: 'site_fixes',
+    label: 'a Technical SEO effect while still pending',
+    row: async () => ({
+      ...(await freshRow('site_fixes')),
+      effect: {
+        technical_seo: 2,
+        technical_seo_pending_on: ['grade_refused'],
+        ai_readability: 1,
+        ai_readability_pending_on: [],
+        absorbed_by: null,
         estimate: true,
       },
     }),

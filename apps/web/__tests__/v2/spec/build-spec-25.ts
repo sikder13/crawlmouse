@@ -5,11 +5,15 @@ import * as constants from '../../../lib/auth/constants';
 import * as prices from '../../../lib/billing/prices';
 import { TRIAL_DAYS } from '../../../lib/billing/state-machine';
 import { GATES } from '../../../lib/entitlement-v2';
-import { MIN_PEPPER_LENGTH, RECENT_DAYS, RECENT_TRIALS_REFUSED_AT } from '../../../lib/auth/ledger';
+import {
+  EMAIL_MONTHS,
+  MIN_PEPPER_LENGTH,
+  RECENT_DAYS,
+  RECENT_TRIALS_REFUSED_AT,
+} from '../../../lib/auth/ledger';
 import { FIRST_LOGIN_TOLERANCE_MS, TRIAL_OUTCOMES } from '../../../lib/auth/first-login';
 import { CLAIM_REFUSALS } from '../../../lib/auth/claim';
 import { SCHEDULE_HOUR_LOCAL } from '../../../lib/auth/schedule';
-import { SERIALIZE_WINDOW_MS } from '../../../lib/auth/stores';
 import { ACCOUNT_DOOR_CHANGES } from '../../../lib/v2/copy/account-door';
 import { PREVIEWS } from '../../../app/(v2-preview)/v2-preview/_preview/registry';
 import {
@@ -141,9 +145,9 @@ function firstLoginSection(): string {
     '',
     `First login is the verify that confirmed the email: in that verify’s response \`email_confirmed_at\` and \`last_sign_in_at\` are within ${FIRST_LOGIN_TOLERANCE_MS / 1000} s of each other (D5 as amended). It depends on Supabase Auth’s \`mailer_autoconfirm\` being false, which \`auth-config --read\` asserts.`,
     '',
-    `The ledger rule (D4 as amended, with SECURITY-DESIGN §5.3): the trial is refused when \`trial_ledger\` holds, under the same hash, an \`email\` row younger than 12 calendar months; or ${RECENT_TRIALS_REFUSED_AT} \`device\` rows in the last ${RECENT_DAYS} days; or ${RECENT_TRIALS_REFUSED_AT} \`ip24\` rows in the last ${RECENT_DAYS} days together with a \`device\` row in the same window. An IP alone never refuses. IPv4 is keyed by its /24, IPv6 by its /48. Values are HMAC-SHA256 under \`TRIAL_LEDGER_PEPPER\` over \`kind:value\`; a pepper shorter than ${MIN_PEPPER_LENGTH} characters reads as none, and then nothing is read or written, the account stays Free and Sentry gets \`auth.trial-ledger-no-pepper\`. CC-04 owns the \`hostname\` and \`card_fingerprint\` kinds and the 13-month sweep.`,
+    `The ledger rule (D4 as amended, with SECURITY-DESIGN §5.3): the trial is refused when \`trial_ledger\` holds, under the same hash, an \`email\` row younger than ${EMAIL_MONTHS} calendar months; or ${RECENT_TRIALS_REFUSED_AT} \`device\` rows in the last ${RECENT_DAYS} days; or ${RECENT_TRIALS_REFUSED_AT} \`ip24\` rows in the last ${RECENT_DAYS} days together with a \`device\` row in the same window. An IP alone never refuses. IPv4 is keyed by its /24, IPv6 by its /48. Values are HMAC-SHA256 under \`TRIAL_LEDGER_PEPPER\` over \`kind:value\`; a pepper shorter than ${MIN_PEPPER_LENGTH} characters reads as none, and then nothing is read or written, the account stays Free and Sentry gets \`auth.trial-ledger-no-pepper\`. CC-04 owns the \`hostname\` and \`card_fingerprint\` kinds and the 13-month sweep.`,
     '',
-    `Before the lookup, a slot is taken on the email and the device hash (\`gridSerialize\`, \`lib/auth/stores.ts\`): one \`increment_rate_limit\` count in each of two grids of ${minutes(SERIALIZE_WINDOW_MS)}, the second shifted by half a window. Of two first logins sharing either less than ${minutes(SERIALIZE_WINDOW_MS / 2)} apart, the second is always refused; up to ${minutes(SERIALIZE_WINDOW_MS)} apart it may be; further apart the ledger lookup decides. Two that arrive within milliseconds can both be refused (\`busy\`, which is final: first login happens once). A count the store cannot make refuses. The slot’s key is its own HMAC, never the ledger hash. The trial is \`trial_started {variant: 'no_card'}\` through \`applyEntitlementTransition\`; the ledger rows are written only when that transition was applied.`,
+    "The trial is decided in one call, `start_trial_with_ledger` (migration 006c, `docs/specs/v2/06c-trial-function.md`), and the rule above is SQL in it (`trial_ledger_refusals`); the numbers here are the ones `lib/auth/ledger.ts` names, and `__tests__/v2-006c-trial-function.test.ts` runs vectors built from them through the SQL. The hook computes the hashes (the pepper never leaves the app) and `trial_started {variant: 'no_card'}` with `next()`. The function, in one transaction, locks the account and each hash, applies the rule, and either refuses or applies the transition through `apply_entitlement_transition` and writes the ledger rows. A decision it cannot make (an error other than a stale version, a lock timeout, an answer that is not a decision) is reported to Sentry as `auth.trial-decision-failed` with its `reason`, and the account stays Free; a stale version (`40001`) is a lost race, `not_first`, not reported.",
     '',
     table(
       ['Outcome', 'Meaning'],
@@ -210,6 +214,7 @@ function ownerSection(): string {
       )}, then reads back and checks \`mailer_autoconfirm = false\`, \`site_url = ${PRODUCTION_SITE_URL}\` and that the magic-link and confirmation templates link to \`${MAGIC_LINK_HREF}\` and \`${SIGNUP_HREF}\`.`,
     '3. Set `V2_ACCOUNT_DOOR=1` for Preview deployments only, and redeploy.',
     '4. Production gets `V2_ACCOUNT_DOOR=1` when CC-20b and CC-26 ship, not in this step.',
+    '5. Before Production gets `V2_ACCOUNT_DOOR=1`: `db-apply-prod` has applied `20261108000001_v2_006c_trial_function_and_checks.sql` and the owner has verified it (`docs/specs/v2/06c-trial-function.md`, "After the apply"). The first-login hook calls `start_trial_with_ledger` and has no other path, so without it every first login fails and stays Free. The door goes off in Production before any rollback of that migration.',
   ].join('\n');
 }
 
@@ -217,12 +222,13 @@ function gapsSection(): string {
   return [
     '## Known gaps and follow-ups',
     '',
-    "- **CC-06c: `start_trial_with_ledger(account_id, hashes[])`**, one SQL function, owner-applied; `hashes` is the array of `(kind, value_hash)` pairs the hook computes. Today the trial and its ledger rows are two PostgREST calls: a crash between them leaves a trial with no ledger rows (reported to Sentry as `auth.trial-ledger-write-failed`). The function does, in one transaction: lock the account `for update`; refuse unless `state = 'free' and trial_used_at is null`; read `trial_ledger` for the hashes under the rule above; apply the transition `apply_entitlement_transition` applies for `trial_started`; insert the rows; return the outcome. `lib/auth/first-login.ts` then calls it in place of steps 2 to 4.",
+    '- **The trial and its ledger rows are one transaction (CC-06c, closed).** `start_trial_with_ledger` replaced the separate ledger read, transition and insert, and the rate-limit slot before them; `auth.trial-ledger-write-failed` no longer exists. Its own known gaps are in `docs/specs/v2/06c-trial-function.md`.',
+    '- **A failed trial decision is not retried** (CC-06c D11). First login is detected once; a sign-up whose decision failed stays Free, and Sentry has `auth.trial-decision-failed` for it.',
     '- **Cross-device.** The named site and a Keep’s claim ride cookies in the browser that asked for the link. Opened on another device, the link signs in and the trial is decided, but no site is attached and no audit claimed; the copy says "opened in this browser".',
     '- **The ledger is decided after Check-email is shown.** A refused sign-up reads "if it is your first trial" there; CC-26 shows the reason category on the dashboard.',
     '- **No-JS Continue** signs in and redirects, and fires no PostHog event.',
     '- **The check id is the claim right** (ARCH-2 §4.3): a member who holds an unowned check’s id may claim it. Two claims for two sites can pass the site limit together; the limit has no database constraint.',
-    '- **Login CSRF through the link itself**: someone can send a person a sign-in link to the sender’s own account; opening it puts the sender’s token in `cm_auth_otp`, and Continue signs the person in as the sender. The POST refuses cross-site posts, which stops a page from doing this silently; the link itself is inherent to magic links. A named site and a Keep are bound to the address that asked for them (`cm_auth_for`), so they stay out of the sender’s account; the person’s anonymous v1 audits in this browser are claimed into it, as v1 does today.',
+    '- **Login CSRF through the link itself**: someone can send a person a sign-in link to the sender’s own account; opening it puts the sender’s token in `cm_auth_otp`, and Continue signs the person in as the sender. The POST refuses cross-site posts, which stops a page from doing this silently; the link itself is inherent to magic links. A named site and a Keep are bound to the address that asked for them (`cm_auth_for`), so they stay out of the sender’s account. When this browser asked for a link to another address (`cm_auth_for` set and not the sender’s), its device id is not recorded for the sender’s trial and its anonymous v1 audits are not claimed (CC-06c D9; `app/login/verify/route.csrf.test.ts`). A browser that never asked for a link carries no binding, and then its anonymous v1 audits are claimed into the sender’s account and its device is recorded, as before.',
     '- **The locked trial sentence stands on the Sign-up lead and the Keep bar** (DESIGN-LOCK’s one-ask wording, "starts 14 days of Pro"): a sign-up the ledger refuses, or an existing account, reads it too. The named-site Check-email, shown after the ask, carries the condition; the from-audit kind states no trial with the pipeline off.',
     '- **What the account cannot take is not said on the page.** A named site is not attached when the account is full, when the SSRF guard refuses the host, or for a user from before migration 001 (no v2 account until CC-05’s backfill). A Keep is refused when the account is full (\`site_limit\`), already keeps that host (\`host_kept\`), has no v2 account (\`no_account\`), or the check has expired (\`expired\`). The copy says “if the account has room for another site”; a refused claim lands on \`/dashboard?claim=<code>\`, which the v1 dashboard does not read; CC-26 shows it.',
     '- **`cm_auth_for` is an unpeppered hash of the email**, so a known address can be matched to it; it is httpOnly and kept out of Sentry, and it relies on no other origin being able to set crawlmouse.com cookies.',

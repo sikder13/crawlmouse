@@ -6,9 +6,9 @@ import type { ClaimDeps } from './claim';
 import type { FirstLoginDeps } from './first-login';
 import { pepperFrom } from './ledger';
 import { admitSiteHost } from './admit-site';
-import { gridSerialize, sentryReport, supabaseDoorStore, supabaseIncrement } from './stores';
+import { sentryReport, supabaseDoorStore } from './stores';
 
-/** The door's production dependencies: the service-role client, its `increment_rate_limit` RPC and Sentry. */
+/** The door's production dependencies: the service-role client and Sentry. */
 export function doorDeps(): { firstLogin: FirstLoginDeps; claim: ClaimDeps } {
   const sb = supabaseAdmin();
   const store = supabaseDoorStore(sb);
@@ -17,7 +17,6 @@ export function doorDeps(): { firstLogin: FirstLoginDeps; claim: ClaimDeps } {
     firstLogin: {
       store,
       entitlement: supabaseEntitlementStore(sb),
-      serialize: gridSerialize(supabaseIncrement(sb), now),
       admit: (host) => admitSiteHost(host),
       report: sentryReport((m, ctx) => Sentry.captureMessage(m, ctx)),
       pepper: pepperFrom(process.env),

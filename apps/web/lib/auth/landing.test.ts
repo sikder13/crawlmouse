@@ -46,6 +46,16 @@ describe('afterSignIn', () => {
     });
   });
 
+  it("sends no device when the link signs in an address other than the browser's door request (D9)", async () => {
+    await afterSignIn(deps, { ...base, boundTo: emailBinding('victim@example.com') });
+    expect(runFirstLogin.mock.calls[0]![1]).toMatchObject({ device: null, signup: null });
+  });
+
+  it('sends the device when there is no binding (a link opened on another device)', async () => {
+    await afterSignIn(deps, { ...base, boundTo: undefined });
+    expect(runFirstLogin.mock.calls[0]![1]).toMatchObject({ device: 'd' });
+  });
+
   it('leaves the destination to the v1 rule when the link was not a Keep', async () => {
     expect(await afterSignIn(deps, { ...base, next: '/r/abc' })).toEqual({
       dest: null,
