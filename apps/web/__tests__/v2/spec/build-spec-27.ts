@@ -184,8 +184,10 @@ function trialEndMoment(): string {
   const viewer = trialEndViewer(d, BAD_ACCOUNT_ID);
   const v = viewAt(d, viewer);
   const zone = v.account.timezone;
-  const weekly = v.d.sites.flatMap((s) =>
-    s.schedule?.cadence === 'weekly' ? [nextWeekly(s.schedule, d.as_of, zone)] : [],
+  const weekly = v.d.sites.flatMap(({ schedule: s }) =>
+    s?.cadence === 'weekly' && s.iso_weekday !== null && s.hour_local !== null
+      ? [nextWeekly({ iso_weekday: s.iso_weekday, hour_local: s.hour_local }, d.as_of, zone)]
+      : [],
   );
   const due = weekly.sort()[0];
   const between = d.checks.filter(
