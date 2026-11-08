@@ -34,15 +34,28 @@ export interface RefusalSinks {
 /** Where refusals go in production; tests pass their own. */
 export const DEFAULT_SINKS: RefusalSinks = {
   sentry: (r) => {
-    Sentry.captureMessage('security.refused', {
-      level: 'warning',
-      tags: {
-        reason: r.reason,
-        route: r.route,
-        class: r.class,
-        method: r.method,
-        status: String(r.status),
-      },
+    Sentry.withScope((scope) => {
+      // In the middleware the SDK puts the request on the scope and names the transaction after the
+      // path. This event says which route refused what, so all of that is dropped before it is sent:
+      // the path can hold an audit id, the headers the visitor's referrer and location.
+      scope.addEventProcessor((event) => {
+        delete event.request;
+        delete event.user;
+        delete event.transaction;
+        delete event.breadcrumbs;
+        if (event.sdkProcessingMetadata) delete event.sdkProcessingMetadata.normalizedRequest;
+        return event;
+      });
+      Sentry.captureMessage('security.refused', {
+        level: 'warning',
+        tags: {
+          reason: r.reason,
+          route: r.route,
+          class: r.class,
+          method: r.method,
+          status: String(r.status),
+        },
+      });
     });
   },
   posthog: async (r) => {

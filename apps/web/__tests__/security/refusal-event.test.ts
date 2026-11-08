@@ -8,7 +8,11 @@ import {
   type RefusalSinks,
 } from '../../lib/security/refusal-event';
 
-const sentry = vi.hoisted(() => ({ captureMessage: vi.fn() }));
+const sentry = vi.hoisted(() => ({
+  captureMessage: vi.fn(),
+  withScope: (fn: (scope: { addEventProcessor: () => void }) => void) =>
+    fn({ addEventProcessor: () => {} }),
+}));
 vi.mock('@sentry/nextjs', () => sentry);
 
 const REFUSAL: Refusal = {
