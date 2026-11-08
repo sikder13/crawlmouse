@@ -118,8 +118,8 @@ export const settingsPreview = (name: 'home' | 'clean') =>
   settingsView(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]());
 
 /**
- * Trial ending on bad-site, read at the trial's reminder: three days before trial_ends_at, five days
- * after the fixture's as_of, with nothing scheduled in between (SPEC 27 states the assumption). The
+ * Trial ending on bad-site, read at the trial's reminder: three days before trial_ends_at, after the
+ * fixture's as_of (SPEC 27 renders what the fixture holds between the two moments). The
  * challenged-site variant was dropped (owner ruling 2): no account there has a trial that overlaps a
  * withheld result.
  */
@@ -127,3 +127,47 @@ export const trialEndPreview = () => {
   const d = fixture('bad-site');
   return trialEndView(d, trialEndViewer(d, BAD_ACCOUNT_ID));
 };
+
+/** Each CC-27 preview: the fixture it reads, who reads it and when, and its view model. */
+export const CC27_PREVIEWS = {
+  '/v2-preview/screens/alerts': {
+    fixture: DATASET.home,
+    viewer: ACCOUNT_VIEWERS.home,
+    view: () => alertsPreview('home'),
+  },
+  '/v2-preview/screens/alerts/free': {
+    fixture: DATASET.clean,
+    viewer: ACCOUNT_VIEWERS.clean,
+    view: () => alertsPreview('clean'),
+  },
+  '/v2-preview/screens/reports': {
+    fixture: DATASET.home,
+    viewer: ACCOUNT_VIEWERS.home,
+    view: () => reportsPreview('home'),
+  },
+  '/v2-preview/screens/reports/agency': {
+    fixture: DATASET.withheld,
+    viewer: ACCOUNT_VIEWERS.withheld,
+    view: () => reportsPreview('withheld'),
+  },
+  '/v2-preview/screens/settings': {
+    fixture: DATASET.home,
+    viewer: ACCOUNT_VIEWERS.home,
+    view: () => settingsPreview('home'),
+  },
+  '/v2-preview/screens/settings/free': {
+    fixture: DATASET.clean,
+    viewer: ACCOUNT_VIEWERS.clean,
+    view: () => settingsPreview('clean'),
+  },
+  '/v2-preview/screens/trial-end': {
+    fixture: 'bad-site',
+    viewer: () => trialEndViewer(fixture('bad-site'), BAD_ACCOUNT_ID),
+    view: trialEndPreview,
+  },
+  '/v2-preview/screens/changes-log': {
+    fixture: DATASET.home,
+    viewer: ACCOUNT_VIEWERS.home,
+    view: () => changesLogPreview(),
+  },
+} as const;

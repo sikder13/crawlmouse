@@ -88,6 +88,43 @@ export const CC27B_ROUTES = {
 export type Cc27bKey = keyof typeof CC27B_ROUTES;
 
 /**
+ * What CC-27b must hold beyond the routes, each with where it is decided. SPEC 27 lists these with
+ * the route table; nothing in the previews enforces them.
+ */
+export const CC27B_REQUIREMENTS = [
+  {
+    what: 'Slack webhook URLs',
+    rule: 'Stored in `alert_rules.destination` through Supabase Vault (`vault.create_secret`) and decrypted only inside `alertFn`; if Vault is not enabled, AES-GCM with `SLACK_SECRET_KEY` in app code. Never granted to a client role (the column grant leaves it out); the screens show its last four characters.',
+    source: 'ARCH-2 §2.11 and §10 Q4',
+  },
+  {
+    what: 'Unsubscribe',
+    rule: 'Change notes and the trial reminder carry RFC 8058 one-click unsubscribe headers: `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. The sign-in link carries none: it is sent only when asked for.',
+    source: 'DECISION-LOG D6; sent by CC-28’s mailer',
+  },
+  {
+    what: 'Cancel',
+    rule: 'Two clicks from Settings › Plan, with no retention offer in the path; effective at the end of the paid month (Stripe `cancel_at_period_end`); the screen then shows the plan until that date.',
+    source: 'DECISION-LOG D5 and L6; ARCH-2 §3.2',
+  },
+  {
+    what: 'Account deletion',
+    rule: 'The owner re-types the primary site’s hostname; sign-in is disabled at once and the Stripe subscription cancelled; a sign-in link within 7 days restores the account (`POST /api/account/restore`); after that `accountDeletedFn` (sleep 7 d, cancelled by the restore) purges Storage prefixes and hard-deletes in dependency order.',
+    source: 'ARCH-2 §2.3, §3.2 and §4.6; DECISION-LOG E6; SECURITY-DESIGN item 17 (CC-SEC-18)',
+  },
+  {
+    what: 'Settings › Plan with no sites',
+    rule: '`GET /settings/plan` answers for an account that holds no site: billing must be reachable after every site is removed.',
+    source: 'CC-27 brief, scope 6',
+  },
+  {
+    what: 'Trial ending',
+    rule: 'One page, `GET /trial-ended`, for both states: before the end (this preview; the reminder email links to it) and after it, as ARCH-2 §5 has it for an account back on Free; the dashboard banner links to it.',
+    source: 'Owner ruling 6',
+  },
+] as const;
+
+/**
  * One of these routes as an action, built as `action()` builds the account screens' others (a link
  * for GET; otherwise a POST form, the verb in `_method`), so ActionControl draws either alike.
  */

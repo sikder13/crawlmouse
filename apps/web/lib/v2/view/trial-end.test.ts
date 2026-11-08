@@ -1,8 +1,8 @@
 /**
  * Trial ending (Final-TrialEnd) against values worked out by hand from bad-site, read at the
  * reminder: trial_ends_at 8 Nov 02:41Z less three days, 5 Nov 02:41Z, Wed 4 Nov 21:41 in Indiana
- * (EST). The trial began 25 Oct 02:41Z, Sat 24 Oct 22:41 (EDT). The fixture holds nothing after its
- * as_of, Fri 30 Oct 10:05Z, and nothing was scheduled between then and now.
+ * (EST). The trial began 25 Oct 02:41Z, Sat 24 Oct 22:41 (EDT). The reading is after the fixture's
+ * as_of, Fri 30 Oct 10:05Z; SPEC 27 renders what the fixture holds between the two.
  */
 import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
