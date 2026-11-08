@@ -90,6 +90,17 @@ test.describe('every route class carries the security headers', () => {
     });
   });
 
+  test('/embed itself, with no domain, is a page like any other', async ({ request }) => {
+    const res = await request.get('/embed', { maxRedirects: 0 });
+    expect(securityHeaders(res)).toEqual(page());
+  });
+
+  test('no response says it is Next.js', async ({ request }) => {
+    for (const path of ['/', '/api/health', '/embed/example.com']) {
+      expect((await request.get(path)).headers()['x-powered-by'], path).toBeUndefined();
+    }
+  });
+
   test('the sign-in landing keeps Referrer-Policy: same-origin', async ({ request }) => {
     const res = await request.get('/login/verify', { maxRedirects: 0 });
     expect(securityHeaders(res)).toEqual(page('same-origin'));
@@ -108,11 +119,27 @@ test.describe('every route class carries the security headers', () => {
 
 const ID = '6f1c2a8e-0000-4000-8000-000000000000';
 const sample = (route: string) => `/${route.replace('[id]', ID).replace(/\[[^\]]+\]/g, 'sample')}`;
-const guarded = ROUTE_POLICIES.filter((p) => p.origin === 'strict');
+// Named here rather than read from the registry, so a route dropped from the strict rule there is
+// still sent a cross-site POST here.
+const STRICT_ROUTES = [
+  'api/audits/[id]/cancel',
+  'api/audits/[id]/reaudit',
+  'api/auth/logout',
+  'api/billing/checkout',
+  'api/billing/portal',
+  'api/checks/[id]/claim',
+  'api/reports/[slug]/claim',
+  'api/reports/[slug]/logo',
+  'api/reports/[slug]/visibility',
+  'api/reports/[slug]/white-label',
+  'api/verify/check/[id]',
+  'api/verify/start',
+];
+const guarded = STRICT_ROUTES.map((route) => ROUTE_POLICIES.find((p) => p.route === route)!);
 
 test.describe('the built app refuses a cross-site state change before the route runs', () => {
-  test('guards the routes the registry marks (anti-vacuity)', () => {
-    expect(guarded.length).toBeGreaterThanOrEqual(12);
+  test('every strict route named here is in the registry', () => {
+    expect(guarded.every(Boolean)).toBe(true);
   });
 
   for (const policy of guarded) {
@@ -146,6 +173,31 @@ test.describe('the built app refuses a cross-site state change before the route 
       expect(await res.text()).not.toContain('auth_required');
     });
   }
+
+  test('no JSON route grants a CORS preflight, so another site cannot send it JSON', async ({
+    request,
+  }) => {
+    const JSON_ROUTES = [
+      '/api/audits/start',
+      '/api/auth/magic-link',
+      '/api/developers',
+      '/api/reports/hide',
+      '/api/reports/mint',
+      '/api/takedown',
+      `/api/audits/${ID}/notify`,
+    ];
+    for (const path of JSON_ROUTES) {
+      const res = await request.fetch(path, {
+        method: 'OPTIONS',
+        headers: {
+          origin: 'https://evil.example',
+          'access-control-request-method': 'POST',
+          'access-control-request-headers': 'content-type',
+        },
+      });
+      expect(res.headers()['access-control-allow-origin'], path).toBeUndefined();
+    }
+  });
 
   test('an unknown method from another site is refused too', async ({ request }) => {
     const res = await request.fetch('/api/billing/portal', {

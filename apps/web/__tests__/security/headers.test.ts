@@ -160,9 +160,35 @@ describe('connect-src names the origins the browser calls', () => {
   });
 });
 
-describe('only /embed/ itself is frameable', () => {
-  it.each(['/embedded', '/embed', '/x/embed/a'])('%s is not', async (path) => {
-    expect((await headersFor(path))['x-frame-options']).toBe('DENY');
+describe('only the badge is frameable: /embed/<domain>', () => {
+  const framing = async (path: string) => {
+    const h = await headersFor(path);
+    return {
+      xfo: h['x-frame-options'],
+      ancestors: h['content-security-policy']!.split('; ').find((d) =>
+        d.startsWith('frame-ancestors'),
+      ),
+    };
+  };
+
+  it.each(['/embed/example.com', '/embed/example.com/'])(
+    '%s may be framed by any site',
+    async (path) => {
+      expect(await framing(path)).toEqual({ xfo: null, ancestors: 'frame-ancestors *' });
+    },
+  );
+
+  it.each(['/embed', '/embed/', '/embed/a/b', '/embedded', '/x/embed/a'])(
+    '%s may not be framed',
+    async (path) => {
+      expect(await framing(path)).toEqual({ xfo: 'DENY', ancestors: "frame-ancestors 'none'" });
+    },
+  );
+});
+
+describe('next.config sends no X-Powered-By header', () => {
+  it('poweredByHeader is off', () => {
+    expect((nextConfig as { poweredByHeader?: boolean }).poweredByHeader).toBe(false);
   });
 });
 

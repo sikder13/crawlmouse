@@ -3,7 +3,7 @@
  * with JSDoc types because next.config.mjs imports it at build time and cannot import TypeScript.
  * __tests__/security/headers.test.ts pins each value on each route class.
  *
- * Two route classes: `/embed/*`, the grade badge other sites frame, and everything else. The CSP is
+ * Two route classes: `/embed/<domain>`, the grade badge other sites frame, and everything else. The CSP is
  * split: the directives no inline script depends on are enforced; the full policy is report-only
  * until its reports show it can be enforced (CC-SEC-2). Both report to Sentry when the build has a
  * DSN. HSTS is Vercel's, not set here.
@@ -13,10 +13,10 @@ const TURNSTILE = 'https://challenges.cloudflare.com';
 const POSTHOG_TOOLBAR = 'https://us.posthog.com';
 const STRIPE_FORM_TARGETS = 'https://checkout.stripe.com https://billing.stripe.com';
 
-/** Every response outside `/embed/*`. */
-export const DEFAULT_SOURCE = '/((?!embed/).*)';
-/** The embeddable badge. */
-export const EMBED_SOURCE = '/embed/:path*';
+/** Every response but the badge's: `/embed`, `/embed/` and deeper paths are pages like any other. */
+export const DEFAULT_SOURCE = '/((?!embed/[^/]+/?$).*)';
+/** The embeddable badge: exactly one segment after `/embed/`, as its route has. */
+export const EMBED_SOURCE = '/embed/:domain';
 /** The sign-in landing, which keeps its stricter referrer policy. */
 export const SIGN_IN_SOURCE = '/login/verify';
 

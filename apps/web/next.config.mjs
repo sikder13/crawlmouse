@@ -12,6 +12,8 @@ const nextConfig = {
     : {}),
   // typedRoutes graduated from `experimental` to a top-level key in Next 15.5; the app relies on it.
   typedRoutes: true,
+  // No X-Powered-By: Next.js header (ZAP's baseline flags it; it tells a scanner what to try).
+  poweredByHeader: false,
   // PostHog reverse proxy: route /ingest/* to PostHog's US hosts so events survive ad-blockers.
   // skipTrailingSlashRedirect keeps PostHog's trailing-slash paths from 308-redirecting.
   skipTrailingSlashRedirect: true,
