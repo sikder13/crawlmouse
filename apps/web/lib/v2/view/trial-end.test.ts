@@ -224,3 +224,24 @@ describe('Trial ending, the card decides, not the plan', () => {
     expect([t.keepTitle, t.endTitle]).toEqual(['If you keep Agency', 'If you let it end']);
   });
 });
+
+describe('Trial ending, a card trial billed yearly, and the counts when nothing is open', () => {
+  const ch = fixture('challenged-site');
+  const K = 'a0000000-0000-4000-8000-0000000000ca';
+
+  it('charges the yearly price, then each year', () => {
+    const d = {
+      ...ch,
+      accounts: ch.accounts.map((a) => (a.id === K ? { ...a, billing_period_months: 12 } : a)),
+    };
+    expect(trialEndView(d, trialEndViewer(d, K)).keepText).toMatch(
+      /^The card ending 4242 is charged \$990 on Mon 16 Nov, then each year\. /,
+    );
+  });
+
+  it('on Kestrel, with no finished check and no alert rule: “none”, and nothing sent by email', () => {
+    const t = trialEndView(ch, trialEndViewer(ch, K));
+    expect(t.did.rows.find((r) => r.label === 'Fixes open with packets')!.detail).toBe('none');
+    expect(t.stays[0]!.how).toBe('monthly checks');
+  });
+});

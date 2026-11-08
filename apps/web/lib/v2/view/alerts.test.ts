@@ -208,3 +208,12 @@ describe('Alerts, an opened change that is not a block', () => {
     expect(row.pill).toEqual({ label: 'opened', state: 'warn' });
   });
 });
+
+describe('Alerts, which values are data', () => {
+  it('sets the address and the workspace in the data face, “on Pro” and “set on each site page” not', () => {
+    expect(home().channels.rows.map((r) => r.data)).toEqual([true, true, false]);
+    expect(
+      alertsView(fixture('clean-site'), CLEAN_VIEWER).channels.rows.map((r) => r.data),
+    ).toEqual([true, false, false]);
+  });
+});

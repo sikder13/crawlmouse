@@ -198,3 +198,19 @@ describe('Reports, a share link after it expires', () => {
     expect(at('2026-11-24T07:10:00Z')).toEqual(['Download · 310 KB']);
   });
 });
+
+describe('Reports, the compare form', () => {
+  it('posts the latest two results of the site: the latest as checkId, the one before as previousCheckId', () => {
+    expect(home().make.compare.action).toMatchObject({
+      label: 'Compare these two',
+      href: '/api/reports',
+      fields: {
+        siteId: '50000000-0000-4000-8000-000000000001',
+        checkId: 'c0000000-0000-4000-8000-000000000006',
+        kind: 'compare',
+        previousCheckId: 'c0000000-0000-4000-8000-000000000005',
+      },
+      context: 'Thu 29 vs Fri 30 Oct',
+    });
+  });
+});

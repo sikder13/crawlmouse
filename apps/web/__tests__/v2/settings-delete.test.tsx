@@ -68,7 +68,12 @@ describe('the delete step, which site it asks for', () => {
     // The staging copy listed first: the primary site is still the oldest site that copies none.
     const d = fixture('bad-site');
     const staging = d.sites.find((s) => s.staging_of_site_id !== null)!;
-    const reordered = { ...d, sites: [staging, ...d.sites.filter((s) => s.id !== staging.id)] };
+    // The whole list reversed: neither the first-listed site nor the first primary one listed is the
+    // oldest.
+    const reordered = {
+      ...d,
+      sites: [staging, ...d.sites.filter((s) => s.id !== staging.id).reverse()],
+    };
     expect(deleteStepView(reordered, ACCOUNT_VIEWERS.home()).field.expected).toBe(
       'example-outfitter.com',
     );

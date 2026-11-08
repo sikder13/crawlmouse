@@ -224,7 +224,9 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
   const elsewherePrimary = new Set(
     elsewhere.filter((c) => !stagingIds.has(c.site_id)).map((c) => c.site_id),
   ).size;
-  const elsewhereStaging = elsewhere.some((c) => stagingIds.has(c.site_id));
+  const elsewhereStaging = new Set(
+    elsewhere.filter((c) => stagingIds.has(c.site_id)).map((c) => c.site_id),
+  ).size;
   const fixOfRecheck = (checkId: string) => {
     const e = v.d.fix_events.find((x) => 'check_id' in x && x.check_id === checkId);
     return e ? (v.d.fixes.find((f) => f.id === e.fix_id)?.number ?? null) : null;

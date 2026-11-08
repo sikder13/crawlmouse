@@ -240,7 +240,10 @@ export function reportsView(
         text: pair.length === 2 ? `${twoDates(pair)} ${COPY.compareBody}` : COPY.compareNeedsTwo,
         action:
           canMake && pair.length === 2
-            ? make('compare', COPY.makeCompare, { previousCheckId: pair[0]!.id })
+            ? {
+                ...make('compare', COPY.makeCompare, { previousCheckId: pair[0]!.id }),
+                context: twoDates(pair).replace(/\.$/, ''),
+              }
             : null,
       },
       raw: {

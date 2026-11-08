@@ -67,12 +67,14 @@ export const TRIAL_END_COPY = {
   recheck: (date: string, fix: number | null) =>
     fix === null ? `the re-check ${date}` : `the re-check ${date} after fix ${fix}`,
   /** "8 across the other four sites": the sites those checks ran on, counted from the checks. */
-  checksElsewhere: (n: number, sites: number, staging: boolean) =>
-    `${count(n)} across ${
+  checksElsewhere: (n: number, sites: number, staging: number) => {
+    const copies = staging === 1 ? 'the staging copy' : `${numberWord(staging)} staging copies`;
+    return `${count(n)} across ${
       sites
-        ? `the other ${numberWord(sites)} ${plural(sites, 'site', 'sites')}${staging ? ' and the staging copy' : ''}`
-        : 'the staging copy'
-    }`,
+        ? `the other ${numberWord(sites)} ${plural(sites, 'site', 'sites')}${staging ? ` and ${copies}` : ''}`
+        : copies
+    }`;
+  },
   changesCaught: 'Changes caught',
   blocked: (uas: readonly string[], date: string) => `${listOf(uas)} blocked ${date}`,
   after: (where: string, when: string) => `after ${where} changed ${when}`,
@@ -117,7 +119,7 @@ export const TRIAL_END_COPY = {
             others
               ? `The other ${numberWord(others)} ${plural(others, 'site pauses', 'sites pause')} with ${plural(others, 'its', 'their')} history kept${staging ? ', and so does the staging copy' : ''}`
               : 'The staging copy pauses with its history kept'
-          }; add ${plan} any time to resume them.`
+          }; add ${plan} any time to resume ${others ? 'them' : 'it'}.`
         : ''
     }`,
   tables: { stays: 'Stays', pauses: 'Pauses', did: 'Trial summary' },

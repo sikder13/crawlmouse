@@ -208,3 +208,23 @@ describe('Settings, the card decides, not the plan (the matcher keys on card_las
     );
   });
 });
+
+describe('Settings, billed yearly, and past due on Free', () => {
+  const ch = fixture('challenged-site');
+  const NW = 'a0000000-0000-4000-8000-0000000000c9';
+  const yearly = {
+    ...ch,
+    accounts: ch.accounts.map((a) => (a.id === NW ? { ...a, billing_period_months: 12 } : a)),
+  };
+
+  it('a yearly plan cancels at the end of the paid year', () => {
+    const p = settingsView(yearly, ACCOUNT_VIEWERS.withheld()).plan;
+    expect(p.terms[0]!.text).toMatch(/^Two clicks, effective at the end of the paid year\. /);
+  });
+
+  it('past due on Free offers no checkout: the card in the billing portal is the way back', () => {
+    const p = settingsView(ch, { accountId: NW, now: '2026-11-08T14:00:00Z' }).plan;
+    expect(p.keep).toBeNull();
+    expect(p.terms[1]!.action).toMatchObject({ label: 'Billing portal' });
+  });
+});

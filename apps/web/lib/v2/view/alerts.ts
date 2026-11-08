@@ -152,7 +152,12 @@ export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
     // A block is drawn ■ whatever its severity (DESIGN-LOCK rule 7: the square is "blocked"); any
     // other change opened keeps the shape its severity gives it.
     if (c.kind === 'opened' && c.subject === 'crawler_access') return { label, state: 'bad' };
-    if (c.kind === 'opened') return { label, state: c.severity === 'warn' ? 'warn' : 'bad' };
+    if (c.kind === 'opened') {
+      return {
+        label,
+        state: c.severity === 'warn' ? 'warn' : c.severity === 'info' ? 'neutral' : 'bad',
+      };
+    }
     if (c.subject === 'grade') {
       const fell = c.grade_deltas.some((g) => g.to_score < g.from_score);
       return { label, state: fell ? 'bad' : 'ok' };

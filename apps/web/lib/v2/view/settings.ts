@@ -124,7 +124,7 @@ export type Cc27bKey = keyof typeof CC27B_ROUTES;
 export const CC27B_REQUIREMENTS = [
   {
     what: 'Cross-site requests',
-    rule: 'Every CC-27b route that changes state (POST, PUT, PATCH, DELETE, the `_method` forms included) checks the request’s `Origin` against the site’s own, as `app/api/checks/[id]/claim` does, besides the SameSite cookie; a mismatch is refused with 403.',
+    rule: 'Every CC-27b route that changes state (POST, PUT, PATCH, DELETE, the `_method` forms included) checks the request’s `Origin` against the site’s own, besides the SameSite cookie, and refuses a mismatch or a missing `Origin` with 403 (`app/api/checks/[id]/claim` lets a missing one through; these routes do not).',
     source: 'CC-27 review round 2 (correctness and security)',
   },
   {
@@ -139,7 +139,7 @@ export const CC27B_REQUIREMENTS = [
   },
   {
     what: 'Cancel',
-    rule: 'Two clicks from Settings › Plan, with no retention offer in the path; effective at the end of the paid month (Stripe `cancel_at_period_end`); the screen then shows the plan until that date.',
+    rule: 'Two clicks from Settings › Plan, with no retention offer in the path; effective at the end of the paid period, month or year (Stripe `cancel_at_period_end`); the screen then shows the plan until that date.',
     source: 'DECISION-LOG D5 and L6; ARCH-2 §3.2',
   },
   {
@@ -147,6 +147,11 @@ export const CC27B_REQUIREMENTS = [
     rule: 'The owner re-types the primary site’s hostname on the confirmation step; a confirmation link then goes to the sign-in address. Opening it disables sign-in at once and cancels the Stripe subscription; a sign-in link within 7 days restores the account (`POST /api/account/restore`); after that `accountDeletedFn` (sleep 7 d, cancelled by the restore) purges Storage prefixes and hard-deletes in dependency order. What the reader is told is FACTS E6’s.',
     source:
       'Owner ruling 12; ARCH-2 §2.3, §3.2, §4.6 and §5; DECISION-LOG E6; SECURITY-DESIGN item 17 (CC-SEC-18)',
+  },
+  {
+    what: 'Report requests',
+    rule: '`POST /api/reports` checks that the posted `siteId` is on the caller’s account and that `checkId`, and a compare’s `previousCheckId`, are results of that site, the previous older than the latest; otherwise 404.',
+    source: 'CC-27 review round 3 (correctness and security)',
   },
   {
     what: 'Settings › Plan with no sites',
@@ -305,8 +310,28 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
   const graceEnds = new Date(
     Date.parse(pastDueSince) + PAST_DUE_GRACE_DAYS * 86_400_000,
   ).toISOString();
-  const keepShown = (trial && !cardTrial) || v.tier === 'free';
   const monthly = v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY;
+  // A trial with a card becomes the plan at its end, and an account past due on Free gets back by
+  // updating its card: neither has a Keep. A trial with no card keeps its plan; Free chooses Pro.
+  const keep =
+    trial && !cardTrial
+      ? action(
+          'keepPlan',
+          COPY.keep(plan, monthly),
+          {},
+          { fields: { plan: v.tier, interval: 'month' } },
+        )
+      : v.tier === 'free' && !pastDue
+        ? action(
+            'keepPlan',
+            COPY.choose(PLAN_NAMES.pro, PRO_MONTHLY),
+            {},
+            {
+              fields: { plan: 'pro', interval: 'month' },
+            },
+          )
+        : null;
+  const keepShown = keep !== null;
   const cancel = routeAction('cancelPlan', COPY.cancelAction);
   const portal = routeAction('billingPortal', COPY.portalAction);
 
@@ -372,35 +397,13 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
         [COPY.pagesUsed, COPY.of(largest, v.gates.pagesPerCheck)],
       ],
       // A trial with a card becomes the plan at its end: there is nothing to keep it by.
-      keep:
-        trial && !cardTrial
-          ? action(
-              'keepPlan',
-              COPY.keep(plan, v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY),
-              {},
-              {
-                fields: { plan: v.tier, interval: 'month' },
-              },
-            )
-          : paid
-            ? null
-            : action(
-                'keepPlan',
-                COPY.choose(PLAN_NAMES.pro, PRO_MONTHLY),
-                {},
-                {
-                  fields: { plan: 'pro', interval: 'month' },
-                },
-              ),
+      keep,
       // "Or …" follows a Keep; where the card has none, the plan's own prices lead.
       other: [
         keepShown
           ? v.tier === 'agency'
             ? COPY.otherYearly(yearly)
-            : COPY.other(yearly, AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats).replace(
-                /^(Or \$\d+ a year\.) /,
-                '$1 ',
-              )
+            : COPY.other(yearly, AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats)
           : COPY.prices(plan, monthly, yearly),
         ...(!keepShown && v.tier !== 'agency'
           ? [COPY.agencyLine(AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats)]
