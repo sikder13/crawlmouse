@@ -556,7 +556,10 @@ describe('input validation: each malformed input raises 22023 and writes nothing
     ['four rows', [E, D, I, E]],
     ['no rows', []],
     ['no email row', [D, I]],
-    ['an element with an extra key', [{ ...E, account_id: id }]],
+    [
+      'an element with an extra key',
+      [{ ...E, account_id: '00000000-0000-4000-8000-000000000001' }],
+    ],
     ['an element missing value_hash', [{ kind: 'email' }]],
     ['an element that is not an object', ['email']],
     ['not an array', { kind: 'email', value_hash: E.value_hash }],
