@@ -249,7 +249,7 @@ jobs:
           path: ${{ runner.temp }}/zap/zap-report.*
           if-no-files-found: warn
 
-  # CodeQL's security-extended queries over the JavaScript and TypeScript. A result whose rule has
+  # CodeQL's security-extended queries over the JavaScript and TypeScript, test code left out. A result whose rule has
   # security-severity 7.0 or more (high or critical) fails the job, read from the SARIF by
   # .github/workflows/scripts/sarif-gate.mjs, which also fails a scan that extracted no file. Results
   # upload to code scanning from this repository's own pushes and pull requests: a fork's token cannot
@@ -269,6 +269,14 @@ jobs:
           languages: javascript-typescript
           build-mode: none
           queries: security-extended
+          # Test code is not shipped: its local fixture servers echo request paths into test pages,
+          # which CodeQL reads as reflected XSS (three results on the first run, 2026-11-08).
+          config: |
+            paths-ignore:
+              - '**/*.test.ts'
+              - '**/*.test.tsx'
+              - '**/__tests__/**'
+              - 'tests/**'
       - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: /language:javascript-typescript

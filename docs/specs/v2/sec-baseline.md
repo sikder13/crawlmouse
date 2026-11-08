@@ -241,6 +241,11 @@ gate:
 pnpm --filter @crawlmouse/web exec vitest run __tests__/security/sarif-gate.test.ts
 ```
 
+Test code is left out of the analysis (`paths-ignore` in the job's CodeQL config): it is not shipped.
+The first run, on 2026-11-08, failed the gate on three `js/reflected-xss` results (7.8), all in local
+fixture servers that echo the request path into a test page: `packages/engine/src/crawl-settlement.test.ts`,
+`crawler-frontier.test.ts` and `reproducibility.test.ts`.
+
 Code scanning is free while the repository is public. Going private (planned before CC-29) needs GitHub
 Advanced Security, or this Semgrep OSS job in its place (ruling 9: it lives here, not commented out in
 the workflow):
