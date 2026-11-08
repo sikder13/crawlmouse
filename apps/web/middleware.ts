@@ -2,29 +2,34 @@ import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server
 import { CONSENT_REQUIRED_COOKIE, isConsentRequiredCountry } from '@/lib/consent';
 import { reportRefusal, type Refusal } from '@/lib/security/refusal-event';
 import { isStateChanging, normalizePath, policyForPath } from '@/lib/security/route-policy';
-import { isSameOrigin } from '@/lib/security/same-origin';
+import { isCrossSite, isJsonBody, isSameOrigin } from '@/lib/security/same-origin';
 import { updateSession } from '@/lib/supabase/middleware';
 
 /**
- * API requests: a state-changing request to a route registered `sameOrigin`
- * (lib/security/route-policy.ts) that does not come from one of our pages is refused here, so the
- * route never runs. Every other API request passes through untouched — no session refresh, no
- * cookie.
+ * API requests: a state change to a route the registry guards (lib/security/route-policy.ts) is
+ * refused here, before the route runs, when its origin fails the route's rule (403) or, for a route
+ * that reads JSON, when the body is not declared JSON (415). Every other API request passes through
+ * untouched: no session refresh, no cookie.
  */
 export function guardApi(req: NextRequest, report: (r: Refusal) => void): NextResponse {
   const policy = policyForPath(req.nextUrl.pathname);
-  if (policy?.sameOrigin && isStateChanging(req.method) && !isSameOrigin(req, req.nextUrl.origin)) {
-    report({
-      reason: 'cross_site',
-      route: policy.route,
-      class: policy.class,
-      method: req.method,
-      status: 403,
+  if (!policy || !isStateChanging(req.method)) return NextResponse.next();
+  const refuse = (reason: Refusal['reason'], status: Refusal['status'], body: object) => {
+    report({ reason, route: policy.route, class: policy.class, method: req.method, status });
+    return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
+  };
+  const origin = req.nextUrl.origin;
+  if (
+    (policy.origin === 'strict' && !isSameOrigin(req, origin)) ||
+    (policy.origin === 'lenient' && isCrossSite(req, origin))
+  ) {
+    return refuse('cross_site', 403, { error: 'Cross-site request refused', code: 'cross_site' });
+  }
+  if (policy.jsonBody && !isJsonBody(req)) {
+    return refuse('not_json', 415, {
+      error: 'Send the request body as JSON',
+      code: 'unsupported_media_type',
     });
-    return NextResponse.json(
-      { error: 'Cross-site request refused', code: 'cross_site' },
-      { status: 403, headers: { 'Cache-Control': 'no-store' } },
-    );
   }
   return NextResponse.next();
 }

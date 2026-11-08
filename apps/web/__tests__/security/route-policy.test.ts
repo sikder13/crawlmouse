@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ROUTE_POLICIES, isStateChanging, policyForPath } from '../../lib/security/route-policy';
-import { mechanismProblems, refusesWithoutSession } from './route-mechanism';
+import { mechanismProblems, readsJsonBody, refusesWithoutSession } from './route-mechanism';
 import {
   callPositions,
   exportedMethods,
@@ -187,26 +187,50 @@ describe('the registry finds the row a request path reaches', () => {
   });
 });
 
-describe('cross-site refusal covers every state change a signed-in session authorises', () => {
-  it('every state-changing user or member route refuses a cross-site request', () => {
+describe('cross-site refusal covers every state change a session or a visitor can be made to send', () => {
+  it('every state-changing user or member route takes the strict rule', () => {
     const open = ROUTE_POLICIES.filter(
       (p) =>
         (p.class === 'user' || p.class === 'member') &&
         p.methods.some(isStateChanging) &&
-        !p.sameOrigin,
+        p.origin !== 'strict',
     );
     expect(open.map((p) => p.route)).toEqual([]);
   });
 
-  it('webhook and service routes never require our origin: their callers are not our pages', () => {
+  it('webhook and service routes take no origin rule: their callers are not our pages', () => {
     const wrong = ROUTE_POLICIES.filter(
-      (p) => (p.class === 'webhook' || p.class === 'service') && p.sameOrigin,
+      (p) => (p.class === 'webhook' || p.class === 'service') && p.origin !== 'any',
     );
     expect(wrong.map((p) => p.route)).toEqual([]);
   });
 
-  it('a route with no state-changing method carries no origin requirement', () => {
-    const idle = ROUTE_POLICIES.filter((p) => p.sameOrigin && !p.methods.some(isStateChanging));
+  it('a route with no state-changing method takes no origin rule, and only API routes take one', () => {
+    const idle = ROUTE_POLICIES.filter(
+      (p) =>
+        p.origin !== 'any' && (!p.methods.some(isStateChanging) || !p.route.startsWith('api/')),
+    );
     expect(idle.map((p) => p.route)).toEqual([]);
+  });
+
+  it('a route that requires a JSON body reads one, and takes an origin rule', () => {
+    for (const p of ROUTE_POLICIES.filter((r) => r.jsonBody)) {
+      expect(readsJsonBody(readRoute(p.route)), p.route).toBe(true);
+      expect(p.origin, p.route).not.toBe('any');
+    }
+  });
+
+  it('every public route that changes state from a JSON body takes the lenient rule and the JSON rule', () => {
+    // auth/magic-link keeps its own cross-site check (V2_ACCOUNT_DOOR) and Turnstile in production.
+    const KEEPS_ITS_OWN = ['api/auth/magic-link'];
+    const missing = ROUTE_POLICIES.filter(
+      (p) =>
+        p.class === 'public' &&
+        p.methods.some(isStateChanging) &&
+        readsJsonBody(readRoute(p.route)) &&
+        !KEEPS_ITS_OWN.includes(p.route) &&
+        !(p.origin === 'lenient' && p.jsonBody),
+    );
+    expect(missing.map((p) => p.route)).toEqual([]);
   });
 });

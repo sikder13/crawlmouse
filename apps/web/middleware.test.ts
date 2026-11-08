@@ -72,7 +72,8 @@ async function run(path: string, method: string, headers: Record<string, string>
   return { res, refresh, refusals };
 }
 
-const guarded = ROUTE_POLICIES.filter((p) => p.sameOrigin);
+const guarded = ROUTE_POLICIES.filter((p) => p.origin === 'strict');
+const lenient = ROUTE_POLICIES.filter((p) => p.origin === 'lenient');
 const passes = (res: NextResponse) => res.headers.get('x-middleware-next') === '1';
 
 describe('a state-changing API request from another site is refused before the route runs', () => {
@@ -142,7 +143,7 @@ describe('a state-changing API request from another site is refused before the r
   });
 
   it.each(
-    ROUTE_POLICIES.filter((p) => !p.sameOrigin && p.route.startsWith('api/')).map(
+    ROUTE_POLICIES.filter((p) => p.origin === 'any' && p.route.startsWith('api/')).map(
       (p) => [samplePath(p), p.methods.find(isStateChanging) ?? p.methods[0]!] as const,
     ),
   )(
@@ -159,10 +160,66 @@ describe('a state-changing API request from another site is refused before the r
   );
 });
 
+describe('a public route that reads JSON refuses another site and a body not declared JSON', () => {
+  const JSON_TYPE = { 'content-type': 'application/json' };
+
+  it('covers the six public JSON routes (anti-vacuity)', () => {
+    expect(lenient.map((p) => p.route).sort()).toEqual([
+      'api/audits/[id]/notify',
+      'api/audits/start',
+      'api/developers',
+      'api/reports/hide',
+      'api/reports/mint',
+      'api/takedown',
+    ]);
+    expect(lenient.every((p) => p.jsonBody)).toBe(true);
+  });
+
+  it.each(lenient.map((p) => [samplePath(p)] as const))('%s', async (path) => {
+    // Another site's page, by Origin or by Sec-Fetch-Site: 403, whatever the body says it is.
+    for (const headers of [
+      { origin: 'https://evil.example', ...JSON_TYPE },
+      { origin: 'null', ...JSON_TYPE },
+      { 'sec-fetch-site': 'cross-site', ...JSON_TYPE },
+      { origin: 'https://evil.example', 'content-type': 'text/plain' },
+    ] as Record<string, string>[]) {
+      const { res, refusals } = await run(path, 'POST', headers);
+      expect(res.status, JSON.stringify(headers)).toBe(403);
+      expect(refusals.map((r) => r.reason)).toEqual(['cross_site']);
+    }
+    // Our page, or a script with no Origin, sending anything but JSON: 415.
+    for (const headers of [
+      { origin: SITE, 'content-type': 'text/plain;charset=UTF-8' },
+      { 'content-type': 'application/x-www-form-urlencoded' },
+      { 'content-type': 'multipart/form-data; boundary=x' },
+      { 'content-type': 'application/json-patch+json' },
+      {},
+    ] as Record<string, string>[]) {
+      const { res, refusals } = await run(path, 'POST', headers);
+      expect(res.status, JSON.stringify(headers)).toBe(415);
+      expect(await res.json()).toEqual({
+        error: 'Send the request body as JSON',
+        code: 'unsupported_media_type',
+      });
+      expect(refusals).toMatchObject([{ reason: 'not_json', status: 415 }]);
+    }
+    // JSON from our page, from a script with no Origin, or same-site: through to the route.
+    for (const headers of [
+      { origin: SITE, ...JSON_TYPE },
+      { 'content-type': 'application/json; charset=utf-8' },
+      { 'sec-fetch-site': 'same-origin', 'content-type': 'Application/JSON' },
+    ] as Record<string, string>[]) {
+      const { res, refusals } = await run(path, 'POST', headers);
+      expect(passes(res), JSON.stringify(headers)).toBe(true);
+      expect(refusals).toEqual([]);
+    }
+  });
+});
+
 describe('the matcher sends every guarded route through the middleware', () => {
   const matches = (url: string) => unstable_doesMiddlewareMatch({ config, nextConfig: {}, url });
 
-  it.each(guarded.map((p) => samplePath(p)))('%s', (path) => {
+  it.each([...guarded, ...lenient].map((p) => samplePath(p)))('%s', (path) => {
     expect(matches(path)).toBe(true);
     expect(matches(`${path}/`)).toBe(true);
   });

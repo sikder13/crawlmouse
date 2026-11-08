@@ -3,7 +3,8 @@
  *
  * __tests__/security/route-policy.test.ts holds this list to the route files on disk (one row per
  * file, the exported methods) and to each route's source; __tests__/security/route-anonymous.test.ts
- * calls each signed-in route without a session. middleware.ts reads `sameOrigin` for the API rows.
+ * calls each signed-in route without a session. middleware.ts reads `origin` and `jsonBody` for the API
+ * rows.
  *
  * Edge-safe: no Node import, because the middleware runs on the Edge runtime.
  */
@@ -22,8 +23,13 @@ export interface RoutePolicy {
   readonly session?: 'optional';
   /** For `service` and `webhook`: the call that authenticates the request. */
   readonly verifier?: string;
-  /** Refuse a state-changing request that does not come from our own pages (API routes). */
-  readonly sameOrigin: boolean;
+  /**
+   * Who may send this API route a state change (middleware.ts): `strict`, only our own pages;
+   * `lenient`, anyone but another site's page (a request with no Origin passes); `any`, no check.
+   */
+  readonly origin: 'strict' | 'lenient' | 'any';
+  /** A state change must say its body is JSON, so another site cannot send one without a preflight. */
+  readonly jsonBody?: true;
 }
 
 export const ROUTE_POLICIES: readonly RoutePolicy[] = [
@@ -32,7 +38,7 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     methods: ['POST'],
     class: 'service',
     verifier: 'timingSafeEqual',
-    sameOrigin: false,
+    origin: 'any',
   },
   {
     route: 'api/audits/[id]/cancel',
@@ -41,26 +47,27 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     reason:
       "the owner's session or the anonymous session cookie that started the audit (authorizeCancel)",
     session: 'optional',
-    sameOrigin: true,
+    origin: 'strict',
   },
-  { route: 'api/audits/[id]/export', methods: ['GET'], class: 'user', sameOrigin: false },
-  { route: 'api/audits/[id]/llms-txt', methods: ['GET'], class: 'user', sameOrigin: false },
+  { route: 'api/audits/[id]/export', methods: ['GET'], class: 'user', origin: 'any' },
+  { route: 'api/audits/[id]/llms-txt', methods: ['GET'], class: 'user', origin: 'any' },
   {
     route: 'api/audits/[id]/notify',
     methods: ['POST'],
     class: 'public',
     reason:
       'capability URL (the audit id); per-IP and per-email caps; writes only the notify address of a running audit',
-    sameOrigin: false,
+    origin: 'lenient',
+    jsonBody: true,
   },
-  { route: 'api/audits/[id]/reaudit', methods: ['POST'], class: 'user', sameOrigin: true },
+  { route: 'api/audits/[id]/reaudit', methods: ['POST'], class: 'user', origin: 'strict' },
   {
     route: 'api/audits/[id]/stream',
     methods: ['GET'],
     class: 'public',
     reason: 'capability URL (the audit id): the progress stream of the audit it names',
     session: 'optional',
-    sameOrigin: false,
+    origin: 'any',
   },
   {
     route: 'api/audits/start',
@@ -68,46 +75,49 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     class: 'public',
     reason: 'anonymous audits by design; Turnstile and per-IP, per-domain and global limits',
     session: 'optional',
-    sameOrigin: false,
+    origin: 'lenient',
+    jsonBody: true,
   },
   {
     route: 'api/auth/logout',
     methods: ['POST'],
     class: 'public',
     reason: "clears the caller's own session cookies; there is nothing to authorise",
-    sameOrigin: true,
+    origin: 'strict',
   },
   {
     route: 'api/auth/magic-link',
     methods: ['POST'],
     class: 'public',
     reason: 'the sign-in request itself; Turnstile and per-IP and per-email limits',
-    sameOrigin: false,
+    origin: 'any',
   },
-  { route: 'api/billing/checkout', methods: ['POST'], class: 'user', sameOrigin: true },
-  { route: 'api/billing/portal', methods: ['POST'], class: 'user', sameOrigin: true },
-  { route: 'api/billing/status', methods: ['GET'], class: 'user', sameOrigin: false },
-  { route: 'api/checks/[id]/claim', methods: ['POST'], class: 'user', sameOrigin: true },
+  { route: 'api/billing/checkout', methods: ['POST'], class: 'user', origin: 'strict' },
+  { route: 'api/billing/portal', methods: ['POST'], class: 'user', origin: 'strict' },
+  { route: 'api/billing/status', methods: ['GET'], class: 'user', origin: 'any' },
+  { route: 'api/checks/[id]/claim', methods: ['POST'], class: 'user', origin: 'strict' },
   {
     route: 'api/developers',
     methods: ['POST'],
     class: 'public',
     reason: 'the developer waitlist form; Turnstile and a per-IP limit',
-    sameOrigin: false,
+    origin: 'lenient',
+    jsonBody: true,
   },
   {
     route: 'api/health',
     methods: ['GET'],
     class: 'public',
     reason: 'liveness probe; reads nothing',
-    sameOrigin: false,
+    origin: 'any',
   },
   {
     route: 'api/reports/hide',
     methods: ['POST'],
     class: 'public',
     reason: 'capability (the audit id), symmetric with mint; a per-IP limit',
-    sameOrigin: false,
+    origin: 'lenient',
+    jsonBody: true,
   },
   {
     route: 'api/reports/mint',
@@ -115,19 +125,21 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     class: 'public',
     reason: 'capability (a completed audit id); per-user and per-IP caps, Turnstile once exhausted',
     session: 'optional',
-    sameOrigin: false,
+    origin: 'lenient',
+    jsonBody: true,
   },
-  { route: 'api/reports/[slug]/claim', methods: ['POST'], class: 'user', sameOrigin: true },
-  { route: 'api/reports/[slug]/logo', methods: ['POST'], class: 'user', sameOrigin: true },
-  { route: 'api/reports/[slug]/mine', methods: ['GET'], class: 'user', sameOrigin: false },
-  { route: 'api/reports/[slug]/visibility', methods: ['POST'], class: 'user', sameOrigin: true },
-  { route: 'api/reports/[slug]/white-label', methods: ['POST'], class: 'user', sameOrigin: true },
+  { route: 'api/reports/[slug]/claim', methods: ['POST'], class: 'user', origin: 'strict' },
+  { route: 'api/reports/[slug]/logo', methods: ['POST'], class: 'user', origin: 'strict' },
+  { route: 'api/reports/[slug]/mine', methods: ['GET'], class: 'user', origin: 'any' },
+  { route: 'api/reports/[slug]/visibility', methods: ['POST'], class: 'user', origin: 'strict' },
+  { route: 'api/reports/[slug]/white-label', methods: ['POST'], class: 'user', origin: 'strict' },
   {
     route: 'api/takedown',
     methods: ['POST'],
     class: 'public',
     reason: 'the public takedown form; Turnstile when sent, per-IP and per-domain limits',
-    sameOrigin: false,
+    origin: 'lenient',
+    jsonBody: true,
   },
   {
     route: 'api/trpc/[trpc]',
@@ -135,46 +147,46 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     class: 'public',
     reason:
       "every procedure reads through the caller's own client under RLS (listMine requires a session); the router has no mutation",
-    sameOrigin: false,
+    origin: 'any',
   },
-  { route: 'api/verify/check/[id]', methods: ['POST'], class: 'user', sameOrigin: true },
-  { route: 'api/verify/start', methods: ['POST'], class: 'user', sameOrigin: true },
+  { route: 'api/verify/check/[id]', methods: ['POST'], class: 'user', origin: 'strict' },
+  { route: 'api/verify/start', methods: ['POST'], class: 'user', origin: 'strict' },
   {
     route: 'api/webhooks/inngest',
     methods: ['GET', 'POST', 'PUT'],
     class: 'webhook',
     verifier: 'serve',
-    sameOrigin: false,
+    origin: 'any',
   },
   {
     route: 'api/webhooks/resend',
     methods: ['POST'],
     class: 'webhook',
     verifier: 'verify',
-    sameOrigin: false,
+    origin: 'any',
   },
   {
     route: 'api/webhooks/stripe',
     methods: ['POST'],
     class: 'webhook',
     verifier: 'constructEvent',
-    sameOrigin: false,
+    origin: 'any',
   },
   // Outside /api. The middleware's origin guard reads API rows only; /login/verify checks its own.
-  { route: 'billing', methods: ['GET'], class: 'user', sameOrigin: false },
+  { route: 'billing', methods: ['GET'], class: 'user', origin: 'any' },
   {
     route: 'embed/[domain]',
     methods: ['GET'],
     class: 'public',
     reason: 'the embeddable grade badge; counts a view for a claimed report',
-    sameOrigin: false,
+    origin: 'any',
   },
   {
     route: 'llms.txt',
     methods: ['GET'],
     class: 'public',
     reason: 'a static text file for crawlers',
-    sameOrigin: false,
+    origin: 'any',
   },
   {
     route: 'login/verify',
@@ -182,14 +194,14 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     class: 'public',
     reason:
       'the sign-in landing: the link token is the credential; its POST checks its own origin (CC-25)',
-    sameOrigin: false,
+    origin: 'any',
   },
   {
     route: 'robots.txt',
     methods: ['GET'],
     class: 'public',
     reason: 'a static text file for crawlers',
-    sameOrigin: false,
+    origin: 'any',
   },
 ];
 

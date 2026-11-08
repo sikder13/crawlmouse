@@ -107,7 +107,7 @@ test.describe('every route class carries the security headers', () => {
 
 const ID = '6f1c2a8e-0000-4000-8000-000000000000';
 const sample = (route: string) => `/${route.replace('[id]', ID).replace(/\[[^\]]+\]/g, 'sample')}`;
-const guarded = ROUTE_POLICIES.filter((p) => p.sameOrigin);
+const guarded = ROUTE_POLICIES.filter((p) => p.origin === 'strict');
 
 test.describe('the built app refuses a cross-site state change before the route runs', () => {
   test('guards the routes the registry marks (anti-vacuity)', () => {
@@ -150,6 +150,31 @@ test.describe('the built app refuses a cross-site state change before the route 
     const res = await request.fetch('/api/billing/portal', {
       method: 'PROPFIND',
       headers: { origin: 'https://evil.example' },
+    });
+    expect(res.status()).toBe(403);
+  });
+
+  test('a text/plain POST to audits/start gets 415; the same JSON with no Origin reaches the route', async ({
+    request,
+  }) => {
+    const body = JSON.stringify({ url: 'https://example.com' });
+    const plain = await request.post('/api/audits/start', {
+      headers: { 'content-type': 'text/plain' },
+      data: body,
+    });
+    expect(plain.status()).toBe(415);
+    const json = await request.post('/api/audits/start', {
+      headers: { 'content-type': 'application/json' },
+      data: body,
+    });
+    // CI has no database: the route answers from its fail-closed global bucket, or its URL check.
+    expect([400, 503], `→ ${json.status()}`).toContain(json.status());
+  });
+
+  test('another site posting JSON to audits/start is refused', async ({ request }) => {
+    const res = await request.post('/api/audits/start', {
+      headers: { origin: 'https://evil.example', 'content-type': 'application/json' },
+      data: '{}',
     });
     expect(res.status()).toBe(403);
   });

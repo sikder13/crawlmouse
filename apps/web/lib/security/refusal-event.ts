@@ -8,12 +8,12 @@ import type { RouteClass } from './route-policy';
  * IP, user id or header value. Edge-safe.
  */
 export interface Refusal {
-  reason: 'cross_site' | 'rate_limited';
+  reason: 'cross_site' | 'not_json';
   /** The route's registry row (`audits/[id]/cancel`), not the path that was requested. */
   route: string;
   class: RouteClass;
   method: string;
-  status: 403 | 429;
+  status: 403 | 415;
 }
 
 /** The share of refusals sent. Counts stay proportional, so a spike is still a spike. */

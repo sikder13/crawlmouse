@@ -37,7 +37,7 @@ function membershipChecks(sf: ts.SourceFile): number[] {
 }
 
 /** Calls of `.json()` or `.formData()` on an exported handler's request parameter. */
-function bodyReads(sf: ts.SourceFile): number[] {
+function bodyReads(sf: ts.SourceFile, methods = ['json', 'formData']): number[] {
   const params = new Set<string>();
   for (const stmt of sf.statements) {
     if (
@@ -53,7 +53,7 @@ function bodyReads(sf: ts.SourceFile): number[] {
     if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
-      ['json', 'formData'].includes(node.expression.name.text) &&
+      methods.includes(node.expression.name.text) &&
       ts.isIdentifier(node.expression.expression) &&
       params.has(node.expression.expression.text)
     ) {
@@ -63,6 +63,11 @@ function bodyReads(sf: ts.SourceFile): number[] {
   };
   visit(sf);
   return out;
+}
+
+/** True when an exported handler parses its request body with `.json()`. */
+export function readsJsonBody(sf: ts.SourceFile): boolean {
+  return bodyReads(sf, ['json']).length > 0;
 }
 
 function sessionFirst(sf: ts.SourceFile): string[] {
