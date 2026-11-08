@@ -1,0 +1,49 @@
+{
+  "measured": "production ezspnfeyzwsisymytssm (PostgreSQL 17.6) read on 2026-11-08 through the read-only endpoint, in fingerprint.sql's format for the functions section. 'removed' is each definer function's line as production holds it; 'added' is the same line with md5 of pg_get_functiondef taken after replacing its one SET search_path line with the setting 20261108000002_v2_definer_search_path.sql writes. scripts/db/fingerprint.ts --expect reads them; scripts/db/definer-search-path.test.ts checks the migration changes exactly these signatures.",
+  "removed": {
+    "functions": [
+      "public.alert_events_rule_scope() kind=f owner=postgres security_definer=t definition=5b1947f2c11c15b9894ebda4548cbe22",
+      "public.alert_rules_entitlement_check() kind=f owner=postgres security_definer=t definition=0a272af09da99bbc59fd7bde748b27da",
+      "public.alert_rules_fired_check_scope() kind=f owner=postgres security_definer=t definition=9a2739270fa1b018b64a9278e8295582",
+      "public.apply_entitlement_transition(p_account_id uuid, p_expected_version integer, p_state text, p_tier text, p_past_due_tier text, p_past_due_since timestamp with time zone, p_trial_variant text, p_trial_ends_at timestamp with time zone, p_trial_used_at timestamp with time zone, p_disputed_at timestamp with time zone, p_seat_limit integer, p_site_limit integer, p_competitor_limit integer, p_at timestamp with time zone, p_subscription_id text, p_changed_at timestamp with time zone) kind=f owner=postgres security_definer=t definition=e186062645e3769949e160f87be53f1e",
+      "public.assert_entitlement_version(p_account_id uuid, p_expected_version integer) kind=f owner=postgres security_definer=t definition=8556b9859c62ce7ccbe345464faabaf7",
+      "public.crawl_worker_check_id() kind=f owner=postgres security_definer=t definition=cc6200faf121e67cc563a6f9cb4b19f1",
+      "public.crawl_worker_check_month() kind=f owner=postgres security_definer=t definition=e82f0de1e3bb424e55eb0112532afdbe",
+      "public.crawl_worker_lineage_id() kind=f owner=postgres security_definer=t definition=6520fbd346c7cb6e247b6291503bacff",
+      "public.crawl_worker_part_path_ok(p_name text) kind=f owner=postgres security_definer=t definition=ebc31e04203fa1a16e4a39ab1ea33f1b",
+      "public.fix_events_append_only() kind=f owner=postgres security_definer=t definition=9adaa1d834e8b58e80317faada944a88",
+      "public.fix_events_references() kind=f owner=postgres security_definer=t definition=9234d8e01a49b381c1adcceaad39a64f",
+      "public.handle_new_user() kind=f owner=postgres security_definer=t definition=f25379f8dd4195883d2b43dfca3e4fd6",
+      "public.is_member(p_account uuid) kind=f owner=postgres security_definer=t definition=4d7f69ad00e26d7dcf4a8bbe92be336b",
+      "public.is_member_for_site(p_site uuid) kind=f owner=postgres security_definer=t definition=8ab5935e912294f1045a3a9e9109524f",
+      "public.member_role(p_account uuid) kind=f owner=postgres security_definer=t definition=bddc1c922e04c2176688324f588f564e",
+      "public.usage_counts(p_account uuid) kind=f owner=postgres security_definer=t definition=231f03a9b27957cd78fc7e8b9cf7dccf",
+      "public.usage_events_append_only() kind=f owner=postgres security_definer=t definition=c7d6a2387f483ecfff37825240e3aaf7",
+      "public.usage_events_references() kind=f owner=postgres security_definer=t definition=c52af8e8cc6de198885ff59dc3c9ac59",
+      "public.v2_premake_month_partitions(p_from date, p_through date) kind=f owner=postgres security_definer=t definition=355dd5e06a3d3f38748e7026ad8a583c"
+    ]
+  },
+  "added": {
+    "functions": [
+      "public.alert_events_rule_scope() kind=f owner=postgres security_definer=t definition=12b97ba0e266b48eadddc45f7bd06f4b",
+      "public.alert_rules_entitlement_check() kind=f owner=postgres security_definer=t definition=42f22991591e1893aa032c1f3c5c3c8f",
+      "public.alert_rules_fired_check_scope() kind=f owner=postgres security_definer=t definition=7df915fab3888f909c9eafdc5164f508",
+      "public.apply_entitlement_transition(p_account_id uuid, p_expected_version integer, p_state text, p_tier text, p_past_due_tier text, p_past_due_since timestamp with time zone, p_trial_variant text, p_trial_ends_at timestamp with time zone, p_trial_used_at timestamp with time zone, p_disputed_at timestamp with time zone, p_seat_limit integer, p_site_limit integer, p_competitor_limit integer, p_at timestamp with time zone, p_subscription_id text, p_changed_at timestamp with time zone) kind=f owner=postgres security_definer=t definition=4ca2114fa106eb08d8b7aadf5ba9acc6",
+      "public.assert_entitlement_version(p_account_id uuid, p_expected_version integer) kind=f owner=postgres security_definer=t definition=30a3987463ade718930529bac277aede",
+      "public.crawl_worker_check_id() kind=f owner=postgres security_definer=t definition=b1438d0c7424201c4f607559ed8963ab",
+      "public.crawl_worker_check_month() kind=f owner=postgres security_definer=t definition=8fc91899d6cc91b9137e5999b7dabb31",
+      "public.crawl_worker_lineage_id() kind=f owner=postgres security_definer=t definition=2335cf86254d9a68d3d48320ec88b67c",
+      "public.crawl_worker_part_path_ok(p_name text) kind=f owner=postgres security_definer=t definition=3fcc957c762daf1c18a87dba5e2ef2a7",
+      "public.fix_events_append_only() kind=f owner=postgres security_definer=t definition=5218ceae2c0bafc3d4fa01585db6e19f",
+      "public.fix_events_references() kind=f owner=postgres security_definer=t definition=6910a7bd707efb7d0a94b99252ce4951",
+      "public.handle_new_user() kind=f owner=postgres security_definer=t definition=d13a41daf92311e97d79dcc66f9b6125",
+      "public.is_member(p_account uuid) kind=f owner=postgres security_definer=t definition=55e2ffc33e71bb4f0bb56fc30474c82f",
+      "public.is_member_for_site(p_site uuid) kind=f owner=postgres security_definer=t definition=81c87f00c2847ba6d9e900ad7a7dcc3f",
+      "public.member_role(p_account uuid) kind=f owner=postgres security_definer=t definition=08ed518534788a57558e3c7e676e4bf6",
+      "public.usage_counts(p_account uuid) kind=f owner=postgres security_definer=t definition=3df6c7ab76e9d079b7186920ec8f0d81",
+      "public.usage_events_append_only() kind=f owner=postgres security_definer=t definition=95336857fde080595e4e319f2a5c366b",
+      "public.usage_events_references() kind=f owner=postgres security_definer=t definition=83484d777973acd95396ae8494e53915",
+      "public.v2_premake_month_partitions(p_from date, p_through date) kind=f owner=postgres security_definer=t definition=b27b32a88a0b2fe3c134f9b672cbc031"
+    ]
+  }
+}
