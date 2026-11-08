@@ -11,6 +11,18 @@ import layout from '../../layout.module.css';
 import styles from './SegmentScreen.module.css';
 import own from './ChangesScreen.module.css';
 
+/** A change's cause, and the diff the check found, as the cause cell draws them. */
+function causeOf(r: ChangeRowView) {
+  return (
+    <>
+      {r.cause}
+      {r.diff.length ? (
+        <pre className={own.diff}>{r.diff.map((l) => `${l.sign} ${l.line}`).join('\n')}</pre>
+      ) : null}
+    </>
+  );
+}
+
 /**
  * Change rows, the site's own and the example's alike. The pages and who-was-told columns appear
  * only when the rows carry them (the example does not), and the site column only on rows that name
@@ -57,12 +69,13 @@ export function ChangeTable({ label, rows }: { label: string; rows: ChangeRowVie
           r.where,
           ...(pages ? [r.pages ?? '—'] : []),
           r.effect,
-          <span key="k" className={site ? own.logCause : undefined}>
-            {r.cause}
-            {r.diff.length ? (
-              <pre className={own.diff}>{r.diff.map((l) => `${l.sign} ${l.line}`).join('\n')}</pre>
-            ) : null}
-          </span>,
+          site ? (
+            <span key="k" className={own.logCause}>
+              {causeOf(r)}
+            </span>
+          ) : (
+            causeOf(r)
+          ),
           ...(told ? [r.told ?? '—'] : []),
         ],
       }))}
