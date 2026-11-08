@@ -4,7 +4,14 @@ import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { listMigrations, rollbackPath } from './files';
 import { compareFingerprints, readFingerprint, type Fingerprint } from './fingerprint';
-import { migratedDb, pgliteDb, withRollback } from './test-support';
+import {
+  grantSql,
+  migratedDb,
+  pgliteDb,
+  V1_FUNCTIONS,
+  V1_TABLES,
+  withRollback,
+} from './test-support';
 
 interface Lines {
   acls: string[];
@@ -16,31 +23,6 @@ const EXPECTED = JSON.parse(
 
 const P2 = listMigrations().find((m) => m.name === 'v1_client_grant_hardening')!;
 const P2_ROLLBACK = readFileSync(rollbackPath(P2), 'utf8');
-
-const V1_TABLES = [
-  'audits',
-  'benchmark_cohorts',
-  'domain_verifications',
-  'email_events',
-  'embed_badges',
-  'findings',
-  'fixes',
-  'frontier',
-  'frontier_politeness',
-  'links',
-  'pages',
-  'public_reports',
-  'rate_limits',
-  'sessions',
-  'stripe_events',
-  'takedown_requests',
-  'users',
-  'waitlist',
-];
-const V1_FUNCTIONS = [
-  'public.handle_new_user()',
-  'public.increment_rate_limit(p_bucket_key text, p_window_start timestamp with time zone)',
-];
 
 const statements = (sql: string) =>
   sql
@@ -106,25 +88,6 @@ function clientLines(fp: Fingerprint): Lines {
       .lines.filter((l) => /^postgres in public on \w: (anon|authenticated) [A-Z]+$/.test(l))
       .sort(),
   };
-}
-
-/** SQL that grants each fingerprint line, built from the line itself: production's state, set up. */
-function grantSql(lines: string[]): string {
-  const names: Record<string, string> = { r: 'tables', S: 'sequences', f: 'functions' };
-  return lines
-    .map((l) => {
-      let m = /^relation (\S+) (\w+) ([A-Z]+)$/.exec(l);
-      if (m) return `grant ${m[3]} on table ${m[1]} to ${m[2]};`;
-      m = /^column (public\.\w+)\.(\w+) (\w+) ([A-Z]+)$/.exec(l);
-      if (m) return `grant ${m[4]} (${m[2]}) on table ${m[1]} to ${m[3]};`;
-      m = /^function (.+\)) (\w+) ([A-Z]+)$/.exec(l);
-      if (m) return `grant ${m[3]} on function ${m[1]} to ${m[2]};`;
-      m = /^postgres in public on (\w): (\w+) ([A-Z]+)$/.exec(l);
-      if (m)
-        return `alter default privileges for role postgres in schema public grant ${m[3]} on ${names[m[1]!]} to ${m[2]};`;
-      throw new Error(`no grant for: ${l}`);
-    })
-    .join('\n');
 }
 
 const AUTHENTICATED_KEEPS = {
