@@ -103,8 +103,9 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm test:templates
 
-  # next build with placeholder values only (apps/web/.env.ci). No real key is present, so nothing
-  # can reach Supabase, Stripe or Sentry. The one outbound call is next/font/google fetching fonts.
+  # next build with placeholder values only (apps/web/.env.ci, and the three below). No real key is
+  # present, so nothing can reach Supabase, Stripe or Sentry. The one outbound call is next/font/google
+  # fetching fonts. The build is kept for the two jobs that run it on next start.
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -115,12 +116,61 @@ jobs:
       - uses: ./.github/actions/setup
       - name: next build (apps/web)
         working-directory: apps/web
+        env:
+          # So security-browser sees the third parties the CSP allows, with values that point nowhere:
+          # Cloudflare's documented always-pass Turnstile test sitekey, a PostHog key no project has,
+          # a Sentry DSN on a .invalid host (apps/web/__tests__/security/browser/build-env.ts).
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          NEXT_PUBLIC_POSTHOG_KEY: ci-placeholder-posthog-key
+          NEXT_PUBLIC_SENTRY_DSN: https://ciplaceholder@o0.ingest.sentry.invalid/0
         run: |
           set -euo pipefail
           set -a
           . ./.env.ci
           set +a
           pnpm build
+      - name: Keep the build for security-browser and zap-baseline
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: next-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/.next
+            !apps/web/.next/cache
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  # The security headers, the cross-site refusal and the report-only CSP, checked on next start of
+  # the build above (docs/specs/v2/sec-baseline.md). Same runner image and checkout path as build, so
+  # the downloaded .next starts as it was built.
+  security-browser:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      NEXT_PUBLIC_POSTHOG_KEY: ci-placeholder-posthog-key
+      NEXT_PUBLIC_SENTRY_DSN: https://ciplaceholder@o0.ingest.sentry.invalid/0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: next-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/.next
+      - name: Install Chromium
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Headers, cross-site refusal and CSP on next start
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          pnpm exec playwright test -c __tests__/security/browser/playwright.config.ts
 
   # CodeQL's security-extended queries over the JavaScript and TypeScript. A result whose rule has
   # security-severity 7.0 or more (high or critical) fails the job, read from the SARIF by
