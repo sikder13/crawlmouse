@@ -167,3 +167,33 @@ describe('Alerts, on the stand-in Free account (clean-site)', () => {
     expect(v.channels.foot).toBe('Slack is Pro. On Free, email alerts cover the first site.');
   });
 });
+
+describe('Alerts, a site notified at two checks', () => {
+  it('sends one message per check, not one per site', () => {
+    // bad-site with the first audit's change (7, c…01) notified by email too: example-outfitter.com
+    // then has two notified checks, c…01 and c…06, which are two messages, not one.
+    const d = {
+      ...bad,
+      changes: bad.changes.map((c) =>
+        c.id === '90000000-0000-4000-8000-000000000007'
+          ? {
+              ...c,
+              notified: {
+                channels: ['email' as const],
+                slack_channel: null,
+                sent_at: '2026-10-25T02:35:00Z',
+              },
+            }
+          : c,
+      ),
+    };
+    const v = alertsView(d, { accountId: BAD, now: bad.as_of });
+    expect(v.fired.messages.map((m) => [m.host, m.checkId.slice(-3), m.rows.length])).toEqual([
+      ['example-outfitter.com', '006', 3],
+      ['nahltech.com', '00c', 1],
+      ['staging.example-outfitter.dev', '029', 1],
+      ['example-outfitter.com', '001', 1],
+    ]);
+    expect(v.header.line).toMatch(/^3 emails since /);
+  });
+});
