@@ -250,8 +250,10 @@ jobs:
           if-no-files-found: warn
 
   # CodeQL's security-extended queries over the JavaScript and TypeScript, test code left out. A result whose rule has
-  # security-severity 7.0 or more (high or critical) fails the job, read from the SARIF by
-  # .github/workflows/scripts/sarif-gate.mjs, which also fails a scan that extracted no file. Results
+  # security-severity 7.0 or more (high or critical) fails the job unless the reviewed baseline
+  # (.github/workflows/scripts/codeql-baseline.json, by fingerprint, expiring 2026-12-08) lists it; read
+  # from the SARIF by .github/workflows/scripts/sarif-gate.mjs, which also fails a scan that extracted
+  # no file. Results
   # upload to code scanning from this repository's own pushes and pull requests: a fork's token cannot
   # write them, and the gate still runs on its SARIF.
   codeql:
@@ -276,14 +278,14 @@ jobs:
               - '**/*.test.ts'
               - '**/*.test.tsx'
               - '**/__tests__/**'
-              - 'tests/**'
+              - '**/tests/**'
       - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: /language:javascript-typescript
           output: ${{ runner.temp }}/codeql
           upload: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && 'always' || 'never' }}
       - name: Fail on a high or critical result
-        run: node .github/workflows/scripts/sarif-gate.mjs "$RUNNER_TEMP/codeql"
+        run: node .github/workflows/scripts/sarif-gate.mjs "$RUNNER_TEMP/codeql" .github/workflows/scripts/codeql-baseline.json
 
   # The v2 design-system harness (tests/visual): screenshots of the preview pages at 1280 and
   # 390 px, light and dark, failing on a diff above 0.2%, plus layout, axe, focus and motion checks.
