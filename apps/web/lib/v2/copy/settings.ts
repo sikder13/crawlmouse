@@ -130,7 +130,7 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     // In the trial card's note, which the locked page and ours hide on a phone.
     hiddenOnPhone: true,
     source:
-      'Owner ruling on CC-27 (change a): a page that carries the plan’s terms and its Keep has the rail’s trial card leave them to it (`plan: page`); what Free keeps is on the plan card',
+      'Owner ruling 10 (change a, as applied): a page that carries the plan’s terms and its Keep has the rail’s trial card leave them to it (`plan: page`); what Free keeps is on the plan card',
   },
   {
     screen: 'settings',
@@ -138,7 +138,7 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     locked: 'Keep Pro, $19 a month Theme',
     rendered: 'Theme',
     source:
-      'Owner ruling on CC-27 (change a): the plan card’s Keep is the one on this page; the rail’s is left out',
+      'Owner ruling 10 (change a, as applied): the plan card’s Keep is the one on this page; the rail’s is left out',
   },
   {
     screen: 'settings',
@@ -246,7 +246,7 @@ export const SETTINGS_CHANGES: CopyChange[] = [
       'Connected Slack Nahl · #seo connected Search Console AI-feature impressions by page Connect Vercel audit each deploy of staging connected API key read-only, for your own scripts Create',
     rendered: '',
     source:
-      'Owner ruling on the CC-27 plan: Integrations is a later step with its own rail entry, so Settings leaves out the Connected card',
+      'Owner ruling 11 (with the plan): Integrations is a later step with its own rail entry, so Settings leaves out the Connected card',
   },
 ];
 

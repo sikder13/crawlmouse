@@ -85,7 +85,7 @@ const DECISIONS: [string, string, string][] = [
   ],
   [
     'D9',
-    'Record tables scroll inside their wrapper and settings tables stack on a phone (DESIGN-LOCK §7.7). The orange element stays where the artboard puts it: none of these sits in a scrolling table, which is when §7.5 moves it to the header.',
+    'Record tables sit in a scroll region and settings tables stack on a phone (DESIGN-LOCK §7.7); the scroll region needs the account frame’s row layout, which the production build loses (Known gaps). The orange element stays where the artboard puts it: none of these sits in a scrolling table, which is when §7.5 moves it to the header.',
     'Design lock.',
   ],
 ];
@@ -127,6 +127,14 @@ const RULINGS: [string, string][] = [
   [
     '9',
     'OPERATING-RULES over the brief on the review gate: only non-blocking findings go under Known gaps; a blocker after round three goes to the owner.',
+  ],
+  [
+    '10',
+    'Change a, as applied: Settings and Trial ending both carry the plan’s terms and its Keep, so both read the rail with `plan: page`. On Settings this replaces the artboard’s rail note and Keep.',
+  ],
+  [
+    '11',
+    'With the plan (approved 2026-11-08): Settings leaves out the artboard’s Connected card, since Integrations is a later step with its own rail entry.',
   ],
 ];
 
@@ -257,7 +265,7 @@ function rulesSection(): string {
     '- **A notification sent after `now` is not yet sent.** `viewAt` drops a change found after `now`, not one found before it whose notification went out later; the Changes log and Alerts read `notified` through `asSentBy`, so at 10:02:30Z the morning’s mail has not gone out.',
     '- **Alerts, Fired (D4).** One message per (site, check), newest sent first; sites within a send in the order they were added; rows by id. “N emails” counts the messages that carried email. “Open” names the problem whose fix is open: an opened change whose `fix_id` names a fix not verified resolved.',
     '- **Reports (D5).** Made: status ready or sent, `public_link` left out (ruling 7). Scheduled: status scheduled or held, by `scheduled_for`. A Link appears while `share_expires_at` is ahead of `now`. Making a report needs the exports gate; without it the card offers the plans, which is not the reader’s action and so not orange.',
-    '- **Settings (D6).** Sites used are primary sites (staging holds no slot, ruling Q10) against `limits.sites`; the largest site is the most pages any latest result crawled, against `GATES[tier].pagesPerCheck`. The deletion names every site it removes, staging included. The rail’s trial card leaves the plan to the page (`plan: page`), which carries it.',
+    '- **Settings (D6).** Sites used are primary sites (staging holds no slot, ruling Q10) against `limits.sites`; the largest site is the most pages any latest result crawled, against `GATES[tier].pagesPerCheck`. The deletion counts the sites it removes, staging included, and opens at a confirmation step (`GET /settings/delete`) where the owner re-types the hostname. The rail’s trial card leaves the plan to the page (`plan: page`), which carries it.',
     '- **Trial ending (D7).** The window is the current trial’s `since` to `now`. Checks run: every check that finished in it. Changes caught: opened and resolved changes detected in it, problems first. Fixes closed: resolved changes in it that name a fix. What stays: the primary site, its free three, its public link, its email alerts. What pauses: the other primary sites, the staging copies (Free has no staging), the fixes beyond the three, and the paid features the account uses.',
   ].join('\n');
 }
@@ -398,12 +406,18 @@ function wiringSection(): string {
 
 /** What this step leaves open, each in a sentence. */
 export const KNOWN_GAPS_27 = [
-  '“Trial ending, withheld” is not built (owner ruling 2): no fixture account has a trial that overlaps a withheld result.',
+  '**Blocking, CC-26’s file.** On the production build the account frame lays out as a column: `AccountShell.module.css`’s `.frame { flex-direction: row }` and `PageShell.module.css`’s `.shell { flex-direction: column }` have equal weight, and the built CSS puts the second later. Every account screen, CC-26’s too, then draws the rail as a full-width block above the page, and the Changes log at 390px is wider than the viewport because its table no longer scrolls in its own region (design review, round 1). The fix is one selector in that file (e.g. `.shell.frame`); CC-27 does not edit it, and its visual baselines wait for it.',
+  'FACTS E6 says deletion “takes effect after a confirmation link”; ARCH-2 §5 has the owner re-type the hostname, with sign-in disabled at once. The preview opens “Delete…” at a confirmation step and keeps E6’s sentence; which flow is right is the owner’s call.',
+  'The keep action posts to `/api/billing/checkout` (`ACCOUNT_ACTIONS.keepPlan`, built). Today that route takes a JSON `priceId`, does no check of the account’s state and charges when the checkout completes; the guard CC-26 wrote describes the route CC-26b is to build. Trial ending says the charge comes when the plan is chosen, which is what the built route does.',
+  '“Trial ending, withheld” is not built (owner ruling 2): no fixture account has a trial that overlaps a withheld result. A trial with a card is read by `trial-end.test.ts` on Kestrel; it has no preview.',
   '`account-control-names.test.tsx` (CC-26) pins `ACCOUNT_ELEMENTS` at seven previews, so CC-27’s previews sit in `CC27_ELEMENTS` and that guard does not run on them in the suite; it was run on them once, from a copy, and passed. Request to CC-26: read the count from the registry and include `CC27_ELEMENTS`.',
   'CC-27b’s action builder (`routeAction` in `settings.ts`) repeats `action()`’s path filling, because `action()` takes only `ACCOUNT_ACTIONS` keys. Folding the two needs an `actionFor(spec, …)` export from CC-26’s `account-actions.ts`.',
-  'Alerts’ highlighted first row (the artboard’s `--s2` background on the open block) is not drawn: the Table primitive has no row emphasis, and its Open is drawn as a button instead of quiet.',
-  'Whether a no-card Pro trial that adds a card is charged at once or at the trial’s end is not in the fixture or ARCH-2; Trial ending keeps the artboard’s “charged on <end date>”.',
+  'Alerts’ first row is not drawn on the artboard’s `--s2` background: the Table primitive has no row emphasis. Its Open is a bordered button, as the artboard draws it, and the others quiet.',
+  'Alerts names a change by FACTS’ labels (“crawler blocked”, “grade moved”, “deploy audited”, ruling 4); the Changes log keeps CC-23’s kind labels (“opened”, “changed”). The same change reads differently on the two screens.',
+  'Trial ending’s header counts every site (“5 sites”, staging included) where Settings counts slots (“4 of 5”) and the end text counts the other primary sites (“the other three”).',
+  'The Table primitive (CC-21) clears the bottom border of a last row’s cells but not of its row header, so a table with row headers draws a short doubled rule under its last row.',
   'The blocking-verdict pair (`disallowed_by_robots`, `blocked_by_ua_rule`) is written in `alerts.ts` as well as in CC-26’s `site.ts`, which does not export it.',
+  'The 90 days in FACTS A6’s sentences is `EVIDENCE_CONDENSED_AFTER_DAYS`, a copy constant: no code condenses evidence yet (the retention job is a later step).',
 ];
 
 function gapsSection(): string {

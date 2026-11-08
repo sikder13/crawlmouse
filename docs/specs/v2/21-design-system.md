@@ -321,6 +321,10 @@ An on/off setting: a native button with role="switch" and aria-checked, inside a
 native button is in the tab order and answers Enter and Space, so it needs no key handling of its
 own. The routes are not built yet (CC-27b), so the submit is stopped; the switch still flips.
 
+The form posts the state the switch moves to, `!checked`. The browser reads the form after the
+click's handlers and React's re-render, so the switch flips in a later task: flipped in the click
+handler, the field would already hold the next click's value when the form is read.
+
 | Prop     | Type                     | Required | Note                                                                        |
 | -------- | ------------------------ | -------- | --------------------------------------------------------------------------- |
 | `label`  | `string`                 | yes      | The setting's own row text, which names the switch (DESIGN-LOCK §7.6).      |
