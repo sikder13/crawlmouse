@@ -186,3 +186,15 @@ describe('Reports, on the stand-in Free account', () => {
     expect(v.made.empty).toBe('No reports yet.');
   });
 });
+
+describe('Reports, a share link after it expires', () => {
+  it('shows the Link while the share link works and not once it has expired', () => {
+    // The CSV's link expires 24 Nov 07:10Z; read a second before and at that moment.
+    const at = (now: string) =>
+      reportsView(bad, { accountId: 'a0000000-0000-4000-8000-000000000001', now }, {}, BASE)
+        .made.rows.find((r) => r.type === 'CSV, all responses')!
+        .actions.map((a) => a.label);
+    expect(at('2026-11-24T07:09:59Z')).toEqual(['Download · 310 KB', 'Link · until Tue 24 Nov']);
+    expect(at('2026-11-24T07:10:00Z')).toEqual(['Download · 310 KB']);
+  });
+});

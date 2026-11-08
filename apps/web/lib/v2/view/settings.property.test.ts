@@ -13,6 +13,7 @@ import { settingsView } from './settings';
 
 describe('Settings, generated', () => {
   it('counts the reader’s slots, its largest crawl and the sites a deletion removes', () => {
+    const reached = new Set<string>();
     fc.assert(
       fc.property(accountReads, ({ d, viewer }) => {
         const v = settingsView(d, viewer);
@@ -41,11 +42,14 @@ describe('Settings, generated', () => {
               : `Removes all ${numberWord(live.length)} sites,`,
         );
         expect(v.email.rows.map((r) => r.kind)).toEqual([...EMAIL_KINDS]);
+        reached.add(live.length === 0 ? 'no site' : live.length === 1 ? 'one site' : 'sites');
         expect(
           v.header.line.startsWith(d.accounts.find((a) => a.id === viewer.accountId)!.email),
         ).toBe(true);
       }),
       { numRuns: 300 },
     );
+    // A site with no finished crawl is not reached here: settings.test.ts reads one.
+    expect([...reached].sort()).toEqual(['no site', 'one site', 'sites']);
   });
 });

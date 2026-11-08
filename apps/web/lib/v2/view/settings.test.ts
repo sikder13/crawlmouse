@@ -95,6 +95,15 @@ describe('Settings, the plan', () => {
     ]);
   });
 
+  it('reads 0 pages for a site whose first audit has not finished', () => {
+    // The stand-in account began 15:30Z on 27 Oct; its audit finished 15:31Z.
+    const p = settingsView(fixture('clean-site'), {
+      ...CLEAN_VIEWER,
+      now: '2026-10-27T15:30:30Z',
+    }).plan;
+    expect(p.usage[1]).toEqual(['Pages crawled, largest site', '0 of 500']);
+  });
+
   it('on Free, reads Free’s limits and offers Pro', () => {
     const p = free().plan;
     expect([p.name, p.left]).toEqual(['Free', null]);
