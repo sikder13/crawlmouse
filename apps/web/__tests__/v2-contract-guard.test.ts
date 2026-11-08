@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { ALL_V2_ENUMS, ENTITIES, RULES, v2Registry } from '@crawlmouse/types/v2';
+import { ALL_V2_ENUMS, ENTITIES, FixTypeSchema, RULES, v2Registry } from '@crawlmouse/types/v2';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 import { constraints, enumSetOf } from './helpers/v2-check-tables';
@@ -241,7 +241,46 @@ function bindings(): Binding[] {
 let db: PGlite;
 const columns = new Map<string, { notnull: boolean; type: string }>();
 /** Every enum CHECK on a single column: 'table.column' → the value set of each. */
-const enumChecks = new Map<string, string[][]>();
+let enumChecks = new Map<string, string[][]>();
+
+async function readEnumChecks(d: PGlite): Promise<Map<string, string[][]>> {
+  const out = new Map<string, string[][]>();
+  const tables = new Set([...Object.values(TABLE_OF), ...Object.values(RELOCATED)]);
+  for (const t of tables) {
+    for (const k of await constraints(d, t)) {
+      const set = enumSetOf(k.def);
+      if (!set || k.columns.length !== 1) continue;
+      const key = `${t}.${k.columns[0]}`;
+      out.set(key, [...(out.get(key) ?? []), set]);
+    }
+  }
+  return out;
+}
+
+/**
+ * The columns whose enum CHECKs are not exactly the contract's value set (less the values declared
+ * not stored yet), and how many columns were compared.
+ */
+function valueSetMismatches(checks: Map<string, string[][]>): {
+  wrong: string[];
+  compared: number;
+} {
+  const wrong: string[] = [];
+  let compared = 0;
+  for (const b of bindings()) {
+    const want = valueSet(b.schema);
+    if (!want) continue;
+    compared++;
+    const got = checks.get(`${b.table}.${b.column}`) ?? [];
+    const pending = VALUES_NOT_STORED_YET[`${b.table}.${b.column}`] ?? [];
+    const now = want.filter((v) => !pending.includes(v));
+    if (got.length === 0 || got.some((g) => JSON.stringify(g) !== JSON.stringify(now)))
+      wrong.push(
+        `${b.at} → ${b.table}.${b.column}: CHECKs ${JSON.stringify(got)}, contract ${JSON.stringify(want)}`,
+      );
+  }
+  return { wrong, compared };
+}
 
 beforeAll(async () => {
   db = await freshDb();
@@ -252,15 +291,7 @@ beforeAll(async () => {
       where n.nspname = 'public' and c.relkind in ('r', 'p') and a.attnum > 0 and not a.attisdropped`,
   );
   for (const r of rows) columns.set(`${r.t}.${r.c}`, { notnull: r.notnull, type: r.type });
-  const tables = new Set([...Object.values(TABLE_OF), ...Object.values(RELOCATED)]);
-  for (const t of tables) {
-    for (const k of await constraints(db, t)) {
-      const set = enumSetOf(k.def);
-      if (!set || k.columns.length !== 1) continue;
-      const key = `${t}.${k.columns[0]}`;
-      enumChecks.set(key, [...(enumChecks.get(key) ?? []), set]);
-    }
-  }
+  enumChecks = await readEnumChecks(db);
 }, 120_000);
 
 describe('the declarations cover the contract', () => {
@@ -323,25 +354,24 @@ describe('every contract field has a column', () => {
 
 describe('every value set the contract places at a column has CHECKs with exactly its values', () => {
   it('enum, array-of-enum and union-discriminator columns: at least one CHECK, and every one exact', () => {
-    const wrong: string[] = [];
-    let checkedColumns = 0;
-    for (const b of bindings()) {
-      const want = valueSet(b.schema);
-      if (!want) continue;
-      checkedColumns++;
-      const got = enumChecks.get(`${b.table}.${b.column}`) ?? [];
-      const pending = VALUES_NOT_STORED_YET[`${b.table}.${b.column}`] ?? [];
-      const now = want.filter((v) => !pending.includes(v));
-      if (got.length === 0 || got.some((g) => JSON.stringify(g) !== JSON.stringify(now)))
-        wrong.push(
-          `${b.at} → ${b.table}.${b.column}: CHECKs ${JSON.stringify(got)}, contract ${JSON.stringify(want)}`,
-        );
-    }
+    const { wrong, compared } = valueSetMismatches(enumChecks);
     expect(wrong).toEqual([]);
-    expect(
-      checkedColumns,
-      'anti-vacuity: the contract places value sets at columns',
-    ).toBeGreaterThan(20);
+    expect(compared, 'anti-vacuity: the contract places value sets at columns').toBeGreaterThan(20);
+  });
+
+  it('a CHECK missing one contract value is reported: site_fixes.type without hreflang_gap', async () => {
+    const narrowed = (await db.clone()) as PGlite;
+    try {
+      const values = FixTypeSchema.options.filter((v) => v !== 'hreflang_gap');
+      await narrowed.exec(`alter table public.site_fixes drop constraint site_fixes_type_check;
+        alter table public.site_fixes add constraint site_fixes_type_check
+          check (type in (${values.map((v) => `'${v}'`).join(', ')}));`);
+      const { wrong } = valueSetMismatches(await readEnumChecks(narrowed));
+      expect(wrong).toHaveLength(1);
+      expect(wrong[0]).toMatch(/^Fix\.type → site_fixes\.type: /);
+    } finally {
+      await narrowed.close();
+    }
   });
 
   it('the union discriminator FixEvent.kind is one of them', () => {

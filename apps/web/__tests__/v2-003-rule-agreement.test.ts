@@ -150,6 +150,23 @@ function extras(rule: string): Record<string, unknown[]> {
         { ...effect, ai_readability: 3, ai_readability_pending_on: ['0123456789abcdef'] },
       ],
     },
+    effect_seo_pending: {
+      effect: [
+        { ...effect, technical_seo: null, technical_seo_pending_on: [] },
+        { ...effect, technical_seo: 2, technical_seo_pending_on: ['grade_refused'] },
+        { ...effect, technical_seo: null, technical_seo_pending_on: ['grade_refused'] },
+      ],
+    },
+    // A positive sum refuses; zero, a negative sum, or no absorber accepts. A null grade counts 0.
+    effect_absorbed: {
+      effect: [
+        { ...effect, absorbed_by: 2, technical_seo: 3, ai_readability: 1 },
+        { ...effect, absorbed_by: 2, technical_seo: 1, ai_readability: null },
+        { ...effect, absorbed_by: 2, technical_seo: 0, ai_readability: 0 },
+        { ...effect, absorbed_by: 2, technical_seo: -1, ai_readability: 1 },
+        { ...effect, absorbed_by: null, technical_seo: 3, ai_readability: 1 },
+      ],
+    },
     fix_gone: { gone: [{ status_code: 404 }, { status_code: 410 }] },
     // Every status the contract allows, one hop each, so a dropped one turns this red.
     redirect_status: {
