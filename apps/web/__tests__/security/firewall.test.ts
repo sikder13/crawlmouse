@@ -51,6 +51,9 @@ const APP_PER_IP: Record<string, Array<[number, number]>> = {
   '/api/checks/6f1c2a8e-0000-4000-8000-000000000000/claim': [],
 };
 
+/** The rate-limited routes with a dynamic segment. */
+const DYNAMIC = new Set(['/api/checks/6f1c2a8e-0000-4000-8000-000000000000/claim']);
+
 const pathCondition = (rule: (typeof firewall.rules)[number]) =>
   rule.conditionGroup.flatMap((g) => g.conditions).find((c) => c.type === 'path')!;
 const rateLimited = firewall.rules.filter((r) => r.action.mitigate.action === 'rate_limit');
@@ -98,6 +101,17 @@ describe('infra/vercel/firewall.json', () => {
       expect(new RegExp(String(cond.value)).test(`${path}/`)).toBe(true);
       for (const other of [`${path}x`, `/x${path}`, `${path}/x`]) {
         expect(new RegExp(String(cond.value)).test(other), other).toBe(false);
+      }
+      // Vercel's router serves a dynamic route in any case (measured on production, 2026-11-08), so its
+      // rule must match every case too. A static route is served only as written.
+      if (DYNAMIC.has(path)) {
+        for (const spelling of [
+          path.toUpperCase(),
+          path.replace('/api/', '/Api/'),
+          path.replace('claim', 'CLAIM'),
+        ]) {
+          expect(new RegExp(String(cond.value)).test(spelling), spelling).toBe(true);
+        }
       }
       const rl = rule.action.mitigate.rateLimit!;
       expect(rl.limit).toBeGreaterThan(appAdmits(buckets, rl.window));

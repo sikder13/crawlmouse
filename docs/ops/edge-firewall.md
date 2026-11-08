@@ -59,6 +59,14 @@ invalid address, so no email goes out. The app answers each with 400, and the ed
 for i in $(seq 1 31); do curl -s -o /dev/null -w '%{http_code}\n' -X POST https://crawlmouse.com/api/auth/magic-link/ -H 'content-type: application/json' -d '{"email":"x"}'; done | sort | uniq -c
 ```
 
+The check-claim rule must count every case of its path, because Vercel serves a dynamic route in any
+case. The same loop on an upper-case spelling must also end in the edge's denial. Vercel's own 403
+page, not the app's JSON, answers the 31st:
+
+```bash
+for i in $(seq 1 31); do curl -s -o /dev/null -w '%{http_code} %{content_type}\n' -X POST https://crawlmouse.com/API/CHECKS/00000000-0000-4000-8000-000000000000/CLAIM; done | sort | uniq -c
+```
+
 ## Roll back
 
 Put back what was active before:

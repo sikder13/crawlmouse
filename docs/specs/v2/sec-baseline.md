@@ -349,7 +349,8 @@ second. The findings and their triage:
 
 - `POST /api/auth/magic-link`: 30 per 60 s per IP, deny.
 - `POST /api/audits/start`: 60 per 600 s per IP, deny.
-- `POST /api/checks/<id>/claim`: 30 per 60 s per IP, deny.
+- `POST /api/checks/<id>/claim`: 30 per 60 s per IP, deny. Its regex matches the path in any case,
+  because Vercel serves a dynamic route in any case; the two static routes are served only as written.
 - `GET /login` and `/signup`: a browser challenge. `/login/verify`, where the email link lands, is not
   challenged.
 

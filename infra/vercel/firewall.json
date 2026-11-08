@@ -55,12 +55,16 @@
     },
     {
       "name": "Rate limit: check claims",
-      "description": "POST /api/checks/<id>/claim: 30 a minute per IP, then deny. The app has no per-IP limit here.",
+      "description": "POST /api/checks/<id>/claim, in any case (Vercel serves a dynamic route so): 30 a minute per IP, then deny. The app has no per-IP limit here.",
       "active": true,
       "conditionGroup": [
         {
           "conditions": [
-            { "type": "path", "op": "re", "value": "^/api/checks/[^/]+/claim/?$" },
+            {
+              "type": "path",
+              "op": "re",
+              "value": "^/[aA][pP][iI]/[cC][hH][eE][cC][kK][sS]/[^/]+/[cC][lL][aA][iI][mM]/?$"
+            },
             { "type": "method", "op": "eq", "value": "POST" }
           ]
         }
