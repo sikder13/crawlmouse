@@ -58,7 +58,6 @@ export const ALERTS_COPY = {
     [
       ...(clauses.length ? [`${ALERTS_COPY.perMessageCap}: ${clauses.join('; ')}.`] : []),
       ...slack,
-      'Checks that found nothing sent nothing.',
     ].join(' '),
   perMessageCap: 'One email per site per check that found something',
   openAction: 'Open',
@@ -84,7 +83,7 @@ export const ALERTS_COPY = {
   quietNamed: (labels: readonly string[]) =>
     `Quiet by default: ${listOf(labels.map((l) => `“${l}”`))} ${plural(labels.length, 'is', 'are')} off.`,
   /** What an off rule would have sent on: the changes no message carried. */
-  unsent: (day: string, summary: string) => `On ${day}, ${summary} and nothing was sent.`,
+  unsent: (day: string, summary: string) => `On ${day}, ${summary}; no alert carried it.`,
 };
 
 /** The tables' names and column headers (the artboard names its tables in `aria-label`). */
@@ -206,6 +205,14 @@ export const ALERTS_CHANGES: CopyChange[] = [
   {
     screen: 'alerts',
     kind: 'fixture',
+    locked: 'Checks that found nothing sent nothing.',
+    rendered: '',
+    source:
+      'The fixture’s staging deploy check found no change to either grade and was sent to Slack (change 6): the sentence would be false beside it',
+  },
+  {
+    screen: 'alerts',
+    kind: 'fixture',
     locked: 'Nahl workspace · #seo',
     rendered: 'Nahl · #seo',
     source: 'The fixture’s Slack integration is labelled “Nahl · #seo”',
@@ -214,7 +221,7 @@ export const ALERTS_CHANGES: CopyChange[] = [
     screen: 'alerts',
     kind: 'fixture',
     locked: 'the last rule is off because 17 content changes a week is noise for most people.',
-    rendered: 'the last rule is off. On Fri, 17 pages changed content and nothing was sent.',
+    rendered: 'the last rule is off. On Fri, 17 pages changed content; no alert carried it.',
     source:
       'The fixture holds one content change, 17 pages at Friday’s check (change 4), not notified; it records no weekly rate',
   },

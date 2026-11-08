@@ -53,7 +53,7 @@ describe('Alerts, Fired (D4)', () => {
         'Fri 30 Oct 06:03',
         'example-outfitter.com',
         'crawler blocked',
-        'warn',
+        'bad',
         'ClaudeBot, all pages · robots.txt changed Thu 19:40',
         'email, #seo',
       ],
@@ -94,7 +94,7 @@ describe('Alerts, Fired (D4)', () => {
 
   it('words its footnote from the messages: two emails, one carrying three rows, and the Slack one', () => {
     expect(home().fired.foot).toBe(
-      'One email per site per check that found something: Fri 06:03 sent two, one for example-outfitter.com carrying three rows and one for nahltech.com. The staging deploy went to Slack only. Checks that found nothing sent nothing.',
+      'One email per site per check that found something: Fri 06:03 sent two, one for example-outfitter.com carrying three rows and one for nahltech.com. The staging deploy went to Slack only.',
     );
     expect(home().fired.sub).toBe(
       'Everything that was sent, newest first. One email per site per check that found something, from alerts@crawlmouse.com.',
@@ -141,7 +141,7 @@ describe('Alerts, where they go and the rules', () => {
       fields: { _method: 'PUT', rule: '70000000-0000-4000-8000-000000000001' },
     });
     expect(r.foot).toBe(
-      'Each site can override these on its own page. Quiet by default: the last rule is off. On Fri, 17 pages changed content and nothing was sent.',
+      'Each site can override these on its own page. Quiet by default: the last rule is off. On Fri, 17 pages changed content; no alert carried it.',
     );
   });
 });

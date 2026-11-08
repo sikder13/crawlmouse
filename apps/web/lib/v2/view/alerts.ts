@@ -12,7 +12,7 @@ import { TRIAL_DAYS } from '../copy/account';
 import { ALERT_LABELS } from '../copy/site';
 import { findCheck } from '../fixtures';
 import { dayDate, dayMonth, hourMinute, weekday, weekdayTime } from '../format';
-import { primarySite, primarySites, viewAt, type Viewer } from './account';
+import { primarySite, primarySites, resultChecks, viewAt, type Viewer } from './account';
 import { action, type ActionView } from './account-actions';
 import { accountShellView, type ShellView } from './account-shell';
 import { accountChanges } from './changes-log';
@@ -53,6 +53,8 @@ export interface MessageView {
   email: boolean;
   slack: boolean;
   rows: FiredRowView[];
+  /** The rows the email carried: a message's Slack-only rows are not in its email. */
+  emailRows: number;
 }
 
 export interface ChannelRowView {
@@ -145,7 +147,8 @@ export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
 
   const pillOf = (c: Change): FiredRowView['pill'] => {
     const label = ALERT_PILLS[c.kind]?.[c.subject] ?? c.kind;
-    if (c.kind === 'opened') return { label, state: c.severity === 'warn' ? 'warn' : 'bad' };
+    // A block is drawn ■ whatever its severity (DESIGN-LOCK rule 7: the square is "blocked").
+    if (c.kind === 'opened') return { label, state: 'bad' };
     if (c.subject === 'grade') {
       const fell = c.grade_deltas.some((g) => g.to_score < g.from_score);
       return { label, state: fell ? 'bad' : 'ok' };
@@ -194,10 +197,12 @@ export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
           email: false,
           slack: false,
           rows: [],
+          emailRows: 0,
         })
         .get(key)!;
     m.email ||= c.notified.channels.includes('email');
     m.slack ||= c.notified.channels.includes('slack');
+    if (c.notified.channels.includes('email')) m.emailRows += 1;
     if (at(c.notified.sent_at) > at(m.sentAt)) m.sentAt = c.notified.sent_at;
     m.rows.push(rowOf(c));
   }
@@ -235,7 +240,7 @@ export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
   const emailClauses = [...new Set(emails.map((m) => m.sentAt))].map((t) =>
     COPY.emailsAt(
       weekdayTime(t, zone),
-      emails.filter((m) => m.sentAt === t).map((m) => COPY.emailFor(m.host, m.rows.length)),
+      emails.filter((m) => m.sentAt === t).map((m) => COPY.emailFor(m.host, m.emailRows)),
     ),
   );
   const slackOnly = messages
@@ -290,9 +295,17 @@ export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
   const rules = v.d.alert_rules.filter((r) => r.site_id === null);
   const off = rules.filter((r) => !r.enabled);
   const label = (r: (typeof rules)[number]) => ALERT_LABELS[r.kind](r.threshold_points);
-  // What the off rules would have sent: changes found by a re-check that no message carried.
+  // What the off rule would have sent: content changes that each site's latest check found against
+  // the one before, which no message carried.
+  const latest = new Set(v.d.sites.flatMap((s) => resultChecks(v, s.id).at(-1)?.id ?? []));
   const unsent = off.some((r) => r.kind === 'any_change')
-    ? changes.filter((c) => !c.notified && c.previous_check_id !== null && c.subject === 'content')
+    ? changes.filter(
+        (c) =>
+          !c.notified &&
+          c.previous_check_id !== null &&
+          c.subject === 'content' &&
+          latest.has(c.check_id),
+      )
     : [];
   const quiet = off.length
     ? [
