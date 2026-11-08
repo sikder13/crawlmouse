@@ -85,9 +85,14 @@ export function gate(sarifs, { baseline, now = new Date() } = {}) {
   for (const run of runs) {
     if (extractedFiles(run) === 0) problems.push(`${run.tool.driver.name}: extracted no file`);
     for (const result of run.results ?? []) {
-      if ((result.suppressions ?? []).length > 0 || result.baselineState === 'absent') continue;
+      // A suppression written in the code is not a review: only the baseline accepts a result.
+      if (result.baselineState === 'absent') continue;
       const rule = ruleOf(run, result);
-      const severity = Number(rule?.properties?.['security-severity'] ?? 0);
+      if (!rule) {
+        problems.push(`a result names a rule the SARIF does not describe: ${result.ruleId ?? result.rule?.id}`);
+        continue;
+      }
+      const severity = Number(rule.properties?.['security-severity'] ?? 0);
       if (severity < BLOCKING_SEVERITY) continue;
       const where = result.locations?.[0]?.physicalLocation;
       const file = where?.artifactLocation?.uri ?? '(no location)';

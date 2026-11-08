@@ -78,9 +78,19 @@ describe('the CodeQL gate', () => {
     expect(gate([codeqlSarif({ severity })])).toMatchObject({ blocking: [], problems: [] });
   });
 
-  it('passes a suppressed result and one CodeQL marks absent', () => {
-    expect(gate([codeqlSarif({ severity: '9.8', suppressed: true })]).blocking).toEqual([]);
+  it('a suppression in the code does not pass a result; one CodeQL marks absent (fixed) does', () => {
+    expect(gate([codeqlSarif({ severity: '9.8', suppressed: true })]).blocking).toHaveLength(1);
     expect(gate([codeqlSarif({ severity: '9.8', baselineState: 'absent' })]).blocking).toEqual([]);
+  });
+
+  it('a result whose rule the SARIF does not describe is a problem, not a pass', () => {
+    const sarif = codeqlSarif({ severity: '9.8' });
+    const result = sarif.runs[0]!.results[0]! as Record<string, unknown>;
+    result.rule = { id: 'js/unknown', index: 7, toolComponent: { index: 1 } };
+    result.ruleId = 'js/unknown';
+    expect(gate([sarif]).problems).toEqual([
+      'a result names a rule the SARIF does not describe: js/unknown',
+    ]);
   });
 
   it('fails a scan that read nothing: no run, or no extracted file', () => {
