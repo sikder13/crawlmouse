@@ -327,7 +327,6 @@ ${D8_QUERY}
 - **Two clocks.** \`next()\` dates the trial with the app's clock; the ledger windows and the rows' \`created_at\` use the database's \`now()\`.
 - **The race test runs only in CI's \`db-cli-files\` job**; \`pnpm test\` skips it, because no local Postgres server is assumed. It refuses a \`TRIAL_RACE_DB_URL\` that is not on this machine.
 - **Definer functions outside this migration.** Read from \`pg_proc\`, those whose \`search_path\` does not name \`pg_temp\` last, with the client roles that may call each: ${await otherDefiners(db)}. Migration 20261108000002 (CC-SEC, \`docs/specs/v2/sec-baseline.md\`) set it last on the rest, and the catalog check \`09-definer-search-path.sql\` fails on one that does not.
-- **\`POST /api/auth/claim\` (v1) claims anonymous audits with no binding check.** Nothing in the app calls it today; a call after sign-in would claim without D9's check.
 `,
     ].join('\n');
     const config = (await resolveConfig(SPEC_06C_PATH)) ?? {};
