@@ -11,7 +11,7 @@ import { resultStateView, resultView, type ResultPageView } from '../../../../li
 import { alertsView } from '../../../../lib/v2/view/alerts';
 import { changesLogView } from '../../../../lib/v2/view/changes-log';
 import { reportsView } from '../../../../lib/v2/view/reports';
-import { settingsView } from '../../../../lib/v2/view/settings';
+import { deleteStepView, settingsView } from '../../../../lib/v2/view/settings';
 import { trialEndView, trialEndViewer } from '../../../../lib/v2/view/trial-end';
 import { ACCOUNT_VIEWERS, BAD_ACCOUNT_ID, DATASET } from './accounts';
 import { fixHref } from './fixes';
@@ -128,6 +128,9 @@ export const trialEndPreview = () => {
   return trialEndView(d, trialEndViewer(d, BAD_ACCOUNT_ID));
 };
 
+/** The step “Delete…” opens, on bad-site (owner ruling 12). */
+export const deletePreview = () => deleteStepView(fixture(DATASET.home), ACCOUNT_VIEWERS.home());
+
 /** Each CC-27 preview: the fixture it reads, who reads it and when, and its view model. */
 export const CC27_PREVIEWS = {
   '/v2-preview/screens/alerts': {
@@ -159,6 +162,11 @@ export const CC27_PREVIEWS = {
     fixture: DATASET.clean,
     viewer: ACCOUNT_VIEWERS.clean,
     view: () => settingsPreview('clean'),
+  },
+  '/v2-preview/screens/settings/delete': {
+    fixture: DATASET.home,
+    viewer: ACCOUNT_VIEWERS.home,
+    view: deletePreview,
   },
   '/v2-preview/screens/trial-end': {
     fixture: 'bad-site',

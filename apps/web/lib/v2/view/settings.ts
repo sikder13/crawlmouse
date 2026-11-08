@@ -24,7 +24,14 @@ import {
   SETTINGS_COPY as COPY,
 } from '../copy/settings';
 import { calendarDays, dayDate, daysBefore } from '../format';
-import { PLAN_NAMES, primarySites, resultChecks, viewAt, type Viewer } from './account';
+import {
+  PLAN_NAMES,
+  primarySite,
+  primarySites,
+  resultChecks,
+  viewAt,
+  type Viewer,
+} from './account';
 import { action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
@@ -56,14 +63,21 @@ export const CC27B_ROUTES = {
     route: '/settings/delete',
     owner: 'CC-27b',
     guard:
-      'Signed-in owner. The confirmation step “Delete…” opens: the owner re-types the primary site’s hostname and submits `DELETE /api/account`. Not in ARCH-2 §5, which names only the DELETE: CC-27b’s contract.',
+      'Signed-in owner. The step “Delete…” opens (owner ruling 12): the owner re-types the primary site’s hostname, the in-page guard, and submits `DELETE /api/account`. Not in ARCH-2 §5, which names only the DELETE: CC-27b’s contract.',
   },
   deleteAccount: {
     verb: 'DELETE',
     route: '/api/account',
     owner: 'CC-27b',
     guard:
-      'Signed-in owner and the re-typed hostname; sign-in disabled at once; Stripe subscription cancelled; `account.deleted`, restorable for 7 days by a sign-in link (`POST /api/account/restore`), then Storage purged and the account hard-deleted.',
+      'Signed-in owner, with `hostname` equal to the primary site’s (the account’s sign-in address when it has no site). Deletes nothing yet: it emails a confirmation link to the sign-in address and writes `account_events` (`delete_requested`) (owner ruling 12).',
+  },
+  deleteLink: {
+    verb: 'POST',
+    route: '/account/delete/[token]',
+    owner: 'CC-27b',
+    guard:
+      'The confirmation link: GET renders the page, POST confirms, so a link scanner cannot delete. On confirm, sign-in is disabled at once, the Stripe subscription cancelled and `account.deleted` sent; a sign-in link within 7 days restores the account (`POST /api/account/restore`); then `accountDeletedFn` purges Storage and hard-deletes (ARCH-2 §5 lifecycle, owner ruling 12).',
   },
   cancelPlan: {
     verb: 'POST',
@@ -125,8 +139,9 @@ export const CC27B_REQUIREMENTS = [
   },
   {
     what: 'Account deletion',
-    rule: 'The owner re-types the primary site’s hostname; sign-in is disabled at once and the Stripe subscription cancelled; a sign-in link within 7 days restores the account (`POST /api/account/restore`); after that `accountDeletedFn` (sleep 7 d, cancelled by the restore) purges Storage prefixes and hard-deletes in dependency order.',
-    source: 'ARCH-2 §2.3, §3.2 and §4.6; DECISION-LOG E6; SECURITY-DESIGN item 17 (CC-SEC-18)',
+    rule: 'The owner re-types the primary site’s hostname on the confirmation step; a confirmation link then goes to the sign-in address. Opening it disables sign-in at once and cancels the Stripe subscription; a sign-in link within 7 days restores the account (`POST /api/account/restore`); after that `accountDeletedFn` (sleep 7 d, cancelled by the restore) purges Storage prefixes and hard-deletes in dependency order. What the reader is told is FACTS E6’s.',
+    source:
+      'Owner ruling 12; ARCH-2 §2.3, §3.2, §4.6 and §5; DECISION-LOG E6; SECURITY-DESIGN item 17 (CC-SEC-18)',
   },
   {
     what: 'Settings › Plan with no sites',
@@ -405,5 +420,47 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
       ],
     },
     columns: COPY.columns,
+  };
+}
+
+// ── Deleting the account: the confirmation step ─────────────────────────────────────────────
+
+export interface DeleteStepView {
+  shell: ShellView;
+  header: { title: string; line: string };
+  /** What deleting removes, and how long the sign-in email can undo it (FACTS E6). */
+  text: string;
+  /** How it goes from here: the link to the sign-in address, sign-in stopping, the restore. */
+  steps: string;
+  /** The in-page guard: the primary site's hostname, typed again. */
+  field: { id: string; label: string; name: string; expected: string; hint: string };
+  submit: ActionView;
+  /** Back to Settings, deleting nothing. */
+  back: ActionView;
+}
+
+/**
+ * The step “Delete…” opens (owner ruling 12): the owner re-types the primary site's hostname (the
+ * account's sign-in address when it holds no site), and the form asks for a confirmation link to the
+ * sign-in address. Nothing is deleted on this page; the link does it. There is no artboard for it.
+ */
+export function deleteStepView(d: FixtureDataset, viewer: Viewer): DeleteStepView {
+  const v = viewAt(d, viewer);
+  const a = v.account;
+  const expected = primarySites(v).length ? primarySite(v).host : a.email;
+  return {
+    shell: accountShellView(v, 'Settings', { plan: 'page' }),
+    header: { title: COPY.deleteLabel, line: a.email },
+    text: COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS),
+    steps: COPY.deleteSteps(a.email, DELETE_GRACE_DAYS),
+    field: {
+      id: 'delete-hostname',
+      label: COPY.retype(expected),
+      name: 'hostname',
+      expected,
+      hint: COPY.retypeHint,
+    },
+    submit: routeAction('deleteAccount', COPY.sendDeleteLink),
+    back: action('emailSettings', COPY.keepAccount),
   };
 }

@@ -181,6 +181,13 @@ export const PREVIEWS: PreviewEntry[] = [
   },
   { path: '/v2-preview/screens/settings', name: 'Final-Settings', kind: 'screen' },
   { path: '/v2-preview/screens/settings/free', name: 'Settings, free', kind: 'screen' },
+  // Its one action deletes, which the Settings artboard draws quiet, never as the best action.
+  {
+    path: '/v2-preview/screens/settings/delete',
+    name: 'Settings, delete (owner ruling 12)',
+    kind: 'screen',
+    orange: 0,
+  },
   { path: '/v2-preview/screens/trial-end', name: 'Final-TrialEnd', kind: 'screen' },
   // The account Changes log has no artboard (CC-27 D3), and nothing on it is the reader's action.
   {

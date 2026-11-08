@@ -55,6 +55,13 @@ export const SETTINGS_COPY = {
           : `Removes all ${numberWord(sites)} sites, their history and reports`
     }. Takes effect after a confirmation link. For ${numberWord(grace)} days the sign-in email can undo it; after that nothing is kept.`,
   deleteAction: 'Delete…',
+  /** The confirmation step (owner ruling 12). */
+  deleteSteps: (email: string, grace: number) =>
+    `Type the hostname below and we send a confirmation link to ${email}. Opening it deletes the account: sign-in stops at once, and for ${numberWord(grace)} days a sign-in link from that address restores it.`,
+  retype: (expected: string) => `Type ${expected} to confirm`,
+  retypeHint: 'Nothing is deleted until you open the link we send.',
+  sendDeleteLink: 'Send the confirmation link',
+  keepAccount: 'Keep the account',
   planTitle: 'Plan',
   trialName: (plan: string) => `${plan}, trial`,
   daysLeft: (n: number) => `${count(n)} ${plural(n, 'day', 'days')} left`,
