@@ -99,11 +99,12 @@ describe('a state-changing API request from another site is refused before the r
   it.each(guarded.map((p) => [samplePath(p), p.methods.find(isStateChanging)!] as const))(
     '%s %s: our own pages pass (Origin ours, or none with Sec-Fetch-Site: same-origin)',
     async (path, method) => {
-      for (const headers of [
+      const ownPages: Record<string, string>[] = [
         { origin: SITE },
         { 'sec-fetch-site': 'same-origin' },
         { origin: 'null', 'sec-fetch-site': 'same-origin' },
-      ]) {
+      ];
+      for (const headers of ownPages) {
         const { res, refusals } = await run(path, method, headers);
         expect(passes(res), JSON.stringify(headers)).toBe(true);
         expect(refusals).toEqual([]);
