@@ -19,6 +19,10 @@ export interface SwitchProps {
  * An on/off setting: a native button with role="switch" and aria-checked, inside a POST form. A
  * native button is in the tab order and answers Enter and Space, so it needs no key handling of its
  * own. The routes are not built yet (CC-27b), so the submit is stopped; the switch still flips.
+ *
+ * The form posts the state the switch moves to, `!checked`. The browser reads the form after the
+ * click's handlers and React's re-render, so the switch flips in a later task: flipped in the click
+ * handler, the field would already hold the next click's value when the form is read.
  */
 export function Switch({ label, name, on, action, fields }: SwitchProps) {
   const [checked, setChecked] = useState(on);
@@ -39,7 +43,7 @@ export function Switch({ label, name, on, action, fields }: SwitchProps) {
         aria-checked={checked}
         aria-label={label}
         className={styles.switch}
-        onClick={() => setChecked((c) => !c)}
+        onClick={() => setTimeout(() => setChecked((c) => !c), 0)}
       >
         <i />
       </button>
