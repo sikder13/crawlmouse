@@ -193,7 +193,8 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
   ];
 
   // ── what Pro did, between the trial's start and now ──
-  const inWindow = (ts: string) => at(ts) >= at(start) && at(ts) <= at(v.now);
+  // From the trial's start; `viewAt` already keeps nothing later than `now`.
+  const inWindow = (ts: string) => at(ts) >= at(start);
   const checks = v.d.checks
     .filter((c) => inWindow(c.finished_at!))
     .sort((x, y) => at(x.finished_at!) - at(y.finished_at!));
