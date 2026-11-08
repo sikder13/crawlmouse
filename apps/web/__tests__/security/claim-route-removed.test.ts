@@ -16,10 +16,13 @@ const OLD_URL = ['', 'api', 'auth', 'claim'].join('/');
 const CODE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
 const CONFIG = /\.(json|ya?ml|toml)$/;
 
+// This guard names the URL it guards, so it is not read.
+const THIS_FILE = 'apps/web/__tests__/security/claim-route-removed.test.ts';
+
 function trackedFiles(): string[] {
   return execFileSync('git', ['ls-files'], { cwd: REPO, encoding: 'utf8' })
     .split('\n')
-    .filter((f) => f && !f.startsWith('docs/') && !f.startsWith('evidence/'));
+    .filter((f) => f && f !== THIS_FILE && !f.startsWith('docs/') && !f.startsWith('evidence/'));
 }
 
 /** The string and template literals in a code file's text that hold the old URL, as file:line. */
