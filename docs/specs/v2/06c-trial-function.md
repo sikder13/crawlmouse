@@ -6,7 +6,7 @@ One migration, `infra/supabase/migrations/20261108000001_v2_006c_trial_function_
 
 | File                                                                                   | sha256                                                             |
 | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `infra/supabase/migrations/20261108000001_v2_006c_trial_function_and_checks.sql`       | `f3694c513f3d97cc27cad52b57c50b17cb145b07e1b916b1a8e96fbacc80d1ef` |
+| `infra/supabase/migrations/20261108000001_v2_006c_trial_function_and_checks.sql`       | `045ec10b75fa626401513804b5b1040808e29f7833a92f671ceed8a9f570d2c8` |
 | `infra/supabase/rollbacks/20261108000001_v2_006c_trial_function_and_checks.revert.sql` | `35f7cc48af3a88730819ac8f114a7ef39f56f709233b4e64b70a8916d0db152a` |
 
 It adds `public.start_trial_with_ledger` and two helpers, replaces the CHECK on `site_fixes.type` with the contract's `FixTypeSchema`, and adds two CHECKs on `site_fixes.effect`. Verify the migration: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006c-trial-function.test.ts`; two real transactions: `pnpm --filter @crawlmouse/scripts exec vitest run db/trial-race.test.ts` (CI's `db-cli-files` job).
@@ -55,9 +55,9 @@ A row exactly at a window's start is outside it; a row dated after `p_now` is in
 
 ### Locks and concurrency
 
-The function locks the caller's account row first, then the hash keys in ascending order. A hash's key is its first 32 bits under the class 1728 (0x06C0), in the two-key form, which shares no key with the one-key lock `scripts/db` takes. Two calls sharing hashes take the shared keys in the same order, and neither holds the other's account row unless both are for one account, when the second waits on that row before taking any key; so no cycle of waits forms between two calls. Two hashes that share a key only wait for each other.
+The function locks the caller's account row first, then the hash keys in ascending order. A hash's key is its first 32 bits under the class 1728 (0x06C0), in the two-key form, which shares no key with the one-key lock `scripts/db` takes. Two calls sharing hashes take the shared keys in the same order, and neither holds the other's account row unless both are for one account, when the second waits on that row before taking any key; so no cycle of waits forms between two calls (the races below run both shapes). Two hashes that share a key only wait for each other.
 
-PGlite has one backend, so its tests show the locks held (one advisory lock per hash, and the account row's `xmax` set) and taken in ascending order, and each race's sequential outcome. Two real transactions racing are `pnpm --filter @crawlmouse/scripts exec vitest run db/trial-race.test.ts`: on one device hash the second waits, then is refused; on one account the second waits, then is `not_eligible`; each ends with one trial and the right rows. The same file builds a database from this migration with the advisory-lock call removed and requires the device race there to start two trials, so it shows on every run that it can fail.
+PGlite has one backend, so its tests show the locks held (one advisory lock per hash, and the account row's `xmax` set, which any row lock does) and taken in ascending order, and each race's sequential outcome. Two real transactions are `pnpm --filter @crawlmouse/scripts exec vitest run db/trial-race.test.ts`: on one device hash the second waits, then is refused; on one account the second waits, then is `not_eligible`; each ends with one trial and the right rows; and while a call that refuses is open, a third session's `FOR KEY SHARE NOWAIT` on the account fails, which only `FOR UPDATE` (or stronger) gives. The file also builds a database from this migration with the advisory-lock call removed, where the device race must start two trials, and one with `for update` weakened to `for key share`, where that third session must get in: it shows it can fail on every run of the file, which CI's `db-cli-files` job makes with `TRIAL_RACE_REQUIRED=1` and `--passWithNoTests=false`.
 
 ## What the hook does with the answer
 
@@ -202,7 +202,7 @@ select version from supabase_migrations.schema_migrations order by version desc 
 ## Known gaps
 
 - **A failed decision is not retried** (D11). First login is detected once (`isFirstLogin`); a sign-up whose call failed stays Free, and Sentry has `auth.trial-decision-failed`.
-- **The 3 s lock timeout can cost a trial.** A first login that waits longer than that, for instance on a busy shared network's `ip24` lock, fails and is not retried.
+- **The 3s lock timeout can cost a trial.** A first login that waits longer than that, for instance on a busy shared network's `ip24` lock, fails and is not retried.
 - **A browser with no `cm_auth_for` sends its device.** A link opened where no door request was made (another device, or a browser that never asked) cannot be told apart from someone else's link, so D9 does not apply there.
 - **Two clocks.** `next()` dates the trial with the app's clock; the ledger windows and the rows' `created_at` use the database's `now()`.
 - **The race test runs only in CI's `db-cli-files` job**; `pnpm test` skips it, because no local Postgres server is assumed. It refuses a `TRIAL_RACE_DB_URL` that is not on this machine.

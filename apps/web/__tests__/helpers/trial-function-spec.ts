@@ -75,6 +75,16 @@ async function functionsTable(db: PGlite): Promise<string> {
   );
 }
 
+/** How many arguments `apply_entitlement_transition` takes. */
+async function argCount(db: PGlite): Promise<number> {
+  const { rows } = await db.query<{ n: number }>(
+    `select p.pronargs::int as n from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+      where s.nspname = 'public' and p.proname = 'apply_entitlement_transition'`,
+  );
+  if (rows.length !== 1) throw new Error('expected one apply_entitlement_transition');
+  return rows[0]!.n;
+}
+
 /** The lock_timeout `start_trial_with_ledger` sets, read from its settings. */
 async function lockTimeout(db: PGlite): Promise<string> {
   const { rows } = await db.query<{ v: string | null }>(
@@ -153,6 +163,7 @@ export async function buildTrialFunctionSpec(): Promise<string> {
   const db = await freshDb();
   try {
     await applyAllMigrations(db);
+    const timeout = await lockTimeout(db);
     const md = [
       `# SPEC 06c: the trial in one transaction, and the fix-type CHECK (CC-06c)
 
@@ -192,9 +203,9 @@ A stale \`p_expected_version\` raises \`40001\` from \`apply_entitlement_transit
 
 **\`p_hashes\`** is an array of 1 to 3 objects, each with the keys \`kind\` and \`value_hash\` and no other; \`kind\` is one of ${LEDGER_KINDS.map(code).join(', ')}, one row per kind, an \`email\` row required; \`value_hash\` is 64 lowercase hex. The hook computes them with \`hashLedgerValue\` (HMAC-SHA256 under \`TRIAL_LEDGER_PEPPER\`); the pepper stays in the app.
 
-**\`p_transition\`** is what the hook computes with \`next()\` for \`trial_started {variant: 'no_card'}\` and \`toTransitionParams\`, plus \`"event": "trial_started"\`: the 16 arguments of \`apply_entitlement_transition\` and the event. The function requires the event, this account's id, \`p_state = 'pro_trial'\`, \`p_tier = 'pro'\`, \`p_trial_variant = 'no_card'\`, a trial end, a trial-used date and \`p_at\` written as ISO 8601 with an offset (no \`infinity\`, \`epoch\` or \`now\`), the trial end after \`p_at\`, integer version and limits, and \`p_subscription_id\`, \`p_past_due_tier\`, \`p_past_due_since\` and \`p_disputed_at\` null. It checks the shape and copies none of the state machine: the limits and dates are \`next()\`'s. Each rejected shape: ${V('v2-006c-trial-function.test.ts', 'input validation')}.
+**\`p_transition\`** is what the hook computes with \`next()\` for \`trial_started {variant: 'no_card'}\` and \`toTransitionParams\`, plus \`"event": "trial_started"\`: the ${await argCount(db)} arguments of \`apply_entitlement_transition\` and the event. The function requires the event, this account's id, \`p_state = 'pro_trial'\`, \`p_tier = 'pro'\`, \`p_trial_variant = 'no_card'\`, a trial end, a trial-used date and \`p_at\` written as ISO 8601 with an offset (no \`infinity\`, \`epoch\` or \`now\`), the trial end after \`p_at\`, integer version and limits, and \`p_subscription_id\`, \`p_past_due_tier\`, \`p_past_due_since\` and \`p_disputed_at\` null. It checks the shape and copies none of the state machine: the limits and dates are \`next()\`'s. Each rejected shape: ${V('v2-006c-trial-function.test.ts', 'input validation')}.
 
-**Lock timeout (\`TRIAL_LOCK_TIMEOUT\`): ${await lockTimeout(db)}**, set on the function (\`set lock_timeout\`), so a stuck account row or hash lock ends the call with \`55P03\` rather than hanging a sign-in.
+**Lock timeout (\`TRIAL_LOCK_TIMEOUT\`): ${timeout}**, set on the function (\`set lock_timeout\`), so a stuck account row or hash lock ends the call with \`55P03\` rather than hanging a sign-in.
 
 ### Who may call what
 
@@ -216,9 +227,9 @@ A row exactly at a window's start is outside it; a row dated after \`p_now\` is 
 
 ### Locks and concurrency
 
-The function locks the caller's account row first, then the hash keys in ascending order. A hash's key is its first 32 bits under the class 1728 (0x06C0), in the two-key form, which shares no key with the one-key lock \`scripts/db\` takes. Two calls sharing hashes take the shared keys in the same order, and neither holds the other's account row unless both are for one account, when the second waits on that row before taking any key; so no cycle of waits forms between two calls. Two hashes that share a key only wait for each other.
+The function locks the caller's account row first, then the hash keys in ascending order. A hash's key is its first 32 bits under the class 1728 (0x06C0), in the two-key form, which shares no key with the one-key lock \`scripts/db\` takes. Two calls sharing hashes take the shared keys in the same order, and neither holds the other's account row unless both are for one account, when the second waits on that row before taking any key; so no cycle of waits forms between two calls (the races below run both shapes). Two hashes that share a key only wait for each other.
 
-PGlite has one backend, so its tests show the locks held (one advisory lock per hash, and the account row's \`xmax\` set) and taken in ascending order, and each race's sequential outcome. Two real transactions racing are ${RACE_TEST}: on one device hash the second waits, then is refused; on one account the second waits, then is \`not_eligible\`; each ends with one trial and the right rows. The same file builds a database from this migration with the advisory-lock call removed and requires the device race there to start two trials, so it shows on every run that it can fail.
+PGlite has one backend, so its tests show the locks held (one advisory lock per hash, and the account row's \`xmax\` set, which any row lock does) and taken in ascending order, and each race's sequential outcome. Two real transactions are ${RACE_TEST}: on one device hash the second waits, then is refused; on one account the second waits, then is \`not_eligible\`; each ends with one trial and the right rows; and while a call that refuses is open, a third session's \`FOR KEY SHARE NOWAIT\` on the account fails, which only \`FOR UPDATE\` (or stronger) gives. The file also builds a database from this migration with the advisory-lock call removed, where the device race must start two trials, and one with \`for update\` weakened to \`for key share\`, where that third session must get in: it shows it can fail on every run of the file, which CI's \`db-cli-files\` job makes with \`TRIAL_RACE_REQUIRED=1\` and \`--passWithNoTests=false\`.
 
 ## What the hook does with the answer
 
@@ -285,7 +296,7 @@ ${D8_QUERY}
 ## Known gaps
 
 - **A failed decision is not retried** (D11). First login is detected once (\`isFirstLogin\`); a sign-up whose call failed stays Free, and Sentry has \`auth.trial-decision-failed\`.
-- **The 3 s lock timeout can cost a trial.** A first login that waits longer than that, for instance on a busy shared network's \`ip24\` lock, fails and is not retried.
+- **The ${timeout} lock timeout can cost a trial.** A first login that waits longer than that, for instance on a busy shared network's \`ip24\` lock, fails and is not retried.
 - **A browser with no \`cm_auth_for\` sends its device.** A link opened where no door request was made (another device, or a browser that never asked) cannot be told apart from someone else's link, so D9 does not apply there.
 - **Two clocks.** \`next()\` dates the trial with the app's clock; the ledger windows and the rows' \`created_at\` use the database's \`now()\`.
 - **The race test runs only in CI's \`db-cli-files\` job**; \`pnpm test\` skips it, because no local Postgres server is assumed. It refuses a \`TRIAL_RACE_DB_URL\` that is not on this machine.
