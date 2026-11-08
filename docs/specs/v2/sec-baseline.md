@@ -67,10 +67,13 @@ The one `dangerouslySetInnerHTML` in the app, `apps/web/lib/seo/jsonld.tsx`, wri
 `<script type="application/ld+json">` data block, which the browser does not execute, so `script-src`
 does not govern it. Every page renders one through the root layout.
 
-**Ruling 3:** the signed-in header calls Supabase from the browser
-(`apps/web/components/layout/HeaderNav.tsx`, token refresh against `NEXT_PUBLIC_SUPABASE_URL`), so the
-Supabase origin belongs in `connect-src`, and `report-uri` belongs on the enforced header too. Not built
-yet: it waits for the ruling, because it adds to the brief's list.
+**`connect-src` beyond the brief's list (ruling 3).** The signed-in header calls Supabase from the
+browser (`apps/web/components/layout/HeaderNav.tsx`, its token refresh against
+`NEXT_PUBLIC_SUPABASE_URL`), so the Supabase origin is in `connect-src`, read at build time. So is
+`NEXT_PUBLIC_POSTHOG_HOST` when it names a host other than the `/ingest` proxy. The browser opens no
+Supabase realtime socket (`grep -rn "\.channel(" apps/web/components apps/web/lib` prints nothing), so
+there is no `wss:` origin. `report-uri` and `report-to` are on the enforced header too, so a page the
+enforced directives break shows up in Sentry.
 
 Verify in a browser on `next start`, with Turnstile, PostHog and Sentry working through the policy and
 no violation (`apps/web/__tests__/security/browser/csp.pw.ts`, CI job `security-browser`). Its last case
@@ -83,7 +86,7 @@ shows the watch catches a report-only violation when one happens.
 `member`, `service`, `webhook`. Print the registry:
 
 ```bash
-pnpm --filter @crawlmouse/web exec tsx -e "import('./lib/security/route-policy.ts').then((m) => console.table(m.ROUTE_POLICIES.map((p) => ({ route: p.route, class: p.class, methods: p.methods.join(' '), sameOrigin: p.sameOrigin }))))"
+pnpm --filter @crawlmouse/web exec tsx -e "import('./lib/security/route-policy.ts').then((m) => console.table(m.ROUTE_POLICIES.map((p) => ({ route: p.route, class: p.class, methods: p.methods.join(' '), origin: p.origin, json: p.jsonBody ?? false }))))"
 ```
 
 The tests, all run by
@@ -115,23 +118,41 @@ nothing). Its checker is tested on synthetic sources.
 ### D4 — the cross-site refusal
 
 `apps/web/middleware.ts` sees every API path but `/ingest` and the webhooks. A request to a route the
-registry marks `sameOrigin` is refused before the route runs, with 403 `{"code":"cross_site"}` and a
+registry guards is refused before the route runs, with 403 `{"code":"cross_site"}` and a
 `security.refused` event, when two things hold:
 
 - its method is anything but GET, HEAD or OPTIONS, so an unknown method counts as a state change;
-- it does not come from one of our pages. That rule is the sign-in POST's (CC-25), now in
-  `apps/web/lib/security/same-origin.ts`: the Origin is ours, or the browser sent none (or `null`) with
-  `Sec-Fetch-Site: same-origin`.
+- its origin fails the route's rule (`origin` in the registry, rules in
+  `apps/web/lib/security/same-origin.ts`):
+  - **strict**, the sign-in POST's rule (CC-25), which `app/login/verify/route.ts` now imports too: the
+    Origin is ours, or the browser sent none (or `null`) with `Sec-Fetch-Site: same-origin`;
+  - **lenient**: refused when the browser says `Sec-Fetch-Site: cross-site` or sends an Origin that is
+    not ours (`null` included). A request with neither, such as a script's, passes.
+
+A route marked `jsonBody` also refuses, with 415 `{"code":"unsupported_media_type"}`, a state change
+whose `Content-Type` is not `application/json`. These routes read `req.json()` whatever the
+Content-Type. Another site's page can send a cross-origin POST without a CORS preflight only as
+`text/plain`, a form encoding or multipart, and the app never answers a preflight, so this keeps such a
+POST out.
 
 The path is percent-decoded, its repeated slashes are collapsed and its trailing slash is dropped
 before the lookup. With `skipTrailingSlashRedirect` a trailing slash reaches the route handler, and the
 plan reviewer measured exactly that. Other API requests pass through with no session refresh and no
 cookie, as before.
 
-The origin-checked routes are the 10 state-changing `user` routes, plus `audits/[id]/cancel` and
-`auth/logout`, which are cookie-authorised but `public` (ruling 2).
-`app/login/verify/route.ts` still holds its own copy of the rule. Importing the shared one there is
-ruling 7a, outside the brief's allowed paths.
+**Strict** routes: the 10 state-changing `user` routes, plus `audits/[id]/cancel` and `auth/logout`,
+which are cookie-authorised but `public`. **Lenient and JSON**: `audits/start`, `reports/mint`,
+`reports/hide`, `audits/[id]/notify`, `takedown` and `developers` (ruling 2, with the owner's addition
+of the JSON rule). They take a cross-site request with no cookie, and `audits/start` would otherwise let
+any page make its visitors' browsers start crawls from their own IPs, draining `global:audits:day`,
+which fails closed. `auth/magic-link` keeps its own route-level cross-site check (`V2_ACCOUNT_DOOR`),
+and Turnstile in production; the registry test names it as the one public JSON route without the rule.
+
+Every page that calls these six already sends `Content-Type: application/json`
+(`grep -rn "content-type" apps/web/components/share apps/web/lib/submit-audit.ts apps/web/lib/notify-submit.ts apps/web/lib/mint-share.ts apps/web/app/takedown apps/web/components/developers`).
+`scripts/seed-corpus.ts` and `scripts/seed-benchmarks.ts` do not call the API: they insert through the
+service role. The scripts that do (`scripts/p5/s1-seed.mjs`, `scripts/p5/driver.mjs`,
+`tests/load/audit-submit.js`) send JSON. The PR records a run of `s1-seed.mjs` against `next start`.
 
 Verify the unit, every row and spelling, and the matcher through Next's own matcher:
 
@@ -139,15 +160,19 @@ Verify the unit, every row and spelling, and the matcher through Next's own matc
 pnpm --filter @crawlmouse/web exec vitest run middleware.test.ts
 ```
 
-On the built app, CI's `security-browser` job sends a cross-site POST to each row and to four spellings
-of one.
+A `text/plain` POST with a JSON body to `audits/start` gets 415 before any rate-limit bucket or insert.
+The test sends it through the middleware and then the real route handler, with every bucket, database
+call and event recorded:
 
-**Ruling 2, not yet built:** the public state-changing routes (`audits/start`, `reports/mint`,
-`reports/hide`, `audits/[id]/notify`, `takedown`, `developers`) take a cross-site request with no
-cookie. `audits/start` reads `req.json()` whatever the Content-Type, so any page can make its visitors'
-browsers start crawls from their own IPs, draining `global:audits:day`, which fails closed. The
-recommendation is magic-link's lenient rule on those rows: refuse `Sec-Fetch-Site: cross-site` or a
-foreign Origin, allow a missing one.
+```bash
+pnpm --filter @crawlmouse/web exec vitest run __tests__/security/json-body.test.ts
+```
+
+On the built app, CI's `security-browser` job sends:
+
+- a cross-site POST to each strict row, and to four spellings of one;
+- a `text/plain` and a JSON POST to `audits/start`;
+- a cross-site JSON POST to `audits/start`.
 
 ### D5 — `POST /api/auth/claim` is gone
 
@@ -241,10 +266,21 @@ gate:
 pnpm --filter @crawlmouse/web exec vitest run __tests__/security/sarif-gate.test.ts
 ```
 
-Test code is left out of the analysis (`paths-ignore` in the job's CodeQL config): it is not shipped.
-The first run, on 2026-11-08, failed the gate on three `js/reflected-xss` results (7.8), all in local
-fixture servers that echo the request path into a test page: `packages/engine/src/crawl-settlement.test.ts`,
-`crawler-frontier.test.ts` and `reproducibility.test.ts`.
+Test code is left out of the analysis (`paths-ignore` in the job's CodeQL config: test files,
+`__tests__` and `tests` directories): it is not shipped. The first run, on 2026-11-08, failed the gate
+on test-only results, among them three `js/reflected-xss` (7.8) in engine tests' local fixture servers
+that echo the request path into a test page.
+
+**The baseline (owner ruling, 2026-11-08).** Outside tests, `main` carries 21 high-severity results
+(none critical). Each was read at its location and given a verdict in
+`.github/workflows/scripts/codeql-baseline.json`, keyed by rule, file and CodeQL's
+`primaryLocationLineHash`, which follows the line's content and not its number. The gate accepts exactly
+those results through 2026-12-08 (UTC) and fails on any other high or critical result. From 2026-12-09
+it fails on every one: the date alone fails nothing, but no listed result is accepted any more. Three of
+the 21 are real hardening and belong to CC-SEC-2 (follow-ups, below); the others are false positives or
+not shipped, as each verdict says. The tests set the clock themselves and check the baseline against the
+results it was written from (`apps/web/__tests__/security/codeql-2026-11-08.sarif.json`, trimmed from
+the stored analysis).
 
 Code scanning is free while the repository is public. Going private (planned before CC-29) needs GitHub
 Advanced Security, or this Semgrep OSS job in its place (ruling 9: it lives here, not commented out in
@@ -314,9 +350,10 @@ transaction and breadcrumbs from its event. Verify through the installed SDK's o
 pnpm --filter @crawlmouse/web exec vitest run __tests__/security/refusal-event.test.ts __tests__/security/refusal-event-sentry.test.ts
 ```
 
-It is emitted for the middleware's 403s. 401s and 429s are returned inside the routes, out of the
-middleware's sight, so they are not emitted in this step (ruling 1). The monitors and alert rules to
-create are in `docs/ops/security-baseline.md`.
+It is emitted for the middleware's refusals: 403 for a cross-site request, 415 for a body not declared
+JSON. 401s and 429s are returned inside the routes, out of the middleware's sight, so they are not
+emitted in this step (ruling 1). The monitors and alert rules to create are in
+`docs/ops/security-baseline.md`.
 
 ### D11 — the incident plan
 
@@ -326,45 +363,50 @@ create are in `docs/ops/security-baseline.md`.
 
 In the follow-ups below.
 
-## Rulings put to the owner (2026-11-08)
+## Rulings (owner, 2026-11-08)
 
-Each is built as recommended unless marked otherwise; an overruling is a small change.
+All approved as recommended, with one addition to ruling 2.
 
-1. D10: emit for the middleware's 403s only; 401/429 follow when the routes adopt one `requireUser()`.
-2. D4: the strict rule also on `cancel` and `logout` (built), and the lenient rule on the public
-   state-changing routes (**not built until ruled**).
-3. D2: the Supabase origin in `connect-src`, and `report-uri` on the enforced header (**not built until
-   ruled**).
+1. D10: emit for the middleware's refusals only; 401/429 follow when the routes adopt one
+   `requireUser()` (CC-SEC-2).
+2. D4: the strict rule on `cancel` and `logout` too, and the lenient rule on the public state-changing
+   JSON routes. The owner's addition: those routes also require `Content-Type: application/json`.
+3. D2: the Supabase origin (and a non-proxy PostHog host) in `connect-src`; reporting on the enforced
+   header.
 4. D3: register every `app/**/route.ts`.
 5. D9: 60 per 600 s on `/api/audits/start`; regex paths with an optional trailing slash.
 6. D6: `pg_catalog, pg_temp` for `v2_premake_month_partitions`; check 09 as an exact allow-list plus no
-   CREATE on `public`.
-7. Allowed paths:
-   - (a) `app/login/verify/route.ts` imports the shared same-origin rule: **not built until ruled**.
-   - (b) Regenerate `docs/specs/v2/06c-trial-function.md`: built, because its spec test fails otherwise.
-   - (c) The `scripts/db` tests and fixture: built.
-   - (d) The `/login/verify` header entry: built.
+   CREATE on `public`. The correction that `is_member` is shadowable through the inlined `auth.uid()`
+   cast is accepted, and its reproduction is the regression test.
+7. Allowed paths: `app/login/verify/route.ts` imports the shared rule; `docs/specs/v2/06c-trial-function.md`
+   is regenerated; the `scripts/db` tests and fixture; the `/login/verify` header entry.
 8. D1: `headers.mjs`.
-9. D7: the Semgrep job in this spec.
-10. OPERATING-RULES §13: the Search Console numbers come from the owner, or are stated as not measured.
+9. D7: the Semgrep job lives in this spec.
+10. OPERATING-RULES §13: Search Console is stated in the PR as not measured (no access from the session);
+    the SEO guards are the evidence that no indexed URL, title or canonical changed.
+11. D7, CodeQL's existing findings: the reviewed baseline above, expiring 2026-12-08; `**/tests/**`
+    excluded; the three real hardening items to CC-SEC-2, due before the baseline expires.
 
 ## Known gaps and follow-ups
 
-| Item                                                                                                                                                                            | Owner                                           |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Enforce the full CSP after seven days of report-only data (CC-SEC-2)                                                                                                            | engineering                                     |
-| Hash-based `script-src` in place of `'unsafe-inline'`                                                                                                                           | engineering                                     |
-| `security.refused` for 401s and 429s, through one `requireUser()` helper in the routes                                                                                          | engineering (CC-SEC-2)                          |
-| `audits/[id]/reaudit` reads the audit row as the service role before refusing a caller with no session; nothing reaches the caller, and `route-anonymous.test.ts` pins the read | engineering                                     |
-| `checks/[id]/claim` and `auth/magic-link` keep their own looser origin checks; the middleware's runs first on the former                                                        | engineering, at the next change to those routes |
-| `GET /billing` creates a Stripe portal session on a cookie-authorised GET                                                                                                       | engineering                                     |
-| `/api/trpc` is a reserved surface with no caller                                                                                                                                | engineering (delete, like D5, or build on it)   |
-| The Inngest route's GET and PUT are not signature-verified; pin `INNGEST_SERVE_HOST` and keep the production signing key out of previews                                        | owner                                           |
-| `scripts/p5/driver.mjs` posts `/api/billing/checkout` with no Origin and now gets 403                                                                                           | engineering, if it is run again                 |
-| HSTS `includeSubDomains; preload`, after the subdomain check above                                                                                                              | owner                                           |
-| WAF tuning after four weeks of traffic                                                                                                                                          | owner's CTO                                     |
-| External penetration test before the first paid agency                                                                                                                          | owner                                           |
-| Renovate installation                                                                                                                                                           | owner                                           |
-| 2FA on every provider account                                                                                                                                                   | owner                                           |
-| Supabase point-in-time recovery                                                                                                                                                 | owner                                           |
-| Cloudflare AI-crawler and managed-robots settings (OPERATING-RULES §12)                                                                                                         | owner                                           |
+| Item                                                                                                                                                                                                                                     | Owner                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| CC-SEC-2, due 2026-12-08: `packages/engine/src/v2/layout/force-layout.ts:300` and `:426` key plain objects by crawled node ids; to a `Map` or `Object.create(null)`. Crawl path: the step runs the live audit smoke (OPERATING-RULES §6) | engineering                                     |
+| CC-SEC-2, due 2026-12-08: `packages/engine/src/extract.ts:152` skips link schemes by deny-list; to an http/https allow-list. Crawl path: live audit smoke                                                                                | engineering                                     |
+| CodeQL baseline expires 2026-12-08: from 2026-12-09 every listed result fails the job again                                                                                                                                              | engineering                                     |
+| Enforce the full CSP after seven days of report-only data (CC-SEC-2)                                                                                                                                                                     | engineering                                     |
+| Hash-based `script-src` in place of `'unsafe-inline'`                                                                                                                                                                                    | engineering                                     |
+| `security.refused` for 401s and 429s, through one `requireUser()` helper in the routes                                                                                                                                                   | engineering (CC-SEC-2)                          |
+| `audits/[id]/reaudit` reads the audit row as the service role before refusing a caller with no session; nothing reaches the caller, and `route-anonymous.test.ts` pins the read                                                          | engineering                                     |
+| `checks/[id]/claim` and `auth/magic-link` keep their own looser origin checks; the middleware's runs first on the former                                                                                                                 | engineering, at the next change to those routes |
+| `GET /billing` creates a Stripe portal session on a cookie-authorised GET                                                                                                                                                                | engineering                                     |
+| `/api/trpc` is a reserved surface with no caller                                                                                                                                                                                         | engineering (delete, like D5, or build on it)   |
+| The Inngest route's GET and PUT are not signature-verified; pin `INNGEST_SERVE_HOST` and keep the production signing key out of previews                                                                                                 | owner                                           |
+| `scripts/p5/driver.mjs` posts `/api/billing/checkout` with no Origin and now gets 403                                                                                                                                                    | engineering, if it is run again                 |
+| HSTS `includeSubDomains; preload`, after the subdomain check above                                                                                                                                                                       | owner                                           |
+| WAF tuning after four weeks of traffic                                                                                                                                                                                                   | owner's CTO                                     |
+| External penetration test before the first paid agency                                                                                                                                                                                   | owner                                           |
+| Renovate installation                                                                                                                                                                                                                    | owner                                           |
+| 2FA on every provider account                                                                                                                                                                                                            | owner                                           |
+| Supabase point-in-time recovery                                                                                                                                                                                                          | owner                                           |
+| Cloudflare AI-crawler and managed-robots settings (OPERATING-RULES §12)                                                                                                                                                                  | owner                                           |

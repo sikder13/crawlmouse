@@ -123,8 +123,8 @@ webhooks for `stripe`, `inngest`, `resend`. tRPC at `trpc/[trpc]`. `health` (bel
 
 **Route policy and headers (CC-SEC, `docs/specs/v2/sec-baseline.md`):** every `app/**/route.ts` is registered
 in `lib/security/route-policy.ts` with its class (`public` with a reason, `user`, `member`, `service`,
-`webhook`); the middleware refuses a cross-site state change to a route marked `sameOrigin` with 403 before
-the route runs. Security headers and the CSP (enforced directives plus a report-only full policy) come from
+`webhook`) and its origin rule; the middleware refuses a cross-site state change (403), or a body not declared
+JSON on the public JSON routes (415), before the route runs. Security headers and the CSP (enforced directives plus a report-only full policy) come from
 `lib/security/headers.mjs` through `next.config.mjs` `headers()`. What is enforced, report-only and advisory,
 with the command beside each: `docs/ops/security-baseline.md`.
 
