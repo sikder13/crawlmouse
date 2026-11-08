@@ -1,4 +1,5 @@
 import { withSentryConfig } from '@sentry/nextjs';
+import { securityHeaders } from './lib/security/headers.mjs';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -14,6 +15,14 @@ const nextConfig = {
   // PostHog reverse proxy: route /ingest/* to PostHog's US hosts so events survive ad-blockers.
   // skipTrailingSlashRedirect keeps PostHog's trailing-slash paths from 308-redirecting.
   skipTrailingSlashRedirect: true,
+  // Security headers on every response (lib/security/headers.mjs). headers() runs at build time, so
+  // the report-only CSP reports to the Sentry project of the DSN the build was given.
+  async headers() {
+    return securityHeaders({
+      sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+      dev: process.env.NODE_ENV === 'development',
+    });
+  },
   async rewrites() {
     return [
       {
