@@ -157,7 +157,7 @@ describe('runFirstLogin', () => {
   });
 
   it('two strangers on one /24 signing up back to back both get the trial', async () => {
-    // The network's lock lasts only for its own call, and its rows refuse nothing without a device row.
+    // The network's rows refuse nothing without a row of this browser's device.
     const a = await input('alice@example.com', { device: 'dev-a', ip: '203.0.113.7' });
     const b = await input('bob@example.org', { device: 'dev-b', ip: '203.0.113.99' });
     const ra = await runFirstLogin(deps(), a);
@@ -476,7 +476,7 @@ describe('runFirstLogin under interleaving of its calls', () => {
     );
   }, 600_000);
 
-  it('two accounts whose emails normalise to one, on different devices: at most one trial', async () => {
+  it('two accounts whose emails normalise to one, on different devices: one trial', async () => {
     await fc.assert(
       fc.asyncProperty(fc.scheduler(), async (s) => {
         await db?.close();
@@ -484,27 +484,23 @@ describe('runFirstLogin under interleaving of its calls', () => {
         const a = await input('ada.lovelace@gmail.com', { device: 'dev-a', ip: 'unknown' });
         const b = await input('adalovelace+2@gmail.com', { device: 'dev-b', ip: 'unknown' });
         await interleave(s, a, b);
-        expect(
-          await count(db, `select 1 from public.accounts where state = 'pro_trial'`),
-        ).toBeLessThanOrEqual(1);
+        expect(await count(db, `select 1 from public.accounts where state = 'pro_trial'`)).toBe(1);
       }),
       { numRuns: 12 },
     );
   }, 600_000);
 
-  it('two accounts sharing a device: at most one trial', async () => {
+  it('two accounts sharing a device that has one trial already: one more trial', async () => {
     await fc.assert(
       fc.asyncProperty(fc.scheduler(), async (s) => {
         await db?.close();
         db = await doorDb();
-        // One prior trial on the device: a second would be refused, so a third concurrent one must be too.
+        // One prior trial on the device: the first of these two is allowed and the second refused.
         await priorTrial({ email: 'first@example.org', device: 'shared', ip: 'unknown' }, 2);
         const a = await input('a@example.com', { device: 'shared' });
         const b = await input('b@example.com', { device: 'shared' });
         await interleave(s, a, b);
-        expect(
-          await count(db, `select 1 from public.accounts where state = 'pro_trial'`),
-        ).toBeLessThanOrEqual(1);
+        expect(await count(db, `select 1 from public.accounts where state = 'pro_trial'`)).toBe(1);
       }),
       { numRuns: 12 },
     );

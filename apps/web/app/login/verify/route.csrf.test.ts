@@ -2,9 +2,10 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // CC-06c D9, end to end: an attacker's sign-in link opened in the victim's browser. The real route,
-// the real landing and first-login hook, and PGlite with every migration applied; only Supabase Auth
-// (the verified user), the anonymous-session cookie and Sentry are stand-ins. The admin client's
-// v1 claim query runs as SQL against the same database.
+// the real landing and first-login hook, and PGlite with every migration applied. Stand-ins: Supabase
+// Auth (the verified user), the anonymous-session cookie, Sentry, the door's dependencies (the PGlite
+// stores of __tests__/v2/_lib in place of the supabase-js ones, a no-op reporter) and the admin
+// client, whose one query here, the v1 claim, runs as the same SQL against the same database.
 
 const h = vi.hoisted(() => ({
   db: null as PGlite | null,
