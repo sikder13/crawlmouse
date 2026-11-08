@@ -1,0 +1,63 @@
+/* The artboards' `.tog` (Final-Alerts, Final-Settings): a 36 × 20 track whose knob moves right when on. */
+
+.form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--v2-ctl);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.switch[aria-checked='true'] {
+  background: var(--v2-fg);
+}
+
+.switch i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--v2-bg);
+}
+
+.switch[aria-checked='true'] i {
+  left: 18px;
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 3px;
+}
+
+/* Forced colours repaint backgrounds: the track keeps a border, and the knob and the on state their
+   own system colours, so the state does not rest on a background that is gone. */
+@media (forced-colors: active) {
+  .switch {
+    border: 1px solid ButtonText;
+  }
+
+  .switch i {
+    forced-color-adjust: none;
+    background: ButtonText;
+  }
+
+  .switch[aria-checked='true'] {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+
+  .switch[aria-checked='true'] i {
+    background: HighlightText;
+  }
+}

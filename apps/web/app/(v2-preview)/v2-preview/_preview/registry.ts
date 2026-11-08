@@ -24,6 +24,8 @@ export const PREVIEWS: PreviewEntry[] = [
   { path: '/v2-preview/card', name: 'Card', kind: 'primitive' },
   { path: '/v2-preview/table', name: 'Table', kind: 'primitive' },
   { path: '/v2-preview/field', name: 'Field', kind: 'primitive' },
+  { path: '/v2-preview/select', name: 'Select', kind: 'primitive' },
+  { path: '/v2-preview/switch', name: 'Switch', kind: 'primitive' },
   { path: '/v2-preview/page-shell', name: 'PageShell', kind: 'primitive' },
   { path: '/v2-preview/account-shell', name: 'AccountShell', kind: 'primitive' },
   { path: '/v2-preview/trial-card', name: 'TrialCard', kind: 'primitive' },
