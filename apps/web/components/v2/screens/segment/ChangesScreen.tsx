@@ -76,7 +76,17 @@ export function ChangeTable({ label, rows }: { label: string; rows: ChangeRowVie
           ) : (
             causeOf(r)
           ),
-          ...(told ? [r.told ?? '—'] : []),
+          ...(told
+            ? [
+                site ? (
+                  <span key="t" className={own.logTold}>
+                    {r.told ?? '—'}
+                  </span>
+                ) : (
+                  (r.told ?? '—')
+                ),
+              ]
+            : []),
         ],
       }))}
     />

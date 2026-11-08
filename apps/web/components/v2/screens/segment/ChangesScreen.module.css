@@ -69,3 +69,8 @@
   display: block;
   min-width: 18rem;
 }
+
+.logTold {
+  display: block;
+  min-width: 10rem;
+}
