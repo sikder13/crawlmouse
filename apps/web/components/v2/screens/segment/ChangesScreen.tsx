@@ -13,12 +13,15 @@ import own from './ChangesScreen.module.css';
 
 /**
  * Change rows, the site's own and the example's alike. The pages and who-was-told columns appear
- * only when the rows carry them (the example does not).
+ * only when the rows carry them (the example does not), and the site column only on rows that name
+ * one (the account's Changes log; never on this page).
  */
-function ChangeTable({ label, rows }: { label: string; rows: ChangeRowView[] }) {
+export function ChangeTable({ label, rows }: { label: string; rows: ChangeRowView[] }) {
+  const site = rows.some((r) => r.site !== undefined);
   const pages = rows.some((r) => r.pages !== null);
   const told = rows.some((r) => r.told !== null);
   const columns: TableColumn[] = [
+    ...(site ? [{ header: 'Site', mono: true }] : []),
     { header: 'When', mono: true, muted: true },
     { header: 'What changed' },
     { header: 'Where', mono: true },
@@ -34,6 +37,7 @@ function ChangeTable({ label, rows }: { label: string; rows: ChangeRowView[] }) 
       rows={rows.map((r) => ({
         key: r.key,
         cells: [
+          ...(site ? [r.site ?? '—'] : []),
           <span key="w" className={own.when}>
             {r.when}
           </span>,
