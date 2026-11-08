@@ -8,8 +8,9 @@ import { CHECKS, recording } from '../../../../lib/v2/recordings';
 import { homeView } from '../../../../lib/v2/view/home';
 import { mapDrawing } from '../../../../lib/v2/view/map';
 import { resultStateView, resultView, type ResultPageView } from '../../../../lib/v2/view/result';
+import { alertsView } from '../../../../lib/v2/view/alerts';
 import { changesLogView } from '../../../../lib/v2/view/changes-log';
-import { ACCOUNT_VIEWERS } from './accounts';
+import { ACCOUNT_VIEWERS, DATASET } from './accounts';
 import { fixHref } from './fixes';
 import { MAP_PATHS, segmentHrefs } from './segments';
 
@@ -83,3 +84,10 @@ export const changesLogPreview = (query: PreviewQuery = {}) =>
     { site: one(query.site), kind: one(query.kind), since: one(query.since) },
     CHANGES_LOG_PATH,
   );
+
+/**
+ * Alerts: on bad-site as Final-Dashboard reads it (Final-Alerts), and on CC-26's stand-in Free
+ * account over clean-site, which has no rules and has sent nothing (Slack gated).
+ */
+export const alertsPreview = (name: 'home' | 'clean') =>
+  alertsView(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]());

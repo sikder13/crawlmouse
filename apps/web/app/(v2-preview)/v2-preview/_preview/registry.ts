@@ -170,6 +170,9 @@ export const PREVIEWS: PreviewEntry[] = [
     kind: 'screen',
   },
   { path: '/v2-preview/screens/site/withheld', name: 'Site, withheld', kind: 'screen' },
+  { path: '/v2-preview/screens/alerts', name: 'Final-Alerts', kind: 'screen' },
+  // The stand-in Free account has sent nothing, so there is no open fix to act on.
+  { path: '/v2-preview/screens/alerts/free', name: 'Alerts, free', kind: 'screen', orange: 0 },
   // The account Changes log has no artboard (CC-27 D3), and nothing on it is the reader's action.
   {
     path: '/v2-preview/screens/changes-log',

@@ -124,6 +124,12 @@ const SCREENS: { path: string; file: string; scheme: 'light' | 'dark'; screen: L
     screen: 'dashboard',
   },
   { path: '/v2-preview/screens/site', file: 'Final-Site.dc.html', scheme: 'dark', screen: 'site' },
+  {
+    path: '/v2-preview/screens/alerts',
+    file: 'Final-Alerts.dc.html',
+    scheme: 'light',
+    screen: 'alerts',
+  },
 ];
 
 const SCREEN_DIR = fileURLToPath(new URL('../../docs/design/v2/screens/', import.meta.url));
