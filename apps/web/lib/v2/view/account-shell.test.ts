@@ -11,6 +11,7 @@ import { viewAt } from './account';
 import { accountShellView, isFirstRun, newChanges } from './account-shell';
 
 const bad = fixture('bad-site');
+const BAD = 'a0000000-0000-4000-8000-000000000001';
 const shellOf = (name: keyof typeof ACCOUNT_VIEWERS, d = bad) =>
   accountShellView(viewAt(d, ACCOUNT_VIEWERS[name]()), 'Sites');
 
@@ -73,6 +74,36 @@ describe('the trial card', () => {
       fields: { plan: 'pro', interval: 'month' },
     });
     expect(t.billing).toBeNull();
+  });
+
+  it('promises the reminder only until it is due: three days before the end, at the same time', () => {
+    // The trial ends 8 Nov 02:41Z, so the reminder is due 5 Nov 02:41Z (Wed 4 Nov 21:41 in Indiana).
+    const at = (now: string) =>
+      accountShellView(viewAt(bad, { accountId: BAD, now }), 'Sites').trial!.note;
+    expect(at('2026-11-05T02:40:59Z')).toMatch(/We'll email you three days before\.$/);
+    expect(at('2026-11-05T02:41:00Z')).toBe(
+      'Then Free: example-outfitter.com keeps monthly checks; the other three sites pause until you choose Pro or remove them. Nothing you can see is deleted.',
+    );
+  });
+
+  it('leaves the plan to a page that carries it: no Keep, and only what the card on file means', () => {
+    const v = viewAt(bad, { accountId: BAD, now: '2026-11-05T02:41:00Z' });
+    expect(accountShellView(v, 'Sites', { plan: 'page' }).trial).toEqual({
+      title: 'Pro, trial · ends Sat 7 Nov',
+      left: '3 days left',
+      note: 'No card on file. Nothing is charged unless you choose Pro.',
+      billing: null,
+      keep: null,
+    });
+    // Kestrel Creative's Agency trial has card 4242 on Stripe's clock: it is charged at the end,
+    // 16 Nov 11:57Z, Mon 16 Nov in New York.
+    const kestrel = viewAt(fixture('challenged-site'), {
+      accountId: 'a0000000-0000-4000-8000-0000000000ca',
+      now: fixture('challenged-site').as_of,
+    });
+    expect(accountShellView(kestrel, 'Sites', { plan: 'page' }).trial!.note).toBe(
+      'The card ending 4242 is charged on Mon 16 Nov unless you cancel.',
+    );
   });
 
   it('is absent outside a trial', () => {
