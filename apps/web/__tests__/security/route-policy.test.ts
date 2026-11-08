@@ -7,6 +7,7 @@ import {
   isApiPath,
   isStateChanging,
   pathSegments,
+  policiesForPath,
   policyForPath,
 } from '../../lib/security/route-policy';
 import { mechanismProblems, readsJsonBody, refusesWithoutSession } from './route-mechanism';
@@ -153,11 +154,17 @@ describe('the mechanism checks fail on the code they guard against', () => {
     ]);
     expect(check(parsed, 'webhook', 'constructEvent')).toEqual([
       'parses the request body with json() or formData()',
+      'calls req.json() before constructEvent()',
     ]);
     const viaClient = `${imports}export async function POST(req) { const raw = await req.text(); const u = JSON.parse(raw); await stripe.customers.update(u.id, {}); stripe.webhooks.constructEvent(raw, s, k); }`;
     expect(check(viaClient, 'webhook', 'constructEvent')).toEqual([
       'calls JSON.parse() before constructEvent()',
       'calls stripe.customers.update() before constructEvent()',
+    ]);
+    const viaAlias = `${imports}export async function POST(req) { const raw = await req.text(); const body = await req.clone().json(); const customers = stripe.customers; await customers.update(body.id, {}); stripe.webhooks.constructEvent(raw, s, k); }`;
+    expect(check(viaAlias, 'webhook', 'constructEvent')).toEqual([
+      'calls req.clone().json() before constructEvent()',
+      'calls customers.update() before constructEvent()',
     ]);
   });
 
@@ -192,6 +199,11 @@ describe('the registry finds the row a request path reaches', () => {
     ['/api/reports/a%2Fb/claim', 'api/reports/[slug]/claim'],
     ['/api/audits/6f1c2a8e%2Fx/cancel', 'api/audits/[id]/cancel'],
     ['/api/trpc/audits.getById', 'api/trpc/[trpc]'],
+    // Vercel's router serves a dynamic route in any case, so the lookup matches in any case too.
+    ['/API/reports/abc/visibility', 'api/reports/[slug]/visibility'],
+    ['/Api/audits/6f1c2a8e-0000-4000-8000-000000000000/CANCEL', 'api/audits/[id]/cancel'],
+    ['/api/REPORTS/abc/mine', 'api/reports/[slug]/mine'],
+    ['/API/webhooks/stripe', 'api/webhooks/stripe'],
     ['/billing', 'billing'],
     ['/login/verify', 'login/verify'],
     ['/robots.txt', 'robots.txt'],
@@ -211,13 +223,31 @@ describe('the registry finds the row a request path reaches', () => {
     expect(policyForPath(path)).toBeUndefined();
   });
 
+  it("each row's own path matches that row alone: no two rows overlap", () => {
+    // A static route's path also matches a dynamic sibling's pattern, so this catches the overlap Next
+    // would settle by preferring the static route, and the lookup would settle by registry order.
+    const samples = (route: string) =>
+      [route.replace(/\[\[?\.\.\.[^\]]+\]\]?/g, 'a/b').replace(/\[[^\]]+\]/g, 'sample')].map(
+        (p) => `/${p}`,
+      );
+    for (const p of ROUTE_POLICIES) {
+      for (const path of samples(p.route)) {
+        expect(
+          policiesForPath(path).map((r) => r.route),
+          path,
+        ).toEqual([p.route]);
+      }
+    }
+  });
+
   it('decodes each segment on its own, and gives up on one that does not decode', () => {
     expect(pathSegments('/api/reports/a%2Fb/claim/')).toEqual(['api', 'reports', 'a/b', 'claim']);
     expect(pathSegments('/api/audits/%ZZ/cancel')).toBeUndefined();
   });
 
   it('an /api path is recognised decoded, encoded, or undecodable', () => {
-    for (const p of ['/api/x', '/%61pi/x', '/api/%ZZ']) expect(isApiPath(p), p).toBe(true);
+    for (const p of ['/api/x', '/%61pi/x', '/api/%ZZ', '/API/x', '/Api/%ZZ'])
+      expect(isApiPath(p), p).toBe(true);
     for (const p of ['/apix', '/login', '/', '/%ZZ/api/x']) expect(isApiPath(p), p).toBe(false);
   });
 
@@ -260,9 +290,27 @@ describe('cross-site refusal covers every state change a session or a visitor ca
     ]);
   });
 
+  it('a public route says it reads the session exactly when its source calls getUser()', () => {
+    for (const p of ROUTE_POLICIES.filter((r) => r.class === 'public')) {
+      expect(p.session === 'optional', p.route).toBe(
+        callPositions(readRoute(p.route), 'getUser').length > 0,
+      );
+    }
+    for (const p of ROUTE_POLICIES.filter((r) => r.class !== 'public'))
+      expect(p.session, p.route).toBeUndefined();
+  });
+
   it('a state-changing public route that reads the session takes an origin rule', () => {
+    // The middleware guards API routes only. /login/verify, outside /api, checks the same strict rule
+    // in its own POST, which its source must show.
+    const CHECKS_ITS_OWN = ['login/verify'];
+    expect(callPositions(readRoute('login/verify'), 'isSameOrigin').length).toBeGreaterThan(0);
     const open = ROUTE_POLICIES.filter(
-      (p) => p.session === 'optional' && p.methods.some(isStateChanging) && p.origin === 'any',
+      (p) =>
+        p.session === 'optional' &&
+        p.methods.some(isStateChanging) &&
+        p.origin === 'any' &&
+        !CHECKS_ITS_OWN.includes(p.route),
     );
     expect(open.map((p) => p.route)).toEqual([]);
   });

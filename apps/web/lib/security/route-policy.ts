@@ -195,6 +195,7 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     class: 'public',
     reason:
       'the sign-in landing: the link token is the credential; its POST checks its own origin (CC-25)',
+    session: 'optional',
     origin: 'any',
   },
   {
@@ -216,14 +217,18 @@ export function isStateChanging(method: string): boolean {
 /** A route's URL segments, as written on disk: a route group adds none. */
 const routeSegments = (route: string) => route.split('/').filter((s) => !/^\(.*\)$/.test(s));
 
-/** Whether a route's segments match a request's. Catch-alls are always the last route segment. */
+/**
+ * Whether a route's segments match a request's. Catch-alls are always the last route segment. A static
+ * segment matches in any case: Vercel's router serves a dynamic route at `/API/...` or `/api/REPORTS/...`
+ * (measured on production, 2026-11-08), though `next start` does not.
+ */
 function matches(route: readonly string[], path: readonly string[]): boolean {
   const [head, ...rest] = route;
   if (head === undefined) return path.length === 0;
   if (/^\[\[\.\.\.[^\]]+\]\]$/.test(head)) return true;
   if (/^\[\.\.\.[^\]]+\]$/.test(head)) return path.length > 0;
   if (path.length === 0) return false;
-  if (head !== path[0] && !/^\[[^\]]+\]$/.test(head)) return false;
+  if (head.toLowerCase() !== path[0]!.toLowerCase() && !/^\[[^\]]+\]$/.test(head)) return false;
   return matches(rest, path.slice(1));
 }
 
@@ -251,14 +256,26 @@ export function pathSegments(pathname: string): string[] | undefined {
   return segments;
 }
 
-/** Whether a path is under /api, decoded or not: a path that does not decode counts if it starts so. */
+/**
+ * Whether a path is under /api, in any case, decoded or not: a path that does not decode counts if it
+ * starts so.
+ */
 export function isApiPath(pathname: string): boolean {
   const segments = pathSegments(pathname);
-  return segments === undefined ? pathname.startsWith('/api/') : segments[0] === 'api';
+  return segments === undefined ? /^\/api\//i.test(pathname) : segments[0]?.toLowerCase() === 'api';
+}
+
+/**
+ * Every row a request path matches. No two rows overlap (route-policy.test.ts holds each row's own path
+ * to that row alone), so there is no precedence to decide between them.
+ */
+export function policiesForPath(pathname: string): RoutePolicy[] {
+  const path = pathSegments(pathname);
+  if (path === undefined) return [];
+  return COMPILED.filter((c) => matches(c.segments, path)).map((c) => c.policy);
 }
 
 /** The policy of the route a request path reaches, or undefined (no such route, or it does not decode). */
 export function policyForPath(pathname: string): RoutePolicy | undefined {
-  const path = pathSegments(pathname);
-  return path === undefined ? undefined : COMPILED.find((c) => matches(c.segments, path))?.policy;
+  return policiesForPath(pathname)[0];
 }

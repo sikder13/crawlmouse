@@ -8,6 +8,16 @@ import type { Refusal } from '@/lib/security/refusal-event';
 
 const AUTH_COOKIE = 'sb-ezspnfeyzwsisymytssm-auth-token';
 
+// The exported middleware's reporter: a spy, so the wiring test can see what reaches waitUntil.
+const reported = vi.hoisted(() => ({ refusals: [] as unknown[], promise: Promise.resolve() }));
+vi.mock('@/lib/security/refusal-event', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/security/refusal-event')>()),
+  reportRefusal: (r: unknown) => {
+    reported.refusals.push(r);
+    return reported.promise;
+  },
+}));
+
 /** A fake session refresh returning a response that already carries a rotated auth cookie,
  *  so we can prove the consent/robots layer is purely additive and never clobbers it. */
 function refreshWithAuthCookie(req: NextRequest) {
@@ -64,8 +74,17 @@ describe('middleware (exported entrypoint)', () => {
       { waitUntil } as unknown as NextFetchEvent,
     );
     expect(res.status).toBe(403);
+    expect(reported.refusals).toEqual([
+      {
+        reason: 'cross_site',
+        route: 'api/billing/portal',
+        class: 'user',
+        method: 'POST',
+        status: 403,
+      },
+    ]);
     expect(waitUntil).toHaveBeenCalledTimes(1);
-    expect(waitUntil.mock.calls[0]![0]).toBeInstanceOf(Promise);
+    expect(waitUntil.mock.calls[0]![0]).toBe(reported.promise);
   });
 });
 
@@ -163,6 +182,10 @@ describe('a state-changing API request from another site is refused before the r
     '/%61pi/billing/portal',
     '/api/reports/a%2Fb/claim',
     '/api/audits/6f1c2a8e%2Fx/cancel',
+    // Vercel serves a dynamic route in any case.
+    '/API/reports/s/logo',
+    '/Api/audits/6f1c2a8e-0000-4000-8000-000000000000/cancel',
+    '/api/REPORTS/s/VISIBILITY',
   ])('refuses a cross-site POST to another spelling of the route: %s', async (path) => {
     const { res } = await run(path, 'POST', { origin: 'https://evil.example' });
     expect(res.status).toBe(403);
@@ -186,6 +209,21 @@ describe('a state-changing API request from another site is refused before the r
   it('a read of an unregistered API path passes through, for the router to answer', async () => {
     const { res } = await run('/api/no/such/route', 'GET', {});
     expect(passes(res)).toBe(true);
+  });
+
+  it('a text/plain POST to an upper-case spelling of a JSON route gets 415', async () => {
+    const { res } = await run('/API/audits/6f1c2a8e-0000-4000-8000-000000000000/notify', 'POST', {
+      'content-type': 'text/plain',
+    });
+    expect(res.status).toBe(415);
+  });
+
+  it('an upper-case spelling of a signed webhook still passes untouched', async () => {
+    const { res, refresh } = await run('/API/webhooks/stripe', 'POST', {
+      origin: 'https://evil.example',
+    });
+    expect(passes(res)).toBe(true);
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it('a method token outside HTTP is refused and reported as OTHER', async () => {
