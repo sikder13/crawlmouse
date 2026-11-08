@@ -1,0 +1,85 @@
+/* Final-Reports: the three ways to make a report side by side, then what was made and scheduled. */
+
+.pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-right: 1px solid var(--v2-line2);
+}
+
+.option:last-child {
+  border-right: 0;
+}
+
+.optionTitle {
+  font-weight: 500;
+}
+
+.optionText {
+  margin-top: 4px;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.nowrap {
+  white-space: nowrap;
+  color: var(--v2-mut);
+}
+
+.muted {
+  color: var(--v2-mut);
+}
+
+.note {
+  padding: 16px;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+.empty {
+  padding: 16px;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+/* DESIGN-LOCK §7.7: the three options stack on a phone. */
+@media (max-width: 760px) {
+  .options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .option {
+    border-right: 0;
+    border-bottom: 1px solid var(--v2-line2);
+  }
+
+  .option:last-child {
+    border-bottom: 0;
+  }
+}

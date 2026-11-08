@@ -10,6 +10,7 @@ import { mapDrawing } from '../../../../lib/v2/view/map';
 import { resultStateView, resultView, type ResultPageView } from '../../../../lib/v2/view/result';
 import { alertsView } from '../../../../lib/v2/view/alerts';
 import { changesLogView } from '../../../../lib/v2/view/changes-log';
+import { reportsView } from '../../../../lib/v2/view/reports';
 import { ACCOUNT_VIEWERS, DATASET } from './accounts';
 import { fixHref } from './fixes';
 import { MAP_PATHS, segmentHrefs } from './segments';
@@ -91,3 +92,21 @@ export const changesLogPreview = (query: PreviewQuery = {}) =>
  */
 export const alertsPreview = (name: 'home' | 'clean') =>
   alertsView(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]());
+
+/** Reports: its preview paths, which the site picker reloads. */
+export const REPORTS_PATHS = {
+  home: '/v2-preview/screens/reports',
+  withheld: '/v2-preview/screens/reports/agency',
+} as const;
+
+/**
+ * Reports: on bad-site (Final-Reports), and on Northwind's Agency account over challenged-site,
+ * whose client reports exercise the Scheduled list (owner ruling 8). `?site=` picks the site.
+ */
+export const reportsPreview = (name: keyof typeof REPORTS_PATHS, query: PreviewQuery = {}) =>
+  reportsView(
+    fixture(DATASET[name]),
+    ACCOUNT_VIEWERS[name](),
+    { site: one(query.site) },
+    REPORTS_PATHS[name],
+  );
