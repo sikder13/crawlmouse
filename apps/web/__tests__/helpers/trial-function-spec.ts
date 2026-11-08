@@ -75,6 +75,25 @@ async function functionsTable(db: PGlite): Promise<string> {
   );
 }
 
+/**
+ * SECURITY DEFINER functions in our schemas, other than 006c's, whose search_path setting leaves
+ * pg_temp implicit (searched first for types) rather than naming it last, with that setting.
+ */
+async function otherDefiners(db: PGlite): Promise<string> {
+  const { rows } = await db.query<{ sig: string; path: string | null }>(
+    `select format('%s.%s', n.nspname, p.proname) as sig,
+            (select c from unnest(p.proconfig) c where c like 'search_path=%') as path
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname in ('public', 'research', 'partitions') and p.prosecdef
+        and p.proname <> all($1)
+      order by 1`,
+    [FUNCTIONS],
+  );
+  const leaves = rows.filter((r) => !/pg_temp"?$/.test(r.path ?? ''));
+  if (leaves.length === 0) return 'none';
+  return leaves.map((r) => `${code(r.sig)} (${r.path ? code(r.path) : 'no setting'})`).join(', ');
+}
+
 /** How many arguments `apply_entitlement_transition` takes. */
 async function argCount(db: PGlite): Promise<number> {
   const { rows } = await db.query<{ n: number }>(
@@ -211,7 +230,7 @@ A stale \`p_expected_version\` raises \`40001\` from \`apply_entitlement_transit
 
 ${await functionsTable(db)}
 
-**Temporary objects.** With \`pg_temp\` left out of \`search_path\`, Postgres searches it first for type names (never for functions or operators), so a caller's temp domain could stand in for a type a body names without its schema, and its CHECK would run as \`postgres\`. The bodies write \`jsonb\`, \`text\` and \`timestamptz\` as \`pg_catalog.*\`; \`integer\`, \`numeric\`, \`bit\` and \`interval\` are keywords the grammar resolves to \`pg_catalog\`. Verify, a temp domain of each name: ${V('v2-006c-trial-function.test.ts', 'temporary objects')}.
+**Temporary objects.** With \`pg_temp\` left out of \`search_path\`, Postgres searches it first for type names (never for functions or operators), so a caller's temp domain could stand in for a type a body names without its schema, and its CHECK would run as \`postgres\`. The bodies write \`jsonb\`, \`text\` and \`timestamptz\` as \`pg_catalog.*\`; \`integer\`, \`numeric\`, \`bit\` and \`interval\` are keywords the grammar resolves to \`pg_catalog\`. Verify, a temp domain of each name, on the refused path (which stops before \`apply_entitlement_transition\`; see known gaps): ${V('v2-006c-trial-function.test.ts', 'temporary objects')}.
 
 PUBLIC's EXECUTE is revoked explicitly on each, and so is service_role's on the helpers, which no role but their owner runs: \`start_trial_with_ledger\` is SECURITY DEFINER and runs them as \`postgres\`. Check 06 (\`infra/supabase/checks/06-client-functions.sql\`) finds nothing. Verify: ${V('v2-006c-trial-function.test.ts', 'grants')}.
 
@@ -300,7 +319,7 @@ ${D8_QUERY}
 - **A browser with no \`cm_auth_for\` sends its device.** A link opened where no door request was made (another device, or a browser that never asked) cannot be told apart from someone else's link, so D9 does not apply there.
 - **Two clocks.** \`next()\` dates the trial with the app's clock; the ledger windows and the rows' \`created_at\` use the database's \`now()\`.
 - **The race test runs only in CI's \`db-cli-files\` job**; \`pnpm test\` skips it, because no local Postgres server is assumed. It refuses a \`TRIAL_RACE_DB_URL\` that is not on this machine.
-- **\`apply_entitlement_transition\` (003) runs with \`search_path = public, pg_catalog\`**, which also leaves \`pg_temp\` searched first for type names. It is SECURITY DEFINER and \`service_role\` may call it directly, so this function adds no path to it that was not there; the other definer functions of 001 and 003 share the setting. A follow-up, outside this migration: set \`search_path = ''\` (or \`pg_catalog, public, pg_temp\`) on them.
+- **\`apply_entitlement_transition\` (003) runs with \`search_path = public, pg_catalog\`**, which also leaves \`pg_temp\` searched first for type names. It is SECURITY DEFINER and \`service_role\` may call it directly, so this function adds no path to it that was not there. The SECURITY DEFINER functions outside this migration whose \`search_path\` does not name \`pg_temp\` last, read from \`pg_proc\`: ${await otherDefiners(db)}. A follow-up, outside this migration: either \`search_path = pg_catalog, pg_temp\`, with \`pg_temp\` named last, and every relation schema-qualified; or \`search_path = ''\` with every type written as \`pg_catalog.*\` too, as here. \`''\` alone is not enough: it is the setting under which a temp domain stood in for \`jsonb\` here before the types were qualified.
 - **\`POST /api/auth/claim\` (v1) claims anonymous audits with no binding check.** Nothing in the app calls it today; a call after sign-in would claim without D9's check.
 `,
     ].join('\n');
