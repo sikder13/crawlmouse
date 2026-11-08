@@ -16,10 +16,12 @@ const nextConfig = {
   // skipTrailingSlashRedirect keeps PostHog's trailing-slash paths from 308-redirecting.
   skipTrailingSlashRedirect: true,
   // Security headers on every response (lib/security/headers.mjs). headers() runs at build time, so
-  // the report-only CSP reports to the Sentry project of the DSN the build was given.
+  // the CSP reports to the Sentry project of the DSN the build was given and allows its Supabase.
   async headers() {
     return securityHeaders({
       sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST,
       dev: process.env.NODE_ENV === 'development',
     });
   },

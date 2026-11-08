@@ -1,5 +1,5 @@
 import { unstable_getResponseFromNextConfig } from 'next/experimental/testing/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import nextConfig from '../../next.config.mjs';
 import { sentryCspTarget } from '../../lib/security/headers.mjs';
 
@@ -11,9 +11,11 @@ const DSN = 'https://abc123@o42.ingest.us.sentry.io/4507';
 const SENTRY_ORIGIN = 'https://o42.ingest.us.sentry.io';
 const REPORT_URL = 'https://o42.ingest.us.sentry.io/api/4507/security/?sentry_key=abc123';
 
+const SUPABASE = 'https://abcdefgh.supabase.co';
 const STRIPE = 'https://checkout.stripe.com https://billing.stripe.com';
-const enforced = (fa: string) =>
-  `frame-ancestors ${fa}; object-src 'none'; base-uri 'self'; form-action 'self' ${STRIPE}; upgrade-insecure-requests`;
+const enforced = (fa: string, withSentry: boolean) =>
+  `frame-ancestors ${fa}; object-src 'none'; base-uri 'self'; form-action 'self' ${STRIPE}; upgrade-insecure-requests` +
+  (withSentry ? `; report-uri ${REPORT_URL}; report-to csp` : '');
 const reportOnly = (fa: string, withSentry: boolean) =>
   [
     "default-src 'self'",
@@ -22,8 +24,8 @@ const reportOnly = (fa: string, withSentry: boolean) =>
     "img-src 'self' data: blob: https:",
     "font-src 'self'",
     withSentry
-      ? `connect-src 'self' ${SENTRY_ORIGIN} https://us.posthog.com`
-      : "connect-src 'self' https://us.posthog.com",
+      ? `connect-src 'self' ${SENTRY_ORIGIN} ${SUPABASE} https://us.posthog.com`
+      : `connect-src 'self' ${SUPABASE} https://us.posthog.com`,
     'frame-src https://challenges.cloudflare.com',
     "worker-src 'self' blob:",
     "manifest-src 'self'",
@@ -72,6 +74,10 @@ async function headersFor(path: string): Promise<Record<string, string | null>> 
   );
 }
 
+beforeEach(() => {
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', `${SUPABASE}/`);
+  vi.stubEnv('NEXT_PUBLIC_POSTHOG_HOST', '');
+});
 afterEach(() => vi.unstubAllEnvs());
 
 describe.each([
@@ -87,7 +93,7 @@ describe.each([
       expect(await headersFor(path)).toEqual({
         ...COMMON,
         'x-frame-options': 'DENY',
-        'content-security-policy': enforced("'none'"),
+        'content-security-policy': enforced("'none'", withSentry),
         'content-security-policy-report-only': reportOnly("'none'", withSentry),
         'reporting-endpoints': withSentry ? `csp="${REPORT_URL}"` : null,
       });
@@ -101,7 +107,7 @@ describe.each([
       expect(await headersFor(path)).toEqual({
         ...COMMON,
         'x-frame-options': null,
-        'content-security-policy': enforced('*'),
+        'content-security-policy': enforced('*', withSentry),
         'content-security-policy-report-only': reportOnly('*', withSentry),
         'reporting-endpoints': withSentry ? `csp="${REPORT_URL}"` : null,
       });
@@ -116,7 +122,7 @@ describe('the sign-in landing keeps its stricter referrer policy', () => {
       ...COMMON,
       'referrer-policy': 'same-origin',
       'x-frame-options': 'DENY',
-      'content-security-policy': enforced("'none'"),
+      'content-security-policy': enforced("'none'", false),
       'content-security-policy-report-only': reportOnly("'none'", false),
       'reporting-endpoints': null,
     });
@@ -128,6 +134,29 @@ describe('the sign-in landing keeps its stricter referrer policy', () => {
         'strict-origin-when-cross-origin',
       );
     }
+  });
+});
+
+describe('connect-src names the origins the browser calls', () => {
+  const connectSrc = async () =>
+    (await headersFor('/'))
+      ['content-security-policy-report-only']!.split('; ')
+      .find((d) => d.startsWith('connect-src'));
+
+  it('a PostHog host other than the /ingest proxy is added; the relative proxy path is not', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SENTRY_DSN', '');
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_HOST', 'https://eu.i.posthog.com');
+    expect(await connectSrc()).toBe(
+      `connect-src 'self' ${SUPABASE} https://eu.i.posthog.com https://us.posthog.com`,
+    );
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_HOST', '/ingest');
+    expect(await connectSrc()).toBe(`connect-src 'self' ${SUPABASE} https://us.posthog.com`);
+  });
+
+  it('without a Supabase URL only our origin and the toolbar remain', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SENTRY_DSN', '');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+    expect(await connectSrc()).toBe("connect-src 'self' https://us.posthog.com");
   });
 });
 

@@ -14,7 +14,7 @@ test.beforeAll(() => {
 
 const STRIPE = 'https://checkout.stripe.com https://billing.stripe.com';
 const enforced = (fa: string) =>
-  `frame-ancestors ${fa}; object-src 'none'; base-uri 'self'; form-action 'self' ${STRIPE}; upgrade-insecure-requests`;
+  `frame-ancestors ${fa}; object-src 'none'; base-uri 'self'; form-action 'self' ${STRIPE}; upgrade-insecure-requests; report-uri ${CSP_REPORT_URL}; report-to csp`;
 const reportOnly = (fa: string) =>
   [
     "default-src 'self'",
@@ -22,7 +22,8 @@ const reportOnly = (fa: string) =>
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self'",
-    `connect-src 'self' ${SENTRY_ORIGIN} https://us.posthog.com`,
+    // apps/web/.env.ci points Supabase at a closed loopback port.
+    `connect-src 'self' ${SENTRY_ORIGIN} http://127.0.0.1:54321 https://us.posthog.com`,
     'frame-src https://challenges.cloudflare.com',
     "worker-src 'self' blob:",
     "manifest-src 'self'",

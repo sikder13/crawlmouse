@@ -4,9 +4,9 @@
  * __tests__/security/headers.test.ts pins each value on each route class.
  *
  * Two route classes: `/embed/*`, the grade badge other sites frame, and everything else. The CSP is
- * split: the directives no inline script depends on are enforced; the full policy is report-only,
- * reporting to Sentry, until its reports show it can be enforced (CC-SEC-2). HSTS is Vercel's, not
- * set here.
+ * split: the directives no inline script depends on are enforced; the full policy is report-only
+ * until its reports show it can be enforced (CC-SEC-2). Both report to Sentry when the build has a
+ * DSN. HSTS is Vercel's, not set here.
  */
 
 const TURNSTILE = 'https://challenges.cloudflare.com';
@@ -46,6 +46,22 @@ export function sentryCspTarget(dsn) {
 }
 
 /**
+ * The origin of an absolute http(s) URL, or null (unset, relative such as `/ingest`, or unparsable).
+ *
+ * @param {string | undefined} url
+ * @returns {string | null}
+ */
+function originOf(url) {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @param {string} frameAncestors
  * @returns {string[]}
  */
@@ -58,12 +74,16 @@ function enforcedDirectives(frameAncestors) {
   ];
 }
 
+/** @param {{ origin: string, endpoint: string } | null} sentry */
+const reporting = (sentry) => (sentry ? [`report-uri ${sentry.endpoint}`, 'report-to csp'] : []);
+
 /**
  * @param {string} frameAncestors
  * @param {{ origin: string, endpoint: string } | null} sentry
+ * @param {string[]} connect the origins the browser calls besides our own
  * @param {boolean} dev
  */
-function reportOnlyPolicy(frameAncestors, sentry, dev) {
+function reportOnlyPolicy(frameAncestors, sentry, connect, dev) {
   return [
     "default-src 'self'",
     // 'unsafe-eval' only under next dev, whose React Refresh needs it.
@@ -71,24 +91,25 @@ function reportOnlyPolicy(frameAncestors, sentry, dev) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self'",
-    `connect-src 'self'${sentry ? ` ${sentry.origin}` : ''} ${POSTHOG_TOOLBAR}`,
+    ["connect-src 'self'", ...connect].join(' '),
     `frame-src ${TURNSTILE}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     // The enforced directives too, so enforcing this policy later is a change of header name.
     // upgrade-insecure-requests is not among them: browsers ignore it in a report-only policy.
     ...enforcedDirectives(frameAncestors),
-    ...(sentry ? [`report-uri ${sentry.endpoint}`, 'report-to csp'] : []),
+    ...reporting(sentry),
   ].join('; ');
 }
 
 /**
  * @param {string} frameAncestors
  * @param {{ origin: string, endpoint: string } | null} sentry
+ * @param {string[]} connect
  * @param {boolean} dev
  * @returns {{ key: string, value: string }[]}
  */
-function headerSet(frameAncestors, sentry, dev) {
+function headerSet(frameAncestors, sentry, connect, dev) {
   return [
     { key: 'X-Content-Type-Options', value: 'nosniff' },
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
@@ -98,31 +119,47 @@ function headerSet(frameAncestors, sentry, dev) {
     },
     {
       key: 'Content-Security-Policy',
-      value: [...enforcedDirectives(frameAncestors), 'upgrade-insecure-requests'].join('; '),
+      value: [
+        ...enforcedDirectives(frameAncestors),
+        'upgrade-insecure-requests',
+        ...reporting(sentry),
+      ].join('; '),
     },
     {
       key: 'Content-Security-Policy-Report-Only',
-      value: reportOnlyPolicy(frameAncestors, sentry, dev),
+      value: reportOnlyPolicy(frameAncestors, sentry, connect, dev),
     },
     ...(sentry ? [{ key: 'Reporting-Endpoints', value: `csp="${sentry.endpoint}"` }] : []),
   ];
 }
 
 /**
- * The `headers()` entries for next.config.
+ * The `headers()` entries for next.config. The browser calls Sentry's ingest, Supabase (the signed-in
+ * header refreshes its session) and, when `NEXT_PUBLIC_POSTHOG_HOST` names one, a PostHog host other
+ * than the same-origin `/ingest` proxy; PostHog's toolbar talks to `us.posthog.com`.
  *
- * @param {{ sentryDsn?: string, dev?: boolean }} options
+ * @param {{ sentryDsn?: string, supabaseUrl?: string, posthogHost?: string, dev?: boolean }} options
  * @returns {{ source: string, headers: { key: string, value: string }[] }[]}
  */
-export function securityHeaders({ sentryDsn, dev = false }) {
+export function securityHeaders({ sentryDsn, supabaseUrl, posthogHost, dev = false }) {
   const sentry = sentryCspTarget(sentryDsn);
+  const connect = [
+    ...new Set(
+      [sentry?.origin, originOf(supabaseUrl), originOf(posthogHost), POSTHOG_TOOLBAR].filter(
+        (o) => typeof o === 'string',
+      ),
+    ),
+  ];
   return [
     {
       source: DEFAULT_SOURCE,
-      headers: [{ key: 'X-Frame-Options', value: 'DENY' }, ...headerSet("'none'", sentry, dev)],
+      headers: [
+        { key: 'X-Frame-Options', value: 'DENY' },
+        ...headerSet("'none'", sentry, connect, dev),
+      ],
     },
     // The badge is framed by the sites that show it: no X-Frame-Options, any ancestor.
-    { source: EMBED_SOURCE, headers: headerSet('*', sentry, dev) },
+    { source: EMBED_SOURCE, headers: headerSet('*', sentry, connect, dev) },
     // A next.config header replaces the one a route sets, and a later entry replaces an earlier one:
     // the sign-in landing sends no referrer off our origin (its route sets the same value).
     { source: SIGN_IN_SOURCE, headers: [{ key: 'Referrer-Policy', value: 'same-origin' }] },
