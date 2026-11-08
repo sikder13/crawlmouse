@@ -164,7 +164,13 @@ export function reportsView(
         ? checks[0]!.trigger === 'first_audit'
           ? COPY.firstAudit
           : COPY.checkOf(dayDate(checks[0]!.finished_at!, zone))
-        : COPY.vs(...(checks.map((c) => dayDate(c.finished_at!, zone)) as [string, string]));
+        : checks.length === 2
+          ? COPY.vs(dayDate(checks[0]!.finished_at!, zone), dayDate(checks[1]!.finished_at!, zone))
+          : COPY.span(
+              checks.length,
+              dayDate(checks[0]!.finished_at!, zone),
+              dayDate(checks.at(-1)!.finished_at!, zone),
+            );
     const cadence = v.d.sites.find((s) => s.id === r.site_id)?.schedule?.cadence;
     const by =
       r.made_by === 'scheduled_check' && cadence

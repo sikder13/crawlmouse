@@ -51,7 +51,7 @@ export const REPORTS_COPY = {
   branded: 'Under your own name and domain.',
   makePdf: 'Make the PDF',
   compareTitle: 'Compare two checks',
-  comparePair: (a: string, b: string) => `${a} vs ${b}, or any two.`,
+  comparePair: (a: string, b: string) => `${a} vs ${b}.`,
   compareBody: 'What moved and why, with the evidence for each change.',
   compareNeedsTwo: 'Needs two finished checks of this site.',
   rawTitle: 'Raw data',
@@ -64,6 +64,8 @@ export const REPORTS_COPY = {
   firstAudit: 'first audit',
   checkOf: (date: string) => `check of ${date}`,
   vs: (a: string, b: string) => `${a} vs ${b}`,
+  /** A report over more than two checks: how many, first to last. */
+  span: (n: number, first: string, last: string) => `${count(n)} checks, ${first} to ${last}`,
   madeByCheck: (cadence: string) => `made by the ${cadence} check`,
   sentTo: (email: string) => `sent to ${email}`,
   download: (size: string) => `Download · ${size}`,
@@ -126,6 +128,14 @@ export const REPORTS_CHANGES: CopyChange[] = [
     locked: 'Choose checks',
     rendered: '',
     source: 'Owner ruling 6: no route chooses the two checks of a compare; a CC-27b candidate',
+  },
+  {
+    screen: 'reports',
+    kind: 'ruling',
+    locked: 'Thu 29 vs Fri 30 Oct, or any two.',
+    rendered: 'Thu 29 vs Fri 30 Oct.',
+    source:
+      'Owner ruling 6: no route chooses the two checks of a compare (“Choose checks” is a CC-27b candidate), so the card offers only the latest pair',
   },
   {
     screen: 'reports',

@@ -12,9 +12,12 @@ export const CHANGES_LOG_COPY = {
   /** Filtered: how many of the account's changes the filters keep, and which filters. */
   filtered: (shown: number, total: number, filters: readonly string[]) =>
     `${count(shown)} of ${count(total)} ${plural(total, 'change', 'changes')} match: ${filters.join(', ')}.`,
-  /** The rail's "N new", said here in words, so the log and the rail count alike. */
+  /**
+   * The rail's "N new", in words, and what it counts: the changes opened or resolved at each site's
+   * latest check (`newChanges`).
+   */
   newNote: (n: number) =>
-    `${capitalise(numberWord(n))} ${plural(n, 'is', 'are')} new since each site’s previous check.`,
+    `${capitalise(numberWord(n))} ${plural(n, 'was', 'were')} opened or resolved at a site’s latest check.`,
   noChanges:
     'No changes yet. A change is something a check finds that differs from the check before.',
   noMatch: 'No change matches these filters.',

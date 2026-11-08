@@ -33,7 +33,7 @@ describe('the Changes log', () => {
     ]);
     expect(v.headline).toBe('8 changes across 4 sites, newest first.');
     // The rail's "3 new": Claude-SearchBot, ClaudeBot (opened) and nahltech's orphans (resolved).
-    expect(v.newNote).toBe('Three are new since each site’s previous check.');
+    expect(v.newNote).toBe('Three were opened or resolved at a site’s latest check.');
     expect(v.shell.nav.find((n) => n.current)!.label).toBe('Changes');
   });
 

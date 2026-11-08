@@ -44,7 +44,8 @@ export interface ChangesLogView {
   shell: ShellView;
   title: string;
   /** "8 changes across 4 sites, newest first."; with a filter set, "3 of 8 changes match: opened." */
-  headline: string;
+  /** Null when the account has no change at all: the empty sentence says so instead. */
+  headline: string | null;
   /** The rail's new count in words; null while a filter is set or nothing is new. */
   newNote: string | null;
   /** The three filters, each with its name, in the order the page draws them. */
@@ -129,7 +130,9 @@ export function changesLogView(
     title: COPY.title,
     headline: filtered
       ? COPY.filtered(rows.length, all.length, named)
-      : COPY.headline(rows.length, sitesShown),
+      : rows.length
+        ? COPY.headline(rows.length, sitesShown)
+        : null,
     newNote: !filtered && fresh > 0 ? COPY.newNote(fresh) : null,
     filters: [
       {

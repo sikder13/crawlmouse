@@ -44,10 +44,12 @@ export function ChangesLogScreen({ data }: { data: ChangesLogView }) {
       <header className={shared.header}>
         <div>
           <h1 className={shared.title}>{data.title}</h1>
-          <div className={shared.line}>
-            {data.headline}
-            {data.newNote ? ` ${data.newNote}` : null}
-          </div>
+          {data.headline ? (
+            <div className={shared.line}>
+              {data.headline}
+              {data.newNote ? ` ${data.newNote}` : null}
+            </div>
+          ) : null}
         </div>
       </header>
       <Card as="section" className={shared.panel} aria-label={data.filtersLabel}>

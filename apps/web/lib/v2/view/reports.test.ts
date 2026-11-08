@@ -34,7 +34,7 @@ describe('Reports, the header and Make a report', () => {
     ]);
     expect(m.selected).toBe('50000000-0000-4000-8000-000000000001');
     expect(m.compare.text).toBe(
-      'Thu 29 vs Fri 30 Oct, or any two. What moved and why, with the evidence for each change.',
+      'Thu 29 vs Fri 30 Oct. What moved and why, with the evidence for each change.',
     );
     expect(m.pdf.text).toBe(
       'Grades, crawler table, every open fix, link map. Under your own name and domain on Agency.',
