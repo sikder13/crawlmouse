@@ -533,6 +533,7 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Reports, Agency (Northwind, owner ruling 8)  | `/v2-preview/screens/reports/agency`                     | screen    |                                      |
 | Final-Settings                               | `/v2-preview/screens/settings`                           | screen    |                                      |
 | Settings, free                               | `/v2-preview/screens/settings/free`                      | screen    |                                      |
+| Settings, delete (owner ruling 12)           | `/v2-preview/screens/settings/delete`                    | screen    |                                      |
 | Final-TrialEnd                               | `/v2-preview/screens/trial-end`                          | screen    |                                      |
 | Changes log                                  | `/v2-preview/screens/changes-log`                        | screen    | ``, `?kind=opened`                   |
 | Final-LinkMap                                | `/v2-preview/screens/map`                                | screen    |                                      |

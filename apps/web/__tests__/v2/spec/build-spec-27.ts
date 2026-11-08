@@ -85,7 +85,7 @@ const DECISIONS: [string, string, string][] = [
   ],
   [
     'D9',
-    'Record tables sit in a scroll region and settings tables stack on a phone (DESIGN-LOCK §7.7); the scroll region needs the account frame’s row layout, which the production build loses (Known gaps). The orange element stays where the artboard puts it: none of these sits in a scrolling table, which is when §7.5 moves it to the header.',
+    'Record tables sit in a scroll region and settings tables stack on a phone (DESIGN-LOCK §7.7). The orange element stays where the artboard puts it: none of these sits in a scrolling table, which is when §7.5 moves it to the header.',
     'Design lock.',
   ],
 ];
@@ -135,6 +135,18 @@ const RULINGS: [string, string][] = [
   [
     '11',
     'With the plan (approved 2026-11-08): Settings leaves out the artboard’s Connected card, since Integrations is a later step with its own rail entry.',
+  ],
+  [
+    '12',
+    'Deletion: FACTS E6 is what the reader is told. The re-typed hostname is the in-page guard (`GET /settings/delete`); submitting it sends a confirmation link to the sign-in address; opening the link disables sign-in at once, and a sign-in link within 7 days restores the account (ARCH-2 §5’s lifecycle).',
+  ],
+  [
+    '13',
+    'The keep action’s checkout route doing less than its guard says is CC-03’s (billing), not changed here.',
+  ],
+  [
+    '14',
+    'Engine timing tests that fail on base as on head under load are load, not this step: recorded, not pursued.',
   ],
 ];
 
@@ -336,6 +348,11 @@ function copySection(): string {
 const OTHER_CODE: [string, string, string][] = [
   [
     'CC-26',
+    '`components/v2/AccountShell.module.css`',
+    'The frame’s rule is `.frame.frame`, so its row layout outweighs PageShell’s `.shell` (a column) whatever order the build emits them in; at equal weight the production build put `.shell` last and every account screen drew its rail across the top. `tests/visual/production.spec.ts` checks each account preview on `next build` + `next start`: at 1280px the rail is the left column with the page beside it, as wide as its 200px basis or its content’s minimum (the locked HTML’s own rail draws at 239px); at 390px the page does not scroll sideways. Commit d10584da. Made here with the owner’s approval, in a commit of its own for CC-26 to cherry-pick.',
+  ],
+  [
+    'CC-26',
     '`account-shell.ts`, `copy/account.ts`',
     '`accountShellView(v, current, { plan })`: with `plan: page` the trial card keeps its dates and says only what the card on file means, with no Keep; a page that carries the plan (Settings, Trial ending) sets it. `current` may be null, for a page that is no rail entry. The “We’ll email you three days before” sentence is dropped once the reminder is due.',
   ],
@@ -406,9 +423,8 @@ function wiringSection(): string {
 
 /** What this step leaves open, each in a sentence. */
 export const KNOWN_GAPS_27 = [
-  '**Blocking, CC-26’s file.** On the production build the account frame lays out as a column: `AccountShell.module.css`’s `.frame { flex-direction: row }` and `PageShell.module.css`’s `.shell { flex-direction: column }` have equal weight, and the built CSS puts the second later. Every account screen, CC-26’s too, then draws the rail as a full-width block above the page, and the Changes log at 390px is wider than the viewport because its table no longer scrolls in its own region (design review, round 1). The fix is one selector in that file (e.g. `.shell.frame`); CC-27 does not edit it, and its visual baselines wait for it.',
-  'FACTS E6 says deletion “takes effect after a confirmation link”; ARCH-2 §5 has the owner re-type the hostname, with sign-in disabled at once. The preview opens “Delete…” at a confirmation step and keeps E6’s sentence; which flow is right is the owner’s call.',
-  'The keep action posts to `/api/billing/checkout` (`ACCOUNT_ACTIONS.keepPlan`, built). Today that route takes a JSON `priceId`, does no check of the account’s state and charges when the checkout completes; the guard CC-26 wrote describes the route CC-26b is to build. Trial ending says the charge comes when the plan is chosen, which is what the built route does.',
+  'The keep action posts to `/api/billing/checkout` (`ACCOUNT_ACTIONS.keepPlan`, built). Today that route takes a JSON `priceId`, does no check of the account’s state and charges when the checkout completes, so the guard text describes the route still to be built. Owner ruling 13: this is CC-03’s (billing). Trial ending says the charge comes when the plan is chosen, which is what the built route does.',
+  'On a loaded machine the engine’s timing tests (`reproducibility-deep-chain`, `crawl-stall-retries`) failed on base and head alike; run alone they pass on both. Owner ruling 14: load, not this step.',
   '“Trial ending, withheld” is not built (owner ruling 2): no fixture account has a trial that overlaps a withheld result. A trial with a card is read by `trial-end.test.ts` on Kestrel; it has no preview.',
   '`account-control-names.test.tsx` (CC-26) pins `ACCOUNT_ELEMENTS` at seven previews, so CC-27’s previews sit in `CC27_ELEMENTS` and that guard does not run on them in the suite; it was run on them once, from a copy, and passed. Request to CC-26: read the count from the registry and include `CC27_ELEMENTS`.',
   'CC-27b’s action builder (`routeAction` in `settings.ts`) repeats `action()`’s path filling, because `action()` takes only `ACCOUNT_ACTIONS` keys. Folding the two needs an `actionFor(spec, …)` export from CC-26’s `account-actions.ts`.',
