@@ -509,21 +509,35 @@ describe('start_trial_with_ledger starts the trial and writes its rows in one ca
     });
   });
 
-  it('refuses to run outside READ COMMITTED, where the read after the lock could miss a commit', async () => {
-    const id = await freshAccount(db, 'isolation');
+  /** The call under `level`, as service_role, in a transaction rolled back afterwards. */
+  async function underIsolation(level: string, tag: string): Promise<Outcome> {
+    const id = await freshAccount(db, tag);
     const t = await transitionFor(db, id);
-    await expect(
-      db.transaction(async (tx) => {
-        await tx.exec(`set transaction isolation level repeatable read`);
-        await tx.exec(`set local role service_role`);
-        await tx.query(`select public.start_trial_with_ledger($1, $2::jsonb, $3::jsonb)`, [
-          id,
-          JSON.stringify([h('email', 'isolation')]),
-          JSON.stringify(t),
-        ]);
-      }),
-    ).rejects.toThrow(/read committed/i);
-    expect((await accountRow(db, id)).state).toBe('free');
+    let out: Outcome | undefined;
+    await db.transaction(async (tx) => {
+      await tx.exec(`set transaction isolation level ${level}`);
+      await tx.exec(`set local role service_role`);
+      const { rows } = await tx.query<{ r: Outcome }>(
+        `select public.start_trial_with_ledger($1, $2::jsonb, $3::jsonb) as r`,
+        [id, JSON.stringify([h('email', tag)]), JSON.stringify(t)],
+      );
+      out = rows[0]!.r;
+      await tx.rollback();
+    });
+    return out!;
+  }
+
+  it.each(['repeatable read', 'serializable'])(
+    'refuses to run under %s, where the read after the lock could miss a commit',
+    async (level) => {
+      await expect(underIsolation(level, `iso-${level.replace(' ', '-')}`)).rejects.toThrow(
+        /runs only under read committed/,
+      );
+    },
+  );
+
+  it('runs under read uncommitted, which Postgres runs as read committed', async () => {
+    expect((await underIsolation('read uncommitted', 'iso-ru')).outcome).toBe('started');
   });
 });
 
@@ -849,7 +863,7 @@ describe('grants: only service_role may start a trial, and no role may call the 
   );
 });
 
-describe("a caller's temporary objects cannot run as the function's owner", () => {
+describe("a caller's temporary objects cannot run as the owner through 006c's bodies (refused path)", () => {
   // With pg_temp left out of search_path, Postgres searches it first for type names (never for
   // functions or operators). A type named in a body without its schema would resolve to a temp
   // domain the caller made, whose CHECK runs as postgres. The call takes the refused path: it runs
