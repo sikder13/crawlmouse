@@ -18,6 +18,10 @@ const URL_ENV = process.env.TRIAL_RACE_DB_URL;
 if (!URL_ENV && process.env.TRIAL_RACE_REQUIRED === '1') {
   throw new Error('TRIAL_RACE_REQUIRED=1 but TRIAL_RACE_DB_URL is not set');
 }
+// It creates databases and cluster-wide roles, so it runs only against a Postgres on this machine.
+if (URL_ENV && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(URL_ENV).hostname)) {
+  throw new Error('TRIAL_RACE_DB_URL must name a local Postgres (localhost, 127.0.0.1 or [::1])');
+}
 
 const MIGRATION = '20261108000001_v2_006c_trial_function_and_checks.sql';
 const LOCK_CALL = '  perform public.trial_ledger_lock(p_hashes);\n';
@@ -100,7 +104,12 @@ async function race(sql: Sql, a: Call, b: Call) {
     const [ra] = await call(ta, a);
     await tb`begin`;
     await tb`set local role service_role`;
-    const pending = call(tb, b).then((rows) => rows[0]!.r as { outcome: string });
+    // Settled into a value at once, so a failure of B while A still holds its locks is not an
+    // unhandled rejection; it is rethrown where B's answer is read.
+    const pending = call(tb, b).then(
+      (rows) => ({ ok: rows[0]!.r as { outcome: string } }),
+      (error: unknown) => ({ error }),
+    );
     let waited = false;
     for (const until = Date.now() + WAIT_WATCH_MS; Date.now() < until && !waited; ) {
       const [w] =
@@ -109,9 +118,10 @@ async function race(sql: Sql, a: Call, b: Call) {
       if (!waited) await new Promise((r) => setTimeout(r, 25));
     }
     await ta`commit`;
-    const rb = await pending;
+    const settled = await pending;
+    if ('error' in settled) throw settled.error;
     await tb`commit`;
-    return { a: (ra!.r as { outcome: string }).outcome, b: rb.outcome, waited };
+    return { a: (ra!.r as { outcome: string }).outcome, b: settled.ok.outcome, waited };
   } finally {
     // A failed race leaves a transaction open; end it before the connection goes back to the pool.
     for (const t of [ta, tb]) {
