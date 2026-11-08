@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import type { PGlite, Transaction } from '@electric-sql/pglite';
 import fc from 'fast-check';
 import { FixTypeSchema } from '@crawlmouse/types/v2';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { next } from '../lib/billing/state-machine';
 import { toTransitionParams } from '../lib/billing/state-machine-apply';
 import { EMAIL_MONTHS, RECENT_DAYS, RECENT_TRIALS_REFUSED_AT } from '../lib/auth/ledger';
@@ -552,11 +552,18 @@ describe('input validation: each malformed input raises 22023 and writes nothing
   const E = h('email', 'v');
   const D = h('device', 'v');
   const I = h('ip24', 'v');
+  // A fresh account per case, and no ledger rows left under these hashes, so one case that wrongly
+  // starts a trial cannot turn the next one red.
   let id: string;
   let t: Record<string, unknown>;
-  beforeAll(async () => {
+  beforeEach(async () => {
     id = await freshAccount(db, 'validation');
     t = await transitionFor(db, id);
+  });
+  afterEach(async () => {
+    await db.query(`delete from public.trial_ledger where value_hash = any($1)`, [
+      [E, D, I].map((x) => x.value_hash),
+    ]);
   });
 
   const hashCases: [string, unknown][] = [
