@@ -20,14 +20,15 @@ list, below) and built as recommended.
 
 `apps/web/lib/security/headers.mjs`, applied by `apps/web/next.config.mjs` `headers()`. It is `.mjs`
 and not `.ts` because `next.config.mjs` imports it at build time and cannot import TypeScript (ruling 8).
-Two route classes: `/embed/*`, the grade badge other sites frame, has no `X-Frame-Options` and
-`frame-ancestors *`; every other path has `X-Frame-Options: DENY` and `frame-ancestors 'none'`. Every
-path carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and
+Two route classes. `/embed/<domain>`, the grade badge other sites frame, has no `X-Frame-Options` and
+`frame-ancestors *`. Every other path has `X-Frame-Options: DENY` and `frame-ancestors 'none'`,
+including `/embed`, `/embed/` and deeper paths, which are not-found pages. Every path carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and
 `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`.
 
 A `next.config` header replaces a header a route sets for itself, and a later `headers()` entry
 replaces an earlier one (measured on `next start` by the plan reviewer). `/login/verify` sets
 `Referrer-Policy: same-origin`, so a third entry keeps that value there (ruling 7d).
+`poweredByHeader: false` drops Next's `X-Powered-By` header (ZAP's first run flagged it).
 
 Verify, the config through Next's own matcher on one URL per class, with and without a DSN:
 
@@ -132,24 +133,28 @@ registry guards is refused before the route runs, with 403 `{"code":"cross_site"
 A route marked `jsonBody` also refuses, with 415 `{"code":"unsupported_media_type"}`, a state change
 whose `Content-Type` is not `application/json`. These routes read `req.json()` whatever the
 Content-Type. Another site's page can send a cross-origin POST without a CORS preflight only as
-`text/plain`, a form encoding or multipart, and the app never answers a preflight, so this keeps such a
-POST out.
+`text/plain`, a form encoding or multipart. A JSON POST needs a preflight, and the app never grants one:
+no response sends `Access-Control-Allow-Origin` (CI's `security-browser` sends an `OPTIONS` preflight to
+each JSON route and checks).
 
-The path is percent-decoded, its repeated slashes are collapsed and its trailing slash is dropped
-before the lookup. With `skipTrailingSlashRedirect` a trailing slash reaches the route handler, and the
-plan reviewer measured exactly that. Other API requests pass through with no session refresh and no
-cookie, as before.
+The lookup reads the path the way Next does. It splits the path on `/`, drops empty segments (a repeated
+or trailing slash; with `skipTrailingSlashRedirect` a trailing slash reaches the route handler, as the
+plan reviewer measured), then decodes each segment on its own. So `a%2Fb` stays one segment, as Next
+gives it to a dynamic route. A state change to an API path that reaches no registered route, or does
+not decode, is refused with 404 `{"code":"not_found"}`, so a spelling the lookup does not understand
+fails closed. Other API requests pass through with no session refresh and no cookie, as before.
 
 **Strict** routes: the 10 state-changing `user` routes, plus `audits/[id]/cancel` and `auth/logout`,
-which are cookie-authorised but `public`. **Lenient and JSON**: `audits/start`, `reports/mint`,
-`reports/hide`, `audits/[id]/notify`, `takedown` and `developers` (ruling 2, with the owner's addition
-of the JSON rule). They take a cross-site request with no cookie, and `audits/start` would otherwise let
-any page make its visitors' browsers start crawls from their own IPs, draining `global:audits:day`,
-which fails closed. `auth/magic-link` keeps its own route-level cross-site check (`V2_ACCOUNT_DOOR`),
-and Turnstile in production; the registry test names it as the one public JSON route without the rule.
+which are cookie-authorised but `public`; the tests name all twelve. **Lenient and JSON** (ruling 2,
+with the owner's addition of the JSON rule): `audits/start`, `reports/mint`, `reports/hide`,
+`audits/[id]/notify`, `takedown`, `developers` and `auth/magic-link`. They take a cross-site request with
+no cookie, and `audits/start` would otherwise let any page make its visitors' browsers start crawls from
+their own IPs, draining `global:audits:day`, which fails closed. `auth/magic-link` joined after the
+security review: its own cross-site check runs only with `V2_ACCOUNT_DOOR` on. A registry test requires
+both rules of every public route that changes state from a JSON body.
 
-Every page that calls these six already sends `Content-Type: application/json`
-(`grep -rn "content-type" apps/web/components/share apps/web/lib/submit-audit.ts apps/web/lib/notify-submit.ts apps/web/lib/mint-share.ts apps/web/app/takedown apps/web/components/developers`).
+Every page that calls these seven already sends `Content-Type: application/json`
+(`grep -rni "content-type" apps/web/components/share apps/web/lib/submit-audit.ts apps/web/lib/notify-submit.ts apps/web/lib/mint-share.ts apps/web/app/takedown apps/web/components/developers apps/web/app/login/LoginForm.tsx apps/web/components/v2/screens/signup/send-link.ts`).
 `scripts/seed-corpus.ts` and `scripts/seed-benchmarks.ts` do not call the API: they insert through the
 service role. The scripts that do (`scripts/p5/s1-seed.mjs`, `scripts/p5/driver.mjs`,
 `tests/load/audit-submit.js`) send JSON. The PR records a run of `s1-seed.mjs` against `next start`.
@@ -309,10 +314,20 @@ Pin the image when the job is turned on.
 ### D8 — ZAP baseline
 
 The `zap-baseline` job runs ZAP's passive scan (image pinned by digest) over `next start` of the build
-job's output: `/`, `/pricing`, `/login`, `/r/ci-fixture`, `/api/health` and a one-minute spider. It has
-`continue-on-error: true` and a six-minute limit, and keeps its HTML and JSON reports as an artifact.
-CI has no database, so `/r/ci-fixture` is the not-found page: ZAP sees its headers and markup, not a
-populated report. It is promoted to required once its first findings are triaged.
+job's output: `/`, `/pricing`, `/login`, `/r/ci-fixture` and `/api/health`, then a spider capped at one
+minute. It has `continue-on-error: true` and a six-minute limit, and keeps its HTML and JSON reports as
+an artifact. CI has no database, so `/r/ci-fixture` is the not-found page: ZAP sees its headers and
+markup, not a populated report. It is promoted to required once its first findings are triaged.
+
+Its first run (CI run 42523977295, 2026-11-08) took 1 min 19 s; the spider stopped after about a
+second. The findings and their triage:
+
+- **Medium.** Four CSP findings: no fallback for one directive, wildcard directives, `script-src` and
+  `style-src` with `'unsafe-inline'`. All are from the report-only policy (and `frame-ancestors *` on
+  the badge), and are the D2 known gap that CC-SEC-2 closes.
+- **Low.** Big Redirect: accepted. CSP Notices: as above. Cookie without HttpOnly: the consent cookie,
+  which the browser must read. `X-Powered-By: Next.js`: fixed (`poweredByHeader: false`).
+- **Informational.** A report-only CSP was found; a modern web application.
 
 ### D9 — edge rate limits as data
 
@@ -342,9 +357,11 @@ No rule keys on a bot or user agent: every AI crawler stays allowed (OPERATING-R
 to Sentry as a warning and to PostHog with a fixed distinct id and no person profile. One refusal in
 ten is sent, and an instance sends at most 30 a minute.
 
-In the middleware the Sentry SDK puts the request on the scope (URL, headers with the visitor's
-referrer and location) and names the transaction after the path. The sink drops the request, user,
-transaction and breadcrumbs from its event. Verify through the installed SDK's own pipeline:
+In the middleware the Sentry SDK puts the request on the scope (its URL, and headers with the visitor's
+referrer and location), and a transaction or span name can carry the path. The sink drops the request,
+user, transaction and breadcrumbs from its event, and captures under a new trace, so no surrounding
+span names the envelope's trace header. Verify through the installed SDK's own pipeline, down to the
+envelope the transport is given:
 
 ```bash
 pnpm --filter @crawlmouse/web exec vitest run __tests__/security/refusal-event.test.ts __tests__/security/refusal-event-sentry.test.ts
@@ -391,6 +408,10 @@ All approved as recommended, with one addition to ruling 2.
 
 | Item                                                                                                                                                                                                                                     | Owner                                           |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| CSP reports go from the browser straight to Sentry, so their `document-uri` (an `/audit/<id>` page, a capability) skips the app's scrubbing; add a Sentry server-side data-scrubbing rule for CSP events                                 | owner's CTO (Sentry settings)                   |
+| A CODEOWNERS entry for `.github/workflows/**`: the CodeQL gate and its baseline run from the pull request's own tree                                                                                                                     | owner                                           |
+| `apps/web/lib/seo/jsonld.tsx` writes `JSON.stringify` output into a script element without escaping `<`; safe while its data is authored in the repo                                                                                     | engineering                                     |
+| CI's `security-browser` run sends its sampled refusal events, server-side, to PostHog with the placeholder key, which PostHog refuses                                                                                                    | accepted                                        |
 | CC-SEC-2, due 2026-12-08: `packages/engine/src/v2/layout/force-layout.ts:300` and `:426` key plain objects by crawled node ids; to a `Map` or `Object.create(null)`. Crawl path: the step runs the live audit smoke (OPERATING-RULES §6) | engineering                                     |
 | CC-SEC-2, due 2026-12-08: `packages/engine/src/extract.ts:152` skips link schemes by deny-list; to an http/https allow-list. Crawl path: live audit smoke                                                                                | engineering                                     |
 | CodeQL baseline expires 2026-12-08: from 2026-12-09 every listed result fails the job again                                                                                                                                              | engineering                                     |
