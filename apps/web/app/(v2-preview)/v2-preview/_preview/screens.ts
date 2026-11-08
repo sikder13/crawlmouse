@@ -8,6 +8,8 @@ import { CHECKS, recording } from '../../../../lib/v2/recordings';
 import { homeView } from '../../../../lib/v2/view/home';
 import { mapDrawing } from '../../../../lib/v2/view/map';
 import { resultStateView, resultView, type ResultPageView } from '../../../../lib/v2/view/result';
+import { changesLogView } from '../../../../lib/v2/view/changes-log';
+import { ACCOUNT_VIEWERS } from './accounts';
 import { fixHref } from './fixes';
 import { MAP_PATHS, segmentHrefs } from './segments';
 
@@ -62,3 +64,22 @@ export const RESULT_PREVIEWS = {
 } satisfies Record<string, () => ResultPageView>;
 
 export type ResultPreview = keyof typeof RESULT_PREVIEWS;
+
+// ── CC-27: the account screens after the dashboard and the site page ──────────────────────────
+
+/** A preview page's query: the filters a link set, as Next hands them over. */
+export type PreviewQuery = Record<string, string | string[] | undefined>;
+
+const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+
+/** The Changes log's preview path: its filter links point back at it. */
+export const CHANGES_LOG_PATH = '/v2-preview/screens/changes-log';
+
+/** The Changes log on bad-site, read as Final-Dashboard reads it, filtered by the page's query. */
+export const changesLogPreview = (query: PreviewQuery = {}) =>
+  changesLogView(
+    fixture('bad-site'),
+    ACCOUNT_VIEWERS.home(),
+    { site: one(query.site), kind: one(query.kind), since: one(query.since) },
+    CHANGES_LOG_PATH,
+  );

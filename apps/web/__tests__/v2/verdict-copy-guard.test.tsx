@@ -165,7 +165,7 @@ describe('verdict copy guard', () => {
 
   it('covers every account screen in the preview registry, counted apart from the segments', () => {
     const paths = PREVIEWS.map((p) => p.path).filter((p) =>
-      /\/screens\/(dashboard|site)(\/|$)/.test(p),
+      /\/screens\/(dashboard|site|changes-log|alerts|reports|settings|trial-end)(\/|$)/.test(p),
     );
     expect(paths.sort()).toEqual(Object.keys(ACCOUNT_ELEMENTS).sort());
   });

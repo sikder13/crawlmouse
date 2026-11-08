@@ -170,6 +170,16 @@ export const PREVIEWS: PreviewEntry[] = [
     kind: 'screen',
   },
   { path: '/v2-preview/screens/site/withheld', name: 'Site, withheld', kind: 'screen' },
+  // The account Changes log has no artboard (CC-27 D3), and nothing on it is the reader's action.
+  {
+    path: '/v2-preview/screens/changes-log',
+    name: 'Changes log',
+    kind: 'screen',
+    moments: [
+      { name: 'all', query: '', orange: 0 },
+      { name: 'opened', query: '?kind=opened', orange: 0 },
+    ],
+  },
   { path: '/v2-preview/screens/map', name: 'Final-LinkMap', kind: 'screen' },
   { path: '/v2-preview/screens/map/all', name: 'Link map, every page', kind: 'screen' },
   // No fix to open from any page: the keep bar's button is the orange element.

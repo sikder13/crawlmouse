@@ -18,6 +18,7 @@ import {
   RESULT_PREVIEWS,
   homePreview,
   type ResultPreview,
+  changesLogPreview,
 } from '../../../app/(v2-preview)/v2-preview/_preview/screens';
 import type { RecordingName } from '../../../lib/v2/recordings';
 import {
@@ -29,6 +30,7 @@ import type {
   SegmentVariant,
 } from '../../../app/(v2-preview)/v2-preview/_preview/segments';
 import type { SegmentKey } from '../../../lib/v2/view/segment/frame';
+import { ChangesLogScreen } from '../../../components/v2/screens/changes-log/ChangesLogScreen';
 
 export const homeData = homePreview;
 
@@ -72,4 +74,6 @@ export const ACCOUNT_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/site/withheld': () => (
     <SiteScreen data={sitePreview('withheld')} shell={shellPreview('withheld')} />
   ),
+  // CC-27's account screens.
+  '/v2-preview/screens/changes-log': () => <ChangesLogScreen data={changesLogPreview()} />,
 };

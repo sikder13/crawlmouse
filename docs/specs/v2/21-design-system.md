@@ -523,6 +523,7 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Final-Site                                   | `/v2-preview/screens/site`                               | screen    |                                      |
 | Site, clean (stand-in Free account)          | `/v2-preview/screens/site/clean`                         | screen    |                                      |
 | Site, withheld                               | `/v2-preview/screens/site/withheld`                      | screen    |                                      |
+| Changes log                                  | `/v2-preview/screens/changes-log`                        | screen    | ``, `?kind=opened`                   |
 | Final-LinkMap                                | `/v2-preview/screens/map`                                | screen    |                                      |
 | Link map, every page                         | `/v2-preview/screens/map/all`                            | screen    |                                      |
 | Link map, clean bill                         | `/v2-preview/screens/map/clean`                          | screen    |                                      |
