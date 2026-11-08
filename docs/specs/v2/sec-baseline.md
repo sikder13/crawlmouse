@@ -103,8 +103,10 @@ hold it:
 - **To the source**, read through the TypeScript AST, so neither comments nor whitespace count:
   - `user` and `member` routes call `getUser()` before any `supabaseAdmin()`. `member` routes also check
     membership through `rpc('is_member' | 'is_member_for_site' | 'member_role')` first.
-  - `webhook` routes call their verifier (`constructEvent`, svix `verify`, Inngest `serve`) before any
-    call into the app's own code, and never parse the body with `json()`.
+  - `webhook` routes call their verifier (`constructEvent`, svix `verify`, Inngest `serve`) first. Before
+    it there is no call rooted at an imported binding or at a local name bound to one, no
+    `JSON.parse`, and no `.json()` or `.formData()` on anything but the Response classes. The request
+    parameter is never parsed with those at all.
   - `service` routes check the bearer credential before `supabaseAdmin()`.
   - A route that answers 401 after `getUser()` is never `public`. A `public` route that calls `getUser()`
     is marked `session: 'optional'`.
@@ -133,16 +135,28 @@ registry guards is refused before the route runs, with 403 `{"code":"cross_site"
 A route marked `jsonBody` also refuses, with 415 `{"code":"unsupported_media_type"}`, a state change
 whose `Content-Type` is not `application/json`. These routes read `req.json()` whatever the
 Content-Type. Another site's page can send a cross-origin POST without a CORS preflight only as
-`text/plain`, a form encoding or multipart. A JSON POST needs a preflight, and the app never grants one:
-no response sends `Access-Control-Allow-Origin` (CI's `security-browser` sends an `OPTIONS` preflight to
-each JSON route and checks).
+`text/plain`, a form encoding or multipart. A JSON POST needs a preflight, and the app grants none. CI's
+`security-browser` sends an `OPTIONS` preflight to each JSON route and finds no
+`Access-Control-Allow-Origin`, and the app's code sets no CORS header
+(`grep -rn "Access-Control-Allow" apps/web/app apps/web/lib apps/web/middleware.ts` prints nothing).
 
-The lookup reads the path the way Next does. It splits the path on `/`, drops empty segments (a repeated
-or trailing slash; with `skipTrailingSlashRedirect` a trailing slash reaches the route handler, as the
-plan reviewer measured), then decodes each segment on its own. So `a%2Fb` stays one segment, as Next
-gives it to a dynamic route. A state change to an API path that reaches no registered route, or does
-not decode, is refused with 404 `{"code":"not_found"}`, so a spelling the lookup does not understand
-fails closed. Other API requests pass through with no session refresh and no cookie, as before.
+The lookup splits the path on `/`, drops empty segments (a repeated or trailing slash; with
+`skipTrailingSlashRedirect` a trailing slash reaches the route handler, as the plan reviewer measured)
+and decodes each segment on its own, as Next decodes a dynamic segment's value, so `a%2Fb` stays one
+segment. It matches static segments in any case: Vercel's router serves a dynamic route at `/API/...` or
+`/api/REPORTS/...` (measured on production, 2026-11-08), although `next start` does not. Decoding
+static segments, which Next does not, and ignoring case can only make more spellings find a row. A
+state change to an API path that reaches no registered route, or does not decode, is refused with 404
+`{"code":"not_found"}`. No two rows overlap (the registry test holds each row's own path to that row
+alone), so the lookup never has to choose. Other API requests pass through with no session refresh and
+no cookie, as before.
+
+Only Vercel shows the case-insensitive routing, so it is a post-deploy check, on the deployed function.
+It must answer 403:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'origin: https://evil.example' -H 'content-type: application/json' -d '{}' https://crawlmouse.com/API/reports/no-such-report/visibility
+```
 
 **Strict** routes: the 10 state-changing `user` routes, plus `audits/[id]/cancel` and `auth/logout`,
 which are cookie-authorised but `public`; the tests name all twelve. **Lenient and JSON** (ruling 2,
@@ -419,7 +433,7 @@ All approved as recommended, with one addition to ruling 2.
 | Hash-based `script-src` in place of `'unsafe-inline'`                                                                                                                                                                                    | engineering                                     |
 | `security.refused` for 401s and 429s, through one `requireUser()` helper in the routes                                                                                                                                                   | engineering (CC-SEC-2)                          |
 | `audits/[id]/reaudit` reads the audit row as the service role before refusing a caller with no session; nothing reaches the caller, and `route-anonymous.test.ts` pins the read                                                          | engineering                                     |
-| `checks/[id]/claim` and `auth/magic-link` keep their own looser origin checks; the middleware's runs first on the former                                                                                                                 | engineering, at the next change to those routes |
+| `checks/[id]/claim` and `auth/magic-link` keep their own looser origin checks; the middleware's runs first on both                                                                                                                       | engineering, at the next change to those routes |
 | `GET /billing` creates a Stripe portal session on a cookie-authorised GET                                                                                                                                                                | engineering                                     |
 | `/api/trpc` is a reserved surface with no caller                                                                                                                                                                                         | engineering (delete, like D5, or build on it)   |
 | The Inngest route's GET and PUT are not signature-verified; pin `INNGEST_SERVE_HOST` and keep the production signing key out of previews                                                                                                 | owner                                           |
