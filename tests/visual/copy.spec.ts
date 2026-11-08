@@ -93,6 +93,24 @@ const SCREENS: { path: string; file: string; scheme: 'light' | 'dark'; screen: L
     scheme: 'light',
     screen: 'link-map',
   },
+  {
+    path: '/v2-preview/screens/signup',
+    file: 'Final-Signup.dc.html',
+    scheme: 'light',
+    screen: 'signup',
+  },
+  {
+    path: '/v2-preview/screens/check-email/from-audit',
+    file: 'Final-CheckEmail.dc.html',
+    scheme: 'light',
+    screen: 'check-email',
+  },
+  {
+    path: '/v2-preview/screens/check-email/named-site',
+    file: 'Final-CheckEmail-NoAudit.dc.html',
+    scheme: 'light',
+    screen: 'check-email-no-audit',
+  },
 ];
 
 const SCREEN_DIR = fileURLToPath(new URL('../../docs/design/v2/screens/', import.meta.url));

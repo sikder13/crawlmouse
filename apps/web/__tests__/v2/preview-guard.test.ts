@@ -5,6 +5,11 @@ import type { Metadata } from 'next';
 import { WEB_ROOT } from './_lib/tokens-css';
 
 const GROUP = join(WEB_ROOT, 'app', '(v2-preview)');
+/**
+ * The account door's pages (CC-25), the first live pages on the v2 design system: their group's
+ * layout loads the tokens and sets noindex. No other live route may import v2.
+ */
+const ACCOUNT_GROUP = join(WEB_ROOT, 'app', '(account)');
 const PREVIEW = join(GROUP, 'v2-preview');
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -165,6 +170,7 @@ describe('v2 stays out of live pages', () => {
         : '';
   const allowed = (file: string) =>
     file.startsWith(GROUP + '/') ||
+    file.startsWith(ACCOUNT_GROUP + '/') ||
     file.startsWith(join(WEB_ROOT, 'components', 'v2') + '/') ||
     file.startsWith(join(WEB_ROOT, '__tests__', 'v2') + '/');
 
@@ -185,7 +191,7 @@ describe('v2 stays out of live pages', () => {
     expect(isV2(resolveSpec(from, 'components/v2'))).toBe(false);
   });
 
-  it('no module outside the preview group imports the v2 components or tokens', () => {
+  it('no module outside the preview and account groups imports the v2 components or tokens', () => {
     const offenders: string[] = [];
     for (const file of sources) {
       if (allowed(file)) continue;
@@ -197,5 +203,15 @@ describe('v2 stays out of live pages', () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('the account group holds exactly the four account-door files', () => {
+    const inGroup = sources.filter((f) => f.startsWith(ACCOUNT_GROUP + '/'));
+    expect(inGroup.map((f) => relative(WEB_ROOT, f)).sort()).toEqual([
+      'app/(account)/check-email/page.tsx',
+      'app/(account)/layout.tsx',
+      'app/(account)/login/verify/continue/page.tsx',
+      'app/(account)/signup/page.tsx',
+    ]);
   });
 });
