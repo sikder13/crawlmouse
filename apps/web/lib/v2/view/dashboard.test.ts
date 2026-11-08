@@ -319,3 +319,13 @@ describe('The first-run note follows the site’s schedule', () => {
     );
   });
 });
+
+describe('Change notes name one sender', () => {
+  it('the day-0 sentence names CC-25’s ALERTS_SENDER, and the dashboard copy keeps no second one', async () => {
+    const { ALERTS_SENDER } = await import('../../auth/constants');
+    expect(day0().threeKinds!.body).toContain(
+      `a note from ${ALERTS_SENDER} when a check finds a change`,
+    );
+    expect(Object.keys(await import('../copy/dashboard'))).not.toContain('ALERTS_FROM');
+  });
+});
