@@ -1,7 +1,6 @@
-import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ROUTE_POLICIES } from '../../lib/security/route-policy';
-import { APP_DIR } from './route-source';
+import { routeFile } from './route-source';
 
 // Every signed-in route, called with no session, refuses, and writes nothing on the way: no
 // service-role or session write, no rate-limit bucket, no Stripe, Inngest or claim call. Reads are
@@ -104,7 +103,7 @@ describe('a signed-in route refuses a caller with no session, and writes nothing
   it.each(signedIn.flatMap((p) => p.methods.map((m) => [p.route, m] as const)))(
     '%s %s',
     async (route, method) => {
-      const mod = (await import(join(APP_DIR, route, 'route.ts'))) as Record<string, unknown>;
+      const mod = (await import(routeFile(route))) as Record<string, unknown>;
       const handler = mod[method] as (req: Request, ctx: unknown) => Promise<Response>;
       const url = `https://crawlmouse.com/${route.replace(/\[id\]/, ID).replace(/\[[^\]]+\]/g, 'sample')}`;
       const req = new Request(url, {

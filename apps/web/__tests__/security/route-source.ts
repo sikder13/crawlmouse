@@ -10,14 +10,17 @@ export const APP_DIR = resolve(__dirname, '../../app');
 
 const HTTP_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
 
-/** Every folder under app/ that holds a route.ts, as `api/audits/[id]/cancel`. */
+/** A route handler's file name: Next serves `route` with any of its default page extensions. */
+const ROUTE_FILE = /^route\.(ts|tsx|js|jsx)$/;
+
+/** Every folder under `dir` that holds a route handler, as `api/audits/[id]/cancel`. */
 export function routeFolders(dir = APP_DIR): string[] {
   const out: string[] = [];
   const walk = (d: string) => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
       const p = join(d, entry.name);
       if (entry.isDirectory()) walk(p);
-      else if (entry.name === 'route.ts') out.push(relative(dir, d).split(sep).join('/'));
+      else if (ROUTE_FILE.test(entry.name)) out.push(relative(dir, d).split(sep).join('/'));
     }
   };
   walk(dir);
@@ -25,11 +28,24 @@ export function routeFolders(dir = APP_DIR): string[] {
 }
 
 export function parseSource(text: string, name = 'route.ts'): ts.SourceFile {
-  return ts.createSourceFile(name, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const kind = name.endsWith('.tsx')
+    ? ts.ScriptKind.TSX
+    : name.endsWith('.ts')
+      ? ts.ScriptKind.TS
+      : ts.ScriptKind.JSX;
+  return ts.createSourceFile(name, text, ts.ScriptTarget.Latest, true, kind);
+}
+
+/** The route handler file in a route folder, whichever extension it has. */
+export function routeFile(route: string, dir = APP_DIR): string {
+  const found = readdirSync(join(dir, route)).filter((f) => ROUTE_FILE.test(f));
+  if (found.length !== 1) throw new Error(`${route}: ${found.length} route files`);
+  return join(dir, route, found[0]!);
 }
 
 export function readRoute(route: string): ts.SourceFile {
-  return parseSource(readFileSync(join(APP_DIR, route, 'route.ts'), 'utf8'), `${route}/route.ts`);
+  const file = routeFile(route);
+  return parseSource(readFileSync(file, 'utf8'), `${route}/${file.split(sep).pop()}`);
 }
 
 const isExported = (node: ts.Node): boolean =>
@@ -37,9 +53,9 @@ const isExported = (node: ts.Node): boolean =>
   (ts.getModifiers(node) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 
 /**
- * The HTTP methods a route module exports, in the three spellings a route can use:
- * `export async function POST`, `export { handler as GET }` and `export const { GET } = serve(…)`
- * (or `export const GET = …`).
+ * The HTTP methods a route module exports, in the four spellings the routes use:
+ * `export async function POST`, `export function GET`, `export { handler as GET }` and
+ * `export const { GET } = serve(…)` (or `export const GET = …`).
  */
 export function exportedMethods(sf: ts.SourceFile): string[] {
   const names: string[] = [];
@@ -77,23 +93,6 @@ export function callPositions(sf: ts.SourceFile, name: string): number[] {
     ts.forEachChild(node, visit);
   };
   visit(sf);
-  return out;
-}
-
-/** Names imported from relative modules or the app's `@/` alias: the route's own code. */
-export function localImports(sf: ts.SourceFile): string[] {
-  const out: string[] = [];
-  for (const stmt of sf.statements) {
-    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
-    const from = stmt.moduleSpecifier.text;
-    if (!from.startsWith('@/') && !from.startsWith('.')) continue;
-    const clause = stmt.importClause;
-    if (!clause || clause.isTypeOnly) continue;
-    if (clause.name) out.push(clause.name.text);
-    if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
-      for (const el of clause.namedBindings.elements) if (!el.isTypeOnly) out.push(el.name.text);
-    }
-  }
   return out;
 }
 

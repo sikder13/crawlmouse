@@ -1,7 +1,14 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ROUTE_POLICIES, isStateChanging, policyForPath } from '../../lib/security/route-policy';
+import {
+  ROUTE_POLICIES,
+  isApiPath,
+  isStateChanging,
+  pathSegments,
+  policyForPath,
+} from '../../lib/security/route-policy';
 import { mechanismProblems, readsJsonBody, refusesWithoutSession } from './route-mechanism';
 import {
   callPositions,
@@ -52,6 +59,20 @@ describe('the route registry lists every route file once', () => {
       expect(p.verifier === undefined, p.route).toBe(
         p.class !== 'service' && p.class !== 'webhook',
       );
+    }
+  });
+});
+
+describe('the route finder sees every file Next serves as a route handler', () => {
+  it.each(['route.ts', 'route.tsx', 'route.js', 'route.jsx'])('%s', (name) => {
+    const dir = mkdtempSync(join(tmpdir(), 'routes-'));
+    try {
+      mkdirSync(join(dir, 'api', 'probe'), { recursive: true });
+      writeFileSync(join(dir, 'api', 'probe', name), 'export async function POST() {}');
+      writeFileSync(join(dir, 'api', 'probe', 'helper.ts'), '');
+      expect(routeFolders(dir)).toEqual(['api/probe']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });
@@ -133,6 +154,11 @@ describe('the mechanism checks fail on the code they guard against', () => {
     expect(check(parsed, 'webhook', 'constructEvent')).toEqual([
       'parses the request body with json() or formData()',
     ]);
+    const viaClient = `${imports}export async function POST(req) { const raw = await req.text(); const u = JSON.parse(raw); await stripe.customers.update(u.id, {}); stripe.webhooks.constructEvent(raw, s, k); }`;
+    expect(check(viaClient, 'webhook', 'constructEvent')).toEqual([
+      'calls JSON.parse() before constructEvent()',
+      'calls stripe.customers.update() before constructEvent()',
+    ]);
   });
 
   it('webhook (inngest): every export is handled by serve() from inngest/next', () => {
@@ -162,6 +188,9 @@ describe('the registry finds the row a request path reaches', () => {
     ['/api/billing/%63heckout', 'api/billing/checkout'],
     ['/api/audits/6f1c2a8e-0000-4000-8000-000000000000/cancel', 'api/audits/[id]/cancel'],
     ['/api/reports/abc123/white-label', 'api/reports/[slug]/white-label'],
+    // Next decodes a dynamic segment's value after matching, so an encoded slash stays inside it.
+    ['/api/reports/a%2Fb/claim', 'api/reports/[slug]/claim'],
+    ['/api/audits/6f1c2a8e%2Fx/cancel', 'api/audits/[id]/cancel'],
     ['/api/trpc/audits.getById', 'api/trpc/[trpc]'],
     ['/billing', 'billing'],
     ['/login/verify', 'login/verify'],
@@ -175,9 +204,21 @@ describe('the registry finds the row a request path reaches', () => {
     '/api/billing/checkout/extra',
     '/api/audits//cancel',
     '/api/%E0%A4%A',
+    '/api/audits/%ZZ/cancel',
     '/billing/checkout',
+    '/robotsXtxt',
   ])('%s matches no row', (path) => {
     expect(policyForPath(path)).toBeUndefined();
+  });
+
+  it('decodes each segment on its own, and gives up on one that does not decode', () => {
+    expect(pathSegments('/api/reports/a%2Fb/claim/')).toEqual(['api', 'reports', 'a/b', 'claim']);
+    expect(pathSegments('/api/audits/%ZZ/cancel')).toBeUndefined();
+  });
+
+  it('an /api path is recognised decoded, encoded, or undecodable', () => {
+    for (const p of ['/api/x', '/%61pi/x', '/api/%ZZ']) expect(isApiPath(p), p).toBe(true);
+    for (const p of ['/apix', '/login', '/', '/%ZZ/api/x']) expect(isApiPath(p), p).toBe(false);
   });
 
   it('every method but GET, HEAD and OPTIONS is a state change, an unknown one included', () => {
@@ -194,6 +235,34 @@ describe('cross-site refusal covers every state change a session or a visitor ca
         (p.class === 'user' || p.class === 'member') &&
         p.methods.some(isStateChanging) &&
         p.origin !== 'strict',
+    );
+    expect(open.map((p) => p.route)).toEqual([]);
+  });
+
+  it('the strict rule is on exactly these twelve routes', () => {
+    expect(
+      ROUTE_POLICIES.filter((p) => p.origin === 'strict')
+        .map((p) => p.route)
+        .sort(),
+    ).toEqual([
+      'api/audits/[id]/cancel',
+      'api/audits/[id]/reaudit',
+      'api/auth/logout',
+      'api/billing/checkout',
+      'api/billing/portal',
+      'api/checks/[id]/claim',
+      'api/reports/[slug]/claim',
+      'api/reports/[slug]/logo',
+      'api/reports/[slug]/visibility',
+      'api/reports/[slug]/white-label',
+      'api/verify/check/[id]',
+      'api/verify/start',
+    ]);
+  });
+
+  it('a state-changing public route that reads the session takes an origin rule', () => {
+    const open = ROUTE_POLICIES.filter(
+      (p) => p.session === 'optional' && p.methods.some(isStateChanging) && p.origin === 'any',
     );
     expect(open.map((p) => p.route)).toEqual([]);
   });
@@ -221,14 +290,11 @@ describe('cross-site refusal covers every state change a session or a visitor ca
   });
 
   it('every public route that changes state from a JSON body takes the lenient rule and the JSON rule', () => {
-    // auth/magic-link keeps its own cross-site check (V2_ACCOUNT_DOOR) and Turnstile in production.
-    const KEEPS_ITS_OWN = ['api/auth/magic-link'];
     const missing = ROUTE_POLICIES.filter(
       (p) =>
         p.class === 'public' &&
         p.methods.some(isStateChanging) &&
         readsJsonBody(readRoute(p.route)) &&
-        !KEEPS_ITS_OWN.includes(p.route) &&
         !(p.origin === 'lenient' && p.jsonBody),
     );
     expect(missing.map((p) => p.route)).toEqual([]);

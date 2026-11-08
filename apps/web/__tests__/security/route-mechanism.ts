@@ -4,13 +4,7 @@
  */
 import ts from 'typescript';
 import type { RouteClass } from '../../lib/security/route-policy';
-import {
-  callPositions,
-  exportedMethods,
-  importSource,
-  localImports,
-  statusPositions,
-} from './route-source';
+import { callPositions, exportedMethods, importSource, statusPositions } from './route-source';
 
 const MEMBERSHIP_FUNCTIONS = new Set(['is_member', 'is_member_for_site', 'member_role']);
 
@@ -101,15 +95,57 @@ function servedByInngest(sf: ts.SourceFile): string[] {
   return others.length ? [`exports ${others.join(', ')} that serve() does not handle`] : [];
 }
 
+/** Every name a module imports: default, named and namespace bindings, from any module. */
+function importedNames(sf: ts.SourceFile): Set<string> {
+  const names = new Set<string>();
+  for (const stmt of sf.statements) {
+    const clause = ts.isImportDeclaration(stmt) ? stmt.importClause : undefined;
+    if (!clause || clause.isTypeOnly) continue;
+    if (clause.name) names.add(clause.name.text);
+    const b = clause.namedBindings;
+    if (b && ts.isNamespaceImport(b)) names.add(b.name.text);
+    if (b && ts.isNamedImports(b))
+      for (const el of b.elements) if (!el.isTypeOnly) names.add(el.name.text);
+  }
+  return names;
+}
+
+/** The identifier a call's callee chain starts from: `stripe` for `stripe.customers.update()`. */
+function rootOf(node: ts.Expression): string | undefined {
+  let e: ts.Expression = node;
+  for (;;) {
+    if (ts.isIdentifier(e)) return e.text;
+    if (ts.isPropertyAccessExpression(e) || ts.isElementAccessExpression(e)) e = e.expression;
+    else if (ts.isCallExpression(e) || ts.isNewExpression(e)) e = e.expression;
+    else if (ts.isParenthesizedExpression(e) || ts.isAwaitExpression(e)) e = e.expression;
+    else return undefined;
+  }
+}
+
+/**
+ * The verifier runs before the route does anything with the request through imported code: no call
+ * rooted at an imported binding (the verifier's own call aside), and no `JSON.parse`, comes first.
+ */
 function verifiedFirst(sf: ts.SourceFile, verifier: string): string[] {
   const at = first(callPositions(sf, verifier));
   if (at === Infinity) return [`never calls ${verifier}()`];
   const problems: string[] = [];
   if (bodyReads(sf).length) problems.push('parses the request body with json() or formData()');
-  for (const name of localImports(sf)) {
-    if (callPositions(sf, name).some((p) => p < at))
-      problems.push(`calls ${name}() before ${verifier}()`);
-  }
+  const imported = importedNames(sf);
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node) && node.getStart(sf) < at) {
+      const text = node.expression.getText(sf);
+      const root = rootOf(node.expression);
+      const isVerifier = ts.isPropertyAccessExpression(node.expression)
+        ? node.expression.name.text === verifier
+        : text === verifier;
+      if (text === 'JSON.parse') problems.push(`calls JSON.parse() before ${verifier}()`);
+      else if (root && imported.has(root) && !isVerifier)
+        problems.push(`calls ${text}() before ${verifier}()`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
   return problems;
 }
 
