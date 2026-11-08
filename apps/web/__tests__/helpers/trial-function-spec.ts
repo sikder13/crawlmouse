@@ -180,7 +180,7 @@ It adds \`public.start_trial_with_ledger\` and two helpers, replaces the CHECK o
 
 \`start_trial_with_ledger(p_account_id uuid, p_hashes jsonb, p_transition jsonb) returns jsonb\` is the first-login hook's one database call (\`apps/web/lib/auth/first-login.ts\`). In one transaction it:
 
-1. refuses to run outside READ COMMITTED (\`0A000\`): the ledger is read in a statement after the locks, and only READ COMMITTED gives that statement a snapshot taken after them;
+1. refuses to run outside READ COMMITTED (\`0A000\`; READ UNCOMMITTED, which Postgres runs as READ COMMITTED, is accepted): the ledger is read in a statement after the locks, and READ COMMITTED gives that statement a snapshot taken after them;
 2. validates the input, before any lock: anything malformed raises \`22023\`;
 3. locks the account \`for update\` (a missing or deleted account raises \`P0002\`);
 4. returns \`{"outcome": "not_eligible", "hits": []}\` unless the account is Free with \`trial_used_at\` null;
@@ -192,13 +192,15 @@ A stale \`p_expected_version\` raises \`40001\` from \`apply_entitlement_transit
 
 **\`p_hashes\`** is an array of 1 to 3 objects, each with the keys \`kind\` and \`value_hash\` and no other; \`kind\` is one of ${LEDGER_KINDS.map(code).join(', ')}, one row per kind, an \`email\` row required; \`value_hash\` is 64 lowercase hex. The hook computes them with \`hashLedgerValue\` (HMAC-SHA256 under \`TRIAL_LEDGER_PEPPER\`); the pepper stays in the app.
 
-**\`p_transition\`** is what the hook computes with \`next()\` for \`trial_started {variant: 'no_card'}\` and \`toTransitionParams\`, plus \`"event": "trial_started"\`: the 16 arguments of \`apply_entitlement_transition\` and the event. The function requires the event, this account's id, \`p_state = 'pro_trial'\`, \`p_tier = 'pro'\`, \`p_trial_variant = 'no_card'\`, a trial end and a trial-used date, integer version and limits, and \`p_subscription_id\`, \`p_past_due_tier\`, \`p_past_due_since\` and \`p_disputed_at\` null. It checks the shape and copies none of the state machine: the limits and dates are \`next()\`'s. Each rejected shape: ${V('v2-006c-trial-function.test.ts', 'input validation')}.
+**\`p_transition\`** is what the hook computes with \`next()\` for \`trial_started {variant: 'no_card'}\` and \`toTransitionParams\`, plus \`"event": "trial_started"\`: the 16 arguments of \`apply_entitlement_transition\` and the event. The function requires the event, this account's id, \`p_state = 'pro_trial'\`, \`p_tier = 'pro'\`, \`p_trial_variant = 'no_card'\`, a trial end, a trial-used date and \`p_at\` written as ISO 8601 with an offset (no \`infinity\`, \`epoch\` or \`now\`), the trial end after \`p_at\`, integer version and limits, and \`p_subscription_id\`, \`p_past_due_tier\`, \`p_past_due_since\` and \`p_disputed_at\` null. It checks the shape and copies none of the state machine: the limits and dates are \`next()\`'s. Each rejected shape: ${V('v2-006c-trial-function.test.ts', 'input validation')}.
 
 **Lock timeout (\`TRIAL_LOCK_TIMEOUT\`): ${await lockTimeout(db)}**, set on the function (\`set lock_timeout\`), so a stuck account row or hash lock ends the call with \`55P03\` rather than hanging a sign-in.
 
 ### Who may call what
 
 ${await functionsTable(db)}
+
+**Temporary objects.** With \`pg_temp\` left out of \`search_path\`, Postgres searches it first for type names (never for functions or operators), so a caller's temp domain could stand in for a type a body names without its schema, and its CHECK would run as \`postgres\`. The bodies write \`jsonb\`, \`text\` and \`timestamptz\` as \`pg_catalog.*\`; \`integer\`, \`numeric\`, \`bit\` and \`interval\` are keywords the grammar resolves to \`pg_catalog\`. Verify, a temp domain of each name: ${V('v2-006c-trial-function.test.ts', 'temporary objects')}.
 
 PUBLIC's EXECUTE is revoked explicitly on each, and so is service_role's on the helpers, which no role but their owner runs: \`start_trial_with_ledger\` is SECURITY DEFINER and runs them as \`postgres\`. Check 06 (\`infra/supabase/checks/06-client-functions.sql\`) finds nothing. Verify: ${V('v2-006c-trial-function.test.ts', 'grants')}.
 
@@ -227,7 +229,7 @@ ${table(
 
 A call that fails is reported to Sentry as \`auth.trial-decision-failed\` with a \`reason\`: \`lock_timeout\` (\`55P03\`), \`malformed_result\` (an answer that is not \`{outcome, hits}\`), or \`rpc_error\` with its SQLSTATE in \`code\` (a revoked grant is \`42501\`, a missing function \`PGRST202\`). \`40001\` is a lost race, read as \`not_first\` and not reported. Verify: ${V('v2/account-door-first-login.test.ts', 'D10')}.
 
-**Login CSRF (D9).** When \`cm_auth_for\` is set and is not the verified address's binding, the link is another address's opened in this browser: the hook sends no device hash, and the verify route skips v1's anonymous-audit claim. Verify, end to end over PGlite: \`pnpm --filter @crawlmouse/web exec vitest run app/login/verify/route.csrf.test.ts\`.
+**Login CSRF (D9).** When \`cm_auth_for\` is set and is not the verified address's binding, the link is another address's opened in this browser: the hook sends no device hash, the verify route skips v1's anonymous-audit claim, and this browser's own door request (\`cm_auth_for\`, \`cm_auth_signup\`, \`post_login_next\`) is left to expire rather than cleared, so the owner's own link still finds it and a second foreign link is recognised too. Verify, end to end over PGlite: \`pnpm --filter @crawlmouse/web exec vitest run app/login/verify/route.csrf.test.ts\`.
 
 ## The site_fixes CHECKs
 
@@ -286,7 +288,9 @@ ${D8_QUERY}
 - **The 3 s lock timeout can cost a trial.** A first login that waits longer than that, for instance on a busy shared network's \`ip24\` lock, fails and is not retried.
 - **A browser with no \`cm_auth_for\` sends its device.** A link opened where no door request was made (another device, or a browser that never asked) cannot be told apart from someone else's link, so D9 does not apply there.
 - **Two clocks.** \`next()\` dates the trial with the app's clock; the ledger windows and the rows' \`created_at\` use the database's \`now()\`.
-- **The race test runs only in CI's \`db-cli-files\` job**; \`pnpm test\` skips it, because no local Postgres server is assumed.
+- **The race test runs only in CI's \`db-cli-files\` job**; \`pnpm test\` skips it, because no local Postgres server is assumed. It refuses a \`TRIAL_RACE_DB_URL\` that is not on this machine.
+- **\`apply_entitlement_transition\` (003) runs with \`search_path = public, pg_catalog\`**, which also leaves \`pg_temp\` searched first for type names. It is SECURITY DEFINER and \`service_role\` may call it directly, so this function adds no path to it that was not there; the other definer functions of 001 and 003 share the setting. A follow-up, outside this migration: set \`search_path = ''\` (or \`pg_catalog, public, pg_temp\`) on them.
+- **\`POST /api/auth/claim\` (v1) claims anonymous audits with no binding check.** Nothing in the app calls it today; a call after sign-in would claim without D9's check.
 `,
     ].join('\n');
     const config = (await resolveConfig(SPEC_06C_PATH)) ?? {};
