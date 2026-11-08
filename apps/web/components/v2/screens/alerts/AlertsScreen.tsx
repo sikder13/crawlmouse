@@ -73,7 +73,7 @@ export function AlertsScreen({ data }: { data: AlertsView }) {
         {fired.foot ? <div className={shared.foot}>{fired.foot}</div> : null}
       </Card>
 
-      <div className={shared.two}>
+      <div className={`${shared.two} ${shared.twoWide}`}>
         <Card as="section" className={shared.panel}>
           <CardHead title={channels.title} />
           <Table

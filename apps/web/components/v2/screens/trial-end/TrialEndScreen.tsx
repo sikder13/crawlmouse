@@ -110,7 +110,7 @@ export function TrialEndScreen({ data }: { data: TrialEndView }) {
         />
       </Card>
 
-      <div className={shared.two}>
+      <div className={`${shared.two} ${shared.twoWide}`}>
         <Card as="section" className={shared.panel}>
           <CardHead title={data.keepTitle} />
           <p className={styles.text}>{data.keepText}</p>
