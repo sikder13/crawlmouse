@@ -598,6 +598,11 @@ describe('input validation: each malformed input raises 22023 and writes nothing
     ['no trial end', (t) => ({ ...t, p_trial_ends_at: null })],
     ['no trial-used date', (t) => ({ ...t, p_trial_used_at: null })],
     ['a trial end that is not a date', (t) => ({ ...t, p_trial_ends_at: 'soon' })],
+    ['a trial end of infinity', (t) => ({ ...t, p_trial_ends_at: 'infinity' })],
+    ['a trial end written as epoch', (t) => ({ ...t, p_trial_ends_at: 'epoch' })],
+    ['a trial end before p_at', (t) => ({ ...t, p_trial_ends_at: '2000-01-01T00:00:00.000Z' })],
+    ['p_at written as now', (t) => ({ ...t, p_at: 'now' })],
+    ['a p_changed_at of infinity', (t) => ({ ...t, p_changed_at: 'infinity' })],
     ['a version that is not an integer', (t) => ({ ...t, p_expected_version: 1.5 })],
     ['a version given as a string', (t) => ({ ...t, p_expected_version: '0' })],
     ['a limit too large for an integer', (t) => ({ ...t, p_site_limit: 1e12 })],
@@ -781,6 +786,41 @@ describe('grants: only service_role may start a trial, and no role may call the 
   );
 });
 
+describe("a caller's temporary objects cannot run as the function's owner", () => {
+  // With pg_temp left out of search_path, Postgres searches it first for type names (never for
+  // functions or operators). A type named in a body without its schema would resolve to a temp
+  // domain the caller made, whose CHECK runs as postgres. The call takes the refused path: it runs
+  // the validation, the locks and the rule, and stops before apply_entitlement_transition (003),
+  // whose own search_path is outside this migration (docs/specs/v2/06c-trial-function.md, known
+  // gaps). Each case needs a session that has not compiled the functions yet: a fresh clone.
+  it.each(['jsonb', 'text', 'timestamptz', 'int4', 'bit', 'numeric', 'interval', 'uuid'])(
+    'a temp domain named %s is not used',
+    async (type) => {
+      const d = await doorDb();
+      try {
+        const id = await freshAccount(d, `shadow-${type}`);
+        const email = h('email', `shadow-${type}`);
+        await priorRows(d, [{ hash: email, age: '1 day' }]);
+        const t = await transitionFor(d, id);
+        const outcome = await asRole(d, 'service_role', null, async (tx) => {
+          await tx.exec(`
+            create function pg_temp.ran_as(v pg_catalog.text) returns boolean language plpgsql as $f$
+            begin raise exception 'RAN AS %', current_user; end; $f$;
+            create domain pg_temp.${type} as pg_catalog.${type} check (pg_temp.ran_as(value::pg_catalog.text));`);
+          const { rows } = await tx.query<{ r: Outcome }>(
+            `select public.start_trial_with_ledger($1, $2::pg_catalog.jsonb, $3::pg_catalog.jsonb) as r`,
+            [id, JSON.stringify([email]), JSON.stringify(t)],
+          );
+          return rows[0]!.r.outcome;
+        });
+        expect(outcome).toBe('refused');
+      } finally {
+        await d.close();
+      }
+    },
+  );
+});
+
 // ─── The site_fixes CHECKs ─────────────────────────────────────────────────────────────────────────
 
 describe('site_fixes.type takes every fix type of the contract and nothing else', () => {
@@ -798,6 +838,26 @@ describe('site_fixes.type takes every fix type of the contract and nothing else'
       ).rejects.toMatchObject({ code: '23514', constraint: 'site_fixes_type_check' });
       expect(FixTypeSchema.options).toContain('missing_schema_description');
       expect(FixTypeSchema.options).toContain('no_question_headings');
+    } finally {
+      await d.close();
+    }
+  });
+
+  it('site_fixes_effect_absorbed reads numbers only: a string in effect is the writer’s to refuse, not a 22P02', async () => {
+    const d = await doorDb();
+    try {
+      await seedWorld(d, 'absorbed-types');
+      await d.query(
+        `update public.site_fixes set effect = jsonb_build_object(
+           'technical_seo', 'x', 'technical_seo_pending_on', '[]'::jsonb, 'ai_readability', 1,
+           'ai_readability_pending_on', '[]'::jsonb, 'absorbed_by', null, 'estimate', true)`,
+      );
+      await expect(
+        d.query(`update public.site_fixes set effect = effect || '{"absorbed_by": 1}'::jsonb`),
+      ).rejects.toMatchObject({ code: '23514', constraint: 'site_fixes_effect_absorbed' });
+      await d.query(
+        `update public.site_fixes set effect = effect || '{"ai_readability": "y", "absorbed_by": 1}'::jsonb`,
+      );
     } finally {
       await d.close();
     }

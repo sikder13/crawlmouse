@@ -37,7 +37,9 @@ as $$
            count(*) filter (where l.created_at > p_now - interval '720 hours') as in_recent
       from sent s
       join public.trial_ledger l on l.kind = s.kind and l.value_hash = s.value_hash
+     -- The widest window is the email rule's; older rows cannot change the answer.
      where s.kind in ('email', 'device', 'ip24')
+       and l.created_at > ((p_now at time zone 'UTC') - interval '12 months') at time zone 'UTC'
      group by s.kind
   ),
   n as (
@@ -49,7 +51,7 @@ as $$
            case when n.email >= 1 then 'email' end,
            case when n.device >= 2 then 'device' end,
            case when n.ip24 >= 2 and n.device >= 1 then 'ip24' end
-         ]::text[], null)
+         ]::pg_catalog.text[], null)
     from n
 $$;
 
@@ -101,14 +103,20 @@ revoke all on function public.trial_ledger_lock(jsonb)
 -- p_transition: what apps/web/lib/auth/first-login.ts computes with next() and toTransitionParams for
 -- trial_started {variant: no_card}, plus "event": "trial_started": exactly the 16 arguments of
 -- apply_entitlement_transition and the event. It must name this account, the pro_trial state, the
--- pro tier and the no_card variant, carry a trial end and a trial-used date, and leave the
+-- pro tier and the no_card variant, carry ISO 8601 dates with a trial end after p_at, and leave the
 -- subscription, past-due and dispute fields null. This function checks the shape and copies none of
 -- the state machine; apply_entitlement_transition refuses a stale version (40001).
 -- Anything malformed raises 22023 before any lock is taken.
 --
 -- The rule is read in a statement after the locks, so under READ COMMITTED it sees every row a
 -- previous holder committed. Under REPEATABLE READ or SERIALIZABLE the snapshot would predate the
--- lock, so the function refuses to run there. lock_timeout bounds the wait for the account row and
+-- lock, so the function refuses to run there.
+--
+-- With pg_temp left out of search_path, Postgres searches it first for type names, so a caller's
+-- temp domain could stand in for a type named without its schema and run its CHECK as the owner.
+-- The bodies write jsonb, text and timestamptz as pg_catalog.*; integer, numeric, bit and interval
+-- are keywords the grammar resolves to pg_catalog. v2-006c-trial-function.test.ts makes a temp
+-- domain of each of those names and calls the function. lock_timeout bounds the wait for the account row and
 -- the hash locks.
 
 create or replace function public.start_trial_with_ledger(
@@ -124,20 +132,21 @@ set search_path = ''
 set lock_timeout = '3s'
 as $$
 declare
-  v_element jsonb;
-  v_state text;
-  v_trial_used_at timestamptz;
-  v_hits text[];
+  v_element pg_catalog.jsonb;
+  v_state pg_catalog.text;
+  v_trial_used_at pg_catalog.timestamptz;
+  v_hits pg_catalog.text[];
   v_version integer;
   v_seat_limit integer;
   v_site_limit integer;
   v_competitor_limit integer;
-  v_trial_ends_at timestamptz;
-  v_trial_used timestamptz;
-  v_at timestamptz;
-  v_changed_at timestamptz;
+  v_trial_ends_at pg_catalog.timestamptz;
+  v_trial_used pg_catalog.timestamptz;
+  v_at pg_catalog.timestamptz;
+  v_changed_at pg_catalog.timestamptz;
 begin
-  if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
+  -- Postgres runs READ UNCOMMITTED as READ COMMITTED.
+  if pg_catalog.current_setting('transaction_isolation') not in ('read committed', 'read uncommitted') then
     raise exception 'start_trial_with_ledger runs only under read committed, not %',
       pg_catalog.current_setting('transaction_isolation') using errcode = '0A000';
   end if;
@@ -177,15 +186,15 @@ begin
        'p_seat_limit', 'p_site_limit', 'p_competitor_limit', 'p_at', 'p_subscription_id',
        'p_changed_at'])
      or (select count(*) from pg_catalog.jsonb_object_keys(p_transition)) <> 17
-     or p_transition -> 'event' is distinct from '"trial_started"'::jsonb
-     or p_transition -> 'p_account_id' is distinct from pg_catalog.to_jsonb(p_account_id::text)
-     or p_transition -> 'p_state' is distinct from '"pro_trial"'::jsonb
-     or p_transition -> 'p_tier' is distinct from '"pro"'::jsonb
-     or p_transition -> 'p_trial_variant' is distinct from '"no_card"'::jsonb
-     or p_transition -> 'p_subscription_id' is distinct from 'null'::jsonb
-     or p_transition -> 'p_past_due_tier' is distinct from 'null'::jsonb
-     or p_transition -> 'p_past_due_since' is distinct from 'null'::jsonb
-     or p_transition -> 'p_disputed_at' is distinct from 'null'::jsonb
+     or p_transition -> 'event' is distinct from '"trial_started"'::pg_catalog.jsonb
+     or p_transition -> 'p_account_id' is distinct from pg_catalog.to_jsonb(p_account_id::pg_catalog.text)
+     or p_transition -> 'p_state' is distinct from '"pro_trial"'::pg_catalog.jsonb
+     or p_transition -> 'p_tier' is distinct from '"pro"'::pg_catalog.jsonb
+     or p_transition -> 'p_trial_variant' is distinct from '"no_card"'::pg_catalog.jsonb
+     or p_transition -> 'p_subscription_id' is distinct from 'null'::pg_catalog.jsonb
+     or p_transition -> 'p_past_due_tier' is distinct from 'null'::pg_catalog.jsonb
+     or p_transition -> 'p_past_due_since' is distinct from 'null'::pg_catalog.jsonb
+     or p_transition -> 'p_disputed_at' is distinct from 'null'::pg_catalog.jsonb
      or pg_catalog.jsonb_typeof(p_transition -> 'p_trial_ends_at') <> 'string'
      or pg_catalog.jsonb_typeof(p_transition -> 'p_trial_used_at') <> 'string'
      or pg_catalog.jsonb_typeof(p_transition -> 'p_at') <> 'string'
@@ -193,7 +202,12 @@ begin
      or pg_catalog.jsonb_typeof(p_transition -> 'p_expected_version') <> 'number'
      or pg_catalog.jsonb_typeof(p_transition -> 'p_seat_limit') <> 'number'
      or pg_catalog.jsonb_typeof(p_transition -> 'p_site_limit') <> 'number'
-     or pg_catalog.jsonb_typeof(p_transition -> 'p_competitor_limit') <> 'number' then
+     or pg_catalog.jsonb_typeof(p_transition -> 'p_competitor_limit') <> 'number'
+     -- ISO 8601 with an offset, as toISOString writes: no 'infinity', 'epoch' or 'now'.
+     or (p_transition ->> 'p_trial_ends_at') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$'
+     or (p_transition ->> 'p_trial_used_at') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$'
+     or (p_transition ->> 'p_at') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$'
+     or (p_transition ->> 'p_changed_at') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$' then
     raise exception 'start_trial_with_ledger: p_transition is not a no-card trial start for this account'
       using errcode = '22023';
   end if;
@@ -208,14 +222,17 @@ begin
     v_seat_limit := (p_transition ->> 'p_seat_limit')::integer;
     v_site_limit := (p_transition ->> 'p_site_limit')::integer;
     v_competitor_limit := (p_transition ->> 'p_competitor_limit')::integer;
-    v_trial_ends_at := (p_transition ->> 'p_trial_ends_at')::timestamptz;
-    v_trial_used := (p_transition ->> 'p_trial_used_at')::timestamptz;
-    v_at := (p_transition ->> 'p_at')::timestamptz;
-    v_changed_at := (p_transition ->> 'p_changed_at')::timestamptz;
+    v_trial_ends_at := (p_transition ->> 'p_trial_ends_at')::pg_catalog.timestamptz;
+    v_trial_used := (p_transition ->> 'p_trial_used_at')::pg_catalog.timestamptz;
+    v_at := (p_transition ->> 'p_at')::pg_catalog.timestamptz;
+    v_changed_at := (p_transition ->> 'p_changed_at')::pg_catalog.timestamptz;
   exception when others then
     raise exception 'start_trial_with_ledger: a p_transition value does not read as its type'
       using errcode = '22023';
   end;
+  if v_trial_ends_at <= v_at then
+    raise exception 'start_trial_with_ledger: the trial ends before it starts' using errcode = '22023';
+  end if;
 
   -- The account, then the hash locks: every caller takes them in this order.
   select a.state, a.trial_used_at into v_state, v_trial_used_at
@@ -227,7 +244,7 @@ begin
       using errcode = 'P0002';
   end if;
   if v_state <> 'free' or v_trial_used_at is not null then
-    return pg_catalog.jsonb_build_object('outcome', 'not_eligible', 'hits', '[]'::jsonb);
+    return pg_catalog.jsonb_build_object('outcome', 'not_eligible', 'hits', '[]'::pg_catalog.jsonb);
   end if;
 
   perform public.trial_ledger_lock(p_hashes);
@@ -245,7 +262,7 @@ begin
   select e ->> 'kind', e ->> 'value_hash', p_account_id, 'pro'
     from pg_catalog.jsonb_array_elements(p_hashes) as e;
 
-  return pg_catalog.jsonb_build_object('outcome', 'started', 'hits', '[]'::jsonb);
+  return pg_catalog.jsonb_build_object('outcome', 'started', 'hits', '[]'::pg_catalog.jsonb);
 end;
 $$;
 
@@ -310,6 +327,8 @@ alter table public.site_fixes validate constraint site_fixes_effect_seo_pending;
 alter table public.site_fixes drop constraint if exists site_fixes_effect_absorbed;
 alter table public.site_fixes add constraint site_fixes_effect_absorbed check (
   not (coalesce(effect -> 'absorbed_by', 'null') <> 'null'
-       and coalesce((effect ->> 'technical_seo')::numeric, 0)
-           + coalesce((effect ->> 'ai_readability')::numeric, 0) > 0)) not valid;
+       and coalesce(case when jsonb_typeof(effect -> 'technical_seo') = 'number'
+                         then (effect ->> 'technical_seo')::numeric end, 0)
+           + coalesce(case when jsonb_typeof(effect -> 'ai_readability') = 'number'
+                           then (effect ->> 'ai_readability')::numeric end, 0) > 0)) not valid;
 alter table public.site_fixes validate constraint site_fixes_effect_absorbed;
