@@ -430,4 +430,5 @@ jobs:
           TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
           # Fail, rather than skip, if the URL ever goes missing.
           TRIAL_RACE_REQUIRED: '1'
-        run: pnpm exec vitest run db/trial-race.test.ts
+        # A renamed or missing file must fail the step, not pass it with no tests.
+        run: pnpm exec vitest run db/trial-race.test.ts --passWithNoTests=false

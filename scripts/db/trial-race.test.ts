@@ -10,8 +10,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  *
  * Each race holds transaction A open after its call, starts B's call, waits until B is seen waiting
  * on a lock, commits A, and then lets B finish. The same race also runs against a database built
- * from the migration with the advisory-lock call removed, where it must start two trials: that is
- * the mutation check, run every time, so this file cannot pass by testing nothing.
+ * from the migration with the advisory-lock call removed, where it must start two trials, and the
+ * row-lock case against one with `for update` weakened to `for key share`, where a third session's
+ * KEY SHARE must get in: those are the mutation checks, run whenever the file runs.
  */
 
 const URL_ENV = process.env.TRIAL_RACE_DB_URL;
@@ -25,6 +26,7 @@ if (URL_ENV && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(URL_ENV).ho
 
 const MIGRATION = '20261108000001_v2_006c_trial_function_and_checks.sql';
 const LOCK_CALL = '  perform public.trial_ledger_lock(p_hashes);\n';
+const ROW_LOCK = '     for update;\n';
 /** How long to watch for B waiting. Below the function's 3 s lock_timeout, so B never times out. */
 const WAIT_WATCH_MS = 2000;
 
@@ -148,10 +150,15 @@ const deviceRows = async (sql: Sql, hash: string) =>
 
 describe.skipIf(!URL_ENV)('start_trial_with_ledger under two real transactions', () => {
   const suffix = `${process.pid}_${Date.now()}`;
-  const names = { real: `trial_race_${suffix}`, unlocked: `trial_race_unlocked_${suffix}` };
+  const names = {
+    real: `trial_race_${suffix}`,
+    unlocked: `trial_race_unlocked_${suffix}`,
+    keyShare: `trial_race_key_share_${suffix}`,
+  };
   let admin: Sql;
   let real: Sql;
   let unlocked: Sql;
+  let keyShare: Sql;
 
   beforeAll(async () => {
     admin = postgres(URL_ENV!, { max: 1, onnotice: () => {} });
@@ -160,11 +167,16 @@ describe.skipIf(!URL_ENV)('start_trial_with_ledger under two real transactions',
       if (!text.includes(LOCK_CALL)) throw new Error('the lock call to remove is not in 006c');
       return text.replace(LOCK_CALL, '');
     });
+    keyShare = await migrated(admin, names.keyShare, (text) => {
+      if (!text.includes(ROW_LOCK)) throw new Error('the row lock to weaken is not in 006c');
+      return text.replace(ROW_LOCK, '     for key share;\n');
+    });
   }, 120_000);
 
   afterAll(async () => {
     await real?.end({ timeout: 5 });
     await unlocked?.end({ timeout: 5 });
+    await keyShare?.end({ timeout: 5 });
     for (const n of Object.values(names))
       await admin?.unsafe(`drop database if exists ${n} with (force)`);
     await admin?.end({ timeout: 5 });
@@ -212,6 +224,46 @@ describe.skipIf(!URL_ENV)('start_trial_with_ledger under two real transactions',
     expect([r.a, r.b]).toEqual(['started', 'not_eligible']);
     expect(await trials(real, [x.id])).toBe(1);
     expect(await rowsOf(real, x.id)).toBe(2);
+  });
+
+  /**
+   * A's call takes the refused path, so nothing updates the account row and the only lock on it is
+   * the function's own. Whether a third session may take FOR KEY SHARE on it while A is open.
+   */
+  async function keyShareWhileHeld(sql: Sql, tag: string): Promise<boolean> {
+    const x = await account(sql, `${tag}@example.com`);
+    const email: Hash = { kind: 'email', value_hash: hex(7, tag) };
+    await sql`insert into public.trial_ledger (kind, value_hash, trial_kind) values ('email', ${email.value_hash}, 'pro')`;
+    const ta = await sql.reserve();
+    const tc = await sql.reserve();
+    try {
+      await ta`begin`;
+      await ta`set local role service_role`;
+      const [r] =
+        await ta`select public.start_trial_with_ledger(${x.id}::uuid, ${ta.json([email] as never)},
+                                                                 ${ta.json(x.transition as never)}) as r`;
+      expect((r!.r as { outcome: string }).outcome).toBe('refused');
+      try {
+        await tc`select 1 from public.accounts where id = ${x.id} for key share nowait`;
+        return true;
+      } catch (e) {
+        expect((e as { code?: string }).code).toBe('55P03');
+        return false;
+      }
+    } finally {
+      for (const t of [ta, tc]) {
+        await t`rollback`.catch(() => {});
+        t.release();
+      }
+    }
+  }
+
+  it('the account row is held FOR UPDATE: a KEY SHARE cannot take it while the call is open', async () => {
+    expect(await keyShareWhileHeld(real, 'held')).toBe(false);
+  });
+
+  it('mutation check: with the row lock weakened to FOR KEY SHARE, the same KEY SHARE gets in', async () => {
+    expect(await keyShareWhileHeld(keyShare, 'weak')).toBe(true);
   });
 
   it('mutation check: without the advisory locks the same device race starts two trials', async () => {
