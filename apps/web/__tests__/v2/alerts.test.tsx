@@ -38,7 +38,7 @@ describe('Alerts against Final-Alerts', () => {
     expect(primaries(header)).toHaveLength(1);
   });
 
-  it('posts every form on the page to a route CC-26b or CC-27b owns, never with a GET', () => {
+  it('posts every form on the page to a route ACCOUNT_ACTIONS or CC27B_ROUTES names, never with a GET', () => {
     const forms = [...main(html).matchAll(/<form [^>]*>/g)].map(([tag]) => [
       tag.match(/ method="([^"]+)"/)?.[1],
       tag.match(/ action="([^"]+)"/)?.[1],

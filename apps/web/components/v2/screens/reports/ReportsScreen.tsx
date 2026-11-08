@@ -147,7 +147,9 @@ export function ReportsScreen({ data }: { data: ReportsView }) {
           {scheduled.compare ? (
             <>
               {' '}
-              <a href={scheduled.compare.href}>{scheduled.compare.label}</a>
+              <a href={scheduled.compare.href} className={styles.inlineLink}>
+                {scheduled.compare.label}
+              </a>
             </>
           ) : null}
         </p>

@@ -3,7 +3,7 @@
  * lock corrections for the artboard follow.
  */
 import type { Addition, CopyChange } from '../copy-registry';
-import { count, numberWord, plural } from '../words';
+import { capitalise, count, numberWord, plural } from '../words';
 
 /** Evidence older than this is condensed to headers and changed parts (FACTS A6, long form). */
 export const EVIDENCE_CONDENSED_AFTER_DAYS = 90;
@@ -48,9 +48,11 @@ export const SETTINGS_COPY = {
   /** FACTS E6: the seven-day undo. */
   deleteText: (sites: number, grace: number) =>
     `${
-      sites === 1
-        ? 'Removes the site, its history and reports'
-        : `Removes all ${numberWord(sites)} sites, their history and reports`
+      sites === 0
+        ? 'Removes the account and its reports'
+        : sites === 1
+          ? 'Removes the site, its history and reports'
+          : `Removes all ${numberWord(sites)} sites, their history and reports`
     }. Takes effect after a confirmation link. For ${numberWord(grace)} days the sign-in email can undo it; after that nothing is kept.`,
   deleteAction: 'Delete…',
   planTitle: 'Plan',
@@ -68,17 +70,28 @@ export const SETTINGS_COPY = {
   choose: (plan: string, price: number) => `Choose ${plan}, $${price} a month`,
   other: (yearly: number, agency: number, sites: number, seats: number) =>
     `Or $${yearly} a year. Agency, $${agency} a month: ${count(sites)} sites, ${count(seats)} seats, reports under your brand.`,
+  otherYearly: (yearly: number) => `Or $${yearly} a year.`,
+  /** A past_due account keeps its plan for the grace days (ARCH-2 §3.1, DECISION-LOG J3). */
+  pastDue: (failed: string, until: string, plan: string) =>
+    `The last payment failed on ${failed}. ${plan} stays until ${until}; update the card in the billing portal to keep it.`,
   compare: 'Compare',
   cancel: 'Cancel',
   /** FACTS A6 (long form) and D5 (two clicks). */
-  cancelTrial: (days: number) =>
-    `Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: two clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
-  cancelPaid: (days: number) =>
-    `"Cancel, back to Free": two clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  cancelTrial: (clicks: number, days: number) =>
+    `Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: ${numberWord(clicks)} clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  /** A trial with a card becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
+  cancelCardTrial: (date: string, clicks: number, days: number) =>
+    `The trial ends ${date} and the card is charged unless you cancel: ${numberWord(clicks)} clicks, effective when the trial ends. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  cancelPaid: (clicks: number, days: number) =>
+    `${capitalise(numberWord(clicks))} clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  cancelAction: 'Cancel, back to Free',
   cancelFree: 'Nothing to cancel on Free.',
   receipts: 'Receipts',
   /** FACTS A9. */
   receiptsText: 'Emailed by Stripe after each charge, and listed in the billing portal from here',
+  /** Before any charge there is no Stripe customer, so no portal to list them in. */
+  noReceipts: 'Emailed by Stripe after each charge; there has been no charge yet.',
+  portalAction: 'Billing portal',
   free: 'Free',
   tables: { email: 'Email kinds', danger: 'Delete', usage: 'Usage', terms: 'Cancel' },
   columns: { kind: 'Kind', detail: 'Detail', control: 'Setting', item: 'Item', value: 'Value' },
@@ -217,6 +230,14 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     locked: 'Listed here once there is a charge',
     rendered: 'Emailed by Stripe after each charge, and listed in the billing portal from here',
     source: 'FACTS A9',
+  },
+  {
+    screen: 'settings',
+    kind: 'fixture',
+    locked: 'Emailed by Stripe after each charge, and listed in the billing portal from here',
+    rendered: 'Emailed by Stripe after each charge; there has been no charge yet.',
+    source:
+      'The fixture’s account has no card and no charge: there is no Stripe customer, so no billing portal lists receipts (FACTS A9’s wording is for an account that has paid)',
   },
   {
     screen: 'settings',

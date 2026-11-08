@@ -83,6 +83,20 @@
   padding-right: 0;
 }
 
+/* A link inside a sentence is underlined, as the artboard draws it: colour alone would not tell it
+   from the text around it (WCAG 1.4.1). */
+.inlineLink {
+  color: var(--v2-fg);
+  text-decoration: underline;
+}
+
+.term {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
 /* DESIGN-LOCK §7.1: the two columns become one under 1100px. */
 @media (max-width: 1100px) {
   .columns {

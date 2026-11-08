@@ -14,10 +14,11 @@ import {
   TRIAL_REMINDER_DAYS_BEFORE_END,
   type EmailKind,
 } from '../../auth/constants';
-import { AGENCY_MONTHLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
-import { GATES } from '../../entitlement-v2';
+import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
+import { GATES, PAST_DUE_GRACE_DAYS } from '../../entitlement-v2';
 import { TRIAL_DAYS } from '../copy/account';
 import {
+  CANCEL_CLICKS,
   DELETE_GRACE_DAYS,
   EVIDENCE_CONDENSED_AFTER_DAYS,
   SETTINGS_COPY as COPY,
@@ -41,7 +42,7 @@ export const CC27B_ROUTES = {
     route: '/api/account',
     owner: 'CC-27b',
     guard:
-      'Owner or manager; `{name, timezone, email_prefs, newEmail}`. A changed `newEmail` starts the `/api/account/email` confirmation instead of saving it. `email_prefs` is not in ARCH-2 §5: CC-27b’s contract (owner ruling 6).',
+      'Owner or manager for `{name, timezone, email_prefs}`. A changed `newEmail` needs the owner (a manager’s is refused with 403) and starts the `/api/account/email` confirmation instead of saving it (ARCH-2 §5: the email change is owner only). `email_prefs` is not in ARCH-2 §5: CC-27b’s contract (owner ruling 6).',
   },
   emailChange: {
     verb: 'POST',
@@ -50,12 +51,26 @@ export const CC27B_ROUTES = {
     guard:
       'Signed-in owner; sends a confirmation link to the new address (GET renders, POST confirms); writes `account_events`.',
   },
+  deleteConfirm: {
+    verb: 'GET',
+    route: '/settings/delete',
+    owner: 'CC-27b',
+    guard:
+      'Signed-in owner. The confirmation step “Delete…” opens: the owner re-types the primary site’s hostname and submits `DELETE /api/account`. Not in ARCH-2 §5, which names only the DELETE: CC-27b’s contract.',
+  },
   deleteAccount: {
     verb: 'DELETE',
     route: '/api/account',
     owner: 'CC-27b',
     guard:
       'Signed-in owner and the re-typed hostname; sign-in disabled at once; Stripe subscription cancelled; `account.deleted`, restorable for 7 days by a sign-in link (`POST /api/account/restore`), then Storage purged and the account hard-deleted.',
+  },
+  cancelPlan: {
+    verb: 'POST',
+    route: '/api/billing/cancel',
+    owner: 'CC-27b',
+    guard:
+      'Signed-in owner; two clicks, the second on the same page, with no retention offer in the path (DECISION-LOG D5, L6); Stripe `cancel_at_period_end`, so the plan, or a trial with a card, runs to its end. Not in ARCH-2 §5 (§3.2 has the transition): CC-27b’s contract.',
   },
   billingPortal: {
     verb: 'POST',
@@ -66,13 +81,14 @@ export const CC27B_ROUTES = {
   },
   reportDownload: {
     verb: 'GET',
-    route: '/api/reports/[id]/download',
+    route: '/api/report-files/[id]/download',
     owner: 'CC-27b',
-    guard: 'Signed-in member of the report’s account; redirects to a 10-minute signed URL.',
+    guard:
+      'Signed-in member of the report’s account; redirects to a 10-minute signed URL. Under `/api/report-files`, not `/api/reports/[id]`, because `/api/reports/[slug]` is a live segment and Next refuses two names at one level.',
   },
   reportShare: {
     verb: 'POST',
-    route: '/api/reports/[id]/share',
+    route: '/api/report-files/[id]/share',
     owner: 'CC-27b',
     guard: 'Signed-in member; a share link works for 30 days and needs no account to open.',
   },
@@ -200,7 +216,8 @@ export interface SettingsView {
     other: string;
     compare: ActionView;
     termsLabel: string;
-    terms: [string, string][];
+    /** Cancel and Receipts, each with its control where the account has one to use. */
+    terms: { label: string; text: string; action: ActionView | null }[];
   };
   columns: typeof COPY.columns;
 }
@@ -209,7 +226,8 @@ export interface SettingsView {
  * Settings (Final-Settings) as data (D6): the account's address and name, its three kinds of email
  * (iterated from CC-25's EMAIL_KINDS, senders from its constants), the plan card and the danger
  * zone. The artboard's Connected card is left out (owner ruling: Integrations is its own later
- * page). Every form posts to a CC27B_ROUTES path and is stopped in the preview.
+ * page). Its forms post to CC27B_ROUTES paths, and Keep to the checkout route ACCOUNT_ACTIONS names;
+ * the preview stops each submit.
  */
 export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
   const v = viewAt(d, viewer);
@@ -258,6 +276,17 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
     ...v.d.sites.map((s) => resultChecks(v, s.id).at(-1)?.coverage?.pages_crawled ?? 0),
   );
   const paid = v.tier !== 'free';
+  const card = a.card_last4;
+  const cardTrial = trial && card !== null;
+  const pastDue = a.state === 'past_due';
+  const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
+  const date = (ts: string) => dayDate(ts, zone);
+  const pastDueSince = a.state_history.at(-1)!.since;
+  const graceEnds = new Date(
+    Date.parse(pastDueSince) + PAST_DUE_GRACE_DAYS * 86_400_000,
+  ).toISOString();
+  const cancel = routeAction('cancelPlan', COPY.cancelAction);
+  const portal = routeAction('billingPortal', COPY.portalAction);
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
@@ -298,56 +327,81 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
       tableLabel: COPY.tables.danger,
       label: COPY.deleteLabel,
       text: COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS),
-      action: routeAction('deleteAccount', COPY.deleteAction),
+      action: routeAction('deleteConfirm', COPY.deleteAction),
     },
     plan: {
       title: COPY.planTitle,
       name: trial ? COPY.trialName(plan) : plan,
       left: days === null ? null : COPY.daysLeft(days),
       note: trial
-        ? `${COPY.ends(dayDate(a.trial_ends_at!, zone))} ${
-            a.card_last4 === null ? COPY.noCardTerms : COPY.cardTerms(a.card_last4)
+        ? `${COPY.ends(date(a.trial_ends_at!))} ${
+            card === null ? COPY.noCardTerms : COPY.cardTerms(card)
           }`
-        : paid
-          ? null
-          : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
+        : pastDue
+          ? COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
+          : paid
+            ? null
+            : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
       usageLabel: COPY.tables.usage,
       usage: [
         [COPY.sitesUsed, COPY.of(primarySites(v).length, a.limits.sites)],
         [COPY.pagesUsed, COPY.of(largest, v.gates.pagesPerCheck)],
       ],
-      keep: trial
-        ? action(
-            'keepPlan',
-            COPY.keep(plan, v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY),
-            {},
-            {
-              fields: { plan: v.tier, interval: 'month' },
-            },
-          )
-        : paid
-          ? null
-          : action(
+      // A trial with a card becomes the plan at its end: there is nothing to keep it by.
+      keep:
+        trial && !cardTrial
+          ? action(
               'keepPlan',
-              COPY.choose(PLAN_NAMES.pro, PRO_MONTHLY),
+              COPY.keep(plan, v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY),
               {},
               {
-                fields: { plan: 'pro', interval: 'month' },
+                fields: { plan: v.tier, interval: 'month' },
               },
-            ),
-      other: COPY.other(PRO_YEARLY, AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats),
+            )
+          : paid
+            ? null
+            : action(
+                'keepPlan',
+                COPY.choose(PLAN_NAMES.pro, PRO_MONTHLY),
+                {},
+                {
+                  fields: { plan: 'pro', interval: 'month' },
+                },
+              ),
+      other:
+        v.tier === 'agency'
+          ? COPY.otherYearly(yearly)
+          : COPY.other(yearly, AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats),
       compare: action('pricing', COPY.compare),
       termsLabel: COPY.tables.terms,
       terms: [
-        [
-          COPY.cancel,
-          trial
-            ? COPY.cancelTrial(EVIDENCE_CONDENSED_AFTER_DAYS)
+        cardTrial
+          ? {
+              label: COPY.cancel,
+              text: COPY.cancelCardTrial(
+                date(a.trial_ends_at!),
+                CANCEL_CLICKS,
+                EVIDENCE_CONDENSED_AFTER_DAYS,
+              ),
+              action: cancel,
+            }
+          : trial
+            ? {
+                label: COPY.cancel,
+                text: COPY.cancelTrial(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
+                action: null,
+              }
             : paid
-              ? COPY.cancelPaid(EVIDENCE_CONDENSED_AFTER_DAYS)
-              : COPY.cancelFree,
-        ],
-        [COPY.receipts, COPY.receiptsText],
+              ? {
+                  label: COPY.cancel,
+                  text: COPY.cancelPaid(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
+                  action: cancel,
+                }
+              : { label: COPY.cancel, text: COPY.cancelFree, action: null },
+        // A card on file means a Stripe customer, whose receipts the portal lists.
+        card === null
+          ? { label: COPY.receipts, text: COPY.noReceipts, action: null }
+          : { label: COPY.receipts, text: COPY.receiptsText, action: portal },
       ],
     },
     columns: COPY.columns,

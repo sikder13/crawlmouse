@@ -37,13 +37,13 @@ describe('Settings against Final-Settings', () => {
     expect(html).toMatch(/data-v2-primary=""[^>]*>Save</);
   });
 
-  it('posts every form on the page to a route CC-26b or CC-27b owns, never with a GET', () => {
+  it('posts every form on the page to a route ACCOUNT_ACTIONS or CC27B_ROUTES names, never with a GET', () => {
     const forms = [...main(html).matchAll(/<form [^>]*>/g)].map(([tag]) => [
       tag.match(/ method="([^"]+)"/)?.[1],
       tag.match(/ action="([^"]+)"/)?.[1],
     ]);
-    // The account form, two email switches, Delete and Keep.
-    expect(forms).toHaveLength(5);
+    // The account form, two email switches and Keep; Delete is a link to its confirmation step.
+    expect(forms).toHaveLength(4);
     for (const [method, action] of forms) {
       expect(method).toBe('post');
       expect(

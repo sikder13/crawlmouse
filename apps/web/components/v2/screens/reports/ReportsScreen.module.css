@@ -68,6 +68,12 @@
   font-size: var(--v2-text-micro);
 }
 
+/* A link inside a sentence is underlined, as the artboard draws it (WCAG 1.4.1). */
+.inlineLink {
+  color: var(--v2-fg);
+  text-decoration: underline;
+}
+
 /* DESIGN-LOCK §7.7: the three options stack on a phone. */
 @media (max-width: 760px) {
   .options {

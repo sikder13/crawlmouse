@@ -34,7 +34,11 @@ describe('Settings, generated', () => {
           new RegExp(`^${Math.max(0, ...latestPages).toLocaleString('en-US')} of `),
         );
         expect(v.danger.text).toContain(
-          live.length === 1 ? 'Removes the site,' : `Removes all ${numberWord(live.length)} sites,`,
+          live.length === 0
+            ? 'Removes the account and its reports.'
+            : live.length === 1
+              ? 'Removes the site,'
+              : `Removes all ${numberWord(live.length)} sites,`,
         );
         expect(v.email.rows.map((r) => r.kind)).toEqual([...EMAIL_KINDS]);
         expect(

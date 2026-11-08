@@ -166,7 +166,10 @@ export function SettingsScreen({ data }: { data: SettingsView }) {
                 </div>
               ) : null}
               <div className={styles.hint}>
-                {plan.other} <a href={plan.compare.href}>{plan.compare.label}</a>
+                {plan.other}{' '}
+                <a href={plan.compare.href} className={styles.inlineLink}>
+                  {plan.compare.label}
+                </a>
               </div>
               <Table
                 label={plan.termsLabel}
@@ -174,12 +177,13 @@ export function SettingsScreen({ data }: { data: SettingsView }) {
                 rowHeader
                 className={styles.usage}
                 columns={[{ header: C.item }, { header: C.detail }]}
-                rows={plan.terms.map(([label, text]) => ({
-                  key: label,
+                rows={plan.terms.map((t) => ({
+                  key: t.label,
                   cells: [
-                    label,
-                    <span key="t" className={shared.muted}>
-                      {text}
+                    t.label,
+                    <span key="t" className={styles.term}>
+                      <span className={shared.muted}>{t.text}</span>
+                      {t.action ? <ActionControl action={t.action} variant="quiet" /> : null}
                     </span>,
                   ],
                 }))}

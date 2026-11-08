@@ -84,15 +84,14 @@ describe('Settings, the plan', () => {
     expect(p.other).toBe(
       'Or $190 a year. Agency, $99 a month: 25 sites, 5 seats, reports under your brand.',
     );
-    expect(p.terms).toEqual([
+    expect(p.terms.map((t) => [t.label, t.text, t.action?.label ?? null])).toEqual([
       [
         'Cancel',
         'Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: two clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than 90 days is condensed to headers and the parts of pages that changed.',
+        null,
       ],
-      [
-        'Receipts',
-        'Emailed by Stripe after each charge, and listed in the billing portal from here',
-      ],
+      // No card, so no charge yet and no Stripe customer whose portal lists receipts.
+      ['Receipts', 'Emailed by Stripe after each charge; there has been no charge yet.', null],
     ]);
   });
 
@@ -113,11 +112,43 @@ describe('Settings, the danger zone', () => {
     expect(d.text).toBe(
       'Removes all five sites, their history and reports. Takes effect after a confirmation link. For seven days the sign-in email can undo it; after that nothing is kept.',
     );
-    expect(d.action).toMatchObject({
-      label: 'Delete…',
-      href: '/api/account',
-      fields: { _method: 'DELETE' },
-    });
+    // "Delete…" opens the confirmation step, where the owner re-types the hostname.
+    expect(d.action).toMatchObject({ label: 'Delete…', href: '/settings/delete', method: 'get' });
     expect(free().danger.text).toMatch(/^Removes the site, its history and reports\. /);
+  });
+});
+
+describe('Settings, on a trial with a card and on a plan past due (challenged-site)', () => {
+  const ch = fixture('challenged-site');
+
+  it('on Kestrel’s Agency trial: no Keep, a cancel, the billing portal, and Agency’s yearly price', () => {
+    const p = settingsView(ch, {
+      accountId: 'a0000000-0000-4000-8000-0000000000ca',
+      now: ch.as_of,
+    }).plan;
+    expect(p.name).toBe('Agency, trial');
+    expect(p.note).toBe('Ends Mon 16 Nov. The card ending 4242 is charged then unless you cancel.');
+    expect(p.keep).toBeNull();
+    expect(p.other).toBe('Or $990 a year.');
+    expect(p.terms.map((t) => [t.label, t.action?.label ?? null, t.action?.href ?? null])).toEqual([
+      ['Cancel', 'Cancel, back to Free', '/api/billing/cancel'],
+      ['Receipts', 'Billing portal', '/api/billing/portal'],
+    ]);
+    expect(p.terms[0]!.text).toMatch(
+      /^The trial ends Mon 16 Nov and the card is charged unless you cancel: two clicks/,
+    );
+  });
+
+  it('on Northwind, past due since Sun 1 Nov: the plan holds for the grace days', () => {
+    // past_due since 1 Nov 14:00Z (09:00 EST); seven days on, 8 Nov 14:00Z.
+    const p = settingsView(ch, ACCOUNT_VIEWERS.withheld()).plan;
+    expect(p.name).toBe('Agency');
+    expect(p.note).toBe(
+      'The last payment failed on Sun 1 Nov. Agency stays until Sun 8 Nov; update the card in the billing portal to keep it.',
+    );
+    expect(p.terms.map((t) => t.action?.label ?? null)).toEqual([
+      'Cancel, back to Free',
+      'Billing portal',
+    ]);
   });
 });
