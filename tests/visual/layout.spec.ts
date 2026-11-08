@@ -528,3 +528,59 @@ for (const width of LAYOUT_WIDTHS) {
     });
   });
 }
+
+/**
+ * A row header's face, as computed: "size weight colour". The colour tokens are resolved beside the
+ * table, where the screen's theme applies, so the test names the token, not a colour value.
+ */
+async function rowHeaderFaces(page: Page, cells: string) {
+  return page.evaluate((sel) => {
+    const found = [...document.querySelectorAll(sel)];
+    const host = found[0]?.closest('table')?.parentElement ?? document.body;
+    const token = (name: string) => {
+      const probe = document.createElement('span');
+      probe.style.color = `var(${name})`;
+      host.appendChild(probe);
+      const c = getComputedStyle(probe).color;
+      probe.remove();
+      return c;
+    };
+    const names = new Map([
+      [token('--v2-mut'), 'mut'],
+      [token('--v2-fg'), 'fg'],
+    ]);
+    return [
+      ...new Set(
+        found.map((c) => {
+          const s = getComputedStyle(c);
+          return `${s.fontSize} ${s.fontWeight} ${names.get(s.color) ?? s.color}`;
+        }),
+      ),
+    ];
+  }, cells);
+}
+
+test.describe('row headers keep their own screen’s face at 1280px', () => {
+  test.use({ viewport: { width: 1280, height: HEIGHT[1280] } });
+
+  // Round 1 put the account screens' row-header style on the shared Table, and it restyled this
+  // table's check names (CC-23's approved baseline) until it moved into the account shell.
+  test('CC-23’s content grid: the column-header face it was approved with (13px, 500, muted)', async ({
+    page,
+  }) => {
+    await openPreview(page, '/v2-preview/screens/segment/content');
+    expect(await rowHeaderFaces(page, 'table th[scope="row"]')).toEqual(['13px 500 mut']);
+  });
+
+  test('the account settings table: the row’s own face (14px, 400, body colour)', async ({
+    page,
+  }) => {
+    await openPreview(page, '/v2-preview/screens/site');
+    expect(
+      await rowHeaderFaces(
+        page,
+        'table[aria-label="Site settings"] tbody tr:not([data-v2-muted]) th[scope="row"]',
+      ),
+    ).toEqual(['14px 400 fg']);
+  });
+});
