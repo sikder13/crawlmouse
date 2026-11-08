@@ -37,7 +37,13 @@ export function ChangeTable({ label, rows }: { label: string; rows: ChangeRowVie
       rows={rows.map((r) => ({
         key: r.key,
         cells: [
-          ...(site ? [r.site ?? '—'] : []),
+          ...(site
+            ? [
+                <span key="s" className={own.site}>
+                  {r.site ?? '—'}
+                </span>,
+              ]
+            : []),
           <span key="w" className={own.when}>
             {r.when}
           </span>,
@@ -51,12 +57,12 @@ export function ChangeTable({ label, rows }: { label: string; rows: ChangeRowVie
           r.where,
           ...(pages ? [r.pages ?? '—'] : []),
           r.effect,
-          <>
+          <span key="k" className={site ? own.logCause : undefined}>
             {r.cause}
             {r.diff.length ? (
               <pre className={own.diff}>{r.diff.map((l) => `${l.sign} ${l.line}`).join('\n')}</pre>
             ) : null}
-          </>,
+          </span>,
           ...(told ? [r.told ?? '—'] : []),
         ],
       }))}

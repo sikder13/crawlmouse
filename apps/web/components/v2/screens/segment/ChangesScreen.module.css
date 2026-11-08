@@ -57,3 +57,15 @@
   font-family: var(--v2-font-mono);
   font-size: var(--v2-text-micro);
 }
+
+/* The account Changes log (D3) adds a site column, eight in all, more than a card holds at 1280px:
+   the table keeps readable widths and scrolls in its region (DESIGN-LOCK §7.7) rather than squeeze its
+   cause into a few words a line. The segment page draws neither class. */
+.site {
+  white-space: nowrap;
+}
+
+.logCause {
+  display: block;
+  min-width: 18rem;
+}
