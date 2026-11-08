@@ -329,3 +329,18 @@ describe('Change notes name one sender', () => {
     expect(Object.keys(await import('../copy/dashboard'))).not.toContain('ALERTS_FROM');
   });
 });
+
+describe('Who builds each account route', () => {
+  it('the account pages CC-27 previews are wired by CC-27b, as the CC-27 brief says', () => {
+    const cc27b = Object.entries(ACCOUNT_ACTIONS)
+      .filter(([, a]) => a.owner === 'CC-27b')
+      .map(([key]) => key)
+      .sort();
+    expect(cc27b).toEqual(
+      ['alertRules', 'changeLog', 'emailSettings', 'integrations', 'plan', 'reports'].sort(),
+    );
+    expect(new Set(Object.values(ACCOUNT_ACTIONS).map((a) => a.owner))).toEqual(
+      new Set(['CC-26b', 'CC-27b', 'built']),
+    );
+  });
+});
