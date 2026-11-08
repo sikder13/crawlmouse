@@ -41,6 +41,7 @@ const { captureMessage } = vi.hoisted(() => ({ captureMessage: vi.fn() }));
 vi.mock('@sentry/nextjs', () => ({ captureMessage }));
 
 import { GET, POST } from './route';
+import { emailBinding } from '@/lib/auth/continue-intent';
 
 const ORIGIN = 'https://crawlmouse.com';
 const CANARY = 'link-canary-one';
@@ -227,6 +228,20 @@ describe('POST /login/verify verifies', () => {
     anon.id = 'anon-1';
     await POST(post({ cm_auth_otp: otp() }));
     expect(anonUpdate.mock.calls[0]![0].is).toEqual(['user_id', null]);
+  });
+
+  it('skips the v1 claim when the link signs in an address other than the one this browser asked for (D9)', async () => {
+    anon.id = 'anon-1';
+    await POST(post({ cm_auth_otp: otp(), cm_auth_for: emailBinding('someone-else@example.com') }));
+    expect(anonUpdate).not.toHaveBeenCalled();
+    expect(clearAnonSession).not.toHaveBeenCalled();
+  });
+
+  it('claims as before when the binding is the verified address, or there is none', async () => {
+    anon.id = 'anon-1';
+    await POST(post({ cm_auth_otp: otp(), cm_auth_for: emailBinding(USER.email) }));
+    await POST(post({ cm_auth_otp: otp() }));
+    expect(anonUpdate).toHaveBeenCalledTimes(2);
   });
 
   it('ends the anonymous session after claiming it, and not before a sign-in', async () => {

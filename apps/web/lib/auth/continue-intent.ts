@@ -20,6 +20,16 @@ export function emailBinding(email: string): string {
   return createHash('sha256').update(`cm-auth-for:${email.trim().toLowerCase()}`).digest('hex');
 }
 
+/**
+ * The link signed in an address other than the one this browser's door request was for: someone
+ * else's link opened here (login CSRF). With no `cm_auth_for` nothing is known either way, as for a
+ * link opened on another device. CC-06c D9: such a sign-in records no device for the trial ledger
+ * and claims none of this browser's anonymous v1 audits.
+ */
+export function bindingMismatch(boundTo: string | undefined, email: string | undefined): boolean {
+  return boundTo !== undefined && (email === undefined || boundTo !== emailBinding(email));
+}
+
 /** A Keep's return target (D8): the claim, then the dashboard. */
 export function claimNext(checkId: string): string {
   if (!isUuid(checkId)) throw new RangeError('a check id is a uuid');

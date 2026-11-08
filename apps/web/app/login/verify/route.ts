@@ -10,6 +10,7 @@ import { getClientIp } from '@/lib/client-ip';
 import { accountDoorEnabled } from '@/lib/auth/flags';
 import { AUTH_LINK_SECONDS, COOKIES } from '@/lib/auth/constants';
 import {
+  bindingMismatch,
   claimFromNext,
   decodeOtp,
   decodeSignup,
@@ -120,10 +121,12 @@ export async function POST(request: Request) {
 
     // Claim the audits this browser ran anonymously before signing in (v1, as /api/auth/claim). The
     // anon-session id is an httpOnly capability cookie, so a browser only claims its own unclaimed
-    // audits.
+    // audits. Not when the link signed in an address other than the one this browser's door request
+    // was for: that is someone else's link opened here, and the audits are not theirs (CC-06c D9).
     stage = 'anon-claim';
     const anonId = await readAnonSessionId();
-    if (user && anonId) {
+    const foreign = bindingMismatch(req.cookies.get(COOKIES.binding)?.value, user?.email);
+    if (user && anonId && !foreign) {
       const admin = supabaseAdmin();
       await admin
         .from('audits')
