@@ -527,6 +527,8 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Alerts, free                                 | `/v2-preview/screens/alerts/free`                        | screen    |                                      |
 | Final-Reports                                | `/v2-preview/screens/reports`                            | screen    |                                      |
 | Reports, Agency (Northwind, owner ruling 8)  | `/v2-preview/screens/reports/agency`                     | screen    |                                      |
+| Final-Settings                               | `/v2-preview/screens/settings`                           | screen    |                                      |
+| Settings, free                               | `/v2-preview/screens/settings/free`                      | screen    |                                      |
 | Changes log                                  | `/v2-preview/screens/changes-log`                        | screen    | ``, `?kind=opened`                   |
 | Final-LinkMap                                | `/v2-preview/screens/map`                                | screen    |                                      |
 | Link map, every page                         | `/v2-preview/screens/map/all`                            | screen    |                                      |

@@ -1,0 +1,91 @@
+/* Final-Settings: the account, its email and its deletion on the left, the plan on the right. */
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 460px;
+  margin: 0;
+  padding: 16px;
+}
+
+.input {
+  height: 40px;
+}
+
+/* A name is not data: it is set in the body face, the address in mono (rule 4). */
+.text {
+  font-family: inherit;
+}
+
+.hint {
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+.signIn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.signInTitle {
+  font-size: var(--v2-text-micro);
+  font-weight: 500;
+}
+
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.planHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.planName {
+  font-weight: 500;
+}
+
+.keep :global(a),
+.keep :global(button) {
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+}
+
+.keep :global(form),
+.keep > :global(span) {
+  display: flex;
+  width: 100%;
+}
+
+.usage td,
+.usage th {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* DESIGN-LOCK §7.1: the two columns become one under 1100px. */
+@media (max-width: 1100px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

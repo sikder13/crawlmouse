@@ -25,6 +25,7 @@ import { DASHBOARD_ADDITIONS, DASHBOARD_CHANGES } from './copy/dashboard';
 import { SITE_ADDITIONS, SITE_CHANGES } from './copy/site';
 import { ALERTS_ADDITIONS, ALERTS_CHANGES } from './copy/alerts';
 import { REPORTS_ADDITIONS, REPORTS_CHANGES } from './copy/reports';
+import { SETTINGS_ADDITIONS, SETTINGS_CHANGES } from './copy/settings';
 import { FIX_ADDITIONS, FIX_CHANGES } from './copy/fix';
 import { LINK_MAP_ADDITIONS, LINK_MAP_CHANGES } from './copy/link-map';
 import { NOJS_ADDITIONS, NOJS_CHANGES } from './copy/segment-nojs';
@@ -388,6 +389,7 @@ export const COPY_CHANGES: CopyChange[] = [
   ...SITE_CHANGES,
   ...ALERTS_CHANGES,
   ...REPORTS_CHANGES,
+  ...SETTINGS_CHANGES,
 ];
 
 export interface Addition {
@@ -454,6 +456,7 @@ export const ADDITIONS: Addition[] = [
   ...SITE_ADDITIONS,
   ...ALERTS_ADDITIONS,
   ...REPORTS_ADDITIONS,
+  ...SETTINGS_ADDITIONS,
 ];
 
 /**

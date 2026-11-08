@@ -179,6 +179,8 @@ export const PREVIEWS: PreviewEntry[] = [
     name: 'Reports, Agency (Northwind, owner ruling 8)',
     kind: 'screen',
   },
+  { path: '/v2-preview/screens/settings', name: 'Final-Settings', kind: 'screen' },
+  { path: '/v2-preview/screens/settings/free', name: 'Settings, free', kind: 'screen' },
   // The account Changes log has no artboard (CC-27 D3), and nothing on it is the reader's action.
   {
     path: '/v2-preview/screens/changes-log',

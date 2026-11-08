@@ -11,6 +11,7 @@ import { resultStateView, resultView, type ResultPageView } from '../../../../li
 import { alertsView } from '../../../../lib/v2/view/alerts';
 import { changesLogView } from '../../../../lib/v2/view/changes-log';
 import { reportsView } from '../../../../lib/v2/view/reports';
+import { settingsView } from '../../../../lib/v2/view/settings';
 import { ACCOUNT_VIEWERS, DATASET } from './accounts';
 import { fixHref } from './fixes';
 import { MAP_PATHS, segmentHrefs } from './segments';
@@ -110,3 +111,7 @@ export const reportsPreview = (name: keyof typeof REPORTS_PATHS, query: PreviewQ
     { site: one(query.site) },
     REPORTS_PATHS[name],
   );
+
+/** Settings: on bad-site (Final-Settings), and on CC-26's stand-in Free account. */
+export const settingsPreview = (name: 'home' | 'clean') =>
+  settingsView(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]());

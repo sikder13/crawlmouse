@@ -21,6 +21,7 @@ import {
   alertsPreview,
   changesLogPreview,
   reportsPreview,
+  settingsPreview,
 } from '../../../app/(v2-preview)/v2-preview/_preview/screens';
 import type { RecordingName } from '../../../lib/v2/recordings';
 import {
@@ -34,6 +35,7 @@ import type {
 import type { SegmentKey } from '../../../lib/v2/view/segment/frame';
 import { AlertsScreen } from '../../../components/v2/screens/alerts/AlertsScreen';
 import { ReportsScreen } from '../../../components/v2/screens/reports/ReportsScreen';
+import { SettingsScreen } from '../../../components/v2/screens/settings/SettingsScreen';
 import { ChangesLogScreen } from '../../../components/v2/screens/changes-log/ChangesLogScreen';
 
 export const homeData = homePreview;
@@ -84,4 +86,6 @@ export const ACCOUNT_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/alerts/free': () => <AlertsScreen data={alertsPreview('clean')} />,
   '/v2-preview/screens/reports': () => <ReportsScreen data={reportsPreview('home')} />,
   '/v2-preview/screens/reports/agency': () => <ReportsScreen data={reportsPreview('withheld')} />,
+  '/v2-preview/screens/settings': () => <SettingsScreen data={settingsPreview('home')} />,
+  '/v2-preview/screens/settings/free': () => <SettingsScreen data={settingsPreview('clean')} />,
 };
