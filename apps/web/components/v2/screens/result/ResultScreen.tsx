@@ -91,13 +91,15 @@ function GradeCard({ g }: { g: GradeView }) {
  * locked, the clean bill, or a check whose AI readability is withheld. What it says about the site
  * comes from `resultView`.
  */
-export function ResultScreen({ data }: { data: ResultView }) {
+export function ResultScreen({ data, checkId }: { data: ResultView; checkId?: string }) {
   const { grades, first, doors, fixes, map, crawlers } = data;
   const kept = data.keptUntil === null;
 
   return (
     <ResultShell
-      keep={kept ? null : <KeepBar domain={data.domain} expires={data.keptUntil!} />}
+      keep={
+        kept ? null : <KeepBar domain={data.domain} expires={data.keptUntil!} checkId={checkId} />
+      }
       share={{ keptUntil: data.keptUntil }}
       rerun
     >

@@ -260,6 +260,45 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       'evidence/2026-08-08-gate9-reports.md',
     ],
   },
+  {
+    text: 'true, true, true, true, false, false, false, false, true, true, false',
+    withdrawnIn:
+      'docs/deploy/spec51a-stage4-migration-runbook.md (4b), after 20261106000002_v1_client_grant_hardening.sql',
+    truth:
+      'Since P2 the stage 4 column check reads false, false, false, false, false, false, false, ' +
+      'false, true, false, false: authenticated keeps nine audits columns, grade among them, and ' +
+      'anon none (infra/supabase/checks/08-v1-client-grants.sql).',
+    allowedIn: [],
+  },
+  {
+    text: 'INTENDED READABLE: user-facing by design',
+    withdrawnIn:
+      'docs/deploy/spec51a-stage4-migration-runbook.md (4b), after 20261106000002_v1_client_grant_hardening.sql',
+    truth:
+      'audits.refusal and audits.coverage are not readable by anon or authenticated since P2: no ' +
+      'client code reads them.',
+    allowedIn: [],
+  },
+  {
+    // SPEC 25 said the scrubber removed the claim target everywhere; it removed only keys of that
+    // name, and the request-data integration copied the raw Cookie header onto every event (CC-25).
+    text: 'and `post_login_next` from every Sentry event',
+    withdrawnIn: 'apps/web/lib/auth/sentry-scrub.ts and SPEC 25 (CC-25 review round 2)',
+    truth:
+      'Sentry events carry no cookie: the request-data integration runs with cookies off, and the ' +
+      'scrubber drops cookie, cookies, set-cookie and post_login_next keys and post_login_next= values.',
+    allowedIn: [],
+  },
+  {
+    // SPEC 25 implied a call more than half a slot window later is never refused; two calls up to a
+    // full window apart can still share a cell (CC-25).
+    text: 'a later one finds the first’s ledger rows once they are written',
+    withdrawnIn: 'apps/web/lib/auth/stores.ts (gridSerialize) and SPEC 25 (CC-25 review round 2)',
+    truth:
+      'Within half a window the second call is always refused; up to a full window apart it may be; ' +
+      'beyond that it is not, and the ledger lookup decides.',
+    allowedIn: [],
+  },
 ];
 
 /**

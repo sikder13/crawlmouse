@@ -176,4 +176,33 @@ export const PREVIEWS: PreviewEntry[] = [
   // section's fixes is the orange element (DESIGN-LOCK orange convention, the Next button).
   { path: '/v2-preview/screens/map/challenged', name: 'Link map, withheld', kind: 'screen' },
   { path: '/v2-preview/screens/map/large', name: 'Link map, 2,000 pages', kind: 'screen' },
+  // CC-25, the account door. Sign-up's orange element is "Send my sign-in link"; Check-email
+  // asks nothing of the reader but to open their inbox, so it has none (as locked).
+  { path: '/v2-preview/screens/signup', name: 'Final-Signup', kind: 'screen' },
+  { path: '/v2-preview/screens/signup/submitting', name: 'Sign-up, sending', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/signup/rate-limited',
+    name: 'Sign-up, rate limited',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/check-email/from-audit',
+    name: 'Final-CheckEmail',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/check-email/named-site',
+    name: 'Final-CheckEmail-NoAudit',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/check-email/signin',
+    name: 'Check-email, sign-in',
+    kind: 'screen',
+    orange: 0,
+  },
+  { path: '/v2-preview/screens/continue', name: 'Continue', kind: 'screen' },
+  { path: '/v2-preview/screens/continue/expired', name: 'Continue, link expired', kind: 'screen' },
 ];

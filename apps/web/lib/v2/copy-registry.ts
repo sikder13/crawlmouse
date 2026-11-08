@@ -28,8 +28,12 @@ import { LINK_MAP_ADDITIONS, LINK_MAP_CHANGES } from './copy/link-map';
 import { NOJS_ADDITIONS, NOJS_CHANGES } from './copy/segment-nojs';
 import { SIGNALS_ADDITIONS, SIGNALS_CHANGES } from './copy/segment-signals';
 import { STRUCTURE_ADDITIONS, STRUCTURE_CHANGES } from './copy/segment-structure';
+import { ACCOUNT_DOOR_ADDITIONS, ACCOUNT_DOOR_CHANGES } from './copy/account-door';
 
 export type LockedScreen =
+  | 'signup'
+  | 'check-email'
+  | 'check-email-no-audit'
   | 'home'
   | 'result'
   | 'crawl'
@@ -373,6 +377,7 @@ export const COPY_CHANGES: CopyChange[] = [
   ...CHANGES_CHANGES,
   ...FIX_CHANGES,
   ...LINK_MAP_CHANGES,
+  ...ACCOUNT_DOOR_CHANGES,
   ...DASHBOARD_CHANGES,
   ...SITE_CHANGES,
 ];
@@ -436,6 +441,7 @@ export const ADDITIONS: Addition[] = [
   ...CHANGES_ADDITIONS,
   ...FIX_ADDITIONS,
   ...LINK_MAP_ADDITIONS,
+  ...ACCOUNT_DOOR_ADDITIONS,
   ...DASHBOARD_ADDITIONS,
   ...SITE_ADDITIONS,
 ];

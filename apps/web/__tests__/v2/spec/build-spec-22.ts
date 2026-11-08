@@ -211,12 +211,16 @@ function recordingSection(): string {
 
 /**
  * Screens with specs of their own: the segment pages (SPEC 23), the fix page and the explorer
- * (SPEC 24), the dashboard and the site page (SPEC 26).
+ * (SPEC 24), the account door (SPEC 25), the dashboard and the site page (SPEC 26).
  */
 const isSegment = (screen: string) =>
   screen.startsWith('segment-') ||
   screen.startsWith('dashboard') ||
-  ['fix', 'link-map', 'site'].includes(screen);
+  ['fix', 'link-map', 'site'].includes(screen) ||
+  isAccountDoor(screen);
+/** The account door's screens are SPEC 25's. */
+const isAccountDoor = (screen: string) =>
+  screen === 'signup' || screen === 'check-email' || screen === 'check-email-no-audit';
 
 function copySection(): string {
   return [

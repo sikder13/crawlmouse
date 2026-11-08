@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -35,6 +35,55 @@ describe('KeepBar', () => {
       form?.dispatchEvent(submit);
     });
     expect(submit.defaultPrevented).toBe(true);
+  });
+
+  it('with a check id, the real submit posts JSON to the magic-link route and puts the email in no URL', async () => {
+    const CHECK = '0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11';
+    const urls: string[] = [];
+    const bodies: unknown[] = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      urls.push(url);
+      bodies.push(JSON.parse(String(init.body)));
+      return new Response('{"ok":true}', { status: 200 });
+    });
+    vi.stubGlobal('location', { ...window.location, assign: (u: string) => urls.push(u) });
+    try {
+      const host = mount(
+        <KeepBar domain="x.com" expires="26 Oct, 02:34 UTC" initial="open" checkId={CHECK} />,
+      );
+      const form = host.querySelector('form')!;
+      expect(form.getAttribute('action')).toBeNull();
+      (form.querySelector('input[name="email"]') as HTMLInputElement).value = 'keeper@example.com';
+      const submit = new Event('submit', { bubbles: true, cancelable: true });
+      await act(async () => {
+        form.dispatchEvent(submit);
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      expect(submit.defaultPrevented).toBe(true);
+      expect(bodies).toEqual([
+        expect.objectContaining({ email: 'keeper@example.com', claimCheckId: CHECK }),
+      ]);
+      expect(urls).toEqual(['/api/auth/magic-link', '/check-email?kind=from-audit&site=x.com']);
+      for (const u of [...urls, document.location.href]) expect(u).not.toContain('keeper');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('without a check id, the submit sends nothing', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      const host = mount(<KeepBar domain="x.com" expires="26 Oct, 02:34 UTC" initial="open" />);
+      await act(async () => {
+        host
+          .querySelector('form')!
+          .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('dismisses to the expiry line, and opens again', () => {

@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
-import { failed, formatResults, runChecks } from './check';
+import { failed, formatResults, listChecks, runChecks, type Check } from './check';
 import { connect, readOnlyApi, type Db } from './db';
 import { listMigrations, rollbackPath, sha256, type MigrationFile } from './files';
 import {
@@ -90,12 +90,15 @@ export async function dryRun(
     commit,
     files = listMigrations(),
     changed = [],
+    checkFiles = listChecks(),
   }: {
     branch: string;
     commit: string;
     files?: MigrationFile[];
     /** Repository paths the pull request changes. */
     changed?: string[];
+    /** The catalog checks to run; every file in infra/supabase/checks unless a test names others. */
+    checkFiles?: Check[];
   },
 ): Promise<DryRunSummary> {
   const summary: DryRunSummary = {
@@ -261,7 +264,7 @@ export async function dryRun(
       await deps.push(created!.url, { dryRun: false });
     };
     const checks = async () => {
-      const results = await runChecks(branchDb);
+      const results = await runChecks(branchDb, checkFiles);
       if (failed(results)) throw new Error(formatResults(results));
       return `${results.length} checks pass`;
     };
