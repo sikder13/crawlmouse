@@ -62,6 +62,11 @@ export interface CopyChange {
    * phone-width comparison leaves the entry out; every other reading still applies it.
    */
   hiddenOnPhone?: boolean;
+  /**
+   * The reverse: text the locked page hides on a phone and ours shows there (data, owner ruling
+   * 2026-11-08), so only the phone-width comparison applies the entry.
+   */
+  onlyOnPhone?: boolean;
 }
 
 const BASE_CHANGES: CopyChange[] = [
@@ -473,7 +478,9 @@ export function applyChanges(
   { phone = false }: { phone?: boolean } = {},
 ): string {
   let text = locked;
-  for (const c of COPY_CHANGES.filter((x) => x.screen === screen && !(phone && x.hiddenOnPhone))) {
+  const applies = (x: CopyChange) =>
+    x.screen === screen && !(phone && x.hiddenOnPhone) && !(!phone && x.onlyOnPhone);
+  for (const c of COPY_CHANGES.filter(applies)) {
     const from = squash(c.locked);
     if (!text.includes(from))
       throw new Error(`Copy change no longer matches the locked ${screen}: "${c.locked}"`);

@@ -134,6 +134,7 @@ const SCREEN_DIR = fileURLToPath(new URL('../../docs/design/v2/screens/', import
 const HIDE = `
   [data-v2-sr-only], label[style*="-9999px"], sc-if + sc-if,
   svg.chart, svg[data-v2-chart] { display: none !important; }
+  @media (max-width: 760px) { [data-v2-phone-secondary] { display: none !important; } }
 `;
 const ADDED = '[data-v2-addition], [data-v2-evidence] { display: none !important; }';
 const SHELL = 'nav[aria-label="Primary"], footer';

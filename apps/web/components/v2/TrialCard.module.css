@@ -56,8 +56,18 @@
     margin-top: 0;
   }
 
+  /* The note is a description: out of sight on a phone, still read (owner ruling 2026-11-08). */
   .note {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 
   .actions {

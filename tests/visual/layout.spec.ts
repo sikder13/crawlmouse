@@ -584,3 +584,74 @@ test.describe('row headers keep their own screen’s face at 1280px', () => {
     ).toEqual(['14px 400 fg']);
   });
 });
+
+const ACCOUNT_SCREENS = [
+  '/v2-preview/screens/dashboard/day0',
+  '/v2-preview/screens/dashboard',
+  '/v2-preview/screens/dashboard/clean',
+  '/v2-preview/screens/dashboard/withheld',
+  '/v2-preview/screens/site',
+  '/v2-preview/screens/site/clean',
+  '/v2-preview/screens/site/withheld',
+];
+
+// Owner ruling 2026-11-08: a phone may keep only secondary text out of sight, and only out of
+// sight. Which texts are secondary is checked against the views in
+// __tests__/v2/phone-secondary.test.tsx; this measures what Chrome does with them at 390px.
+test.describe('text on a phone, at 390px (owner ruling 2026-11-08)', () => {
+  test.use({ viewport: { width: 390, height: HEIGHT[390] } });
+
+  for (const path of ACCOUNT_SCREENS) {
+    test(`${path}: every text shows but secondary text, which stays in the accessibility tree, and the effort shows`, async ({
+      page,
+    }) => {
+      await openPreview(page, path);
+      const r = await page.evaluate(() => {
+        const skip = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT', 'TITLE']);
+        const gone: string[] = [];
+        const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+          const t = (n.textContent ?? '').trim();
+          const el = n.parentElement;
+          if (!t || !el || skip.has(el.tagName)) continue;
+          // false under display: none (itself or an ancestor) or visibility: hidden.
+          if (!el.checkVisibility({ visibilityProperty: true })) gone.push(t);
+        }
+        const squash = (t: string) => t.replace(/\s+/g, ' ').trim().replace(/^·\s*/, '');
+        const secondary = [...document.querySelectorAll('[data-v2-phone-secondary]')].map((el) => ({
+          text: squash(el.textContent ?? ''),
+          clip: getComputedStyle(el).clipPath,
+        }));
+        const efforts = [...document.querySelectorAll('[data-v2-effort]')].map((el) => {
+          const b = el.getBoundingClientRect();
+          return {
+            text: squash(el.textContent ?? ''),
+            w: b.width,
+            h: b.height,
+            right: b.right,
+            clip: getComputedStyle(el).clipPath,
+          };
+        });
+        return { gone, secondary, efforts, vw: window.innerWidth };
+      });
+
+      expect(r.gone, 'text a phone takes out of the page altogether').toEqual([]);
+
+      const tree = (await page.locator('body').ariaSnapshot()).replace(/\s+/g, ' ');
+      for (const s of r.secondary) {
+        expect(s.clip, `"${s.text}" is out of sight on a phone`).toBe('inset(50%)');
+        // The opening words, which a snapshot writes as the page does.
+        const words = s.text.split(' ').slice(0, 4).join(' ');
+        expect(tree, `"${words}…" is in the accessibility tree`).toContain(words);
+      }
+
+      for (const e of r.efforts) {
+        expect(e.clip, `the effort "${e.text}" is not clipped`).toBe('none');
+        expect(e.w * e.h, `the effort "${e.text}" is laid out`).toBeGreaterThan(0);
+        expect(e.right, `the effort "${e.text}" ends inside the screen`).toBeLessThanOrEqual(r.vw);
+      }
+      if (path.endsWith('/day0')) expect(r.efforts).toHaveLength(3);
+      if (path === '/v2-preview/screens/site') expect(r.secondary.length).toBeGreaterThan(1);
+    });
+  }
+});
