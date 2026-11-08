@@ -12,7 +12,8 @@ import { alertsView } from '../../../../lib/v2/view/alerts';
 import { changesLogView } from '../../../../lib/v2/view/changes-log';
 import { reportsView } from '../../../../lib/v2/view/reports';
 import { settingsView } from '../../../../lib/v2/view/settings';
-import { ACCOUNT_VIEWERS, DATASET } from './accounts';
+import { trialEndView, trialEndViewer } from '../../../../lib/v2/view/trial-end';
+import { ACCOUNT_VIEWERS, BAD_ACCOUNT_ID, DATASET } from './accounts';
 import { fixHref } from './fixes';
 import { MAP_PATHS, segmentHrefs } from './segments';
 
@@ -115,3 +116,14 @@ export const reportsPreview = (name: keyof typeof REPORTS_PATHS, query: PreviewQ
 /** Settings: on bad-site (Final-Settings), and on CC-26's stand-in Free account. */
 export const settingsPreview = (name: 'home' | 'clean') =>
   settingsView(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]());
+
+/**
+ * Trial ending on bad-site, read at the trial's reminder: three days before trial_ends_at, five days
+ * after the fixture's as_of, with nothing scheduled in between (SPEC 27 states the assumption). The
+ * challenged-site variant was dropped (owner ruling 2): no account there has a trial that overlaps a
+ * withheld result.
+ */
+export const trialEndPreview = () => {
+  const d = fixture('bad-site');
+  return trialEndView(d, trialEndViewer(d, BAD_ACCOUNT_ID));
+};

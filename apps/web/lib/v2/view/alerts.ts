@@ -173,7 +173,7 @@ export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
         'openAudit',
         COPY.openAction,
         { checkId: c.check_id },
-        { context: `${site.host}, ${when(n.sent_at)}` },
+        { context: `${pillOf(c).label}: ${what(c)}` },
       ),
     };
   };

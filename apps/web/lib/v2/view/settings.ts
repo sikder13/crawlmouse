@@ -223,7 +223,8 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
   const paid = v.tier !== 'free';
 
   return {
-    shell: accountShellView(v, 'Settings'),
+    // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
+    shell: accountShellView(v, 'Settings', { plan: 'page' }),
     header: {
       title: COPY.title,
       line: [a.email, trial ? COPY.trialLeft(plan, days!) : plan].join(' · '),

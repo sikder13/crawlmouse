@@ -22,6 +22,7 @@ import {
   changesLogPreview,
   reportsPreview,
   settingsPreview,
+  trialEndPreview,
 } from '../../../app/(v2-preview)/v2-preview/_preview/screens';
 import type { RecordingName } from '../../../lib/v2/recordings';
 import {
@@ -36,6 +37,7 @@ import type { SegmentKey } from '../../../lib/v2/view/segment/frame';
 import { AlertsScreen } from '../../../components/v2/screens/alerts/AlertsScreen';
 import { ReportsScreen } from '../../../components/v2/screens/reports/ReportsScreen';
 import { SettingsScreen } from '../../../components/v2/screens/settings/SettingsScreen';
+import { TrialEndScreen } from '../../../components/v2/screens/trial-end/TrialEndScreen';
 import { ChangesLogScreen } from '../../../components/v2/screens/changes-log/ChangesLogScreen';
 
 export const homeData = homePreview;
@@ -80,7 +82,13 @@ export const ACCOUNT_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/site/withheld': () => (
     <SiteScreen data={sitePreview('withheld')} shell={shellPreview('withheld')} />
   ),
-  // CC-27's account screens.
+};
+
+/**
+ * CC-27's account screens, apart from CC-26's: account-control-names.test.tsx pins the length of
+ * ACCOUNT_ELEMENTS, and CC-27 does not edit that file. The verdict-copy guard reads both maps.
+ */
+export const CC27_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/changes-log': () => <ChangesLogScreen data={changesLogPreview()} />,
   '/v2-preview/screens/alerts': () => <AlertsScreen data={alertsPreview('home')} />,
   '/v2-preview/screens/alerts/free': () => <AlertsScreen data={alertsPreview('clean')} />,
@@ -88,4 +96,5 @@ export const ACCOUNT_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/reports/agency': () => <ReportsScreen data={reportsPreview('withheld')} />,
   '/v2-preview/screens/settings': () => <SettingsScreen data={settingsPreview('home')} />,
   '/v2-preview/screens/settings/free': () => <SettingsScreen data={settingsPreview('clean')} />,
+  '/v2-preview/screens/trial-end': () => <TrialEndScreen data={trialEndPreview()} />,
 };

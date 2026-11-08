@@ -181,6 +181,7 @@ export const PREVIEWS: PreviewEntry[] = [
   },
   { path: '/v2-preview/screens/settings', name: 'Final-Settings', kind: 'screen' },
   { path: '/v2-preview/screens/settings/free', name: 'Settings, free', kind: 'screen' },
+  { path: '/v2-preview/screens/trial-end', name: 'Final-TrialEnd', kind: 'screen' },
   // The account Changes log has no artboard (CC-27 D3), and nothing on it is the reader's action.
   {
     path: '/v2-preview/screens/changes-log',

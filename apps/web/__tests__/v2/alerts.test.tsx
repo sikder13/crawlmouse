@@ -53,9 +53,9 @@ describe('Alerts against Final-Alerts', () => {
     }
   });
 
-  it('names each Open by its site and send time for a screen reader (WCAG 2.4.4)', () => {
+  it('names each Open by the row it opens, for a screen reader (WCAG 2.4.4)', () => {
     expect(html).toMatch(
-      />Open<span [^>]*data-v2-sr-only=""> example-outfitter\.com, Fri 30 Oct 06:03</,
+      />Open<span [^>]*data-v2-sr-only=""> crawler blocked: Claude-SearchBot, all pages/,
     );
   });
 });

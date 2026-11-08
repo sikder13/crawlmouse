@@ -4,7 +4,6 @@
  */
 import type { Addition, CopyChange } from '../copy-registry';
 import { count, numberWord, plural } from '../words';
-import { railChanges } from './dashboard';
 
 /** Evidence older than this is condensed to headers and changed parts (FACTS A6, long form). */
 export const EVIDENCE_CONDENSED_AFTER_DAYS = 90;
@@ -92,7 +91,40 @@ const DAYS =
   'FACTS D4 and Q4 (owner ruling): calendar days in the account’s zone, Fri 30 Oct to Sat 7 Nov';
 
 export const SETTINGS_CHANGES: CopyChange[] = [
-  ...railChanges('settings'),
+  // The rail's trial card: this page carries the plan, so the card leaves its terms and Keep here.
+  {
+    screen: 'settings',
+    kind: 'facts',
+    locked: 'ends Sun 8 Nov',
+    rendered: 'ends Sat 7 Nov',
+    source: `${ZONE}: trial_ends_at 8 Nov 02:41Z is Sat 7 Nov 21:41 there`,
+  },
+  {
+    screen: 'settings',
+    kind: 'facts',
+    locked: '9 days left',
+    rendered: '8 days left',
+    source: DAYS,
+  },
+  {
+    screen: 'settings',
+    kind: 'ruling',
+    locked:
+      "Then Free: example-outfitter.com keeps monthly checks; the other four sites pause until you choose Pro or remove them. Nothing is deleted. We'll email you two days before.",
+    rendered: 'No card on file. Nothing is charged unless you choose Pro.',
+    // In the trial card's note, which the locked page and ours hide on a phone.
+    hiddenOnPhone: true,
+    source:
+      'Owner ruling on CC-27 (change a): a page that carries the plan’s terms and its Keep has the rail’s trial card leave them to it (`plan: page`); what Free keeps is on the plan card',
+  },
+  {
+    screen: 'settings',
+    kind: 'ruling',
+    locked: 'Keep Pro, $19 a month Theme',
+    rendered: 'Theme',
+    source:
+      'Owner ruling on CC-27 (change a): the plan card’s Keep is the one on this page; the rail’s is left out',
+  },
   {
     screen: 'settings',
     kind: 'facts',

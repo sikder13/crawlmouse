@@ -1,0 +1,68 @@
+/* Final-TrialEnd: the banner with both choices and what changes, then what the trial did. */
+
+.banner {
+  padding: 22px 24px;
+  border-color: var(--v2-fg);
+}
+
+.bannerHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.bannerText {
+  max-width: 640px;
+}
+
+.bannerTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.bannerSub {
+  margin-top: 6px;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-small);
+}
+
+.lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.list {
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+  overflow: hidden;
+}
+
+.listHead {
+  margin: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--v2-line);
+  font-size: var(--v2-text-body);
+  font-weight: 500;
+}
+
+.text {
+  padding: 16px;
+  color: var(--v2-fg2);
+  font-size: var(--v2-text-small);
+}
+
+.muted {
+  color: var(--v2-mut);
+}
+
+@media (max-width: 760px) {
+  .lists {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
