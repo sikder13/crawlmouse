@@ -56,7 +56,10 @@ describe('Trial ending, what stays and what pauses', () => {
     // The free three at the primary site's latest result (c…06), by rank: fix 1, fix 2, fix 0.
     expect(view().stays.map((r) => [r.what, r.how])).toEqual([
       ['example-outfitter.com', 'monthly checks, email if changed'],
-      ['Every check, every audit, the evidence', 'kept'],
+      [
+        'Every check, every audit, the evidence',
+        'kept; evidence older than 90 days is condensed to headers and the parts of pages that changed',
+      ],
       ['Fixes 0, 1 and 2, the free three', 'packets stay open'],
       ['Public audit link', 'keeps working'],
       ['Alerts on example-outfitter.com', 'still sent by email, after each monthly check'],
@@ -71,7 +74,8 @@ describe('Trial ending, what stays and what pauses', () => {
         'no checks; history kept, nothing you can see deleted',
       ],
       ['staging.example-outfitter.dev', 'no deploy checks on Free; history kept'],
-      ['Fixes 3–15, thirteen on Pro', 'listed, packets closed'],
+      // Fixes 14 and 15 have no packet, so eleven packets close.
+      ['Fixes 3–15, thirteen on Pro', 'listed, 11 packets closed'],
       // Weekly schedules, the Slack integration, summitgear.co, three exports made.
       ['Weekly checks, Slack alerts, competitor, exports', 'off; email alerts continue'],
     ]);
@@ -110,11 +114,79 @@ describe('Trial ending, what Pro did', () => {
 describe('Trial ending, the two choices', () => {
   it('words keeping Pro and letting it end from the prices, the gates and the sites', () => {
     const v = view();
+    expect(v.keepTitle).toBe('If you keep Pro');
     expect(v.keepText).toBe(
-      '$19 a month, or $190 a year, charged on Sat 7 Nov and then monthly. Cancel any day from Settings, in two clicks; the account goes back to Free. Nothing you can see is deleted; evidence older than 90 days is condensed to headers and the parts of pages that changed. Stripe emails the receipts; they are also in Settings › Plan.',
+      '$19 a month, or $190 a year, charged when you choose it and then each month or year. Cancel any day from Settings, in two clicks; the account goes back to Free. Nothing you can see is deleted; evidence older than 90 days is condensed to headers and the parts of pages that changed. Stripe emails the receipts; they are also in Settings › Plan.',
     );
     expect(v.endText).toBe(
       'Nothing to do. On Sat 7 Nov the account is Free: example-outfitter.com keeps its monthly check and its three fixes. The other three sites pause with their history kept, and so does the staging copy; add Pro any time to resume them.',
     );
+  });
+});
+
+describe('Trial ending, on a trial with a card (Kestrel’s Agency trial, challenged-site)', () => {
+  // Kestrel's trial ends 16 Nov 11:57Z, Mon 16 Nov in New York, with card 4242 on file. This reads
+  // the rule, not a preview: the fixture holds nothing for Kestrel after its as_of.
+  const ch = fixture('challenged-site');
+  const v = () => trialEndView(ch, trialEndViewer(ch, 'a0000000-0000-4000-8000-0000000000ca'));
+
+  it('says the card is charged unless the trial is cancelled, and offers the cancel, not a checkout', () => {
+    const t = v();
+    expect(t.header.title).toBe('Three days of Agency left');
+    expect(t.banner.sub).toMatch(
+      /The card ending 4242 is charged on Mon 16 Nov unless you cancel\.$/,
+    );
+    expect(t.banner.keep).toBeNull();
+    expect(t.banner.end).toMatchObject({
+      label: 'Cancel before Mon 16 Nov',
+      href: '/settings/plan',
+    });
+    expect(t.pausesTitle).toBe('Pauses, until Agency');
+  });
+
+  it('words doing nothing and cancelling at the Agency price', () => {
+    const t = v();
+    expect(t.keepTitle).toBe('If you do nothing');
+    expect(t.keepText).toMatch(
+      /^The card ending 4242 is charged \$99 on Mon 16 Nov, then each month\. /,
+    );
+    expect(t.endTitle).toBe('If you cancel');
+    expect(t.endText).toBe(
+      'Cancel before Mon 16 Nov from Settings › Plan, in two clicks, and on Mon 16 Nov the account is Free: pinecrest.example keeps its monthly check.',
+    );
+  });
+});
+
+describe('Trial ending, the window’s edges', () => {
+  it('starts at the current trial, not at the account’s first state', () => {
+    // The same account with a Free state before its trial: the first audit (finished 02:34Z on
+    // 25 Oct, before the trial's 02:41Z) stays outside the window.
+    const a = bad.accounts.find((x) => x.id === BAD)!;
+    const d = {
+      ...bad,
+      accounts: bad.accounts.map((x) =>
+        x.id === BAD
+          ? {
+              ...a,
+              state_history: [
+                { state: 'free' as const, since: '2026-10-24T00:00:00Z' },
+                ...a.state_history,
+              ],
+            }
+          : x,
+      ),
+    };
+    expect(trialEndView(d, trialEndViewer(d, BAD)).did.rows[0]!.value).toBe('13');
+  });
+
+  it('counts as closed only a resolved change that names its fix', () => {
+    const d = {
+      ...bad,
+      changes: bad.changes.map((c) =>
+        c.id === '90000000-0000-4000-8000-000000000005' ? { ...c, fix_id: null } : c,
+      ),
+    };
+    const row = trialEndView(d, trialEndViewer(d, BAD)).did.rows[2]!;
+    expect([row.value, row.detail]).toEqual(['0', 'none']);
   });
 });

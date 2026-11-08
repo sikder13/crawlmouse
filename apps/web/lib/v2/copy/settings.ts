@@ -7,6 +7,8 @@ import { count, numberWord, plural } from '../words';
 
 /** Evidence older than this is condensed to headers and changed parts (FACTS A6, long form). */
 export const EVIDENCE_CONDENSED_AFTER_DAYS = 90;
+/** Cancelling a plan takes this many clicks, with no retention offer in the path (FACTS D5, L6). */
+export const CANCEL_CLICKS = 2;
 /** A deleted account can be restored by a sign-in link for this long (FACTS E6, ARCH-2 §3.2). */
 export const DELETE_GRACE_DAYS = 7;
 

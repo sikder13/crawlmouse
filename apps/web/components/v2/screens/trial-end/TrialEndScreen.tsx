@@ -5,7 +5,6 @@ import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
 import { CardHead } from '../account/parts';
 import shared from '../account/AccountScreen.module.css';
-import settings from '../settings/SettingsTable.module.css';
 import styles from './TrialEndScreen.module.css';
 
 /** "Stays, on Free" or "Pauses, until Pro": what it is, then what happens to it. */
@@ -27,7 +26,7 @@ function List({
         label={label}
         headersHidden
         rowHeader
-        className={settings.settings}
+        className={styles.prose}
         columns={[{ header: columns.what }, { header: columns.how }]}
         rows={rows.map((r) => ({
           key: r.what,
@@ -71,7 +70,7 @@ export function TrialEndScreen({ data }: { data: TrialEndView }) {
             <div className={styles.bannerSub}>{banner.sub}</div>
           </div>
           <div className={shared.actions}>
-            <ActionControl action={banner.keep} size="md" />
+            {banner.keep ? <ActionControl action={banner.keep} size="md" /> : null}
             <ActionControl action={banner.end} variant="quiet" size="md" />
           </div>
         </div>

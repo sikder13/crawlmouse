@@ -19,18 +19,21 @@ export const TRIAL_END_COPY = {
   sentToday: 'We sent this once, today, as promised.',
   sentOn: (date: string) => `We sent this once, on ${date}, as promised.`,
   noCard: 'No card is on file, so nothing is charged either way.',
+  /** A trial with a card on file becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
   card: (last4: string, date: string) =>
-    `The card ending ${last4} is charged on ${date} unless you let it end.`,
+    `The card ending ${last4} is charged on ${date} unless you cancel.`,
   keepNoCard: (plan: string, price: number) => `Keep ${plan}, $${price} a month · add a card`,
-  keep: (plan: string, price: number) => `Keep ${plan}, $${price} a month`,
   letItEnd: (date: string) => `Let it end on ${date}`,
+  cancelBefore: (date: string) => `Cancel before ${date}`,
   staysTitle: 'Stays, on Free',
-  pausesTitle: 'Pauses, until Pro',
+  pausesTitle: (plan: string) => `Pauses, until ${plan}`,
   stays: {
     site: (schedule: string, email: boolean) =>
       `${schedule} checks${email ? ', email if changed' : ''}`,
     evidence: 'Every check, every audit, the evidence',
-    kept: 'kept',
+    /** FACTS A6, long form. */
+    kept: (condensed: number) =>
+      `kept; evidence older than ${condensed} days is condensed to headers and the parts of pages that changed`,
     freeFixes: (numbers: readonly number[]) =>
       `${plural(numbers.length, 'Fix', 'Fixes')} ${listOf(numbers.map(String))}, the free ${numberWord(numbers.length)}`,
     packetsOpen: 'packets stay open',
@@ -42,9 +45,10 @@ export const TRIAL_END_COPY = {
   pauses: {
     sitesHow: 'no checks; history kept, nothing you can see deleted',
     stagingHow: 'no deploy checks on Free; history kept',
-    fixes: (range: string, n: number) =>
-      `${plural(n, 'Fix', 'Fixes')} ${range}, ${numberWord(n)} on Pro`,
-    fixesHow: 'listed, packets closed',
+    fixes: (range: string, n: number, plan: string) =>
+      `${plural(n, 'Fix', 'Fixes')} ${range}, ${numberWord(n)} on ${plan}`,
+    fixesHow: (packets: number) =>
+      `listed, ${count(packets)} ${plural(packets, 'packet', 'packets')} closed`,
     features: {
       weekly: 'Weekly checks',
       slack: 'Slack alerts',
@@ -61,6 +65,7 @@ export const TRIAL_END_COPY = {
     `${count(n)} on ${host}: ${listOf(dates)}`,
   recheck: (date: string, fix: number | null) =>
     fix === null ? `the re-check ${date}` : `the re-check ${date} after fix ${fix}`,
+  /** "8 across the other four sites": the sites those checks ran on, counted from the checks. */
   checksElsewhere: (n: number, sites: number) =>
     `${count(n)} across the other ${numberWord(sites)} ${plural(sites, 'site', 'sites')}`,
   changesCaught: 'Changes caught',
@@ -77,26 +82,37 @@ export const TRIAL_END_COPY = {
         : ''
     }`,
   none: 'none',
-  keepTitle: 'If you keep Pro',
+  keepTitle: (plan: string) => `If you keep ${plan}`,
+  doNothingTitle: 'If you do nothing',
   /** FACTS A6 (long form), D5 (two clicks) and A9 (Stripe emails the receipts). */
-  keepText: (monthly: number, yearly: number, date: string, condensed: number) =>
-    `$${monthly} a month, or $${yearly} a year, charged on ${date} and then monthly. Cancel any day from Settings, in two clicks; the account goes back to Free. Nothing you can see is deleted; evidence older than ${condensed} days is condensed to headers and the parts of pages that changed. Stripe emails the receipts; they are also in Settings › Plan.`,
+  terms: (clicks: number, condensed: number) =>
+    `Cancel any day from Settings, in ${numberWord(clicks)} clicks; the account goes back to Free. Nothing you can see is deleted; evidence older than ${condensed} days is condensed to headers and the parts of pages that changed. Stripe emails the receipts; they are also in Settings › Plan.`,
+  /** Keeping a no-card trial is a checkout, which charges when it is made (`/api/billing/checkout`). */
+  keepNoCardText: (monthly: number, yearly: number) =>
+    `$${monthly} a month, or $${yearly} a year, charged when you choose it and then each month or year.`,
+  keepCardText: (last4: string, monthly: number, date: string) =>
+    `The card ending ${last4} is charged $${monthly} on ${date}, then each month.`,
   endTitle: 'If you let it end',
-  endText: (
-    date: string,
+  cancelTitle: 'If you cancel',
+  endNothing: (date: string) => `Nothing to do. On ${date} the account is Free:`,
+  endCancel: (date: string, clicks: number) =>
+    `Cancel before ${date} from Settings › Plan, in ${numberWord(clicks)} clicks, and on ${date} the account is Free:`,
+  /** What Free keeps and pauses, from the sites and the free fixes the account holds. */
+  endKeeps: (
     host: string,
     schedule: string,
     fixes: number,
     others: number,
     staging: boolean,
+    plan: string,
   ) =>
-    `Nothing to do. On ${date} the account is Free: ${host} keeps its ${schedule} check and its ${numberWord(fixes)} fixes.${
+    `${host} keeps its ${schedule} check${fixes ? ` and its ${numberWord(fixes)} ${plural(fixes, 'fix', 'fixes')}` : ''}.${
       others || staging
         ? ` ${
             others
               ? `The other ${numberWord(others)} ${plural(others, 'site pauses', 'sites pause')} with ${plural(others, 'its', 'their')} history kept${staging ? ', and so does the staging copy' : ''}`
               : 'The staging copy pauses with its history kept'
-          }; add Pro any time to resume them.`
+          }; add ${plan} any time to resume them.`
         : ''
     }`,
   tables: { stays: 'Stays', pauses: 'Pauses', did: 'Trial summary' },
@@ -161,6 +177,22 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
   },
   {
     screen: 'trial-end',
+    kind: 'facts',
+    locked: 'the evidence kept',
+    rendered:
+      'the evidence kept; evidence older than 90 days is condensed to headers and the parts of pages that changed',
+    source: 'FACTS A6 (long form): what Free keeps is what you can see',
+  },
+  {
+    screen: 'trial-end',
+    kind: 'fixture',
+    locked: 'listed, packets closed',
+    rendered: 'listed, 11 packets closed',
+    source:
+      'The fixture’s fixes 14 and 15 have no packet, so eleven of the thirteen fixes on Pro close a packet',
+  },
+  {
+    screen: 'trial-end',
     kind: 'fixture',
     locked: 'Fixes 4–14, eleven on Pro',
     rendered: 'Fixes 3–15, thirteen on Pro',
@@ -208,6 +240,14 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
     locked: '3 stay open on Free; 11 close',
     rendered: '3 stay open on Free; 11 close. 2 more open fixes have no packet.',
     source: 'The fixture’s fixes 14 and 15 are open with no packet',
+  },
+  {
+    screen: 'trial-end',
+    kind: 'fixture',
+    locked: 'charged on Sun 8 Nov and then monthly.',
+    rendered: 'charged when you choose it and then each month or year.',
+    source:
+      'The contract’s keep route, `/api/billing/checkout`, opens a subscription with no trial end, so it charges when it is made; a yearly plan is billed each year, not monthly',
   },
   {
     screen: 'trial-end',

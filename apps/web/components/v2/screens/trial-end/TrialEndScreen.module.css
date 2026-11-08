@@ -61,8 +61,31 @@
   color: var(--v2-mut);
 }
 
+/* A table of what and how, both prose: left-aligned at every width, and on a phone each row reads
+   as its label above its detail rather than two squeezed columns (DESIGN-LOCK §7.7 stacks it). */
+.prose td,
+.prose th {
+  text-align: left;
+}
+
 @media (max-width: 760px) {
   .lists {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .prose tbody tr {
+    display: block;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--v2-line2);
+  }
+
+  .prose tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .prose tbody :is(td, th) {
+    display: block;
+    padding: 0 !important;
+    border-bottom: 0 !important;
   }
 }

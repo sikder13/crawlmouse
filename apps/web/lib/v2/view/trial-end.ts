@@ -8,9 +8,9 @@
  */
 import { instant, type Change, type FixtureDataset, type Verdict } from '@crawlmouse/types/v2';
 import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
-import { AGENCY_MONTHLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
+import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
-import { EVIDENCE_CONDENSED_AFTER_DAYS } from '../copy/settings';
+import { CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS } from '../copy/settings';
 import { TRIAL_END_COPY as COPY } from '../copy/trial-end';
 import { fixesAsOf } from '../fixtures';
 import {
@@ -33,7 +33,7 @@ import {
 } from './account';
 import { ACCOUNT_NAV, action, type ActionView } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
-import { FREE_FIXES, freeFixes } from './free-fixes';
+import { freeFixes } from './free-fixes';
 import { GRADES } from './segment/changes';
 
 export interface TrialRowView {
@@ -52,7 +52,12 @@ export interface DidRowView {
 export interface TrialEndView {
   shell: ShellView;
   header: { title: string; line: string; actions: ActionView[] };
-  banner: { title: string; sub: string; keep: ActionView; end: ActionView };
+  /**
+   * `keep`: on a trial with no card, the checkout that keeps the plan (the page's orange action);
+   * null on a trial with a card, which becomes the plan at its end unless it is cancelled. `end`:
+   * leaving it to end (no card), or cancelling it (a card).
+   */
+  banner: { title: string; sub: string; keep: ActionView | null; end: ActionView };
   staysTitle: string;
   stays: TrialRowView[];
   pausesTitle: string;
@@ -96,6 +101,8 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
   const end = a.trial_ends_at!;
   const start = a.state_history.at(-1)!.since;
   const price = v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY;
+  const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
+  const card = a.card_last4;
   const site = primarySite(v);
   const others = primarySites(v).filter((s) => s.id !== site.id);
   const staging = v.d.sites.filter((s) => s.staging_of_site_id !== null);
@@ -126,7 +133,7 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
         ? COPY.sentToday
         : COPY.sentOn(dayDate(reminder, zone))
       : null;
-  const card = a.card_last4 === null ? COPY.noCard : COPY.card(a.card_last4, dayDate(end, zone));
+  const cardLine = card === null ? COPY.noCard : COPY.card(card, dayDate(end, zone));
   const dashboard = ACCOUNT_NAV[0];
 
   // ── the fixes at the primary site's latest result ──
@@ -140,6 +147,7 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
     .sort((x, y) => x - y);
   const withPacket = open.filter((f) => f.packet !== null);
   const freeWithPacket = withPacket.filter((f) => freeIds.has(f.id));
+  const closedPackets = withPacket.length - freeWithPacket.length;
 
   // ── what stays and what pauses ──
   const emails = a.email_prefs.change_notes;
@@ -147,7 +155,7 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
     emails && v.d.alert_rules.some((r) => r.enabled && r.channels.includes('email'));
   const stays: TrialRowView[] = [
     { what: site.host, how: COPY.stays.site(free, emails) },
-    { what: COPY.stays.evidence, how: COPY.stays.kept },
+    { what: COPY.stays.evidence, how: COPY.stays.kept(EVIDENCE_CONDENSED_AFTER_DAYS) },
     ...(freeThree.length
       ? [
           {
@@ -187,7 +195,12 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
       ? [{ what: listOf(staging.map((s) => s.host)), how: COPY.pauses.stagingHow }]
       : []),
     ...(onPro.length
-      ? [{ what: COPY.pauses.fixes(numbersText(onPro), onPro.length), how: COPY.pauses.fixesHow }]
+      ? [
+          {
+            what: COPY.pauses.fixes(numbersText(onPro), onPro.length, plan),
+            how: COPY.pauses.fixesHow(closedPackets),
+          },
+        ]
       : []),
     ...(features.length ? [{ what: features.join(', '), how: COPY.pauses.featuresHow }] : []),
   ];
@@ -199,7 +212,8 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
     .filter((c) => inWindow(c.finished_at!))
     .sort((x, y) => at(x.finished_at!) - at(y.finished_at!));
   const onSite = checks.filter((c) => c.site_id === site.id);
-  const elsewhere = checks.length - onSite.length;
+  const elsewhere = checks.filter((c) => c.site_id !== site.id);
+  const elsewhereSites = new Set(elsewhere.map((c) => c.site_id)).size;
   const fixOfRecheck = (checkId: string) => {
     const e = v.d.fix_events.find((x) => 'check_id' in x && x.check_id === checkId);
     return e ? (v.d.fixes.find((f) => f.id === e.fix_id)?.number ?? null) : null;
@@ -240,26 +254,35 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
     },
     banner: {
       title: COPY.bannerTitle(plan, dayDate(end, zone)),
-      sub: [sent, card].filter(Boolean).join(' '),
-      keep: action(
-        'keepPlan',
-        a.card_last4 === null ? COPY.keepNoCard(plan, price) : COPY.keep(plan, price),
-        {},
-        { primary: true, fields: { plan: v.tier, interval: 'month' } },
-      ),
-      end: {
-        label: COPY.letItEnd(dayDate(end, zone)),
-        route: dashboard.href,
-        href: dashboard.href,
-        method: 'get',
-        fields: {},
-        primary: false,
-        context: null,
-      },
+      sub: [sent, cardLine].filter(Boolean).join(' '),
+      keep:
+        card === null
+          ? action(
+              'keepPlan',
+              COPY.keepNoCard(plan, price),
+              {},
+              {
+                primary: true,
+                fields: { plan: v.tier, interval: 'month' },
+              },
+            )
+          : null,
+      end:
+        card === null
+          ? {
+              label: COPY.letItEnd(dayDate(end, zone)),
+              route: dashboard.href,
+              href: dashboard.href,
+              method: 'get',
+              fields: {},
+              primary: false,
+              context: null,
+            }
+          : action('plan', COPY.cancelBefore(dayDate(end, zone))),
     },
     staysTitle: COPY.staysTitle,
     stays,
-    pausesTitle: COPY.pausesTitle,
+    pausesTitle: COPY.pausesTitle(plan),
     pauses,
     did: {
       title: COPY.didTitle(plan, calendarDays(start, v.now, zone)),
@@ -271,7 +294,7 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
           detail:
             [
               ...(onSite.length ? [COPY.checksOn(onSite.length, site.host, checkDates)] : []),
-              ...(elsewhere ? [COPY.checksElsewhere(elsewhere, v.d.sites.length - 1)] : []),
+              ...(elsewhere.length ? [COPY.checksElsewhere(elsewhere.length, elsewhereSites)] : []),
             ].join(' · ') || COPY.none,
           verdicts: [],
         },
@@ -312,17 +335,20 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
         },
       ],
     },
-    keepTitle: COPY.keepTitle,
-    keepText: COPY.keepText(price, PRO_YEARLY, dayDate(end, zone), EVIDENCE_CONDENSED_AFTER_DAYS),
-    endTitle: COPY.endTitle,
-    endText: COPY.endText(
-      dayDate(end, zone),
-      site.host,
-      free,
-      FREE_FIXES,
-      others.length,
-      staging.length > 0,
-    ),
+    keepTitle: card === null ? COPY.keepTitle(plan) : COPY.doNothingTitle,
+    keepText: [
+      card === null
+        ? COPY.keepNoCardText(price, yearly)
+        : COPY.keepCardText(card, price, dayDate(end, zone)),
+      COPY.terms(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
+    ].join(' '),
+    endTitle: card === null ? COPY.endTitle : COPY.cancelTitle,
+    endText: [
+      card === null
+        ? COPY.endNothing(dayDate(end, zone))
+        : COPY.endCancel(dayDate(end, zone), CANCEL_CLICKS),
+      COPY.endKeeps(site.host, free, freeThree.length, others.length, staging.length > 0, plan),
+    ].join(' '),
     tables: COPY.tables,
     columns: COPY.columns,
   };
