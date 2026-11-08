@@ -36,6 +36,8 @@ export interface LedgerDecision {
 }
 
 const DAY_MS = 86_400_000;
+/** The window of the email rule, in calendar months. */
+export const EMAIL_MONTHS = 12;
 /** The window of the device and IP rules. */
 export const RECENT_DAYS = 30;
 /** Prior trials from one device (or one network) that refuse the next. */
