@@ -235,8 +235,9 @@ refused 403 by the middleware before the route runs:
   `STRIPE_ACCOUNT_WEBHOOK_SECRET`, `STRIPE_ACCOUNT_LIVEMODE`. Production keeps `V2_BILLING` unset.
 
 - **Mode.** The v2 Stripe client (`lib/billing/stripe-account.ts`) refuses a key whose mode is not
-  `STRIPE_ACCOUNT_LIVEMODE`'s, and a test key on `VERCEL_ENV=production`; checkout, the webhook and the
-  reconcile then answer 500 and write nothing.
+  `STRIPE_ACCOUNT_LIVEMODE`'s, and a test key on `VERCEL_ENV=production`; the billing routes and the
+  webhook then answer 500 and the reconcile's step fails, before any write
+  (`pnpm --filter @crawlmouse/web exec vitest run lib/billing/stripe-account.test.ts`).
 - **Prices.** Change a Stripe price and `prices.ts` in one deploy. A session opened before it and paid after
   is refused on its prices, cancelled and alerted. Subscribers left on a retired price keep their plan while
   it is listed; once it is not, their revokes still apply (Q11) but a restore is refused, so moving them to
