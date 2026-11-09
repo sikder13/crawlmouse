@@ -8,6 +8,7 @@ import {
   handleAuditFailure,
   setAuditFailureReporter,
 } from './audit';
+import { PLAN_CONCURRENCY_CAP } from './concurrency';
 
 // A realistic large crawl result: ~600 pages / 700 links / 40 findings. Serialized whole,
 // this is the multi-MiB object that previously crossed the run-engine -> persist-results
@@ -191,9 +192,10 @@ describe('auditConcurrencyLimit (Inngest plan-cap safety)', () => {
     expect(auditConcurrencyLimit({})).toBe(5);
   });
 
-  it('uses an explicit positive integer (e.g. 50 on a paid plan)', () => {
-    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '50' })).toBe(50);
+  it('uses an explicit whole number up to the plan cap', () => {
     expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '1' })).toBe(1);
+    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '3' })).toBe(3);
+    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '5' })).toBe(5);
   });
 
   it('falls back to 5 for non-numeric, empty, zero, negative, or fractional values', () => {
@@ -202,11 +204,12 @@ describe('auditConcurrencyLimit (Inngest plan-cap safety)', () => {
     }
   });
 
-  it('clamps a fat-finger value to the cost-model ceiling (100) so a typo cannot re-break app sync', () => {
-    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '100' })).toBe(100);
-    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '101' })).toBe(100);
-    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '500' })).toBe(100);
-    expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: '1000000' })).toBe(100);
+  it('clamps any value above the plan cap to the cap, so no env value can break app sync', () => {
+    // The cap is the account's Inngest plan cap (Free: 5), shared with checkFn
+    // (concurrency.ts). Before CC-20b this clamped at 100, so `6` already broke sync on Free.
+    for (const raw of ['6', '50', '100', '101', '500', '1000000']) {
+      expect(auditConcurrencyLimit({ INNGEST_AUDIT_CONCURRENCY: raw })).toBe(PLAN_CONCURRENCY_CAP);
+    }
   });
 });
 
