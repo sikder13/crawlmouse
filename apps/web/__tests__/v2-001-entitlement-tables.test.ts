@@ -373,7 +373,8 @@ describe('migration 001 catalog posture', () => {
     expect(rows.map((r) => r.name)).toEqual(Object.keys(FUNCTION_ACL).sort());
     for (const row of rows) {
       expect(row.definer, row.name).toBe(true);
-      expect(row.config, row.name).toEqual(['search_path=public, pg_catalog']);
+      // 001 wrote public, pg_catalog; 20261108000002 (CC-SEC) moved pg_catalog first and pg_temp last.
+      expect(row.config, row.name).toEqual(['search_path=pg_catalog, public, pg_temp']);
       expect(aclItems(row.acl), row.name).toEqual(expect.arrayContaining(FUNCTION_ACL[row.name]!));
       expect(aclItems(row.acl), row.name).toHaveLength(FUNCTION_ACL[row.name]!.length);
     }

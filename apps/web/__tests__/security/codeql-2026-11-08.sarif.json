@@ -1,0 +1,593 @@
+{
+  "$comment": "Trimmed from the SARIF GitHub stored for the codeql job on 2026-11-08 (analysis 2122616052, commit 6938fb47): its high-severity results outside tests/, and each rule's id and security-severity. GitHub stores a SARIF without its tool notifications, so this one has no extracted-file count; the baseline test reads results only.",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "CodeQL",
+          "rules": []
+        },
+        "extensions": [
+          {
+            "name": "codeql/javascript-queries",
+            "rules": [
+              {
+                "id": "js/file-system-race",
+                "properties": {
+                  "security-severity": "7.7"
+                }
+              },
+              {
+                "id": "js/incomplete-sanitization",
+                "properties": {
+                  "security-severity": "7.8"
+                }
+              },
+              {
+                "id": "js/incomplete-url-scheme-check",
+                "properties": {
+                  "security-severity": "7.8"
+                }
+              },
+              {
+                "id": "js/insecure-temporary-file",
+                "properties": {
+                  "security-severity": "7"
+                }
+              },
+              {
+                "id": "js/regex/missing-regexp-anchor",
+                "properties": {
+                  "security-severity": "7.8"
+                }
+              },
+              {
+                "id": "js/remote-property-injection",
+                "properties": {
+                  "security-severity": "7.5"
+                }
+              }
+            ]
+          },
+          {
+            "name": "codeql/javascript-all",
+            "rules": []
+          },
+          {
+            "name": "codeql/threat-models",
+            "rules": []
+          }
+        ]
+      },
+      "invocations": [],
+      "results": [
+        {
+          "ruleId": "js/incomplete-sanitization",
+          "rule": {
+            "id": "js/incomplete-sanitization",
+            "index": 1,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "apps/web/lib/entitlement-spec.ts"
+                },
+                "region": {
+                  "startLine": 348
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "570bef24ab4b3a5:1"
+          }
+        },
+        {
+          "ruleId": "js/incomplete-sanitization",
+          "rule": {
+            "id": "js/incomplete-sanitization",
+            "index": 1,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "apps/web/lib/v2/view/home.ts"
+                },
+                "region": {
+                  "startLine": 203
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "7cc7ef6bf772fb1:1"
+          }
+        },
+        {
+          "ruleId": "js/incomplete-sanitization",
+          "rule": {
+            "id": "js/incomplete-sanitization",
+            "index": 1,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/worker/src/spec/render.ts"
+                },
+                "region": {
+                  "startLine": 110
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "3d2db658dfd6460b:1"
+          }
+        },
+        {
+          "ruleId": "js/incomplete-url-scheme-check",
+          "rule": {
+            "id": "js/incomplete-url-scheme-check",
+            "index": 2,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/extract.ts"
+                },
+                "region": {
+                  "startLine": 152
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "52a3a31abe2ab219:1"
+          }
+        },
+        {
+          "ruleId": "js/file-system-race",
+          "rule": {
+            "id": "js/file-system-race",
+            "index": 0,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/research/cf-panel/tranco.ts"
+                },
+                "region": {
+                  "startLine": 49
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "439b33ccb515527b:1"
+          }
+        },
+        {
+          "ruleId": "js/remote-property-injection",
+          "rule": {
+            "id": "js/remote-property-injection",
+            "index": 5,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/v2/layout/force-layout.ts"
+                },
+                "region": {
+                  "startLine": 300
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "ab1205daaf58a4aa:1"
+          }
+        },
+        {
+          "ruleId": "js/remote-property-injection",
+          "rule": {
+            "id": "js/remote-property-injection",
+            "index": 5,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/v2/layout/force-layout.ts"
+                },
+                "region": {
+                  "startLine": 426
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "8eabf3ded00f1884:1"
+          }
+        },
+        {
+          "ruleId": "js/insecure-temporary-file",
+          "rule": {
+            "id": "js/insecure-temporary-file",
+            "index": 3,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/p5/driver.mjs"
+                },
+                "region": {
+                  "startLine": 30
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "8163fca11f68f6bf:1"
+          }
+        },
+        {
+          "ruleId": "js/insecure-temporary-file",
+          "rule": {
+            "id": "js/insecure-temporary-file",
+            "index": 3,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/p5/l8-funnel.mjs"
+                },
+                "region": {
+                  "startLine": 104
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "1334075aa1c7d48e:1"
+          }
+        },
+        {
+          "ruleId": "js/insecure-temporary-file",
+          "rule": {
+            "id": "js/insecure-temporary-file",
+            "index": 3,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/p5/l8-funnel2.mjs"
+                },
+                "region": {
+                  "startLine": 72
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "1334075aa1c7d48e:1"
+          }
+        },
+        {
+          "ruleId": "js/regex/missing-regexp-anchor",
+          "rule": {
+            "id": "js/regex/missing-regexp-anchor",
+            "index": 4,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/cms-detection/signatures.ts"
+                },
+                "region": {
+                  "startLine": 22
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "2787d013bc523fb9:1"
+          }
+        },
+        {
+          "ruleId": "js/regex/missing-regexp-anchor",
+          "rule": {
+            "id": "js/regex/missing-regexp-anchor",
+            "index": 4,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/cms-detection/signatures.ts"
+                },
+                "region": {
+                  "startLine": 23
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "7f6dad6457fa448f:1"
+          }
+        },
+        {
+          "ruleId": "js/regex/missing-regexp-anchor",
+          "rule": {
+            "id": "js/regex/missing-regexp-anchor",
+            "index": 4,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/cms-detection/signatures.ts"
+                },
+                "region": {
+                  "startLine": 49
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "19672e7e5049cb74:1"
+          }
+        },
+        {
+          "ruleId": "js/regex/missing-regexp-anchor",
+          "rule": {
+            "id": "js/regex/missing-regexp-anchor",
+            "index": 4,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/cms-detection/signatures.ts"
+                },
+                "region": {
+                  "startLine": 50
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "35960c2be9f05822:1"
+          }
+        },
+        {
+          "ruleId": "js/regex/missing-regexp-anchor",
+          "rule": {
+            "id": "js/regex/missing-regexp-anchor",
+            "index": 4,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/cms-detection/signatures.ts"
+                },
+                "region": {
+                  "startLine": 51
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "d8170816c6b14eb1:1"
+          }
+        },
+        {
+          "ruleId": "js/regex/missing-regexp-anchor",
+          "rule": {
+            "id": "js/regex/missing-regexp-anchor",
+            "index": 4,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/cms-detection/signatures.ts"
+                },
+                "region": {
+                  "startLine": 57
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "e955ff0a27b40c00:1"
+          }
+        },
+        {
+          "ruleId": "js/regex/missing-regexp-anchor",
+          "rule": {
+            "id": "js/regex/missing-regexp-anchor",
+            "index": 4,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/cms-detection/signatures.ts"
+                },
+                "region": {
+                  "startLine": 57
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "e955ff0a27b40c00:1"
+          }
+        },
+        {
+          "ruleId": "js/regex/missing-regexp-anchor",
+          "rule": {
+            "id": "js/regex/missing-regexp-anchor",
+            "index": 4,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/cms-detection/signatures.ts"
+                },
+                "region": {
+                  "startLine": 66
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "c20a551777c27373:1"
+          }
+        },
+        {
+          "ruleId": "js/regex/missing-regexp-anchor",
+          "rule": {
+            "id": "js/regex/missing-regexp-anchor",
+            "index": 4,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/cms-detection/signatures.ts"
+                },
+                "region": {
+                  "startLine": 67
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "fc68ebbb4b85e1c2:1"
+          }
+        },
+        {
+          "ruleId": "js/regex/missing-regexp-anchor",
+          "rule": {
+            "id": "js/regex/missing-regexp-anchor",
+            "index": 4,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "packages/engine/src/cms-detection/signatures.ts"
+                },
+                "region": {
+                  "startLine": 75
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "a56f95510a7b8076:1"
+          }
+        },
+        {
+          "ruleId": "js/regex/missing-regexp-anchor",
+          "rule": {
+            "id": "js/regex/missing-regexp-anchor",
+            "index": 4,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts/research/cf-panel/robots-access.ts"
+                },
+                "region": {
+                  "startLine": 77
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "2f7a00f8d23d0d3:1"
+          }
+        }
+      ]
+    }
+  ]
+}

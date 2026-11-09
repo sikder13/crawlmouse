@@ -7,6 +7,7 @@ import { readAnonSessionId, clearAnonSession } from '@/lib/anon-session';
 import { applyNoStore } from '@/lib/supabase/no-store';
 import { safeNextPath } from '@/lib/safe-next-path';
 import { getClientIp } from '@/lib/client-ip';
+import { isSameOrigin } from '@/lib/security/same-origin';
 import { accountDoorEnabled } from '@/lib/auth/flags';
 import { AUTH_LINK_SECONDS, COOKIES } from '@/lib/auth/constants';
 import {
@@ -75,16 +76,10 @@ export async function GET(req: Request) {
   return res;
 }
 
-/** A form post from our own page. A browser may send `Origin: null` on a no-JS post. */
-function sameOrigin(req: Request, origin: string): boolean {
-  const o = req.headers.get('origin');
-  if (o === origin) return true;
-  return (o === null || o === 'null') && req.headers.get('sec-fetch-site') === 'same-origin';
-}
-
 export async function POST(request: Request) {
   const url = new URL(request.url);
-  if (!sameOrigin(request, url.origin)) {
+  // A form post from our own page; a browser may send `Origin: null` on a no-JS post.
+  if (!isSameOrigin(request, url.origin)) {
     return applyNoStore(NextResponse.json({ error: 'cross_site' }, { status: 403 }));
   }
   const req = new NextRequest(request);
@@ -119,7 +114,7 @@ export async function POST(request: Request) {
     }
     const user: User | null = data.user ?? (await sb.auth.getUser()).data.user;
 
-    // Claim the audits this browser ran anonymously before signing in (v1, as /api/auth/claim). The
+    // Claim the audits this browser ran anonymously before signing in (v1). The
     // anon-session id is an httpOnly capability cookie, so a browser only claims its own unclaimed
     // audits. Not when the link signed in an address other than the one this browser's door request
     // was for: that is someone else's link opened here, and the audits are not theirs (CC-06c D9).

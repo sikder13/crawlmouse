@@ -139,6 +139,10 @@ const INVENTORY: [entry: string, why: string][] = [
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
   [
+    'apps/web/lib/security/route-policy.ts :: return matches(rest, path.slice(1));',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
     'apps/web/app/api/audits/[id]/export/route.ts :: .slice()',
     'array slice \u2014 cannot split a surrogate pair',
   ],
