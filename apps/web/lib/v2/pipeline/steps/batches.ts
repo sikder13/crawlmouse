@@ -9,7 +9,8 @@
  * a 5xx asks the worker whether the batch arrived, and throws (so the step retries) when it did not.
  *
  * read. The result is checked against the contract and against the batch it should be, stored
- * gzipped, and its row marked done with a summary of counts and the worker release its rows name.
+ * gzipped, and its row marked done with a summary of counts and the worker release its rows name. A
+ * row already done answers with that summary, without asking the worker.
  */
 import { nextCrawlBatch, sample, type Sample } from '@crawlmouse/engine/v2/pipeline';
 import { BatchResultSchema, type BatchResult } from '@crawlmouse/types/v2';
@@ -32,6 +33,15 @@ import { assembledSoFar, isCrawl, iso, loadResults, loadSeeds, pathOf, releaseOf
 
 /** A post's summary until the batch is read: what was asked and how long it was given. */
 const PlannedSchema = z.object({ urls: z.int().min(1), max_seconds: z.int().min(1) });
+
+/** A read batch's summary, as `read` writes it on the row. */
+const ReadSummarySchema = z.strictObject({
+  pages: z.int().min(0),
+  links: z.int().min(0),
+  access_tests: z.int().min(0),
+  partial: z.boolean(),
+  release: z.string().nullable(),
+});
 
 /** The worker did not answer; asking it again may. */
 const TRANSIENT: ReadonlySet<WorkerErrorKind> = new Set(['timeout', 'network', 'server']);
@@ -185,6 +195,12 @@ export function batchSteps(
     },
 
     async read(event, at, so) {
+      // A read retried after it stored the result and marked the row done: the worker may no longer
+      // hold the batch (restarted on the same release), so the row's summary is the answer.
+      const row = await deps.store.batch(event.checkId, at.batch);
+      if (row?.status === 'done' && row.result_path !== null) {
+        return { status: 'read', ...ReadSummarySchema.parse(row.summary) };
+      }
       const worker = workerOf();
       const id = batchIdOf(event.checkId, at.batch);
       const got = await worker.pollBatch(id);

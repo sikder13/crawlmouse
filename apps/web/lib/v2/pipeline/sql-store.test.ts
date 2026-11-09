@@ -182,6 +182,19 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
       summary: { pages: 3 },
       result_path: 'anon/x/y/batch-1.json.gz',
     });
+    // A done batch is not posted again (correctness 3): its stored result stays where its row says.
+    await expect(
+      store.upsertBatch({
+        ...posted,
+        nonce: 'c'.repeat(24),
+        summary: { urls: 3, max_seconds: 70 },
+      }),
+    ).rejects.toThrow('is done; it is not posted again');
+    expect(await store.batch(id, 1)).toMatchObject({
+      status: 'done',
+      nonce: 'b'.repeat(24),
+      result_path: 'anon/x/y/batch-1.json.gz',
+    });
   });
 
   it('inserts a queued check once by id, and reads the request site', async () => {

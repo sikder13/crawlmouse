@@ -62,6 +62,14 @@ interface Case {
 }
 const C = 'c0000000-0000-4000-8000-000000000000';
 const S = 's0000000-0000-4000-8000-000000000000';
+const BATCH_ROW = {
+  check_id: C,
+  batch: 3,
+  kind: 'crawl' as const,
+  nonce: 'n'.repeat(24),
+  posted_at: 'T',
+  summary: { urls: 50, max_seconds: 240 },
+};
 const QUEUED_ROW = {
   id: C,
   site_id: S,
@@ -144,14 +152,6 @@ describe('supabasePipelineStore: the race-critical statements are 008’s functi
 });
 
 describe('supabasePipelineStore: each method’s statements, whole (quality 2)', () => {
-  const BATCH_ROW = {
-    check_id: C,
-    batch: 3,
-    kind: 'crawl' as const,
-    nonce: 'n'.repeat(24),
-    posted_at: 'T',
-    summary: { urls: 50, max_seconds: 240 },
-  };
   const page = (from: number) => ['range', [from, from + PAGE_ROWS - 1]] as [string, unknown[]];
 
   /**
@@ -347,7 +347,8 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
       })),
     },
     upsertBatch: {
-      answers: [ok(null)],
+      // The row exists (the insert adds none), so the second statement writes over it.
+      answers: [ok([]), ok([{ batch: 3 }])],
       call: (s) => s.upsertBatch(BATCH_ROW),
       calls: [
         {
@@ -357,9 +358,33 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
               'upsert',
               [
                 { ...BATCH_ROW, status: 'posted', finished_at: null, result_path: null },
-                { onConflict: 'check_id,batch' },
+                { onConflict: 'check_id,batch', ignoreDuplicates: true },
               ],
             ],
+            ['select', ['batch']],
+          ],
+        },
+        {
+          root: ['from', 'crawl_batches'],
+          chain: [
+            [
+              'update',
+              [
+                {
+                  kind: 'crawl',
+                  nonce: BATCH_ROW.nonce,
+                  posted_at: 'T',
+                  summary: BATCH_ROW.summary,
+                  status: 'posted',
+                  finished_at: null,
+                  result_path: null,
+                },
+              ],
+            ],
+            ['eq', ['check_id', C]],
+            ['eq', ['batch', 3]],
+            ['neq', ['status', 'done']],
+            ['select', ['batch']],
           ],
         },
       ],
@@ -435,6 +460,19 @@ describe('supabasePipelineStore: answers', () => {
       ...inputs,
     });
     expect(await store.previousGraded(S, C)).toBeNull();
+  });
+
+  it('posts a new batch with the insert alone', async () => {
+    const { sb, calls } = recorder(ok([{ batch: 3 }]));
+    await supabasePipelineStore(sb).upsertBatch(BATCH_ROW);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('refuses to write over a batch that is done (correctness 3)', async () => {
+    const { sb } = recorder(ok([]), ok([]));
+    await expect(supabasePipelineStore(sb).upsertBatch(BATCH_ROW)).rejects.toThrow(
+      `pipeline store: batch 3 of check ${C} is done; it is not posted again`,
+    );
   });
 
   it('says whether it inserted a queued check', async () => {

@@ -1,6 +1,7 @@
 /**
  * Fakes for the step tests: a PipelineStore in memory that keeps the rules the steps rely on (claim
- * only from queued, fail only from queued or running, a batch ended only while posted), and a
+ * only from queued, fail only from queued or running, a batch ended only while posted and never
+ * posted again once done), and a
  * WorkerClient that serves batch results the test hands it. PGlite runs the real statements
  * (sql-store.ts); these keep the step tests to the step's own logic.
  */
@@ -13,7 +14,13 @@ import {
   type PollResult,
   type WorkerClient,
 } from '../../../worker-client/types';
-import type { ClaimOutcome, PipelineStore, QueuedCheck, RequestSite } from '../store';
+import {
+  batchDone,
+  type ClaimOutcome,
+  type PipelineStore,
+  type QueuedCheck,
+  type RequestSite,
+} from '../store';
 import type { CrawlBatchRow } from '../types';
 
 type CheckRow = Check & { inngest_run_id: string | null; heartbeat_at: string | null };
@@ -152,6 +159,9 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
         .sort((a, b) => a.batch - b.batch);
     },
     async upsertBatch(row) {
+      if (batches.get(key(row.check_id, row.batch))?.status === 'done') {
+        throw batchDone(row.check_id, row.batch);
+      }
       batches.set(key(row.check_id, row.batch), {
         ...row,
         status: 'posted',

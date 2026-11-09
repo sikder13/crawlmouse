@@ -8,6 +8,7 @@ import type { CheckSide } from '@crawlmouse/engine/v2/pipeline';
 import type { ReapedCheck } from '../../../../../../inngest/check-reaper';
 import { checkFromRow, fixEventFromRow, fixFromRow, siteFromRow } from '../rows';
 import {
+  batchDone,
   graded,
   knownReason,
   statesOf,
@@ -170,16 +171,19 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
     },
 
     async upsertBatch(row) {
-      await db.query(
+      const { rows: written } = await db.query(
         `insert into public.crawl_batches
            (check_id, batch, kind, nonce, status, posted_at, finished_at, summary, result_path)
          values ($1, $2, $3, $4, 'posted', $5::timestamptz, null, $6::jsonb, null)
          on conflict (check_id, batch) do update set
            kind = excluded.kind, nonce = excluded.nonce, status = excluded.status,
            posted_at = excluded.posted_at, finished_at = null, summary = excluded.summary,
-           result_path = null`,
+           result_path = null
+         where public.crawl_batches.status <> 'done'
+         returning batch`,
         [row.check_id, row.batch, row.kind, row.nonce, row.posted_at, JSON.stringify(row.summary)],
       );
+      if (written.length === 0) throw batchDone(row.check_id, row.batch);
     },
 
     async endBatch(checkId, batch, end) {

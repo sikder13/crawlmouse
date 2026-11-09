@@ -287,6 +287,22 @@ describe('read (finding 3)', () => {
     expect(s.evidence.objects.has(`anon/${SITE_ID}/${CHECK}/batch-1.json.gz`)).toBe(true);
   });
 
+  it('returns the stored summary of a row already done, without asking the worker (correctness 3)', async () => {
+    const recorded = readRecorded('batches');
+    const s = await setup(new Map([[1, renumbered(recorded[0]!, 1)]]));
+    await s.steps.post(EVENT, CRAWL_1, SO);
+    const first = await s.steps.read(EVENT, CRAWL_1, SO);
+    // A retry of the step after it stored the result, against a worker restarted since.
+    s.worker.pollBatch = async () => {
+      throw new Error('read asked the worker for a batch it had read');
+    };
+    expect(await s.steps.read(EVENT, CRAWL_1, SO)).toEqual(first);
+    expect(s.batches.get(`${CHECK}:1`)).toMatchObject({
+      status: 'done',
+      result_path: `anon/${SITE_ID}/${CHECK}/batch-1.json.gz`,
+    });
+  });
+
   it('gives not_found when the worker no longer holds the batch', async () => {
     const s = await setup();
     expect(await s.steps.read(EVENT, CRAWL_1, SO)).toEqual({ status: 'not_found' });

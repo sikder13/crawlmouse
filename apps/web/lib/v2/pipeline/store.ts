@@ -82,7 +82,10 @@ export interface PipelineStore {
   pageStates(checkId: string): Promise<Map<string, JsTextState>>;
   batch(checkId: string, batch: number): Promise<CrawlBatchRow | null>;
   batches(checkId: string): Promise<CrawlBatchRow[]>;
-  /** Writes the batch's row as posted, with this attempt's nonce, over an earlier attempt's. */
+  /**
+   * Writes the batch's row as posted, with this attempt's nonce, over an earlier attempt's; throws,
+   * writing nothing, when the row is done, so a stored result is never orphaned (correctness 3).
+   */
   upsertBatch(row: PostedBatch): Promise<void>;
   endBatch(checkId: string, batch: number, end: BatchEnd): Promise<void>;
   /** Inserts a queued check unless its id exists; true when it inserted. */
@@ -295,18 +298,29 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
     },
 
     async upsertBatch(row) {
-      must(
-        'upsert batch',
-        await sb.from('crawl_batches').upsert(
-          {
-            ...row,
-            status: 'posted',
-            finished_at: null,
-            result_path: null,
-          },
-          { onConflict: 'check_id,batch' },
-        ),
+      // PostgREST's upsert takes no condition on the row it would write over, so a new row is
+      // inserted, and an existing one is written over only while it is not done.
+      const posted = { ...row, status: 'posted', finished_at: null, result_path: null };
+      const inserted = must<Row[]>(
+        'insert batch',
+        await sb
+          .from('crawl_batches')
+          .upsert(posted, { onConflict: 'check_id,batch', ignoreDuplicates: true })
+          .select('batch'),
       );
+      if ((inserted ?? []).length > 0) return;
+      const { check_id: checkId, batch, ...fields } = posted;
+      const reposted = must<Row[]>(
+        'repost batch',
+        await sb
+          .from('crawl_batches')
+          .update(fields)
+          .eq('check_id', checkId)
+          .eq('batch', batch)
+          .neq('status', 'done')
+          .select('batch'),
+      );
+      if ((reposted ?? []).length === 0) throw batchDone(checkId, batch);
     },
 
     async endBatch(checkId, batch, end) {
@@ -333,6 +347,10 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
     },
   };
 }
+
+/** upsertBatch's refusal of a done batch. */
+export const batchDone = (checkId: string, batch: number): Error =>
+  new Error(`pipeline store: batch ${batch} of check ${checkId} is done; it is not posted again`);
 
 /** `ids` in lists of at most IN_LIST, in order. */
 export function inLists(ids: readonly string[]): string[][] {
