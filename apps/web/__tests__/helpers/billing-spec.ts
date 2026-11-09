@@ -14,6 +14,7 @@ import { format, resolveConfig } from 'prettier';
 import {
   SETUPS,
   WEBHOOK_CASES,
+  type CaseRole,
   type Setup,
   type WebhookCase,
 } from '../../lib/billing/webhook-cases.fixture';
@@ -32,10 +33,21 @@ function rowKey(c: WebhookCase): string {
   return `\`${s.type}\`, ${s.subscription === 'current' ? 'its' : 'another'} subscription ${s.status} on ${s.plan}`;
 }
 
+const ROLE: Record<CaseRole, string> = { current: 'its', other: 'the other' };
+
 function cell(c: WebhookCase): string {
   const e = c.expect;
-  if (e.outcome === 'applied') return `→ ${e.state}`;
-  return e.reason === undefined ? e.outcome : `${e.outcome}: ${e.reason}`;
+  const outcome =
+    e.outcome === 'applied'
+      ? `→ ${e.state}`
+      : e.reason === undefined
+        ? e.outcome
+        : `${e.outcome}: ${e.reason}`;
+  const writes = [
+    ...e.cancels.map((r) => `cancels ${ROLE[r]}`),
+    ...e.alerts.map((a) => `alerts ${a}`),
+  ];
+  return writes.length === 0 ? outcome : `${outcome} (${writes.join(', ')})`;
 }
 
 /** The table as Markdown: one row per event and Stripe state, one column per starting account. */
@@ -56,7 +68,9 @@ export function renderEventStateTable(cases: readonly WebhookCase[] = WEBHOOK_CA
   return [
     `${cases.length} cases, each run through the handler against PGlite with every migration. "→" is the`,
     'state after an applied event; "ignored" carries the machine\'s reason; "—" is a cell the cases do',
-    'not run.',
+    'not run. In parentheses, what that one event plans for Stripe: "cancels its" the subscription the',
+    'account followed before it, "cancels the other" the subscription the event is about, "alerts" a',
+    'founder alert and its reason. A cell without parentheses plans neither.',
     '',
     header,
     rule,

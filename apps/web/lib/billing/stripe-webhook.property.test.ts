@@ -12,7 +12,9 @@ vi.mock('server-only', () => ({}));
  * Each event is delivered at or after the step that created it, some more than once, and some
  * while another delivery is between its read and its write (two deliveries at once: one reads,
  * the timeline moves on and a newer event is processed, then the first writes). For each generated
- * schedule, once its events have been processed, the account is what the final status implies.
+ * schedule, once its events have been processed, the account is what the final status implies,
+ * and the webhook has cancelled nothing and raised no alert: the account follows the one
+ * subscription until Stripe itself ends it, so none of its events leaves anything to cancel.
  *
  * The timeline ends settled (active, unpaid or canceled): past_due is dunning, which Stripe ends by
  * a payment or by giving up. The implied state is written out below, not computed by the code
@@ -200,6 +202,8 @@ describe('convergence to the final status of a modelled Stripe timeline', () => 
         }
         advanceTo(statuses.length);
 
+        expect(w.stripe.cancelled.filter((c) => c.subscriptionId === sub.id)).toEqual([]);
+        expect(w.stripe.alerts.filter((a) => a.subscriptionId === sub.id)).toEqual([]);
         const final = (statuses.at(-1) ?? 'active') as Exclude<Status, 'past_due'>;
         const implied = IMPLIED[final];
         const { rows } = await w.db.query<{

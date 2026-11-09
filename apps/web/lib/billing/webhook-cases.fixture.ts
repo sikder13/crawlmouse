@@ -9,6 +9,8 @@
  * processed, and an update's payload status), delivers one event of `stripe.type` about the
  * account's own subscription (`current`) or another one of its customer (`other`), and expects the
  * account's state and tier and the handler's outcome. `reason` is the machine's, for an ignored event.
+ * `cancels` names, by the same two roles, each subscription the delivery plans to cancel, and
+ * `alerts` the reason of each founder alert it raises; `c` expects neither, and `writes` states them.
  * A dispute names a charge, not a subscription: its `stripe.subscription`, `status` and `plan` are
  * null, and Stripe is left as the setup left it.
  *
@@ -18,6 +20,7 @@
  */
 import type { AccountState } from '@crawlmouse/types/v2';
 import type { PaidTier, Tier } from '../entitlement-v2';
+import type { PlannedAlert } from './effects';
 import type { SubscriptionStatus } from './state-machine';
 
 export const SETUPS = {
@@ -41,12 +44,15 @@ export type CaseEventType =
   | 'invoice.payment_failed'
   | 'charge.dispute.created';
 
+/** The account's own subscription, or another one of its customer that the event is about. */
+export type CaseRole = 'current' | 'other';
+
 export interface WebhookCase {
   name: string;
   from: Setup;
   stripe: {
     type: CaseEventType;
-    subscription: 'current' | 'other' | null;
+    subscription: CaseRole | null;
     status: SubscriptionStatus | null;
     plan: PaidTier | null;
   };
@@ -55,6 +61,8 @@ export interface WebhookCase {
     tier: Tier;
     outcome: 'applied' | 'ignored' | 'recorded';
     reason?: string;
+    cancels: readonly CaseRole[];
+    alerts: readonly PlannedAlert['reason'][];
   };
 }
 
@@ -76,19 +84,42 @@ function c(
     name: `${type} (${subscription} subscription, ${status} ${plan}) from ${from}`,
     from,
     stripe: { type, subscription, status, plan },
-    expect: reason === undefined ? { state, tier, outcome } : { state, tier, outcome, reason },
+    expect: {
+      state,
+      tier,
+      outcome,
+      ...(reason === undefined ? {} : { reason }),
+      cancels: [],
+      alerts: [],
+    },
   };
 }
 
-/** A dispute on the account's customer's charge. */
-function dispute(from: Setup, state: AccountState, tier: Tier): WebhookCase {
+/** A case whose delivery cancels `cancels` and raises `alerts`. */
+function writes(
+  k: WebhookCase,
+  cancels: readonly CaseRole[],
+  alerts: readonly PlannedAlert['reason'][] = [],
+): WebhookCase {
+  return { ...k, expect: { ...k.expect, cancels, alerts } };
+}
+
+/** A dispute on the account's customer's charge: it alerts, and cancels what the account follows. */
+function dispute(
+  from: Setup,
+  state: AccountState,
+  tier: Tier,
+  cancels: readonly CaseRole[],
+): WebhookCase {
   return {
     name: `charge.dispute.created from ${from}`,
     from,
     stripe: { type: 'charge.dispute.created', subscription: null, status: null, plan: null },
-    expect: { state, tier, outcome: 'applied' },
+    expect: { state, tier, outcome: 'applied', cancels, alerts: ['dispute'] },
   };
 }
+
+const PAID_ORPHAN = 'orphaned_subscription';
 
 const CHECKOUT = 'checkout.session.completed';
 const UPDATED = 'customer.subscription.updated';
@@ -98,14 +129,30 @@ const PAYMENT_FAILED = 'invoice.payment_failed';
 
 export const WEBHOOK_CASES: readonly WebhookCase[] = Object.freeze([
   // A paid checkout: no state guard, so it applies from each state below (a disputed Free account too).
+  // The subscription it replaces is cancelled while Stripe may still charge it (trialing, active,
+  // past_due): the unpaid one is kept as it is, the disputed one has been cancelled already.
   c('free', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
   c('free_kept', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
   c('free_disputed', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
   c('pro_trial_no_card', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
-  c('pro', CHECKOUT, 'other', 'active', 'agency', 'agency', 'agency', 'applied'),
-  c('agency_trial', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
-  c('agency', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
-  c('past_due', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
+  writes(
+    c('pro', CHECKOUT, 'other', 'active', 'agency', 'agency', 'agency', 'applied'),
+    ['current'],
+    [PAID_ORPHAN],
+  ),
+  writes(c('agency_trial', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'), [
+    'current',
+  ]),
+  writes(
+    c('agency', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
+    ['current'],
+    [PAID_ORPHAN],
+  ),
+  writes(
+    c('past_due', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
+    ['current'],
+    [PAID_ORPHAN],
+  ),
   c(
     'pro',
     CHECKOUT,
@@ -118,55 +165,76 @@ export const WEBHOOK_CASES: readonly WebhookCase[] = Object.freeze([
     'already the current subscription',
   ),
 
-  // An agency trial checkout: the subscription is trialing on the Agency price.
+  // An agency trial checkout: the subscription is trialing on the Agency price. One that does not
+  // start the trial is cancelled, and a trial has charged nothing, so there is no alert.
   c('free', CHECKOUT, 'other', 'trialing', 'agency', 'agency_trial', 'agency', 'applied'),
-  c(
-    'free_kept',
-    CHECKOUT,
-    'other',
-    'trialing',
-    'agency',
-    'free',
-    'free',
-    'ignored',
-    'the account still has a subscription',
+  writes(
+    c(
+      'free_kept',
+      CHECKOUT,
+      'other',
+      'trialing',
+      'agency',
+      'free',
+      'free',
+      'ignored',
+      'the account still has a subscription',
+    ),
+    ['other'],
   ),
-  c(
-    'free_disputed',
-    CHECKOUT,
-    'other',
-    'trialing',
-    'agency',
-    'free',
-    'free',
-    'ignored',
-    'a disputed account gets no trial',
+  writes(
+    c(
+      'free_disputed',
+      CHECKOUT,
+      'other',
+      'trialing',
+      'agency',
+      'free',
+      'free',
+      'ignored',
+      'a disputed account gets no trial',
+    ),
+    ['other'],
   ),
-  c(
-    'pro_trial_no_card',
-    CHECKOUT,
-    'other',
-    'trialing',
-    'agency',
-    'pro_trial',
-    'pro',
-    'ignored',
-    ONLY_FREE,
+  writes(
+    c(
+      'pro_trial_no_card',
+      CHECKOUT,
+      'other',
+      'trialing',
+      'agency',
+      'pro_trial',
+      'pro',
+      'ignored',
+      ONLY_FREE,
+    ),
+    ['other'],
   ),
-  c('pro', CHECKOUT, 'other', 'trialing', 'agency', 'pro', 'pro', 'ignored', ONLY_FREE),
-  c(
-    'agency_trial',
-    CHECKOUT,
+  writes(c('pro', CHECKOUT, 'other', 'trialing', 'agency', 'pro', 'pro', 'ignored', ONLY_FREE), [
     'other',
-    'trialing',
-    'agency',
-    'agency_trial',
-    'agency',
-    'ignored',
-    ONLY_FREE,
+  ]),
+  writes(
+    c(
+      'agency_trial',
+      CHECKOUT,
+      'other',
+      'trialing',
+      'agency',
+      'agency_trial',
+      'agency',
+      'ignored',
+      ONLY_FREE,
+    ),
+    ['other'],
   ),
-  c('agency', CHECKOUT, 'other', 'trialing', 'agency', 'agency', 'agency', 'ignored', ONLY_FREE),
-  c('past_due', CHECKOUT, 'other', 'trialing', 'agency', 'past_due', 'pro', 'ignored', ONLY_FREE),
+  writes(
+    c('agency', CHECKOUT, 'other', 'trialing', 'agency', 'agency', 'agency', 'ignored', ONLY_FREE),
+    ['other'],
+  ),
+  writes(
+    c('past_due', CHECKOUT, 'other', 'trialing', 'agency', 'past_due', 'pro', 'ignored', ONLY_FREE),
+    ['other'],
+  ),
 
   c('free', UPDATED, 'other', 'active', 'pro', 'free', 'free', 'ignored', NOT_CURRENT),
   c('free_kept', UPDATED, 'current', 'active', 'pro', 'pro', 'pro', 'applied'),
@@ -409,13 +477,15 @@ export const WEBHOOK_CASES: readonly WebhookCase[] = Object.freeze([
   c('agency', PAYMENT_FAILED, 'current', 'past_due', 'agency', 'past_due', 'agency', 'applied'),
   c('past_due', PAYMENT_FAILED, 'current', 'past_due', 'pro', 'past_due', 'pro', 'applied'),
 
-  // A dispute applies whatever subscription the charge was for, and cancels the followed one.
-  dispute('free', 'free', 'free'),
-  dispute('free_kept', 'free', 'free'),
-  dispute('free_disputed', 'free', 'free'),
-  dispute('pro_trial_no_card', 'free', 'free'),
-  dispute('pro', 'free', 'free'),
-  dispute('agency_trial', 'free', 'free'),
-  dispute('agency', 'free', 'free'),
-  dispute('past_due', 'free', 'free'),
+  // A dispute applies whatever subscription the charge was for, and cancels the followed one: the
+  // kept unpaid one and the already disputed one too (the sink skips one Stripe shows ended). Free
+  // and the no-card trial follow none.
+  dispute('free', 'free', 'free', []),
+  dispute('free_kept', 'free', 'free', ['current']),
+  dispute('free_disputed', 'free', 'free', ['current']),
+  dispute('pro_trial_no_card', 'free', 'free', []),
+  dispute('pro', 'free', 'free', ['current']),
+  dispute('agency_trial', 'free', 'free', ['current']),
+  dispute('agency', 'free', 'free', ['current']),
+  dispute('past_due', 'free', 'free', ['current']),
 ]);
