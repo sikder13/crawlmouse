@@ -1,5 +1,11 @@
 import { Inngest, EventSchemas } from 'inngest';
 import type { AccountState } from '@crawlmouse/types/v2';
+import type {
+  CheckCancelRequested,
+  CheckFailed,
+  CheckFinished,
+  CheckRequested,
+} from './check-events';
 
 type Events = {
   'audit.requested': {
@@ -37,6 +43,11 @@ type Events = {
   'entitlement.changed': { data: { accountId: string; from: AccountState; to: AccountState } };
   // CC-28's mailer handles it; nothing in CC-03 does.
   'email.requested': { data: { accountId: string; template: 'trial_reminder' } };
+  // The v2 check pipeline (CC-20b, check.ts). Registered only when V2_PIPELINE=1.
+  'check.requested': { data: CheckRequested };
+  'check.finished': { data: CheckFinished };
+  'check.failed': { data: CheckFailed };
+  'check.cancel.requested': { data: CheckCancelRequested };
 };
 
 export const inngest = new Inngest({

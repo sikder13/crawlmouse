@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { HostSchema } from '@crawlmouse/types/v2';
-import { accountDoorEnabled, pipelineEnabled } from '@/lib/auth/flags';
+import { accountDoorEnabled, checksPublicEnabled } from '@/lib/auth/flags';
 import {
   CheckEmailScreen,
   type CheckEmailKind,
@@ -26,5 +26,5 @@ export default async function CheckEmailPage({
   const site = HostSchema.safeParse(raw).success ? raw : null;
   const asked = KINDS.find((k) => k === params.kind) ?? 'signin';
   const kind = asked !== 'signin' && site === null ? 'signin' : asked;
-  return <CheckEmailScreen kind={kind} site={site} pipeline={pipelineEnabled()} />;
+  return <CheckEmailScreen kind={kind} site={site} checksPublic={checksPublicEnabled()} />;
 }

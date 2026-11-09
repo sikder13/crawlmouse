@@ -7,7 +7,8 @@
   "exports": {
     ".": "./client.ts",
     "./audit": "./audit.ts",
-    "./billing": "./billing.ts"
+    "./billing": "./billing.ts",
+    "./check": "./check.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

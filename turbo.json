@@ -34,6 +34,7 @@
         "CRAWL_PAUSED",
         "V2_ACCOUNT_DOOR",
         "V2_PIPELINE",
+        "V2_CHECKS_PUBLIC",
         "TRIAL_LEDGER_PEPPER",
         "V2_BILLING",
         "STRIPE_ACCOUNT_SECRET_KEY",

@@ -42,10 +42,9 @@ async function migrated(include: (f: string) => boolean): Promise<PGlite> {
 }
 
 /**
- * A fresh session (plpgsql compiles a function once per session) on the database before or after this
- * migration. Later migrations are left out of both, so the counts and the rollback's catalog compare
- * this file's change alone. Check 09 over every migration runs in scripts/db/check.test.ts ("all pass
- * on a database with every migration applied").
+ * A fresh session (plpgsql compiles a function once per session) on the database before or after.
+ * After is through this migration and no further, so a later migration's objects are not counted as
+ * this one's; check 09 holds every migration's definers (v2-008-pipeline.test.ts runs it on all).
  */
 async function database(state: 'before' | 'after'): Promise<PGlite> {
   const template =

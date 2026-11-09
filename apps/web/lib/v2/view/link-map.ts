@@ -165,6 +165,9 @@ function detailsOf(
   const out = [...new Set(edges.filter((e) => e.from_url === page.url).map((e) => e.to_url))];
   const more = (total: number, listed: number) =>
     total > listed ? `${count(total - listed)} more, not in this record` : null;
+  // A page whose links were not all read has no count of its links out (its links_out is 0 when none
+  // was read, the links found so far when the read stopped early), so none is shown.
+  const linksOut = page.links_read ? page.links_out : null;
   const pills: PillView[] = [
     page.depth === null
       ? { state: 'neutral', label: page.is_orphan ? 'orphan' : 'no link path' }
@@ -205,7 +208,7 @@ function detailsOf(
     pills,
     facts: [
       { label: 'Links in', value: count(page.links_in) },
-      { label: 'Links out', value: count(page.links_out) },
+      { label: 'Links out', value: linksOut === null ? 'not read' : count(linksOut) },
       {
         label: 'Share of internal PageRank',
         value: page.pagerank_share === null ? 'not measured' : share(page.pagerank_share),
@@ -232,9 +235,9 @@ function detailsOf(
       more: more(page.links_in, into.length),
     },
     linksTo: {
-      heading: `Links to · ${count(page.links_out)}`,
+      heading: `Links to · ${linksOut === null ? 'not read' : count(linksOut)}`,
       paths: out.map(pathOf),
-      more: more(page.links_out, out.length),
+      more: linksOut === null ? null : more(linksOut, out.length),
     },
     access:
       tests.length || engines.length

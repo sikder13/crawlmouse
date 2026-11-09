@@ -9,9 +9,9 @@ describe('docs/specs/v2/16-structure-detectors.md', () => {
   });
 });
 
-/** The inputs a detector can read by name: the PageFacts fields (html included), robots_search and disallowed. */
+/** The inputs a detector can read by name: the PageFacts fields (html included), robots_search, disallowed and client_rendered. */
 const INPUT =
-  /\.(final_url|redirect|canonical|links_read|html|simhash|hreflang|robots_search|disallowed)\b/g;
+  /\.(final_url|redirect|canonical|links_read|html|simhash|hreflang|robots_search|disallowed|client_rendered)\b/g;
 const MODULE: Record<string, string> = {
   scope: 'scope.ts',
   orphan_pages: 'orphans.ts',

@@ -25,14 +25,20 @@ import { ANONYMOUS_VISIBLE_MS } from '../../lib/v2/view/result';
 import { PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/registry';
 import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
 
-const signup = (pipeline = false) => renderToStaticMarkup(<SignupScreen pipeline={pipeline} />);
+const signup = (checksPublic = false) =>
+  renderToStaticMarkup(<SignupScreen checksPublic={checksPublic} />);
 const checkEmail = (
   kind: 'signin' | 'named-site' | 'from-audit',
   site: string | null,
-  pipeline = false,
+  checksPublic = false,
 ) =>
   renderToStaticMarkup(
-    <CheckEmailScreen kind={kind} site={site} pipeline={pipeline} email="you@company.com" />,
+    <CheckEmailScreen
+      kind={kind}
+      site={site}
+      checksPublic={checksPublic}
+      email="you@company.com"
+    />,
   );
 
 const LOCKS = [
@@ -78,7 +84,7 @@ describe('every number on the door comes from a constant', () => {
   ]);
   it.each([
     ['Sign-up', signup()],
-    ['Sign-up, pipeline on', signup(true)],
+    ['Sign-up, checks public', signup(true)],
     ['Check-email, from an audit', checkEmail('from-audit', 'example-outfitter.com')],
     ['Check-email, named site', checkEmail('named-site', 'acme-outdoors.com', true)],
     ['Check-email, sign-in', checkEmail('signin', null)],
@@ -126,7 +132,7 @@ describe('Check-email', () => {
     expect(checkEmail('signin', null)).not.toContain('you@company.com');
   });
 
-  it('promises a first audit only when the pipeline that starts it is on (D6)', () => {
+  it('promises a first audit only when checks are public (D6)', () => {
     const on = checkEmail('named-site', 'acme-outdoors.com', true);
     const off = checkEmail('named-site', 'acme-outdoors.com', false);
     expect(on).toContain('starts the moment you open it');

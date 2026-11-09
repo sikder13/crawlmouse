@@ -10,13 +10,13 @@ import styles from './Signup.module.css';
 
 /**
  * Final-Signup (CC-25): the email, an optional first site, and what the account is. The table and
- * every number on the page come from door-copy.ts; `pipeline` is V2_PIPELINE, read by the route.
+ * every number on the page come from door-copy.ts; `checksPublic` is V2_CHECKS_PUBLIC, read by the route.
  */
 export function SignupScreen({
-  pipeline,
+  checksPublic,
   initial,
 }: {
-  pipeline: boolean;
+  checksPublic: boolean;
   /** Fix the form's state, for previews and tests. */
   initial?: SignupFormState;
 }) {
@@ -36,11 +36,11 @@ export function SignupScreen({
               One email, and the account is yours.
             </Heading>
             <p className={styles.lead}>{signupLead()}</p>
-            <SignupForm pipeline={pipeline} initial={initial} />
+            <SignupForm checksPublic={checksPublic} initial={initial} />
             <div className={styles.other}>
               Already have an account? Use the same form; the link signs you in.
-              {/* The audit page keeps an audit once CC-20b serves it, which sets V2_PIPELINE. */}
-              {pipeline
+              {/* The audit page keeps an audit once it is served publicly, which sets V2_CHECKS_PUBLIC. */}
+              {checksPublic
                 ? ' Running an audit right now? Keep it from the audit page instead and it becomes your first site.'
                 : null}
             </div>

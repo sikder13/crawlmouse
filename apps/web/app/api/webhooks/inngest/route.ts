@@ -1,18 +1,9 @@
 import { serve } from 'inngest/next';
 import { inngest as workerInngest } from '@crawlmouse/inngest';
-import {
-  auditFn,
-  setAuditFailureReporter,
-  setCrawlHealthReporter,
-} from '@crawlmouse/inngest/audit';
-import {
-  reconcileBillingFn,
-  reconcileBillingManualFn,
-  cleanupExpiredAuditsFn,
-} from '@crawlmouse/inngest/billing';
+import { setAuditFailureReporter, setCrawlHealthReporter } from '@crawlmouse/inngest/audit';
 import { sentryAuditFailureReporter } from '@/lib/audit-failure-sentry';
 import { sentryCrawlHealthReporter } from '@/lib/audit-crawl-health-telemetry';
-import { billingFunctions } from '@/lib/billing/inngest-functions';
+import { inngestFunctions } from '@/lib/v2/pipeline/functions';
 
 // Wire the worker's failure-reporter seam to the app's Sentry client (which is initialized here in
 // the Next runtime). This module loads before any Inngest invocation it serves, so the reporter is
@@ -37,11 +28,6 @@ export const maxDuration = 300;
 
 export const { GET, POST, PUT } = serve({
   client: workerInngest,
-  functions: [
-    auditFn,
-    reconcileBillingFn,
-    reconcileBillingManualFn,
-    cleanupExpiredAuditsFn,
-    ...billingFunctions(process.env),
-  ],
+  // v1's four functions; with V2_PIPELINE=1 also checkFn, its cancel handler and the reaper (D3).
+  functions: inngestFunctions(process.env),
 });

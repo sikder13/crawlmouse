@@ -96,6 +96,26 @@ const INVENTORY: [entry: string, why: string][] = [
       '(CC-20a). No string is indexed.',
   ],
   [
+    'apps/web/lib/v2/pipeline/load.ts :: const chunk = values.slice(i, i + VALUES_PER_REQUEST);',
+    'ARRAY slice of the ids a read filters on, VALUES_PER_REQUEST at a time so the URL stays short ' +
+      '(CC-20b); every chunk is read. No string is indexed.',
+  ],
+  [
+    'apps/web/lib/v2/pipeline/rows.ts :: : `${offset.slice(0, 3)}:${offset.slice(3)}`;',
+    "Splits a UTC offset Postgres wrote (`+0530` → `+05:30`), matched first by DB_TIMESTAMP; the database's " +
+      'own text, not crawled text, and nothing is dropped (CC-20b).',
+  ],
+  [
+    'apps/web/lib/v2/pipeline/rows.ts :: return `${whole.toISOString().slice(0, 19)}${fraction}Z`;',
+    "The whole seconds of an ISO instant the code just made, with Postgres's own fraction put back " +
+      '(CC-20b). Not crawled text.',
+  ],
+  [
+    'packages/engine/src/sitemap.ts :: return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date',
+    'The date part of an ISO instant the code just made, compared with the date a sitemap wrote to ' +
+      'refuse a date that does not exist (CC-20b). Nothing is kept from it.',
+  ],
+  [
     'apps/web/lib/refusal-copy.ts :: const named = kinds.slice(0, 3);',
     'ARRAY slice bounding the refusal copy to the three largest exclusion kinds so the sentence stays ' +
       'readable. Elements are `{ kind: PageKind; count: number }` — a closed enum from our own ' +

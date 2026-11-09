@@ -23,6 +23,7 @@ function scoped(a: Assembled, pageCap: number): string[] {
     edges: a.edges,
     disallowed: a.disallowed,
     previous_coverage: null,
+    client_rendered: a.client_rendered,
   });
   return pairs([...s.out.values()].flat());
 }
