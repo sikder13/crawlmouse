@@ -14,6 +14,7 @@ import { format, resolveConfig } from 'prettier';
 import {
   SETUPS,
   WEBHOOK_CASES,
+  type CaseRole,
   type Setup,
   type WebhookCase,
 } from '../../lib/billing/webhook-cases.fixture';
@@ -32,10 +33,21 @@ function rowKey(c: WebhookCase): string {
   return `\`${s.type}\`, ${s.subscription === 'current' ? 'its' : 'another'} subscription ${s.status} on ${s.plan}`;
 }
 
+const ROLE: Record<CaseRole, string> = { current: 'its', other: 'the other' };
+
 function cell(c: WebhookCase): string {
   const e = c.expect;
-  if (e.outcome === 'applied') return `→ ${e.state}`;
-  return e.reason === undefined ? e.outcome : `${e.outcome}: ${e.reason}`;
+  const outcome =
+    e.outcome === 'applied'
+      ? `→ ${e.state}`
+      : e.reason === undefined
+        ? e.outcome
+        : `${e.outcome}: ${e.reason}`;
+  const writes = [
+    ...e.cancels.map((r) => `cancels ${ROLE[r]}`),
+    ...e.alerts.map((a) => `alerts ${a}`),
+  ];
+  return writes.length === 0 ? outcome : `${outcome} (${writes.join(', ')})`;
 }
 
 /** The table as Markdown: one row per event and Stripe state, one column per starting account. */
@@ -55,8 +67,16 @@ export function renderEventStateTable(cases: readonly WebhookCase[] = WEBHOOK_CA
   );
   return [
     `${cases.length} cases, each run through the handler against PGlite with every migration. "→" is the`,
-    'state after an applied event; "ignored" carries the machine\'s reason; "—" is a cell the cases do',
-    'not run.',
+    'state after an applied event; "ignored" carries the machine\'s reason, "recorded" the webhook\'s;',
+    '"—" is a cell the cases do not run. In parentheses, what that one event plans for Stripe: "cancels',
+    'its" the subscription the account followed before it, "cancels the other" the subscription the',
+    'event is about, "alerts" a founder alert and its reason. A cell without parentheses plans neither.',
+    '',
+    "The cells are the machine's answers inside the webhook. The rules the webhook adds to the",
+    "machine's, which record an event rather than decide it (superseded, older than the subscription's",
+    'last event, the allow-list, no account, the recorded-only types), are tested in',
+    '`apps/web/lib/billing/stripe-webhook.test.ts`; "the subscription had ended" in',
+    '`apps/web/__tests__/v2-billing-rpc.test.ts` and `apps/web/lib/billing/stripe-webhook.property.test.ts`.',
     '',
     header,
     rule,

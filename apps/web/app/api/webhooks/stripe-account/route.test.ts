@@ -264,7 +264,28 @@ describe('the route with the real handler over PGlite', () => {
       { id: 'evt_route_dispute', created: BASE },
     );
     w.stripe.charges.set('ch_route', 'cus_nobody');
-    expect((await post(payload, header)).status).toBe(200);
+    // A flush the test resolves by hand: on Vercel the function may freeze once it has answered.
+    let flushStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      flushStarted = resolve;
+    });
+    let delivered!: (ok: boolean) => void;
+    vi.mocked(Sentry.flush).mockImplementationOnce(() => {
+      flushStarted();
+      return new Promise<boolean>((resolve) => {
+        delivered = resolve;
+      });
+    });
+    let answered = false;
+    const answer = post(payload, header).then((res) => {
+      answered = true;
+      return res;
+    });
+    await started;
+    await new Promise((resolve) => setTimeout(resolve, 20)); // turns enough to answer, unawaited
+    expect(answered).toBe(false);
+    delivered(true);
+    expect((await answer).status).toBe(200);
     expect(Sentry.captureMessage).toHaveBeenCalledWith('billing.webhook.dispute_without_account', {
       level: 'error',
       tags: { signal: 'stripe-account-webhook' },

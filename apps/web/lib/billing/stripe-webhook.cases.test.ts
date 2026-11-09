@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyEntitlementTransition } from './state-machine-apply';
 import { payloads, stripeEvent, type FakeSubscription } from './stripe.fake';
-import { WEBHOOK_CASES, type Setup, type WebhookCase } from './webhook-cases.fixture';
+import {
+  WEBHOOK_CASES,
+  type CaseRole,
+  type Setup,
+  type WebhookCase,
+} from './webhook-cases.fixture';
 import { webhookWorld, type WebhookWorld } from './webhook-db.pglite';
 import { pgliteEntitlementStore } from '../../__tests__/v2/_lib/door-pglite';
 
@@ -9,8 +14,9 @@ vi.mock('server-only', () => ({}));
 
 /**
  * The event × state table (./webhook-cases.fixture.ts), end to end: each case sets an account up
- * by delivering signed events to the handler, delivers one more, and reads the account row and the
- * ledger row from PGlite with every migration applied.
+ * by delivering signed events to the handler, delivers one more, and reads the account row from
+ * PGlite with every migration applied, the outcome, and the cancellations and founder alerts that
+ * one delivery sent to the Stripe fake's sinks.
  */
 
 // 2099-01-01T00:00:00Z: after any wall clock this runs at, so history stays in order.
@@ -134,13 +140,17 @@ async function setUp(from: Setup): Promise<Account> {
   return a;
 }
 
+/** Delivers the case's event; `other` is the subscription it made for an `other` case. */
 async function run(k: WebhookCase, a: Account) {
   const at = BASE + 1000;
   const { type, subscription: which, status, plan } = k.stripe;
   if (type === 'charge.dispute.created') {
     const charge = next('ch');
     world.stripe.charges.set(charge, a.customer);
-    return deliver(type, payloads.dispute({ id: next('dp'), charge }), at);
+    return {
+      outcome: await deliver(type, payloads.dispute({ id: next('dp'), charge }), at),
+      other: null,
+    };
   }
   let subId: string;
   if (which === 'current') {
@@ -152,17 +162,24 @@ async function run(k: WebhookCase, a: Account) {
   } else {
     subId = subscription(a.customer, status!, plan!, at).id;
   }
+  const other = which === 'other' ? subId : null;
   switch (type) {
     case 'checkout.session.completed':
-      return checkout(a, subId, at);
+      return { outcome: await checkout(a, subId, at), other };
     case 'invoice.payment_failed':
-      return deliver(
-        type,
-        payloads.invoice({ id: next('in'), customer: a.customer, subscription: subId }),
-        at,
-      );
+      return {
+        outcome: await deliver(
+          type,
+          payloads.invoice({ id: next('in'), customer: a.customer, subscription: subId }),
+          at,
+        ),
+        other,
+      };
     default:
-      return deliver(type, payloads.subscription(world.stripe.get(subId)), at);
+      return {
+        outcome: await deliver(type, payloads.subscription(world.stripe.get(subId)), at),
+        other,
+      };
   }
 }
 
@@ -174,17 +191,23 @@ describe('the event × state table, through the handler, on the real schema', ()
 
   it.each(WEBHOOK_CASES.map((k) => [k.name, k] as const))('%s', async (_name, k) => {
     const a = await setUp(k.from);
-    const outcome = await run(k, a);
+    const cancelled = world.stripe.cancelled.length;
+    const alerted = world.stripe.alerts.length;
+    const { outcome, other } = await run(k, a);
     expect(outcome).toMatchObject({ outcome: k.expect.outcome, accountId: a.id });
     const { rows } = await world.db.query<{ state: string; tier: string }>(
       `select state, tier from public.accounts where id = $1`,
       [a.id],
     );
     expect(rows[0]).toEqual({ state: k.expect.state, tier: k.expect.tier });
-    if (k.expect.outcome === 'ignored') {
-      expect((outcome as { reason: string | null }).reason).toBe(k.expect.reason);
-    } else {
-      expect((outcome as { reason: string | null }).reason).toBeNull();
-    }
+    // The machine's reason for an ignored case, the webhook's for a recorded one, none if unstated.
+    expect((outcome as { reason: string | null }).reason).toBe(k.expect.reason ?? null);
+    // What this delivery sent to Stripe: each cancellation by its subscription's role, each alert.
+    const role = (id: string): CaseRole | string =>
+      id === a.current ? 'current' : id === other ? 'other' : id;
+    expect(world.stripe.cancelled.slice(cancelled).map((x) => role(x.subscriptionId))).toEqual(
+      k.expect.cancels,
+    );
+    expect(world.stripe.alerts.slice(alerted).map((x) => x.reason)).toEqual(k.expect.alerts);
   });
 });

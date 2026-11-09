@@ -3,6 +3,10 @@
  * run the handler in: that database, the Stripe fake (./stripe.fake.ts) and the fake catalog.
  * Test-only: for the webhook tests and the sandbox smoke.
  *
+ * Two ports reach the database. `pgliteWebhookDb` writes each statement as SQL; `postgrestWebhookDb`
+ * is the port that ships, `supabaseWebhookDb`, over a PostgREST stand-in on the same database
+ * (__tests__/helpers/postgrest-pglite.ts). A world runs one of them, `pglite` by default.
+ *
  * Each call is its own transaction as the service role, as each PostgREST request is. PGlite has
  * one connection, so two calls run one after the other; `hooks.afterLoad` runs between a decision's read of
  * the account and its write, which is where two real deliveries interleave.
@@ -10,6 +14,7 @@
 import type { PGlite, Transaction } from '@electric-sql/pglite';
 import type Stripe from 'stripe';
 import { applyAllMigrations, freshDb } from '../../__tests__/helpers/pglite-migrations';
+import { postgrestOver } from '../../__tests__/helpers/postgrest-pglite';
 import type { Catalog } from './catalog';
 import { fakeCatalog } from './catalog.fake';
 import type { EffectSinks } from './effects';
@@ -22,6 +27,7 @@ import {
   ledgerStateOf,
   recordedDecisionOf,
   storedMirrorOf,
+  supabaseWebhookDb,
   type WebhookDb,
 } from './webhook-db';
 
@@ -126,6 +132,26 @@ export function pgliteWebhookDb(db: PGlite, hooks: PgliteHooks = {}): WebhookDb 
   };
 }
 
+/** `supabaseWebhookDb` over the PostgREST stand-in, with `hooks.afterLoad` run after its account read. */
+export function postgrestWebhookDb(db: PGlite, hooks: PgliteHooks = {}): WebhookDb {
+  const port = supabaseWebhookDb(postgrestOver(db));
+  return {
+    ...port,
+    async load(accountId) {
+      const stored = await port.load(accountId);
+      await hooks.afterLoad?.(accountId);
+      return stored;
+    },
+  };
+}
+
+export type WebhookPort = 'pglite' | 'postgrest';
+
+const PORTS: Record<WebhookPort, typeof pgliteWebhookDb> = {
+  pglite: pgliteWebhookDb,
+  postgrest: postgrestWebhookDb,
+};
+
 let template: Promise<PGlite> | null = null;
 
 /** A database with every migration applied: migrated once per test file, cloned per call. */
@@ -157,7 +183,8 @@ export interface WebhookWorld {
   deliver(event: Stripe.Event, options?: DeliverOptions): Promise<WebhookOutcome>;
 }
 
-export async function webhookWorld(): Promise<WebhookWorld> {
+export async function webhookWorld(options: { port?: WebhookPort } = {}): Promise<WebhookWorld> {
+  const port = PORTS[options.port ?? 'pglite'];
   const db = await webhookTestDb();
   const stripe = new StripeFake();
   const hooks: PgliteHooks = {};
@@ -183,7 +210,7 @@ export async function webhookWorld(): Promise<WebhookWorld> {
       return applyStripeEvent(
         event,
         {
-          db: pgliteWebhookDb(db, hooks),
+          db: port(db, hooks),
           stripe,
           catalog: options.catalog ?? fakeCatalog(),
           sinks: options.sinks ?? stripe.sinks(),
