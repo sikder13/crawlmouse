@@ -1,7 +1,8 @@
 // Fails the semgrep job on a blocking result: severity ERROR, or CRITICAL or HIGH (the levels of
 // Semgrep's newer severity scale; the four packs the job runs used only ERROR and WARNING on
 // 2026-11-09). A result whose severity is in neither BLOCKING nor NOT_BLOCKING fails too, so a renamed
-// level cannot pass silently. NOT_BLOCKING results are counted, not gated.
+// level cannot pass silently. NOT_BLOCKING results are counted, not gated. Severity is compared
+// after upper-casing, so `error` blocks as ERROR does.
 //
 // It also fails when the scan cannot be trusted: Semgrep exited non-zero (the job runs it without
 // --error, so findings alone exit 0), the JSON holds an `errors` entry of level "error" (other levels

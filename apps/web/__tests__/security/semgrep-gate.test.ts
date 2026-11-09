@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,6 +27,8 @@ afterAll(() => rmSync(root, { recursive: true, force: true }));
 function semgrepJson({
   severity = 'ERROR',
   line = 2,
+  endLine = undefined as number | undefined,
+  path = FILE,
   results = 1,
   scanned = 3,
   rules = 74,
@@ -35,9 +38,9 @@ function semgrepJson({
     version: '1.182.1',
     results: Array.from({ length: results }, () => ({
       check_id: RULE,
-      path: FILE,
+      path,
       start: { line, col: 3, offset: 0 },
-      end: { line, col: 24, offset: 21 },
+      end: { line: endLine ?? line, col: 24, offset: 21 },
       extra: { severity, lines: 'requires login', fingerprint: 'requires login', message: 'm' },
     })),
     errors,
@@ -67,15 +70,30 @@ const run = (report: object, entries?: object[], now = NOW, expires?: string) =>
 describe('the Semgrep gate', () => {
   beforeAll(() => write(SOURCE.join('\n')));
 
-  it('fails a new ERROR result', () => {
-    expect(run(semgrepJson())).toMatchObject({
-      blocking: [`${RULE} (ERROR) ${FILE}:2 [${FINGERPRINT}]`],
+  // The levels are written out here, not read from the gate, so moving one between the gate's lists
+  // turns a case red.
+  it.each(['ERROR', 'CRITICAL', 'HIGH'])('fails a new %s result', (severity) => {
+    expect(run(semgrepJson({ severity }))).toMatchObject({
+      blocking: [`${RULE} (${severity}) ${FILE}:2 [${FINGERPRINT}]`],
       problems: [],
+      below: 0,
     });
   });
 
-  it.each(['WARNING', 'INFO'])('passes a %s result, and counts it', (severity) => {
-    expect(run(semgrepJson({ severity }))).toMatchObject({ blocking: [], problems: [], below: 1 });
+  it.each(['WARNING', 'INFO', 'MEDIUM', 'LOW', 'INVENTORY', 'EXPERIMENT'])(
+    'passes a %s result, and counts it',
+    (severity) => {
+      expect(run(semgrepJson({ severity }))).toMatchObject({
+        blocking: [],
+        problems: [],
+        below: 1,
+      });
+    },
+  );
+
+  it('compares severity case-insensitively: a lowercase "error" blocks, "warning" passes', () => {
+    expect(run(semgrepJson({ severity: 'error' })).blocking).toHaveLength(1);
+    expect(run(semgrepJson({ severity: 'warning' }))).toMatchObject({ blocking: [], below: 1 });
   });
 
   it('fails a result whose severity it does not know', () => {
@@ -144,6 +162,31 @@ describe('the Semgrep baseline', () => {
     expect(run(semgrepJson({ line: 4 }), [ENTRY])).toMatchObject({ blocking: [], problems: [] });
   });
 
+  it('keys on the file: the same lines at another path are not accepted', () => {
+    write(SOURCE.join('\n'));
+    const other = 'apps/web/lib/y.ts';
+    writeFileSync(join(root, other), SOURCE.join('\n'));
+    expect(run(semgrepJson({ path: other }), [ENTRY]).blocking).toEqual([
+      `${RULE} (ERROR) ${other}:2 [${FINGERPRINT}]`,
+    ]);
+  });
+
+  it('a multi-line match is fingerprinted over every line: a change to its last line fails', () => {
+    write(SOURCE.join('\n'));
+    // Lines 1–2 of SOURCE, collapsed and trimmed, joined by a newline: computed by hand.
+    const two = createHash('sha256')
+      .update(`${RULE}\nexport function f(input: string) {\neval("1+" + input);`)
+      .digest('hex')
+      .slice(0, 16);
+    const entry = { ...ENTRY, fingerprint: two, line: 1 };
+    expect(run(semgrepJson({ line: 1, endLine: 2 }), [entry])).toMatchObject({
+      blocking: [],
+      problems: [],
+    });
+    write(SOURCE.join('\n').replace('"1+"', '"2+"'));
+    expect(run(semgrepJson({ line: 1, endLine: 2 }), [entry]).blocking).toHaveLength(1);
+  });
+
   it('changed content on the matched line fails', () => {
     write(SOURCE.join('\n').replace('"1+"', '"2+"'));
     expect(run(semgrepJson(), [ENTRY]).blocking).toHaveLength(1);
@@ -175,6 +218,43 @@ describe('the Semgrep baseline', () => {
     const r = run(semgrepJson({ results: 0 }), [ENTRY]);
     expect(r.stale).toHaveLength(1);
     expect(r).toMatchObject({ blocking: [], problems: [] });
+  });
+});
+
+// The command line the semgrep job runs: node semgrep-gate.mjs <json> <baseline> --repo-root
+// --scan-exit. Its exit code is what fails the job.
+describe('the gate as CI runs it', () => {
+  const script = resolve(__dirname, '../../../../.github/workflows/scripts/semgrep-gate.mjs');
+  const cli = (report: object, scanExit: string) => {
+    write(SOURCE.join('\n'));
+    const json = join(root, 'semgrep.json');
+    const baseline = join(root, 'baseline.json');
+    writeFileSync(json, JSON.stringify(report));
+    writeFileSync(baseline, JSON.stringify(baselineOf([], '2999-12-31')));
+    const r = spawnSync(
+      process.execPath,
+      [script, json, baseline, '--repo-root', root, '--scan-exit', scanExit],
+      { encoding: 'utf8' },
+    );
+    return { status: r.status, out: r.stdout };
+  };
+
+  it('exits 0 on a clean scan that exited 0', () => {
+    expect(cli(semgrepJson({ severity: 'WARNING' }), '0')).toMatchObject({ status: 0 });
+  });
+
+  it('exits 1 on a new ERROR result', () => {
+    const r = cli(semgrepJson(), '0');
+    expect(r.status).toBe(1);
+    expect(r.out).toContain(`::error::semgrep ERROR: ${RULE} (ERROR) ${FILE}:2`);
+  });
+
+  it('exits 1 when Semgrep exited 2, or when no exit code was recorded', () => {
+    const clean = semgrepJson({ severity: 'WARNING' });
+    expect(cli(clean, '2')).toMatchObject({ status: 1 });
+    expect(cli(clean, '2').out).toContain('::error::semgrep exited 2');
+    expect(cli(clean, 'missing')).toMatchObject({ status: 1 });
+    expect(cli(clean, 'missing').out).toContain('::error::no semgrep exit code was recorded');
   });
 });
 
