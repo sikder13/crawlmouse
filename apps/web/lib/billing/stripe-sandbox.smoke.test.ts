@@ -33,7 +33,7 @@ vi.mock('server-only', () => ({}));
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const KEY = sandboxKey(process.env, resolve(HERE, '../../../../scripts/.env.local'));
 /** A test secret of this file's own: no endpoint exists, so nothing else signs with it. */
-const SECRET = 'whsec_cc03_sandbox_smoke';
+const SECRET = 'cc03-sandbox-smoke-signing';
 
 interface Row {
   state: string;
