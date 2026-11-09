@@ -245,7 +245,7 @@ describe('the catalog checks', () => {
     .filter((f) => /^0\d-.*\.sql$/.test(f))
     .sort();
 
-  it('are the eight on this branch', () => {
+  it('are the nine on this branch, 09 (definer search_path, CC-SEC) among them', () => {
     expect(files.map((f) => f.slice(0, 2))).toEqual([
       '01',
       '02',
@@ -255,6 +255,7 @@ describe('the catalog checks', () => {
       '06',
       '07',
       '08',
+      '09',
     ]);
   });
 
