@@ -3,12 +3,12 @@
   "rules": [
     {
       "name": "Rate limit: sign-in links",
-      "description": "POST /api/auth/magic-link: 30 a minute per IP, then deny. The app allows 5 an hour per IP and answers with its own copy first.",
+      "description": "POST /api/auth/magic-link, and its .rsc spellings: 30 a minute per IP, then deny. The app allows 5 an hour per IP and answers with its own copy first.",
       "active": true,
       "conditionGroup": [
         {
           "conditions": [
-            { "type": "path", "op": "re", "value": "^/api/auth/magic-link/?$" },
+            { "type": "path", "op": "re", "value": "^/api/auth/magic-link(/?\\.[rR][sS][cC])?/?$" },
             { "type": "method", "op": "eq", "value": "POST" }
           ]
         }
@@ -29,12 +29,12 @@
     },
     {
       "name": "Rate limit: audit starts",
-      "description": "POST /api/audits/start: 60 per 10 minutes per IP, then deny. The app allows at most 40 a day per IP before Turnstile.",
+      "description": "POST /api/audits/start, and its .rsc spellings: 60 per 10 minutes per IP, then deny. The app allows at most 40 a day per IP before Turnstile.",
       "active": true,
       "conditionGroup": [
         {
           "conditions": [
-            { "type": "path", "op": "re", "value": "^/api/audits/start/?$" },
+            { "type": "path", "op": "re", "value": "^/api/audits/start(/?\\.[rR][sS][cC])?/?$" },
             { "type": "method", "op": "eq", "value": "POST" }
           ]
         }
@@ -55,7 +55,7 @@
     },
     {
       "name": "Rate limit: check claims",
-      "description": "POST /api/checks/<id>/claim, in any case (Vercel serves a dynamic route so): 30 a minute per IP, then deny. The app has no per-IP limit here.",
+      "description": "POST /api/checks/<id>/claim and its .rsc spellings, in any case (Vercel serves a dynamic route so): 30 a minute per IP, then deny. The app has no per-IP limit here.",
       "active": true,
       "conditionGroup": [
         {
@@ -63,7 +63,7 @@
             {
               "type": "path",
               "op": "re",
-              "value": "^/[aA][pP][iI]/[cC][hH][eE][cC][kK][sS]/[^/]+/[cC][lL][aA][iI][mM]/?$"
+              "value": "^/[aA][pP][iI]/[cC][hH][eE][cC][kK][sS]/[^/]+/[cC][lL][aA][iI][mM](/?\\.[rR][sS][cC])?/?$"
             },
             { "type": "method", "op": "eq", "value": "POST" }
           ]

@@ -151,6 +151,11 @@ state change to an API path that reaches no registered route, or does not decode
 alone), so the lookup never has to choose. Other API requests pass through with no session refresh and
 no cookie, as before.
 
+Vercel also serves a route handler at `<path>.rsc` (D9 lists the spellings). On this branch's preview
+deployment, 2026-11-08, the middleware saw a lower-case `.rsc` already removed: a cross-site POST to
+`/api/checks/<id>/claim.rsc` got the strict rule's 403, and a same-origin one reached the route (401,
+no session). An upper-case `CLAIM.RSC` kept its suffix, matched no row, and got the middleware's 404.
+
 Only Vercel shows the case-insensitive routing, so it is a post-deploy check, on the deployed function.
 It must answer 403:
 
@@ -387,15 +392,20 @@ second. The findings and their triage:
 
 - `POST /api/auth/magic-link`: 30 per 60 s per IP, deny.
 - `POST /api/audits/start`: 60 per 600 s per IP, deny.
-- `POST /api/checks/<id>/claim`: 30 per 60 s per IP, deny. Its regex matches the path in any case,
-  because Vercel serves a dynamic route in any case; the two static routes are served only as written.
+- `POST /api/checks/<id>/claim`: 30 per 60 s per IP, deny.
 - `GET /login` and `/signup`: a browser challenge. `/login/verify`, where the email link lands, is not
   challenged.
 
 Vercel Pro caps a rate-limit window at 10 minutes, so D9's "60 / hour" is 60 per 10 minutes (ruling 5).
-It stays above the app's highest per-IP bucket for that route (40 a day). Paths match by regex with an
-optional trailing slash, because a trailing slash reaches the route. Verify against Vercel's request
-schema, the Pro limits and the app's own limits:
+It stays above the app's highest per-IP bucket for that route (40 a day).
+
+Paths match by regex, because Vercel serves a route handler at more than its path. Read on production
+with GETs on 2026-11-08: with a trailing slash, with `.rsc` or `.rsc/` appended (lower case), and with
+`/.rsc` appended (any case); and a dynamic route in any letter case, its suffix included. A static
+route's own letters answer only as written. So each rate-limit regex accepts the three `.rsc` suffixes, with
+`.rsc` in any case, and the check-claim regex accepts any case throughout. The read-back in
+`docs/ops/edge-firewall.md` reads the spellings again. Verify against Vercel's request schema, the Pro
+limits, the app's own limits and those spellings:
 
 ```bash
 pnpm --filter @crawlmouse/web exec vitest run __tests__/security/firewall.test.ts

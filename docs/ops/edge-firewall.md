@@ -59,13 +59,31 @@ invalid address, so no email goes out. The app answers each with 400, and the ed
 for i in $(seq 1 31); do curl -s -o /dev/null -w '%{http_code}\n' -X POST https://crawlmouse.com/api/auth/magic-link/ -H 'content-type: application/json' -d '{"email":"x"}'; done | sort | uniq -c
 ```
 
-The check-claim rule must count every case of its path, because Vercel serves a dynamic route in any
-case. The same loop on an upper-case spelling must also end in the edge's denial. Vercel's own 403
-page, not the app's JSON, answers the 31st:
+A rule has to count each spelling Vercel serves its route at. Read on production with GETs on
+2026-11-08, they were: the path; with a trailing slash; with `.rsc` or `.rsc/` appended (lower case);
+with `/.rsc` appended (any case); and, for a dynamic route, any letter case, its suffix included. A
+percent-encoded letter, `/./` and `.json` answered 404, and a double slash was redirected (308) to the
+path. Read them again; these routes take POST only, so a GET answers 405 where the route is served and
+404 where it is not:
 
 ```bash
-for i in $(seq 1 31); do curl -s -o /dev/null -w '%{http_code} %{content_type}\n' -X POST https://crawlmouse.com/API/CHECKS/00000000-0000-4000-8000-000000000000/CLAIM; done | sort | uniq -c
+for s in '' / .rsc .rsc/ /.rsc /.RSC .RSC .json; do for p in /api/auth/magic-link /api/audits/start /API/CHECKS/00000000-0000-4000-8000-000000000000/CLAIM; do printf '%-72s %s\n' "$p$s" "$(curl -s -o /dev/null -w '%{http_code}' "https://crawlmouse.com$p$s")"; done; done
 ```
+
+A spelling that answers 405 must be one the rule's regex accepts:
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/security/firewall.test.ts` holds each rule to
+the list above. If the loop shows a new one, add it to the test and the regex first.
+
+Then, a minute after the sign-in loop, send the same loop to an upper-case `.rsc` spelling of the
+check-claim route. It must also end in the edge's denial; Vercel's own 403 page, not the app's JSON,
+answers the 31st:
+
+```bash
+for i in $(seq 1 31); do curl -s -o /dev/null -w '%{http_code} %{content_type}\n' -X POST https://crawlmouse.com/API/CHECKS/00000000-0000-4000-8000-000000000000/CLAIM.rsc; done | sort | uniq -c
+```
+
+The challenge on GET `/login` and `/signup` does not count their `.rsc` spellings. Those return the
+page's RSC payload (`text/x-component`), not its HTML.
 
 ## Roll back
 

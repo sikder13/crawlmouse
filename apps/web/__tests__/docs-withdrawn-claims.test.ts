@@ -289,6 +289,15 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       'beyond that it is not, and the ledger lookup decides.',
     allowedIn: [],
   },
+  {
+    // CC-SEC review round 4: Vercel also serves a static route handler at its .rsc spellings.
+    text: 'the two static routes are served only as written',
+    withdrawnIn: 'docs/specs/v2/sec-baseline.md (D9), CC-SEC review round 4',
+    truth:
+      "A static route's own letters answer only as written, and Vercel also serves it with `.rsc` or " +
+      '`.rsc/` appended and with `/.rsc` appended; the edge rules count those spellings.',
+    allowedIn: [],
+  },
 ];
 
 /**

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import fc from 'fast-check';
 import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
 import {
@@ -54,6 +55,30 @@ const APP_PER_IP: Record<string, Array<[number, number]>> = {
 /** The rate-limited routes with a dynamic segment. */
 const DYNAMIC = new Set(['/api/checks/6f1c2a8e-0000-4000-8000-000000000000/claim']);
 
+// What Vercel serves a route handler at, read on production with GETs on 2026-11-08 (the loop is in
+// docs/ops/edge-firewall.md): the path, with a trailing slash, with `.rsc` or `.rsc/` appended (lower
+// case), and with `/.rsc` appended (any case). A dynamic route answers in any letter case, its suffix
+// included; a static route's own letters only as written. The rules accept `.rsc` in any case at each
+// of these places, a few spellings more than Vercel serves, which a rate limit can count at no cost.
+const SUFFIXES = ['', '/', '.rsc', '.rsc/', '/.rsc'];
+/** Spellings a rule must not count: another path, or a suffix Vercel does not serve. */
+const NOT_THE_ROUTE = (path: string) => [
+  `${path}x`,
+  `/x${path}`,
+  `${path}/x`,
+  `${path}.json`,
+  `${path}.rscx`,
+  `${path}.rsc.rsc`,
+  `${path}/.rsc/x`,
+  `${path}.prefetch.rsc`,
+];
+
+/** `s` with each letter in a case fast-check picks. */
+const anyCase = (s: string) =>
+  fc
+    .array(fc.boolean(), { minLength: s.length, maxLength: s.length })
+    .map((up) => [...s].map((c, i) => (up[i] ? c.toUpperCase() : c.toLowerCase())).join(''));
+
 const pathCondition = (rule: (typeof firewall.rules)[number]) =>
   rule.conditionGroup.flatMap((g) => g.conditions).find((c) => c.type === 'path')!;
 const rateLimited = firewall.rules.filter((r) => r.action.mitigate.action === 'rate_limit');
@@ -88,7 +113,7 @@ describe('infra/vercel/firewall.json', () => {
   });
 
   it.each(Object.entries(APP_PER_IP))(
-    '%s: one rule, matched by regex with or without a trailing slash, above the app',
+    '%s: one rule, matched by regex at each spelling Vercel serves it at, above the app',
     (path, buckets) => {
       const rules = rateLimited.filter((r) =>
         new RegExp(String(pathCondition(r).value)).test(path),
@@ -96,23 +121,22 @@ describe('infra/vercel/firewall.json', () => {
       expect(rules).toHaveLength(1);
       const rule = rules[0]!;
       const cond = pathCondition(rule);
-      // A trailing slash reaches the route handler, so an exact-match path rule would miss it.
+      // The route handler answers at more than one spelling, so an exact-match path rule would miss it.
       expect(cond.op).toBe('re');
-      expect(new RegExp(String(cond.value)).test(`${path}/`)).toBe(true);
-      for (const other of [`${path}x`, `/x${path}`, `${path}/x`]) {
-        expect(new RegExp(String(cond.value)).test(other), other).toBe(false);
-      }
-      // Vercel's router serves a dynamic route in any case (measured on production, 2026-11-08), so its
-      // rule must match every case too. A static route is served only as written.
-      if (DYNAMIC.has(path)) {
-        for (const spelling of [
-          path.toUpperCase(),
-          path.replace('/api/', '/Api/'),
-          path.replace('claim', 'CLAIM'),
-        ]) {
-          expect(new RegExp(String(cond.value)).test(spelling), spelling).toBe(true);
-        }
-      }
+      const re = new RegExp(String(cond.value));
+      for (const suffix of SUFFIXES) expect(re.test(`${path}${suffix}`), suffix).toBe(true);
+      for (const other of NOT_THE_ROUTE(path)) expect(re.test(other), other).toBe(false);
+      const served = DYNAMIC.has(path)
+        ? // Any case, every letter: the path, its id and the suffix.
+          fc
+            .tuple(fc.uuid(), fc.constantFrom(...SUFFIXES))
+            .chain(([id, suffix]) => anyCase(`/api/checks/${id}/claim${suffix}`))
+        : // The path as written, the suffix in any case.
+          fc.constantFrom(...SUFFIXES).chain((suffix) => anyCase(suffix).map((s) => path + s));
+      fc.assert(
+        fc.property(served, (spelling) => re.test(spelling)),
+        { numRuns: 500 },
+      );
       const rl = rule.action.mitigate.rateLimit!;
       expect(rl.limit).toBeGreaterThan(appAdmits(buckets, rl.window));
     },
