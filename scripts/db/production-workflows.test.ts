@@ -1,4 +1,7 @@
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   GUARD_ENV as HELPER_GUARD_ENV,
@@ -144,7 +147,7 @@ describe.each(PRODUCTION_WORKFLOWS)('%s', (file) => {
     }
   });
 
-  it('has a guard nothing can skip, swallow or reshell (guardProblems is empty)', () => {
+  it('passes guardProblems (each of its checks has a bypass fixture below)', () => {
     expect(guardProblems(workflow)).toEqual([]);
   });
 
@@ -242,13 +245,13 @@ const BYPASSES: Bypass[] = [
       jobIn(w, 'apply').if = 'always()';
       guardIn(w, 'apply')['continue-on-error'] = true;
     },
-    /apply: its if can run it after authorize failed/,
+    /apply: its if calls a status function/,
   ],
   [
     'if: always() on plan',
     'db-rollback-prod.yml',
     (w) => void (jobIn(w, 'plan').if = "${{ always() && github.ref == 'refs/heads/main' }}"),
-    /plan: its if can run it/,
+    /plan: its if calls a status function/,
   ],
   [
     'a second step in authorize',
@@ -282,8 +285,164 @@ const BYPASSES: Bypass[] = [
   ],
 ];
 
+const MORE_BYPASSES: Bypass[] = [
+  [
+    'workflow-level env BASH_ENV',
+    'db-apply-prod.yml',
+    (w) => void (w.env = { BASH_ENV: '/tmp/x' }),
+    /workflow: has env/,
+  ],
+  [
+    'workflow-level env naming a secret',
+    'db-rollback-prod.yml',
+    (w) => void (w.env = { T: '${{ secrets.X }}' }),
+    /workflow: has env/,
+  ],
+  [
+    'job-level env BASH_FUNC_[%% on authorize',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'authorize').env = { 'BASH_FUNC_[%%': '() { return 0; }' }),
+    /authorize: has a job-level env/,
+  ],
+  [
+    'job-level env BASH_ENV on apply',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'apply').env = { BASH_ENV: '/tmp/x' }),
+    /apply: has a job-level env/,
+  ],
+  [
+    'job-level env on rollback plan',
+    'db-rollback-prod.yml',
+    (w) => void (jobIn(w, 'plan').env = { A: 'b' }),
+    /plan: has a job-level env/,
+  ],
+  [
+    'if: failure() on apply',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'apply').if = 'failure()'),
+    /apply: its if calls a status function/,
+  ],
+  [
+    'if: !cancelled() on plan',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'plan').if = '${{ !cancelled() }}'),
+    /plan: its if calls a status function/,
+  ],
+  [
+    'if: success() || true on rollback',
+    'db-rollback-prod.yml',
+    (w) => void (jobIn(w, 'rollback').if = 'success() || true'),
+    /rollback: its if calls a status function/,
+  ],
+  [
+    'if: !success() || success() on apply',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'apply').if = '${{ !success() || success() }}'),
+    /apply: its if calls a status function/,
+  ],
+  [
+    'needs on authorize',
+    'db-rollback-prod.yml',
+    (w) => void (jobIn(w, 'authorize').needs = 'plan'),
+    /authorize: needs another job/,
+  ],
+  [
+    'a container on apply',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'apply').container = 'ubuntu:24.04'),
+    /apply: has a container/,
+  ],
+  [
+    'services on rollback plan',
+    'db-rollback-prod.yml',
+    (w) => void (jobIn(w, 'plan').services = { pg: { image: 'postgres' } }),
+    /plan: has services/,
+  ],
+  [
+    'runs-on [self-hosted] on authorize',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'authorize')['runs-on'] = ['self-hosted']),
+    /authorize: runs-on is not ubuntu-24.04/,
+  ],
+  [
+    'runs-on ubuntu-latest on rollback',
+    'db-rollback-prod.yml',
+    (w) => void (jobIn(w, 'rollback')['runs-on'] = 'ubuntu-latest'),
+    /rollback: runs-on is not ubuntu-24.04/,
+  ],
+  [
+    'continue-on-error on a later step',
+    'db-rollback-prod.yml',
+    (w) => void (jobIn(w, 'rollback').steps![1]!['continue-on-error'] = true),
+    /rollback: step 1 has continue-on-error/,
+  ],
+  [
+    'no secret-holding job left',
+    'db-apply-prod.yml',
+    (w) => {
+      delete w.jobs.plan;
+      delete w.jobs.apply;
+    },
+    /no job can read a secret/,
+  ],
+  [
+    'no authorize job',
+    'db-rollback-prod.yml',
+    (w) => void delete w.jobs.authorize,
+    /authorize: missing/,
+  ],
+  [
+    'an environment on authorize',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'authorize').environment = 'staging'),
+    /authorize: has an environment/,
+  ],
+  [
+    'a secret in authorize outputs',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'authorize').outputs = { x: '${{ secrets.X }}' }),
+    /authorize: mentions secrets/,
+  ],
+  [
+    'a permission on authorize',
+    'db-rollback-prod.yml',
+    (w) => void (jobIn(w, 'authorize').permissions = { contents: 'read' }),
+    /authorize: permissions are not \{\}/,
+  ],
+  [
+    'a job-level uses',
+    'db-apply-prod.yml',
+    (w) => void (w.jobs.called = { uses: './.github/workflows/x.yml' }),
+    /called: calls a reusable workflow/,
+  ],
+  [
+    'a push trigger beside the dispatch',
+    'db-rollback-prod.yml',
+    (w) => void ((w.on as Record<string, unknown>).push = null),
+    /the events are/,
+  ],
+  [
+    'a guard env from github.actor',
+    'db-rollback-prod.yml',
+    (w) => void (guardIn(w, 'rollback').env!.OWNER = '${{ github.actor }}'),
+    /rollback: the guard step's env is not the pinned mapping/,
+  ],
+  [
+    'a guard with no run',
+    'db-rollback-prod.yml',
+    (w) => void delete guardIn(w, 'plan').run,
+    /plan: the guard's run is missing/,
+  ],
+  [
+    'an expression inside the guard script',
+    'db-apply-prod.yml',
+    (w) => void (guardIn(w, 'apply').run = 'echo ${{ github.actor }}'),
+    /apply: the guard's run is missing or holds an expression/,
+  ],
+];
+
 describe('bypasses of the guard, each rejected by guardProblems', () => {
-  it.each(BYPASSES)('%s (%s)', (_label, file, mutate, expected) => {
+  it.each([...BYPASSES, ...MORE_BYPASSES])('%s (%s)', (_label, file, mutate, expected) => {
     const workflow = readWorkflow(file);
     expect(guardProblems(workflow)).toEqual([]);
     mutate(workflow);
@@ -346,6 +505,40 @@ describe('the guard step', () => {
     const r = runGuard(script, { ...PASSING, ...change });
     expect(r.status, r.stdout + r.stderr).not.toBe(0);
     expect(r.status).not.toBeNull();
+  });
+
+  // Why a workflow- or job-level env is rejected: it reaches the guard's process. Run as GitHub runs
+  // a bash step (`bash --noprofile --norc -eo pipefail {0}`), each of these makes the real script
+  // pass a non-owner. These tests pass while the threat holds; they document it.
+  function runAsStep(env: Record<string, string>) {
+    const dir = mkdtempSync(join(tmpdir(), 'guard-'));
+    const file = join(dir, 'step.sh');
+    writeFileSync(file, script);
+    return spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', file], {
+      env: { PATH: process.env.PATH ?? '/usr/bin:/bin', ...PASSING, ACTOR: 'someone-else', ...env },
+      encoding: 'utf8',
+      cwd: dir,
+    });
+  }
+
+  it('refuses a non-owner when run as GitHub runs a step, with no extra env', () => {
+    const r = runAsStep({});
+    expect(r.status).not.toBeNull();
+    expect(r.status).not.toBe(0);
+  });
+
+  it('threat, documented: BASH_ENV in the env makes the guard exit 0 for a non-owner', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bash-env-'));
+    writeFileSync(join(dir, 'f'), 'exit 0\n');
+    const r = runAsStep({ BASH_ENV: join(dir, 'f') });
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(r.stdout).not.toMatch(/::error::/);
+  });
+
+  it('threat, documented: an exported BASH_FUNC_[%% makes the guard print the owner line for a non-owner', () => {
+    const r = runAsStep({ 'BASH_FUNC_[%%': '() { return 0; }' });
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/dispatched and run by the owner/);
   });
 
   it('names what failed in an ::error:: line', () => {
