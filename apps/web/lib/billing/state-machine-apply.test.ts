@@ -387,7 +387,8 @@ describe('applyEntitlementTransition on the real schema', () => {
     const members: string[] = [];
     for (let i = 0; i < 6; i++) {
       const user = randomUUID();
-      await db.query(`insert into public.users (id, email) values ($1, $2)`, [
+      // A sign-up: the trigger writes public.users (which references auth.users, B-F2).
+      await db.query(`insert into auth.users (id, email) values ($1, $2)`, [
         user,
         `${user}@example.com`,
       ]);
