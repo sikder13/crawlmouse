@@ -12,6 +12,7 @@ import {
 } from '../../../../../inngest/billing';
 import { CHECK_CANCELLED_FN_ID, CHECK_FN_ID } from '../../../../../inngest/check';
 import { CHECK_REAPER_FN_ID } from '../../../../../inngest/check-reaper';
+import { inngest } from '../../../../../inngest/client';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { PLAN_CONCURRENCY_CAP } from '../../../../../inngest/concurrency';
 import { recordedInput } from '../../../../../packages/engine/fixtures/v2/build/recorded';
@@ -398,11 +399,28 @@ describe('a worker variable that makes no client (correctness 1)', () => {
         expect(() => workerClientFromEnv(env)).toThrow();
       });
 
-      it('the reaper still reaps', async () => {
+      it('the reaper still reaps, and sends check.failed for what it reaped', async () => {
         const w = wired(env);
         const t = tools();
-        await w.reaper.fn({ step: t.step });
+        // The reaper sends from inside its step with the client's own send; nothing leaves here.
+        const send = vi.spyOn(inngest, 'send').mockResolvedValue({ ids: [] });
+        let sent: unknown[];
+        try {
+          await w.reaper.fn({ step: t.step });
+          sent = send.mock.calls.map(([events]) => events);
+        } finally {
+          send.mockRestore();
+        }
         expect(w.reap).toHaveBeenCalledTimes(1);
+        expect(sent).toEqual([
+          [
+            {
+              id: `check-failed:${EVENT.checkId}`,
+              name: 'check.failed',
+              data: { checkId: EVENT.checkId, siteId: site.id, reason: 'stalled' },
+            },
+          ],
+        ]);
       });
 
       it('the cancel handler still fails the check its run claimed', async () => {
