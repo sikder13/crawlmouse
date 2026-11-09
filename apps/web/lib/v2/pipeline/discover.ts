@@ -1,0 +1,73 @@
+/**
+ * Discovery (Q8): the crawl's seeds, read from the Vercel function as v1 reads them. robots.txt's
+ * `Sitemap:` lines (else the common sitemap paths) and the sitemaps, through the engine's
+ * discoverSitemaps and parseSitemapUrls over safeFetch (the SSRF guard), as our identified crawler,
+ * within DISCOVER_S and SITEMAP_URL_CAP. The seeds are the homepage and the sitemap's URLs.
+ *
+ * `lastmod` is null on every seed: the engine's sitemap reader returns `<loc>` values only. Reading
+ * `<lastmod>` needs a reader in the engine (follow-up); until then stage 2's "newest" picks are empty.
+ */
+import {
+  canonicalizeUrl,
+  discoverSitemaps,
+  parseSitemapUrls,
+  type safeFetch,
+  type Seed,
+} from '@crawlmouse/engine/v2/pipeline';
+import { DISCOVER_REQUEST_MS, DISCOVER_S, SITEMAP_URL_CAP } from './limits';
+
+export interface DiscoverDeps {
+  fetch: typeof safeFetch;
+  /** The user agent our crawl identity sends (the worker's CRAWL_USER_AGENT). */
+  userAgent: string;
+  /** Milliseconds since the epoch. */
+  now: () => number;
+}
+
+/** `raw` in canonical spelling when it is an http(s) URL; null otherwise. */
+function canonicalHttp(raw: string): string | null {
+  try {
+    const { protocol } = new URL(raw);
+    return protocol === 'http:' || protocol === 'https:' ? canonicalizeUrl(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function discoverSeeds(
+  homepageUrl: string,
+  deps: DiscoverDeps,
+): Promise<{ seeds: Seed[]; sitemapUrls: number }> {
+  const deadline = deps.now() + DISCOVER_S * 1000;
+  // A fetch that throws reads as "not there" to both engine readers, so once the deadline has
+  // passed every sitemap left is skipped.
+  const fetcher = async (url: string) => {
+    const left = deadline - deps.now();
+    if (left <= 0) throw new Error('discovery: deadline passed');
+    const res = await deps.fetch(url, {
+      userAgent: deps.userAgent,
+      timeoutMs: DISCOVER_REQUEST_MS,
+      totalDeadlineMs: Math.min(left, DISCOVER_REQUEST_MS),
+    });
+    return { status: res.status, body: res.body };
+  };
+
+  const { sitemapUrls } = await discoverSitemaps(new URL(homepageUrl).origin, { fetcher });
+  const locs: string[] = [];
+  for (const sitemap of sitemapUrls) {
+    if (locs.length >= SITEMAP_URL_CAP) break;
+    await parseSitemapUrls(sitemap, { fetcher, maxUrls: SITEMAP_URL_CAP }, 0, locs);
+  }
+
+  // The homepage is a seed whether or not the sitemap lists it; the builder keeps the sitemap's
+  // seed of a URL listed as both (assemble.ts seedMap).
+  const seeds: Seed[] = [{ url: homepageUrl, source: 'homepage', lastmod: null }];
+  const listed = new Set<string>();
+  for (const raw of locs) {
+    const url = canonicalHttp(raw);
+    if (url === null || listed.has(url)) continue;
+    listed.add(url);
+    seeds.push({ url, source: 'sitemap', lastmod: null });
+  }
+  return { seeds, sitemapUrls: locs.length };
+}
