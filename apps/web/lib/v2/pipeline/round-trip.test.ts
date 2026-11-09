@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
-import { buildCheck, type BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
+import { buildCheck, serialiseBuilt, type BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
 import type { BatchResult, CrawlPage } from '@crawlmouse/types/v2';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
@@ -9,7 +9,7 @@ import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-m
 import { loadCheck } from './load';
 import { pageVantage, persistBuiltCheck, persistCalls } from './persist';
 import { pgliteCheckReader, pglitePersistDb, seedRunningCheck } from './test-support/pglite';
-import type { PersistInput } from './types';
+import type { PageVantage, PersistInput } from './types';
 
 /**
  * D12: the engine's build of the recorded site, computed here at run time, persisted into PGlite with
@@ -19,7 +19,9 @@ import type { PersistInput } from './types';
  * timestamps, compared as instants (the database writes them in its own spelling).
  *
  * D5: a second persist of the same check writes nothing; a finishing call that fails part way leaves
- * nothing of the check in any table it writes.
+ * nothing of the check in any table it writes; page_results holds each page's vantage from its crawl
+ * row, which the contract's PageResult does not carry; and the built check as the persist step reads it
+ * (JSON.parse(serialiseBuilt(built)), from built.json.gz) writes the rows the build in memory writes.
  */
 
 const FIXTURE = resolve(__dirname, '../../fixtures/v2/built-site.json');
@@ -48,13 +50,14 @@ const withoutMeta = (d: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(d).filter(([k]) => !META.includes(k)));
 
 let built: BuiltCheck;
+let crawl: CrawlPage[];
 let input: PersistInput;
 let base: PGlite;
 let db: PGlite;
 beforeAll(async () => {
   const recorded = recordedBuild();
   built = buildCheck(recorded);
-  const crawl = (recorded.batches as BatchResult[]).flatMap((b): CrawlPage[] =>
+  crawl = (recorded.batches as BatchResult[]).flatMap((b): CrawlPage[] =>
     b.kind === 'crawl' ? b.pages : [],
   );
   input = {
@@ -136,5 +139,91 @@ describe('persisting is atomic (D5)', () => {
     );
     // The check is still running, with its staging as it was: a retry starts from there.
     expect(rows[0]).toEqual({ status: 'running', staged: calls.stages.length });
+  });
+});
+
+describe('page_results holds each page’s vantage, as its crawl row carried it (D5)', () => {
+  it('identity_sent, source_ip_class, request_headers and headers, read back, are the crawl row’s', async () => {
+    await persistBuiltCheck(pglitePersistDb(db), input);
+    const { rows } = await db.query<Record<string, unknown> & { url: string }>(
+      `select url, identity_sent, source_ip_class, request_headers, headers
+         from public.page_results where check_id = $1`,
+      [built.check.id],
+    );
+    // Each URL's last fetched crawl row, as the builder reads the batches.
+    const fetched = new Map(crawl.filter((p) => p.outcome === 'fetched').map((p) => [p.url, p]));
+    const byUrl = (a: { url: string }, b: { url: string }) => (a.url < b.url ? -1 : 1);
+    expect(rows.sort(byUrl)).toEqual(
+      built.page_results
+        .map(({ url }) => {
+          const row = fetched.get(url)!;
+          return {
+            url,
+            identity_sent: row.identity_sent,
+            source_ip_class: row.source_ip_class,
+            request_headers: row.request_headers,
+            headers: row.headers,
+          };
+        })
+        .sort(byUrl),
+    );
+    // Anti-vacuity: the pages are read, and their request and response headers differ.
+    expect(rows.length).toBe(built.page_results.length);
+    expect(rows.every((r) => JSON.stringify(r.request_headers) !== JSON.stringify(r.headers))).toBe(
+      true,
+    );
+  });
+});
+
+describe('the persist step’s input writes what the build in memory writes', () => {
+  /**
+   * Every row the persist wrote for the check, by table. checks.heartbeat_at is left out:
+   * persist_built_check sets it from the clock, so two writes cannot share it.
+   */
+  async function written(d: PGlite): Promise<Record<string, unknown[]>> {
+    const tables: [string, string, string[]][] = [
+      ...WRITTEN.map(([t, c]): [string, string, string[]] => [t, c, [built.check.id]]),
+      ['checks', 'id', [built.check.id]],
+      ['persist_chunks', 'check_id', [built.check.id]],
+      ['measurement_lineages', 'id', [built.lineages.grading.id, built.lineages.fetching.id]],
+    ];
+    const out: Record<string, unknown[]> = {};
+    for (const [table, column, values] of tables) {
+      const { rows } = await d.query<{ row: unknown }>(
+        `select to_jsonb(t) - $2::text[] as row from public.${table} t where t.${column}::text = any($1)`,
+        [values, table === 'checks' ? ['heartbeat_at'] : []],
+      );
+      out[table] = rows
+        .map((r) => r.row)
+        .sort((a, b) => (JSON.stringify(a) < JSON.stringify(b) ? -1 : 1));
+    }
+    return out;
+  }
+
+  it('JSON.parse(serialiseBuilt(built)) and its vantage entries, as built.json.gz holds them, write the same rows', async () => {
+    // As steps/finish.ts stores { built, vantage } and the persist step reads it back.
+    const stored = JSON.parse(
+      JSON.stringify({ built: JSON.parse(serialiseBuilt(built)), vantage: [...input.vantage] }),
+    ) as { built: BuiltCheck; vantage: [string, PageVantage][] };
+    const other = (await base.clone()) as PGlite;
+    try {
+      await seedRunningCheck(other, recordedBuild().site, recordedBuild().check);
+      await persistBuiltCheck(pglitePersistDb(db), input);
+      await persistBuiltCheck(pglitePersistDb(other), {
+        built: stored.built,
+        vantage: new Map(stored.vantage),
+        map_path: input.map_path,
+      });
+      const fromMemory = await written(db);
+      expect(await written(other)).toEqual(fromMemory);
+      // Anti-vacuity: the rows compared are the check's.
+      expect(fromMemory.page_results).toHaveLength(built.page_results.length);
+      expect(fromMemory.access_tests).toHaveLength(built.access_tests.length);
+      expect(fromMemory.site_fixes).toHaveLength(built.fixes.length);
+      expect(fromMemory.checks).toHaveLength(1);
+      expect(fromMemory.measurement_lineages).toHaveLength(2);
+    } finally {
+      await other.close();
+    }
   });
 });
