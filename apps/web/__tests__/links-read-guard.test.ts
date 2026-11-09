@@ -17,12 +17,18 @@ import { describe, expect, it } from 'vitest';
  * WHAT COUNTS AS A READ, from the TypeScript AST (the `typescript` package), so formatting cannot
  * hide one: a property access (`p.links_out`, `p?.links_out`, `p!.links_out`), an element access
  * with the literal name (`p['links_out']`), and a destructuring (`{ links_out }`,
- * `{ links_out: n }`). Not a read: the target of a plain `=` assignment, an object-literal key, and
+ * `{ links_out: n }`, `{ ['links_out']: n }`). Not a read: the target of a plain `=` assignment, an object-literal key, and
  * anything in a type. Each form is varied in the cases below, both ways.
  */
 
 const REPO = resolve(__dirname, '../../..');
-const ROOTS = ['packages/engine/src', 'apps/web/lib', 'apps/web/components', 'inngest'];
+const ROOTS = [
+  'packages/engine/src',
+  'apps/web/lib',
+  'apps/web/components',
+  'apps/web/app',
+  'inngest',
+];
 const SOURCE = /\.tsx?$/;
 const TEST = /(\.test\.|\.spec\.)|(^|\/)__tests__\//;
 
@@ -69,6 +75,8 @@ function readsProperty(node: ts.Node, name: string): boolean {
   }
   if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
     const key = node.propertyName ?? node.name;
+    if (ts.isComputedPropertyName(key))
+      return ts.isStringLiteralLike(key.expression) && key.expression.text === name;
     return (ts.isIdentifier(key) || ts.isStringLiteral(key)) && key.text === name;
   }
   return false;
@@ -138,6 +146,8 @@ describe('every reader of links_out reads links_read', () => {
       expect(reads(f, text(f)), f).toBeGreaterThan(0);
     }
     expect(FILES.some((f) => f.startsWith('inngest/'))).toBe(true);
+    // The routes and pages a later step reads loadCheck from (CC-22b, CC-30) live here.
+    expect(FILES.some((f) => f.startsWith('apps/web/app/') && f.endsWith('route.ts'))).toBe(true);
     expect(FILES.some((f) => f.startsWith('apps/web/components/') && f.endsWith('.tsx'))).toBe(
       true,
     );
@@ -155,6 +165,8 @@ describe('what the guard counts as a read', () => {
     ['an element access', "return p['links_out'];"],
     ['a destructuring', 'const { links_out } = p; return links_out;'],
     ['a renamed destructuring', 'const { links_out: n } = p; return n;'],
+    ['a destructuring by a computed key', "const { ['links_out']: n } = p; return n;"],
+    ['an element access by a template literal', 'return p[`links_out`];'],
     ['a compound assignment, which reads first', 'p.links_out += 1;'],
   ])('names %s with no links_read', (_, body) => {
     expect(bare(body)).toEqual([1]);
