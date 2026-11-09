@@ -34,7 +34,7 @@ import { isGraded, type TechnicalSeoInput } from '../grade/technical-seo.js';
 import type { RenderOutcome } from '../render/run.js';
 import type { Batches } from './batches.js';
 import { fileEdges, landingsOf } from './filing.js';
-import { crawlableSeeds, landedOn, nextCrawlBatch } from './plan.js';
+import { crawlableDiscovered, crawlableSeeds, landedOn, nextCrawlBatch } from './plan.js';
 import { decideStatus, type StatusDecision } from './status.js';
 import type { BuildInput, Seed } from './types.js';
 
@@ -251,7 +251,7 @@ export function assemble(
   const rowUrls = new Set(allRows.map((r) => r.url));
   const crawlable = crawlableSeeds(input.seeds);
   const found = [
-    ...batches.crawl.flatMap((b) => b.discovered_urls),
+    ...crawlableDiscovered(input.seeds, batches.crawl),
     ...crawlable.map((s) => canonicalizeUrl(s.url)),
   ];
   const unread = [...new Set(found)].filter((u) => !rowUrls.has(u) && !landed.has(u)).sort();

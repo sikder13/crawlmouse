@@ -10,6 +10,7 @@
  * test or a render the planners would not have asked for.
  */
 import type { AccessTest, CrawlBatchResult, Fix, PageResult } from '@crawlmouse/types/v2';
+import { inSiteScope } from '../../extract.js';
 import { canonicalizeUrl } from '../../url-canonical.js';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
 import { FREE_MAX_RENDERS, type RenderCandidate } from '../render/sample.js';
@@ -66,7 +67,7 @@ export function nextCrawlBatch(
   const queue = [
     ...crawlable.filter((s) => s.source === 'homepage').map((s) => s.url),
     ...crawlable.filter((s) => s.source === 'sitemap').map((s) => s.url),
-    ...crawl.flatMap((b) => b.discovered_urls),
+    ...crawlableDiscovered(seeds, crawl),
   ];
   const next: string[] = [];
   for (const raw of queue) {
@@ -80,15 +81,34 @@ export function nextCrawlBatch(
 }
 
 /**
- * The seeds the crawl requests: the homepage's, and the sitemap's on the homepage's host. A sitemap can
- * list another host (www against the apex); those are neither crawled nor counted as discovered.
+ * The seeds the crawl requests: the homepage's, and the sitemap's on the homepage's host and the
+ * default port. A sitemap can list another host (www against the apex) or port; those are neither
+ * crawled nor counted as discovered.
  */
 export function crawlableSeeds(seeds: readonly Seed[]): Seed[] {
   const home = seeds.find((s) => s.source === 'homepage');
   const host = home ? new URL(home.url).hostname : null;
-  return seeds.filter(
-    (s) => s.source === 'homepage' || host === null || new URL(s.url).hostname === host,
-  );
+  return seeds.filter((s) => {
+    if (s.source === 'homepage' || host === null) return true;
+    const url = new URL(s.url);
+    return url.hostname === host && url.port === '';
+  });
+}
+
+/**
+ * The URLs the batches discovered that the worker would fetch for the site (`inSiteScope`: its host or
+ * the www twin, on the default port), batch by batch in the order each found them. A link to another
+ * port is neither crawled nor counted as discovered: a batch holding it would be refused whole.
+ */
+export function crawlableDiscovered(
+  seeds: readonly Seed[],
+  crawl: readonly Pick<CrawlBatchResult, 'discovered_urls'>[],
+): string[] {
+  const home = seeds.find((s) => s.source === 'homepage');
+  const site = home ? new URL(home.url) : null;
+  return crawl
+    .flatMap((b) => b.discovered_urls)
+    .filter((u) => site === null || inSiteScope(new URL(u), site));
 }
 
 /**

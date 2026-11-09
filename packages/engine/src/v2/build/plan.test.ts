@@ -256,4 +256,41 @@ describe('nextCrawlBatch', () => {
       ),
     ).toBeNull();
   });
+
+  // The worker refuses a whole batch holding one URL off the site's default port (jwt_scope,
+  // packages/worker/src/server.ts), so a crawled link such as a leftover dev link must not be planned.
+  it('plans no discovered link on another port, nor the www twin’s, and coverage does not count one', () => {
+    const ported = [
+      'https://p.test:8443/admin',
+      'http://www.p.test:8080/',
+      'https://p.test:443/kept',
+    ];
+    const batch = crawlBatch(
+      0,
+      [crawlRow({ url: HOME, outcome: 'fetched', status: 200 })],
+      [],
+      [...ported, at('/ok')],
+    );
+    const seeds: Seed[] = [{ url: HOME, source: 'homepage', lastmod: null }];
+    // https://p.test:443/kept is the default port written out: the URL parser drops it.
+    expect(nextCrawlBatch(seeds, [batch], 500)).toEqual([at('/kept'), at('/ok')]);
+    const a = assemble(
+      {
+        check: { id: CHECK, site_id: SITE, page_cap: 500 } as never,
+        homepage_url: HOME,
+        seeds,
+        render: null,
+      },
+      readBatches([batch], { id: CHECK, site_id: SITE }, 'unreleased'),
+    );
+    expect(a.coverage.pages_discovered).toBe(3);
+  });
+
+  it('crawls no sitemap seed on another port', () => {
+    const seeds: Seed[] = [
+      { url: HOME, source: 'homepage', lastmod: null },
+      { url: 'https://p.test:8443/x/ported', source: 'sitemap', lastmod: null },
+    ];
+    expect(nextCrawlBatch(seeds, [], 500)).toEqual([HOME]);
+  });
 });

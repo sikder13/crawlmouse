@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
-import { sameHostIgnoringWww } from '@crawlmouse/engine/worker';
+import { inSiteScope } from '@crawlmouse/engine/worker';
 import {
   SIGNATURE_HEADER,
   TS_HEADER,
@@ -120,11 +120,9 @@ function inScope(c: BatchClaims, b: BatchRequest): boolean {
     return false;
   }
   const site = new URL(`https://${c.site_host}/`);
-  // The scheme's default port only: the JWT names a site, not a port to probe on its host.
-  return urlsOf(b).every((u) => {
-    const url = new URL(u);
-    return url.port === '' && sameHostIgnoringWww(url, site);
-  });
+  // The scheme's default port only: the JWT names a site, not a port to probe on its host. The check
+  // builder's planner plans by the same function, so it never sends a URL this refuses.
+  return urlsOf(b).every((u) => inSiteScope(new URL(u), site));
 }
 
 export function createWorker(deps: WorkerDeps): Worker {
