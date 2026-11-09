@@ -12,7 +12,7 @@ vi.mock('./rows', () => ({
   diffInputsFromRow: (r: { diff_inputs: unknown }) => r.diff_inputs ?? null,
 }));
 
-import { IN_LIST, PAGE_ROWS, supabasePipelineStore } from './store';
+import { IN_LIST, PAGE_ROWS, supabasePipelineStore, type PipelineStore } from './store';
 
 type Result = { data: unknown; error: { message: string } | null };
 interface Call {
@@ -54,8 +54,23 @@ function recorder(...answers: Result[]) {
 }
 
 const ok = (data: unknown): Result => ({ data, error: null });
+
+interface Case {
+  answers: Result[];
+  call: (store: PipelineStore) => Promise<unknown>;
+  calls: Call[];
+}
 const C = 'c0000000-0000-4000-8000-000000000000';
 const S = 's0000000-0000-4000-8000-000000000000';
+const QUEUED_ROW = {
+  id: C,
+  site_id: S,
+  trigger: 'manual' as const,
+  grade_version: '1.0.0',
+  queued_at: 'T',
+  heartbeat_at: 'T',
+  expires_at: null,
+};
 const PROGRESS = {
   steps: [{ phase: 'robots_and_sitemap' as const, state: 'now' as const }],
   pages_crawled: 0,
@@ -128,147 +143,306 @@ describe('supabasePipelineStore: the race-critical statements are 008’s functi
   });
 });
 
-describe('supabasePipelineStore: one statement per method', () => {
-  it('writes progress and the heartbeat on a running check only', async () => {
-    const { sb, calls } = recorder(ok(null));
-    await supabasePipelineStore(sb).progress(C, PROGRESS, '2026-11-08T12:00:00.000Z');
-    expect(calls).toEqual([
-      {
-        root: ['from', 'checks'],
+describe('supabasePipelineStore: each method’s statements, whole (quality 2)', () => {
+  const BATCH_ROW = {
+    check_id: C,
+    batch: 3,
+    kind: 'crawl' as const,
+    nonce: 'n'.repeat(24),
+    posted_at: 'T',
+    summary: { urls: 50, max_seconds: 240 },
+  };
+  const page = (from: number) => ['range', [from, from + PAGE_ROWS - 1]] as [string, unknown[]];
+
+  /**
+   * Every call each method makes, root and chain, in order: each filter that scopes a read or a write
+   * to its check or site, each order and each page. `answers` are what the recorder replies.
+   */
+  const CASES: Record<keyof PipelineStore, Case> = {
+    claim: {
+      answers: [ok('claimed')],
+      call: (s) => s.claim(C, 'run-1', PROGRESS),
+      calls: [
+        {
+          root: ['rpc', 'claim_check', { p_check: C, p_run: 'run-1', p_progress: PROGRESS }],
+          chain: [],
+        },
+      ],
+    },
+    fail: {
+      answers: [ok(true)],
+      call: (s) => s.fail(null, 'canceled', 'run-9'),
+      calls: [
+        {
+          root: ['rpc', 'fail_check', { p_check: null, p_reason: 'canceled', p_run: 'run-9' }],
+          chain: [],
+        },
+      ],
+    },
+    reap: {
+      answers: [ok([])],
+      call: (s) => s.reap('T'),
+      calls: [{ root: ['rpc', 'reap_stalled_checks', { p_cutoff: 'T' }], chain: [] }],
+    },
+    checkOfRun: {
+      answers: [ok(null)],
+      call: (s) => s.checkOfRun('run-9'),
+      calls: [
+        {
+          root: ['from', 'checks'],
+          chain: [
+            ['select', ['id, site_id']],
+            ['eq', ['inngest_run_id', 'run-9']],
+            ['maybeSingle', []],
+          ],
+        },
+      ],
+    },
+    progress: {
+      answers: [ok(null)],
+      call: (s) => s.progress(C, PROGRESS, 'T'),
+      calls: [
+        {
+          root: ['from', 'checks'],
+          chain: [
+            ['update', [{ progress: PROGRESS, heartbeat_at: 'T' }]],
+            ['eq', ['id', C]],
+            ['eq', ['status', 'running']],
+          ],
+        },
+      ],
+    },
+    check: {
+      answers: [ok({ id: C })],
+      call: (s) => s.check(C),
+      calls: [
+        {
+          root: ['from', 'checks'],
+          chain: [
+            ['select', ['*']],
+            ['eq', ['id', C]],
+            ['single', []],
+          ],
+        },
+      ],
+    },
+    site: {
+      // siteFromRow reads the report schedule from the row, embedded under `report_schedules`.
+      answers: [ok({ id: S, report_schedules: [] })],
+      call: (s) => s.site(S),
+      calls: [
+        {
+          root: ['from', 'sites'],
+          chain: [
+            ['select', ['*, report_schedules(*)']],
+            ['eq', ['id', S]],
+            ['single', []],
+          ],
+        },
+      ],
+    },
+    requestSite: {
+      answers: [ok({ id: S })],
+      call: (s) => s.requestSite(S),
+      calls: [
+        {
+          root: ['from', 'sites'],
+          chain: [
+            ['select', ['id, account_id, host, next_check_at']],
+            ['eq', ['id', S]],
+            ['single', []],
+          ],
+        },
+      ],
+    },
+    previousCheckId: {
+      answers: [ok(null)],
+      call: (s) => s.previousCheckId(S, C, 'T'),
+      calls: [
+        {
+          root: ['from', 'checks'],
+          chain: [
+            ['select', ['id']],
+            ['eq', ['site_id', S]],
+            ['neq', ['id', C]],
+            ['lte', ['queued_at', 'T']],
+            ['order', ['queued_at', { ascending: false }]],
+            ['order', ['id', { ascending: false }]],
+            ['limit', [1]],
+            ['maybeSingle', []],
+          ],
+        },
+      ],
+    },
+    previousGraded: {
+      answers: [ok(null)],
+      call: (s) => s.previousGraded(S, C, 'T'),
+      calls: [
+        {
+          root: ['from', 'checks'],
+          chain: [
+            ['select', ['*']],
+            ['eq', ['site_id', S]],
+            ['neq', ['id', C]],
+            ['in', ['status', ['finished', 'partial']]],
+            ['lte', ['queued_at', 'T']],
+            ['order', ['queued_at', { ascending: false }]],
+            ['order', ['id', { ascending: false }]],
+            ['limit', [1]],
+            ['maybeSingle', []],
+          ],
+        },
+      ],
+    },
+    fixes: {
+      answers: [ok([{ id: 'f1' }]), ok([])],
+      call: (s) => s.fixes(S),
+      calls: [0, 1].map((from) => ({
+        root: ['from', 'site_fixes'],
+        chain: [['select', ['*']], ['eq', ['site_id', S]], ['order', ['id']], page(from)],
+      })),
+    },
+    fixEvents: {
+      answers: [ok([{ id: 'e1' }]), ok([])],
+      call: (s) => s.fixEvents(['f1', 'f2']),
+      calls: [0, 1].map((from) => ({
+        root: ['from', 'fix_events'],
+        chain: [['select', ['*']], ['in', ['fix_id', ['f1', 'f2']]], ['order', ['id']], page(from)],
+      })),
+    },
+    pageStates: {
+      answers: [ok([{ url: 'https://example.com/a', without_js: { state: 'readable' } }]), ok([])],
+      call: (s) => s.pageStates(C),
+      calls: [0, 1].map((from) => ({
+        root: ['from', 'page_results'],
         chain: [
-          ['update', [{ progress: PROGRESS, heartbeat_at: '2026-11-08T12:00:00.000Z' }]],
-          ['eq', ['id', C]],
-          ['eq', ['status', 'running']],
+          ['select', ['url, without_js']],
+          ['eq', ['check_id', C]],
+          ['not', ['without_js', 'is', null]],
+          ['order', ['url']],
+          page(from),
         ],
-      },
-    ]);
+      })),
+    },
+    batch: {
+      answers: [ok(null)],
+      call: (s) => s.batch(C, 3),
+      calls: [
+        {
+          root: ['from', 'crawl_batches'],
+          chain: [
+            ['select', ['*']],
+            ['eq', ['check_id', C]],
+            ['eq', ['batch', 3]],
+            ['maybeSingle', []],
+          ],
+        },
+      ],
+    },
+    batches: {
+      answers: [ok([{ batch: 1 }]), ok([])],
+      call: (s) => s.batches(C),
+      calls: [0, 1].map((from) => ({
+        root: ['from', 'crawl_batches'],
+        chain: [['select', ['*']], ['eq', ['check_id', C]], ['order', ['batch']], page(from)],
+      })),
+    },
+    upsertBatch: {
+      answers: [ok(null)],
+      call: (s) => s.upsertBatch(BATCH_ROW),
+      calls: [
+        {
+          root: ['from', 'crawl_batches'],
+          chain: [
+            [
+              'upsert',
+              [
+                { ...BATCH_ROW, status: 'posted', finished_at: null, result_path: null },
+                { onConflict: 'check_id,batch' },
+              ],
+            ],
+          ],
+        },
+      ],
+    },
+    endBatch: {
+      answers: [ok(null)],
+      call: (s) => s.endBatch(C, 3, { status: 'failed', finished_at: 'T' }),
+      calls: [
+        {
+          root: ['from', 'crawl_batches'],
+          chain: [
+            ['update', [{ status: 'failed', finished_at: 'T' }]],
+            ['eq', ['check_id', C]],
+            ['eq', ['batch', 3]],
+            ['eq', ['status', 'posted']],
+          ],
+        },
+      ],
+    },
+    insertQueued: {
+      answers: [ok([{ id: C }])],
+      call: (s) => s.insertQueued(QUEUED_ROW),
+      calls: [
+        {
+          root: ['from', 'checks'],
+          chain: [
+            [
+              'upsert',
+              [
+                { ...QUEUED_ROW, status: 'queued' },
+                { onConflict: 'id', ignoreDuplicates: true },
+              ],
+            ],
+            ['select', ['id']],
+          ],
+        },
+      ],
+    },
+  };
+
+  it('has a case for each of the store’s methods', () => {
+    expect(Object.keys(CASES).sort()).toEqual(
+      Object.keys(supabasePipelineStore(recorder().sb)).sort(),
+    );
   });
 
-  it('reads a site with its report schedule embedded, as siteFromRow needs', async () => {
-    const { sb, calls } = recorder(ok({ id: S, report_schedules: [] }));
-    await supabasePipelineStore(sb).site(S);
-    expect(calls[0]).toEqual({
-      root: ['from', 'sites'],
-      chain: [
-        ['select', ['*, report_schedules(*)']],
-        ['eq', ['id', S]],
-        ['single', []],
-      ],
-    });
+  it.each(Object.entries(CASES))('%s', async (_, c) => {
+    const { sb, calls } = recorder(...c.answers);
+    await c.call(supabasePipelineStore(sb));
+    expect(calls).toEqual(c.calls);
+  });
+});
+
+describe('supabasePipelineStore: answers', () => {
+  it('fails by check or by run, and says whether fail_check moved it', async () => {
+    const { sb } = recorder(ok(true), ok(false));
+    const store = supabasePipelineStore(sb);
+    expect(await store.fail(C, 'paused', null)).toBe(true);
+    expect(await store.fail(null, 'canceled', 'run-9')).toBe(false);
   });
 
   it('finds the check a run claimed by its run id', async () => {
-    const { sb, calls } = recorder(ok({ id: C, site_id: S }));
+    const { sb } = recorder(ok({ id: C, site_id: S }));
     expect(await supabasePipelineStore(sb).checkOfRun('run-9')).toEqual({ checkId: C, siteId: S });
-    expect(calls[0]!.chain).toEqual([
-      ['select', ['id, site_id']],
-      ['eq', ['inngest_run_id', 'run-9']],
-      ['maybeSingle', []],
-    ]);
   });
 
-  it('reads the previous check as the latest other one queued no later', async () => {
-    const { sb, calls } = recorder(ok({ id: 'p1' }));
-    expect(await supabasePipelineStore(sb).previousCheckId(S, C, '2026-11-08T12:00:00Z')).toBe(
-      'p1',
-    );
-    expect(calls[0]!.chain).toEqual([
-      ['select', ['id']],
-      ['eq', ['site_id', S]],
-      ['neq', ['id', C]],
-      ['lte', ['queued_at', '2026-11-08T12:00:00Z']],
-      ['order', ['queued_at', { ascending: false }]],
-      ['order', ['id', { ascending: false }]],
-      ['limit', [1]],
-      ['maybeSingle', []],
-    ]);
-  });
-
-  it('reads the previous graded check, finished or partial, with its diff inputs', async () => {
+  it('reads the previous graded check with its diff inputs, or null', async () => {
     const inputs = { page_cap: 500, robots_txt: '', detectors: [], indeterminate: [] };
-    const { sb, calls } = recorder(ok({ id: 'p1', diff_inputs: inputs }), ok(null));
+    const { sb } = recorder(ok({ id: 'p1', diff_inputs: inputs }), ok(null));
     const store = supabasePipelineStore(sb);
     expect(await store.previousGraded(S, C, 'T')).toEqual({
       check: { id: 'p1', diff_inputs: inputs },
       ...inputs,
     });
     expect(await store.previousGraded(S, C, 'T')).toBeNull();
-    expect(calls[0]!.chain).toContainEqual(['in', ['status', ['finished', 'partial']]]);
-    expect(calls[0]!.chain).toContainEqual(['neq', ['id', C]]);
-    expect(calls[0]!.chain).toContainEqual(['lte', ['queued_at', 'T']]);
   });
 
-  it('upserts a batch row on (check_id, batch) as posted, with this attempt’s nonce', async () => {
-    const { sb, calls } = recorder(ok(null));
-    await supabasePipelineStore(sb).upsertBatch({
-      check_id: C,
-      batch: 3,
-      kind: 'crawl',
-      nonce: 'n'.repeat(24),
-      posted_at: 'T',
-      summary: { urls: 50, max_seconds: 240 },
-    });
-    expect(calls).toEqual([
-      {
-        root: ['from', 'crawl_batches'],
-        chain: [
-          [
-            'upsert',
-            [
-              {
-                check_id: C,
-                batch: 3,
-                kind: 'crawl',
-                nonce: 'n'.repeat(24),
-                posted_at: 'T',
-                summary: { urls: 50, max_seconds: 240 },
-                status: 'posted',
-                finished_at: null,
-                result_path: null,
-              },
-              { onConflict: 'check_id,batch' },
-            ],
-          ],
-        ],
-      },
-    ]);
-  });
-
-  it('ends a batch only while it is posted, so a released batch stays released', async () => {
-    const { sb, calls } = recorder(ok(null));
-    await supabasePipelineStore(sb).endBatch(C, 3, { status: 'failed', finished_at: 'T' });
-    expect(calls[0]!.chain).toEqual([
-      ['update', [{ status: 'failed', finished_at: 'T' }]],
-      ['eq', ['check_id', C]],
-      ['eq', ['batch', 3]],
-      ['eq', ['status', 'posted']],
-    ]);
-  });
-
-  it('inserts a queued check unless its id exists, and says which', async () => {
-    const { sb, calls } = recorder(ok([{ id: C }]), ok([]));
+  it('says whether it inserted a queued check', async () => {
+    const { sb } = recorder(ok([{ id: C }]), ok([]));
     const store = supabasePipelineStore(sb);
-    const row = {
-      id: C,
-      site_id: S,
-      trigger: 'manual' as const,
-      grade_version: '1.0.0',
-      queued_at: 'T',
-      heartbeat_at: 'T',
-      expires_at: null,
-    };
-    expect(await store.insertQueued(row)).toBe(true);
-    expect(await store.insertQueued(row)).toBe(false);
-    expect(calls[0]!.chain).toEqual([
-      [
-        'upsert',
-        [
-          { ...row, status: 'queued' },
-          { onConflict: 'id', ignoreDuplicates: true },
-        ],
-      ],
-      ['select', ['id']],
-    ]);
+    expect(await store.insertQueued(QUEUED_ROW)).toBe(true);
+    expect(await store.insertQueued(QUEUED_ROW)).toBe(false);
   });
 
   it('throws on a PostgREST error, naming the statement', async () => {
@@ -317,7 +491,7 @@ describe('supabasePipelineStore: lists are read whole', () => {
   });
 
   it('reads the previous check’s page states, measured pages only', async () => {
-    const { sb, calls } = recorder(
+    const { sb } = recorder(
       ok([
         { url: 'https://example.com/a', without_js: { state: 'readable' } },
         { url: 'https://example.com/b', without_js: { state: 'empty_shell' } },
@@ -328,6 +502,5 @@ describe('supabasePipelineStore: lists are read whole', () => {
       ['https://example.com/a', 'readable'],
       ['https://example.com/b', 'empty_shell'],
     ]);
-    expect(calls[0]!.chain).toContainEqual(['not', ['without_js', 'is', null]]);
   });
 });
