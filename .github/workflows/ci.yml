@@ -249,10 +249,12 @@ jobs:
   # security-severity 7.0 or more (high or critical) fails the job unless the reviewed baseline
   # (.github/workflows/scripts/codeql-baseline.json, by fingerprint, expiring 2026-12-08) lists it; read
   # from the SARIF by .github/workflows/scripts/sarif-gate.mjs, which also fails a scan that extracted
-  # no file. Results
-  # upload to code scanning from this repository's own pushes and pull requests: a fork's token cannot
-  # write them, and the gate still runs on its SARIF.
+  # no file. Results upload to code scanning from every run (CI runs on pushes only).
+  #
+  # Code scanning is not available on a private repository without GitHub Advanced Security, so the
+  # job runs only while the repository is public; once it is private the job is skipped, not failed.
   codeql:
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -279,7 +281,7 @@ jobs:
         with:
           category: /language:javascript-typescript
           output: ${{ runner.temp }}/codeql
-          upload: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && 'always' || 'never' }}
+          upload: always
       - name: Fail on a high or critical result
         run: node .github/workflows/scripts/sarif-gate.mjs "$RUNNER_TEMP/codeql" .github/workflows/scripts/codeql-baseline.json
 
