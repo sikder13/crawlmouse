@@ -156,6 +156,10 @@ export async function POST(req: Request) {
   // (sent on the top-level navigation from the email link on the SAME device; cross-device safely falls
   // back to /dashboard). Off-origin values are dropped by safeNextPath. For the v2 door the route
   // computes the target itself and keeps it as long as the link works.
+  // A resend for the address this browser is already bound to (the Expired page posts only the
+  // address) keeps that request's return target and named site; a request for another address
+  // clears them, since the new binding disowns them.
+  const rebinds = requestCookie(req, COOKIES.binding) !== emailBinding(email);
   const safeNext = v2
     ? typeof claimCheckId === 'string'
       ? claimNext(claimCheckId)
@@ -169,7 +173,7 @@ export async function POST(req: Request) {
       maxAge: v2 ? AUTH_LINK_SECONDS : V1_NEXT_COOKIE_SECONDS,
       path: '/',
     });
-  } else {
+  } else if (rebinds) {
     // The binding below makes this address the one the browser asked for; an earlier request's
     // return target must not ride along into its account.
     res.cookies.set(COOKIES.next, '', { path: '/', maxAge: 0 });
@@ -188,7 +192,7 @@ export async function POST(req: Request) {
 
   if (!v2) {
     // Likewise an earlier door request's named site (the door path below replaces or clears it).
-    res.cookies.set(COOKIES.signup, '', { path: '/', maxAge: 0 });
+    if (rebinds) res.cookies.set(COOKIES.signup, '', { path: '/', maxAge: 0 });
   } else {
     const carry: SignupCarry = {};
     if (host) carry.site = host;

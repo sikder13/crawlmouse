@@ -81,6 +81,43 @@ describe.each([
     expect(set.find((c) => c.startsWith('post_login_next='))).toMatch(/Max-Age=0/);
   });
 
+  it("a resend for the address already bound keeps that request's named site and return target", async () => {
+    // The Expired page's resend posts only the address; for the same person the door's Keep and
+    // named site must survive it.
+    const res = await POST(
+      request(
+        { email: 'Ada@Example.com' },
+        { origin: ORIGIN, cookie: `cm_auth_for=${emailBinding('ada@example.com')}` },
+      ),
+    );
+    const set = res.headers.getSetCookie();
+    expect(set.find((c) => c.startsWith('cm_auth_signup='))).toBeUndefined();
+    expect(set.find((c) => c.startsWith('post_login_next='))).toBeUndefined();
+    expect(binding(res)?.split(';')[0]).toBe(`cm_auth_for=${emailBinding('ada@example.com')}`);
+  });
+
+  it('a request for another address than the one bound clears them', async () => {
+    const res = await POST(
+      request(
+        { email: 'ada@example.com' },
+        { origin: ORIGIN, cookie: `cm_auth_for=${emailBinding('bob@example.com')}` },
+      ),
+    );
+    const set = res.headers.getSetCookie();
+    expect(set.find((c) => c.startsWith('cm_auth_signup='))).toMatch(/Max-Age=0/);
+    expect(set.find((c) => c.startsWith('post_login_next='))).toMatch(/Max-Age=0/);
+  });
+
+  it('marks the binding Secure in production, and only there', async () => {
+    expect(binding(await POST(request({ email: 'ada@example.com' })))).not.toMatch(/Secure/i);
+    vi.stubEnv('NODE_ENV', 'production');
+    try {
+      expect(binding(await POST(request({ email: 'ada@example.com' })))).toMatch(/;\s*Secure/i);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('a request that sends no link sets no binding', async () => {
     limit.allowed = false;
     expect(binding(await POST(request({ email: 'ada@example.com' })))).toBeUndefined();
