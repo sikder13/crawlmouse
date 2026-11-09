@@ -1,7 +1,10 @@
 import * as cheerio from 'cheerio';
 import { parseRobotsTxt, type ParsedRobots } from './robots.js';
 
-export interface FetchedResource { status: number; body: string }
+export interface FetchedResource {
+  status: number;
+  body: string;
+}
 export type Fetcher = (url: string) => Promise<FetchedResource>;
 
 export interface DiscoverResult {
@@ -11,7 +14,9 @@ export interface DiscoverResult {
   robots: ParsedRobots | null;
 }
 
-export interface DiscoverOptions { fetcher: Fetcher }
+export interface DiscoverOptions {
+  fetcher: Fetcher;
+}
 
 const COMMON_SITEMAP_PATHS = [
   '/sitemap.xml',
@@ -57,12 +62,33 @@ export interface ParseOptions {
  *  cross-origin filtering downstream. */
 const DEFAULT_MAX_SITEMAP_URLS = 10_000;
 
-export async function parseSitemapUrls(
+/** One `<url>` of a urlset: its `<loc>`, and its `<lastmod>` as a calendar date (YYYY-MM-DD). */
+export interface SitemapEntry {
+  loc: string;
+  /** Null when the url gives no `<lastmod>`, or one that does not start with a real date. */
+  lastmod: string | null;
+}
+
+/** The date a W3C-datetime `<lastmod>` starts with, as written; null unless it is a real date. */
+function lastmodDate(text: string): string | null {
+  const date = /^(\d{4}-\d{2}-\d{2})/.exec(text.trim())?.[1];
+  if (!date) return null;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date
+    ? date
+    : null;
+}
+
+/**
+ * Every url of a sitemap, following an index to its children, with each url's `<lastmod>`. The same
+ * walk and the same bounds as parseSitemapUrls, which is this list's `loc`s.
+ */
+export async function parseSitemapEntries(
   sitemapUrl: string,
   opts: ParseOptions,
   depth = 0,
-  collected: string[] = [],
-): Promise<string[]> {
+  collected: SitemapEntry[] = [],
+): Promise<SitemapEntry[]> {
   const maxUrls = opts.maxUrls ?? DEFAULT_MAX_SITEMAP_URLS;
   if (depth > (opts.depthLimit ?? 3)) return collected;
   if (collected.length >= maxUrls) return collected;
@@ -91,16 +117,35 @@ export async function parseSitemapUrls(
   if (indexLocs.length > 0) {
     for (const child of indexLocs) {
       if (collected.length >= maxUrls) break;
-      await parseSitemapUrls(child, opts, depth + 1, collected);
+      await parseSitemapEntries(child, opts, depth + 1, collected);
     }
     return collected;
   }
 
   // urlset — skip empty <loc> (would throw downstream in canonicalizeUrl) and cap.
-  const locs = $('urlset > url > loc').map((_, el) => $(el).text().trim()).get();
-  for (const loc of locs) {
+  const locs = $('urlset > url > loc')
+    .map((_, el) => ({
+      loc: $(el).text().trim(),
+      lastmod: lastmodDate($(el).parent().children('lastmod').first().text()),
+    }))
+    .get();
+  for (const entry of locs) {
     if (collected.length >= maxUrls) break;
-    if (loc) collected.push(loc);
+    if (entry.loc) collected.push(entry);
   }
+  return collected;
+}
+
+export async function parseSitemapUrls(
+  sitemapUrl: string,
+  opts: ParseOptions,
+  depth = 0,
+  collected: string[] = [],
+): Promise<string[]> {
+  const maxUrls = opts.maxUrls ?? DEFAULT_MAX_SITEMAP_URLS;
+  const room = { ...opts, maxUrls: maxUrls - collected.length };
+  if (room.maxUrls <= 0) return collected;
+  const entries = await parseSitemapEntries(sitemapUrl, room, depth);
+  collected.push(...entries.map((e) => e.loc));
   return collected;
 }

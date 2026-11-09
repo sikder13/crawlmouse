@@ -72,6 +72,8 @@ export interface SiteOptions {
   facts?: 'none';
   /** URLs robots.txt kept our crawler from; discovered, and counted as excluded when every search engine is disallowed too. */
   disallowed?: readonly DisallowedSpec[];
+  /** What is served for JavaScript to fill in; by default nothing is. */
+  clientRendered?: DetectorInput['client_rendered'];
 }
 
 const full = (p: string) => (p.startsWith('http') ? p : u(p));
@@ -227,6 +229,7 @@ export function site(specs: readonly PageSpec[], opts: SiteOptions = {}): Detect
     edges: specs.flatMap((s) => (s.links ?? []).map((l) => edge(s.path, l))),
     disallowed,
     previous_coverage: opts.previous ?? null,
+    client_rendered: opts.clientRendered ?? { homepage: false, templates: [] },
   };
 }
 

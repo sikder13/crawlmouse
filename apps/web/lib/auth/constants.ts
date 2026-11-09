@@ -19,7 +19,7 @@ export const SIGNIN_SENDER = 'magic@crawlmouse.com';
 /** The address change notes will come from. Nothing sends from it before CC-28. */
 export const ALERTS_SENDER = 'alerts@crawlmouse.com';
 
-/** How long a first audit takes, as the Check-email page says it. Shown only with V2_PIPELINE=1. */
+/** How long a first audit takes, as the Check-email page says it. Shown only with V2_CHECKS_PUBLIC=1. */
 export const FIRST_AUDIT_MINUTES = 2;
 
 /** How long to wait for the email before checking spam. */

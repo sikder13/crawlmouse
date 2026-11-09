@@ -24,7 +24,6 @@ import {
   pageUrl,
   redirectProblems,
   refProblems,
-  servedFunctionNames,
   urlMatches,
   v1InngestFunctions,
   v1MetadataFiles,
@@ -229,25 +228,24 @@ describe('the finders see what they claim to see', () => {
       ]);
     }));
 
-  it('the serve route reader refuses a functions list it cannot read whole', () =>
-    withDir((dir) => {
-      writeFixture(dir, {
-        'ok.ts': 'serve({ functions: [a, b] });',
-        'spread.ts': 'serve({ functions: [...xs, a] });',
-        'call.ts': 'serve({ functions: build(env) });',
-      });
-      expect(servedFunctionNames(join(dir, 'ok.ts'))).toEqual(['a', 'b']);
-      expect(() => servedFunctionNames(join(dir, 'spread.ts'))).toThrow();
-      expect(servedFunctionNames(join(dir, 'call.ts'))).toBeNull();
-    }));
-
-  it('the serve route registers exactly the v1 functions the finder sees', () => {
-    const served = servedFunctionNames(join(WEB, 'app/api/webhooks/inngest/route.ts'));
-    // null would mean the route builds the list with a call (CC-20b's shape); this check then fails
-    // and is rewritten with that merge, rather than passing unread.
-    expect(served).not.toBeNull();
-    const found = v1InngestFunctions().map((f) => f.path.split('#')[1]);
-    expect([...served!].sort()).toEqual([...found].sort());
+  it('the serve route registers exactly the v1 functions the finder sees, with the pipeline off', async () => {
+    // The route hands serve() the list inngestFunctions builds (CC-20b), so the list is read by
+    // running that function with the flag unset, not by reading source text.
+    const route = readFileSync(join(WEB, 'app/api/webhooks/inngest/route.ts'), 'utf8');
+    expect(route).toMatch(/functions:\s*inngestFunctions\(process\.env\)/);
+    const { inngestFunctions } = await import('../lib/v2/pipeline/functions');
+    const served = inngestFunctions({});
+    const found = await Promise.all(
+      v1InngestFunctions().map(async (f) => {
+        const [file, name] = f.path.split('#');
+        const mod = (await import(join(REPO_ROOT, file!))) as Record<string, unknown>;
+        expect(mod[name!], f.path).toBeDefined();
+        return mod[name!];
+      }),
+    );
+    expect(found.length).toBeGreaterThan(0);
+    expect(served).toHaveLength(found.length);
+    expect(new Set(served)).toEqual(new Set(found));
   });
 
   it("a file:line reference is checked against the file it names, or the entry's own", () => {

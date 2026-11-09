@@ -1,4 +1,10 @@
 import { Inngest, EventSchemas } from 'inngest';
+import type {
+  CheckCancelRequested,
+  CheckFailed,
+  CheckFinished,
+  CheckRequested,
+} from './check-events';
 
 type Events = {
   'audit.requested': {
@@ -27,6 +33,11 @@ type Events = {
   'billing.reconcile.requested': {
     data: { mode?: 'dry-run' | 'single-customer' | 'full'; customerId?: string };
   };
+  // The v2 check pipeline (CC-20b, check.ts). Registered only when V2_PIPELINE=1.
+  'check.requested': { data: CheckRequested };
+  'check.finished': { data: CheckFinished };
+  'check.failed': { data: CheckFailed };
+  'check.cancel.requested': { data: CheckCancelRequested };
 };
 
 export const inngest = new Inngest({

@@ -3,5 +3,7 @@ import { previewOnly } from '../../../_preview/guard';
 
 export default function CheckEmailSigninPreview() {
   previewOnly();
-  return <CheckEmailScreen kind="signin" site={null} pipeline={false} email="you@company.com" />;
+  return (
+    <CheckEmailScreen kind="signin" site={null} checksPublic={false} email="you@company.com" />
+  );
 }

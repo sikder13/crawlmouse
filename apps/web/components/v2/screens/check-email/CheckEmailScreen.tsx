@@ -40,13 +40,13 @@ const minutes = (n: number, article: boolean) =>
 export function CheckEmailScreen({
   kind,
   site,
-  pipeline,
+  checksPublic,
   email: fixedEmail,
 }: {
   kind: CheckEmailKind;
   /** A hostname, already validated by the route; null for the sign-in kind. */
   site: string | null;
-  pipeline: boolean;
+  checksPublic: boolean;
   email?: string;
 }) {
   const [pending, setPending] = useState<LinkRequest | null>(
@@ -106,7 +106,7 @@ export function CheckEmailScreen({
                   : `Opening the link creates your account, with ${trialDays} of Pro if it is your first trial, or signs you in to the one you have.`}
               </div>
               <p className={styles.cardBody}>
-                {fromAudit && pipeline ? (
+                {fromAudit && checksPublic ? (
                   <>
                     From then on, {site} is re-checked {cadenceOf('pro')} for {trialDays} if it is
                     your first trial, and {cadenceOf('free')} after; if a check finds a change, the
@@ -118,7 +118,7 @@ export function CheckEmailScreen({
                     Until you open it, the audit of {site} stays at its {ANONYMOUS_VISIBLE_HOURS}
                     -hour link.
                   </>
-                ) : pipeline ? (
+                ) : checksPublic ? (
                   <>
                     The first audit of <span className={styles.monoStrong}>{site}</span> starts the
                     moment you open it, about {numberWord(FIRST_AUDIT_MINUTES)} minutes, if the

@@ -101,14 +101,25 @@ function entryPoints(): string[] {
 // ─────────────────────────────────────────────────────────────────────────────
 const EXT = ['.ts', '.tsx', '.js', '.jsx'];
 
+/** The engine's published subpaths (`./worker`, `./v2/pipeline`, …) and the source file each names. */
+const ENGINE_EXPORTS = JSON.parse(readFileSync(join(REPO, 'packages/engine/package.json'), 'utf8'))
+  .exports as Record<string, { import: string }>;
+
 function resolveSpec(spec: string, fromFile: string): string | null {
   let base: string;
   if (spec.startsWith('.')) base = resolve(dirname(fromFile), spec);
   else if (spec.startsWith('@/')) base = join(WEB, spec.slice(2));
   else if (spec === '@crawlmouse/engine') base = join(REPO, 'packages/engine/src/index.ts');
-  else if (spec.startsWith('@crawlmouse/engine/')) base = join(REPO, 'packages/engine/src', spec.slice(19));
+  else if (
+    Object.hasOwn(ENGINE_EXPORTS, `./${spec.slice(19)}`) &&
+    spec.startsWith('@crawlmouse/engine/')
+  )
+    base = join(REPO, 'packages/engine', ENGINE_EXPORTS[`./${spec.slice(19)}`]!.import);
+  else if (spec.startsWith('@crawlmouse/engine/'))
+    base = join(REPO, 'packages/engine/src', spec.slice(19));
   else if (spec === '@crawlmouse/types') base = join(REPO, 'packages/types/src/index.ts');
-  else if (spec.startsWith('@crawlmouse/types/')) base = join(REPO, 'packages/types/src', spec.slice(18));
+  else if (spec.startsWith('@crawlmouse/types/'))
+    base = join(REPO, 'packages/types/src', spec.slice(18));
   else if (spec === '@crawlmouse/inngest') base = join(REPO, 'inngest/client.ts');
   else if (spec.startsWith('@crawlmouse/inngest/')) base = join(REPO, 'inngest', spec.slice(20));
   else return null; // a third-party package — outside our control and outside this rule
@@ -120,7 +131,8 @@ function resolveSpec(spec: string, fromFile: string): string | null {
   return null;
 }
 
-const IMPORT_RE = /(?:^|\n)\s*(?:import|export)\s[^;]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+const IMPORT_RE =
+  /(?:^|\n)\s*(?:import|export)\s[^;]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
 function buildGraph(): { reachable: Set<string>; unresolved: string[] } {
   const reachable = new Set<string>();
@@ -131,16 +143,22 @@ function buildGraph(): { reachable: Set<string>; unresolved: string[] } {
     if (reachable.has(f)) continue;
     reachable.add(f);
     let src: string;
-    try { src = readFileSync(f, 'utf8'); } catch { continue; }
+    try {
+      src = readFileSync(f, 'utf8');
+    } catch {
+      continue;
+    }
     for (const m of src.matchAll(IMPORT_RE)) {
       const spec = m[1] ?? m[2];
       if (!spec) continue;
       // Only OUR code is walked. A third-party package cannot be policed by a source scan, and
       // pretending otherwise would be the vacuity this guard exists to avoid.
-      if (!spec.startsWith('.') && !spec.startsWith('@/') && !spec.startsWith('@crawlmouse/')) continue;
+      if (!spec.startsWith('.') && !spec.startsWith('@/') && !spec.startsWith('@crawlmouse/'))
+        continue;
       const r = resolveSpec(spec, f);
-      if (r) { if (!reachable.has(r)) stack.push(r); }
-      else unresolved.push(`${relative(REPO, f)} -> ${spec}`);
+      if (r) {
+        if (!reachable.has(r)) stack.push(r);
+      } else unresolved.push(`${relative(REPO, f)} -> ${spec}`);
     }
   }
   return { reachable, unresolved };
@@ -239,7 +257,8 @@ const INVENTORY: [entry: string, why: string][] = [
 ];
 
 /** Whitespace-normalised so indentation changes and re-wrapping do not invalidate a justification. */
-const inventoryKey = (rel: string, line: string): string => `${rel} :: ${line.trim().replace(/\s+/g, ' ')}`;
+const inventoryKey = (rel: string, line: string): string =>
+  `${rel} :: ${line.trim().replace(/\s+/g, ' ')}`;
 describe('GUARD — the refusal gate, over the whole reachable import graph', () => {
   const { reachable, unresolved } = buildGraph();
   const files = [...reachable].sort();
@@ -304,13 +323,15 @@ describe('GUARD — the refusal gate, over the whole reachable import graph', ()
     const where = new Map<string, string>();
     for (const f of files) {
       const rel = relative(REPO, f);
-      readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
-        if (isComment(line)) return;
-        if (!VERDICT_DEFAULT.test(line)) return;
-        const key = inventoryKey(rel, line);
-        found.push(key);
-        if (!where.has(key)) where.set(key, `${rel}:${i + 1}`);
-      });
+      readFileSync(f, 'utf8')
+        .split('\n')
+        .forEach((line, i) => {
+          if (isComment(line)) return;
+          if (!VERDICT_DEFAULT.test(line)) return;
+          const key = inventoryKey(rel, line);
+          found.push(key);
+          if (!where.has(key)) where.set(key, `${rel}:${i + 1}`);
+        });
     }
     const unlisted = found.filter((e) => !listed.has(e)).map((e) => `${where.get(e)}  ${e}`);
     expect(
@@ -329,7 +350,11 @@ describe('GUARD — the refusal gate, over the whole reachable import graph', ()
     for (const [entry, why] of INVENTORY) {
       expect(why.length, `${entry} needs a real justification`).toBeGreaterThan(40);
       // "it is safe" is a conclusion. The entry has to name a mechanism.
-      expect(/gate|query|route|pinned|null|branch|short-circuit|counts|present|excluded|graded|ledger/i.test(why)).toBe(true);
+      expect(
+        /gate|query|route|pinned|null|branch|short-circuit|counts|present|excluded|graded|ledger/i.test(
+          why,
+        ),
+      ).toBe(true);
     }
   });
 });

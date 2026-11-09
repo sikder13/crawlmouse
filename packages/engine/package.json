@@ -17,6 +17,10 @@
     "./v2/layout": {
       "types": "./src/v2/layout/index.ts",
       "import": "./src/v2/layout/index.ts"
+    },
+    "./v2/pipeline": {
+      "types": "./src/v2/pipeline-surface.ts",
+      "import": "./src/v2/pipeline-surface.ts"
     }
   },
   "scripts": {

@@ -82,9 +82,11 @@ export interface Scope {
   resolve: (url: string) => string;
   /**
    * The distinct links a crawled page found (`links_out`), less those recorded to a URL robots.txt
-   * excludes (`excluded`), which are not part of the graph.
+   * excludes (`excluded`), which are not part of the graph; null for an HTML page whose links were not
+   * all read, whose count is not all its links. A response that is not HTML (a PDF, an image, a feed
+   * served as XML) has no links the crawl reads, so its count stands.
    */
-  linksOut: (url: string) => number;
+  linksOut: (url: string) => number | null;
   /** Link targets of crawled 200 pages that were not crawled themselves, sorted. */
   uncrawledTargets: readonly string[];
   /** The crawl was cut short: the page cap, a partial check, or coverage under MIN_CRAWL_COVERAGE. */
@@ -190,13 +192,6 @@ function disallowedOf(input: DetectorInput, page: ReadonlyMap<string, PageResult
   return { by, excluded };
 }
 
-/**
- * An HTML page whose links were not all read. A response that is not HTML (a PDF, an image, a feed
- * served as XML) has no links the crawl reads, so it hides none; nor does a redirect, a 404 or a
- * 410, which are not 200 pages at all.
- */
-const unreadHtml = (f: PageFacts): boolean => f.html && !f.links_read;
-
 export function scopeOf(input: DetectorInput): Scope {
   const page = indexBy(input.pages, 'pages');
   const spelled = input.pages.map((p) => canonicalFacts(pageFacts(p)));
@@ -238,10 +233,16 @@ export function scopeOf(input: DetectorInput): Scope {
   const unfetched =
     (c !== null && c.pages_crawled + c.excluded_by_robots < c.pages_discovered) ||
     uncrawledTargets.length > 0;
-  const linksOut = (url: string) => page.get(url)!.links_out - (toExcluded.get(url) ?? 0);
+  const linksOut = (url: string) => {
+    const f = facts.get(url)!;
+    if (f.html && !f.links_read) return null;
+    return page.get(url)!.links_out - (toExcluded.get(url) ?? 0);
+  };
   const linksIncomplete =
-    ok.some((url) => linksOut(url) > (recorded.get(url) ?? 0) || unreadHtml(facts.get(url)!)) ||
-    input.pages.some((p) => isUnread(p.status_code));
+    ok.some((url) => {
+      const found = linksOut(url);
+      return found === null || found > (recorded.get(url) ?? 0);
+    }) || input.pages.some((p) => isUnread(p.status_code));
   return {
     input,
     page,
@@ -272,6 +273,15 @@ export function absenceUnproven(s: Scope): IndeterminateReason | null {
   if (s.linksIncomplete) return 'links_not_fully_recorded';
   return null;
 }
+
+/**
+ * The page's template, or the homepage, is served for JavaScript to fill in
+ * (`DetectorInput.client_rendered`). Links made in the browser are not in the HTML the crawl read, so
+ * the crawl cannot prove that the page has no link to it or no short path: v1's JS/SPA orphan
+ * suppression (OPERATING-RULES §5), applied to the page's template.
+ */
+export const clientRendered = (s: Scope, p: PageResult): boolean =>
+  s.input.client_rendered.homepage || s.input.client_rendered.templates.includes(p.template_key);
 
 /** 404 or 410: the page is no longer there. */
 export function goneStatus(p: PageResult): 404 | 410 | null {

@@ -3,5 +3,5 @@ import { previewOnly } from '../../_preview/guard';
 
 export default function SignupPreview() {
   previewOnly();
-  return <SignupScreen pipeline={false} />;
+  return <SignupScreen checksPublic={false} />;
 }

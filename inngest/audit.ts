@@ -6,6 +6,7 @@ import { supabaseAdmin } from './supabase';
 import { persistAuditResults } from './persist-results';
 import { createProgressBatcher, type ProgressBatcher } from './progress';
 import { sendAuditNotification } from './notify';
+import { PLAN_CONCURRENCY_CAP, planSafeLimit } from './concurrency';
 import type { CrawlHealth, AuditResult, CrawlActivity } from '@crawlmouse/types';
 
 /**
@@ -111,26 +112,18 @@ export function emitFindingPreviews(
  * Inngest validates this at APP SYNC time and REJECTS the entire app registration (no functions
  * get registered, so NO audit ever runs) if a function's concurrency limit exceeds the account
  * plan's cap — the Inngest Free plan caps at 5. Hardcoding the Pro-tier 50 therefore broke prod
- * sync with `"...higher concurrency limits (50) than your plan limit of 5"`. Read the limit from
- * the environment with a plan-safe default so the value tracks the Inngest plan as config, not a
- * code change: leave it unset on Free (-> 5); set INNGEST_AUDIT_CONCURRENCY=50 (the cost-model
- * target, docs/ops/2026-06-03-cost-model.md §4) once the account is on a paid plan whose cap
- * allows it. A missing / non-numeric / non-positive value falls back to the Free-safe 5.
+ * sync with `"...higher concurrency limits (50) than your plan limit of 5"`. The limit comes from
+ * INNGEST_AUDIT_CONCURRENCY; a missing / non-numeric / non-positive value falls back to the cap.
  *
- * Clamped to MAX_AUDIT_CONCURRENCY: a fat-finger env value (e.g. `500`) would otherwise exceed
- * EVERY Inngest plan cap and re-trigger the exact app-sync rejection this change fixes (no
- * functions register → every audit stuck `pending`). Clamping degrades a typo to throttled-but-
- * working instead of a prod outage. NOTE the operator must still keep the value ≤ the account's
- * actual Inngest plan cap; the clamp only bounds gross typos, not plan mismatches.
+ * Clamped to PLAN_CONCURRENCY_CAP (concurrency.ts), which checkFn shares, so no env value can
+ * declare more than the plan allows. It clamped at 100 before CC-20b, so a value from 6 to 100
+ * re-created the outage on Free. Moving to a paid plan (the cost model's 50,
+ * docs/ops/2026-06-03-cost-model.md §4) raises PLAN_CONCURRENCY_CAP in the same change.
  */
-const MAX_AUDIT_CONCURRENCY = 100; // cost-model docs/ops/2026-06-03-cost-model.md §4 ceiling ("on Pro keep ≤ 100")
-
 export function auditConcurrencyLimit(
   env: Record<string, string | undefined> = process.env,
 ): number {
-  const n = Number(env.INNGEST_AUDIT_CONCURRENCY);
-  if (!Number.isInteger(n) || n <= 0) return 5;
-  return Math.min(n, MAX_AUDIT_CONCURRENCY);
+  return planSafeLimit(env.INNGEST_AUDIT_CONCURRENCY, PLAN_CONCURRENCY_CAP);
 }
 
 /**
@@ -404,7 +397,8 @@ export const auditFn = inngest.createFunction(
     // pathologically slow site retry the 240s wall-clock ~5× and sit 'crawling' ~30 min.
     retries: 1,
     // Plan-safe: must not exceed the Inngest account's concurrency cap or the whole app sync is
-    // rejected and no audits run. Defaults to 5 (Free); raise via INNGEST_AUDIT_CONCURRENCY on Pro.
+    // rejected and no audits run. Clamped to PLAN_CONCURRENCY_CAP (concurrency.ts), which checkFn
+    // shares; INNGEST_AUDIT_CONCURRENCY can lower it.
     concurrency: { limit: auditConcurrencyLimit() },
     // User-stop: when the Cancel button POSTs /api/audits/[id]/cancel, the route sends
     // `audit.cancel.requested` with the auditId; this cancelOn makes Inngest STOP the in-flight

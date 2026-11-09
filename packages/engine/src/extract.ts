@@ -82,6 +82,15 @@ export function sameHostIgnoringWww(a: URL, b: URL): boolean {
 }
 
 /**
+ * A URL the crawl worker fetches for a site: on the site's host or its `www.` twin, on the scheme's
+ * default port. The worker refuses a batch holding any other URL (jwt_scope); the check builder's
+ * planner leaves such a URL out, so one link to another port cannot fail a check.
+ */
+export function inSiteScope(url: URL, site: URL): boolean {
+  return url.port === '' && sameHostIgnoringWww(url, site);
+}
+
+/**
  * Jetpack / WordPress share buttons render as SAME-HOST `?share=<platform>` links that the server
  * 302-redirects to the external share endpoint — fetching them wastes the crawl budget and pollutes
  * the graph with cross-host nodes. Match the PRECISE pattern (a known platform token, incl. the
@@ -89,8 +98,23 @@ export function sameHostIgnoringWww(a: URL, b: URL): boolean {
  * query param for another purpose is never dropped.
  */
 const SHARE_PLATFORMS = new Set([
-  'facebook', 'twitter', 'x', 'linkedin', 'reddit', 'telegram', 'tumblr', 'pinterest', 'whatsapp',
-  'pocket', 'skype', 'email', 'print', 'mastodon', 'bluesky', 'nextdoor', 'pressthis',
+  'facebook',
+  'twitter',
+  'x',
+  'linkedin',
+  'reddit',
+  'telegram',
+  'tumblr',
+  'pinterest',
+  'whatsapp',
+  'pocket',
+  'skype',
+  'email',
+  'print',
+  'mastodon',
+  'bluesky',
+  'nextdoor',
+  'pressthis',
 ]);
 function isShareActionUrl(url: URL): boolean {
   const v = url.searchParams.get('share');
@@ -106,12 +130,55 @@ function isShareActionUrl(url: URL): boolean {
  * are intentionally absent (they ARE content).
  */
 const MEDIA_EXTENSIONS = new Set([
-  'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'avif', 'ico', 'bmp', 'tiff', 'tif',
-  'pdf', 'zip', 'gz', 'tar', 'rar', '7z', 'dmg', 'exe', 'pkg', 'apk',
-  'mp4', 'webm', 'mov', 'avi', 'mkv', 'mp3', 'wav', 'ogg', 'flac', 'm4a',
-  'css', 'js', 'mjs', 'json', 'xml', 'rss', 'csv',
-  'woff', 'woff2', 'ttf', 'eot', 'otf',
-  'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'svg',
+  'webp',
+  'avif',
+  'ico',
+  'bmp',
+  'tiff',
+  'tif',
+  'pdf',
+  'zip',
+  'gz',
+  'tar',
+  'rar',
+  '7z',
+  'dmg',
+  'exe',
+  'pkg',
+  'apk',
+  'mp4',
+  'webm',
+  'mov',
+  'avi',
+  'mkv',
+  'mp3',
+  'wav',
+  'ogg',
+  'flac',
+  'm4a',
+  'css',
+  'js',
+  'mjs',
+  'json',
+  'xml',
+  'rss',
+  'csv',
+  'woff',
+  'woff2',
+  'ttf',
+  'eot',
+  'otf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'ppt',
+  'pptx',
 ]);
 function isMediaFileUrl(url: URL): boolean {
   if (url.pathname.includes('/wp-content/uploads/')) return true; // WordPress media library
@@ -149,7 +216,13 @@ export function extractPage(
 
   $('a[href]').each((_, el) => {
     const href = ($(el).attr('href') ?? '').trim();
-    if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+    if (
+      !href ||
+      href.startsWith('#') ||
+      href.startsWith('javascript:') ||
+      href.startsWith('mailto:') ||
+      href.startsWith('tel:')
+    ) {
       return;
     }
     let resolved: URL;
@@ -162,7 +235,8 @@ export function extractPage(
     if (!sameHostIgnoringWww(resolved, baseUrlObj)) return;
     // SPEC 02 (v2): skip same-host NON-CONTENT links — share-action (?share=) + media/binary files —
     // they aren't pages of the site (they 302 off-site or are assets), so they waste budget + pollute cures.
-    if (opts.excludeNonContentLinks && (isShareActionUrl(resolved) || isMediaFileUrl(resolved))) return;
+    if (opts.excludeNonContentLinks && (isShareActionUrl(resolved) || isMediaFileUrl(resolved)))
+      return;
 
     const anchorText = $(el).text().trim().replace(/\s+/g, ' ');
     links.push({

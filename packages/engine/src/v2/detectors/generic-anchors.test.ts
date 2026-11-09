@@ -138,4 +138,36 @@ describe('generic_anchor_text', () => {
     expect(siteWide).toBe(0.2);
     expect(of(detectGenericAnchors(s), '/')).toMatchObject({ state: 'detected', measured: 0.6 });
   });
+
+  describe('a hub whose links were not all read (links_read false)', () => {
+    // Its count is the links found before the read stopped, so the unread rest could move the share
+    // either way: neither a detection nor a clearance is proved.
+    const unread = { facts: { links_read: false } };
+
+    it.each([
+      ['every recorded anchor generic', 5, 5],
+      ['no recorded anchor generic', 5, 0],
+      ['fewer recorded links than a hub needs', 2, 2],
+    ])('is indeterminate with %s', (_, total, generic) => {
+      expect(of(detectGenericAnchors(hubSite(total, generic, unread)), '/')).toMatchObject({
+        state: 'indeterminate',
+        reason: 'links_not_fully_recorded',
+      });
+    });
+
+    it('control: the same hubs read whole are decided', () => {
+      expect(of(detectGenericAnchors(hubSite(5, 5)), '/')).toMatchObject({ state: 'detected' });
+      expect(of(detectGenericAnchors(hubSite(5, 0)), '/')).toMatchObject({
+        state: 'not_detected',
+      });
+    });
+
+    it('a response that is not HTML has no links to read, so its count stands', () => {
+      const pdf = { facts: { links_read: false, html: false } };
+      expect(of(detectGenericAnchors(hubSite(2, 2, pdf)), '/')).toMatchObject({
+        state: 'indeterminate',
+        reason: 'too_few_links',
+      });
+    });
+  });
 });

@@ -55,13 +55,15 @@ interface Rule {
 const ABSENCE = 'the crawl cannot prove absence (below)';
 const GONE = `the page answers ${GONE_STATUSES.join(' or ')} (\`page_gone\`)`;
 const UNCRAWLED = 'a linked URL was not crawled (`not_crawled`)';
+const CLIENT =
+  "the page's template, or the homepage, is served for JavaScript to fill in (`client_rendered`, below)";
 
 const RULES: Readonly<Record<StructureFixType, Rule>> = {
   orphan_pages: {
     subject: 'page URL',
     detected: 'a gradeable 200 page (not the homepage) has no link from another crawled 200 page',
     clear: 'it has at least one such link (proof on any crawl)',
-    indeterminate: `no such link and ${ABSENCE}; ${GONE}; ${UNCRAWLED}`,
+    indeterminate: `no such link and ${CLIENT}; no such link and ${ABSENCE}; ${GONE}; ${UNCRAWLED}`,
     measured: 'links to the page from crawled 200 pages',
     affected: 'the page',
   },
@@ -69,7 +71,7 @@ const RULES: Readonly<Record<StructureFixType, Rule>> = {
     subject: 'page URL',
     detected: `a gradeable 200 page is more than ${MAX_HEALTHY_DEPTH} clicks from the homepage, or no path reaches it`,
     clear: `it is ${MAX_HEALTHY_DEPTH} clicks or fewer away (proof on any crawl: more pages only shorten paths)`,
-    indeterminate: `the homepage was not crawled with a 200; the sample's overlap with the previous check is under ${pct(MIN_STRATA_OVERLAP)}; deeper than ${MAX_HEALTHY_DEPTH} and ${ABSENCE}; ${GONE}; ${UNCRAWLED}`,
+    indeterminate: `the homepage was not crawled with a 200; the sample's overlap with the previous check is under ${pct(MIN_STRATA_OVERLAP)}; deeper than ${MAX_HEALTHY_DEPTH} and ${CLIENT}; deeper than ${MAX_HEALTHY_DEPTH} and ${ABSENCE}; ${GONE}; ${UNCRAWLED}`,
     measured: 'clicks from the homepage (none when unreachable)',
     affected: 'the page',
   },
@@ -77,7 +79,7 @@ const RULES: Readonly<Record<StructureFixType, Rule>> = {
     subject: 'hub URL',
     detected: `a hub (top ${pct(TOP_HUB_FRACTION)} of crawled 200 pages by PageRank share, at least one) with ${MIN_HUB_OUTLINKS} or more outbound links has more than ${pct(GENERIC_DETECT_ABOVE)} generic anchors`,
     clear: `the share is ${pct(GENERIC_CLEAR_AT_OR_BELOW)} or less`,
-    indeterminate: `fewer than ${MIN_HUB_OUTLINKS} outbound links; a share above ${pct(GENERIC_CLEAR_AT_OR_BELOW)} and at most ${pct(GENERIC_DETECT_ABOVE)} (hysteresis: an open fix stays open, no new one opens); links found but not recorded that could move the share across a threshold`,
+    indeterminate: `the hub is HTML and its links were not all read; fewer than ${MIN_HUB_OUTLINKS} outbound links; a share above ${pct(GENERIC_CLEAR_AT_OR_BELOW)} and at most ${pct(GENERIC_DETECT_ABOVE)} (hysteresis: an open fix stays open, no new one opens); links found but not recorded that could move the share across a threshold`,
     measured:
       'generic share of the recorded outbound links; the worker records one link per target, with its first anchor',
     affected: 'the hub',
@@ -191,6 +193,7 @@ const FACT_FIELDS: Readonly<Record<keyof PageFacts, [string, string]>> = {
 export const INPUTS_READ: Readonly<Record<StructureFixType | 'scope', readonly string[]>> = {
   scope: [
     'canonical',
+    'client_rendered',
     'disallowed',
     'final_url',
     'hreflang',
@@ -234,6 +237,8 @@ const REASONS: Readonly<Record<IndeterminateReason, string>> = {
   canonical_target_not_read: 'The canonical target kept its content from us (`isUnread`).',
   member_not_crawled:
     'A cluster member was not crawled, its hreflang was not read at its own URL, or it kept its content from us.',
+  client_rendered:
+    "The page's template, or the homepage, is served for JavaScript to fill in: links made in the browser are not in the HTML the crawl read.",
 };
 
 const CONDITION_TEXT: Readonly<Record<Condition, [StructureFixType, string]>> = {
@@ -295,8 +300,8 @@ export function renderStructureSpec(): string {
 > \`pnpm --filter @crawlmouse/engine exec tsx src/v2/detectors/write-spec.ts\`.
 
 Each detector is a pure function of one check (\`DetectorInput\`): page results, link edges, coverage, the
-page cap, the homepage, the previous check's coverage, and the URLs robots.txt kept our crawler from
-(\`disallowed\`). It returns
+page cap, the homepage, the previous check's coverage, the URLs robots.txt kept our crawler from
+(\`disallowed\`), and what is served for JavaScript to fill in (\`client_rendered\`). It returns
 one \`Detection\` per fingerprint, sorted by fix type and then key. \`detectStructure\` runs them all. A
 detected record is not a \`FixDraft\`: CC-17 adds the effect and the packet and turns records into the
 diff's \`DetectorOutcome\`s.
@@ -364,6 +369,17 @@ between it and 100 % is \`urls_not_fetched\`. The brief's exemption, "unless the
 crawled", is not implemented. Coverage counts each template's pages without saying how many were
 discovered, and the pages that link to an orphan are often of another template (the ticket's archives
 link its posts).
+
+## Pages served for JavaScript to fill in
+
+v1 suppresses orphan findings on a site whose homepage is an app shell (OPERATING-RULES §5): the crawl
+reads static HTML, and links a script makes in the browser are not in it. \`DetectorInput.client_rendered\`
+carries that signal per check: whether the homepage is served for JavaScript to fill in, and the template
+keys of the pages that are (the builder's rule is in SPEC 20a). An \`orphan_pages\` or \`deep_pages\`
+verdict that rests on absence (no link to the page; no path within ${MAX_HEALTHY_DEPTH} clicks) is \`indeterminate\`
+with reason \`client_rendered\` for a page of a listed template, and for every page when the homepage is
+listed; the reason is given before any of the three above. A link the crawl did see still proves the page
+is linked, and a path it did see still proves the depth. The other structure detectors do not read it.
 
 ## Fingerprint stability
 

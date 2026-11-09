@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 import { insertRow, premakeTestMonths, signUp } from './helpers/v2-check-tables';
 import { NOT_STORED_YET, VALUES_NOT_STORED_YET } from './helpers/v2-contract-storage';
+import { CHECK_PIPELINE_COLUMNS, SITE_SCHEDULE_COLUMNS } from '../lib/v2/pipeline/columns';
 
 /**
  * The contract's own fixture datasets (apps/web/lib/fixtures/v2) round-trip through the tables:
@@ -136,7 +137,13 @@ const storable = (collection: string, rows: Rec[], isPending = pending): Rec[] =
  * them, with the generated statuses, which are compared with the contract's functions on their own.
  */
 const DATABASE_ONLY: Record<string, string[]> = {
-  checks: ['lineage_id', 'check_month', 'technical_seo_status', 'ai_readability_status'],
+  checks: [
+    'lineage_id',
+    'check_month',
+    'technical_seo_status',
+    'ai_readability_status',
+    ...CHECK_PIPELINE_COLUMNS,
+  ],
   page_results: [
     'url_hash',
     'check_month',
@@ -286,6 +293,7 @@ async function project(db: PGlite): Promise<Record<string, Rec[]>> {
           'paused_reason',
           'removed_at',
           'updated_at',
+          ...SITE_SCHEDULE_COLUMNS,
         ]),
         schedule:
           s.schedule_cadence === null

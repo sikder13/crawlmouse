@@ -1543,9 +1543,9 @@
       "id": "C-3",
       "severity": "minor",
       "items": ["inngest/audit.ts#auditFn"],
-      "evidence": "inngest/audit.ts:126",
-      "what": "INNGEST_AUDIT_CONCURRENCY from 6 to 100 passes the clamp; above the Free cap the whole app sync is rejected.",
-      "owner": "CC-20b (its PLAN_CONCURRENCY_CAP closes it)"
+      "evidence": "inngest/audit.ts:123-127",
+      "what": "INNGEST_AUDIT_CONCURRENCY from 6 to 100 passed the old clamp of 100; above the Free cap the whole app sync is rejected. CC-20b clamps it to PLAN_CONCURRENCY_CAP = 5 (inngest/concurrency.ts:13).",
+      "fixedIn": "a9bd2008"
     },
     {
       "id": "C-4",

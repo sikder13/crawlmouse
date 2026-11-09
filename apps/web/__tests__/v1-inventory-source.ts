@@ -227,37 +227,6 @@ function isFactoryBody(node: ts.Node): boolean {
 }
 
 /**
- * The identifiers in the serve route's `functions: [ … ]` array, or null when `functions` is not an
- * array literal (CC-20b's branch builds it with a call). An entry that is not a plain name (a spread,
- * a call) throws, so a list this cannot read is not checked as if it were complete.
- */
-export function servedFunctionNames(routeFile: string): string[] | null {
-  const sf = ts.createSourceFile(
-    routeFile,
-    readFileSync(routeFile, 'utf8'),
-    ts.ScriptTarget.Latest,
-    true,
-  );
-  let names: string[] | null = null;
-  const visit = (node: ts.Node) => {
-    if (
-      ts.isPropertyAssignment(node) &&
-      node.name.getText() === 'functions' &&
-      ts.isArrayLiteralExpression(node.initializer)
-    ) {
-      const elements = node.initializer.elements;
-      const odd = elements.find((e) => !ts.isIdentifier(e));
-      if (odd)
-        throw new Error(`serve route: a functions entry that is not a name: ${odd.getText()}`);
-      names = elements.map((e) => (e as ts.Identifier).text);
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sf);
-  return names;
-}
-
-/**
  * Every `createFunction(…)` call in each non-test module of `dir`. A call inside a function body is
  * a factory's (the v2 rule) and is skipped; a call written as the top-level
  * `export const name = <client>.createFunction(config, trigger, handler)` is a v1 function, `path`

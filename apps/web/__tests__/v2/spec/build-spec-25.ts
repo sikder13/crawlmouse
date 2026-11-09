@@ -44,7 +44,7 @@ function constantsSection(): string {
         [code('ALERTS_SENDER'), code(c.ALERTS_SENDER)],
         [
           code('FIRST_AUDIT_MINUTES'),
-          `${c.FIRST_AUDIT_MINUTES} (shown only with \`V2_PIPELINE=1\`)`,
+          `${c.FIRST_AUDIT_MINUTES} (shown only with \`V2_CHECKS_PUBLIC=1\`)`,
         ],
         [code('RESEND_HINT_MINUTES'), String(c.RESEND_HINT_MINUTES)],
         [code('TRIAL_REMINDER_DAYS_BEFORE_END'), String(c.TRIAL_REMINDER_DAYS_BEFORE_END)],
@@ -135,7 +135,7 @@ function flagSection(): string {
       ],
     ),
     '',
-    'With `V2_PIPELINE=1` (CC-20b) Sign-up and Check-email say a named site’s first audit starts when the link is opened, that a kept site is re-checked and that change notes come from `alerts@`, and Sign-up points to Keep on the audit page; without it they say only that the site is kept (D6). The keep bar’s own line (\`We’ll re-check {domain} monthly\`) is the locked one-ask line and renders only on CC-20b’s live result page. This step starts no check. Before CC-20b sets the flag, those sentences must be true: checks scheduled, and CC-28 sending from `alerts@`.',
+    'With `V2_CHECKS_PUBLIC=1` Sign-up and Check-email say a named site’s first audit starts when the link is opened, that a kept site is re-checked and that change notes come from `alerts@`, and Sign-up points to Keep on the audit page; without it they say only that the site is kept (D6). The keep bar’s own line (\`We’ll re-check {domain} monthly\`) is the locked one-ask line and renders only on the live result page. This step starts no check. Before the flag is set, those sentences must be true: `requestCheck` called from the claim route and Sign-up, checks scheduled, and CC-28 sending from `alerts@`. `V2_PIPELINE=1` (CC-20b) only registers the pipeline’s functions and changes no copy.',
   ].join('\n');
 }
 
@@ -234,7 +234,7 @@ function gapsSection(): string {
     '- **`cm_auth_for` is an unpeppered hash of the email**, so a known address can be matched to it; it is httpOnly and kept out of Sentry, and it relies on no other origin being able to set crawlmouse.com cookies.',
     '- **The Sentry scrubber does not recognise a `token_hash` that is double-URL-encoded, or written as a JSON key inside a string**; no current path sends either. It also hides PostgREST filter values that are not secrets (`removed_at=is.null` becomes `is.[Filtered]`), and does not walk class instances or Maps, which the SDK normalises to plain objects before it runs.',
     '- **On the Edge runtime, Sentry events now carry request headers, URL and query** (not cookies, not bodies), because the request-data integration is named in `sentry.server.config.ts`; before, Edge events had none.',
-    '- **With `V2_PIPELINE=1` the copy is CC-20b’s to prove true**: the first-audit, re-check and alerts sentences and the keep bar’s line.',
+    '- **`V2_CHECKS_PUBLIC=1` waits on its preconditions** (CC-20b split it from `V2_PIPELINE`): the first-audit, re-check and alerts sentences and the keep bar’s line are true only once `requestCheck` is called from the claim route and Sign-up, checks are scheduled, and CC-28 sends from `alerts@`.',
     '- **Outside this step:** the result preview still shows the Agency price as $69 a month; Sign-up shows $99 (D7). The result page’s owner reconciles it.',
     '- **Fidelity notes**: the Sign-up footnote’s "14-day trial with a card" is text, not a link (the Agency trial page is CC-03’s); the plan card is a `section` (the v2 `Card` takes no `aside`); Check-email’s "Back to the audit" goes back in history (no live v2 audit route yet); "Send the link again" is disabled, drawn as the disabled quiet button, for the minute the page mentions after each send. The Turnstile widget draws its light theme on dark pages (`components/ui/Turnstile.tsx`, v1’s).',
   ].join('\n');
