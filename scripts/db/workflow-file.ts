@@ -128,20 +128,54 @@ function guardStepProblems(where: string, step: Step | undefined): string[] {
   return problems;
 }
 
-function runsWithoutItsNeeds(job: Job): boolean {
-  return /\b(?:always|failure|cancelled)\s*\(/.test(String(job.if ?? ''));
+/** Any status function in an `if:` lets a job run, or not, regardless of how its needs ended. */
+function hasStatusFunction(job: Job): boolean {
+  return /\b(?:success|failure|always|cancelled)\s*\(/.test(String(job.if ?? ''));
+}
+
+/** The one runner the guarded jobs may use: a GitHub-hosted image, no container, no services. */
+export const GUARD_RUNNER = 'ubuntu-24.04';
+
+/** Checks shared by `authorize` and every secret-holding job: what reaches the guard step. */
+function guardedJobProblems(name: string, job: Job): string[] {
+  const problems: string[] = [];
+  // A job-level env reaches every step's process: BASH_ENV, or an exported BASH_FUNC_*, runs code
+  // or replaces a builtin before the guard's first line.
+  if ('env' in job) problems.push(`${name}: has a job-level env`);
+  if ('defaults' in job) problems.push(`${name}: has defaults`);
+  if ('continue-on-error' in job) problems.push(`${name}: has continue-on-error`);
+  if (job['runs-on'] !== GUARD_RUNNER) problems.push(`${name}: runs-on is not ${GUARD_RUNNER}`);
+  if ('container' in job) problems.push(`${name}: has a container`);
+  if ('services' in job) problems.push(`${name}: has services`);
+  const steps = job.steps ?? [];
+  problems.push(...guardStepProblems(name, steps[0]));
+  steps.forEach((step, i) => {
+    if ('continue-on-error' in step) problems.push(`${name}: step ${i} has continue-on-error`);
+  });
+  return problems;
 }
 
 /**
- * Problems with a production workflow's guard; empty when there are none. Checks that the guard
- * RUNS, not only that it is there: nothing may skip it, swallow its exit status, or change the shell
- * that runs it.
+ * Problems with a production workflow's guard; empty when there are none. Each problem below has a
+ * fixture in production-workflows.test.ts. The workflow must:
+ * - start only from workflow_dispatch (dispatchOnlyProblems);
+ * - have no workflow-level `defaults` or `env`, and no job-level `uses:`;
+ * - have an `authorize` job with no environment, no `secrets` mention, `permissions: {}`, no `needs`,
+ *   no `if`, and exactly one step;
+ * - have at least one secret-holding job, each needing `authorize`, with no status function
+ *   (`success(`, `failure(`, `always(`, `cancelled(`) in its `if:`, and no `secrets` mention
+ *   outside its steps;
+ * - for `authorize` and each secret-holding job: no job-level `env`, `defaults`,
+ *   `continue-on-error`, `container` or `services`; `runs-on: ubuntu-24.04`; step 0 the guard with
+ *   exactly the keys name, env and run, the pinned env, and a run holding no expression; no
+ *   `continue-on-error` on any step;
+ * - carry the same guard script in every copy.
  */
 export function guardProblems(workflow: Workflow): string[] {
   const problems = [...dispatchOnlyProblems(workflow)];
-  if ('defaults' in workflow)
-    problems.push('workflow: has defaults (a shell override reaches the guard)');
-  if (mentionsSecrets(workflow.env)) problems.push('workflow: env mentions secrets');
+  if ('defaults' in workflow) problems.push('workflow: has defaults');
+  // Workflow-level env reaches every step, the guard included (see guardedJobProblems).
+  if ('env' in workflow) problems.push('workflow: has env');
 
   const jobs = workflow.jobs ?? {};
   for (const [name, job] of Object.entries(jobs)) {
@@ -158,12 +192,10 @@ export function guardProblems(workflow: Workflow): string[] {
       problems.push('authorize: permissions are not {}');
     if (needsOf(authorize).length > 0) problems.push('authorize: needs another job');
     if ('if' in authorize) problems.push('authorize: has an if');
-    if ('continue-on-error' in authorize) problems.push('authorize: has continue-on-error');
-    if ('defaults' in authorize) problems.push('authorize: has defaults');
     const steps = authorize.steps ?? [];
     if (steps.length !== 1)
       problems.push(`authorize: has ${steps.length} steps, not the guard alone`);
-    problems.push(...guardStepProblems('authorize', steps[0]));
+    problems.push(...guardedJobProblems('authorize', authorize));
   }
 
   const secretJobs = secretJobNames(workflow);
@@ -171,15 +203,8 @@ export function guardProblems(workflow: Workflow): string[] {
   for (const name of secretJobs) {
     const job = jobs[name]!;
     if (!needsOf(job).includes('authorize')) problems.push(`${name}: does not need authorize`);
-    if ('continue-on-error' in job) problems.push(`${name}: has continue-on-error`);
-    if ('defaults' in job) problems.push(`${name}: has defaults`);
-    if (runsWithoutItsNeeds(job))
-      problems.push(`${name}: its if can run it after authorize failed`);
-    const steps = job.steps ?? [];
-    problems.push(...guardStepProblems(name, steps[0]));
-    steps.forEach((step, i) => {
-      if ('continue-on-error' in step) problems.push(`${name}: step ${i} has continue-on-error`);
-    });
+    if (hasStatusFunction(job)) problems.push(`${name}: its if calls a status function`);
+    problems.push(...guardedJobProblems(name, job));
     const { steps: _steps, ...rest } = job;
     if (mentionsSecrets(rest)) problems.push(`${name}: mentions secrets outside its steps`);
   }
