@@ -1,4 +1,4 @@
--- Reverts 20261109000001_v2_008_pipeline.sql: drops the five functions, the two indexes, the columns
+-- Reverts 20261109000001_v2_008_pipeline.sql: drops the six functions, the two indexes, the columns
 -- 008 added to checks and sites with what they hold, and crawl_batches and persist_chunks with their
 -- rows. A check persisted under 008 keeps its rows in the measurement tables; only its diff inputs,
 -- map path, run id and heartbeat go. Re-runnable.
@@ -8,6 +8,7 @@ drop function if exists public.stage_check_rows(uuid, text, integer, jsonb);
 drop function if exists public.reap_stalled_checks(timestamptz);
 drop function if exists public.fail_check(uuid, text, text);
 drop function if exists public.claim_check(uuid, text, jsonb);
+drop function if exists public.check_failure_reasons();
 
 drop index if exists public.checks_heartbeat_idx;
 drop index if exists public.checks_one_running_per_site;
