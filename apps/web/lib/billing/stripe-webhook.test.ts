@@ -265,6 +265,7 @@ describe('order: the out-of-order guard and the superseded rule', () => {
     // Stripe changes something the mirror holds; the older event would write it.
     w.stripe.update(current!.id, { cancelAtPeriodEnd: true });
     const older = updated(w.stripe.get(current!.id), BASE + 200);
+    const sent = w.stripe.sent.length;
     expect(await w.deliver(older)).toEqual({
       outcome: 'recorded',
       accountId,
@@ -280,6 +281,7 @@ describe('order: the out-of-order guard and the superseded rule', () => {
       last_event_id: newer.id,
     });
     expect(await accountRow(accountId)).toEqual(accountBefore);
+    expect(w.stripe.sent).toHaveLength(sent);
   });
 
   it('a payment failure delivered after the customer paid is superseded: the account stays Pro', async () => {
@@ -325,6 +327,8 @@ describe('order: the out-of-order guard and the superseded rule', () => {
     });
     expect(paid).toMatchObject({ outcome: 'ignored', reason: 'no entitlement change' });
     expect((await accountRow(accountId)).state).toBe('pro');
+    // The stale delivery planned entitlement.changed to past_due; what it recorded, and sent, is none.
+    expect(w.stripe.sent.map((x) => x.data)).toEqual([{ accountId, from: 'free', to: 'pro' }]);
   });
 
   it('the invoice’s subscription is read from parent, or from the older top-level field', async () => {
