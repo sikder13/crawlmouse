@@ -78,7 +78,10 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
   },
   {
     text: 'which only the v2 door sets, so on v1 it never fires',
-    withdrawnIn: 'docs/ops/v1-inventory.json finding A-8, CC-V1FIX review round 1',
+    // The guard reads Markdown: this is the finding's text in the report rendered from
+    // docs/ops/v1-inventory.json, which v1-inventory.test.ts holds equal to the inventory.
+    withdrawnIn:
+      'docs/specs/v2/v1-audit.md finding A-8 (from docs/ops/v1-inventory.json), CC-V1FIX review round 1',
     truth: 'Since A-8 every magic-link request sets cm_auth_for, door or v1.',
     allowedIn: [],
   },
