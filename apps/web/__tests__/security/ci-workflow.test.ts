@@ -21,6 +21,7 @@ import {
   parseChanged,
   skippable,
 } from '../../../../.github/workflows/scripts/changes.mjs';
+import tailwindConfig from '../../tailwind.config';
 
 // CI's trigger, CodeQL's condition, and when the visual shards, security-browser and zap-baseline
 // run (.github/workflows/ci.yml, .github/workflows/scripts/changes.mjs). The workflow is parsed with
@@ -144,6 +145,8 @@ describe('the rule the required visual check applies', () => {
 
   // The passing triples, written out: the shards passed (whatever `changes` reported), or they
   // were skipped because `changes` passed and said visual=false. Every other triple fails.
+  // shards=success with changes other than success cannot occur (the shards need changes); those
+  // triples are listed only because the rule, as written, passes them.
   const PASSING = new Set([
     'success/success/true',
     'success/success/false',
@@ -260,6 +263,19 @@ describe('changes.mjs', () => {
     expect(needsVisual(files)).toBe(want);
   });
 
+  it.each((tailwindConfig.content as string[]).map((glob) => [glob]))(
+    "keeps test files under Tailwind's content glob %s",
+    (glob) => {
+      const dir = join('apps/web', glob.slice(0, glob.indexOf('/**')))
+        .split(sep)
+        .join('/');
+      expect(dir).toMatch(/^apps\/web\/[a-z]/);
+      expect(skippable(`${dir}/x.test.tsx`)).toBe(false);
+      expect(skippable(`${dir}/x.test.ts`)).toBe(false);
+      expect(skippable(`${dir}/__tests__/a.tsx`)).toBe(false);
+    },
+  );
+
   it('reads NUL-separated paths (keeping a newline inside a name), else lines', () => {
     expect(parseChanged('a\0b c\0')).toEqual(['a', 'b c']);
     expect(parseChanged('a\nb\0c\0')).toEqual(['a\nb', 'c']);
@@ -302,7 +318,8 @@ describe("the changes job's decide step", () => {
       join(bin, 'git'),
       [
         '#!/usr/bin/env bash',
-        `printf '%s\\n' "$*" >> '${log}'`,
+        // One line per call, its arguments separated by the unit separator, so argv is exact.
+        `{ printf '%s\\037' "$@"; printf '\\n'; } >> '${log}'`,
         'args=("$@")',
         'while [ "${args[0]}" = -c ]; do args=("${args[@]:2}"); done',
         'case "${args[0]}" in',
@@ -327,7 +344,12 @@ describe("the changes job's decide step", () => {
       },
       encoding: 'utf8',
     });
-    const calls = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
+    const calls = existsSync(log)
+      ? readFileSync(log, 'utf8')
+          .split('\n')
+          .filter((line) => line !== '')
+          .map((line) => line.split('\x1f').slice(0, -1))
+      : [];
     return { r, output: readFileSync(output, 'utf8'), calls };
   }
 
@@ -343,7 +365,7 @@ describe("the changes job's decide step", () => {
     expect(r.status, r.stdout + r.stderr).toBe(0);
     expect(output).toBe('visual=true\n');
     expect(r.stdout).toMatch(/^::warning::/m);
-    expect(calls.some((c) => / diff /.test(` ${c} `))).toBe(false);
+    expect(calls).toEqual([['merge-base', 'origin/main', 'HEAD']]);
   });
 
   it('on a docs-only branch, outputs visual=false', () => {
@@ -360,18 +382,19 @@ describe("the changes job's decide step", () => {
 
   it('diffs the whole branch against the merge-base, NUL-separated, with renames split', () => {
     const { calls } = run({ ref: 'refs/heads/x', diff: ['docs/a.md'] });
-    expect(calls[0]).toBe('merge-base origin/main HEAD');
-    const diff = calls.find((c) => / diff /.test(` ${c} `));
-    expect(diff?.split(' ')).toEqual(
-      expect.arrayContaining([
+    expect(calls).toEqual([
+      ['merge-base', 'origin/main', 'HEAD'],
+      [
+        '-c',
+        'core.quotePath=false',
         'diff',
         '--name-only',
         '--no-renames',
         '-z',
         '0123456789abcdef',
         'HEAD',
-      ]),
-    );
+      ],
+    ]);
   });
 });
 
