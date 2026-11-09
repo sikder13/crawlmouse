@@ -120,10 +120,13 @@ What serialises two calls of `apply_stripe_event`, as `scripts/db/stripe-event-r
 CI's Postgres (each mechanism is removed in a mutated database there):
 
 - **One event delivered twice:** the ledger row's `for update`.
-- **Two events on one subscription:** the subscription row's `for update`, and before it the
-  `insert … on conflict do nothing` of a call that carries a mirror row, which waits for a concurrent
-  writer's uncommitted row; the guard then reads that writer's `last_event_created`. Each is enough alone
-  for a call with a mirror row; a call without one (a superseded event) has the lock only.
+- **Two events on one subscription:** the `insert … on conflict do nothing` that a call carrying a mirror row
+  runs first. It is the only statement that creates a subscription row, and it waits for a concurrent
+  writer's uncommitted row, so the guard then reads that writer's `last_event_created`. This is what
+  protects the path, a brand-new subscription included; keep it. The `for update` that follows can lock only
+  a row that already exists: on such a row it serialises the two events by itself, and on a new one it locks
+  nothing. A call without a mirror row (a superseded event, record-only) runs no insert and applies no
+  transition.
 - **A confirm and a commit on one account:** the account row's `for update`, taken before the version is
   read. Without it, the confirm still waits later, on the `FOR KEY SHARE` lock that writing its ledger row's
   `account_id` takes, but only after deciding on the old version.
