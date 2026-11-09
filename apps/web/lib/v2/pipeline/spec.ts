@@ -19,6 +19,9 @@ import {
   CHECK_PIPELINE_COLUMNS,
   CRAWL_BATCH_COLUMNS,
   PERSIST_RPC,
+  PIPELINE_FUNCTIONS,
+  PIPELINE_INDEXES,
+  PIPELINE_TABLES,
   SITE_SCHEDULE_COLUMNS,
 } from './columns';
 import {
@@ -305,7 +308,7 @@ export function buildSpec20b(): string {
     '## Migrations',
     '',
     '- `20261108000003_v2_006d_contract_columns.sql` (Q1): the contract fields SPEC 06 left to CC-06d, so a built check can be stored and read back whole.',
-    `- \`20261109000001_v2_008_pipeline.sql\`: \`crawl_batches\` (${CRAWL_BATCH_COLUMNS.map(code).join(', ')}); on \`checks\` ${CHECK_PIPELINE_COLUMNS.map(code).join(', ')}; on \`sites\` ${SITE_SCHEDULE_COLUMNS.map(code).join(', ')}; the index \`checks_one_running_per_site\`; \`claim_check\`, \`fail_check\`, \`reap_stalled_checks\` (Q13) and \`check_failure_reasons()\`; the persist staging and \`${PERSIST_RPC}\` (D5, Q11).`,
+    `- \`20261109000001_v2_008_pipeline.sql\`: the tables ${PIPELINE_TABLES.map(code).join(' and ')} (\`crawl_batches\`: ${CRAWL_BATCH_COLUMNS.map(code).join(', ')}); on \`checks\` ${CHECK_PIPELINE_COLUMNS.map(code).join(', ')} and the indexes ${PIPELINE_INDEXES.map(code).join(' and ')}; on \`sites\` ${SITE_SCHEDULE_COLUMNS.map(code).join(', ')}; the functions ${PIPELINE_FUNCTIONS.map(code).join(', ')} (D5, Q11, Q13, review round 1). \`lib/v2/pipeline/spec.test.ts\` holds these lists to what the migration creates.`,
     '',
     '## Differences from ARCH-2 §4',
     '',
@@ -323,7 +326,15 @@ export function buildSpec20b(): string {
     '- **Migration 006d ships here** (Q1): without CC-06d’s columns a built check could not be stored whole.',
     '- **`loadCheck` returns `provenance: "measured"`** (Q2), not FixtureDataset’s `"fixture"`.',
     '- **`V2_PIPELINE` registers the functions only** (Q6); the account door’s promises about checks moved to `V2_CHECKS_PUBLIC`.',
-    '- **Persistence is staged** (Q11) and **008 adds an index and four SQL functions** beyond D6’s list (Q13, review round 1).',
+    `- **Persistence is staged** (Q11), and **008 creates more than D6 listed** (its table, its columns and \`${PERSIST_RPC}\`): ${PIPELINE_TABLES.filter(
+      (t) => t !== 'crawl_batches',
+    )
+      .map(code)
+      .join(', ')}, ${PIPELINE_INDEXES.map(code).join(' and ')}, and ${PIPELINE_FUNCTIONS.filter(
+      (f) => f !== PERSIST_RPC,
+    )
+      .map(code)
+      .join(', ')} (Q11, Q13, review round 1).`,
     '- **v1’s audit function clamps its concurrency to the plan cap**, not 100 (Q3).',
   ].join('\n');
 }

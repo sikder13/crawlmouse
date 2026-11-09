@@ -108,7 +108,7 @@ A bucketed key’s check id is the engine’s `stableId` of the key, so two requ
 ## Migrations
 
 - `20261108000003_v2_006d_contract_columns.sql` (Q1): the contract fields SPEC 06 left to CC-06d, so a built check can be stored and read back whole.
-- `20261109000001_v2_008_pipeline.sql`: `crawl_batches` (`check_id`, `batch`, `kind`, `nonce`, `status`, `posted_at`, `finished_at`, `summary`, `result_path`); on `checks` `inngest_run_id`, `heartbeat_at`, `diff_inputs`, `map_path`; on `sites` `next_check_at`, `schedule_offset_min`; the index `checks_one_running_per_site`; `claim_check`, `fail_check`, `reap_stalled_checks` (Q13) and `check_failure_reasons()`; the persist staging and `persist_built_check` (D5, Q11).
+- `20261109000001_v2_008_pipeline.sql`: the tables `crawl_batches` and `persist_chunks` (`crawl_batches`: `check_id`, `batch`, `kind`, `nonce`, `status`, `posted_at`, `finished_at`, `summary`, `result_path`); on `checks` `inngest_run_id`, `heartbeat_at`, `diff_inputs`, `map_path` and the indexes `checks_one_running_per_site` and `checks_heartbeat_idx`; on `sites` `next_check_at`, `schedule_offset_min`; the functions `check_failure_reasons`, `claim_check`, `fail_check`, `reap_stalled_checks`, `stage_check_rows`, `persist_built_check` (D5, Q11, Q13, review round 1). `lib/v2/pipeline/spec.test.ts` holds these lists to what the migration creates.
 
 ## Differences from ARCH-2 §4
 
@@ -126,5 +126,5 @@ A bucketed key’s check id is the engine’s `stableId` of the key, so two requ
 - **Migration 006d ships here** (Q1): without CC-06d’s columns a built check could not be stored whole.
 - **`loadCheck` returns `provenance: "measured"`** (Q2), not FixtureDataset’s `"fixture"`.
 - **`V2_PIPELINE` registers the functions only** (Q6); the account door’s promises about checks moved to `V2_CHECKS_PUBLIC`.
-- **Persistence is staged** (Q11) and **008 adds an index and four SQL functions** beyond D6’s list (Q13, review round 1).
+- **Persistence is staged** (Q11), and **008 creates more than D6 listed** (its table, its columns and `persist_built_check`): `persist_chunks`, `checks_one_running_per_site` and `checks_heartbeat_idx`, and `check_failure_reasons`, `claim_check`, `fail_check`, `reap_stalled_checks`, `stage_check_rows` (Q11, Q13, review round 1).
 - **v1’s audit function clamps its concurrency to the plan cap**, not 100 (Q3).
