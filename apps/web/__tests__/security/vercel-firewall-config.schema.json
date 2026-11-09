@@ -1,0 +1,666 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "The request body of PUT /v1/security/firewall/config, as the Vercel API publishes it (transcribed 2026-11-08 from the API's tool definition, put_firewall_config requestBody). Used by firewall.test.ts to validate infra/vercel/firewall.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "botIdEnabled": {
+      "type": "boolean"
+    },
+    "crs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gen": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["deny", "log"]
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": ["active", "action"]
+        },
+        "java": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["deny", "log"]
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": ["active", "action"]
+        },
+        "lfi": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["deny", "log"]
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": ["active", "action"]
+        },
+        "ma": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["deny", "log"]
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": ["active", "action"]
+        },
+        "php": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["deny", "log"]
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": ["active", "action"]
+        },
+        "rce": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["deny", "log"]
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": ["active", "action"]
+        },
+        "rfi": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["deny", "log"]
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": ["active", "action"]
+        },
+        "sd": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["deny", "log"]
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": ["active", "action"]
+        },
+        "sf": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["deny", "log"]
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": ["active", "action"]
+        },
+        "sqli": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["deny", "log"]
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": ["active", "action"]
+        },
+        "xss": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["deny", "log"]
+            },
+            "active": {
+              "type": "boolean"
+            }
+          },
+          "required": ["active", "action"]
+        }
+      }
+    },
+    "firewallEnabled": {
+      "type": "boolean"
+    },
+    "ips": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["deny", "challenge", "log", "bypass"]
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": ["hostname", "ip", "action"]
+      }
+    },
+    "logHeaders": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "managedRules": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": {}
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mitigate": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": ["log", "challenge", "deny", "bypass", "rate_limit", "redirect"]
+                  },
+                  "actionDuration": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "bypassSystem": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "logHeaders": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  },
+                  "rateLimit": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "action": {
+                                "anyOf": [
+                                  {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": ["log", "challenge", "deny", "rate_limit"]
+                                      },
+                                      {}
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "algo": {
+                                "type": "string",
+                                "enum": ["fixed_window", "token_bucket"]
+                              },
+                              "keys": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "limit": {
+                                "type": "number"
+                              },
+                              "window": {
+                                "type": "number"
+                              }
+                            },
+                            "required": ["algo", "window", "limit", "keys"]
+                          },
+                          {}
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "redirect": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "location": {
+                                "type": "string"
+                              },
+                              "permanent": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["location", "permanent"]
+                          },
+                          {}
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["action"]
+              }
+            }
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "conditionGroup": {
+            "type": "array",
+            "maxItems": 25,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "conditions": {
+                  "type": "array",
+                  "maxItems": 65,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "neg": {
+                        "type": "boolean"
+                      },
+                      "op": {
+                        "type": "string",
+                        "enum": [
+                          "re",
+                          "eq",
+                          "neq",
+                          "ex",
+                          "nex",
+                          "inc",
+                          "ninc",
+                          "pre",
+                          "suf",
+                          "sub",
+                          "gt",
+                          "gte",
+                          "lt",
+                          "lte",
+                          "list"
+                        ]
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "host",
+                          "path",
+                          "method",
+                          "header",
+                          "query",
+                          "cookie",
+                          "target_path",
+                          "route",
+                          "raw_path",
+                          "ip_address",
+                          "region",
+                          "protocol",
+                          "scheme",
+                          "environment",
+                          "domain_environment",
+                          "user_agent",
+                          "geo_continent",
+                          "geo_country",
+                          "geo_country_region",
+                          "geo_city",
+                          "geo_as_number",
+                          "ja4_digest",
+                          "ja3_digest",
+                          "rate_limit_api_id",
+                          "server_action",
+                          "bot_name",
+                          "bot_category",
+                          "bot_status",
+                          "bot_protection",
+                          "shared_condition",
+                          "traffic_source",
+                          "ruleset"
+                        ]
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "maxItems": 75
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["type", "op"]
+                  }
+                }
+              },
+              "required": ["conditions"]
+            }
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "validationErrors": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "required": ["name", "active", "conditionGroup", "action"]
+      }
+    },
+    "rulesets": {
+      "anyOf": [
+        {
+          "type": "array",
+          "maxItems": 25,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "mitigate": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": ["deny", "challenge", "log"]
+                      }
+                    },
+                    "required": ["action"]
+                  }
+                }
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "conditionGroup": {
+                "type": "array",
+                "maxItems": 25,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "conditions": {
+                      "type": "array",
+                      "maxItems": 65,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "neg": {
+                            "type": "boolean"
+                          },
+                          "op": {
+                            "type": "string",
+                            "enum": [
+                              "re",
+                              "eq",
+                              "neq",
+                              "ex",
+                              "nex",
+                              "inc",
+                              "ninc",
+                              "pre",
+                              "suf",
+                              "sub",
+                              "gt",
+                              "gte",
+                              "lt",
+                              "lte",
+                              "list"
+                            ]
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "host",
+                              "path",
+                              "method",
+                              "header",
+                              "query",
+                              "cookie",
+                              "target_path",
+                              "route",
+                              "raw_path",
+                              "ip_address",
+                              "region",
+                              "protocol",
+                              "scheme",
+                              "environment",
+                              "domain_environment",
+                              "user_agent",
+                              "geo_continent",
+                              "geo_country",
+                              "geo_country_region",
+                              "geo_city",
+                              "geo_as_number",
+                              "ja4_digest",
+                              "ja3_digest",
+                              "rate_limit_api_id",
+                              "server_action",
+                              "bot_name",
+                              "bot_category",
+                              "bot_status",
+                              "bot_protection",
+                              "shared_condition",
+                              "traffic_source",
+                              "ruleset"
+                            ]
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "maxItems": 75
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["type", "op"]
+                      }
+                    }
+                  },
+                  "required": ["conditions"]
+                }
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 256
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "valid": {
+                "type": "boolean"
+              },
+              "validationErrors": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "required": ["name", "active", "conditionGroup"]
+          }
+        },
+        {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": ["deny", "challenge", "log", "allow"]
+              }
+            },
+            "required": ["action"]
+          }
+        }
+      ]
+    }
+  },
+  "required": ["firewallEnabled"]
+}

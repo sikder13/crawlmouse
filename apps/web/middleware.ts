@@ -1,18 +1,62 @@
-import { type NextRequest, type NextResponse } from 'next/server';
+import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
 import { CONSENT_REQUIRED_COOKIE, isConsentRequiredCountry } from '@/lib/consent';
+import { reportRefusal, reportedMethod, type Refusal } from '@/lib/security/refusal-event';
+import { isApiPath, isStateChanging, policyForPath } from '@/lib/security/route-policy';
+import { isCrossSite, isJsonBody, isSameOrigin } from '@/lib/security/same-origin';
 import { updateSession } from '@/lib/supabase/middleware';
 
 /**
- * Edge request handler. Order matters: refresh the Supabase session FIRST (middleware is a
- * write-allowed context, so a logged-in visitor's rotated tokens are persisted here — the
- * durable half of the CRAWLMOUSE-7/-8 /dashboard fix), THEN layer the consent cookie + the
- * X-Robots rule onto the SAME response. Those layers are purely additive, so they never
- * clobber the refreshed auth cookies. `refresh` is injected in tests.
+ * API requests: a state change to a route the registry guards (lib/security/route-policy.ts) is
+ * refused here, before the route runs, when its origin fails the route's rule (403) or, for a route
+ * that reads JSON, when the body is not declared JSON (415). A state change to a path that reaches no
+ * registered route, or does not decode, is refused too (404), so a spelling the lookup does not
+ * understand fails closed. Every other API request passes through untouched: no session refresh, no
+ * cookie.
+ */
+export function guardApi(req: NextRequest, report: (r: Refusal) => void): NextResponse {
+  if (!isStateChanging(req.method)) return NextResponse.next();
+  const policy = policyForPath(req.nextUrl.pathname);
+  const refuse = (reason: Refusal['reason'], status: Refusal['status'], body: object) => {
+    report({
+      reason,
+      route: policy?.route ?? '(none)',
+      class: policy?.class ?? 'none',
+      method: reportedMethod(req.method),
+      status,
+    });
+    return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
+  };
+  if (!policy) return refuse('no_route', 404, { error: 'Not found', code: 'not_found' });
+  const origin = req.nextUrl.origin;
+  if (
+    (policy.origin === 'strict' && !isSameOrigin(req, origin)) ||
+    (policy.origin === 'lenient' && isCrossSite(req, origin))
+  ) {
+    return refuse('cross_site', 403, { error: 'Cross-site request refused', code: 'cross_site' });
+  }
+  if (policy.jsonBody && !isJsonBody(req)) {
+    return refuse('not_json', 415, {
+      error: 'Send the request body as JSON',
+      code: 'unsupported_media_type',
+    });
+  }
+  return NextResponse.next();
+}
+
+/**
+ * Edge request handler. API paths go to guardApi only. For pages, order matters: refresh the
+ * Supabase session FIRST (middleware is a write-allowed context, so a logged-in visitor's rotated
+ * tokens are persisted here — the durable half of the CRAWLMOUSE-7/-8 /dashboard fix), THEN layer the
+ * consent cookie + the X-Robots rule onto the SAME response. Those layers are purely additive, so
+ * they never clobber the refreshed auth cookies. `refresh` and `report` are injected in tests.
  */
 export async function handleEdge(
   req: NextRequest,
   refresh: (req: NextRequest) => Promise<NextResponse> = updateSession,
+  report: (r: Refusal) => void = (r) => void reportRefusal(r),
 ): Promise<NextResponse> {
+  if (isApiPath(req.nextUrl.pathname)) return guardApi(req, report);
+
   const res = await refresh(req);
 
   if (req.nextUrl.pathname.startsWith('/r/') || req.nextUrl.pathname.startsWith('/embed/')) {
@@ -33,13 +77,14 @@ export async function handleEdge(
   return res;
 }
 
-export function middleware(req: NextRequest): Promise<NextResponse> {
-  return handleEdge(req);
+export function middleware(req: NextRequest, event: NextFetchEvent): Promise<NextResponse> {
+  return handleEdge(req, updateSession, (r) => event.waitUntil(reportRefusal(r)));
 }
 
-// Run on page routes (so the consent cookie is set before the client loads), excluding API,
-// the PostHog reverse-proxy (/ingest), Next internals, and static files. The X-Robots rule above
-// still applies only to /r/ and /embed/.
+// Every path but the PostHog reverse proxy (/ingest), the signed webhooks, Next internals and the
+// favicon: pages for the session refresh and the consent cookie, the other API routes for guardApi,
+// which /ingest and the webhooks do not need. The X-Robots rule above still applies only to /r/ and
+// /embed/.
 export const config = {
-  matcher: ['/((?!api|ingest|_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!ingest|api/webhooks/|_next/static|_next/image|favicon.ico).*)'],
 };

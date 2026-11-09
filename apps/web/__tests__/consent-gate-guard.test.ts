@@ -10,9 +10,7 @@ import { describe, expect, it } from 'vitest';
 // is unit-tested in lib/consent.test.ts; this guard pins that the wiring actually USES it.
 
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 }
 
 function read(rel: string): string {
@@ -37,7 +35,9 @@ describe('instrumentation-client gates PostHog on consent', () => {
   it('never records replay for opted-out (pre-consent) visitors', () => {
     expect(src).toContain('has_opted_out_capturing');
     // the guard must short-circuit BEFORE startSessionRecording
-    expect(src).toMatch(/has_opted_out_capturing\?\.\(\)\)\s*return;[\s\S]*startSessionRecording\(/);
+    expect(src).toMatch(
+      /has_opted_out_capturing\?\.\(\)\)\s*return;[\s\S]*startSessionRecording\(/,
+    );
   });
 });
 
@@ -58,8 +58,10 @@ describe('middleware sets the consent-required cookie from geo', () => {
   });
 
   it('runs on page routes (matcher broadened beyond just /r/ and /embed/)', () => {
-    // Must match generic pages so the cookie is set before the client loads; excludes api/ingest.
-    expect(src).toMatch(/matcher:\s*\[\s*'\/\(\(\?!api\|ingest/);
+    // Must match generic pages so the cookie is set before the client loads; excludes /ingest. API
+    // paths reach the middleware too, for the origin guard, and return before the cookie is set
+    // (middleware.test.ts).
+    expect(src).toMatch(/matcher:\s*\[\s*'\/\(\(\?!ingest\|api\/webhooks\/\|_next\/static/);
   });
 });
 

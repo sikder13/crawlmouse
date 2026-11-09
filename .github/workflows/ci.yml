@@ -103,8 +103,9 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm test:templates
 
-  # next build with placeholder values only (apps/web/.env.ci). No real key is present, so nothing
-  # can reach Supabase, Stripe or Sentry. The one outbound call is next/font/google fetching fonts.
+  # next build with placeholder values only (apps/web/.env.ci, and the three below). No real key is
+  # present, so nothing can reach Supabase, Stripe or Sentry. The one outbound call is next/font/google
+  # fetching fonts. The build is kept for the two jobs that run it on next start.
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -115,12 +116,176 @@ jobs:
       - uses: ./.github/actions/setup
       - name: next build (apps/web)
         working-directory: apps/web
+        env:
+          # So security-browser sees the third parties the CSP allows, with values that point nowhere:
+          # Cloudflare's documented always-pass Turnstile test sitekey, a PostHog key no project has,
+          # a Sentry DSN on a .invalid host (apps/web/__tests__/security/browser/build-env.ts).
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          NEXT_PUBLIC_POSTHOG_KEY: ci-placeholder-posthog-key
+          NEXT_PUBLIC_SENTRY_DSN: https://ciplaceholder@o0.ingest.sentry.invalid/0
         run: |
           set -euo pipefail
           set -a
           . ./.env.ci
           set +a
           pnpm build
+      - name: Keep the build for security-browser and zap-baseline
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: next-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/.next
+            !apps/web/.next/cache
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  # The security headers, the cross-site refusal and the report-only CSP, checked on next start of
+  # the build above (docs/specs/v2/sec-baseline.md). Same runner image and checkout path as build, so
+  # the downloaded .next starts as it was built.
+  security-browser:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      NEXT_PUBLIC_POSTHOG_KEY: ci-placeholder-posthog-key
+      NEXT_PUBLIC_SENTRY_DSN: https://ciplaceholder@o0.ingest.sentry.invalid/0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: next-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/.next
+      - name: Install Chromium
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Headers, cross-site refusal and CSP on next start
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          pnpm exec playwright test -c __tests__/security/browser/playwright.config.ts
+
+  # ZAP's passive baseline over next start of the build above: advisory until its first findings are
+  # triaged (docs/specs/v2/sec-baseline.md), within six minutes, its reports kept as an artifact.
+  # /r/ci-fixture has no database behind it in CI, so ZAP sees the not-found page there.
+  zap-baseline:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    continue-on-error: true
+    env:
+      # renovate: datasource=docker depName=ghcr.io/zaproxy/zaproxy
+      ZAP_IMAGE: ghcr.io/zaproxy/zaproxy:stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: next-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/.next
+      - name: Pull the ZAP image
+        run: docker pull "$ZAP_IMAGE"
+      - name: next start
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env.ci
+          set +a
+          setsid pnpm exec next start -p 3000 > "$RUNNER_TEMP/next.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/api/health > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/next.log"
+          exit 1
+      - name: ZAP baseline
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/zap"
+          chmod 777 "$RUNNER_TEMP/zap"
+          cat > "$RUNNER_TEMP/zap/plan.yaml" <<'PLAN'
+          env:
+            contexts:
+              - name: crawlmouse
+                urls: [http://localhost:3000]
+                includePaths: ['http://localhost:3000.*']
+            parameters:
+              failOnError: true
+              progressToStdout: true
+          jobs:
+            - type: requestor
+              requests:
+                - url: http://localhost:3000/
+                - url: http://localhost:3000/pricing
+                - url: http://localhost:3000/login
+                - url: http://localhost:3000/r/ci-fixture
+                - url: http://localhost:3000/api/health
+            - type: spider
+              parameters: { context: crawlmouse, maxDuration: 1 }
+            - type: passiveScan-wait
+              parameters: { maxDuration: 2 }
+            - type: report
+              parameters: { template: traditional-html, reportDir: /zap/wrk, reportFile: zap-report.html }
+            - type: report
+              parameters: { template: traditional-json, reportDir: /zap/wrk, reportFile: zap-report.json }
+          PLAN
+          docker run --rm --network host -v "$RUNNER_TEMP/zap:/zap/wrk:rw" "$ZAP_IMAGE" \
+            zap.sh -cmd -silent -autorun /zap/wrk/plan.yaml
+      - name: Keep the ZAP reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zap-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/zap/zap-report.*
+          if-no-files-found: warn
+
+  # CodeQL's security-extended queries over the JavaScript and TypeScript, test code left out. A result whose rule has
+  # security-severity 7.0 or more (high or critical) fails the job unless the reviewed baseline
+  # (.github/workflows/scripts/codeql-baseline.json, by fingerprint, expiring 2026-12-08) lists it; read
+  # from the SARIF by .github/workflows/scripts/sarif-gate.mjs, which also fails a scan that extracted
+  # no file. Results
+  # upload to code scanning from this repository's own pushes and pull requests: a fork's token cannot
+  # write them, and the gate still runs on its SARIF.
+  codeql:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+          # Test code is not shipped: its local fixture servers echo request paths into test pages,
+          # which CodeQL reads as reflected XSS (three results on the first run, 2026-11-08).
+          config: |
+            paths-ignore:
+              - '**/*.test.ts'
+              - '**/*.test.tsx'
+              - '**/__tests__/**'
+              - '**/tests/**'
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:javascript-typescript
+          output: ${{ runner.temp }}/codeql
+          upload: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && 'always' || 'never' }}
+      - name: Fail on a high or critical result
+        run: node .github/workflows/scripts/sarif-gate.mjs "$RUNNER_TEMP/codeql" .github/workflows/scripts/codeql-baseline.json
 
   # The v2 design-system harness (tests/visual): screenshots of the preview pages at 1280 and
   # 390 px, light and dark, failing on a diff above 0.2%, plus layout, axe, focus and motion checks.
