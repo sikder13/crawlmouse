@@ -365,6 +365,25 @@ describe('erase-account (B-F2)', () => {
     }
   }, 120_000);
 
+  it('counts an account as theirs alone only through an active seat', async () => {
+    const p = await person();
+    // An account where this person's seat was removed and no one is active any more.
+    const { rows } = await pglite.query<{ id: string }>(
+      `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+       values ('agency', 'free', 'free', 1, 1, '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]')
+       returning id`,
+    );
+    const abandoned = rows[0]!.id;
+    await pglite.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, removed_at)
+       values ($1, $2, $3, 'developer', 'removed', now())`,
+      [abandoned, p.id, p.email],
+    );
+    const plan = await planErasure(db(), { userId: p.id });
+    expect(plan.accounts).toEqual([p.world.accountId]);
+    expect(plan.accounts).not.toContain(abandoned);
+  }, 120_000);
+
   it('with no account, erases the rows that hold the address only', async () => {
     const email = `nobody-${++serial}@example.com`;
     await pglite.query(`insert into public.waitlist (email, source) values ($1, 'developers')`, [
