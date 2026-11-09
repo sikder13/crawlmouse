@@ -36,12 +36,13 @@ pnpm --filter @crawlmouse/scripts exec tsx ops/erase-account.ts --db-url-env DB_
 `--user-id <uuid>` instead of `--email` when the address names more than one user. The dry run
 changes nothing and prints:
 
-- per table, the rows `--yes` deletes or changes, including what cascades from the person's
-  accounts;
+- by table, the rows `--yes` deletes or changes, and, of what cascades from the accounts it
+  deletes, the sites, checks and reports;
 - what is kept (§5);
 - the storage objects to delete in §4;
-- the reasons it refuses, if any. **Refused: other people are seated on it** means the person owns
-  an account with other active members: ownership has to be transferred to one of them first.
+- the reasons it refuses, if any. **Other people are seated on it** means the person owns an
+  account with other active members: ownership has to be transferred to one of them first.
+  **Storage objects are still stored** means §4 is not done yet.
 
 ## 4. Storage objects
 
@@ -49,7 +50,7 @@ SQL cannot delete Storage objects (Supabase's `protect_objects_delete` trigger),
 through the Storage API, before `--yes` removes the rows that name them. For each line
 `<bucket>/<path>` the dry run printed: Supabase dashboard → Storage → the bucket → select the
 object → Delete, or the Storage API's remove call with the service-role key. Run the dry run again:
-the list is read from `storage.objects`, so it is empty once they are gone.
+the list is read from `storage.objects`, so it is empty, and that refusal gone, once they are.
 
 ## 5. Erase
 
@@ -57,13 +58,17 @@ the list is read from `storage.objects`, so it is empty once they are gone.
 NEXT_PUBLIC_SUPABASE_URL=https://ezspnfeyzwsisymytssm.supabase.co SUPABASE_SERVICE_ROLE_KEY=… pnpm --filter @crawlmouse/scripts exec tsx ops/erase-account.ts --db-url-env DB_URL --email person@example.com --yes --yes-production
 ```
 
-In one transaction it nulls or deletes the rows that hold the address or the user id elsewhere
-(other people's audits' `notify_email`, `email_events`, `waitlist`, invitations on other accounts,
-rate-limit keys ending in `:<address>` or `:<user id>`, closed takedown requests' address), and
-deletes the accounts on which the person is the only active member, with what cascades from them.
-Then it deletes the auth user through the Auth admin API, which deletes `public.users` and what
-cascades from it. It prints the counts again; the changed and cascaded rows read 0. A failure
-after the transaction (the Auth call) leaves the user in place: run the same command again.
+In one transaction it nulls or deletes the rows that hold the address or the user id outside the
+person's own rows: the Auth audit log's entries, `notify_email` on audits that are not theirs,
+`email_events`, `waitlist`, invitations on other accounts, report recipients and client contacts
+on other accounts, rate-limit keys ending in `:<address>` or `:<user id>`, and closed takedown
+requests' address. It deletes the accounts on which the person is the only active member, with
+what cascades from them. Each change must touch the rows the dry run counted, or the transaction
+is rolled back and nothing changes. Then it deletes the auth user through the Auth admin API, which
+deletes `public.users` and what cascades from it. It prints every count again, read with the same
+user id, addresses and accounts, and the storage objects still listed; each reads 0 when the
+erasure is complete (`scripts/ops/erase-account.test.ts`). A failure after the transaction (the
+Auth call) leaves the user in place: run the same command again.
 
 Kept, by the owner's ruling (CC-V1FIX Q5), and printed under "kept":
 
@@ -79,15 +84,16 @@ Kept, by the owner's ruling (CC-V1FIX Q5), and printed under "kept":
 - **PostHog** (project 448922): Persons → find by the user id → Delete person, with its events.
 - **Resend**: remove the address from any audience and suppression list it appears in.
 - **Sentry**: events may carry the user id; delete by searching for it if any are found.
-- **Inngest, Vercel and Supabase logs and backups** expire on their own retention; say so in the
-  reply rather than promising an immediate purge.
+- **Inngest, Vercel and Supabase logs (the Auth logs in Supabase's log explorer among them) and
+  backups** expire on their own retention; say so in the reply rather than promising an immediate
+  purge.
 
 ## 7. Reply
 
 > We have deleted your Crawlmouse account and the data linked to it: your profile, your audits
 > and sites, your sign-in records and the places your address was stored. A few things are kept:
-> a one-way fingerprint of your address used only to stop a second
-> free trial, any takedown request of yours that is still open, and public reports you published,
+> one-way fingerprints (of your address, and of the device, network and card used for a trial),
+> used only to stop a second free trial, any takedown request of yours that is still open, and public reports you published,
 > which no longer name you. Copies in our providers' logs and backups are deleted on their normal
 > schedules. Payment records that Stripe must keep by law stay with Stripe.
 

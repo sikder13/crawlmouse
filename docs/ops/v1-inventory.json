@@ -1488,7 +1488,7 @@
       "severity": "major",
       "items": ["app/r/[slug]/page.tsx"],
       "evidence": "apps/web/middleware.ts:64; apps/web/app/r/[slug]/page.tsx:23",
-      "what": "the middleware sends X-Robots-Tag: noindex, nofollow, noarchive on every /r/ page, including the claimed, indexable reports the page marks index and the sitemap lists, so no report can be indexed (since 0478f107, before SPEC 04 made claimed reports indexable). A missing report's HTML also carries two robots metas. Changing the header changes what search engines index (§13).",
+      "what": "the middleware sends X-Robots-Tag: noindex, nofollow, noarchive on every /r/ page, including the claimed, indexable reports the page marks index and the sitemap lists, so no report can be indexed (since 0478f107, before SPEC 04 made claimed reports indexable). A missing report's HTML also carries two robots metas. Changing the header changes what search engines index (§13). Fixed: the header is gone from /r/ and stays on /embed/. The missing report's two robots metas (Next's noindex for the 404 and the root layout's) are unchanged; the 404 status and the noindex keep it out of the index.",
       "fixedIn": "268cc2ec"
     },
     {
@@ -1584,7 +1584,7 @@
       "severity": "major",
       "items": ["app/login/verify/route.ts"],
       "evidence": "apps/web/lib/auth/continue-intent.ts:39; apps/web/app/api/auth/magic-link/route.ts:181; apps/web/app/login/verify/route.ts:132",
-      "what": "login CSRF with data capture: an attacker requests a magic link for their own address and gets a victim to open it and press Continue; the victim is signed in as the attacker and the victim browser's anonymous audits move into the attacker's account. The foreign-link refusal needs the cm_auth_for cookie, which only the v2 door sets, so on v1 it never fires. Disclosed for v2 in docs/specs/v2/25-account-door.md. Not fixed here: refusing without the cookie switches off the anonymous-audit claim for every v1 sign-in, a §5 flow.",
+      "what": "login CSRF with data capture: an attacker requests a magic link for their own address and gets a victim to open it and press Continue; the victim is signed in as the attacker and the victim browser's anonymous audits move into the attacker's account. The foreign-link refusal needed the cm_auth_for cookie, which only the v2 door set, so on v1 it never fired. Disclosed for v2 in docs/specs/v2/25-account-door.md. Fixed: every magic-link request sets cm_auth_for, and the claim needs it to match the signed-in address (§5 change signed off by the owner).",
       "fixedIn": "6e0b51cd"
     },
     {
