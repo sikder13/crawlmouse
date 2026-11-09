@@ -134,6 +134,8 @@ describe('the finders see what they claim to see', () => {
       writeFixture(dir, {
         'gated.ts': `${imp}\nexport async function POST() { ${gate} return 1; }`,
         'helper404.ts': `${imp}\nexport async function POST() { if (!billingV2Enabled()) return refuse(404, 'x'); return 1; }`,
+        'fake404.ts': `${imp}\nexport async function GET() { if (!billingV2Enabled()) return Response.json({ code: 404 }); return 1; }`,
+        'arg404.ts': `${imp}\nexport async function GET() { if (!billingV2Enabled()) return legacy('x', 404); return 1; }`,
         'page.tsx': `import { accountDoorEnabled as on } from '../../lib/auth/flags';\nexport default function P() { if (!on()) { return notFound(); } return 1; }`,
         'arrow.ts': `${imp}\nexport const GET = async () => { ${gate} return 1; };`,
         'fallback.ts': `${imp}\nexport async function GET() { if (!billingV2Enabled()) return legacy(); return 2; }`,
@@ -148,7 +150,15 @@ describe('the finders see what they claim to see', () => {
       const gated = (f: string) => isFlagGated(join(dir, f));
       const yes = ['gated.ts', 'helper404.ts', 'page.tsx', 'arrow.ts'];
       expect(yes.filter(gated)).toEqual(yes);
-      const no = ['fallback.ts', 'helperonly.ts', 'onegated.ts', 'nested.ts', 'branch.ts'];
+      const no = [
+        'fallback.ts',
+        'fake404.ts',
+        'arg404.ts',
+        'helperonly.ts',
+        'onegated.ts',
+        'nested.ts',
+        'branch.ts',
+      ];
       expect([...no, 'typeonly.ts', 'comment.ts', 'other.ts'].filter(gated)).toEqual([]);
     }));
 
@@ -219,6 +229,18 @@ describe('the finders see what they claim to see', () => {
       ]);
     }));
 
+  it('the serve route reader refuses a functions list it cannot read whole', () =>
+    withDir((dir) => {
+      writeFixture(dir, {
+        'ok.ts': 'serve({ functions: [a, b] });',
+        'spread.ts': 'serve({ functions: [...xs, a] });',
+        'call.ts': 'serve({ functions: build(env) });',
+      });
+      expect(servedFunctionNames(join(dir, 'ok.ts'))).toEqual(['a', 'b']);
+      expect(() => servedFunctionNames(join(dir, 'spread.ts'))).toThrow();
+      expect(servedFunctionNames(join(dir, 'call.ts'))).toBeNull();
+    }));
+
   it('the serve route registers exactly the v1 functions the finder sees', () => {
     const served = servedFunctionNames(join(WEB, 'app/api/webhooks/inngest/route.ts'));
     // null would mean the route builds the list with a call (CC-20b's shape); this check then fails
@@ -250,6 +272,9 @@ describe('the finders see what they claim to see', () => {
     expect(refProblems('x/route.ts:41', undefined, count, local)).toEqual(['x/route.ts:41']);
     expect(refProblems('x/nope.ts:1', undefined, count, local)).toEqual(['unresolved x/nope.ts:1']);
     expect(refProblems('dep/dist/index.js:543', undefined, count, local)).toEqual([]);
+    expect(refProblems('src/nope.ts:9999', undefined, count)).toEqual([
+      'unresolved src/nope.ts:9999',
+    ]);
     expect(refProblems('(x/route.ts:41)', undefined, count, local)).toEqual(['x/route.ts:41']);
   });
 

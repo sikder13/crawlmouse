@@ -105,17 +105,27 @@ function handlerBodies(sf: ts.SourceFile): ts.Block[] {
   return out;
 }
 
-/** True when `node` holds a 404: the numeric literal, or a `notFound()` call. */
-function holds404(node: ts.Node): boolean {
-  if (ts.isNumericLiteral(node) && node.text === '404') return true;
-  if (
-    ts.isCallExpression(node) &&
-    ts.isIdentifier(node.expression) &&
-    node.expression.text === 'notFound'
-  ) {
-    return true;
-  }
-  return ts.forEachChild(node, holds404) ?? false;
+/**
+ * True when a returned value is a refusal with a 404: `notFound()`, a `status: 404` property, or a
+ * call whose first argument is 404 (`refuse(404, …)`). A 404 elsewhere in the value is not one.
+ */
+function holds404(node: ts.Expression): boolean {
+  const is404 = (n: ts.Node | undefined) =>
+    n !== undefined && ts.isNumericLiteral(n) && n.text === '404';
+  let found = false;
+  const visit = (n: ts.Node) => {
+    if (found) return;
+    if (ts.isCallExpression(n)) {
+      if (ts.isIdentifier(n.expression) && n.expression.text === 'notFound') found = true;
+      else if (ts.isIdentifier(n.expression) && is404(n.arguments[0])) found = true;
+    }
+    if (ts.isPropertyAssignment(n) && n.name.getText() === 'status' && is404(n.initializer)) {
+      found = true;
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(node);
+  return found;
 }
 
 /**
@@ -218,7 +228,8 @@ function isFactoryBody(node: ts.Node): boolean {
 
 /**
  * The identifiers in the serve route's `functions: [ … ]` array, or null when `functions` is not an
- * array literal (CC-20b's branch builds it with a call). Spread elements are skipped.
+ * array literal (CC-20b's branch builds it with a call). An entry that is not a plain name (a spread,
+ * a call) throws, so a list this cannot read is not checked as if it were complete.
  */
 export function servedFunctionNames(routeFile: string): string[] | null {
   const sf = ts.createSourceFile(
@@ -234,7 +245,11 @@ export function servedFunctionNames(routeFile: string): string[] | null {
       node.name.getText() === 'functions' &&
       ts.isArrayLiteralExpression(node.initializer)
     ) {
-      names = node.initializer.elements.filter(ts.isIdentifier).map((e) => e.text);
+      const elements = node.initializer.elements;
+      const odd = elements.find((e) => !ts.isIdentifier(e));
+      if (odd)
+        throw new Error(`serve route: a functions entry that is not a name: ${odd.getText()}`);
+      names = elements.map((e) => (e as ts.Identifier).text);
     }
     ts.forEachChild(node, visit);
   };
@@ -329,7 +344,14 @@ const PATH_REF = new RegExp(
   'g',
 );
 /** Where a folder-relative reference may start, tried in order. */
-const REF_ROOTS = ['apps/web/app/', 'apps/web/', 'packages/engine/src/', 'inngest/', ''];
+const REF_ROOTS = [
+  'apps/web/app/',
+  'apps/web/',
+  'packages/engine/src/',
+  'packages/engine/',
+  'inngest/',
+  '',
+];
 const localDir = (segment: string): boolean =>
   REF_ROOTS.some((r) => {
     const p = join(REPO_ROOT, r, segment);

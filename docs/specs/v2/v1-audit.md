@@ -390,7 +390,7 @@ The network search: `grep -rnE "\bfetch\(|https?\.request|net\.connect|tls\.conn
 
 `apps/web/lib/seo/jsonld.tsx` serialised with bare `JSON.stringify` into a `<script>`. Its callers,
 listed by `grep -rln "<JsonLd" apps/web/app apps/web/components apps/web/lib | grep -v "\.test\."`, pass
-our own constants (the blog registry, author records, the checker page), so nothing crawled
+our own constants (the root layout, the home page, the blog registry, author records, the checker page), so nothing crawled
 reached it; it is fixed regardless (D9-1, `fed2923e`): `scriptSafeJson` escapes `<`, `>`, `&`, U+2028 and
 U+2029 as `\u` escapes, which `JSON.parse` reads back to the same object. Test:
 `pnpm --filter @crawlmouse/web exec vitest run lib/seo/jsonld.test.tsx`. The search below returns one

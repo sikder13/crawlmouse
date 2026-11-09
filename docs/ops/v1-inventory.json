@@ -399,7 +399,7 @@
         "cache": "pass — revalidate=300 (app/r/[slug]/page.tsx:17) is safe because the page reads no cookies or session; owner state is fetched client-side with no-store (app/api/reports/[slug]/mine/route.ts:23)",
         "redirect": "n/a — no redirect or next param",
         "errors": "pass — a read error returns null (lib/reports.ts:43-50) and renders the 404 page, no upstream text",
-        "escaping": "pass — crawled domain, titles and URLs are JSX text in server components (components/report/sections.tsx:52-56, where crawled text is rendered as JSX children); no crawled href; the white-label logo src is built from our storage base plus a logoPath constrained to `${slug}/[A-Za-z0-9._-]+` (lib/report-brand.ts:23-27, app/api/reports/[slug]/white-label/route.ts:54-60); brandName is JSX text (components/report/ReportBrandHeader.tsx:26)",
+        "escaping": "pass — crawled domain, titles and URLs are JSX text in server components (crawled titles and URLs render as JSX text at components/report/sections.tsx:81 and components/report/AiReadinessReportSection.tsx:125); no crawled href; the white-label logo src is built from our storage base plus a logoPath constrained to `${slug}/[A-Za-z0-9._-]+` (lib/report-brand.ts:23-27, app/api/reports/[slug]/white-label/route.ts:54-60); brandName is JSX text (components/report/ReportBrandHeader.tsx:26)",
         "abuse": "n/a — read only"
       },
       "e2e": {
