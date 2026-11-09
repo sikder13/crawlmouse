@@ -198,4 +198,14 @@ describe('the reviewed baseline and the semgrep job', () => {
     expect(script).toMatch(/semgrep-gate\.mjs[\s\S]*--scan-exit "\$\{SCAN_EXIT:-missing\}"/);
     expect(job.permissions).toEqual({ contents: 'read' });
   });
+
+  // Semgrep's built-in ignore list, used only when no .semgrepignore exists, skips `build/`
+  // directories: on 2026-11-09 an ERROR planted in packages/engine/src/v2/build passed the gate
+  // without this file and failed it with the file in place.
+  it('writes a .semgrepignore with no pattern before the scan', () => {
+    const write = script.match(/^\s*echo "([^"]*)" > \.semgrepignore$/m);
+    expect(write, 'the step that writes .semgrepignore').not.toBeNull();
+    expect(write![1]).toMatch(/^#/);
+    expect(script.indexOf('> .semgrepignore')).toBeLessThan(script.indexOf('docker run'));
+  });
 });
