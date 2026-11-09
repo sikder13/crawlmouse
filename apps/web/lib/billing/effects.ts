@@ -162,7 +162,8 @@ export type InngestSend = PlannedSend extends infer P
 
 /** The send without its tag; the variant's name and data stay paired. */
 function untagged(p: PlannedSend): InngestSend {
-  const { kind: _kind, ...event } = p;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the tag is dropped, not read
+  const { kind, ...event } = p;
   return event;
 }
 
