@@ -243,8 +243,7 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
 
     async fixEvents(fixIds) {
       const rows: Row[] = [];
-      for (let i = 0; i < fixIds.length; i += IN_LIST) {
-        const ids = fixIds.slice(i, i + IN_LIST);
+      for (const ids of inLists(fixIds)) {
         rows.push(
           ...(await paged('fix events', (from, to) =>
             sb.from('fix_events').select('*').in('fix_id', ids).order('id').range(from, to),
@@ -324,6 +323,16 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
       return (inserted ?? []).length > 0;
     },
   };
+}
+
+/** `ids` in lists of at most IN_LIST, in order. */
+export function inLists(ids: readonly string[]): string[][] {
+  const lists: string[][] = [];
+  ids.forEach((id, i) => {
+    if (i % IN_LIST === 0) lists.push([]);
+    lists[lists.length - 1]!.push(id);
+  });
+  return lists;
 }
 
 /** A finished or partial check row as the next check's diff reads it; null when it stored no diff inputs. */
