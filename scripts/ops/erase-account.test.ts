@@ -108,6 +108,25 @@ async function person() {
        ($1, $2, 'developer', 'invited'), ($1, $3, 'developer', 'invited')`,
     [bystander.accountId, email.toUpperCase(), lookalike],
   );
+  // The address as a pending invitation, a report recipient and a client contact: once inside this
+  // person's own account (deleted with it) and once on the bystander's (where it is removed).
+  for (const accountId of [world.accountId, bystander.accountId]) {
+    await pglite.query(
+      `insert into public.seats (account_id, invited_email, role, status)
+       values ($1, $2, 'developer', 'invited') on conflict do nothing`,
+      [accountId, email],
+    );
+    await pglite.query(
+      `update public.sites set client_contact_email = $2
+        where id = (select id from public.sites where account_id = $1 order by id limit 1)`,
+      [accountId, email.toUpperCase()],
+    );
+    await pglite.query(
+      `update public.reports set recipient_email = $2
+        where id = (select id from public.reports where account_id = $1 order by id limit 1)`,
+      [accountId, email],
+    );
+  }
   const slug = `r-${tag}`;
   await pglite.query(
     `insert into public.public_reports (slug, domain, minted_by) values ($1, 'a.example', $2)`,
@@ -188,6 +207,8 @@ describe('erase-account (B-F2)', () => {
       'takedown_requests redacted (closed)': 1,
       'rate_limits deleted': 4,
       'seats deleted (invitations in other accounts)': 1,
+      'reports.recipient_email nulled': 1,
+      'sites.client_contact_email nulled': 1,
       'seats deleted (own)': 1,
       'public_reports.minted_by nulled': 1,
       'accounts deleted': 1,
