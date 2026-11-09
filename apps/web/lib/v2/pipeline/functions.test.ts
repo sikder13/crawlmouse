@@ -347,7 +347,7 @@ async function loopbackSite() {
   return { seen, port, close };
 }
 
-describe('production discovery goes through the SSRF guard, which refuses loopback (quality 2)', () => {
+describe('production discovery sends a loopback site nothing (quality 2)', () => {
   let site: Awaited<ReturnType<typeof loopbackSite>>;
   beforeEach(async () => {
     site = await loopbackSite();
