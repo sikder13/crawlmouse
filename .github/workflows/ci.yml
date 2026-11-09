@@ -287,6 +287,56 @@ jobs:
       - name: Fail on a high or critical result
         run: node .github/workflows/scripts/sarif-gate.mjs "$RUNNER_TEMP/codeql" .github/workflows/scripts/codeql-baseline.json
 
+  # Semgrep CE with four registry packs, in CI only: nothing is uploaded to code scanning. The image
+  # is pinned by digest; the packs are fetched at run time and are not pinned, so the log's rule
+  # count shows when one changes. Test code is excluded as in the codeql job. Semgrep's built-in
+  # ignore list (used when the repository has no .semgrepignore) skips every `build/` directory,
+  # which holds engine source (packages/engine/src/v2/build), so the job writes a .semgrepignore
+  # with no pattern first. Without --error Semgrep exits 0 on findings, so the gate treats any
+  # other exit as a failed scan; it also fails on an ERROR result the reviewed baseline does not
+  # accept, and on a scan that read no file or ran too few rules (--time lists them).
+  semgrep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      # renovate: datasource=docker depName=semgrep/semgrep
+      SEMGREP_IMAGE: semgrep/semgrep:1.182.1@sha256:451b3d875c00dac7ed5db5293e584a07de11449a409c10b3c2d2652f429630b6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: semgrep
+        id: scan
+        run: |
+          set -uo pipefail
+          echo "# No pattern: replaces Semgrep's built-in list; the exclusions are the --exclude flags." > .semgrepignore
+          mkdir -p "$RUNNER_TEMP/semgrep"
+          status=0
+          docker run --rm -v "$PWD:/src" -w /src -v "$RUNNER_TEMP/semgrep:/out" \
+            -e SEMGREP_ENABLE_VERSION_CHECK=0 "$SEMGREP_IMAGE" \
+            semgrep scan --metrics=off --time \
+            --config p/typescript --config p/javascript --config p/nodejs --config p/react \
+            --exclude '*.test.ts' --exclude '*.test.tsx' --exclude __tests__ --exclude tests \
+            --text --json-output=/out/semgrep.json || status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+      - name: Upload the Semgrep JSON
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: semgrep-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/semgrep/semgrep.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Fail on an ERROR result or a scan that cannot be trusted
+        if: ${{ !cancelled() }}
+        env:
+          SCAN_EXIT: ${{ steps.scan.outputs.status }}
+        run: |
+          node .github/workflows/scripts/semgrep-gate.mjs "$RUNNER_TEMP/semgrep/semgrep.json" \
+            .github/workflows/scripts/semgrep-baseline.json --repo-root . --scan-exit "${SCAN_EXIT:-missing}"
+
   # The v2 design-system harness (tests/visual): screenshots of the preview pages at 1280 and
   # 390 px, light and dark, failing on a diff above 0.2%, plus layout, axe, focus and motion checks.
   # It runs in the Playwright image pinned by digest, so the fonts and rasteriser that drew the

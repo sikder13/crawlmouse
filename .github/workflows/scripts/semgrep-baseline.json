@@ -1,0 +1,5 @@
+{
+  "$comment": "Semgrep ERROR results reviewed 2026-11-09 (the first run, Semgrep 1.182.1, packs p/typescript p/javascript p/nodejs p/react): none. Keyed by rule, file and the gate's content fingerprint (semgrep-gate.mjs); `line` is where it was, for reading only; `count` (default 1) is how many identical matches in that file are accepted. Accepted through 2026-12-08; from 2026-12-09 every result fails the semgrep job again. Remove an entry in the change that fixes it.",
+  "expires": "2026-12-08",
+  "entries": []
+}
