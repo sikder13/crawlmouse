@@ -13,13 +13,18 @@
  * 3. `next()` computes `trial_started {variant: 'no_card'}` from the account as read;
  * 4. `start_trial_with_ledger` (migration 006c) does the rest in one transaction: it locks the
  *    account and the hashes, applies the ledger rule, and either refuses or applies the transition
- *    and writes the ledger rows. Its version check refuses a stale read (`not_first`).
+ *    and writes the ledger rows. Its version check refuses a stale read (`not_first`);
+ * 5. when it answers `started`, the transition's effects are dispatched (CC-03 D9b): `trial.started`,
+ *    which starts the trial's own clock, and `entitlement.changed`. A failed dispatch is reported as
+ *    `trial-dispatch-failed` and the sign-in goes on; the hourly sweep still expires the trial once
+ *    it has ended. Nothing is dispatched for any other outcome.
  * A decision the function cannot make is reported as `auth.trial-decision-failed` and leaves the
  * account Free; it is not retried (docs/specs/v2/06c-trial-function.md, known gaps).
  * The named site (at any sign-in) follows; its `(account_id, host)` unique index makes a second
  * insert a no-op.
  */
-import { next } from '../billing/state-machine';
+import { planEffects, type PlannedEffect } from '../billing/effects';
+import { next, type EntitlementSnapshot, type Transition } from '../billing/state-machine';
 import { toTransitionParams, type EntitlementStore } from '../billing/state-machine-apply';
 import { effectiveTier } from '../entitlement-v2';
 import type { FunnelEvent } from '../analytics-events';
@@ -74,6 +79,11 @@ export interface FirstLoginDeps {
   /** `pepperFrom(process.env)`: null fails closed. */
   pepper: string | null;
   now: () => Date;
+  /**
+   * Sends a started trial's planned effects: `billingDispatcher(process.env)`, a no-op with
+   * V2_BILLING unset.
+   */
+  dispatch: (planned: readonly PlannedEffect[]) => Promise<void>;
 }
 
 /** What the hook decided about the trial, each with the case that produces it. The spec lists them. */
@@ -182,7 +192,31 @@ async function decideTrial(
     console.info(JSON.stringify({ event: 'trial.fingerprint_hit', kinds: decision.hits }));
     return { outcome: 'denied', variant };
   }
+  if (decision.outcome === 'started') {
+    await dispatchTrialEffects(deps, account.accountId, stored.snapshot, planned);
+  }
   return { outcome: decision.outcome, variant };
+}
+
+/** The started trial's effects, through the dispatcher; a failure is reported, not raised. */
+async function dispatchTrialEffects(
+  deps: FirstLoginDeps,
+  accountId: string,
+  before: EntitlementSnapshot,
+  started: Extract<Transition, { outcome: 'applied' }>,
+): Promise<void> {
+  try {
+    await deps.dispatch(
+      planEffects(started.effects, {
+        accountId,
+        source: 'trial-start',
+        before,
+        after: started.state,
+      }),
+    );
+  } catch {
+    deps.report('trial-dispatch-failed', { accountId });
+  }
 }
 
 /** Why the trial function gave no decision: a lock timeout, an unreadable answer, or an error. */
