@@ -46,6 +46,14 @@ describe('stripeAccount', () => {
       },
       'live mode only',
     ],
+    // The same host written with its trailing root dot, which reaches the same project.
+    [
+      {
+        STRIPE_ACCOUNT_SECRET_KEY: 'sk_test_x',
+        NEXT_PUBLIC_SUPABASE_URL: 'https://EZSPNFEYZWSISYMYTSSM.supabase.co.:443/',
+      },
+      'live mode only',
+    ],
   ])('refuses %j, naming no key', async (env, message) => {
     const { stripeAccount } = await load();
     expect(() => stripeAccount(env)).toThrow(message);
