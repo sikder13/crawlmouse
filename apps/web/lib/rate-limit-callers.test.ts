@@ -7,20 +7,25 @@ import { MAX_RATE_LIMIT_WINDOW_MS } from './rate-limit-window';
 
 // B-F1: rows are deleted once their window started PRUNE_AFTER_MS ago, so no caller may use a
 // window longer than MAX_RATE_LIMIT_WINDOW_MS. checkRateLimit throws on one at run time; this sweep
-// reads every call's window argument from source, so a caller no test reaches is still checked.
-// A window this reader cannot evaluate (a parameter, an import, a call) fails the sweep.
+// reads the window argument of each call from source, so a route whose tests mock the module is
+// still checked. A file is a caller when it imports the rate-limit module; the reader follows a
+// named import (aliased or not) and a namespace import, and throws on a shape it cannot read: a
+// dynamic import or require of the module, checkRateLimit used other than as a callee, a window it
+// cannot evaluate, or a caller file with no call in it.
 
 const WEB = resolve(__dirname, '..');
+const MODULE = /(^|\/)rate-limit$/;
 
 function callerFiles(): string[] {
-  const out = execFileSync('git', ['grep', '-l', 'checkRateLimit(', '--', 'app', 'lib'], {
+  const out = execFileSync('git', ['grep', '-l', '-E', 'rate-limit[\'"]', '--', '.'], {
     cwd: WEB,
     encoding: 'utf8',
   });
   return out
     .split('\n')
-    .filter(Boolean)
-    .filter((f) => !/\.test\.tsx?$/.test(f) && f !== 'lib/rate-limit.ts');
+    .filter((f) => /\.(ts|tsx|mts|js|mjs)$/.test(f))
+    .filter((f) => !/\.test\.tsx?$/.test(f) && f !== 'lib/rate-limit.ts')
+    .filter((f) => !f.startsWith('node_modules/'));
 }
 
 /** The number an expression of numeric literals, `*`, `+` and same-file consts comes to. */
@@ -55,29 +60,78 @@ function evaluate(node: ts.Expression, sf: ts.SourceFile, seen = new Set<string>
   throw new Error(`cannot evaluate ${node.getText(sf)}`);
 }
 
-function windows(file: string): Array<{ where: string; ms: number }> {
-  const text = readFileSync(join(WEB, file), 'utf8');
+/** The windows of the calls a module makes through its import of the rate-limit module. */
+function windowsOf(file: string, text: string): Array<{ where: string; ms: number }> {
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const at = (n: ts.Node) => `${file}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1}`;
+  const direct = new Set<string>();
+  const namespaces = new Set<string>();
+  let imports = false;
+  for (const st of sf.statements) {
+    if (!ts.isImportDeclaration(st) || !ts.isStringLiteral(st.moduleSpecifier)) continue;
+    if (!MODULE.test(st.moduleSpecifier.text)) continue;
+    imports = true;
+    const b = st.importClause?.namedBindings;
+    if (b && ts.isNamespaceImport(b)) namespaces.add(b.name.text);
+    else if (b && ts.isNamedImports(b)) {
+      for (const el of b.elements) {
+        if ((el.propertyName ?? el.name).text === 'checkRateLimit') direct.add(el.name.text);
+      }
+    }
+  }
   const out: Array<{ where: string; ms: number }> = [];
   const visit = (n: ts.Node) => {
+    // import('…rate-limit') and require('…rate-limit') hand the module to code this cannot follow.
     if (
       ts.isCallExpression(n) &&
-      ts.isIdentifier(n.expression) &&
-      n.expression.text === 'checkRateLimit'
+      (n.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(n.expression) && n.expression.text === 'require')) &&
+      n.arguments[0] &&
+      ts.isStringLiteral(n.arguments[0]) &&
+      MODULE.test(n.arguments[0].text)
     ) {
-      const where = `${file}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1}`;
-      const arg = n.arguments[2];
-      if (!arg) throw new Error(`${where}: no window argument`);
-      try {
-        out.push({ where, ms: evaluate(arg, sf) });
-      } catch (e) {
-        throw new Error(`${where}: ${(e as Error).message}`);
+      throw new Error(`${at(n)}: a dynamic import of the rate-limit module`);
+    }
+    const isRef =
+      (ts.isIdentifier(n) && direct.has(n.text) && !ts.isImportSpecifier(n.parent)) ||
+      (ts.isPropertyAccessExpression(n) &&
+        ts.isIdentifier(n.expression) &&
+        namespaces.has(n.expression.text) &&
+        n.name.text === 'checkRateLimit');
+    if (isRef) {
+      const call = n.parent;
+      if (!ts.isCallExpression(call) || call.expression !== n) {
+        throw new Error(`${at(n)}: checkRateLimit used other than as a callee`);
       }
+      const arg = call.arguments[2];
+      if (!arg) throw new Error(`${at(call)}: no window argument`);
+      try {
+        out.push({ where: at(call), ms: evaluate(arg, sf) });
+      } catch (e) {
+        throw new Error(`${at(call)}: ${(e as Error).message}`);
+      }
+      return;
+    }
+    // A namespace used other than through .checkRateLimit (passed on, destructured) is unreadable.
+    if (
+      ts.isIdentifier(n) &&
+      namespaces.has(n.text) &&
+      !ts.isNamespaceImport(n.parent) &&
+      !(ts.isPropertyAccessExpression(n.parent) && n.parent.expression === n)
+    ) {
+      throw new Error(`${at(n)}: the rate-limit namespace used other than as obj.member`);
     }
     ts.forEachChild(n, visit);
   };
   visit(sf);
+  if (imports && direct.size + namespaces.size > 0 && out.length === 0) {
+    throw new Error(`${file}: imports checkRateLimit and calls it nowhere this can read`);
+  }
   return out;
+}
+
+function windows(file: string): Array<{ where: string; ms: number }> {
+  return windowsOf(file, readFileSync(join(WEB, file), 'utf8'));
 }
 
 describe('every checkRateLimit caller (B-F1)', () => {
@@ -86,8 +140,10 @@ describe('every checkRateLimit caller (B-F1)', () => {
     // The routes that count today: magic-link, audits/start, re-audit, notify, verify, mint, the
     // report routes, waitlist, takedown. A sweep that found none would pass by reading nothing.
     expect(files.length).toBeGreaterThanOrEqual(10);
+    // windowsOf throws for a file that imports checkRateLimit and yields no call, so a file the
+    // reader cannot follow fails here rather than adding nothing.
     const found = files.flatMap(windows);
-    expect(found.length).toBeGreaterThanOrEqual(files.length);
+    expect(new Set(found.map((w) => w.where.split(':')[0])).size).toBeGreaterThanOrEqual(10);
     const tooLong = found.filter((w) => !(w.ms > 0 && w.ms <= MAX_RATE_LIMIT_WINDOW_MS));
     expect(tooLong).toEqual([]);
   });
@@ -102,5 +158,31 @@ describe('every checkRateLimit caller (B-F1)', () => {
     expect(() => evaluate(expr(b), b)).toThrow(/cannot evaluate/);
     const c = sf('let W = 5; W;');
     expect(() => evaluate(expr(c), c)).toThrow(/cannot evaluate/);
+  });
+
+  it('follows an aliased and a namespace import, and refuses a shape it cannot read', () => {
+    const H = 'const H = 3_600_000;';
+    expect(
+      windowsOf(
+        'a.ts',
+        `import { checkRateLimit as limit } from '@/lib/rate-limit'; ${H} limit('k', 1, 25 * H);`,
+      ),
+    ).toEqual([{ where: 'a.ts:1', ms: 25 * 3_600_000 }]);
+    expect(
+      windowsOf('b.ts', `import * as RL from '../rate-limit'; ${H} RL.checkRateLimit('k', 1, H);`),
+    ).toEqual([{ where: 'b.ts:1', ms: 3_600_000 }]);
+    // The window constant's module is not the rate-limit module.
+    expect(windowsOf('c.ts', `import { MAX } from './rate-limit-window'; MAX;`)).toEqual([]);
+    for (const [src, why] of [
+      [`const m = await import('@/lib/rate-limit');`, /dynamic import/],
+      [
+        `import { checkRateLimit } from '@/lib/rate-limit'; const f = checkRateLimit;`,
+        /other than as a callee/,
+      ],
+      [`import * as RL from '@/lib/rate-limit'; const { checkRateLimit } = RL;`, /namespace used/],
+      [`import { checkRateLimit } from '@/lib/rate-limit'; export {};`, /calls it nowhere/],
+    ] as const) {
+      expect(() => windowsOf('d.ts', src), src).toThrow(why);
+    }
   });
 });
