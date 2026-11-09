@@ -382,7 +382,7 @@ describe('every ruling is one of three and carries its consequence (D2, D3)', ()
     ]);
   });
 
-  it('a retired page that redirects to a path names a keep page, not a pattern or itself', () => {
+  it('a retired page that redirects to a path names a page that stays served, with segments it has', () => {
     expect(redirectProblems(items)).toEqual([]);
     const page = (path: string, url: string, ruling: string, redirect?: string) => ({
       kind: 'page',
@@ -398,11 +398,24 @@ describe('every ruling is one of three and carries its consequence (D2, D3)', ()
       'app/a/page.tsx: redirects to itself (use same)',
     ]);
     expect(redirectProblems([keep, a('/r/[x]')])).toEqual([
-      'app/a/page.tsx: redirects to a pattern, /r/[x]',
+      'app/a/page.tsx: /r/[x] names [x], which /a does not have',
     ]);
     expect(redirectProblems([keep, page('app/b/page.tsx', '/b', 'retire'), a('/b')])).toEqual([
-      'app/a/page.tsx: /b is not a keep page',
+      'app/a/page.tsx: /b is not a page that stays served',
     ]);
+    // A dynamic target: its shape is a served page's, and its segments come from the source's.
+    const served = page('app/s/[id]/page.tsx', '/s/[id]', 'retire', 'same');
+    const pair = (to: string) => page('app/c/[a]/[b]/page.tsx', '/c/[a]/[b]', 'retire', to);
+    expect(redirectProblems([served, pair('/s/[a]')])).toEqual([]);
+    expect(redirectProblems([served, pair('/s/[z]')])).toEqual([
+      'app/c/[a]/[b]/page.tsx: /s/[z] names [z], which /c/[a]/[b] does not have',
+    ]);
+    expect(redirectProblems([served, pair('/t/[a]')])).toEqual([
+      'app/c/[a]/[b]/page.tsx: /t/[a] is not a page that stays served',
+    ]);
+    expect(
+      redirectProblems([page('app/s/[id]/page.tsx', '/s/[id]', 'retire', 'none'), pair('/s/[a]')]),
+    ).toEqual(['app/c/[a]/[b]/page.tsx: /s/[a] is not a page that stays served']);
   });
 
   it('every file:line in evidence, checks and findings holds on the tracked tree', () => {

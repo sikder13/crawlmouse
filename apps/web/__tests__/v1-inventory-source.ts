@@ -400,8 +400,10 @@ export function refProblems(
 }
 
 /**
- * A retired page's redirect: `same` (v2 serves the URL), `410`, `none`, or a path that is the URL of
- * a `keep` page, with no dynamic segment, and not the page's own URL.
+ * A retired page's redirect: `same` (v2 serves the URL), `410`, `none`, or a path. The path must have
+ * the shape of a page that stays served (a `keep` page, or a `retire` page whose redirect is `same`),
+ * must not be the page's own URL, and each dynamic segment it names must be one of the source's, so
+ * `/compare/[a]/[b]` may send `[a]` on to `/audit/[a]`.
  */
 export function redirectProblems(
   entries: readonly {
@@ -412,16 +414,29 @@ export function redirectProblems(
     redirect?: string;
   }[],
 ): string[] {
-  const keepUrls = new Set(
-    entries.filter((e) => e.kind === 'page' && e.ruling === 'keep').map((e) => e.url),
+  const shape = (url: string) => url.replace(/\[[^\]]+\]/g, '[]');
+  const segments = (url: string) => [...url.matchAll(/\[[^\]]+\]/g)].map((m) => m[0]);
+  const served = new Set(
+    entries
+      .filter(
+        (e) =>
+          e.kind === 'page' &&
+          e.url !== undefined &&
+          (e.ruling === 'keep' || (e.ruling === 'retire' && e.redirect === 'same')),
+      )
+      .map((e) => shape(e.url!)),
   );
   return entries
     .filter((e) => e.kind === 'page' && e.ruling === 'retire' && e.redirect?.startsWith('/'))
     .flatMap((e) => {
       const to = e.redirect!;
       if (to === e.url) return [`${e.path}: redirects to itself (use same)`];
-      if (to.includes('[')) return [`${e.path}: redirects to a pattern, ${to}`];
-      if (!keepUrls.has(to)) return [`${e.path}: ${to} is not a keep page`];
+      const own = new Set(segments(e.url ?? ''));
+      const foreign = segments(to).filter((s) => !own.has(s));
+      if (foreign.length > 0) {
+        return [`${e.path}: ${to} names ${foreign.join(', ')}, which ${e.url} does not have`];
+      }
+      if (!served.has(shape(to))) return [`${e.path}: ${to} is not a page that stays served`];
       return [];
     });
 }
