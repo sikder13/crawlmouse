@@ -693,6 +693,19 @@ describe.each(PORTS)('through the %s port', (p) => {
       ]);
     });
 
+    it('the subscription a checkout replaces is cancelled whatever its price', async () => {
+      // The account's own subscription, now on a price the listing no longer holds.
+      const { accountId, customer, current } = await account('pro');
+      w.stripe.update(current!.id, { priceIds: ['price_retired'] });
+      const next = sub(customer, { plan: 'agency' });
+      const e = checkoutEvent(accountId, customer, next.id, BASE + 300);
+      expect((await w.deliver(e)).outcome).toBe('applied');
+      expect(w.stripe.cancelled.map((c) => [c.subscriptionId, c.reason])).toEqual([
+        [current!.id, 'orphaned'],
+      ]);
+      expect(w.stripe.live()).toEqual([next.id]);
+    });
+
     it('two Pro tabs, the later processed first: the earlier is stale, ignored and cancelled', async () => {
       const { accountId, customer } = await account();
       const a = sub(customer);
@@ -831,6 +844,16 @@ describe.each(PORTS)('through the %s port', (p) => {
       ]);
       expect(w.stripe.alerts).toEqual([
         { kind: 'alert', reason: 'dispute', accountId, subscriptionId: current!.id, source: e.id },
+      ]);
+      expect(w.stripe.live()).toEqual([]);
+    });
+
+    it('cancels the followed subscription whatever its price', async () => {
+      const { customer, current } = await account('pro');
+      w.stripe.update(current!.id, { priceIds: ['price_retired'] });
+      await w.deliver(dispute(customer, BASE + 200));
+      expect(w.stripe.cancelled.map((c) => [c.subscriptionId, c.reason])).toEqual([
+        [current!.id, 'disputed'],
       ]);
       expect(w.stripe.live()).toEqual([]);
     });
