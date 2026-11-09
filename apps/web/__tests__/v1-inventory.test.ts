@@ -20,6 +20,7 @@ import {
   v1Routes,
   v1Tables,
 } from './v1-inventory-source';
+import { BLOCKS, readBlock, renderCounts, renderCutover, writeBlocks } from './v1-inventory-report';
 
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({}) }));
 vi.mock('@/lib/sitemap-reports', () => ({ fetchIndexableReportSlugs: () => Promise.resolve([]) }));
@@ -217,5 +218,27 @@ describe('the sitemap (§13): nothing in it is deleted, and a retired URL in it 
       (e) => e.ruling === 'retire' && inSitemap(e) && !e.redirect!.startsWith('/'),
     );
     expect(noTarget.map((e) => e.path)).toEqual([]);
+  });
+});
+
+describe('the report renders its inventory sections from the JSON (D12, §10)', () => {
+  const REPORT = join(REPO_ROOT, 'docs/specs/v2/v1-audit.md');
+
+  it('renders counts that add up to the entries (anti-vacuity)', () => {
+    const counts = renderCounts(items);
+    expect(counts).toContain(`| **all** |`);
+    expect(counts.trim().endsWith(`| ${items.length} |`)).toBe(true);
+    expect(renderCutover(items).split('\n').length - 2).toBe(
+      items.filter((e) => e.ruling === 'retire').length,
+    );
+  });
+
+  it.each(Object.keys(BLOCKS))('block %s equals what the generator renders', (name) => {
+    let report = readFileSync(REPORT, 'utf8');
+    if (process.env.V1_INVENTORY_WRITE === '1') {
+      report = writeBlocks(report, items);
+      writeFileSync(REPORT, report);
+    }
+    expect(readBlock(report, name)).toBe(BLOCKS[name]!(items));
   });
 });
