@@ -10,7 +10,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('server-only', () => ({}));
-vi.mock('@crawlmouse/inngest', () => ({ inngest: { send: h.send } }));
+vi.mock('../../../../inngest/client', () => ({ inngest: { send: h.send } }));
 vi.mock('@sentry/nextjs', () => ({
   captureMessage: h.capture,
   flush: h.flush,

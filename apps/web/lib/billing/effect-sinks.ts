@@ -1,6 +1,6 @@
 import 'server-only';
 import * as Sentry from '@sentry/nextjs';
-import { inngest } from '@crawlmouse/inngest';
+import { inngest } from '../../../../inngest/client';
 import { dispatchPlanned, type EffectSinks, type PlannedEffect } from './effects';
 import { billingV2Enabled } from './flags';
 import { stripeAccount } from './stripe-account';
