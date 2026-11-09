@@ -70,6 +70,14 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
       return r ? { checkId: String(r.id), siteId: String(r.site_id) } : null;
     },
 
+    async siteOf(checkId) {
+      const r = await one(
+        `select jsonb_build_object('site_id', site_id) as row from public.checks where id = $1`,
+        [checkId],
+      );
+      return r ? String(r.site_id) : null;
+    },
+
     async progress(checkId, progress, at) {
       await db.query(
         `update public.checks set progress = $2::jsonb, heartbeat_at = $3::timestamptz

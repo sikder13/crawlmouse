@@ -138,7 +138,7 @@ function simulate(opts: { latencyS: number; busyClaims: number; slowBatches: boo
     build: async () => ({ status: 'partial', pages: 50, fixes: 0 }),
     persist: async () => ({ written: true }),
     finalize: async () => ({}),
-    fail: async () => ({ failed: true }),
+    fail: async () => ({ failed: true, siteId: 's' }),
   };
   const event = {
     checkId: 'c',

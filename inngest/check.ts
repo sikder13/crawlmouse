@@ -10,8 +10,8 @@
  * check.test.ts moves the system clock between invocations).
  *
  * Step order: claim (with `claim-wait-{i}` / `claim-{i}` while the site is busy) → discover → crawl
- * batches `crawl-{n}` → access batches `access-{stage}` → render → build → persist → finalize →
- * emit. A batch is `{p}-post` (busy: `{p}-post-busy-{k}`, `{p}-post-{k}`), then `{p}-wait-{i}` and
+ * batches `crawl-{n}` → access batches `access-{stage}` → render → build → persist → emit →
+ * finalize. A batch is `{p}-post` (busy: `{p}-post-busy-{k}`, `{p}-post-{k}`), then `{p}-wait-{i}` and
  * `{p}-poll-{i}` until the batch is done, failed or past its deadline, then `{p}-read`. A batch the
  * worker lost is posted once more (`{p}-repost`), read as `{p}-read-2`; a second loss or the deadline
  * is `{p}-fail`, and the phase ends there. Batch numbers are one sequence over the check.
@@ -21,6 +21,8 @@ import { inngest } from './client';
 import { checkConcurrencyLimit } from './concurrency';
 import {
   CheckFailure,
+  checkFailedEventId,
+  checkFinishedEventId,
   failureReasonOf,
   type CheckFailed,
   type CheckFinished,
@@ -108,7 +110,8 @@ export type ReadOutput =
 export type RenderOutput = { rendered: number; not_rendered: number };
 export type BuildOutput = { status: 'finished' | 'partial'; pages: number; fixes: number };
 export type PersistOutput = { written: boolean };
-export type FailOutput = { failed: boolean };
+/** Whether the call failed the check, and if so the site the database holds it under. */
+export type FailOutput = { failed: false } | { failed: true; siteId: string };
 type Empty = Record<string, never>;
 
 /**
@@ -130,7 +133,7 @@ export interface CheckSteps {
   build(event: CheckRequested, so: RunSoFar): Promise<BuildOutput>;
   persist(event: CheckRequested): Promise<PersistOutput>;
   finalize(event: CheckRequested): Promise<Empty>;
-  /** Marks the check failed unless it has ended; `failed` says whether this call moved it. */
+  /** Marks the check failed unless it has ended; `failed` says whether it is failed with `reason`. */
   fail(event: CheckRequested, reason: FailureReason): Promise<FailOutput>;
 }
 
@@ -142,8 +145,8 @@ export interface CheckStepTools {
   sendEvent(
     id: string,
     payload:
-      | { name: 'check.finished'; data: CheckFinished }
-      | { name: 'check.failed'; data: CheckFailed },
+      | { id: string; name: 'check.finished'; data: CheckFinished }
+      | { id: string; name: 'check.failed'; data: CheckFailed },
   ): Promise<unknown>;
 }
 
@@ -180,13 +183,8 @@ export async function runCheck(
     step.run(id, async () => sized(id, await fn()));
 
   const endFailed = async (reason: FailureReason): Promise<CheckRunResult> => {
-    const { failed } = await run('fail', () => steps.fail(data, reason));
-    if (failed) {
-      await step.sendEvent('emit-failed', {
-        name: 'check.failed',
-        data: { checkId: data.checkId, siteId: data.siteId, reason },
-      });
-    }
+    const out = await run('fail', () => steps.fail(data, reason));
+    if (out.failed) await step.sendEvent('emit-failed', failedEvent(data.checkId, out, reason));
     return { status: 'failed', reason };
   };
 
@@ -296,8 +294,9 @@ export async function runCheck(
     run('build', () => steps.build(data, soFar())),
   );
   await failingAs('persist_failed', () => run('persist', () => steps.persist(data)));
-  await run('finalize', () => steps.finalize(data));
+  // Before finalize: a finalize that fails after the check is persisted cannot cost its event.
   await step.sendEvent('emit', {
+    id: checkFinishedEventId(data.checkId),
     name: 'check.finished',
     data: {
       checkId: data.checkId,
@@ -306,7 +305,21 @@ export async function runCheck(
       status: built.status,
     },
   });
+  await run('finalize', () => steps.finalize(data));
   return { status: built.status };
+}
+
+/** check.failed for a check a fail step failed, naming the site the database holds it under. */
+function failedEvent(
+  checkId: string,
+  out: Extract<FailOutput, { failed: true }>,
+  reason: FailureReason,
+) {
+  return {
+    id: checkFailedEventId(checkId),
+    name: 'check.failed' as const,
+    data: { checkId, siteId: out.siteId, reason },
+  };
 }
 
 /**
@@ -346,15 +359,10 @@ export function createCheckFn(
       retries: 2,
       cancelOn: [{ event: 'check.cancel.requested', match: 'data.checkId' }],
       onFailure: async ({ event, error, step }) => {
-        const data = event.data.event.data;
+        const { checkId } = event.data.event.data;
         const reason = failureReasonOf(error);
-        const { failed } = await step.run('fail', () => fail(data.checkId, reason));
-        if (failed) {
-          await step.sendEvent('emit-failed', {
-            name: 'check.failed',
-            data: { checkId: data.checkId, siteId: data.siteId, reason },
-          });
-        }
+        const out = await step.run('fail', () => fail(checkId, reason));
+        if (out.failed) await step.sendEvent('emit-failed', failedEvent(checkId, out, reason));
       },
     },
     { event: 'check.requested' },
@@ -395,10 +403,10 @@ export function createCheckCancelledFn(
     async ({ event, step }) => {
       const failed = await step.run('fail', () => failCancelled(event.data.run_id));
       if (failed) {
-        await step.sendEvent('emit-failed', {
-          name: 'check.failed',
-          data: { checkId: failed.checkId, siteId: failed.siteId, reason: 'canceled' },
-        });
+        await step.sendEvent(
+          'emit-failed',
+          failedEvent(failed.checkId, { failed: true, siteId: failed.siteId }, 'canceled'),
+        );
       }
       return { failed: failed !== null };
     },

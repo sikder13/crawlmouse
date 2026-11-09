@@ -50,13 +50,20 @@ export function lifecycleSteps(deps: StepDeps): Pick<CheckSteps, 'claim' | 'disc
   };
 }
 
-/** Fails the check by its id unless it has ended; what runCheck's `fail` and onFailure run. */
+/**
+ * Fails the check by its id unless it has ended; what runCheck's `fail` and onFailure run. A failed
+ * check's site is read from its row, so check.failed names the site the database holds it under,
+ * whatever the event said (security 6).
+ */
 export async function failCheck(
-  store: Pick<PipelineStore, 'fail'>,
+  store: Pick<PipelineStore, 'fail' | 'siteOf'>,
   checkId: string,
   reason: FailureReason,
 ): Promise<FailOutput> {
-  return { failed: await store.fail(checkId, reason, null) };
+  if (!(await store.fail(checkId, reason, null))) return { failed: false };
+  const siteId = await store.siteOf(checkId);
+  if (siteId === null) throw new Error(`fail: check ${checkId} has no row after it failed`);
+  return { failed: true, siteId };
 }
 
 /** The cancel handler's work: the check the run claimed, failed `canceled`; null when none moved. */

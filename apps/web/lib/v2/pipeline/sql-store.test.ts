@@ -90,6 +90,14 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
     expect(await store.checkOfRun('run-1')).toEqual({ checkId: id, siteId: expect.any(String) });
   });
 
+  it('reads the site a check belongs to', async () => {
+    const { db, store } = await fresh();
+    const s = await site(db);
+    const id = await check(db, s, { status: 'queued', heartbeat: ago(0) });
+    expect(await store.siteOf(id)).toBe(s);
+    expect(await store.siteOf('c0000000-0000-4000-8000-00000000dead')).toBeNull();
+  });
+
   it('answers site_busy while another check of the site runs', async () => {
     const { db, store } = await fresh();
     const s = await site(db);

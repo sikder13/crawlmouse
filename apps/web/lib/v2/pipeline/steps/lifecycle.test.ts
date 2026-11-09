@@ -22,6 +22,7 @@ function deps(env: Record<string, string> = {}, now = T0) {
   const store = {
     claim: vi.fn(async () => 'claimed' as const),
     fail: vi.fn(async () => true),
+    siteOf: vi.fn(async (): Promise<string | null> => EVENT.siteId),
     progress: vi.fn(async () => {}),
   };
   const evidence = memoryEvidenceStore();
@@ -105,6 +106,16 @@ describe('fail', () => {
     store.fail.mockResolvedValueOnce(false);
     expect(await lifecycleSteps(d).fail(EVENT, 'paused')).toEqual({ failed: false });
     expect(store.fail).toHaveBeenCalledWith(EVENT.checkId, 'paused', null);
+  });
+
+  it('names the site the database holds the failed check under, not the event’s', async () => {
+    const { d, store } = deps();
+    store.siteOf.mockResolvedValueOnce('s-in-db');
+    expect(await lifecycleSteps(d).fail(EVENT, 'paused')).toEqual({
+      failed: true,
+      siteId: 's-in-db',
+    });
+    expect(store.siteOf).toHaveBeenCalledWith(EVENT.checkId);
   });
 });
 

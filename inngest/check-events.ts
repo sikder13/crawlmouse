@@ -62,6 +62,14 @@ export type CheckFailed = { checkId: string; siteId: string; reason: FailureReas
 
 export type CheckCancelRequested = { checkId: string };
 
+/**
+ * The ids check.failed and check.finished are sent with: one of each per check, so a second send of
+ * either (a retried step, or two handlers failing the same check) starts no second run of what they
+ * trigger, by Inngest's deduplication of event ids, which lasts 24 hours (correctness 5).
+ */
+export const checkFailedEventId = (checkId: string): string => `check-failed:${checkId}`;
+export const checkFinishedEventId = (checkId: string): string => `check-finished:${checkId}`;
+
 const FAILURE_PREFIX = 'check failed: ';
 const FAILURE_MESSAGE = /^check failed: ([a-z_]+)$/;
 

@@ -198,6 +198,20 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
         },
       ],
     },
+    siteOf: {
+      answers: [ok({ site_id: S })],
+      call: (s) => s.siteOf(C),
+      calls: [
+        {
+          root: ['from', 'checks'],
+          chain: [
+            ['select', ['site_id']],
+            ['eq', ['id', C]],
+            ['maybeSingle', []],
+          ],
+        },
+      ],
+    },
     progress: {
       answers: [ok(null)],
       call: (s) => s.progress(C, PROGRESS, 'T'),
@@ -444,6 +458,13 @@ describe('supabasePipelineStore: answers', () => {
     const store = supabasePipelineStore(sb);
     expect(await store.fail(C, 'paused', null)).toBe(true);
     expect(await store.fail(null, 'canceled', 'run-9')).toBe(false);
+  });
+
+  it('reads the site a check belongs to, or null when there is no such check', async () => {
+    const { sb } = recorder(ok({ site_id: S }), ok(null));
+    const store = supabasePipelineStore(sb);
+    expect(await store.siteOf(C)).toBe(S);
+    expect(await store.siteOf(C)).toBeNull();
   });
 
   it('finds the check a run claimed by its run id', async () => {

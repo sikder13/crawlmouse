@@ -64,6 +64,8 @@ export interface PipelineStore {
   reap(cutoff: string): Promise<ReapedCheck[]>;
   /** The check a run claimed, if any. */
   checkOfRun(runId: string): Promise<{ checkId: string; siteId: string } | null>;
+  /** The site a check belongs to, as its row holds it; null when there is no such check. */
+  siteOf(checkId: string): Promise<string | null>;
   /** The heartbeat and progress of a running check. */
   progress(checkId: string, progress: NonNullable<Check['progress']>, at: string): Promise<void>;
   check(checkId: string): Promise<Check>;
@@ -172,6 +174,14 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
         await sb.from('checks').select('id, site_id').eq('inngest_run_id', runId).maybeSingle(),
       );
       return row ? { checkId: String(row.id), siteId: String(row.site_id) } : null;
+    },
+
+    async siteOf(checkId) {
+      const row = must<Row | null>(
+        'site of check',
+        await sb.from('checks').select('site_id').eq('id', checkId).maybeSingle(),
+      );
+      return row ? String(row.site_id) : null;
     },
 
     async progress(checkId, progress, at) {

@@ -116,6 +116,9 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
       const r = [...rows.values()].find((o) => o.inngest_run_id === runId);
       return r ? { checkId: r.id, siteId: r.site_id } : null;
     },
+    async siteOf(checkId) {
+      return rows.get(checkId)?.site_id ?? null;
+    },
     async progress(checkId, progress, at) {
       const r = rows.get(checkId);
       if (r?.status === 'running') Object.assign(r, { progress, heartbeat_at: at });

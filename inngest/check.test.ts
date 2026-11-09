@@ -27,6 +27,8 @@ const EVENT: CheckRequested = {
   pageCap: 500,
 };
 const RELEASE = 'abcdef012345';
+/** A site id other than the event's, as the database might hold it. */
+const DB_SITE = '33333333-3333-4333-8333-333333333333';
 const T0 = Date.UTC(2026, 10, 8, 12, 0, 0);
 
 /** A fake `step`: records every id, `sleep` advances the clock and returns at once. */
@@ -106,7 +108,7 @@ function fakeSteps(clock: { now: number }, script: Script = {}) {
     build: async () => ({ status: 'finished', pages: 100, fixes: 3 }),
     persist: async () => ({ written: true }),
     finalize: async () => ({}),
-    fail: async () => ({ failed: true }),
+    fail: async () => ({ failed: true, siteId: EVENT.siteId }),
   };
   return { steps, posts, failed };
 }
@@ -145,8 +147,8 @@ describe('runCheck: the step order', () => {
       'render',
       'build',
       'persist',
-      'finalize',
       'emit',
+      'finalize',
     ]);
     expect(result).toEqual({ status: 'finished' });
     // One batch-number sequence per check: access continues after the crawl.
@@ -165,12 +167,13 @@ describe('runCheck: the step order', () => {
     expect(second.ids).toEqual(first.ids);
   });
 
-  it('emits check.finished with the built status', async () => {
+  it('emits check.finished with the built status, under an event id of its own (correctness 5)', async () => {
     const { events } = await drive();
     expect(events).toEqual([
       {
         id: 'emit',
         payload: {
+          id: `check-finished:${EVENT.checkId}`,
           name: 'check.finished',
           data: {
             checkId: EVENT.checkId,
@@ -224,9 +227,25 @@ describe('runCheck: claim', () => {
     ]);
     expect(result).toEqual({ status: 'failed', reason: 'site_busy' });
     expect(events[0]!.payload).toEqual({
+      id: `check-failed:${EVENT.checkId}`,
       name: 'check.failed',
       data: { checkId: EVENT.checkId, siteId: EVENT.siteId, reason: 'site_busy' },
     });
+  });
+
+  it('names in check.failed the site the fail step read from the database', async () => {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock, { claims: ['paused'] });
+    fake.steps.fail = async () => ({ failed: true, siteId: DB_SITE });
+    await runCheck({ event: { data: EVENT }, step: step.tools, runId: 'r' }, fake.steps);
+    expect(step.events.map((e) => e.payload)).toEqual([
+      {
+        id: `check-failed:${EVENT.checkId}`,
+        name: 'check.failed',
+        data: { checkId: EVENT.checkId, siteId: DB_SITE, reason: 'paused' },
+      },
+    ]);
   });
 
   it('fails the check paused when the claim reads CRAWL_PAUSED', async () => {
@@ -547,7 +566,7 @@ function configOf(fn: unknown) {
 
 describe('createCheckFn (D3)', () => {
   const noSteps = () => fakeSteps({ now: T0 }).steps;
-  const noFail = async () => ({ failed: false });
+  const noFail = async () => ({ failed: false }) as const;
 
   it('declares the D3 options', () => {
     const [main] = configOf(createCheckFn(noSteps, noFail, {}));
@@ -586,7 +605,7 @@ describe('createCheckFn (D3)', () => {
       },
       async (checkId, reason) => {
         calls.push([checkId, reason]);
-        return { failed: true };
+        return { failed: true, siteId: DB_SITE };
       },
       {},
     ) as unknown as {
@@ -605,8 +624,9 @@ describe('createCheckFn (D3)', () => {
       {
         id: 'emit-failed',
         payload: {
+          id: `check-failed:${EVENT.checkId}`,
           name: 'check.failed',
-          data: { checkId: EVENT.checkId, siteId: EVENT.siteId, reason: 'worker_redeployed' },
+          data: { checkId: EVENT.checkId, siteId: DB_SITE, reason: 'worker_redeployed' },
         },
       },
     ]);
@@ -620,7 +640,7 @@ describe('createCheckCancelledFn (finding 4)', () => {
     const [, failure] = configOf(
       createCheckFn(
         () => fakeSteps({ now: T0 }).steps,
-        async () => ({ failed: false }),
+        async () => ({ failed: false }) as const,
         {},
       ),
     );
@@ -651,6 +671,7 @@ describe('createCheckCancelledFn (finding 4)', () => {
     expect(runs).toEqual(['run-9']);
     expect(events.map((e) => e.payload)).toEqual([
       {
+        id: `check-failed:${EVENT.checkId}`,
         name: 'check.failed',
         data: { checkId: EVENT.checkId, siteId: EVENT.siteId, reason: 'canceled' },
       },
