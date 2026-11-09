@@ -390,7 +390,9 @@ describe('a subscription event whose customer has no account', () => {
 // ─── The allow-list ────────────────────────────────────────────────────────────────────────────────
 
 describe('the allow-list gates grants', () => {
-  it('a checkout on a price outside it is recorded, with no account change and no mirror row', async () => {
+  it('our checkout on a price outside it grants nothing, cancels the paid subscription and alerts', async () => {
+    // Our route opened it (client_reference_id and metadata name the account), so the subscription is
+    // ours whatever the listing says: a deploy that changed prices.ts while the session was open.
     const { accountId, customer } = await account();
     const s = sub(customer, { priceIds: ['price_someone_elses'] });
     const e = checkoutEvent(accountId, customer, s.id, BASE + 100);
@@ -399,16 +401,29 @@ describe('the allow-list gates grants', () => {
       accountId,
       reason: 'price not in the allow-list',
     });
-    expect(await ledgerRow(e.id)).toMatchObject({ handled: false, effects: [] });
     expect(await accountRow(accountId)).toMatchObject({ state: 'free', entitlement_version: 0 });
     expect(await mirrorRow(s.id)).toBeUndefined();
     expect(w.reports.map((r) => [r.level, r.message, r.detail.priceIds])).toEqual([
-      ['warning', 'billing.webhook.foreign_price', 'price_someone_elses'],
+      ['error', 'billing.webhook.foreign_price', 'price_someone_elses'],
     ]);
-    expect(w.stripe.cancelled).toEqual([]);
+    expect(w.stripe.cancelled.map((c) => [c.subscriptionId, c.reason])).toEqual([
+      [s.id, 'orphaned'],
+    ]);
+    expect(w.stripe.alerts.map((a) => [a.reason, a.accountId, a.subscriptionId])).toEqual([
+      ['orphaned_subscription', accountId, s.id],
+    ]);
+    expect(w.stripe.live()).toEqual([]);
   });
 
-  it('extras the plan does not sell are recorded before the machine', async () => {
+  it('our checkout on a trial outside it cancels the trial, which has charged nothing, and does not alert', async () => {
+    const { accountId, customer } = await account();
+    const s = sub(customer, { status: 'trialing', priceIds: ['price_someone_elses'] });
+    await w.deliver(checkoutEvent(accountId, customer, s.id, BASE + 100));
+    expect(w.stripe.cancelled.map((c) => c.subscriptionId)).toEqual([s.id]);
+    expect(w.stripe.alerts).toEqual([]);
+  });
+
+  it('extras the plan does not sell are recorded before the machine, and the subscription cancelled', async () => {
     const { accountId, customer } = await account();
     const s = sub(customer, { plan: 'agency', sites: 26 });
     expect(await w.deliver(checkoutEvent(accountId, customer, s.id, BASE + 100))).toEqual({
@@ -416,6 +431,7 @@ describe('the allow-list gates grants', () => {
       accountId,
       reason: 'extras the plan does not sell',
     });
+    expect(w.stripe.cancelled.map((c) => c.subscriptionId)).toEqual([s.id]);
   });
 
   it('a revoke applies whatever the price, with the plan the mirror holds, and warns', async () => {
