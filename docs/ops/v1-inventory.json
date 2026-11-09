@@ -1,7 +1,7 @@
 {
   "base": "ee11796d",
   "measuredAt": "2026-11-09",
-  "v2Rule": "Not listed: app files under the (v2-preview) or (account) route group or under app/api/checks/; Inngest functions built inside a factory rather than as a top-level export; tables created by a migration whose file name contains _v2_. The finders are apps/web/__tests__/v1-inventory-source.ts.",
+  "v2Rule": "Not listed: app files under a (v2-preview) or (account) route group at any depth; an app file with no entry that imports a ...Enabled reader from a .../flags module; Inngest functions built inside a factory rather than as a top-level export; tables created by a migration whose file name contains _v2_. The finders are apps/web/__tests__/v1-inventory-source.ts.",
   "items": [
     {
       "kind": "page",
@@ -84,20 +84,20 @@
       "path": "app/compare/page.tsx",
       "url": "/compare",
       "ruling": "retire",
-      "reason": "head-to-head leaves with v1",
+      "reason": "head-to-head leaves with v1; not in the sitemap, and ARCH-2 names no target for the index (questions Q2)",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "v2 competitor feature inside the account",
-      "redirect": "none (not in the sitemap; ARCH-2 names no target for the index)"
+      "redirect": "none"
     },
     {
       "kind": "page",
       "path": "app/compare/[a]/[b]/page.tsx",
       "url": "/compare/[a]/[b]",
       "ruling": "retire",
-      "reason": "kept 90 days with noindex, then redirected",
+      "reason": "kept 90 days with noindex; ARCH-2 says 301 to /r/[a], but [a] is an audit id and /r/ takes a minted slug, so that target would 404 (questions Q5); not in the sitemap",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "v2 competitor feature inside the account",
-      "redirect": "/r/[a] (301, 90 days after cutover)"
+      "redirect": "none"
     },
     {
       "kind": "page",
@@ -194,10 +194,10 @@
       "path": "app/top/[platform]/page.tsx",
       "url": "/top/[platform]",
       "ruling": "retire",
-      "reason": "ARCH-2 removes /top/* at cutover",
+      "reason": "removed at cutover (410 Gone); not in the sitemap and noindex while thin",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
-      "replacedBy": "nothing; leaderboards leave with v1",
-      "redirect": "410 Gone (not in the sitemap; noindex while thin)"
+      "replacedBy": "nothing; leaderboards are removed at cutover",
+      "redirect": "410"
     },
     {
       "kind": "page",
@@ -284,7 +284,7 @@
       "reason": "v1 audit API, replaced by the checks API",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
-      "redirect": "n/a (API route; alias layer)"
+      "redirect": "alias"
     },
     {
       "kind": "route",
@@ -293,7 +293,7 @@
       "reason": "v1 audit API, replaced by the checks API",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
-      "redirect": "n/a (API route; alias layer)"
+      "redirect": "alias"
     },
     {
       "kind": "route",
@@ -302,7 +302,7 @@
       "reason": "v1 audit API, replaced by the checks API",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
-      "redirect": "n/a (API route; alias layer)"
+      "redirect": "alias"
     },
     {
       "kind": "route",
@@ -311,7 +311,7 @@
       "reason": "v1 audit API, replaced by the checks API",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
-      "redirect": "n/a (API route; alias layer)"
+      "redirect": "alias"
     },
     {
       "kind": "route",
@@ -320,7 +320,7 @@
       "reason": "v1 audit API, replaced by the checks API",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
-      "redirect": "n/a (API route; alias layer)"
+      "redirect": "alias"
     },
     {
       "kind": "route",
@@ -329,7 +329,7 @@
       "reason": "v1 audit API, replaced by the checks API",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
-      "redirect": "n/a (API route; alias layer)"
+      "redirect": "alias"
     },
     {
       "kind": "route",
@@ -338,7 +338,7 @@
       "reason": "v1 audit start, replaced by the checks API",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "/api/checks (CC-22), behind a 90-day alias",
-      "redirect": "n/a (API route; alias layer)"
+      "redirect": "alias"
     },
     {
       "kind": "route",
@@ -449,10 +449,10 @@
       "kind": "route",
       "path": "app/api/trpc/[trpc]/route.ts",
       "ruling": "retire",
-      "reason": "ARCH-2: removed unless something still calls it",
+      "reason": "ARCH-2: removed unless something still calls it; not deletable now, app/layout.tsx imports its provider",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
-      "replacedBy": "nothing (route handlers replace it)",
-      "redirect": "n/a (API route)"
+      "replacedBy": "nothing; removed at cutover",
+      "redirect": "none"
     },
     {
       "kind": "route",
@@ -496,7 +496,7 @@
       "reason": "v1 redirect to the Stripe portal",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "/settings/plan (v2 settings)",
-      "redirect": "/settings/plan (301)"
+      "redirect": "/settings/plan"
     },
     {
       "kind": "route",

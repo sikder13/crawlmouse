@@ -4,7 +4,11 @@
  * point it at a fixture tree and prove it sees what it claims to see.
  *
  * What counts as v2, and is therefore not listed (the rule, not a list of items):
- * - app files under the `(v2-preview)` or `(account)` route group, or under `app/api/checks/`;
+ * - app files under a `(v2-preview)` or `(account)` route group, at any depth;
+ * - an app file with no inventory entry that imports a `…Enabled` flag reader from a `…/flags` module
+ *   (`isFlagGated`): that is how v2 routes outside those groups gate themselves (`api/checks/[id]/claim`
+ *   on `accountDoorEnabled`, CC-03's new billing routes on `billingV2Enabled`). A v1 file that gained
+ *   a v2 branch keeps its entry, so the rule only decides files nobody has ruled;
  * - an Inngest function built inside a function body (a factory) rather than as a top-level
  *   `export const x = inngest.createFunction(…)`; the v2 functions are registered that way, behind
  *   their flags;
@@ -19,23 +23,31 @@ export const APP_DIR = resolve(__dirname, '../app');
 export const INNGEST_DIR = join(REPO_ROOT, 'inngest');
 export const MIGRATIONS_DIR = join(REPO_ROOT, 'infra/supabase/migrations');
 
-const V2_APP_PREFIXES = ['(v2-preview)/', '(account)/', 'api/checks/'];
+const V2_GROUPS = new Set(['(v2-preview)', '(account)']);
 
 const PAGE_FILE = /^page\.(tsx|ts|jsx|js)$/;
 const ROUTE_FILE = /^route\.(tsx|ts|jsx|js)$/;
 /** Next's file conventions other than page and route: they render or are served without a page. */
-const METADATA_FILE =
-  /^(layout|template|loading|error|not-found|global-error|default|opengraph-image|twitter-image|icon|apple-icon|sitemap|manifest)\.(tsx|ts|jsx|js)$/;
+const METADATA_FILE = new RegExp(
+  [
+    '^(layout|template|loading|error|not-found|global-error|default|opengraph-image|twitter-image|icon|apple-icon|sitemap|robots|manifest)\\.(tsx|ts|jsx|js)$',
+    '^(icon|apple-icon|opengraph-image|twitter-image)\\d*\\.(ico|png|jpe?g|svg|gif)$',
+    '^(favicon\\.ico|sitemap\\.xml|robots\\.txt|manifest\\.(json|webmanifest))$',
+  ].join('|'),
+);
 
-export const isV2AppPath = (rel: string): boolean => V2_APP_PREFIXES.some((p) => rel.startsWith(p));
+/** A v2 route group at any depth. Next does not route `_folder`s, so they are skipped as well. */
+export const isV2AppPath = (rel: string): boolean =>
+  rel.split('/').some((segment) => V2_GROUPS.has(segment));
 
 function walkApp(dir: string, keep: RegExp): string[] {
   const out: string[] = [];
   const walk = (d: string) => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
       const p = join(d, entry.name);
-      if (entry.isDirectory()) walk(p);
-      else if (keep.test(entry.name)) out.push(relative(dir, p).split(sep).join('/'));
+      if (entry.isDirectory()) {
+        if (!entry.name.startsWith('_')) walk(p);
+      } else if (keep.test(entry.name)) out.push(relative(dir, p).split(sep).join('/'));
     }
   };
   walk(dir);
@@ -54,6 +66,23 @@ export const v1MetadataFiles = (dir = APP_DIR): string[] =>
 export const v1Routes = (dir = APP_DIR): string[] =>
   walkApp(dir, ROUTE_FILE).map((rel) => `app/${rel}`);
 
+/**
+ * True when the file imports a `…Enabled` reader from a module whose path ends in `/flags` (read
+ * through the AST, so a comment naming a flag does not count).
+ */
+export function isFlagGated(file: string): boolean {
+  const sf = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+  return sf.statements.some(
+    (s) =>
+      ts.isImportDeclaration(s) &&
+      ts.isStringLiteral(s.moduleSpecifier) &&
+      /\/flags$/.test(s.moduleSpecifier.text) &&
+      s.importClause?.namedBindings !== undefined &&
+      ts.isNamedImports(s.importClause.namedBindings) &&
+      s.importClause.namedBindings.elements.some((e) => /Enabled$/.test(e.name.text)),
+  );
+}
+
 /** The URL a page file serves: route groups dropped, `page.tsx` dropped. */
 export function pageUrl(path: string): string {
   const segments = path
@@ -63,6 +92,9 @@ export function pageUrl(path: string): string {
     .filter((s) => !/^\(.*\)$/.test(s));
   return `/${segments.join('/')}`;
 }
+
+/** The URL a route or metadata file serves: its folder, route groups dropped. */
+export const fileUrl = pageUrl;
 
 /** True when a concrete URL path is served by a page URL pattern such as `/blog/[slug]`. */
 export function urlMatches(pattern: string, url: string): boolean {
@@ -121,18 +153,20 @@ export function v1InngestFunctions(dir = INNGEST_DIR): InngestFunction[] {
 }
 
 const CREATE_TABLE =
-  /\bcreate\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?"?([a-z_][a-z0-9_]*)"?/gi;
+  /\bcreate\s+(?:unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?(?:"?([a-z_][a-z0-9_]*)"?\.)?"?([a-z_][a-z0-9_]*)"?/gi;
 
 /** Strips `--` line comments and block comments so a commented-out statement is not read. */
 const stripSqlComments = (sql: string): string =>
   sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '');
 
-/** Tables created by the non-v2 migrations, as `public.<name>`. */
+/** Tables created by the non-v2 migrations, as `<schema>.<name>` (`public` when unqualified). */
 export function v1Tables(dir = MIGRATIONS_DIR): string[] {
   const names = new Set<string>();
   for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql') && !f.includes('_v2_'))) {
     const sql = stripSqlComments(readFileSync(join(dir, file), 'utf8'));
-    for (const m of sql.matchAll(CREATE_TABLE)) names.add(`public.${m[1]!.toLowerCase()}`);
+    for (const m of sql.matchAll(CREATE_TABLE)) {
+      names.add(`${(m[1] ?? 'public').toLowerCase()}.${m[2]!.toLowerCase()}`);
+    }
   }
   return [...names].sort();
 }

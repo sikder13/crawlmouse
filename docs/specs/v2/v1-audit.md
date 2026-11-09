@@ -65,19 +65,19 @@ rows that matter here are reproduced below so this repository holds the basis of
 | --- | --- | --- | --- |
 | page | `/` (`app/page.tsx`) | v2 Home (CC-21 screens/home), same URL | / |
 | page | `/audit/[id]` (`app/audit/[id]/page.tsx`) | v2 result and segment pages under /audit/[id] (CC-22), same ids | /audit/[id] |
-| page | `/compare` (`app/compare/page.tsx`) | v2 competitor feature inside the account | none (not in the sitemap; ARCH-2 names no target for the index) |
-| page | `/compare/[a]/[b]` (`app/compare/[a]/[b]/page.tsx`) | v2 competitor feature inside the account | /r/[a] (301, 90 days after cutover) |
+| page | `/compare` (`app/compare/page.tsx`) | v2 competitor feature inside the account | none |
+| page | `/compare/[a]/[b]` (`app/compare/[a]/[b]/page.tsx`) | v2 competitor feature inside the account | none |
 | page | `/dashboard` (`app/dashboard/page.tsx`) | v2 Dashboard home (CC-26), same URL | /dashboard |
-| page | `/top/[platform]` (`app/top/[platform]/page.tsx`) | nothing; leaderboards leave with v1 | 410 Gone (not in the sitemap; noindex while thin) |
-| route | `app/api/audits/[id]/cancel/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | n/a (API route; alias layer) |
-| route | `app/api/audits/[id]/export/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | n/a (API route; alias layer) |
-| route | `app/api/audits/[id]/llms-txt/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | n/a (API route; alias layer) |
-| route | `app/api/audits/[id]/notify/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | n/a (API route; alias layer) |
-| route | `app/api/audits/[id]/reaudit/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | n/a (API route; alias layer) |
-| route | `app/api/audits/[id]/stream/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | n/a (API route; alias layer) |
-| route | `app/api/audits/start/route.ts` | /api/checks (CC-22), behind a 90-day alias | n/a (API route; alias layer) |
-| route | `app/api/trpc/[trpc]/route.ts` | nothing (route handlers replace it) | n/a (API route) |
-| route | `app/billing/route.ts` | /settings/plan (v2 settings) | /settings/plan (301) |
+| page | `/top/[platform]` (`app/top/[platform]/page.tsx`) | nothing; leaderboards are removed at cutover | 410 |
+| route | `app/api/audits/[id]/cancel/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | alias |
+| route | `app/api/audits/[id]/export/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | alias |
+| route | `app/api/audits/[id]/llms-txt/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | alias |
+| route | `app/api/audits/[id]/notify/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | alias |
+| route | `app/api/audits/[id]/reaudit/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | alias |
+| route | `app/api/audits/[id]/stream/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | alias |
+| route | `app/api/audits/start/route.ts` | /api/checks (CC-22), behind a 90-day alias | alias |
+| route | `app/api/trpc/[trpc]/route.ts` | nothing; removed at cutover | none |
+| route | `app/billing/route.ts` | /settings/plan (v2 settings) | /settings/plan |
 | inngest | `inngest/audit.ts#auditFn` | crawlmouse.check.run (CC-20b checkFn) | n/a |
 | inngest | `inngest/billing.ts#cleanupExpiredAuditsFn` | crawlmouse.cleanup.daily (v2) | n/a |
 | cron | `inngest/billing.ts#cleanupExpiredAuditsFn` | the crawlmouse.cleanup.daily schedule (v2) | n/a |
@@ -106,8 +106,8 @@ rows that matter here are reproduced below so this repository holds the basis of
 | page | `/blog/[slug]` (`app/blog/[slug]/page.tsx`) | keep | organic traffic, kept with the same slugs | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | page | `/blog/research` (`app/blog/research/page.tsx`) | keep | blog tag page, kept with the blog | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | page | `/bot` (`app/bot/page.tsx`) | keep | crawler UA page referenced in the UA string, kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
-| page | `/compare` (`app/compare/page.tsx`) | retire | head-to-head leaves with v1 | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
-| page | `/compare/[a]/[b]` (`app/compare/[a]/[b]/page.tsx`) | retire | kept 90 days with noindex, then redirected | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
+| page | `/compare` (`app/compare/page.tsx`) | retire | head-to-head leaves with v1; not in the sitemap, and ARCH-2 names no target for the index (questions Q2) | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
+| page | `/compare/[a]/[b]` (`app/compare/[a]/[b]/page.tsx`) | retire | kept 90 days with noindex; ARCH-2 says 301 to /r/[a], but [a] is an audit id and /r/ takes a minted slug, so that target would 404 (questions Q5); not in the sitemap | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | page | `/dashboard` (`app/dashboard/page.tsx`) | retire | v2 serves the dashboard at the same URL | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | page | `/developers` (`app/developers/page.tsx`) | keep | OG holding page and waitlist, kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | page | `/guides` (`app/guides/page.tsx`) | keep | organic traffic, kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
@@ -119,7 +119,7 @@ rows that matter here are reproduced below so this repository holds the basis of
 | page | `/subprocessors` (`app/subprocessors/page.tsx`) | keep | legal page, kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | page | `/takedown` (`app/takedown/page.tsx`) | keep | legal page and form, kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | page | `/terms` (`app/terms/page.tsx`) | keep | legal page, kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
-| page | `/top/[platform]` (`app/top/[platform]/page.tsx`) | retire | ARCH-2 removes /top/* at cutover | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
+| page | `/top/[platform]` (`app/top/[platform]/page.tsx`) | retire | removed at cutover (410 Gone); not in the sitemap and noindex while thin | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | page | `/verify/[id]` (`app/verify/[id]/page.tsx`) | keep | domain verification for claims, kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | metadata | `app/layout.tsx` | keep | root layout of every v1 page and of the v2 route groups | apps/web/app/layout.tsx:1 |
 | metadata | `app/opengraph-image.tsx` | keep | site OG card | apps/web/app/opengraph-image.tsx:1 |
@@ -153,7 +153,7 @@ rows that matter here are reproduced below so this repository holds the basis of
 | route | `app/api/reports/[slug]/visibility/route.ts` | keep | /api/reports/* kept as is | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/api/reports/[slug]/white-label/route.ts` | keep | /api/reports/* kept as is | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/api/takedown/route.ts` | keep | public takedown form, kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
-| route | `app/api/trpc/[trpc]/route.ts` | retire | ARCH-2: removed unless something still calls it | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
+| route | `app/api/trpc/[trpc]/route.ts` | retire | ARCH-2: removed unless something still calls it; not deletable now, app/layout.tsx imports its provider | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/api/verify/check/[id]/route.ts` | keep | /api/verify/* kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/api/verify/start/route.ts` | keep | /api/verify/* kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/api/webhooks/inngest/route.ts` | keep | Inngest serve route; v2 functions register through it too | apps/web/app/api/webhooks/inngest/route.ts:31 |
