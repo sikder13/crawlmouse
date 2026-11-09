@@ -1,0 +1,724 @@
+{
+  "base": "ee11796d",
+  "measuredAt": "2026-11-09",
+  "v2Rule": "Not listed: app files under the (v2-preview) or (account) route group or under app/api/checks/; Inngest functions built inside a factory rather than as a top-level export; tables created by a migration whose file name contains _v2_. The finders are apps/web/__tests__/v1-inventory-source.ts.",
+  "items": [
+    {
+      "kind": "page",
+      "path": "app/page.tsx",
+      "url": "/",
+      "ruling": "retire",
+      "reason": "v2 serves a new Home at the same URL; the v1 component goes at cutover",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "v2 Home (CC-21 screens/home), same URL",
+      "redirect": "/"
+    },
+    {
+      "kind": "page",
+      "path": "app/ai-readiness-checker/page.tsx",
+      "url": "/ai-readiness-checker",
+      "ruling": "keep",
+      "reason": "SEO landing in the sitemap; ARCH-2 keeps it as a landing page that posts to /api/checks",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/audit/[id]/page.tsx",
+      "url": "/audit/[id]",
+      "ruling": "retire",
+      "reason": "capability URL kept; V2_READS switches it to read checks",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "v2 result and segment pages under /audit/[id] (CC-22), same ids",
+      "redirect": "/audit/[id]"
+    },
+    {
+      "kind": "page",
+      "path": "app/aup/page.tsx",
+      "url": "/aup",
+      "ruling": "keep",
+      "reason": "legal page, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/authors/[slug]/page.tsx",
+      "url": "/authors/[slug]",
+      "ruling": "keep",
+      "reason": "blog author pages, kept with the blog",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/blog/page.tsx",
+      "url": "/blog",
+      "ruling": "keep",
+      "reason": "organic traffic, kept with the same slugs",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/blog/[slug]/page.tsx",
+      "url": "/blog/[slug]",
+      "ruling": "keep",
+      "reason": "organic traffic, kept with the same slugs",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/blog/research/page.tsx",
+      "url": "/blog/research",
+      "ruling": "keep",
+      "reason": "blog tag page, kept with the blog",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/bot/page.tsx",
+      "url": "/bot",
+      "ruling": "keep",
+      "reason": "crawler UA page referenced in the UA string, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/compare/page.tsx",
+      "url": "/compare",
+      "ruling": "retire",
+      "reason": "head-to-head leaves with v1",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "v2 competitor feature inside the account",
+      "redirect": "none (not in the sitemap; ARCH-2 names no target for the index)"
+    },
+    {
+      "kind": "page",
+      "path": "app/compare/[a]/[b]/page.tsx",
+      "url": "/compare/[a]/[b]",
+      "ruling": "retire",
+      "reason": "kept 90 days with noindex, then redirected",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "v2 competitor feature inside the account",
+      "redirect": "/r/[a] (301, 90 days after cutover)"
+    },
+    {
+      "kind": "page",
+      "path": "app/dashboard/page.tsx",
+      "url": "/dashboard",
+      "ruling": "retire",
+      "reason": "v2 serves the dashboard at the same URL",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "v2 Dashboard home (CC-26), same URL",
+      "redirect": "/dashboard"
+    },
+    {
+      "kind": "page",
+      "path": "app/developers/page.tsx",
+      "url": "/developers",
+      "ruling": "keep",
+      "reason": "OG holding page and waitlist, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/guides/page.tsx",
+      "url": "/guides",
+      "ruling": "keep",
+      "reason": "organic traffic, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/login/page.tsx",
+      "url": "/login",
+      "ruling": "keep",
+      "reason": "magic-link sign-in, kept; /signup is added beside it",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/pricing/page.tsx",
+      "url": "/pricing",
+      "ruling": "keep",
+      "reason": "kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/privacy/page.tsx",
+      "url": "/privacy",
+      "ruling": "keep",
+      "reason": "legal page, kept (gains the evidence-retention statement)",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/r/[slug]/page.tsx",
+      "url": "/r/[slug]",
+      "ruling": "keep",
+      "reason": "public reports; old snapshots keep rendering with the v1 component until re-minted",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/status/page.tsx",
+      "url": "/status",
+      "ruling": "keep",
+      "reason": "kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/subprocessors/page.tsx",
+      "url": "/subprocessors",
+      "ruling": "keep",
+      "reason": "legal page, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/takedown/page.tsx",
+      "url": "/takedown",
+      "ruling": "keep",
+      "reason": "legal page and form, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/terms/page.tsx",
+      "url": "/terms",
+      "ruling": "keep",
+      "reason": "legal page, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "page",
+      "path": "app/top/[platform]/page.tsx",
+      "url": "/top/[platform]",
+      "ruling": "retire",
+      "reason": "ARCH-2 removes /top/* at cutover",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "nothing; leaderboards leave with v1",
+      "redirect": "410 Gone (not in the sitemap; noindex while thin)"
+    },
+    {
+      "kind": "page",
+      "path": "app/verify/[id]/page.tsx",
+      "url": "/verify/[id]",
+      "ruling": "keep",
+      "reason": "domain verification for claims, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/layout.tsx",
+      "ruling": "keep",
+      "reason": "root layout of every v1 page and of the v2 route groups",
+      "evidence": "apps/web/app/layout.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/opengraph-image.tsx",
+      "ruling": "keep",
+      "reason": "site OG card",
+      "evidence": "apps/web/app/opengraph-image.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/blog/[slug]/opengraph-image.tsx",
+      "ruling": "keep",
+      "reason": "blog post OG cards; the blog is kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/r/[slug]/opengraph-image.tsx",
+      "ruling": "keep",
+      "reason": "public report OG cards; /r/ is kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/icon.tsx",
+      "ruling": "keep",
+      "reason": "favicon",
+      "evidence": "apps/web/app/icon.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/apple-icon.tsx",
+      "ruling": "keep",
+      "reason": "touch icon",
+      "evidence": "apps/web/app/apple-icon.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/not-found.tsx",
+      "ruling": "keep",
+      "reason": "site 404 page",
+      "evidence": "apps/web/app/not-found.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/global-error.tsx",
+      "ruling": "keep",
+      "reason": "root error boundary (reports to Sentry)",
+      "evidence": "apps/web/app/global-error.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/sitemap.ts",
+      "ruling": "keep",
+      "reason": "sitemap; outside this step's allowed paths (§13)",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/admin/takedown/process/route.ts",
+      "ruling": "keep",
+      "reason": "takedown processing; legal obligation",
+      "evidence": "apps/web/lib/security/route-policy.ts:37"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/cancel/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "n/a (API route; alias layer)"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/export/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "n/a (API route; alias layer)"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/llms-txt/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "n/a (API route; alias layer)"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/notify/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "n/a (API route; alias layer)"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/reaudit/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "n/a (API route; alias layer)"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/stream/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "n/a (API route; alias layer)"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/start/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit start, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks (CC-22), behind a 90-day alias",
+      "redirect": "n/a (API route; alias layer)"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/auth/logout/route.ts",
+      "ruling": "keep",
+      "reason": "auth routes are kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/auth/magic-link/route.ts",
+      "ruling": "keep",
+      "reason": "auth routes are kept (v2 door fields behind V2_ACCOUNT_DOOR)",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/billing/checkout/route.ts",
+      "ruling": "keep",
+      "reason": "kept with new bodies; CC-03 owns these files",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/billing/portal/route.ts",
+      "ruling": "keep",
+      "reason": "kept with new bodies; CC-03 owns these files",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/billing/status/route.ts",
+      "ruling": "keep",
+      "reason": "kept with new bodies; CC-03 owns these files",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/developers/route.ts",
+      "ruling": "keep",
+      "reason": "waitlist form behind /developers, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/health/route.ts",
+      "ruling": "keep",
+      "reason": "liveness probe",
+      "evidence": "apps/web/app/api/health/route.ts:1"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/hide/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/mint/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/[slug]/claim/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/[slug]/logo/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/[slug]/mine/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/[slug]/visibility/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/[slug]/white-label/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/takedown/route.ts",
+      "ruling": "keep",
+      "reason": "public takedown form, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/trpc/[trpc]/route.ts",
+      "ruling": "retire",
+      "reason": "ARCH-2: removed unless something still calls it",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "nothing (route handlers replace it)",
+      "redirect": "n/a (API route)"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/verify/check/[id]/route.ts",
+      "ruling": "keep",
+      "reason": "/api/verify/* kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/verify/start/route.ts",
+      "ruling": "keep",
+      "reason": "/api/verify/* kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/webhooks/inngest/route.ts",
+      "ruling": "keep",
+      "reason": "Inngest serve route; v2 functions register through it too",
+      "evidence": "apps/web/app/api/webhooks/inngest/route.ts:31"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/webhooks/resend/route.ts",
+      "ruling": "keep",
+      "reason": "email events webhook, kept",
+      "evidence": "apps/web/lib/security/route-policy.ts:163"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/webhooks/stripe/route.ts",
+      "ruling": "keep",
+      "reason": "Stripe webhook, kept (dual-write until 009)",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/billing/route.ts",
+      "ruling": "retire",
+      "reason": "v1 redirect to the Stripe portal",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/settings/plan (v2 settings)",
+      "redirect": "/settings/plan (301)"
+    },
+    {
+      "kind": "route",
+      "path": "app/embed/[domain]/route.ts",
+      "ruling": "keep",
+      "reason": "badge image; kept forever",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/llms.txt/route.ts",
+      "ruling": "keep",
+      "reason": "kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/login/verify/route.ts",
+      "ruling": "keep",
+      "reason": "magic-link verify, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/robots.txt/route.ts",
+      "ruling": "keep",
+      "reason": "kept; outside this step's allowed paths (§12, §13)",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "inngest",
+      "path": "inngest/audit.ts#auditFn",
+      "id": "crawlmouse.audit",
+      "ruling": "retire",
+      "reason": "ARCH-2 Appendix: crawlmouse.audit is retired",
+      "evidence": "ARCH-2 Appendix \"Inngest function ids\" (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "crawlmouse.check.run (CC-20b checkFn)",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "inngest",
+      "path": "inngest/billing.ts#reconcileBillingFn",
+      "id": "crawlmouse.stripe-reconcile",
+      "ruling": "keep",
+      "reason": "crawlmouse.stripe-reconcile is kept in v2",
+      "evidence": "ARCH-2 Appendix \"Inngest function ids\""
+    },
+    {
+      "kind": "inngest",
+      "path": "inngest/billing.ts#reconcileBillingManualFn",
+      "id": "crawlmouse.stripe-reconcile-manual",
+      "ruling": "keep",
+      "reason": "crawlmouse.stripe-reconcile-manual is kept in v2",
+      "evidence": "ARCH-2 Appendix \"Inngest function ids\""
+    },
+    {
+      "kind": "inngest",
+      "path": "inngest/billing.ts#cleanupExpiredAuditsFn",
+      "id": "crawlmouse.audits-ttl-cleanup",
+      "ruling": "retire",
+      "reason": "ARCH-2 Appendix: crawlmouse.audits-ttl-cleanup is retired",
+      "evidence": "ARCH-2 Appendix \"Inngest function ids\"",
+      "replacedBy": "crawlmouse.cleanup.daily (v2)",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "cron",
+      "path": "inngest/billing.ts#reconcileBillingFn",
+      "schedule": "0 3 * * *",
+      "ruling": "keep",
+      "reason": "its function is kept",
+      "evidence": "inngest/billing.ts:49"
+    },
+    {
+      "kind": "cron",
+      "path": "inngest/billing.ts#cleanupExpiredAuditsFn",
+      "schedule": "0 4 * * *",
+      "ruling": "retire",
+      "reason": "its function is retired",
+      "evidence": "inngest/billing.ts:88",
+      "replacedBy": "the crawlmouse.cleanup.daily schedule (v2)",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.audits",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "checks",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.pages",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "page_results",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.links",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "link_edges",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.findings",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "fixes and page_results columns",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.fixes",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "site_fixes",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.sessions",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "Supabase Auth (never used)",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.benchmark_cohorts",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "nothing (leaderboards leave)",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.users",
+      "ruling": "keep",
+      "reason": "kept; pro_until and stripe_customer_id dropped in 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.rate_limits",
+      "ruling": "keep",
+      "reason": "kept unchanged",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.domain_verifications",
+      "ruling": "keep",
+      "reason": "kept; user_id dropped in 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.public_reports",
+      "ruling": "keep",
+      "reason": "kept; v1 columns dropped in 009, snapshots never mutated",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.embed_badges",
+      "ruling": "keep",
+      "reason": "kept; user_id dropped in 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.takedown_requests",
+      "ruling": "keep",
+      "reason": "kept unchanged",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.stripe_events",
+      "ruling": "keep",
+      "reason": "kept; gains account_id",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.email_events",
+      "ruling": "keep",
+      "reason": "kept; gains account_id, kind",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.waitlist",
+      "ruling": "keep",
+      "reason": "kept unchanged",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.frontier",
+      "ruling": "keep",
+      "reason": "kept; audit_id becomes check_id",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.frontier_politeness",
+      "ruling": "keep",
+      "reason": "kept; audit_id becomes check_id",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    }
+  ]
+}
