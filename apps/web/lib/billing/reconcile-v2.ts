@@ -119,7 +119,12 @@ async function driftOf(
   }
   for (const s of subs) {
     if (s.id === a.currentSubscriptionId || !LIVE.has(s.status)) continue;
-    if ((await ours(s, deps.catalog)) !== null) drifts.push({ kind: 'double_billing', ref: s.id });
+    // Ours by price, or by the account id our checkout writes on the subscription: a price the listing
+    // no longer holds still charges this account.
+    const named = s.metadata?.account_id === a.id;
+    if (named || (await ours(s, deps.catalog)) !== null) {
+      drifts.push({ kind: 'double_billing', ref: s.id });
+    }
   }
   return drifts;
 }

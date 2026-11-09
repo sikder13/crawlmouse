@@ -174,6 +174,26 @@ describe('reconcileAccounts', () => {
     });
   });
 
+  it('counts a live subscription whose metadata names the account as its own, whatever its price', async () => {
+    // A checkout our route opened, on a price the listing no longer holds: it charges this account.
+    const named = {
+      ...stripeSub('sub_named', { priceIds: ['price_retired'] }),
+      metadata: { account_id: 'free' },
+    };
+    const other = {
+      ...stripeSub('sub_other', { priceIds: ['price_retired'] }),
+      metadata: { account_id: 'x' },
+    };
+    const { d, reports } = deps({
+      accounts: [acct('free', { state: 'free', tier: 'free', currentSubscriptionId: null })],
+      mirrors: {},
+      stripe: { cus_free: [named as Stripe.Subscription, other as Stripe.Subscription] },
+      unsent: [],
+    });
+    await reconcileAccounts(d);
+    expect(reports).toEqual([['free', [{ kind: 'double_billing', ref: 'sub_named' }]]]);
+  });
+
   it(`reports at most ${REPORT_CAP} accounts and counts the rest`, async () => {
     const accounts = Array.from({ length: REPORT_CAP + 3 }, (_, i) => acct(`x${i}`));
     const { d, reports, withheld } = deps({ accounts, mirrors: {}, stripe: {}, unsent: [] });
