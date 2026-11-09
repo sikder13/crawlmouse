@@ -32,8 +32,13 @@ export const homepageOf = (host: string): string => canonicalizeUrl(`https://${h
 
 /**
  * Inserts the check (`on conflict (id) do nothing`) and sends the event, whose `id` Inngest
- * deduplicates on. The event is sent whether or not the row was new, so a retry after a send that
- * failed still starts the run. `created` says whether this call inserted the row.
+ * deduplicates on. `created` says whether this call inserted the row.
+ *
+ * Retries (correctness 7). A bucketed request (`manual`, `fix_recheck`, `deploy` and `scheduled` for
+ * a kept site) takes its check id from its key, so a retry in the same bucket after a send that failed
+ * finds the row and sends the same event id, and the run starts once. A request keyed by a fresh check
+ * id (`first_audit`, and any request for a site no account keeps) has no such key: a retry writes a
+ * second row and sends a second event. Its caller (CC-22b) needs an idempotency key of its own.
  */
 export async function requestCheck(
   deps: RequestDeps,
