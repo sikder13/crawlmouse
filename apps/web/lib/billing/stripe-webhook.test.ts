@@ -150,8 +150,10 @@ async function mirrorRow(subscriptionId: string) {
       plan: string;
       cancel_at_period_end: boolean;
       last_event_id: string | null;
+      last_event_created: Date | null;
     }>(
-      `select status, plan, cancel_at_period_end, last_event_id from public.subscriptions where id = $1`,
+      `select status, plan, cancel_at_period_end, last_event_id, last_event_created
+         from public.subscriptions where id = $1`,
       [subscriptionId],
     )
   ).rows[0];
@@ -260,6 +262,41 @@ describe.each(PORTS)('through the %s port', (p) => {
       });
       expect((await ledgerRow(e.id))!.account_id).toBe(accountId);
     });
+
+    it('customer.subscription.created writes the mirror row and its mark, and changes no account', async () => {
+      const { accountId, customer } = await account();
+      const s = sub(customer, { plan: 'agency', status: 'trialing', trialEnd: BASE + 15 * DAY });
+      const e = subscriptionEvent('customer.subscription.created', s, BASE + 200);
+      expect(await w.deliver(e)).toEqual({
+        outcome: 'recorded',
+        accountId,
+        reason: 'customer.subscription.created is recorded, not applied',
+      });
+      expect(await mirrorRow(s.id)).toEqual({
+        status: 'trialing',
+        plan: 'agency',
+        cancel_at_period_end: false,
+        last_event_id: e.id,
+        last_event_created: new Date((BASE + 200) * 1000),
+      });
+      expect(await accountRow(accountId)).toMatchObject({ state: 'free', entitlement_version: 0 });
+    });
+
+    it('customer.updated is recorded against the account its id names', async () => {
+      const { accountId, customer } = await account();
+      // A customer object: its own id is the customer, and it has no `customer` field.
+      const e = stripeEvent(
+        'customer.updated',
+        { id: customer, object: 'customer' },
+        { id: id('evt'), created: BASE },
+      );
+      expect(await w.deliver(e)).toEqual({
+        outcome: 'recorded',
+        accountId,
+        reason: 'customer.updated is recorded, not applied',
+      });
+      expect((await ledgerRow(e.id))!.account_id).toBe(accountId);
+    });
   });
 
   // ─── Order ─────────────────────────────────────────────────────────────────────────────────────────
@@ -360,6 +397,49 @@ describe.each(PORTS)('through the %s port', (p) => {
         outcome: 'recorded',
         accountId,
         reason: 'the invoice names no subscription',
+      });
+    });
+
+    it('an agency trial’s trial_will_end older than its last update still applies and sends the reminder', async () => {
+      const { accountId, customer } = await account();
+      const s = sub(customer, { plan: 'agency', status: 'trialing', trialEnd: BASE + 15 * DAY });
+      await w.deliver(checkoutEvent(accountId, customer, s.id, BASE + 100));
+      // A newer update on the trial (a card added, say) is processed first.
+      const newer = updated(w.stripe.get(s.id), BASE + 12 * DAY + 60);
+      expect(await w.deliver(newer)).toMatchObject({
+        outcome: 'ignored',
+        reason: 'status trialing changes no entitlement',
+      });
+      const e = subscriptionEvent(
+        'customer.subscription.trial_will_end',
+        w.stripe.get(s.id),
+        BASE + 12 * DAY,
+      );
+      expect(await w.deliver(e)).toEqual({ outcome: 'applied', accountId, reason: null });
+      expect(w.stripe.sent.at(-1)).toEqual({
+        id: `email.requested:trial_reminder:${accountId}:${e.id}`,
+        name: 'email.requested',
+        data: { accountId, template: 'trial_reminder' },
+      });
+      // Not gated, but it does not write its older read over the newer mirror.
+      expect(await mirrorRow(s.id)).toMatchObject({
+        last_event_id: newer.id,
+        last_event_created: new Date((BASE + 12 * DAY + 60) * 1000),
+      });
+    });
+
+    it('a checkout older than a customer.subscription.created already processed for its subscription grants', async () => {
+      const { accountId, customer } = await account();
+      const s = sub(customer);
+      const created = subscriptionEvent('customer.subscription.created', s, BASE + 200);
+      expect((await w.deliver(created)).outcome).toBe('recorded');
+      expect((await mirrorRow(s.id))!.last_event_id).toBe(created.id);
+      const e = checkoutEvent(accountId, customer, s.id, BASE + 100);
+      expect(await w.deliver(e)).toEqual({ outcome: 'applied', accountId, reason: null });
+      expect(await accountRow(accountId)).toMatchObject({
+        state: 'pro',
+        tier: 'pro',
+        current_subscription_id: s.id,
       });
     });
   });
