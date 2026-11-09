@@ -9,7 +9,7 @@
 // A path is skipped when it matches a SKIP pattern and no KEEP pattern. An empty list of changed
 // files runs everything: an empty diff is more likely a broken diff than a branch with no change.
 //
-// CLI: changed paths on stdin, separated by NUL or newline. Prints `visual=true|false` (for
+// CLI: changed paths on stdin, separated by NUL (when any is present) or newline. Prints `visual=true|false` (for
 // $GITHUB_OUTPUT) on stdout, and the paths that forced a run on stderr.
 
 import { readFileSync } from 'node:fs';
@@ -46,6 +46,10 @@ export const KEEP = [
   'packages/types/**',
   'packages/engine/**',
   'packages/timing/**',
+  // Tailwind scans every .ts/.tsx under these two for class names, test files included
+  // (apps/web/tailwind.config.ts `content`).
+  'apps/web/app/**',
+  'apps/web/components/**',
   // security-browser's own specs and Playwright config.
   'apps/web/__tests__/security/browser/**',
   // This file decides what runs.
@@ -95,8 +99,9 @@ export function needsVisual(files) {
   return forcing(files).length > 0;
 }
 
+/** NUL-separated when the input holds a NUL (`git diff -z`, where a newline can be in a name), else lines. */
 export function parseChanged(text) {
-  return text.split(/[\0\n]/).filter((f) => f !== '');
+  return text.split(text.includes('\0') ? '\0' : '\n').filter((f) => f !== '');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

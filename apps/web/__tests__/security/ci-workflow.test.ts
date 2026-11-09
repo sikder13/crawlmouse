@@ -1,5 +1,15 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { builtinModules } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -126,17 +136,29 @@ describe('the rule the required visual check applies', () => {
   });
 
   function rule(SHARDS: string, CHANGES: string, VISUAL: string) {
-    return spawnSync('bash', ['-c', step?.run ?? 'exit 0'], {
+    return spawnSync('bash', ['-c', step?.run ?? 'exit 99'], {
       env: { NODE_ENV: 'test', PATH: process.env.PATH ?? '/usr/bin:/bin', SHARDS, CHANGES, VISUAL },
       encoding: 'utf8',
     });
   }
 
-  // Written out by hand rather than derived from the script.
-  function expected(shards: string, changes: string, visual: string): boolean {
-    if (shards === 'success') return true;
-    return shards === 'skipped' && changes === 'success' && visual === 'false';
-  }
+  // The passing triples, written out: the shards passed (whatever `changes` reported), or they
+  // were skipped because `changes` passed and said visual=false. Every other triple fails.
+  const PASSING = new Set([
+    'success/success/true',
+    'success/success/false',
+    'success/success/',
+    'success/failure/true',
+    'success/failure/false',
+    'success/failure/',
+    'success/cancelled/true',
+    'success/cancelled/false',
+    'success/cancelled/',
+    'success/skipped/true',
+    'success/skipped/false',
+    'success/skipped/',
+    'skipped/success/false',
+  ]);
 
   const RESULTS = ['success', 'failure', 'cancelled', 'skipped'];
   const cases = RESULTS.flatMap((shards) =>
@@ -145,13 +167,10 @@ describe('the rule the required visual check applies', () => {
     ),
   );
 
-  it('covers every combination (4 x 4 x 3)', () => {
-    expect(cases).toHaveLength(48);
-  });
-
   it.each(cases)('shards=%s changes=%s visual=%j', (shards, changes, visual) => {
     const r = rule(shards, changes, visual);
-    expect(r.status === 0, r.stdout + r.stderr).toBe(expected(shards, changes, visual));
+    expect(r.status, r.stdout + r.stderr).not.toBeNull();
+    expect(r.status === 0, r.stdout + r.stderr).toBe(PASSING.has(`${shards}/${changes}/${visual}`));
   });
 
   it.each([
@@ -163,6 +182,7 @@ describe('the rule the required visual check applies', () => {
     ['cancelled', 'success', 'true'],
   ])('fails, naming why: shards=%s changes=%s visual=%j', (shards, changes, visual) => {
     const r = rule(shards, changes, visual);
+    expect(r.status).not.toBeNull();
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/^::error::/m);
   });
@@ -194,6 +214,8 @@ describe('changes.mjs', () => {
       'packages/types/**',
       'packages/engine/**',
       'packages/timing/**',
+      'apps/web/app/**',
+      'apps/web/components/**',
       'apps/web/__tests__/security/browser/**',
       '.github/workflows/scripts/changes.mjs',
       '**/package.json',
@@ -204,7 +226,11 @@ describe('changes.mjs', () => {
     ['docs only', ['docs/ops/db-migrations.md', 'README.md'], false],
     ['docs and a lib file', ['docs/ops/a.md', 'apps/web/lib/x.ts'], true],
     ['a web test file', ['apps/web/foo.test.ts'], false],
-    ['a web component test', ['apps/web/components/v2/x.test.tsx'], false],
+    ['a web component test, which Tailwind scans', ['apps/web/components/v2/x.test.tsx'], true],
+    ['a route test, which Tailwind scans', ['apps/web/app/api/health/route.test.ts'], true],
+    ['a lib test', ['apps/web/lib/x.test.ts'], false],
+    ['a folder only ending in __tests__', ['apps/web/lib/x__tests__/a.ts'], true],
+    ['a test file at the root', ['a.test.ts'], false],
     ['a web __tests__ file', ['apps/web/__tests__/v2/a.ts'], false],
     ['a security-browser spec', ['apps/web/__tests__/security/browser/headers.pw.ts'], true],
     ['a visual spec', ['tests/visual/a.spec.ts'], true],
@@ -234,9 +260,118 @@ describe('changes.mjs', () => {
     expect(needsVisual(files)).toBe(want);
   });
 
-  it('reads NUL- and newline-separated paths', () => {
+  it('reads NUL-separated paths (keeping a newline inside a name), else lines', () => {
     expect(parseChanged('a\0b c\0')).toEqual(['a', 'b c']);
+    expect(parseChanged('a\nb\0c\0')).toEqual(['a\nb', 'c']);
     expect(parseChanged('a\nb\n')).toEqual(['a', 'b']);
+  });
+
+  function cli(stdin: string) {
+    return spawnSync(process.execPath, [join(REPO, '.github/workflows/scripts/changes.mjs')], {
+      input: stdin,
+      encoding: 'utf8',
+    });
+  }
+
+  it.each([
+    ['a docs-only diff', 'docs/a.md\0README.md\0', 'visual=false'],
+    ['a rendering diff', 'docs/a.md\0apps/web/lib/x.ts\0', 'visual=true'],
+    ['an empty diff', '', 'visual=true'],
+  ])('as a CLI, prints only the output line on stdout for %s', (_label, stdin, line) => {
+    const r = cli(stdin);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toBe(`${line}\n`);
+  });
+
+  it('as a CLI, names the files that forced a run on stderr', () => {
+    expect(cli('docs/a.md\0apps/web/lib/x.ts\0').stderr).toContain('apps/web/lib/x.ts');
+  });
+});
+
+// The changes job's decide step, run in bash with a stub git on PATH that records its arguments.
+describe("the changes job's decide step", () => {
+  const decide = (job('changes').steps ?? []).find((s) => (s as { id?: string }).id === 'decide');
+
+  function run(opts: { ref: string; mergeBaseFails?: boolean; diff?: string[] }) {
+    const dir = mkdtempSync(join(tmpdir(), 'ci-changes-'));
+    const bin = join(dir, 'bin');
+    spawnSync('mkdir', ['-p', bin]);
+    const log = join(dir, 'git.log');
+    writeFileSync(join(dir, 'diff'), (opts.diff ?? []).map((f) => `${f}\0`).join(''));
+    writeFileSync(
+      join(bin, 'git'),
+      [
+        '#!/usr/bin/env bash',
+        `printf '%s\\n' "$*" >> '${log}'`,
+        'args=("$@")',
+        'while [ "${args[0]}" = -c ]; do args=("${args[@]:2}"); done',
+        'case "${args[0]}" in',
+        `  merge-base) ${opts.mergeBaseFails ? 'exit 128' : 'echo 0123456789abcdef'} ;;`,
+        `  diff) cat '${join(dir, 'diff')}' ;;`,
+        '  *) exit 2 ;;',
+        'esac',
+        '',
+      ].join('\n'),
+    );
+    chmodSync(join(bin, 'git'), 0o755);
+    const output = join(dir, 'output');
+    writeFileSync(output, '');
+    const r = spawnSync('bash', ['-e', '-c', decide?.run ?? 'exit 99'], {
+      cwd: REPO,
+      env: {
+        NODE_ENV: 'test',
+        PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
+        REF: opts.ref,
+        GITHUB_OUTPUT: output,
+        RUNNER_TEMP: dir,
+      },
+      encoding: 'utf8',
+    });
+    const calls = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
+    return { r, output: readFileSync(output, 'utf8'), calls };
+  }
+
+  it('on main, outputs visual=true without asking git anything', () => {
+    const { r, output, calls } = run({ ref: 'refs/heads/main' });
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(output).toBe('visual=true\n');
+    expect(calls).toEqual([]);
+  });
+
+  it('when merge-base fails, outputs visual=true with a warning and diffs nothing', () => {
+    const { r, output, calls } = run({ ref: 'refs/heads/x', mergeBaseFails: true });
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(output).toBe('visual=true\n');
+    expect(r.stdout).toMatch(/^::warning::/m);
+    expect(calls.some((c) => / diff /.test(` ${c} `))).toBe(false);
+  });
+
+  it('on a docs-only branch, outputs visual=false', () => {
+    const { r, output } = run({ ref: 'refs/heads/x', diff: ['docs/a.md', 'README.md'] });
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(output).toBe('visual=false\n');
+  });
+
+  it('on a branch that changes rendering, outputs visual=true', () => {
+    const { r, output } = run({ ref: 'refs/heads/x', diff: ['docs/a.md', 'apps/web/lib/x.ts'] });
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(output).toBe('visual=true\n');
+  });
+
+  it('diffs the whole branch against the merge-base, NUL-separated, with renames split', () => {
+    const { calls } = run({ ref: 'refs/heads/x', diff: ['docs/a.md'] });
+    expect(calls[0]).toBe('merge-base origin/main HEAD');
+    const diff = calls.find((c) => / diff /.test(` ${c} `));
+    expect(diff?.split(' ')).toEqual(
+      expect.arrayContaining([
+        'diff',
+        '--name-only',
+        '--no-renames',
+        '-z',
+        '0123456789abcdef',
+        'HEAD',
+      ]),
+    );
   });
 });
 
@@ -245,8 +380,9 @@ describe('changes.mjs', () => {
 // the routes next start serves to security-browser and zap-baseline), the middleware and configs, the
 // visual and security-browser specs, and the locked design screens. None may be on the skip list, or a
 // change to it would skip the jobs that would have caught it. Not seen: a file read at run time other
-// than through new URL('<literal>', import.meta.url), and a whole `import type` (erased, so it cannot
-// change what runs).
+// than through new URL('<literal>', import.meta.url); a whole `import type` (erased, so it cannot
+// change what runs); and files Tailwind scans for class names by its `content` globs rather than by
+// import (apps/web/app and apps/web/components, which changes.mjs keeps whole instead).
 describe('the import closure of what the gated jobs render and serve', () => {
   const WEB = join(REPO, 'apps/web');
   const CODE = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs|css)$/;
@@ -286,6 +422,18 @@ describe('the import closure of what the gated jobs render and serve', () => {
     packages.set(pkg.name, { dir: join(REPO, dir), exports });
   }
 
+  /** A bare specifier is external only when node resolves it: a builtin, or under node_modules. */
+  function isInstalled(from: string, name: string): boolean {
+    if (builtinModules.includes(name)) return true;
+    // Next resolves these two to its own compiled copies, not to node_modules/<name>.
+    const nextCompiled = join(WEB, 'node_modules/next/dist/compiled', name);
+    if ((name === 'server-only' || name === 'client-only') && existsSync(nextCompiled)) return true;
+    for (let dir = dirname(from); ; dir = dirname(dir)) {
+      if (existsSync(join(dir, 'node_modules', name))) return true;
+      if (dir === dirname(dir)) return false;
+    }
+  }
+
   function isDirectory(path: string): boolean {
     return existsSync(path) && statSync(path).isDirectory();
   }
@@ -314,7 +462,7 @@ describe('the import closure of what the gated jobs render and serve', () => {
     return undefined;
   }
 
-  /** Files for a specifier, [] for a package outside the repository, undefined when unresolved. */
+  /** Files for a specifier, [] for an installed package, undefined when unresolved. */
   function resolveSpecifier(from: string, spec: string): string[] | undefined {
     let target: string | undefined;
     if (spec.startsWith('.')) target = resolve(dirname(from), spec);
@@ -323,7 +471,7 @@ describe('the import closure of what the gated jobs render and serve', () => {
       const parts = spec.split('/');
       const name = spec.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]!;
       const pkg = packages.get(name);
-      if (!pkg) return [];
+      if (!pkg) return isInstalled(from, name) ? [] : undefined;
       const sub = spec.slice(name.length);
       const exported = exportTarget(pkg.exports[sub === '' ? '.' : `.${sub}`]);
       if (!exported) return undefined;
@@ -367,7 +515,8 @@ describe('the import closure of what the gated jobs render and serve', () => {
     const file = queue.pop()!;
     if (reached.has(file)) continue;
     reached.add(file);
-    if (!CODE.test(file)) continue;
+    // An installed package reached by a relative path is a leaf: not walked, not counted.
+    if (!CODE.test(file) || file.split(sep).includes('node_modules')) continue;
     const text = readFileSync(file, 'utf8');
     for (const pattern of PATTERNS) {
       for (const match of text.matchAll(pattern)) {
@@ -382,7 +531,9 @@ describe('the import closure of what the gated jobs render and serve', () => {
       }
     }
   }
-  const inRepo = [...reached].map((f) => relative(REPO, f).split(sep).join('/'));
+  const inRepo = [...reached]
+    .filter((f) => !f.split(sep).includes('node_modules'))
+    .map((f) => relative(REPO, f).split(sep).join('/'));
 
   it('resolves every relative, aliased and workspace import it finds', () => {
     expect(unresolved).toEqual([]);

@@ -351,7 +351,10 @@ jobs:
           echo "# No pattern: replaces Semgrep's built-in list; the exclusions are the --exclude flags." > .semgrepignore
           mkdir -p "$RUNNER_TEMP/semgrep"
           status=0
+          # safe.directory, as in the gitleaks job: without it git refuses the mounted checkout
+          # (another owner), and Semgrep's git-based target listing needs git.
           docker run --rm -v "$PWD:/src" -w /src -v "$RUNNER_TEMP/semgrep:/out" \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
             -e SEMGREP_ENABLE_VERSION_CHECK=0 "$SEMGREP_IMAGE" \
             semgrep scan --metrics=off --time \
             --config p/typescript --config p/javascript --config p/nodejs --config p/react \
