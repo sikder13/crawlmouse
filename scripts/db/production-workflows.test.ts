@@ -1,8 +1,11 @@
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
+  GUARD_ENV as HELPER_GUARD_ENV,
   GUARD_NAME,
   dispatchOnlyProblems,
+  environmentProblems,
+  guardProblems,
   environmentName,
   mentionsSecrets,
   needsOf,
@@ -12,6 +15,7 @@ import {
   workflowFiles,
   type Job,
   type Step,
+  type Workflow,
 } from './workflow-file';
 
 // The two workflows that can reach production. On a private repository under a personal GitHub Pro
@@ -140,6 +144,10 @@ describe.each(PRODUCTION_WORKFLOWS)('%s', (file) => {
     }
   });
 
+  it('has a guard nothing can skip, swallow or reshell (guardProblems is empty)', () => {
+    expect(guardProblems(workflow)).toEqual([]);
+  });
+
   it('runs the guard as step 0 of every job that can read a secret, and no secret outside its steps', () => {
     for (const [name, job] of secretJobs(file)) {
       const steps = job.steps ?? [];
@@ -151,7 +159,143 @@ describe.each(PRODUCTION_WORKFLOWS)('%s', (file) => {
   });
 });
 
+type Bypass = [label: string, file: string, mutate: (w: Workflow) => void, expected: RegExp];
+
+function jobIn(w: Workflow, name: string): Job {
+  const job = w.jobs[name];
+  if (!job) throw new Error(`no job ${name}`);
+  return job;
+}
+
+function guardIn(w: Workflow, name: string): Step {
+  const step = jobIn(w, name).steps?.[0];
+  if (step?.name !== GUARD_NAME) throw new Error(`${name}: step 0 is not the guard`);
+  return step;
+}
+
+// Each one leaves the guard as step 0 and disables it. Applied to the parsed real files.
+const BYPASSES: Bypass[] = [
+  [
+    'step-level if: false on the guard',
+    'db-apply-prod.yml',
+    (w) => void (guardIn(w, 'apply').if = false),
+    /apply: the guard step's keys/,
+  ],
+  [
+    'continue-on-error on the guard step',
+    'db-apply-prod.yml',
+    (w) => void (guardIn(w, 'apply')['continue-on-error'] = true),
+    /apply: step 0 has continue-on-error/,
+  ],
+  [
+    "shell: 'true {0}' on the guard step",
+    'db-rollback-prod.yml',
+    (w) => void (guardIn(w, 'rollback').shell = 'true {0}'),
+    /rollback: the guard step's keys/,
+  ],
+  [
+    'an id on the authorize guard',
+    'db-apply-prod.yml',
+    (w) => void (guardIn(w, 'authorize').id = 'x'),
+    /authorize: the guard step's keys/,
+  ],
+  [
+    'workflow-level defaults.run.shell',
+    'db-apply-prod.yml',
+    (w) => void (w.defaults = { run: { shell: 'true {0}' } }),
+    /workflow: has defaults/,
+  ],
+  [
+    'job-level defaults.run.shell',
+    'db-rollback-prod.yml',
+    (w) => void (jobIn(w, 'plan').defaults = { run: { shell: 'true {0}' } }),
+    /plan: has defaults/,
+  ],
+  [
+    'job-level defaults on authorize',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'authorize').defaults = { run: { shell: 'true {0}' } }),
+    /authorize: has defaults/,
+  ],
+  [
+    'continue-on-error on the authorize job',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'authorize')['continue-on-error'] = true),
+    /authorize: has continue-on-error/,
+  ],
+  [
+    'an if on the authorize job',
+    'db-rollback-prod.yml',
+    (w) => void (jobIn(w, 'authorize').if = 'false'),
+    /authorize: has an if/,
+  ],
+  [
+    'continue-on-error on a secret job',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'apply')['continue-on-error'] = true),
+    /apply: has continue-on-error/,
+  ],
+  [
+    'if: always() on apply, with continue-on-error on its guard',
+    'db-apply-prod.yml',
+    (w) => {
+      jobIn(w, 'apply').if = 'always()';
+      guardIn(w, 'apply')['continue-on-error'] = true;
+    },
+    /apply: its if can run it after authorize failed/,
+  ],
+  [
+    'if: always() on plan',
+    'db-rollback-prod.yml',
+    (w) => void (jobIn(w, 'plan').if = "${{ always() && github.ref == 'refs/heads/main' }}"),
+    /plan: its if can run it/,
+  ],
+  [
+    'a second step in authorize',
+    'db-apply-prod.yml',
+    (w) => void jobIn(w, 'authorize').steps!.push({ run: 'true' }),
+    /authorize: has 2 steps/,
+  ],
+  [
+    'a different guard script in one copy',
+    'db-rollback-prod.yml',
+    (w) => void (guardIn(w, 'plan').run = 'exit 0'),
+    /differs between copies/,
+  ],
+  [
+    'a job-level secret on a secret job',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'apply').env = { T: '${{ secrets.X }}' }),
+    /apply: mentions secrets outside its steps/,
+  ],
+  [
+    'the guard gone from rollback',
+    'db-rollback-prod.yml',
+    (w) => void jobIn(w, 'rollback').steps!.shift(),
+    /rollback: step 0 is not the guard/,
+  ],
+  [
+    'authorize no longer needed by plan',
+    'db-apply-prod.yml',
+    (w) => void (jobIn(w, 'plan').needs = []),
+    /plan: does not need authorize/,
+  ],
+];
+
+describe('bypasses of the guard, each rejected by guardProblems', () => {
+  it.each(BYPASSES)('%s (%s)', (_label, file, mutate, expected) => {
+    const workflow = readWorkflow(file);
+    expect(guardProblems(workflow)).toEqual([]);
+    mutate(workflow);
+    expect(guardProblems(workflow).join('\n')).toMatch(expected);
+  });
+});
+
 describe('the guard step', () => {
+  it('is pinned in the helper to the same env mapping this file writes out', () => {
+    expect(HELPER_GUARD_ENV).toEqual(GUARD_ENV);
+  });
+
   const guards = guardSteps();
 
   it('appears in both workflows: authorize, plan and the production job of each', () => {
@@ -219,9 +363,56 @@ describe('every workflow in .github/workflows', () => {
 
   it('binds the production environment only in the two production workflows', () => {
     const using = files.filter((f) =>
-      Object.values(readWorkflow(f).jobs).some((job) => environmentName(job) === 'production'),
+      Object.values(readWorkflow(f).jobs).some(
+        (job) => environmentName(job)?.toLowerCase() === 'production',
+      ),
     );
     expect(using).toEqual([...PRODUCTION_WORKFLOWS]);
+  });
+
+  it('passes environmentProblems: production only where it belongs, no computed name, no spike, top-level permissions', () => {
+    for (const f of files) {
+      expect(environmentProblems(f, readWorkflow(f), PRODUCTION_WORKFLOWS), f).toEqual([]);
+    }
+  });
+
+  it.each([
+    [
+      'Production, capitalised',
+      'ci.yml',
+      'jobs:\n  x:\n    environment: Production\n',
+      /binds production/,
+    ],
+    [
+      'PRODUCTION as a name map',
+      'ci.yml',
+      'jobs:\n  x:\n    environment:\n      name: PRODUCTION\n',
+      /binds production/,
+    ],
+    [
+      'a computed name',
+      'ci.yml',
+      "jobs:\n  x:\n    environment: ${{ 'production' }}\n",
+      /computes its environment name/,
+    ],
+    [
+      'a computed name map',
+      'nightly.yml',
+      'jobs:\n  x:\n    environment:\n      name: ${{ inputs.env }}\n',
+      /computes its environment name/,
+    ],
+    ['spike', 'ci.yml', 'jobs:\n  x:\n    environment: spike\n', /binds spike/],
+    [
+      'Spike in a production workflow',
+      'db-apply-prod.yml',
+      'jobs:\n  x:\n    environment: Spike\n',
+      /binds spike/,
+    ],
+    ['no top-level permissions', 'ci.yml', 'jobs: {}\n', /no top-level permissions/],
+  ])('rejects %s', (_label, file, body, expected) => {
+    const permissions = body.startsWith('jobs: {}') ? '' : 'permissions:\n  contents: read\n';
+    const workflow = parseWorkflow(`on: push\n${permissions}${body}`);
+    expect(environmentProblems(file, workflow, PRODUCTION_WORKFLOWS).join('\n')).toMatch(expected);
   });
 
   it('never grants actions: write (nor write-all), at workflow or job level', () => {
