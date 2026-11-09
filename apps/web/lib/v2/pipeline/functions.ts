@@ -4,9 +4,10 @@
  * with. With the flag unset the list is v1's four objects, unchanged (functions.test.ts).
  *
  * What each function is built from (correctness 1): the reaper, the cancel handler and checkFn's
- * onFailure take the pipeline store and nothing else; a check's steps take `stepDeps`, whose worker
- * client is built when a batch step asks for it. A worker variable that does not make a client fails
- * the checks that reach a batch step (`worker_unavailable`); the store-only handlers never build one.
+ * onFailure take the pipeline store and nothing else; a check's steps are `checkStepsFromEnv`'s, over
+ * `stepDeps`, whose worker client is built when a batch step asks for it. A worker variable that does
+ * not make a client fails the checks that reach a batch step (`worker_unavailable`); the store-only
+ * handlers never build one.
  */
 import { randomBytes } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -23,7 +24,11 @@ import {
   reconcileBillingFn,
   reconcileBillingManualFn,
 } from '../../../../../inngest/billing';
-import { createCheckCancelledFn, createCheckFn } from '../../../../../inngest/check';
+import {
+  createCheckCancelledFn,
+  createCheckFn,
+  type CheckSteps,
+} from '../../../../../inngest/check';
 import { createCheckReaperFn } from '../../../../../inngest/check-reaper';
 import { pipelineEnabled } from '../../auth/flags';
 import { workerClientFromEnv } from '../../worker-client/client';
@@ -81,13 +86,18 @@ export function inngestFunctions(
   return [
     ...v1,
     createCheckFn(
-      () => checkSteps(stepDeps(env, wiring.stores(env))),
+      () => checkStepsFromEnv(env, wiring.stores(env)),
       (checkId, reason) => failCheck(wiring.store(env), checkId, reason),
       env,
     ),
     createCheckCancelledFn((run) => failCancelled(wiring.store(env), run)),
     createCheckReaperFn(() => reapStalled(wiring.store(env), Date.now)),
   ];
+}
+
+/** A check's step bodies as checkFn runs them in production: checkSteps over stepDeps. */
+export function checkStepsFromEnv(env: Env, stores: StepStores): CheckSteps {
+  return checkSteps(stepDeps(env, stores));
 }
 
 /**

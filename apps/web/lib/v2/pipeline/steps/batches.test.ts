@@ -127,7 +127,40 @@ describe('post (finding 2)', () => {
     expect(s.batches.get(`${CHECK}:1`)!.nonce).toBe('nonce-0000000000000002');
   });
 
-  it('writes the heartbeat on each attempt, busy included, so a busy worker does not look like a stall (correctness 10)', async () => {
+  it('refuses to post a batch that is done, leaving its row and its stored result as they were (correctness 3)', async () => {
+    const recorded = readRecorded('batches');
+    const s = await setup(new Map([[1, renumbered(recorded[0]!, 1)]]));
+    await s.steps.post(EVENT, CRAWL_1, SO);
+    await s.steps.read(EVENT, CRAWL_1, SO);
+    const done = structuredClone(s.batches.get(`${CHECK}:1`)!);
+    expect(done).toMatchObject({
+      status: 'done',
+      nonce: 'nonce-0000000000000001',
+      result_path: `anon/${SITE_ID}/${CHECK}/batch-1.json.gz`,
+    });
+    // A post of the same batch after it was read: the crawl has URLs left, so one is planned.
+    s.clock.now += 30_000;
+    await expect(s.steps.post(EVENT, CRAWL_1, SO)).rejects.toThrow(
+      `pipeline store: batch 1 of check ${CHECK} is done; it is not posted again`,
+    );
+    expect(s.batches.get(`${CHECK}:1`)).toEqual(done);
+    expect(s.posted).toHaveLength(1);
+  });
+
+  it('writes the heartbeat on an attempt that returns, and none on one that throws', async () => {
+    const s = await setup();
+    const heartbeat = () => s.rows.get(CHECK)!.heartbeat_at;
+    // The claim wrote it at T0. The worker does not answer and does not hold the batch: a retry.
+    s.refuse.push('network');
+    s.clock.now += 30_000;
+    await expect(s.steps.post(EVENT, CRAWL_1, SO)).rejects.toMatchObject({ kind: 'network' });
+    expect(heartbeat()).toBe(new Date(T0).toISOString());
+    s.clock.now += 30_000;
+    expect(await s.steps.post(EVENT, CRAWL_1, SO)).toMatchObject({ status: 'posted' });
+    expect(heartbeat()).toBe(new Date(T0 + 60_000).toISOString());
+  });
+
+  it('writes the heartbeat on each attempt that returns, busy included, so a busy worker does not look like a stall (correctness 10)', async () => {
     const s = await setup();
     const heartbeat = () => s.rows.get(CHECK)!.heartbeat_at;
     s.refuse.push('busy');

@@ -1,16 +1,22 @@
 /**
  * The SQL store on PGlite with every migration: the statements the pipeline's race-critical calls make
- * (claim, fail, reap) and the one-statement methods, against migration 008's columns and functions.
+ * (claim, fail, reap) and the one-statement methods, against migration 008's columns and functions;
+ * and the build and persist steps over it, for the check a built check names as its previous one.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import { buildCheck } from '@crawlmouse/engine/v2/pipeline';
+import { buildCheck, GRADE_VERSION } from '@crawlmouse/engine/v2/pipeline';
 import type { BatchResult, CrawlPage } from '@crawlmouse/types/v2';
 import { beforeAll, describe, expect, it } from 'vitest';
+import type { CheckRequested } from '../../../../../inngest/check-events';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, asRole, freshDb } from '../../../__tests__/helpers/pglite-migrations';
+import { putJson } from './evidence';
 import { pageVantage, persistBuiltCheck } from './persist';
-import { reapStalled } from './steps';
-import { pglitePersistDb, seedRunningCheck } from './test-support/pglite';
+import { reapStalled, type StepDeps } from './steps';
+import { finishSteps } from './steps/finish';
+import { pathOf } from './steps/stored';
+import { memoryEvidenceStore } from './test-support/memory-evidence';
+import { pglitePersistDb, seedRunning, seedRunningCheck } from './test-support/pglite';
 import { sqlPipelineStore, type SqlDb } from './test-support/sql-store';
 
 const NOW = Date.parse('2026-11-08T12:00:00.000Z');
@@ -239,26 +245,16 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
     expect(rows[0]!.progress).toBeNull();
   });
 
-  it('reads the previous check as the latest other one queued no later', async () => {
-    const { db, store } = await fresh();
-    const s = await site(db);
-    const first = await check(db, s, { status: 'queued', heartbeat: null, queued: ago(30 * MIN) });
-    const second = await check(db, s, { status: 'queued', heartbeat: null, queued: ago(20 * MIN) });
-    const later = await check(db, s, { status: 'queued', heartbeat: null, queued: ago(5 * MIN) });
-    expect(await store.previousCheckId(s, second, ago(20 * MIN))).toBe(first);
-    expect(await store.previousCheckId(s, later, ago(5 * MIN))).toBe(second);
-    expect(await store.previousCheckId(s, first, ago(30 * MIN))).toBeNull();
-  });
-
   /**
-   * A copy of check `from` under `id`, queued, started and finished at the times given: every column
-   * the table does not generate, so the copy is a graded check as the persisted one is.
+   * A copy of check `from` under `id`, queued, started (when it was queued, unless given) and finished
+   * at the times given, graded under `grade_version` when given: every column the table does not
+   * generate, so the copy is a graded check as the persisted one is.
    */
   async function copyCheck(
     db: PGlite,
     from: string,
     id: string,
-    at: { queued: string; finished: string },
+    at: { queued: string; started?: string; finished: string; grade_version?: string },
   ): Promise<void> {
     const { rows } = await db.query<{ column_name: string }>(
       `select column_name from information_schema.columns
@@ -268,19 +264,20 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
     const set: Record<string, string> = {
       id: '$2::uuid',
       queued_at: '$3::timestamptz',
-      started_at: '$3::timestamptz',
+      started_at: 'coalesce($5::timestamptz, $3::timestamptz)',
       finished_at: '$4::timestamptz',
+      grade_version: 'coalesce($6::text, grade_version)',
     };
     const cols = rows.map((r) => r.column_name);
     await db.query(
       `insert into public.checks (${cols.join(', ')})
        select ${cols.map((c) => set[c] ?? c).join(', ')} from public.checks where id = $1`,
-      [from, id, at.queued, at.finished],
+      [from, id, at.queued, at.finished, at.started ?? null, at.grade_version ?? null],
     );
   }
 
-  it('takes the diff baseline as the site’s check that finished last, in whatever order the checks were queued (correctness 4)', async () => {
-    const { db, store } = await fresh();
+  /** The recorded check, built and persisted as the site's first: what a later check is diffed with. */
+  async function persistRecorded(db: PGlite) {
     const input = recordedBuild();
     const built = buildCheck(input);
     await seedRunningCheck(db, input.site, input.check);
@@ -292,15 +289,28 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
       vantage: pageVantage(crawl),
       map_path: null,
     });
+    return { input, built };
+  }
+
+  const shift = (iso: string, ms: number) => new Date(Date.parse(iso) + ms).toISOString();
+
+  it('takes the diff baseline as the site’s check that finished last, in whatever order the checks were queued (correctness 4)', async () => {
+    const { db, store } = await fresh();
+    const { built } = await persistRecorded(db);
     const newer = built.check;
     const H = 60 * MIN;
-    const at = (iso: string, ms: number) => new Date(Date.parse(iso) + ms).toISOString();
-    // `before` was queued and finished before `newer`; `older` was queued between the two and claims
-    // only now, after `newer` has finished.
+    const at = shift;
+    // `before` was queued and finished before `newer`; `after` was queued after `newer` and finished
+    // before it; `older` was queued before both and claims only now, after `newer` has finished.
     const before = 'b0000000-0000-4000-8000-0000000000f1';
     await copyCheck(db, newer.id, before, {
       queued: at(newer.queued_at, -2 * H),
       finished: at(newer.finished_at!, -H),
+    });
+    const after = 'b0000000-0000-4000-8000-0000000000f3';
+    await copyCheck(db, newer.id, after, {
+      queued: at(newer.queued_at, MIN),
+      finished: at(newer.finished_at!, -MIN),
     });
     const older = await check(db, newer.site_id, {
       status: 'running',
@@ -308,7 +318,122 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
       queued: at(newer.queued_at, -H),
       run: 'run-older',
     });
+    // By queue order the graded check last queued is `after`; by finish order it is `newer`.
     expect((await store.previousGraded(newer.site_id, older))?.check.id).toBe(newer.id);
-    expect((await store.previousGraded(newer.site_id, newer.id))?.check.id).toBe(before);
+    expect((await store.previousGraded(newer.site_id, newer.id))?.check.id).toBe(after);
+    expect((await store.previousGraded(newer.site_id, after))?.check.id).toBe(newer.id);
+  }, 60_000);
+
+  it('writes the diff baseline as the check’s previous_check_id, on its row and on its changes (correctness 1)', async () => {
+    const { db, store } = await fresh();
+    const { input, built } = await persistRecorded(db);
+    const first = built.check;
+    const siteId = first.site_id;
+    const H = 60 * MIN;
+    // `baseline` was queued before the first check and ran after it, under an earlier grading, so it
+    // is the check that finished last and the diff writes one baseline row about it. `failed` was
+    // queued after both: the latest other check by queue time, and not a graded one.
+    const baseline = 'b0000000-0000-4000-8000-0000000000f2';
+    await copyCheck(db, first.id, baseline, {
+      queued: shift(first.queued_at, -H),
+      started: shift(first.finished_at!, 10 * MIN),
+      finished: shift(first.finished_at!, H),
+      grade_version: '1.0.0',
+    });
+    const failed = await check(db, siteId, {
+      status: 'queued',
+      heartbeat: null,
+      queued: shift(first.queued_at, 2 * H),
+    });
+    expect(await store.fail(failed, 'internal', null)).toBe(true);
+    const current = 'b0000000-0000-4000-8000-0000000000c3';
+    await seedRunning(db, {
+      id: current,
+      site_id: siteId,
+      trigger: 'manual',
+      grade_version: GRADE_VERSION,
+      queued_at: shift(first.queued_at, 3 * H),
+      started_at: shift(first.queued_at, 3 * H),
+      expires_at: null,
+    });
+    // The vector the two rules this replaces differ on: by queue time, any status, the previous check
+    // is `failed`; by queue time among graded checks it is the first check; by finish it is `baseline`.
+    const latestBy = async (order: string, graded: boolean) =>
+      (
+        await db.query<{ id: string }>(
+          `select id from public.checks where site_id = $1 and id <> $2
+              ${graded ? `and status in ('finished', 'partial')` : ''}
+            order by ${order} desc limit 1`,
+          [siteId, current],
+        )
+      ).rows[0]!.id;
+    expect(await latestBy('queued_at', false)).toBe(failed);
+    expect(await latestBy('queued_at', true)).toBe(first.id);
+    expect(await latestBy('finished_at', true)).toBe(baseline);
+
+    // The check's evidence as its batches left it: the recorded crawl, renamed to this check. The
+    // access batches are left out: their tests' ids are the first check's, which the table holds.
+    const event: CheckRequested = {
+      checkId: current,
+      siteId,
+      accountId: null,
+      host: input.site.host,
+      homepageUrl: input.homepage_url,
+      trigger: 'manual',
+      pageCap: input.check.page_cap,
+    };
+    const evidence = memoryEvidenceStore();
+    await putJson(evidence, pathOf(event, 'seeds'), input.seeds);
+    await putJson(evidence, pathOf(event, 'render'), null);
+    const batches = (
+      JSON.parse(JSON.stringify(input.batches).replaceAll(first.id, current)) as BatchResult[]
+    ).filter((b) => b.kind === 'crawl');
+    for (const [k, b] of batches.entries()) {
+      const n = k + 1;
+      const path = pathOf(event, `batch-${n}`);
+      await putJson(evidence, path, b);
+      const posted = shift(first.queued_at, 3 * H + n * MIN);
+      await store.upsertBatch({
+        check_id: current,
+        batch: n,
+        kind: b.kind,
+        nonce: 'n'.repeat(24),
+        posted_at: posted,
+        summary: { urls: 1, max_seconds: 60 },
+      });
+      await store.endBatch(current, n, {
+        status: 'done',
+        finished_at: posted,
+        summary: {},
+        result_path: path,
+      });
+    }
+    const steps = finishSteps({
+      store,
+      evidence,
+      persistDb: pglitePersistDb(db),
+      now: () => Date.parse(shift(first.queued_at, 4 * H)),
+      env: { VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40) },
+    } as unknown as StepDeps);
+    const started = Date.parse(shift(first.queued_at, 3 * H));
+    await steps.build(event, {
+      startedAt: started,
+      crawlFrom: started,
+      pagesCrawled: 0,
+      linksFound: 0,
+      release: null,
+    });
+    expect(await steps.persist(event)).toEqual({ written: true });
+
+    const row = await db.query<{ previous_check_id: string | null }>(
+      `select previous_check_id from public.checks where id = $1`,
+      [current],
+    );
+    const changes = await db.query<{ kind: string; previous_check_id: string | null }>(
+      `select kind, previous_check_id from public.changes where check_id = $1`,
+      [current],
+    );
+    expect(row.rows).toEqual([{ previous_check_id: baseline }]);
+    expect(changes.rows).toEqual([{ kind: 'baseline', previous_check_id: baseline }]);
   }, 60_000);
 });

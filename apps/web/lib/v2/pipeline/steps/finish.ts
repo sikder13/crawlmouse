@@ -7,9 +7,11 @@
  *
  * build calls buildCheck on what the check stored and what the database holds (finding 14: the
  * engine SHA is VERCEL_GIT_COMMIT_SHA, 40 hex, or the step fails; the worker release is the batches'
- * one release; `previous_check_id` is the site's latest other check by queue time, `previous` the
- * graded one that finished last, with its diff inputs; the page cap is the event's). It stores the built check with the pages'
- * vantage (pageVantage), and the map drawing (D10). persist hands that to persistBuiltCheck, the one writer (D5).
+ * one release; `previous` is the site's other finished or partial check that finished last, with its
+ * diff inputs, or null when there is none or it stored none; `previous_check_id` is its id, or null
+ * with it, so the check row and its changes name the same check; the page cap is the event's). It
+ * stores the built check with the pages' vantage (pageVantage), and the map drawing (D10). persist
+ * hands that to persistBuiltCheck, the one writer (D5).
  * finalize deletes the built check, which is scratch; the map drawing stays.
  */
 import {
@@ -87,8 +89,7 @@ export function finishSteps(
       ]);
       const release = releaseOfAll(results);
       if (!results.some(isCrawl) || release === null) throw new CheckFailure('worker_unavailable');
-      const [previousCheckId, previous, fixes, render] = await Promise.all([
-        deps.store.previousCheckId(event.siteId, event.checkId, check.queued_at),
+      const [previous, fixes, render] = await Promise.all([
         deps.store.previousGraded(event.siteId, event.checkId),
         deps.store.fixes(event.siteId),
         getJson(deps.evidence, pathOf(event, 'render')) as Promise<RenderOutcome>,
@@ -100,7 +101,8 @@ export function finishSteps(
         check: {
           id: check.id,
           site_id: check.site_id,
-          previous_check_id: previousCheckId,
+          // The diff's baseline: the changes name it too (diffCheck's `previous_check_id`).
+          previous_check_id: previous?.check.id ?? null,
           trigger: check.trigger,
           queued_at: check.queued_at,
           started_at: check.started_at,

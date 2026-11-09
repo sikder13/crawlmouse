@@ -269,25 +269,6 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
         },
       ],
     },
-    previousCheckId: {
-      answers: [ok(null)],
-      call: (s) => s.previousCheckId(S, C, 'T'),
-      calls: [
-        {
-          root: ['from', 'checks'],
-          chain: [
-            ['select', ['id']],
-            ['eq', ['site_id', S]],
-            ['neq', ['id', C]],
-            ['lte', ['queued_at', 'T']],
-            ['order', ['queued_at', { ascending: false }]],
-            ['order', ['id', { ascending: false }]],
-            ['limit', [1]],
-            ['maybeSingle', []],
-          ],
-        },
-      ],
-    },
     previousGraded: {
       answers: [ok(null)],
       call: (s) => s.previousGraded(S, C),
