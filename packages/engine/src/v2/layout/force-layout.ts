@@ -208,14 +208,6 @@ export const BAND_ANCHOR: Point = { x: BAND_X, y: MARGIN + 6.4 };
 const WARM = { alpha: 0.15, ticks: 100 };
 
 /**
- * An empty object for positions keyed by page id, with no prototype: an id is the crawled site's to
- * choose, and on an object literal `__proto__` would set the prototype rather than hold a position.
- * It serialises as JSON like an object literal; its readers go through `Object.hasOwn` or the id of a
- * node it was written for.
- */
-const byId = (): Record<string, Point> => Object.create(null) as Record<string, Point>;
-
-/**
  * The map from scratch: the same pages and links give the same positions. `complete` says whether
  * the map has its last pages, which decides the panels its key pages are kept clear of (PANELS).
  */
@@ -304,7 +296,7 @@ export function layoutMapFrom(
     }
   }
 
-  const raw = byId();
+  const raw: Record<string, Point> = {};
   for (const i of cloud) raw[nodes[i]!.id] = { x: x[i]!, y: y[i]! };
 
   // The band's height, taken off the top of the box the cloud is fitted into.
@@ -429,7 +421,7 @@ export function layoutMapFrom(
     if (!moved) break;
   }
 
-  const positions = byId();
+  const positions: Record<string, Point> = {};
   nodes.forEach((node, i) => {
     positions[node.id] = {
       x: Math.round((MAP_VIEWBOX.width / 2 + x[i]!) * 10) / 10,
