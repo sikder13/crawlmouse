@@ -79,7 +79,7 @@ const RULES: Readonly<Record<StructureFixType, Rule>> = {
     subject: 'hub URL',
     detected: `a hub (top ${pct(TOP_HUB_FRACTION)} of crawled 200 pages by PageRank share, at least one) with ${MIN_HUB_OUTLINKS} or more outbound links has more than ${pct(GENERIC_DETECT_ABOVE)} generic anchors`,
     clear: `the share is ${pct(GENERIC_CLEAR_AT_OR_BELOW)} or less`,
-    indeterminate: `fewer than ${MIN_HUB_OUTLINKS} outbound links; a share above ${pct(GENERIC_CLEAR_AT_OR_BELOW)} and at most ${pct(GENERIC_DETECT_ABOVE)} (hysteresis: an open fix stays open, no new one opens); links found but not recorded that could move the share across a threshold`,
+    indeterminate: `the hub is HTML and its links were not all read; fewer than ${MIN_HUB_OUTLINKS} outbound links; a share above ${pct(GENERIC_CLEAR_AT_OR_BELOW)} and at most ${pct(GENERIC_DETECT_ABOVE)} (hysteresis: an open fix stays open, no new one opens); links found but not recorded that could move the share across a threshold`,
     measured:
       'generic share of the recorded outbound links; the worker records one link per target, with its first anchor',
     affected: 'the hub',
