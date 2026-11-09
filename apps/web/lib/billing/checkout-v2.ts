@@ -6,10 +6,11 @@
  *
  * Refused, before any Stripe call: a plan the account already holds or exceeds (`plan_held`), and any
  * account that still follows a subscription (`subscription_open`, questions Q3), because a second
- * checkout would open a second subscription that Stripe keeps charging. The customer's other open
- * sessions are expired first and the new one lasts 31 minutes, so two tabs cannot both pay (plan
- * review, finding 1). Card only, so the subscription is `active` when the checkout completes
- * (questions Q12).
+ * checkout would open a second subscription that Stripe keeps charging. Opening a session expires
+ * the customer's other open ones, and each lasts 31 minutes (plan review, finding 1); a subscription
+ * a checkout still leaves orphaned is the webhook's to cancel (questions Q10). Card only (questions
+ * Q12): a delayed method such as a bank debit can leave the subscription `incomplete` when the
+ * checkout completes, and the machine grants nothing on that.
  *
  * The agency trial (./agency-trial.ts) opens its session through `startCheckout` here.
  */
@@ -24,8 +25,8 @@ import { snapshotFromRow, type AccountRow } from './state-machine-apply';
 import { CatalogError } from './stripe-catalog';
 
 /**
- * Stripe's minimum is 30 minutes after it creates the session. The extra minute covers the time the
- * request takes to reach Stripe, so a session is not refused for expiring a moment too soon.
+ * Stripe's minimum is 30 minutes after it creates the session, which is later than this clock reads
+ * when the request is built. The extra minute is the margin for that gap and for clock skew.
  */
 export const SESSION_LIFETIME_S = 31 * 60;
 
