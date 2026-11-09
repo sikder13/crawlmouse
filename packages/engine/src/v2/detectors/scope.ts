@@ -273,6 +273,15 @@ export function absenceUnproven(s: Scope): IndeterminateReason | null {
   return null;
 }
 
+/**
+ * The page's template, or the homepage, is served for JavaScript to fill in
+ * (`DetectorInput.client_rendered`). Links made in the browser are not in the HTML the crawl read, so
+ * the crawl cannot prove that the page has no link to it or no short path: v1's JS/SPA orphan
+ * suppression (OPERATING-RULES §5), applied to the page's template.
+ */
+export const clientRendered = (s: Scope, p: PageResult): boolean =>
+  s.input.client_rendered.homepage || s.input.client_rendered.templates.includes(p.template_key);
+
 /** 404 or 410: the page is no longer there. */
 export function goneStatus(p: PageResult): 404 | 410 | null {
   return GONE_STATUSES.find((s) => s === p.status_code) ?? null;
