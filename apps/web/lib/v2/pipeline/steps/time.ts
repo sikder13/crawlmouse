@@ -1,17 +1,17 @@
 /**
  * The time plan (plan §4, finding 8): how long a batch posted now may run. Its zero is the first
- * claim attempt (`RunSoFar.startedAt`). Every fetching phase ends by `fetchEndsAt`, the finish
- * timeout less RESERVE_S; the crawl also ends by CRAWL_CEILING_S after discovery and leaves
- * ACCESS_SLICE_S to the access stages. A batch's max_seconds is cut so that its deadline
- * (max_seconds + the poll grace) and the last poll after it (one poll wait at most) fall before its
- * phase ends.
+ * claim attempt (`RunSoFar.startedAt`). The fetching phases end by `fetchEndsAt`, the finish timeout
+ * less RESERVE_S; the crawl's end comes earlier, CRAWL_CEILING_S after discovery, or ACCESS_SLICE_S
+ * before `fetchEndsAt`. A batch's max_seconds is cut so that its deadline (max_seconds + the poll
+ * grace) and the poll after it (one poll wait at most) fall before its phase's end; step latency
+ * comes on top (time.test.ts simulates it).
  */
 import type { BatchAt, RunSoFar } from '../../../../../../inngest/check';
 import { ACCESS_SLICE_S, CRAWL_CEILING_S, MIN_BATCH_S, PACE, RESERVE_S } from '../limits';
 
 const S = 1000;
 
-/** When the crawl and access batches must all have ended. */
+/** The end of the fetching phases. */
 export const fetchEndsAt = (startedAt: number): number =>
   startedAt + (PACE.finishS - RESERVE_S) * S;
 

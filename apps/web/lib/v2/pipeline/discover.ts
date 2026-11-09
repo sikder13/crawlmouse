@@ -18,8 +18,8 @@ import { DISCOVER_REQUEST_MS, DISCOVER_S, SITEMAP_URL_CAP } from './limits';
 
 /**
  * The user agent our crawl identity sends: the worker's CRAWL_USER_AGENT
- * (packages/worker/src/identities.ts), which the app cannot import (it does not depend on the worker
- * package). discover.test.ts fails when the two differ.
+ * (packages/worker/src/identities.ts). The app does not import the worker package, which it does
+ * not depend on; discover.test.ts fails when the two differ.
  */
 export const CRAWL_USER_AGENT =
   'Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)';

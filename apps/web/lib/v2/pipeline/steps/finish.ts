@@ -2,14 +2,14 @@
  * The steps after the batches: render, build, persist, finalize.
  *
  * render runs CC-14's renderCheck over renderCandidates with the daily budget it is given; today that
- * budget refuses (Q7), so every sampled page records `daily_budget_unavailable`. renderCheck has no
- * deadline of its own yet, which rendering needs before it is enabled (RESERVE_S).
+ * budget throws (Q7, NO_DAILY_BUDGET), so nothing renders. renderCheck has no deadline of its own
+ * yet, which rendering needs before it is enabled (RESERVE_S).
  *
  * build calls buildCheck on what the check stored and what the database holds (finding 14: the
  * engine SHA is VERCEL_GIT_COMMIT_SHA, 40 hex, or the step fails; the worker release is the batches'
  * one release; `previous_check_id` is the site's latest other check, `previous` its latest graded one
- * with its diff inputs; the page cap is the event's). It stores the built check with each page's
- * vantage, and the map drawing (D10). persist hands that to persistBuiltCheck, the one writer (D5).
+ * with its diff inputs; the page cap is the event's). It stores the built check with the pages'
+ * vantage (pageVantage), and the map drawing (D10). persist hands that to persistBuiltCheck, the one writer (D5).
  * finalize deletes the built check, which is scratch; the map drawing stays.
  */
 import {

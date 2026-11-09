@@ -4,8 +4,9 @@
  * Inngest refuses the whole app sync when a function declares a concurrency limit above the
  * account plan's cap, and then no function runs: v1 audits stop (PROJECT_OVERVIEW §11, the June
  * outage). A limit read from the environment therefore goes through `planSafeLimit`.
- * `apps/web/lib/v2/pipeline/functions.test.ts` reads the limit of every registered function, in
- * both states of the pipeline flag and over a sweep of values, and fails above the cap.
+ * `apps/web/lib/v2/pipeline/functions.test.ts` reads the declared limits of the functions the serve
+ * route registers, in both states of the pipeline flag and over a sweep of values, and fails above
+ * the cap: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts`.
  */
 
 /** The account's Inngest plan cap (Free). Raising the plan raises this, in the same change. */

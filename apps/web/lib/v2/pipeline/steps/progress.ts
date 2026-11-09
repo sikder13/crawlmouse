@@ -1,6 +1,6 @@
 /**
- * A running check's `progress` (the contract's ProgressSchema; `checks_progress` holds it non-null
- * exactly while the check runs): the crawl screen's steps and counts. Parsed before it is written.
+ * A running check's `progress` (the contract's ProgressSchema; the `checks_progress` constraint ties
+ * it to `status = 'running'`): the crawl screen's steps and counts. Parsed before it is written.
  */
 import { CheckPhaseSchema, ProgressSchema, type Check } from '@crawlmouse/types/v2';
 import type { BatchAt, RunSoFar } from '../../../../../../inngest/check';

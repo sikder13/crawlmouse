@@ -33,7 +33,8 @@ type Env = Readonly<Record<string, string | undefined>>;
 export function inngestFunctions(env: Env = process.env): InngestFunction.Like[] {
   const v1 = [auditFn, reconcileBillingFn, reconcileBillingManualFn, cleanupExpiredAuditsFn];
   if (!pipelineEnabled(env)) return v1;
-  // Built when a step runs, not when the route loads: a missing variable fails that step only.
+  // Built when a function runs, not when the route loads, so a missing variable cannot keep the
+  // route from registering v1's functions.
   const deps = () => stepDeps(env);
   return [
     ...v1,

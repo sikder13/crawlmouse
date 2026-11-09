@@ -32,10 +32,10 @@ export interface StepDeps {
 }
 
 /**
- * Q7: no durable daily render budget exists yet, and one kept in memory would reset with every
- * Vercel invocation. The pipeline passes this one, which throws, so renderCheck renders nothing and
- * every sampled page records `daily_budget_unavailable` (when a client and caps are configured;
- * without them the page records `not_configured` or `caps_not_configured` first).
+ * Q7: no durable daily render budget exists yet, and one kept in memory would count per Vercel
+ * instance, not per day. The pipeline passes this one, which throws, so renderCheck renders nothing:
+ * a sampled page records `daily_budget_unavailable`, or a reason renderCheck finds before it asks the
+ * budget (`not_configured`, `caps_not_configured`, `check_cap`).
  */
 export const NO_DAILY_BUDGET: DailyBudget = {
   reserve: async () => {

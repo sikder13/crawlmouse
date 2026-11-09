@@ -1,7 +1,7 @@
 /**
  * The numbers the check pipeline runs by, each with its reason. The orchestration's own waits and
- * bounds (PACE) and the failure reasons live with the Inngest functions, which cannot import the app,
- * and are re-exported here beside the rest.
+ * bounds (PACE) and the failure reasons live with the Inngest functions, which do not import the
+ * app, and are re-exported here beside the rest.
  */
 export { PACE, STEP_OUTPUT_BYTES } from '../../../../../inngest/check';
 export { FAILURE_REASONS, type FailureReason } from '../../../../../inngest/check-events';

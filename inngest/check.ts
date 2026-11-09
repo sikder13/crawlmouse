@@ -4,9 +4,10 @@
  * apps/web/lib/v2/pipeline/steps), the pattern setAuditFailureReporter uses, so this package imports
  * nothing from the app.
  *
- * Replays. Inngest runs this function again from the top for every step, returning the recorded
- * output of each step already run. So the code here reads no clock, no random value and no
- * environment: every time it compares comes out of a step, and every branch is on a step's output.
+ * Replays. Inngest runs the function again from the top for each new step, returning the recorded
+ * output of the steps already run. So runCheck reads no clock, no random value and no environment:
+ * the times it compares come out of steps, and it branches on step outputs (the replay test in
+ * check.test.ts moves the system clock between invocations).
  *
  * Step order: claim (with `claim-wait-{i}` / `claim-{i}` while the site is busy) → discover → crawl
  * batches `crawl-{n}` → access batches `access-{stage}` → render → build → persist → finalize →
@@ -55,7 +56,7 @@ export const PACE = {
   maxCrawlBatches: 40,
 } as const;
 
-/** Each step's output as JSON stays under this many bytes (ARCH-2 §4.2); bulk data is stored. */
+/** runCheck's steps return under this many bytes as JSON (`sized`, ARCH-2 §4.2); bulk data is stored. */
 export const STEP_OUTPUT_BYTES = 4096;
 
 export type BatchKind = 'crawl' | 'access';
@@ -129,7 +130,7 @@ export interface CheckSteps {
   build(event: CheckRequested, so: RunSoFar): Promise<BuildOutput>;
   persist(event: CheckRequested): Promise<PersistOutput>;
   finalize(event: CheckRequested): Promise<Empty>;
-  /** Marks the check failed unless it has ended; `failed` is true only on that transition. */
+  /** Marks the check failed unless it has ended; `failed` says whether this call moved it. */
   fail(event: CheckRequested, reason: FailureReason): Promise<FailOutput>;
 }
 
