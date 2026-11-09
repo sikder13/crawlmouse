@@ -40,7 +40,8 @@ describe('the expected change of 20261108000002', () => {
 
   it('applied on PGlite, it changes the functions section only, by exactly those lines', async () => {
     const before = await migratedDb((f) => f < MIGRATION);
-    const after = await migratedDb();
+    // Migrations after this one are left out, so the compare is this file's change alone.
+    const after = await migratedDb((f) => f <= MIGRATION);
     const differences = compareFingerprints(
       await readFingerprint(pgliteDb(before)),
       await readFingerprint(pgliteDb(after)),
