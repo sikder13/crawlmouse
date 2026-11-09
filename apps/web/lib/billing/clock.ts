@@ -5,8 +5,9 @@
  * `billingClock` and send each plan in a step of its own.
  *
  * `applyClockEvent` does not send. Its plan's event ids are fixed by the account and the moment the
- * event is about (the trial's end, or when the account fell past due), so the lifecycle's expiry and
- * the sweep's backstop expiry of one trial send one `entitlement.changed` between them.
+ * event is about (the trial's end, or when the account fell past due), not by when the event is
+ * applied: the lifecycle's expiry of a trial and the sweep's backstop expiry of it plan the same ids,
+ * and of the two the machine applies whichever comes first and ignores the other.
  *
  * The sweep's read only narrows: the machine decides each account on the account as it is read when
  * the event is applied.
