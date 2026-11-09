@@ -262,9 +262,13 @@ describe('the production readers write nothing', () => {
     expect(calls).toContain(
       'stripe.subscriptions.list({"customer":"cus_a","status":"all","limit":100})',
     );
-    expect(calls.filter((c) => c.startsWith('stripe_events.')).join(' ')).toContain(
+    // Decided (handled set), never stamped, and received over an hour before NOW.
+    expect(calls.filter((c) => c.startsWith('stripe_events.'))).toEqual([
+      'stripe_events.select(["id, account_id"])',
+      'stripe_events.not(["handled","is",null])',
+      'stripe_events.is(["processed_at",null])',
       `stripe_events.lt(["received_at","${new Date(NOW.getTime() - 3_600_000).toISOString()}"])`,
-    );
+    ]);
   });
 
   it('a customer Stripe does not know is reported, any other Stripe error propagates', async () => {
