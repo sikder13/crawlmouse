@@ -1,29 +1,12 @@
 /**
  * The SQL store on PGlite with every migration: the statements the pipeline's race-critical calls make
  * (claim, fail, reap) and the one-statement methods, against migration 008's columns and functions.
- *
- * Migration 008 is workstream A's. Until `20261109000001_v2_008_pipeline.sql` is in
- * infra/supabase/migrations these tests are skipped, and the sentinel test below says so in the run.
  */
 import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
-import {
-  applyAllMigrations,
-  asRole,
-  freshDb,
-  migrationFiles,
-} from '../../../__tests__/helpers/pglite-migrations';
+import { applyAllMigrations, asRole, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { reapStalled } from './steps';
 import { sqlPipelineStore, type SqlDb } from './test-support/sql-store';
-
-const HAS_008 = migrationFiles().some((f) => f.startsWith('20261109000001_v2_008_pipeline'));
-
-it.runIf(!HAS_008)(
-  'waits for migration 008: the PGlite store tests in this file run once it is in the tree',
-  () => {
-    expect(HAS_008).toBe(false);
-  },
-);
 
 const NOW = Date.parse('2026-11-08T12:00:00.000Z');
 const ago = (ms: number) => new Date(NOW - ms).toISOString();
@@ -37,7 +20,7 @@ const PROGRESS = {
   recent_fetches: [],
 };
 
-describe.runIf(HAS_008)('sqlPipelineStore on PGlite (migration 008)', () => {
+describe('sqlPipelineStore on PGlite (migration 008)', () => {
   let template: PGlite;
   beforeAll(async () => {
     template = await freshDb();
