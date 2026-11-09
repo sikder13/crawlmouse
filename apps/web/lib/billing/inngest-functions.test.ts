@@ -143,35 +143,31 @@ describe('billingFunctions (CC-03 D9)', () => {
 });
 
 describe('the Inngest serve route’s function list', () => {
-  async function routeList(flag: string | undefined) {
+  // The route registers CC-20b's inngestFunctions(process.env), which holds v1's four as the same
+  // objects (lib/v2/pipeline/functions.test.ts); here, which functions in which order.
+  async function routeIds(flag: string | undefined): Promise<string[]> {
     vi.stubEnv('V2_BILLING', flag);
     vi.resetModules();
     await import('../../app/api/webhooks/inngest/route');
-    // Through the aliases the route imports: resetModules keeps a mocked module's first instance.
-    const { auditFn } = await import('@crawlmouse/inngest/audit');
-    const billing = await import('@crawlmouse/inngest/billing');
-    return {
-      functions: served.functions!,
-      v1: [
-        auditFn,
-        billing.reconcileBillingFn,
-        billing.reconcileBillingManualFn,
-        billing.cleanupExpiredAuditsFn,
-      ],
-    };
+    return configsOf(served.functions!).map((c) => c.id);
   }
 
-  it('with V2_BILLING unset is v1’s four functions, the same objects, in today’s order', async () => {
-    const { functions, v1 } = await routeList(undefined);
-    expect(functions).toHaveLength(4);
-    v1.forEach((fn, i) => expect(functions[i]).toBe(fn));
+  // auditFn syncs two configs: the function and its onFailure handler.
+  const V1 = [
+    'crawlmouse-crawlmouse.audit',
+    'crawlmouse-crawlmouse.audit-failure',
+    'crawlmouse-crawlmouse.stripe-reconcile',
+    'crawlmouse-crawlmouse.stripe-reconcile-manual',
+    'crawlmouse-crawlmouse.audits-ttl-cleanup',
+  ];
+
+  it('with V2_BILLING unset is v1’s four functions, in today’s order', async () => {
+    expect(await routeIds(undefined)).toEqual(V1);
   });
 
-  it('with V2_BILLING=1 is v1’s four, unchanged and first, then the two billing functions', async () => {
-    const { functions, v1 } = await routeList('1');
-    expect(functions).toHaveLength(6);
-    v1.forEach((fn, i) => expect(functions[i]).toBe(fn));
-    expect(configsOf(functions.slice(4)).map((c) => c.id)).toEqual([
+  it('with V2_BILLING=1 is v1’s four, first, then the two billing functions', async () => {
+    expect(await routeIds('1')).toEqual([
+      ...V1,
       'crawlmouse-crawlmouse.trial.lifecycle',
       'crawlmouse-crawlmouse.billing.past-due-sweep',
     ]);
