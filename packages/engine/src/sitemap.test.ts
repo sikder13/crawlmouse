@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { discoverSitemaps, parseSitemapUrls } from './sitemap.js';
+import { discoverSitemaps, parseSitemapEntries, parseSitemapUrls } from './sitemap.js';
 import { isAllowedByRobots, ROBOTS_UA } from './robots.js';
 
 describe('discoverSitemaps', () => {
@@ -61,6 +61,71 @@ describe('parseSitemapUrls', () => {
     });
     const urls = await parseSitemapUrls('https://example.com/sitemap.xml', { fetcher });
     expect(urls).toEqual(['https://example.com/p1']);
+  });
+});
+
+describe('parseSitemapEntries', () => {
+  const serve = (files: Record<string, string>) =>
+    vi.fn(async (url: string) =>
+      Object.hasOwn(files, url) ? { status: 200, body: files[url]! } : { status: 404, body: '' },
+    );
+
+  it('reads each <loc> with its <lastmod> as a date, and null where a url gives none', async () => {
+    const fetcher = serve({
+      'https://example.com/sitemap.xml': `<urlset>
+        <url><loc>https://example.com/a</loc><lastmod>2026-11-05</lastmod></url>
+        <url><loc>https://example.com/b</loc><lastmod>2026-10-01T08:30:00+02:00</lastmod></url>
+        <url><loc>https://example.com/c</loc></url>
+      </urlset>`,
+    });
+    expect(await parseSitemapEntries('https://example.com/sitemap.xml', { fetcher })).toEqual([
+      { loc: 'https://example.com/a', lastmod: '2026-11-05' },
+      { loc: 'https://example.com/b', lastmod: '2026-10-01' },
+      { loc: 'https://example.com/c', lastmod: null },
+    ]);
+  });
+
+  it('gives null for a <lastmod> that is not a calendar date', async () => {
+    const fetcher = serve({
+      'https://example.com/sitemap.xml': `<urlset>
+        <url><loc>https://example.com/a</loc><lastmod>2026-02-30</lastmod></url>
+        <url><loc>https://example.com/b</loc><lastmod>yesterday</lastmod></url>
+        <url><loc>https://example.com/c</loc><lastmod></lastmod></url>
+      </urlset>`,
+    });
+    const entries = await parseSitemapEntries('https://example.com/sitemap.xml', { fetcher });
+    expect(entries.map((e) => e.lastmod)).toEqual([null, null, null]);
+  });
+
+  it('follows an index, keeps the cap across children, and agrees with parseSitemapUrls', async () => {
+    const files = {
+      'https://example.com/index.xml': `<sitemapindex>
+        <sitemap><loc>https://example.com/one.xml</loc></sitemap>
+        <sitemap><loc>https://example.com/two.xml</loc></sitemap>
+      </sitemapindex>`,
+      'https://example.com/one.xml': `<urlset>
+        <url><loc>https://example.com/1</loc><lastmod>2026-01-01</lastmod></url>
+        <url><loc>https://example.com/2</loc></url>
+      </urlset>`,
+      'https://example.com/two.xml': `<urlset>
+        <url><loc>https://example.com/3</loc><lastmod>2026-03-03</lastmod></url>
+        <url><loc>https://example.com/4</loc></url>
+      </urlset>`,
+    };
+    const entries = await parseSitemapEntries('https://example.com/index.xml', {
+      fetcher: serve(files),
+      maxUrls: 3,
+    });
+    expect(entries).toEqual([
+      { loc: 'https://example.com/1', lastmod: '2026-01-01' },
+      { loc: 'https://example.com/2', lastmod: null },
+      { loc: 'https://example.com/3', lastmod: '2026-03-03' },
+    ]);
+    const urls = await parseSitemapUrls('https://example.com/index.xml', {
+      fetcher: serve(files),
+      maxUrls: 3,
+    });
+    expect(urls).toEqual(entries.map((e) => e.loc));
   });
 });
 

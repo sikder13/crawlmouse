@@ -36,6 +36,6 @@ export type { JsTextState } from './render/state.js';
 export { checkMap } from './layout/check-map.js';
 export type { MapDrawing } from './layout/check-map.js';
 export { safeFetch } from '../safe-fetch.js';
-export { discoverSitemaps, parseSitemapUrls } from '../sitemap.js';
+export { discoverSitemaps, parseSitemapEntries, parseSitemapUrls } from '../sitemap.js';
 export { canonicalizeUrl } from '../url-canonical.js';
 export { templateKeyFor } from '../analysis/template-key.js';

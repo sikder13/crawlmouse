@@ -1,16 +1,15 @@
 /**
  * Discovery (Q8): the crawl's seeds, read from the Vercel function as v1 reads them. robots.txt's
  * `Sitemap:` lines (else the common sitemap paths) and the sitemaps, through the engine's
- * discoverSitemaps and parseSitemapUrls over safeFetch (the SSRF guard), as our identified crawler,
- * within DISCOVER_S and SITEMAP_URL_CAP. The seeds are the homepage and the sitemap's URLs.
- *
- * `lastmod` is null on every seed: the engine's sitemap reader returns `<loc>` values only. Reading
- * `<lastmod>` needs a reader in the engine (follow-up); until then stage 2's "newest" picks are empty.
+ * discoverSitemaps and parseSitemapEntries over safeFetch (the SSRF guard), as our identified
+ * crawler, within DISCOVER_S and SITEMAP_URL_CAP. The seeds are the homepage and the sitemap's URLs,
+ * each with its `<lastmod>` date (null where the sitemap gives none), which stage 2's "newest" picks
+ * read.
  */
 import {
   canonicalizeUrl,
   discoverSitemaps,
-  parseSitemapUrls,
+  parseSitemapEntries,
   type safeFetch,
   type Seed,
 } from '@crawlmouse/engine/v2/pipeline';
@@ -61,21 +60,21 @@ export async function discoverSeeds(
   };
 
   const { sitemapUrls } = await discoverSitemaps(new URL(homepageUrl).origin, { fetcher });
-  const locs: string[] = [];
+  const entries: { loc: string; lastmod: string | null }[] = [];
   for (const sitemap of sitemapUrls) {
-    if (locs.length >= SITEMAP_URL_CAP) break;
-    await parseSitemapUrls(sitemap, { fetcher, maxUrls: SITEMAP_URL_CAP }, 0, locs);
+    if (entries.length >= SITEMAP_URL_CAP) break;
+    await parseSitemapEntries(sitemap, { fetcher, maxUrls: SITEMAP_URL_CAP }, 0, entries);
   }
 
   // The homepage is a seed whether or not the sitemap lists it; the builder keeps the sitemap's
   // seed of a URL listed as both (assemble.ts seedMap).
   const seeds: Seed[] = [{ url: homepageUrl, source: 'homepage', lastmod: null }];
   const listed = new Set<string>();
-  for (const raw of locs) {
-    const url = canonicalHttp(raw);
+  for (const { loc, lastmod } of entries) {
+    const url = canonicalHttp(loc);
     if (url === null || listed.has(url)) continue;
     listed.add(url);
-    seeds.push({ url, source: 'sitemap', lastmod: null });
+    seeds.push({ url, source: 'sitemap', lastmod });
   }
-  return { seeds, sitemapUrls: locs.length };
+  return { seeds, sitemapUrls: entries.length };
 }

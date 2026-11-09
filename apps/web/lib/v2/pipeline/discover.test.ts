@@ -41,9 +41,9 @@ describe('discoverSeeds (Q8)', () => {
     const out = await discoverSeeds('https://example.com', deps);
     expect(out.seeds).toEqual([
       { url: 'https://example.com', source: 'homepage', lastmod: null },
-      { url: 'https://example.com', source: 'sitemap', lastmod: null },
-      { url: 'https://example.com/p/1', source: 'sitemap', lastmod: null },
-      { url: 'https://example.com/p/2', source: 'sitemap', lastmod: null },
+      { url: 'https://example.com', source: 'sitemap', lastmod: '2026-11-01' },
+      { url: 'https://example.com/p/1', source: 'sitemap', lastmod: '2026-11-01' },
+      { url: 'https://example.com/p/2', source: 'sitemap', lastmod: '2026-11-01' },
     ]);
     expect(out.sitemapUrls).toBe(4);
     expect(requests.map((r) => r.url)).toEqual([
