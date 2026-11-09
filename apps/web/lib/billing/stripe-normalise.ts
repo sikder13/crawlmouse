@@ -279,7 +279,7 @@ class Normaliser {
     const refusal = await mismatch();
     if (refusal !== null) {
       return this.record(account.id, refusal, {
-        effects: orphanEffects(own, account.id, this.event.id),
+        effects: followed ? [] : orphanEffects(own, account.id, this.event.id),
         reports: [
           {
             level: 'error',

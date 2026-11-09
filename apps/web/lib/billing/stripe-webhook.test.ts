@@ -1014,6 +1014,21 @@ describe.each(PORTS)('through the %s port', (p) => {
       expect(w.stripe.live()).toEqual([]);
     });
 
+    it('a mismatched completion for the subscription the account follows cancels nothing', async () => {
+      // The account's customer has since been rebound: a later completion for the subscription it
+      // follows now names another customer than the account's.
+      const { accountId, current } = await account('pro');
+      await w.db.query(
+        `update public.accounts set stripe_customer_id = 'cus_rebound' where id = $1`,
+        [accountId],
+      );
+      expect(
+        await w.deliver(checkoutEvent(accountId, current!.customer, current!.id, BASE + 300)),
+      ).toMatchObject({ reason: 'the checkout is for another customer' });
+      expect(w.stripe.cancelled).toEqual([]);
+      expect(w.stripe.live()).toEqual([current!.id]);
+    });
+
     it('a binding that loses a race to another account is decided again and recorded', async () => {
       const { accountId } = await account();
       await w.db.query(`update public.accounts set stripe_customer_id = null where id = $1`, [
