@@ -38,6 +38,18 @@ vi.mock('@crawlmouse/engine/v2/pipeline', async (original) => ({
 }));
 
 const T0 = Date.parse('2026-11-05T02:30:00Z');
+/**
+ * persist.ts is mocked above, so the database it would call is never reached: each of PersistDb's
+ * methods (the finishing RPC, and the chunked staging A added for Q11) throws if it is.
+ */
+const UNUSED_DB = {
+  persistBuiltCheck: async (): Promise<unknown> => {
+    throw new Error('persistDb is not called in this test');
+  },
+  stageCheckRows: async (): Promise<unknown> => {
+    throw new Error('persistDb is not called in this test');
+  },
+};
 const EVENT: CheckRequested = {
   checkId: CHECK,
   siteId: SITE_ID,
@@ -79,7 +91,7 @@ async function runRecorded() {
   const deps: StepDeps = {
     store,
     evidence,
-    persistDb: { persistBuiltCheck: async () => ({}) },
+    persistDb: UNUSED_DB,
     worker,
     now: () => clock.now,
     nonce: () => `nonce-${String(++nonces).padStart(16, '0')}`,
