@@ -167,6 +167,10 @@ interface Page {
 }
 
 function fromPageResult(p: PageResult, keys: string[]): Page {
+  // A stream's fetch counts the links in the response. A page whose links were not all read has no
+  // such count (its links_out is 0 when none was read, the links found so far when the read stopped
+  // early), and a fetch has no way to say "not read".
+  if (!p.links_read) throw new Error(`synthesise: the links of ${p.url} were not all read`);
   const template = templateOf(keys, p.url);
   return {
     url: p.url,

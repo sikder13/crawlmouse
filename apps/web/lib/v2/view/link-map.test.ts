@@ -94,6 +94,26 @@ describe('linkMapView: the hubs and their neighbours (Final-LinkMap)', () => {
     });
   });
 
+  it('says "not read" for a page whose links were not all read, never its count as links out', () => {
+    // A page whose links were not all read has no count: links_out is 0 for a 404, partial for a cut body.
+    const d = structuredClone(fixture('bad-site'));
+    const page = d.page_results.find(
+      (p) => p.check_id === BAD && p.url.endsWith('/products/ridge-2p'),
+    )!;
+    page.links_read = false;
+    const ridge = linkMapView(d, BAD, { scope: 'hubs', asFirstSeen: true, hrefs }).details[
+      '/products/ridge-2p'
+    ]!;
+    expect(ridge.facts.find((f) => f.label === 'Links out')).toEqual({
+      label: 'Links out',
+      value: 'not read',
+    });
+    expect(ridge.linksTo.heading).toBe('Links to · not read');
+    expect(ridge.linksTo.more).toBeNull();
+    // What the crawl did record from it is still listed.
+    expect(ridge.linksTo.paths).toEqual(v.details['/products/ridge-2p']!.linksTo.paths);
+  });
+
   it('lists the crawler requests the record holds for a page, and says how many it holds', () => {
     const access = v.details['/products/ridge-2p']!.access!;
     expect(access.rows.map((r) => [r.ua, r.verdict, r.words])).toEqual([
