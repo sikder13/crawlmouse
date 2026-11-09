@@ -1,5 +1,5 @@
 /**
- * The v2 nightly reconcile (CC-03 D10, plan §7): each account with a Stripe customer, and its
+ * The v2 nightly reconcile (CC-03 D10): each account with a Stripe customer, and its
  * subscription mirror, compared with Stripe; what differs is reported to Sentry as
  * `reconcile.drift`, one message per account, at most `REPORT_CAP` of them. Nothing is written,
  * here or in Stripe: a drift is for a person to look at.
