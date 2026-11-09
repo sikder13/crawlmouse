@@ -88,13 +88,15 @@ It parses both files with `yaml` (YAML 1.2, so the key `on` stays a string; YAML
   - no workflow-level `defaults` or `env`, and no job-level `uses:`;
   - an `authorize` job with no environment, no `secrets` reference, `permissions: {}`, no `needs`,
     no `if:` and one step;
-  - at least one job holding an environment or a `secrets` reference; each such job needs
+  - at least one job holding an environment or a `secrets` reference (the context and the status
+    functions are matched without case, as GitHub's expressions read them); each such job needs
     `authorize`, has no status function (`success(`, `failure(`, `always(`, `cancelled(`) in its
     `if:`, and no `secrets` reference outside its steps;
-  - on `authorize` and each such job: no job-level `env`, `defaults`, `continue-on-error`,
-    `container` or `services`; `runs-on: ubuntu-24.04`; step 0 is the guard, with exactly the keys
+  - on `authorize` and each such job: no key outside `environment`, `if`, `needs`, `outputs`,
+    `permissions`, `runs-on`, `steps` and `timeout-minutes`, spelled as written, so no job-level
+    `env`, `defaults`, `continue-on-error`, `container` or `services` in any case; `runs-on: ubuntu-24.04`; step 0 is the guard, with exactly the keys
     `name`, `env` and `run`, the five-line `env:` mapping, and no expression in its script; no step
-    has `continue-on-error`;
+    has `continue-on-error`, in any case;
   - the same guard script in every copy.
 
   Why `env` is refused at workflow and job level: it reaches the guard's process. The test runs the

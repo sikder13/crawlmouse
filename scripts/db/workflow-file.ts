@@ -87,7 +87,8 @@ export function environmentName(job: Job): string | undefined {
 
 /** True when anything in the value, at any depth, mentions the `secrets` context. */
 export function mentionsSecrets(value: unknown): boolean {
-  return /\bsecrets\b/.test(JSON.stringify(value ?? null));
+  // Context names are case-insensitive in GitHub expressions: `SECRETS.X` reads a secret too.
+  return /\bsecrets\b/i.test(JSON.stringify(value ?? null));
 }
 
 /** The guard step's env mapping. Every copy must pass exactly these values, and nothing else. */
@@ -130,15 +131,34 @@ function guardStepProblems(where: string, step: Step | undefined): string[] {
 
 /** Any status function in an `if:` lets a job run, or not, regardless of how its needs ended. */
 function hasStatusFunction(job: Job): boolean {
-  return /\b(?:success|failure|always|cancelled)\s*\(/.test(String(job.if ?? ''));
+  // Function names are case-insensitive in GitHub expressions: `Always()` is `always()`.
+  return /\b(?:success|failure|always|cancelled)\s*\(/i.test(String(job.if ?? ''));
 }
 
 /** The one runner the guarded jobs may use: a GitHub-hosted image, no container, no services. */
 export const GUARD_RUNNER = 'ubuntu-24.04';
 
+/**
+ * The keys a guarded job may have, as these files spell them. Any other key, an `Env` or `IF` in
+ * another case among them, is refused rather than interpreted.
+ */
+export const GUARDED_JOB_KEYS = [
+  'environment',
+  'if',
+  'needs',
+  'outputs',
+  'permissions',
+  'runs-on',
+  'steps',
+  'timeout-minutes',
+];
+
 /** Checks shared by `authorize` and every secret-holding job: what reaches the guard step. */
 function guardedJobProblems(name: string, job: Job): string[] {
   const problems: string[] = [];
+  for (const key of Object.keys(job)) {
+    if (!GUARDED_JOB_KEYS.includes(key)) problems.push(`${name}: has the key ${key}`);
+  }
   // A job-level env reaches every step's process: BASH_ENV, or an exported BASH_FUNC_*, runs code
   // or replaces a builtin before the guard's first line.
   if ('env' in job) problems.push(`${name}: has a job-level env`);
@@ -150,7 +170,8 @@ function guardedJobProblems(name: string, job: Job): string[] {
   const steps = job.steps ?? [];
   problems.push(...guardStepProblems(name, steps[0]));
   steps.forEach((step, i) => {
-    if ('continue-on-error' in step) problems.push(`${name}: step ${i} has continue-on-error`);
+    if (Object.keys(step).some((k) => k.toLowerCase() === 'continue-on-error'))
+      problems.push(`${name}: step ${i} has continue-on-error`);
   });
   return problems;
 }

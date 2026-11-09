@@ -287,6 +287,36 @@ const BYPASSES: Bypass[] = [
 
 const MORE_BYPASSES: Bypass[] = [
   [
+    'SECRETS.X, the context in another case, read by report',
+    'db-apply-prod.yml',
+    (w) => void (w.jobs.report!.steps![0]!.env = { T: '${{ SECRETS.X }}' }),
+    /report: step 0 is not the guard/,
+  ],
+  [
+    'an Env key, in another case, on apply',
+    'db-apply-prod.yml',
+    (w) => void ((w.jobs.apply as Record<string, unknown>).Env = { BASH_ENV: '/tmp/x' }),
+    /apply: has the key Env/,
+  ],
+  [
+    'Always() in plan, a status function in another case',
+    'db-apply-prod.yml',
+    (w) => void (w.jobs.plan!.if = 'Always()'),
+    /plan: its if calls a status function/,
+  ],
+  [
+    'SUCCESS() || true in rollback',
+    'db-rollback-prod.yml',
+    (w) => void (w.jobs.rollback!.if = 'SUCCESS() || true'),
+    /rollback: its if calls a status function/,
+  ],
+  [
+    'Continue-On-Error on a later step of apply',
+    'db-apply-prod.yml',
+    (w) => void ((w.jobs.apply!.steps![1] as Record<string, unknown>)['Continue-On-Error'] = true),
+    /apply: step 1 has continue-on-error/,
+  ],
+  [
     'workflow-level env BASH_ENV',
     'db-apply-prod.yml',
     (w) => void (w.env = { BASH_ENV: '/tmp/x' }),

@@ -263,9 +263,14 @@ describe('changes.mjs', () => {
     expect(needsVisual(files)).toBe(want);
   });
 
+  it("reads Tailwind's content as folder globs, so the cases below are not vacuous", () => {
+    expect(tailwindConfig.content).toEqual(['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}']);
+  });
+
   it.each((tailwindConfig.content as string[]).map((glob) => [glob]))(
     "keeps test files under Tailwind's content glob %s",
     (glob) => {
+      expect(glob).toMatch(/^\.\/[a-z][\w-]*\/\*\*\//);
       const dir = join('apps/web', glob.slice(0, glob.indexOf('/**')))
         .split(sep)
         .join('/');
