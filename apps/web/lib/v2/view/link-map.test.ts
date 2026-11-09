@@ -1,3 +1,4 @@
+import { checkMap } from '@crawlmouse/engine/v2/pipeline';
 import { describe, expect, it } from 'vitest';
 import { findCheck, fixture } from '../fixtures';
 import { generatedGraph } from '../generated-graph';
@@ -172,5 +173,49 @@ describe('linkMapView: every page', () => {
     expect(v.nodes).toHaveLength(findCheck(d, id).coverage!.pages_crawled);
     expect(v.explore).toBeNull();
     expect(Object.keys(v.details)).toHaveLength(0);
+  });
+});
+
+describe('the drawing a finished check stores (checkMap, CC-20b D10)', () => {
+  const pathOf = (url: string) => {
+    const u = new URL(url);
+    return `${u.pathname}${u.search}`;
+  };
+
+  // The built check, which the check builder made; and the bad site's, whose hubs include a
+  // JavaScript-only page, the one kind the layout places by whether the map is finished.
+  it.each(['built-site', 'bad-site'] as const)(
+    'is the drawing the explorer draws of the %s check: the same pages, kinds, lines and places',
+    (name) => {
+      const d = fixture(name);
+      const id = FIRST_AUDIT[name];
+      const stored = checkMap(
+        d.page_results.filter((p) => p.check_id === id),
+        d.link_edges.filter((e) => e.check_id === id),
+      );
+      const fromStored = stored.nodes.map((n) => ({
+        path: pathOf(n.id),
+        kind: n.kind,
+        x: stored.positions[n.id]!.x,
+        y: stored.positions[n.id]!.y,
+        parent: n.parent ? pathOf(n.parent) : null,
+        js: n.via === 'javascript',
+      }));
+      const drawn = linkMapView(d, id, { scope: 'hubs', hrefs }).nodes.map(
+        ({ path, kind, x, y, parent, js }) => ({ path, kind, x, y, parent, js }),
+      );
+      expect(drawn.length).toBeGreaterThan(1);
+      expect(fromStored).toEqual(drawn);
+    },
+  );
+
+  it('the bad site’s drawing holds a JavaScript-only page, so the comparison sees the finished layout', () => {
+    const d = fixture('bad-site');
+    const id = FIRST_AUDIT['bad-site'];
+    const stored = checkMap(
+      d.page_results.filter((p) => p.check_id === id),
+      d.link_edges.filter((e) => e.check_id === id),
+    );
+    expect(stored.nodes.some((n) => n.kind === 'js_only')).toBe(true);
   });
 });
