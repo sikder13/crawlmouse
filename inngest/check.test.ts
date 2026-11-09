@@ -547,9 +547,10 @@ function configOf(fn: unknown) {
 
 describe('createCheckFn (D3)', () => {
   const noSteps = () => fakeSteps({ now: T0 }).steps;
+  const noFail = async () => ({ failed: false });
 
   it('declares the D3 options', () => {
-    const [main] = configOf(createCheckFn(noSteps, {}));
+    const [main] = configOf(createCheckFn(noSteps, noFail, {}));
     expect(main).toMatchObject({
       id: `${inngest.id}-${CHECK_FN_ID}`,
       triggers: [{ event: 'check.requested' }],
@@ -567,7 +568,8 @@ describe('createCheckFn (D3)', () => {
   it('reads the account-wide limit from INNGEST_CHECK_CONCURRENCY under the plan cap', () => {
     const limitOf = (v: string) =>
       (
-        configOf(createCheckFn(noSteps, { INNGEST_CHECK_CONCURRENCY: v }))[0]!.concurrency as {
+        configOf(createCheckFn(noSteps, noFail, { INNGEST_CHECK_CONCURRENCY: v }))[0]!
+          .concurrency as {
           limit: number;
         }[]
       )[1]!.limit;
@@ -575,14 +577,19 @@ describe('createCheckFn (D3)', () => {
     expect(limitOf('50')).toBe(5);
   });
 
-  it('onFailure fails the check with the error’s reason and sends check.failed', async () => {
+  it('onFailure fails the check with the error’s reason through `fail` alone, and sends check.failed', async () => {
     const calls: unknown[] = [];
-    const steps = fakeSteps({ now: T0 }).steps;
-    steps.fail = async (event, reason) => {
-      calls.push([event.checkId, reason]);
-      return { failed: true };
-    };
-    const fn = createCheckFn(() => steps, {}) as unknown as {
+    // onFailure builds no step bodies (correctness 1): `steps` throws if it is called.
+    const fn = createCheckFn(
+      () => {
+        throw new Error('onFailure built the step bodies');
+      },
+      async (checkId, reason) => {
+        calls.push([checkId, reason]);
+        return { failed: true };
+      },
+      {},
+    ) as unknown as {
       onFailureFn: (ctx: unknown) => Promise<void>;
     };
     const step = fakeStep({ now: T0 });
@@ -610,7 +617,13 @@ describe('createCheckCancelledFn (finding 4)', () => {
   it('triggers on the function_id the SDK gives checkFn, as its own onFailure handler does', () => {
     // The SDK builds checkFn's failure handler with a trigger on inngest/function.failed filtered to
     // checkFn's function_id; inngest/function.cancelled carries the same function_id.
-    const [, failure] = configOf(createCheckFn(() => fakeSteps({ now: T0 }).steps, {}));
+    const [, failure] = configOf(
+      createCheckFn(
+        () => fakeSteps({ now: T0 }).steps,
+        async () => ({ failed: false }),
+        {},
+      ),
+    );
     const sdkFilter = (failure!.triggers as { expression: string }[])[0]!.expression;
     const [cancelled] = configOf(createCheckCancelledFn(async () => null));
     expect(cancelled!.triggers).toEqual([

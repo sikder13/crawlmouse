@@ -14,8 +14,13 @@ export interface StepDeps {
   store: PipelineStore;
   evidence: EvidenceStore;
   persistDb: PersistDb;
-  /** Null when the environment holds no worker credentials: a post then fails the check. */
-  worker: WorkerClient | null;
+  /**
+   * The worker client, built when a step asks for it (correctness 1): null when the environment holds
+   * no worker credentials; it throws when they do not make a client (a malformed key, a URL with no
+   * scheme). The batch steps call it through batches.ts `workerOf`, which turns either into the
+   * check's `worker_unavailable`.
+   */
+  worker: () => WorkerClient | null;
   /** Milliseconds since the epoch. */
   now: () => number;
   /** A fresh single-use nonce for one POST: 16 to 128 of `[A-Za-z0-9_-]`. */

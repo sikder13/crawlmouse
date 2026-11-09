@@ -9,7 +9,7 @@ import { finishSteps } from './finish';
 import { lifecycleSteps } from './lifecycle';
 
 export { NO_DAILY_BUDGET, type StepDeps } from './deps';
-export { failCancelled, reapCutoff, reapStalled } from './lifecycle';
+export { failCancelled, failCheck, reapCutoff, reapStalled } from './lifecycle';
 
 export function checkSteps(deps: StepDeps): CheckSteps {
   return { ...lifecycleSteps(deps), ...batchSteps(deps), ...finishSteps(deps) };

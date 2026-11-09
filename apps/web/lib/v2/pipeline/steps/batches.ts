@@ -65,9 +65,17 @@ export function countsOf(result: BatchResult) {
 export function batchSteps(
   deps: StepDeps,
 ): Pick<CheckSteps, 'post' | 'poll' | 'read' | 'failBatch'> {
+  /** The worker client; a missing or unbuildable one fails the check, non-retriably. */
   const workerOf = (): WorkerClient => {
-    if (deps.worker === null) throw new CheckFailure('worker_unavailable');
-    return deps.worker;
+    let worker: WorkerClient | null;
+    try {
+      worker = deps.worker();
+    } catch (e) {
+      // The client's construction errors name the variable, never its value.
+      throw new CheckFailure('worker_unavailable', { cause: e });
+    }
+    if (worker === null) throw new CheckFailure('worker_unavailable');
+    return worker;
   };
   const found = (s: string) => s === 'running' || s === 'done' || s === 'failed';
 

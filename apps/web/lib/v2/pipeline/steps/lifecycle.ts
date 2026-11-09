@@ -2,7 +2,8 @@
  * The steps that start and end a check outside its batches: claim, discover and fail, and what the
  * cancel handler and the reaper run.
  */
-import type { CancelledCheck, CheckSteps } from '../../../../../../inngest/check';
+import type { CancelledCheck, CheckSteps, FailOutput } from '../../../../../../inngest/check';
+import type { FailureReason } from '../../../../../../inngest/check-events';
 import type { ReapedCheck } from '../../../../../../inngest/check-reaper';
 import { isCrawlPaused } from '../../../crawl-pause';
 import { discoverSeeds } from '../discover';
@@ -45,10 +46,17 @@ export function lifecycleSteps(deps: StepDeps): Pick<CheckSteps, 'claim' | 'disc
       return { seeds: seeds.length, sitemap_urls: sitemapUrls, at };
     },
 
-    async fail(event, reason) {
-      return { failed: await deps.store.fail(event.checkId, reason, null) };
-    },
+    fail: (event, reason) => failCheck(deps.store, event.checkId, reason),
   };
+}
+
+/** Fails the check by its id unless it has ended; what runCheck's `fail` and onFailure run. */
+export async function failCheck(
+  store: Pick<PipelineStore, 'fail'>,
+  checkId: string,
+  reason: FailureReason,
+): Promise<FailOutput> {
+  return { failed: await store.fail(checkId, reason, null) };
 }
 
 /** The cancel handler's work: the check the run claimed, failed `canceled`; null when none moved. */

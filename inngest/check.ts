@@ -326,11 +326,17 @@ type Env = Readonly<Record<string, string | undefined>>;
 
 /**
  * checkFn. `steps` is called once per invocation, so the deps are built where the step runs.
+ * onFailure calls `fail` and never `steps`: failing a check needs the database only, so a dependency
+ * the steps need and cannot build does not keep a failed check from being marked failed.
  * Concurrency: one check per site at a time, and an account-wide limit under the plan cap
  * (concurrency.ts). Inngest counts executing steps, so a run asleep between polls holds no slot:
  * `claim_check` keeps one check per site running in the database (plan §10, finding 1).
  */
-export function createCheckFn(steps: () => CheckSteps, env: Env = process.env) {
+export function createCheckFn(
+  steps: () => CheckSteps,
+  fail: (checkId: string, reason: FailureReason) => Promise<FailOutput>,
+  env: Env = process.env,
+) {
   return inngest.createFunction(
     {
       id: CHECK_FN_ID,
@@ -342,7 +348,7 @@ export function createCheckFn(steps: () => CheckSteps, env: Env = process.env) {
       onFailure: async ({ event, error, step }) => {
         const data = event.data.event.data;
         const reason = failureReasonOf(error);
-        const { failed } = await step.run('fail', () => steps().fail(data, reason));
+        const { failed } = await step.run('fail', () => fail(data.checkId, reason));
         if (failed) {
           await step.sendEvent('emit-failed', {
             name: 'check.failed',

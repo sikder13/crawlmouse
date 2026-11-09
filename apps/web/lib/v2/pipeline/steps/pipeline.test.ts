@@ -92,7 +92,7 @@ async function runRecorded() {
     store,
     evidence,
     persistDb: UNUSED_DB,
-    worker,
+    worker: () => worker,
     now: () => clock.now,
     nonce: () => `nonce-${String(++nonces).padStart(16, '0')}`,
     env: { VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40) },
