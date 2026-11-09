@@ -67,7 +67,7 @@ export async function personalAccount(
   return { accountId: rows[0]!.account_id, seatId: rows[0]!.seat_id };
 }
 
-const SHA = (n: number) => n.toString(16).padStart(64, '0');
+export const SHA = (n: number) => n.toString(16).padStart(64, '0');
 const CRAWL_UA = 'Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)';
 /** sha256 hex of the UTF-8 URL: what page_results.url_hash and the link_edges hashes hold. */
 export const urlHash = (url: string) => createHash('sha256').update(url, 'utf8').digest('hex');
@@ -201,6 +201,9 @@ export const ROWS = {
     byte_count: 1000,
     word_count: 120,
     body_excerpt: '<html>',
+    // 006d's NOT NULL columns; seedWorld leaves them out on a database migrated before 006d.
+    identity_role: 'crawler',
+    tagged: true,
   }),
   site_fixes: (id: string, siteId: string, checkId: string, n: number): Row => ({
     id,
@@ -470,6 +473,13 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.usage_events')::text as t`,
   );
   const with006b = found[0]!.t !== null;
+  // A database migrated before 006d (the revert tests of 003 to 006c) has no identity columns.
+  const { rows: identity } = await db.query<{ n: number }>(
+    `select count(*)::int as n from pg_attribute
+      where attrelid = 'public.access_tests'::regclass and attname in ('identity_role', 'tagged')
+        and not attisdropped`,
+  );
+  const with006d = identity[0]!.n === 2;
   const ownerId = await signUp(db, `owner-${tag}-${n}@example.com`);
   const { accountId, seatId: ownerSeatId } = await personalAccount(db, ownerId);
   const scopedUserId = await signUp(db, `dev-${tag}-${n}@example.com`);
@@ -530,12 +540,12 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       scope,
     });
     const at = randomUUID();
-    await put(
-      'access_tests',
-      { ...ROWS.access_tests(at, checkId), lineage_id: lineage },
-      { id: at, ...month },
-      scope,
-    );
+    const access = { ...ROWS.access_tests(at, checkId), lineage_id: lineage };
+    if (!with006d) {
+      delete access.identity_role;
+      delete access.tagged;
+    }
+    await put('access_tests', access, { id: at, ...month }, scope);
     if (with006b) {
       const run = randomUUID();
       await insertLedgerRow(db, 'check_runs', ledgerRun(run, SHA(++k), lineage));

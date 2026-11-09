@@ -138,7 +138,7 @@ describe('the crawl_worker role', () => {
           and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
         order by 1`,
     );
-    // The CHECK helpers are v2_* (003): a CHECK's function needs EXECUTE for the role that inserts.
+    // The CHECK helpers are v2_* (003, 006d): a CHECK's function needs EXECUTE for the role that inserts.
     expect(rows.filter((r) => !r.name.startsWith('v2_'))).toEqual([
       { name: 'crawl_worker_check_id', worker: true, anon: false, authed: false },
       { name: 'crawl_worker_check_month', worker: true, anon: false, authed: false },
@@ -149,6 +149,8 @@ describe('the crawl_worker role', () => {
     expect(helpers.map((r) => r.name)).toEqual([
       'v2_canonical_shape_ok',
       'v2_crawled_text_ok',
+      'v2_head_text_absent_ok',
+      'v2_head_text_shape_ok',
       'v2_headers_shape_ok',
       'v2_hreflang_shape_ok',
       'v2_http_url_ok',

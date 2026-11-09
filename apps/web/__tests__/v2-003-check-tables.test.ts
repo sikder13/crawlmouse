@@ -656,6 +656,36 @@ const RULE_CASES: Record<
     table: 'access_tests',
     row: async () => ({ ...(await freshRow('access_tests')), method: 'GET', http_version: null }),
   },
+  // 006d.
+  access_tests_fly_region: {
+    table: 'access_tests',
+    row: async () => ({ ...(await freshRow('access_tests')), fly_region: 'IAD' }),
+  },
+  access_tests_worker_release: {
+    table: 'access_tests',
+    row: async () => ({ ...(await freshRow('access_tests')), worker_release: 'v1.2.3' }),
+  },
+  page_results_title: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      title: { text: 'Tents', chars: 5 },
+    }),
+  },
+  page_results_meta_description: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      meta_description: { text: 'x'.repeat(1025), chars: 1025, cut: false },
+    }),
+  },
+  page_results_head_text_absent: {
+    table: 'page_results',
+    row: async () => ({
+      ...(await freshRow('page_results')),
+      title: { text: null, chars: 12, cut: false },
+    }),
+  },
   changes_severity: {
     table: 'changes',
     row: async () => ({ ...(await freshRow('changes')), severity: null }),
