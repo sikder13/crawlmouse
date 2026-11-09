@@ -178,10 +178,10 @@ export function sample(
   assembled: Pick<Assembled, 'pages' | 'rows' | 'homepage_url' | 'access_tests'>,
 ): Sample {
   const { pages, rows, homepage_url } = assembled;
-  // A page whose template key the worker would refuse in an access batch is not tested.
-  const eligible = pages.filter(
-    (p) => p.status_code === 200 && p.is_html && p.template_key.length <= MAX_TEMPLATE_KEY_LENGTH,
-  );
+  // A page whose template key the worker would refuse in an access batch is not tested, whichever
+  // way it would be picked.
+  const testable = (p: PageResult) => p.template_key.length <= MAX_TEMPLATE_KEY_LENGTH;
+  const eligible = pages.filter((p) => p.status_code === 200 && p.is_html && testable(p));
   const picked: SampledPage[] = [];
   const taken = new Set<string>();
   const covered = new Set<string>();
@@ -194,7 +194,7 @@ export function sample(
   const home = eligible.find((p) => p.url === homepage_url);
   if (home) take(home, 1, 'homepage');
   pages
-    .filter((p) => rows.get(p.url)?.response === 'challenged')
+    .filter((p) => rows.get(p.url)?.response === 'challenged' && testable(p))
     .slice(0, STAGE1_CHALLENGED)
     .forEach((p) => take(p, 1, 'challenged'));
   const templates = templatesBySize(eligible);

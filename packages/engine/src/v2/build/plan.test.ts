@@ -74,18 +74,42 @@ describe('stage 1', () => {
 describe('stage 1 bounds', () => {
   // An access batch's template keys are bounded by the worker (invalid_body past it); a crawler trap
   // (/a/b/a/b/…) gives a key per depth, each longer than the last.
-  it('samples no page whose template key is over the worker’s limit', () => {
-    const deep = `/${Array.from({ length: Math.ceil(MAX_TEMPLATE_KEY_LENGTH / 2) + 1 }, () => 'a').join('/')}`;
-    // The fixture's title is `Page <url>`, which a URL this long would push past the title's own
-    // bound; the row is made on a short URL and then given the long one.
-    const trap = { ...ok('/trap'), url: at(deep), final_url: at(deep) };
-    const rows = [ok(''), ok('/plain/page'), trap];
-    const a = assembled(rows);
-    expect(a.pages.find((p) => p.url === at(deep))!.template_key.length).toBeGreaterThan(
-      MAX_TEMPLATE_KEY_LENGTH,
+  // A row made on a short URL and then given a long one: the fixture's title is `Page <url>`, which a
+  // URL this long would push past the title's own bound.
+  const longRow = (path: string, challengedRow = false) => ({
+    ...(challengedRow ? challenged('/trap') : ok('/trap')),
+    url: at(path),
+    final_url: at(path),
+  });
+  /** A path whose template key is `length` characters: `/a` segments, and one `/bb` for an odd length. */
+  const keyed = (length: number) =>
+    `${'/a'.repeat(Math.floor(length / 2) - (length % 2))}${length % 2 ? '/bb' : ''}`;
+
+  it('samples a page whose template key is at the worker’s limit, and none past it', () => {
+    const rows = [ok(''), ok('/plain/page'), longRow(keyed(MAX_TEMPLATE_KEY_LENGTH))];
+    const at_limit = assembled(rows);
+    const page = at_limit.pages.find((p) => p.url === at(keyed(MAX_TEMPLATE_KEY_LENGTH)))!;
+    expect(page.template_key.length).toBe(MAX_TEMPLATE_KEY_LENGTH);
+    expect(sample(at_limit).stage1.map((p) => p.url)).toContain(page.url);
+
+    const past = assembled([
+      ok(''),
+      ok('/plain/page'),
+      longRow(keyed(MAX_TEMPLATE_KEY_LENGTH + 1)),
+    ]);
+    const over = past.pages.find((p) => p.url === at(keyed(MAX_TEMPLATE_KEY_LENGTH + 1)))!;
+    expect(over.template_key.length).toBe(MAX_TEMPLATE_KEY_LENGTH + 1);
+    expect(sample(past).stage1.map((p) => p.url)).not.toContain(over.url);
+    expect(sample(past).stage1.map((p) => p.url)).toContain(at('/plain/page'));
+  });
+
+  it('samples no challenged page whose template key is past the worker’s limit', () => {
+    const path = keyed(MAX_TEMPLATE_KEY_LENGTH + 1);
+    const a = assembled([ok(''), ok('/plain/page'), longRow(path, true)]);
+    expect(a.pages.find((p) => p.url === at(path))!.template_key.length).toBe(
+      MAX_TEMPLATE_KEY_LENGTH + 1,
     );
-    expect(sample(a).stage1.map((p) => p.url)).not.toContain(at(deep));
-    expect(sample(a).stage1.map((p) => p.url)).toContain(at('/plain/page'));
+    expect(sample(a).stage1.map((p) => p.url)).not.toContain(at(path));
   });
 });
 
@@ -307,19 +331,33 @@ describe('nextCrawlBatch', () => {
 
   // The worker refuses a whole batch holding a URL over its request limit (invalid_body), and a
   // sitemap's <loc> can be any length.
-  it('plans no URL over the worker’s URL limit, from a sitemap or a link', () => {
-    const long = at(`/${'x'.repeat(MAX_URL_LENGTH)}`);
+  it('plans a URL at the worker’s URL limit, and none past it, from a sitemap or a link', () => {
+    // HOME is 14 characters and the path's slash one more.
+    const of = (length: number, tail: string) =>
+      at(`/${tail}${'x'.repeat(length - HOME.length - 1 - tail.length)}`);
+    const seedAt = of(MAX_URL_LENGTH, 's');
+    const seedPast = of(MAX_URL_LENGTH + 1, 's');
+    const linkAt = of(MAX_URL_LENGTH, 'l');
+    const linkPast = of(MAX_URL_LENGTH + 1, 'l');
+    for (const [u, n] of [
+      [seedAt, MAX_URL_LENGTH],
+      [seedPast, MAX_URL_LENGTH + 1],
+      [linkAt, MAX_URL_LENGTH],
+      [linkPast, MAX_URL_LENGTH + 1],
+    ] as const)
+      expect(canonicalizeUrl(u).length).toBe(n);
     const seeds: Seed[] = [
       { url: HOME, source: 'homepage', lastmod: null },
-      { url: long, source: 'sitemap', lastmod: null },
+      { url: seedAt, source: 'sitemap', lastmod: null },
+      { url: seedPast, source: 'sitemap', lastmod: null },
     ];
     const batch = crawlBatch(
       0,
       [crawlRow({ url: HOME, outcome: 'fetched', status: 200 })],
       [],
-      [`${long}/linked`, at('/ok')],
+      [linkAt, linkPast],
     );
-    expect(nextCrawlBatch(seeds, [batch], 500)).toEqual([at('/ok')]);
+    expect(nextCrawlBatch(seeds, [batch], 500)).toEqual([seedAt, linkAt]);
   });
 
   it('crawls no sitemap seed on another port', () => {
