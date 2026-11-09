@@ -61,7 +61,7 @@
         "cache": "pass — dynamic; measured Cache-Control: private, no-cache, no-store",
         "redirect": "n/a — no redirect param",
         "errors": "pass — notFound() only",
-        "escaping": "pass — the audit URL is display text, never an href (components/audit/AuditUrlHeader.tsx:7); crawled titles/URLs are JSX text (components/audit/NodeDetail.tsx:7, FreeFixCard.tsx:11-12); the graph tooltip is innerHTML (react-force-graph nodeLabel) and gets nodeTooltipLabel, which decodes then escapes (components/audit/LinkGraph.tsx:96, components/audit/graph-logic.ts:146)",
+        "escaping": "pass — the audit URL is display text, never an href (components/audit/AuditUrlHeader.tsx:7); crawled titles/URLs are JSX text (components/audit/NodeDetail.tsx:7, components/audit/FreeFixCard.tsx:26-44); the graph tooltip is innerHTML (react-force-graph nodeLabel) and gets nodeTooltipLabel, which decodes then escapes (components/audit/LinkGraph.tsx:96, components/audit/graph-logic.ts:146)",
         "abuse": "pass — re-audit/start actions are rate-limited (app/api/audits/[id]/reaudit/route.ts:67-93)"
       }
     },
@@ -262,7 +262,7 @@
         "cache": "pass — dynamic, reads cookies; measured private, no-cache, no-store on the signed-out 307",
         "redirect": "pass — signed-out → fixed '/login' (app/dashboard/page.tsx:28); post-upgrade return goes through safeReturnTo, /audit/<id> only (components/billing/post-upgrade-return.ts:9-12)",
         "errors": "pass — no error body",
-        "escaping": "pass — site URLs are JSX text; links are /audit/${id} and /r/${slug} built from ids (components/dashboard/SiteCard.tsx:47, ReportBrandingSettings.tsx:30)",
+        "escaping": "pass — site URLs are JSX text; links are /audit/${id} and /r/${slug} built from ids (components/dashboard/SiteCard.tsx:47, components/dashboard/ReportBrandingSettings.tsx:30)",
         "abuse": "n/a — read only"
       }
     },
@@ -394,12 +394,12 @@
       "reason": "public reports; old snapshots keep rendering with the v1 component until re-minted",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "checks": {
-        "input": "pass — slug is only an .eq('slug') filter in readReportRow (lib/reports.ts:44); unknown or garbage slug → null → notFound() (app/r/[slug]/page.tsx:39), measured 404 on next start",
-        "output": "pass — selects only render columns, never minted_by or audit_id (lib/reports.ts:29-30); the client island gets slug, domain and claimed only (app/r/[slug]/page.tsx:62); ownership state comes from /api/reports/[slug]/mine after hydration",
+        "input": "pass — slug is only an .eq('slug') filter in readReportRow (lib/reports.ts:44); unknown or garbage slug → null → notFound() (app/r/[slug]/page.tsx:40), measured 404 on next start",
+        "output": "pass — selects only render columns, never minted_by or audit_id (lib/reports.ts:29-30); the client island gets slug, domain and claimed only (app/r/[slug]/page.tsx:65); ownership state comes from /api/reports/[slug]/mine after hydration",
         "cache": "pass — revalidate=300 (app/r/[slug]/page.tsx:17) is safe because the page reads no cookies or session; owner state is fetched client-side with no-store (app/api/reports/[slug]/mine/route.ts:23)",
         "redirect": "n/a — no redirect or next param",
         "errors": "pass — a read error returns null (lib/reports.ts:43-50) and renders the 404 page, no upstream text",
-        "escaping": "pass — crawled domain, titles and URLs are JSX text in server components (components/report/sections.tsx:13, ReportBody.tsx); no crawled href; the white-label logo src is built from our storage base plus a logoPath constrained to `${slug}/[A-Za-z0-9._-]+` (lib/report-brand.ts:23-27, app/api/reports/[slug]/white-label/route.ts:54-60); brandName is JSX text (components/report/ReportBrandHeader.tsx:26)",
+        "escaping": "pass — crawled domain, titles and URLs are JSX text in server components (components/report/ReportBody.tsx:1 (crawled text reaches the page only as JSX children), ReportBody.tsx); no crawled href; the white-label logo src is built from our storage base plus a logoPath constrained to `${slug}/[A-Za-z0-9._-]+` (lib/report-brand.ts:23-27, app/api/reports/[slug]/white-label/route.ts:54-60); brandName is JSX text (components/report/ReportBrandHeader.tsx:26)",
         "abuse": "n/a — read only"
       },
       "e2e": {
@@ -662,7 +662,7 @@
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — 'could not process' (:46)",
         "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
-        "abuse": "pass — closed without ADMIN_SECRET, timing-safe compare (:15-25), per-IP 30/h (:36-39)"
+        "abuse": "finding — minor (A-10): closed without ADMIN_SECRET, timing-safe compare (app/api/admin/takedown/process/route.ts:15), but the per-IP 30/h limit runs only after authorized() succeeds (app/api/admin/takedown/process/route.ts:34), so wrong-secret guesses are never throttled"
       }
     },
     {
@@ -694,7 +694,7 @@
       "checks": {
         "input": "pass — id is an .eq filter; not-owned or missing → identical 404 (:36)",
         "output": "pass — auth + Pro + owner before any read (:28-36)",
-        "cache": "finding — minor: the zip response sets no Cache-Control (:85-86); dynamic (reads cookies), not CDN-cached without s-maxage, but private, no-store is the stated bar",
+        "cache": "finding — minor (A-2): the zip response sets no Cache-Control (:85-86); dynamic (reads cookies), not CDN-cached without s-maxage, but private, no-store is the stated bar",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — fixed codes",
         "escaping": "pass — CSV escaping lives in lib/billing/csv (CC-03 file, not reviewed here)",
@@ -712,7 +712,7 @@
       "checks": {
         "input": "pass — id is an .eq filter; not-owned → 404 (:34)",
         "output": "pass — auth + Pro + owner first (:24-34)",
-        "cache": "finding — minor: text/plain attachment with no Cache-Control (:43-47); same reasoning as export",
+        "cache": "finding — minor (A-2): text/plain attachment with no Cache-Control (:43-47); same reasoning as export",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — fixed codes",
         "escaping": "n/a — plain-text attachment",
@@ -734,7 +734,7 @@
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — fixed codes",
         "escaping": "n/a — JSON",
-        "abuse": "pass — per-IP 10/day and per-email 5/day before the write (:27-33, lib/limits.ts:53-54); the mail content is fixed"
+        "abuse": "finding — minor (A-11): per-IP 10/day and per-email 5/day before the write (app/api/audits/[id]/notify/route.ts:27, lib/limits.ts:53), but anyone holding the audit id can replace notify_email on a running audit, so the owner's address is overwritten and an arbitrary address gets mail carrying the /audit/<id> link (app/api/audits/[id]/notify/route.ts:36, inngest/notify.ts:43); IPs rotate"
       }
     },
     {
@@ -764,13 +764,13 @@
       "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
       "redirect": "alias",
       "checks": {
-        "input": "finding — minor: id is not validated; a garbage or unknown id gets no snapshot and the function polls the DB every 2.5 s until the 250 s self-close (app/api/audits/[id]/stream/route.ts:253-293, lib/limits.ts:65,71), so open connections to random ids hold functions open; retire item, lead follow-up (validate uuid and close on a missing row)",
+        "input": "finding — minor (A-1): id is not validated; a garbage or unknown id gets no snapshot and the function polls the DB every 2.5 s until the 250 s self-close (app/api/audits/[id]/stream/route.ts:253-293, lib/limits.ts:65,71), so open connections to random ids hold functions open; retire item, lead follow-up (validate uuid and close on a missing row)",
         "output": "pass — every event goes through projectAuditForClient (lib/audit-stream-projection.ts:245-275), no user_id or anonymous_session_id; Pro-only fields are owner-scoped (:82-88)",
-        "cache": "finding — minor: 'no-cache, no-transform' (:309) without 'private' on an owner-dependent body; Vercel does not cache it (no s-maxage), so hardening only",
+        "cache": "finding — minor (A-1): 'no-cache, no-transform' (:309) without 'private' on an owner-dependent body; Vercel does not cache it (no s-maxage), so hardening only",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — 'Could not load results.' (:229)",
         "escaping": "n/a — JSON over SSE (JSON.stringify per event, :202)",
-        "abuse": "finding — minor: no rate limit (see input)"
+        "abuse": "finding — minor (A-1): no rate limit (see input)"
       }
     },
     {
@@ -786,7 +786,7 @@
         "output": "pass — returns auditId only (:148)",
         "cache": "pass — POST, not cached",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
-        "errors": "finding — minor: the engine's validation message is returned verbatim (:45-47), including the resolved private address, e.g. 'URL resolves to private or reserved IP (10.0.0.5): …' (packages/engine/src/ssrf-guard.ts:164-169); owner CC-SEC-2",
+        "errors": "finding — minor (A-3): the engine's validation message is returned verbatim (:45-47), including the resolved private address, e.g. 'URL resolves to private or reserved IP (10.0.0.5): …' (packages/engine/src/ssrf-guard.ts:164-169); owner CC-SEC-2",
         "escaping": "n/a — JSON",
         "abuse": "pass — global ceiling fails closed, per-IP + Turnstile on exhaustion, per-domain (:58-117)"
       }
@@ -814,7 +814,7 @@
       "reason": "auth routes are kept (v2 door fields behind V2_ACCOUNT_DOOR)",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "checks": {
-        "input": "finding — minor: email is z.string().email() with no max length (:32); next ≤2048 (:36); the v2 fields are checked only behind the door flag (:73-81)",
+        "input": "finding — minor (A-4): email is z.string().email() with no max length (:32); next ≤2048 (:36); the v2 fields are checked only behind the door flag (:73-81)",
         "output": "pass — {ok:true}; no account existence signal",
         "cache": "pass — POST",
         "redirect": "pass — next stored only after safeNextPath (:163); vectors listed under app/login/page.tsx",
@@ -836,7 +836,7 @@
         "redirect": "pass — success/cancel URLs built from resolveOrigin (:22,31-32) (lib/origin, not reviewed)",
         "errors": "pass — fixed codes; a Stripe throw is an unhandled 500 with Next's generic body",
         "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
-        "abuse": "finding — minor: no per-user rate limit on a Stripe API call (:23); signed-in only. CC-03 file, reported only"
+        "abuse": "finding — minor (A-6): no per-user rate limit on a Stripe API call (:23); signed-in only. CC-03 file, reported only"
       }
     },
     {
@@ -852,7 +852,7 @@
         "redirect": "pass — return_url fixed to origin/dashboard (:17)",
         "errors": "pass — fixed codes",
         "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
-        "abuse": "finding — minor: Stripe call with no rate limit (:15); signed-in with a customer. CC-03, reported only"
+        "abuse": "finding — minor (A-6): Stripe call with no rate limit (:15); signed-in with a customer. CC-03, reported only"
       }
     },
     {
@@ -1028,7 +1028,7 @@
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — fixed codes",
         "escaping": "n/a — stored for the ops queue",
-        "abuse": "finding — minor: Turnstile only when a token is sent (:44); the per-domain bucket (3/day, lib/limits.ts:56) is spent before the report check (:39-61), so anyone can use a domain's three daily submissions and the owner's form gets 429 until the next day (email takedown@ still works). No mail is sent. Lead follow-up"
+        "abuse": "finding — minor (A-5): Turnstile only when a token is sent (:44); the per-domain bucket (3/day, lib/limits.ts:56) is spent before the report check (:39-61), so anyone can use a domain's three daily submissions and the owner's form gets 429 until the next day (email takedown@ still works). No mail is sent. Lead follow-up"
       }
     },
     {
@@ -1104,11 +1104,11 @@
       "reason": "email events webhook, kept",
       "evidence": "apps/web/lib/security/route-policy.ts:163",
       "checks": {
-        "input": "pass — svix signature verified (:56) before parse; email shape check (:64)",
+        "input": "pass — svix signature verified (:24) before parse; email shape check (:32)",
         "output": "n/a — returns no data of its owns",
         "cache": "n/a — machine-to-machine POST, never cached",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
-        "errors": "pass — 'db error' (:74), the DB message only in logs",
+        "errors": "pass — 'db error' (:42), the DB message only in logs",
         "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
         "abuse": "n/a — signed"
       }
@@ -1120,11 +1120,11 @@
       "reason": "Stripe webhook, kept (dual-write until 009)",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "checks": {
-        "input": "pass — constructEvent signature check (:98) (CC-03 file, reported only)",
+        "input": "pass — constructEvent signature check (:21) (CC-03 file, reported only)",
         "output": "n/a — returns no data of its owns",
         "cache": "n/a — machine-to-machine POST, never cached",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
-        "errors": "pass — 'invalid signature' / 'handler error' (:107,115)",
+        "errors": "pass — 'invalid signature' / 'handler error' (:30,38)",
         "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
         "abuse": "n/a — signed"
       }
@@ -1144,7 +1144,7 @@
         "redirect": "pass — /login, /pricing on req.url, or Stripe's portal.url (:14-24)",
         "errors": "n/a — no error path of its owns",
         "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
-        "abuse": "finding — minor: GET creates a Stripe portal session on every visit with no rate limit (:20). Retire item; CC-03 owns billing"
+        "abuse": "finding — minor (A-6): GET creates a Stripe portal session on every visit with no rate limit (:20). Retire item; CC-03 owns billing"
       }
     },
     {
@@ -1159,7 +1159,7 @@
         "cache": "pass — public s-maxage=300 (:21) on a body that depends on the domain only, no cookies",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — the 'no report' badge",
-        "escaping": "pass — every interpolation goes through htmlEscape, which escapes & < > \" ' (lib/html-escape.ts:12-18; route.ts:33-34,64,67); score is toFixed(0)",
+        "escaping": "pass — every interpolation goes through htmlEscape, which escapes & < > \" ' (lib/html-escape.ts:12-18; :33-34,64,67); score is toFixed(0)",
         "abuse": "n/a — read; the view counter is best-effort in after() (:73-79)"
       }
     },
@@ -1188,11 +1188,11 @@
       "checks": {
         "input": "pass — OTP type allowlisted (:48,57-60); token only moves into an httpOnly cookie on GET (:69-75)",
         "output": "pass — token never in a URL after GET; Sentry gets the stage, not the error (:176-180)",
-        "cache": "pass — applyNoStore on every response (:67,90)",
+        "cache": "pass — applyNoStore on the continue redirect and every POST response (app/login/verify/route.ts:67, app/login/verify/route.ts:90); the missing-token redirect (app/login/verify/route.ts:65) is not wrapped, and carries no session or token",
         "redirect": "pass — dest is safeNextPath(cookie) or DASHBOARD (:139) or the door's computed target (lib/auth/landing.ts:77-83), always new URL(dest, url.origin)",
         "errors": "pass — any failure → the 'expired' state (:113,181)",
         "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
-        "abuse": "pass — POST same-origin only (:82); anon-claim bound to the browser's httpOnly anon cookie and refused on a foreign link (:122-131)"
+        "abuse": "finding — major (A-8): POST same-origin only (:82), and the anon claim is bound to this browser's httpOnly anon cookie, but bindingMismatch refuses a foreign link only when a cm_auth_for cookie exists (lib/auth/continue-intent.ts:29); that cookie is set only with V2_ACCOUNT_DOOR on (app/api/auth/magic-link/route.ts:174), so on v1 an attacker's own link opened here signs the browser in as the attacker and claims its anonymous audits (app/login/verify/route.ts:122)"
       }
     },
     {
@@ -1412,7 +1412,7 @@
       "severity": "major",
       "items": ["inngest/audit.ts#auditFn"],
       "evidence": "node_modules got-scraping@4.2.1 dist/index.js:543-552,577-585; packages/engine/src/crawler.ts:575",
-      "what": "got-scraping's header generator opens a TLS connection (ALPN probe) to each new https host:port with system DNS, ignoring the pinned dnsLookup; with a rebinding hostname a blind TLS handshake reaches an internal ip:port (reproduced: a 1,604-byte ClientHello reached 127.0.0.1; with useHeaderGenerator:false nothing arrived). No HTTP request is sent and nothing is read back.",
+      "what": "got-scraping's header generator opens a TLS connection (ALPN probe) to each new https host:port with system DNS, ignoring the pinned dnsLookup. With a rebinding hostname (needs only a DNS server the attacker runs) the probe handshakes with an internal ip:port; reproduced: a 1,604-byte ClientHello reached 127.0.0.1, and with useHeaderGenerator:false nothing arrived. No HTTP request is sent on the probe and no body is read, but a failed probe fails the request and the page is stored with status 0, so one audit of https://rebind.example:PORT/ URLs (no port check; same-host strategy matches the hostname only) reads one bit per URL: a blind internal TLS port scan. The request itself still goes over the pinned connection.",
       "owner": "CC-SEC-2 (engine; crawl-path change needs the deployed-function smoke)"
     },
     {
@@ -1427,8 +1427,8 @@
       "id": "B-F2",
       "severity": "major",
       "items": ["public.users", "app/privacy/page.tsx", "app/terms/page.tsx"],
-      "evidence": "apps/web/app/privacy/page.tsx:152; apps/web/app/terms/page.tsx:205",
-      "what": "/privacy and /terms promise erasure on request; no code deletes public.users, public.users has no FK to auth.users, and the email also sits unlinked in rate_limits keys, email_events, audits.notify_email, waitlist and takedown_requests.",
+      "evidence": "apps/web/app/privacy/page.tsx:151; apps/web/app/privacy/page.tsx:219; apps/web/app/terms/page.tsx:205",
+      "what": "/privacy and /terms promise erasure on request; no code deletes public.users, public.users has no FK to auth.users, and the email also sits unlinked in rate_limits keys, email_events, audits.notify_email, waitlist and takedown_requests. Erasure is possible by hand in SQL; what is missing is the process and the cascade.",
       "owner": "owner follow-up: an erasure runbook and an auth.users cascade migration (owner-applied)"
     },
     {
@@ -1468,7 +1468,7 @@
       "severity": "minor",
       "items": ["app/api/takedown/route.ts"],
       "evidence": "apps/web/app/api/takedown/route.ts:39",
-      "what": "the per-domain bucket (3 a day) is spent before the report lookup, so three junk posts block a domain's takedown form for a day; Turnstile runs only when a token is sent. No mail is sent.",
+      "what": "the per-domain bucket (3 a day) is spent before the report lookup, so three junk posts block a domain's takedown form for a day; Turnstile runs only when a token is sent. No mail is sent. Rated minor because the takedown address (email) remains open when the form is blocked.",
       "owner": "lead follow-up"
     },
     {
@@ -1485,11 +1485,11 @@
     },
     {
       "id": "A-7",
-      "severity": "minor",
+      "severity": "major",
       "items": ["app/r/[slug]/page.tsx"],
-      "evidence": "apps/web/middleware.ts:62",
-      "what": "the initial HTML of a missing report carries two robots metas (noindex and index, follow); the middleware's X-Robots-Tag noindex covers /r/, so nothing is indexed.",
-      "owner": "lead follow-up"
+      "evidence": "apps/web/middleware.ts:62; apps/web/app/r/[slug]/page.tsx:23",
+      "what": "the middleware sends X-Robots-Tag: noindex, nofollow, noarchive on every /r/ page, including the claimed, indexable reports the page marks index and the sitemap lists, so no report can be indexed (since 0478f107, before SPEC 04 made claimed reports indexable). A missing report's HTML also carries two robots metas. Changing the header changes what search engines index (§13).",
+      "owner": "owner decision (questions Q9): an SEO change, out of D11"
     },
     {
       "id": "B-F3",
@@ -1578,6 +1578,46 @@
       "evidence": "apps/web/lib/seo/jsonld.tsx:118",
       "what": "JSON-LD was serialised with bare JSON.stringify into a script tag; every caller passes our own constants today, so this was hardening.",
       "fixedIn": "fed2923e"
+    },
+    {
+      "id": "A-8",
+      "severity": "major",
+      "items": ["app/login/verify/route.ts"],
+      "evidence": "apps/web/lib/auth/continue-intent.ts:29; apps/web/app/api/auth/magic-link/route.ts:174; apps/web/app/login/verify/route.ts:122",
+      "what": "login CSRF with data capture: an attacker requests a magic link for their own address and gets a victim to open it and press Continue; the victim is signed in as the attacker and the victim browser's anonymous audits move into the attacker's account. The foreign-link refusal needs the cm_auth_for cookie, which only the v2 door sets, so on v1 it never fires. Disclosed for v2 in docs/specs/v2/25-account-door.md. Not fixed here: refusing without the cookie switches off the anonymous-audit claim for every v1 sign-in, a §5 flow.",
+      "owner": "owner decision (questions Q8): §5 claim-on-signup flow"
+    },
+    {
+      "id": "A-10",
+      "severity": "minor",
+      "items": ["app/api/admin/takedown/process/route.ts"],
+      "evidence": "apps/web/app/api/admin/takedown/process/route.ts:34",
+      "what": "the per-IP throttle runs after the secret check, so wrong-secret guesses are not throttled; it matters only if ADMIN_SECRET is short.",
+      "owner": "lead follow-up"
+    },
+    {
+      "id": "A-11",
+      "severity": "minor",
+      "items": ["app/api/audits/[id]/notify/route.ts"],
+      "evidence": "apps/web/app/api/audits/[id]/notify/route.ts:36; inngest/notify.ts:43",
+      "what": "anyone holding an audit id can replace notify_email on a running audit: the owner's address is overwritten and an arbitrary address gets a mail with the /audit/<id> link. Capped at 10 per IP and 5 per address a day.",
+      "owner": "lead follow-up (retired at cutover)"
+    },
+    {
+      "id": "C-7",
+      "severity": "minor",
+      "items": ["inngest/billing.ts#reconcileBillingManualFn"],
+      "evidence": "inngest/billing-helpers.ts:127",
+      "what": "with STRIPE_RECONCILE_LIVEMODE unset the livemode guard does not run, including on a manual full (writing) run; D6 asks for a livemode guard.",
+      "owner": "owner: set STRIPE_RECONCILE_LIVEMODE=true in production (CC-03 owns inngest/billing.ts)"
+    },
+    {
+      "id": "B-F8",
+      "severity": "minor",
+      "items": ["app/api/reports/[slug]/logo/route.ts", "app/privacy/page.tsx"],
+      "evidence": "apps/web/lib/report-brand.ts:7",
+      "what": "customer logo uploads sit in the public report-logos storage bucket with no retention and are not named on /privacy.",
+      "owner": "owner (legal text) and lead follow-up"
     }
   ]
 }

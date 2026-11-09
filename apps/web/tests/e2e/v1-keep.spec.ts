@@ -63,7 +63,11 @@ for (const item of keepPages) {
     const response = await page.goto(block.url, { waitUntil: 'load' });
     expect(response, `no response for ${block.url}`).not.toBeNull();
     expect(response!.status()).toBe(block.status);
-    if (block.finalPath !== undefined) expect(new URL(page.url()).pathname).toBe(block.finalPath);
+    // Where the page ended up: its own path unless the block names a designed redirect, so a page
+    // that starts bouncing to /login fails here and not only on its title.
+    expect(new URL(page.url()).pathname).toBe(
+      block.finalPath ?? new URL(block.url, baseURL).pathname,
+    );
 
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveTitle(block.title);

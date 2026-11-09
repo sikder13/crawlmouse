@@ -5,14 +5,17 @@
  *
  * What counts as v2, and is therefore not listed (the rule, not a list of items):
  * - app files under a `(v2-preview)` or `(account)` route group, at any depth;
- * - an app file with no inventory entry that imports a `…Enabled` flag reader from a `…/flags` module
- *   (`isFlagGated`): that is how v2 routes outside those groups gate themselves (`api/checks/[id]/claim`
- *   on `accountDoorEnabled`, CC-03's new billing routes on `billingV2Enabled`). A v1 file that gained
- *   a v2 branch keeps its entry, so the rule only decides files nobody has ruled;
+ * - an app file that refuses whenever a v2 flag is off (`isFlagGated`): that is how v2 routes outside
+ *   those groups gate themselves (`api/checks/[id]/claim` on `accountDoorEnabled`, CC-03's new billing
+ *   routes on `billingV2Enabled`). A v1 file with a v2 branch does not refuse, so it stays v1;
  * - an Inngest function built inside a function body (a factory) rather than as a top-level
  *   `export const x = inngest.createFunction(…)`; the v2 functions are registered that way, behind
  *   their flags;
- * - a table created by a migration whose file name contains `_v2_`.
+ * - a table created by a migration whose file name is a timestamp then `_v2_`.
+ *
+ * Not read: middleware, `next.config` redirects and rewrites, and storage buckets (the report states
+ * this); a `create table` inside a dynamic `execute`, or a `--` inside a SQL string literal; parallel
+ * (`@slot`) and intercepting (`(.)x`) segments, none of which exist under app/ today.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
@@ -67,20 +70,48 @@ export const v1Routes = (dir = APP_DIR): string[] =>
   walkApp(dir, ROUTE_FILE).map((rel) => `app/${rel}`);
 
 /**
- * True when the file imports a `…Enabled` reader from a module whose path ends in `/flags` (read
- * through the AST, so a comment naming a flag does not count).
+ * True when the file refuses whenever a v2 flag is off: it imports a `…Enabled` reader (a value
+ * import, not `import type`) from a module whose path ends in `/flags`, and some function in it has
+ * a top-level `if (!reader()) return …`. Importing a reader is not enough: a v1 route that gained a
+ * v2 branch (`api/auth/magic-link`, `login/verify`) imports one and still serves v1 with the flag off.
  */
 export function isFlagGated(file: string): boolean {
   const sf = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
-  return sf.statements.some(
-    (s) =>
-      ts.isImportDeclaration(s) &&
-      ts.isStringLiteral(s.moduleSpecifier) &&
-      /\/flags$/.test(s.moduleSpecifier.text) &&
-      s.importClause?.namedBindings !== undefined &&
-      ts.isNamedImports(s.importClause.namedBindings) &&
-      s.importClause.namedBindings.elements.some((e) => /Enabled$/.test(e.name.text)),
-  );
+  const readers = new Set<string>();
+  for (const s of sf.statements) {
+    if (!ts.isImportDeclaration(s) || !ts.isStringLiteral(s.moduleSpecifier)) continue;
+    if (!/\/flags$/.test(s.moduleSpecifier.text) || s.importClause?.isTypeOnly) continue;
+    const named = s.importClause?.namedBindings;
+    if (!named || !ts.isNamedImports(named)) continue;
+    for (const e of named.elements) {
+      if (!e.isTypeOnly && /Enabled$/.test((e.propertyName ?? e.name).text))
+        readers.add(e.name.text);
+    }
+  }
+  if (readers.size === 0) return false;
+  const returns = (st: ts.Statement): boolean =>
+    ts.isReturnStatement(st) || (ts.isBlock(st) && st.statements.some(ts.isReturnStatement));
+  const refusesWhenOff = (st: ts.Statement): boolean => {
+    if (!ts.isIfStatement(st) || !returns(st.thenStatement)) return false;
+    const cond = st.expression;
+    return (
+      ts.isPrefixUnaryExpression(cond) &&
+      cond.operator === ts.SyntaxKind.ExclamationToken &&
+      ts.isCallExpression(cond.operand) &&
+      ts.isIdentifier(cond.operand.expression) &&
+      readers.has(cond.operand.expression.text)
+    );
+  };
+  let found = false;
+  const visit = (node: ts.Node) => {
+    if (found) return;
+    if (ts.isFunctionLike(node) && 'body' in node && node.body && ts.isBlock(node.body)) {
+      if (node.body.statements.some(refusesWhenOff)) found = true;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return found;
 }
 
 /** The URL a page file serves: route groups dropped, `page.tsx` dropped. */
@@ -117,9 +148,25 @@ function property(obj: ts.Node | undefined, name: string): ts.Expression | undef
   return undefined;
 }
 
+/** The crons a trigger argument names: an object, or an array of them. A non-literal cron throws. */
+function crons(trigger: ts.Expression | undefined, where: string): string[] {
+  const objects =
+    trigger && ts.isArrayLiteralExpression(trigger) ? [...trigger.elements] : [trigger];
+  return objects.flatMap((o) => {
+    const cron = property(o, 'cron');
+    if (cron === undefined) return [];
+    const text = stringLiteral(cron);
+    if (text === null) throw new Error(`${where}: a cron that is not a literal`);
+    return [text];
+  });
+}
+
 /**
- * Top-level `export const name = <client>.createFunction(config, trigger, handler)` in each
- * non-test module of `dir`. `path` is `inngest/<file>#<name>`; the cron is read from the trigger.
+ * Every `createFunction(…)` call in each non-test module of `dir`. A call inside a function body is
+ * a factory's (the v2 rule) and is skipped; a call written as the top-level
+ * `export const name = <client>.createFunction(config, trigger, handler)` is a v1 function, `path`
+ * `inngest/<file>#<name>`. Any other placement throws, so a shape this finder does not read cannot
+ * pass unseen.
  */
 export function v1InngestFunctions(dir = INNGEST_DIR): InngestFunction[] {
   const out: InngestFunction[] = [];
@@ -127,30 +174,46 @@ export function v1InngestFunctions(dir = INNGEST_DIR): InngestFunction[] {
   for (const file of files.sort()) {
     const text = readFileSync(join(dir, file), 'utf8');
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    for (const stmt of sf.statements) {
-      if (!ts.isVariableStatement(stmt)) continue;
-      const exported = (ts.getModifiers(stmt) ?? []).some(
-        (m) => m.kind === ts.SyntaxKind.ExportKeyword,
-      );
-      if (!exported) continue;
-      for (const decl of stmt.declarationList.declarations) {
-        const init = decl.initializer;
-        if (!init || !ts.isCallExpression(init)) continue;
-        const callee = init.expression;
-        if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== 'createFunction')
-          continue;
-        const id = stringLiteral(property(init.arguments[0], 'id'));
-        if (id === null) throw new Error(`${file}: createFunction without a literal id`);
+    const visit = (node: ts.Node, inFunction: boolean) => {
+      const isCall =
+        ts.isCallExpression(node) &&
+        ((ts.isPropertyAccessExpression(node.expression) &&
+          node.expression.name.text === 'createFunction') ||
+          (ts.isIdentifier(node.expression) && node.expression.text === 'createFunction'));
+      if (isCall && !inFunction) {
+        const call = node as ts.CallExpression;
+        const decl = call.parent;
+        const stmt = decl?.parent?.parent;
+        const topLevelExport =
+          ts.isPropertyAccessExpression(call.expression) &&
+          ts.isVariableDeclaration(decl) &&
+          decl.initializer === call &&
+          stmt !== undefined &&
+          ts.isVariableStatement(stmt) &&
+          stmt.parent === sf &&
+          (ts.getModifiers(stmt) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+        const where = `${file}:${sf.getLineAndCharacterOfPosition(call.getStart()).line + 1}`;
+        if (!topLevelExport)
+          throw new Error(`${where}: a createFunction call this finder cannot read`);
+        const id = stringLiteral(property(call.arguments[0], 'id'));
+        if (id === null) throw new Error(`${where}: createFunction without a literal id`);
+        const found = crons(call.arguments[1], where);
+        if (found.length > 1) throw new Error(`${where}: more than one cron`);
         out.push({
-          path: `inngest/${file}#${decl.name.getText()}`,
+          path: `inngest/${file}#${(decl as ts.VariableDeclaration).name.getText()}`,
           id,
-          cron: stringLiteral(property(init.arguments[1], 'cron')),
+          cron: found[0] ?? null,
         });
       }
-    }
+      ts.forEachChild(node, (child) => visit(child, inFunction || ts.isFunctionLike(node)));
+    };
+    visit(sf, false);
   }
   return out;
 }
+
+/** A v2 migration's file name: the timestamp, then `_v2_` (not `…_engine_v2_…`, which is v1's). */
+const V2_MIGRATION = /^\d{14}_v2_/;
 
 const CREATE_TABLE =
   /\bcreate\s+(?:unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?(?:"?([a-z_][a-z0-9_]*)"?\.)?"?([a-z_][a-z0-9_]*)"?/gi;
@@ -162,11 +225,62 @@ const stripSqlComments = (sql: string): string =>
 /** Tables created by the non-v2 migrations, as `<schema>.<name>` (`public` when unqualified). */
 export function v1Tables(dir = MIGRATIONS_DIR): string[] {
   const names = new Set<string>();
-  for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql') && !f.includes('_v2_'))) {
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql') && !V2_MIGRATION.test(f))) {
     const sql = stripSqlComments(readFileSync(join(dir, file), 'utf8'));
     for (const m of sql.matchAll(CREATE_TABLE)) {
       names.add(`${(m[1] ?? 'public').toLowerCase()}.${m[2]!.toLowerCase()}`);
     }
   }
   return [...names].sort();
+}
+
+const WEB_PREFIX = /^((app|lib|components)\/|middleware\.ts$)/;
+const FULL_REF =
+  /(?<![\w/.])((?:apps|packages|inngest|infra|docs|scripts|app|lib|components)\/[\w./()[\]-]+|middleware\.ts):(\d+(?:[-,]\s?\d+)*)/g;
+const BARE_REF = /(?<![\w/.[\]()-])([\w-]+\.(?:tsx?|jsx?|mjs|sql|json)):(\d+)/g;
+const RELATIVE_REF = /(?<![\w\])])(?:^|(?<=[\s(,]))(?<!\S\S:):(\d+(?:[-,]\s?\d+)*)/g;
+
+/**
+ * The file:line references in `text` that do not hold: a full path (`apps/…`, `inngest/…`, or
+ * apps/web-relative `app/…`, `lib/…`, `components/…`) that is not a tracked file or is shorter than
+ * the line; a relative `(:45-47)` when there is no `own` file to read it against, or past its end; a
+ * bare `route.ts:12` that names no folder. `lineCount` returns 0 for a file that is not tracked.
+ */
+export function refProblems(
+  text: string,
+  own: string | undefined,
+  lineCount: (repoPath: string) => number,
+): string[] {
+  const bad: string[] = [];
+  const maxLine = (spec: string) => Math.max(...spec.split(/[-,]\s?/).map(Number));
+  const repoPath = (p: string) => (WEB_PREFIX.test(p) ? `apps/web/${p}` : p);
+  for (const m of text.matchAll(FULL_REF)) {
+    if (maxLine(m[2]!) > lineCount(repoPath(m[1]!))) bad.push(m[0]);
+  }
+  const withoutFull = text.replace(FULL_REF, ' ');
+  for (const m of withoutFull.matchAll(BARE_REF)) bad.push(`bare ${m[0]}`);
+  const withoutAny = withoutFull.replace(BARE_REF, ' ');
+  for (const m of withoutAny.matchAll(RELATIVE_REF)) {
+    if (own === undefined) bad.push(`relative ${m[0]} with no file`);
+    else if (maxLine(m[1]!) > lineCount(repoPath(own))) bad.push(`${own}${m[0]}`);
+  }
+  return bad;
+}
+
+/** D3's conditions on `delete` entries that the tree can show: an app file, gone, with its query. */
+export function deleteProblems(
+  entries: readonly { kind: string; path: string; ruling: string; evidence: string }[],
+  exists: (webPath: string) => boolean,
+): string[] {
+  return entries
+    .filter((e) => e.ruling === 'delete')
+    .flatMap((e) => {
+      if (!['page', 'metadata', 'route'].includes(e.kind)) {
+        return [`${e.path}: only app files are deleted here`];
+      }
+      const out: string[] = [];
+      if (exists(e.path)) out.push(`${e.path}: still on disk`);
+      if (!/posthog/i.test(e.evidence)) out.push(`${e.path}: no PostHog query`);
+      return out;
+    });
 }

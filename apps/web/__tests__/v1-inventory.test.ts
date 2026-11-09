@@ -20,7 +20,9 @@ import {
   REPO_ROOT,
   fileUrl,
   isFlagGated,
+  deleteProblems,
   pageUrl,
+  refProblems,
   urlMatches,
   v1InngestFunctions,
   v1MetadataFiles,
@@ -123,17 +125,22 @@ describe('the finders see what they claim to see', () => {
       ]);
     }));
 
-  it('a file is flag-gated only when its code imports a …Enabled reader from a …/flags module', () =>
+  it('a file is flag-gated only when it refuses with a v2 flag off, read through the AST', () =>
     withDir((dir) => {
+      const refuse =
+        'export async function POST() { if (!billingV2Enabled()) return null; return 1; }';
       writeFixture(dir, {
-        'gated.ts': "import { billingV2Enabled } from '@/lib/billing/flags';",
-        'relative.ts': "import { accountDoorEnabled, x } from '../../lib/auth/flags';",
-        'comment.ts': "// import { accountDoorEnabled } from '@/lib/auth/flags';",
-        'other.ts':
-          "import { enabled } from '@/lib/auth/flags';\nimport { aEnabled } from '@/lib/x';",
+        'gated.ts': `import { billingV2Enabled } from '@/lib/billing/flags';\n${refuse}`,
+        'aliased.ts': `import { accountDoorEnabled as on } from '../../lib/auth/flags';\nexport function GET() { if (!on()) { return 404; } }`,
+        'branch.ts': `import { accountDoorEnabled } from '@/lib/auth/flags';\nexport function GET() { const v2 = accountDoorEnabled(); return v2; }`,
+        'typeonly.ts': `import type { billingV2Enabled } from '@/lib/billing/flags';\n${refuse}`,
+        'comment.ts': `// import { billingV2Enabled } from '@/lib/billing/flags';\n${refuse}`,
+        'other.ts': `import { billingV2Enabled } from '@/lib/x';\n${refuse}`,
       });
       expect(isFlagGated(join(dir, 'gated.ts'))).toBe(true);
-      expect(isFlagGated(join(dir, 'relative.ts'))).toBe(true);
+      expect(isFlagGated(join(dir, 'aliased.ts'))).toBe(true);
+      expect(isFlagGated(join(dir, 'branch.ts'))).toBe(false);
+      expect(isFlagGated(join(dir, 'typeonly.ts'))).toBe(false);
       expect(isFlagGated(join(dir, 'comment.ts'))).toBe(false);
       expect(isFlagGated(join(dir, 'other.ts'))).toBe(false);
     }));
@@ -144,6 +151,7 @@ describe('the finders see what they claim to see', () => {
         'probe.ts': [
           "export const a = inngest.createFunction({ id: 'p.a' }, { cron: '1 2 * * *' }, h);",
           "export const b = inngest.createFunction({ id: 'p.b' }, { event: 'x' }, h);",
+          "export const d = inngest.createFunction({ id: 'p.d' }, [{ event: 'y' }, { cron: '5 * * * *' }], h);",
           "export function c() { return inngest.createFunction({ id: 'p.c' }, { cron: '* * * * *' }, h); }",
         ].join('\n'),
         'probe.test.ts': "export const t = inngest.createFunction({ id: 't' }, {}, h);",
@@ -151,26 +159,75 @@ describe('the finders see what they claim to see', () => {
       expect(v1InngestFunctions(dir)).toEqual([
         { path: 'inngest/probe.ts#a', id: 'p.a', cron: '1 2 * * *' },
         { path: 'inngest/probe.ts#b', id: 'p.b', cron: null },
+        { path: 'inngest/probe.ts#d', id: 'p.d', cron: '5 * * * *' },
       ]);
     }));
+
+  it.each([
+    ['no receiver', "export const z = createFunction({ id: 'z' }, {}, h);"],
+    ['not exported', "const z = inngest.createFunction({ id: 'z' }, {}, h);\nexport { z as y };"],
+    ['a default export', "export default inngest.createFunction({ id: 'z' }, {}, h);"],
+    [
+      'a cron constant',
+      "const C = '1 * * * *';\nexport const z = inngest.createFunction({ id: 'z' }, { cron: C }, h);",
+    ],
+    [
+      'an id constant',
+      "const I = 'z';\nexport const z = inngest.createFunction({ id: I }, {}, h);",
+    ],
+  ])('an Inngest shape the finder cannot read throws: %s', (_name, text) =>
+    withDir((dir) => {
+      writeFixture(dir, { 'probe.ts': text });
+      expect(() => v1InngestFunctions(dir)).toThrow();
+    }),
+  );
 
   it('tables from non-v2 migrations, with their schema, ignoring comments', () =>
     withDir((dir) => {
       writeFixture(dir, {
-        '1_a.sql':
+        '20260101000001_a.sql':
           'create table foo (id int);\n-- create table ghost (x int);\n/* create table ghost2 */',
-        '2_b.sql':
+        '20260101000002_b.sql':
           'CREATE TABLE IF NOT EXISTS public.Bar (id int);\ncreate unlogged table baz (i int);',
-        '3_c.sql': 'create table research.runs (id int);',
-        '4_v2_d.sql': 'create table v2thing (id int);',
+        '20260101000003_c.sql': 'create table research.runs (id int);',
+        '20260101000004_engine_v2_e.sql': 'create table enginev2 (id int);',
+        '20261101000001_v2_001_d.sql': 'create table v2thing (id int);',
       });
-      expect(v1Tables(dir)).toEqual(['public.bar', 'public.baz', 'public.foo', 'research.runs']);
+      expect(v1Tables(dir)).toEqual([
+        'public.bar',
+        'public.baz',
+        'public.enginev2',
+        'public.foo',
+        'research.runs',
+      ]);
     }));
+
+  it("a file:line reference is checked against the file it names, or the entry's own", () => {
+    const lines: Record<string, number> = { 'apps/web/app/x/route.ts': 40, 'inngest/a.ts': 10 };
+    const count = (p: string) => lines[p] ?? 0;
+    expect(
+      refProblems(
+        'ok (app/x/route.ts:12-40) and (:3, :7) inngest/a.ts:10',
+        'app/x/route.ts',
+        count,
+      ),
+    ).toEqual([]);
+    expect(refProblems('(:41)', 'app/x/route.ts', count)).toEqual(['app/x/route.ts:41']);
+    expect(refProblems('(:3-99)', 'app/x/route.ts', count)).toEqual(['app/x/route.ts:3-99']);
+    expect(refProblems('see (:3)', undefined, count)).toEqual(['relative :3 with no file']);
+    expect(refProblems('Foo.tsx:9', 'app/x/route.ts', count)).toEqual(['bare Foo.tsx:9']);
+    expect(refProblems('inngest/a.ts:11', undefined, count)).toEqual(['inngest/a.ts:11']);
+    expect(refProblems('lib/missing.ts:1', undefined, count)).toEqual(['lib/missing.ts:1']);
+    expect(refProblems('at 13:25 UTC, 0 3 * * *', undefined, count)).toEqual([]);
+  });
 
   it('reads the real tree (anti-vacuity)', () => {
     expect(v1Pages()).toContain('app/r/[slug]/page.tsx');
     expect(v1Routes()).toContain('app/api/webhooks/stripe/route.ts');
     expect(isFlagGated(join(WEB, 'app/api/checks/[id]/claim/route.ts'))).toBe(true);
+    // v1 routes with a v2 branch import a flag reader but do not refuse with it off.
+    expect(isFlagGated(join(WEB, 'app/api/auth/magic-link/route.ts'))).toBe(false);
+    expect(isFlagGated(join(WEB, 'app/login/verify/route.ts'))).toBe(false);
     expect(v1InngestFunctions().map((f) => f.id)).toContain('crawlmouse.audit');
     expect(v1Tables()).toContain('public.public_reports');
   });
@@ -249,34 +306,51 @@ describe('every ruling is one of three and carries its consequence (D2, D3)', ()
   });
 
   it('a delete is an app file that is gone, with its PostHog traffic query in evidence', () => {
-    const deleted = items.filter((e) => e.ruling === 'delete');
-    expect(deleted.filter((e) => !APP_KINDS.includes(e.kind)).map((e) => e.path)).toEqual([]);
-    for (const e of deleted) {
-      expect(existsSync(join(WEB, e.path)), e.path).toBe(false);
-      expect(e.evidence, e.path).toMatch(/posthog/i);
-    }
+    expect(deleteProblems(items, (p) => existsSync(join(WEB, p)))).toEqual([]);
   });
 
-  it('a file:line in evidence names a tracked file that has that line', () => {
+  it('the delete rule refuses what D3 forbids (fixture: no entry is a delete today)', () => {
+    const del = (kind: Kind, path: string, evidence = 'PostHog: 0 views') =>
+      ({ kind, path, ruling: 'delete', reason: 'r', evidence }) as Entry;
+    const exists = (p: string) => p === 'app/here/page.tsx';
+    expect(deleteProblems([del('page', 'app/gone/page.tsx')], exists)).toEqual([]);
+    expect(deleteProblems([del('page', 'app/here/page.tsx')], exists)).toEqual([
+      'app/here/page.tsx: still on disk',
+    ]);
+    expect(deleteProblems([del('page', 'app/gone/page.tsx', 'no traffic')], exists)).toEqual([
+      'app/gone/page.tsx: no PostHog query',
+    ]);
+    expect(deleteProblems([del('table', 'public.x')], exists)).toEqual([
+      'public.x: only app files are deleted here',
+    ]);
+  });
+
+  it('a retired page that redirects to a path names a page the inventory serves', () => {
+    const pageUrls = items.filter((e) => e.kind === 'page').map((e) => e.url!);
+    const targets = items.filter(
+      (e) => e.kind === 'page' && e.ruling === 'retire' && e.redirect!.startsWith('/'),
+    );
+    expect(targets.length).toBeGreaterThan(0);
+    expect(targets.filter((e) => !pageUrls.includes(e.redirect!)).map((e) => e.path)).toEqual([]);
+  });
+
+  it('every file:line in evidence, checks and findings holds on the tracked tree', () => {
     const tracked = new Set(
       execFileSync('git', ['ls-files'], { cwd: REPO_ROOT, encoding: 'utf8' }).split('\n'),
     );
-    const ref =
-      /(?<![\w/.])((?:apps|packages|inngest|infra|docs|scripts|app|lib|components)\/[\w./()[\]-]+):(\d+)\b/g;
-    const texts = [
-      ...items.flatMap((e) => [e.evidence, ...Object.values(e.checks ?? {})]),
-      ...inventory.findings.map((f) => f.evidence),
+    const count = (p: string) =>
+      tracked.has(p) ? readFileSync(join(REPO_ROOT, p), 'utf8').split('\n').length : 0;
+    const bad = [
+      ...items.flatMap((e) => {
+        const own = APP_KINDS.includes(e.kind) ? e.path : undefined;
+        return [e.evidence, ...Object.values(e.checks ?? {})].flatMap((t) =>
+          refProblems(t, own, count),
+        );
+      }),
+      ...inventory.findings.flatMap((f) =>
+        refProblems(`${f.evidence} ${f.what}`, undefined, count),
+      ),
     ];
-    const bad: string[] = [];
-    for (const text of texts) {
-      for (const m of text.matchAll(ref)) {
-        const file = /^(app|lib|components)\//.test(m[1]!) ? `apps/web/${m[1]}` : m[1]!;
-        const lines = tracked.has(file)
-          ? readFileSync(join(REPO_ROOT, file), 'utf8').split('\n').length
-          : 0;
-        if (Number(m[2]) > lines) bad.push(m[0]);
-      }
-    }
     expect(bad).toEqual([]);
   });
 });
@@ -292,13 +366,19 @@ describe('each live page and route carries its D4 row, and each keep page its D7
     if (e.kind === 'page' && e.ruling === 'keep') expect(e.e2e, 'e2e block').toBeDefined();
   });
 
-  it('a finding verdict is named by a finding (anti-vacuity: some verdicts are findings)', () => {
-    const named = new Set(inventory.findings.flatMap((f) => f.items));
-    const flagged = items.filter((e) =>
-      Object.values(e.checks ?? {}).some((t) => verdictOf(t) === 'finding'),
+  it('a finding verdict names, as "(ID)", a finding that lists its item', () => {
+    const byId = new Map(inventory.findings.map((f) => [f.id, f]));
+    const flagged = items.flatMap((e) =>
+      Object.entries(e.checks ?? {})
+        .filter(([, t]) => verdictOf(t) === 'finding')
+        .map(([k, t]) => ({ where: `${e.path}#${k}`, path: e.path, text: t })),
     );
     expect(flagged.length).toBeGreaterThan(0);
-    expect(flagged.map((e) => e.path).filter((p) => !named.has(p))).toEqual([]);
+    const unnamed = flagged.filter(({ path, text }) => {
+      const id = /^finding — \w+ \(([A-Z0-9-]+)\):/.exec(text)?.[1];
+      return id === undefined || !byId.get(id)?.items.includes(path);
+    });
+    expect(unnamed.map((u) => u.where)).toEqual([]);
   });
 });
 
@@ -350,6 +430,28 @@ describe('the report renders its inventory sections from the JSON (D12, §10)', 
     expect(renderCutover(items).split('\n').length - 2).toBe(
       items.filter((e) => e.ruling === 'retire').length,
     );
+  });
+
+  it('renders a known row literally (independent of the generator)', () => {
+    expect(readFileSync(REPORT, 'utf8')).toContain(
+      '| route | `app/billing/route.ts` | /settings/plan (v2 settings) | /settings/plan |',
+    );
+  });
+
+  it('every full-path file:line in the report outside the rendered blocks holds', () => {
+    const tracked = new Set(
+      execFileSync('git', ['ls-files'], { cwd: REPO_ROOT, encoding: 'utf8' }).split('\n'),
+    );
+    const count = (p: string) =>
+      tracked.has(p) ? readFileSync(join(REPO_ROOT, p), 'utf8').split('\n').length : 0;
+    const prose = readFileSync(REPORT, 'utf8').replace(
+      /<!-- v1-inventory:(\w+) -->[\s\S]*?<!-- \/v1-inventory:\1 -->/g,
+      '',
+    );
+    const bad = refProblems(prose, undefined, count).filter(
+      (b) => !b.startsWith('bare ') && !b.startsWith('relative '),
+    );
+    expect(bad).toEqual([]);
   });
 
   it.each(Object.keys(BLOCKS))('block %s equals what the generator renders', (name) => {
