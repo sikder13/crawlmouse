@@ -161,14 +161,48 @@ describe('after 20261108000002: the same calls resolve the catalog type and retu
   });
 });
 
+describe("search_path = '' still searches pg_temp first, so check 09 does not allow it", () => {
+  // A probe, not a production function: SECURITY DEFINER, owned by postgres, callable by
+  // authenticated, with one variable whose type it names without a schema. With '' the caller's
+  // temp domain named uuid stands in for it and the domain's CHECK runs as postgres; with pg_temp
+  // named last, pg_catalog.uuid is found first and the call returns.
+  it.each([
+    ["''", 'RAN AS postgres'],
+    ['pg_catalog, pg_temp', null],
+  ])(
+    'a definer function with search_path = %s and an unqualified uuid variable',
+    async (path, want) => {
+      const db = await database('after');
+      try {
+        await db.exec(`
+        create function public.zz_unqualified_uuid() returns pg_catalog.text
+          language plpgsql security definer set search_path = ${path} as $f$
+          declare v uuid := '00000000-0000-0000-0000-000000000000';
+          begin return v::pg_catalog.text; end; $f$;
+        grant execute on function public.zz_unqualified_uuid() to authenticated;`);
+        const error = await errorOf(() =>
+          asRole(db, 'authenticated', null, async (tx) => {
+            await plantDomains(tx, 'uuid');
+            await tx.query('select public.zz_unqualified_uuid()');
+          }),
+        );
+        expect(error).toBe(want);
+      } finally {
+        await db.close();
+      }
+    },
+  );
+});
+
 describe('check 09', () => {
-  it('finds the 19 definer functions before the migration and none after', async () => {
+  it('finds the 20 definer functions before the migration and none after', async () => {
     const before = await database('before');
     const after = await database('after');
     try {
       const found = (await before.query<{ object: string }>(CHECK_09)).rows.map((r) => r.object);
-      expect(found).toHaveLength(19);
-      expect(found).not.toContain('public.start_trial_with_ledger(uuid, jsonb, jsonb)');
+      expect(found).toHaveLength(20);
+      // 006c wrote search_path = '', which leaves pg_temp searched first as well.
+      expect(found).toContain('public.start_trial_with_ledger(uuid, jsonb, jsonb)');
       expect((await after.query(CHECK_09)).rows).toEqual([]);
     } finally {
       await before.close();
@@ -176,9 +210,9 @@ describe('check 09', () => {
     }
   });
 
-  const allowed = '; allowed: "", "pg_catalog, pg_temp", "pg_catalog, public, pg_temp"';
+  const allowed = '; allowed: "pg_catalog, pg_temp", "pg_catalog, public, pg_temp"';
   it.each([
-    ["set search_path = ''", []],
+    ["set search_path = ''", [`search_path=""${allowed}`]],
     ['set search_path = pg_catalog, public, pg_temp', []],
     ['set search_path = pg_catalog, pg_temp', []],
     ['set search_path = pg_temp', [`search_path=pg_temp${allowed}`]],
