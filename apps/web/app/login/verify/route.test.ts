@@ -400,6 +400,7 @@ describe('POST /login/verify verifies', () => {
     expect(body).toEqual({
       next: '/dashboard',
       events: [{ name: 'trial_started', props: { kind: 'pro', variant: 'no_card' } }],
+      email: USER.email,
     });
     expect(JSON.stringify(body)).not.toContain(CANARY);
     expect(res.headers.get('Cache-Control')).toContain('no-store');
@@ -408,5 +409,41 @@ describe('POST /login/verify verifies', () => {
   it('answers JSON on the expired state too, so the page can show it', async () => {
     const res = await POST(post({}, { origin: ORIGIN, accept: 'application/json' }));
     expect(await res.json()).toEqual({ next: '/login/verify/continue?state=expired', events: [] });
+  });
+
+  // Q3(b): the Continue page names the account the link signed in, so a person handed someone
+  // else's link sees it before working inside that account.
+  it.each([
+    ['off', undefined],
+    ['on', '1'],
+  ])('with the door %s, names the signed-in address in the JSON answer only', async (_, flag) => {
+    if (flag) process.env.V2_ACCOUNT_DOOR = flag;
+    else delete process.env.V2_ACCOUNT_DOOR;
+    const json = await POST(
+      post({ cm_auth_otp: otp() }, { origin: ORIGIN, accept: 'application/json' }),
+    );
+    expect(await json.json()).toMatchObject({ next: '/dashboard', email: USER.email });
+    const plain = await POST(post({ cm_auth_otp: otp() }));
+    expect(plain.status).toBe(303);
+    expect(await plain.text()).not.toContain(USER.email);
+  });
+
+  it('names no address when the link is refused or the landing throws', async () => {
+    verifyOtp.mockResolvedValueOnce({ data: { user: null }, error: { status: 403 } });
+    const refused = await POST(
+      post({ cm_auth_otp: otp() }, { origin: ORIGIN, accept: 'application/json' }),
+    );
+    expect(await refused.json()).not.toHaveProperty('email');
+    anon.throws = true;
+    const threw = await POST(
+      post(
+        { cm_auth_otp: otp(), cm_auth_for: OWN },
+        { origin: ORIGIN, accept: 'application/json' },
+      ),
+    );
+    expect(await threw.json()).toEqual({
+      next: '/login/verify/continue?state=expired',
+      events: [],
+    });
   });
 });

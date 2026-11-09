@@ -87,10 +87,15 @@ export async function POST(request: Request) {
   const wantsJson = (request.headers.get('accept') ?? '').includes('application/json');
   const carry = decodeOtp(req.cookies.get(COOKIES.otp)?.value);
 
-  const respond = (dest: string, events: DoorEvent[] = []) => {
+  // `email` is the address the link signed in, for the Continue page to show before it goes on
+  // (Q3 of CC-V1FIX): someone handed another person's link sees whose account it is. JSON only; the
+  // no-script post is redirected and names nothing.
+  const respond = (dest: string, events: DoorEvent[] = [], email?: string) => {
     const res = applyNoStore(
       wantsJson
-        ? NextResponse.json({ next: dest, events })
+        ? NextResponse.json(
+            email === undefined ? { next: dest, events } : { next: dest, events, email },
+          )
         : NextResponse.redirect(new URL(dest, url.origin), 303),
     );
     // The token is spent or refused either way; nothing reads it twice.
@@ -166,7 +171,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const res = respond(dest, events);
+    const res = respond(dest, events, user?.email ?? undefined);
     // Someone else's link leaves this browser's own door request in place until it expires, so the
     // owner's link still finds it and a second foreign link is still recognised as one.
     if (!foreign) {
