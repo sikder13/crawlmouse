@@ -373,7 +373,7 @@ U+2029 as `\u` escapes, which `JSON.parse` reads back to the same object. Test:
 `pnpm --filter @crawlmouse/web exec vitest run lib/seo/jsonld.test.tsx`. The search below finds two sinks. This one; and the link graph's hover tooltip, where
 `react-force-graph` writes `nodeLabel` through `innerHTML` and crawled titles feed it
 (`apps/web/components/audit/LinkGraph.tsx:96`): `nodeTooltipLabel` decodes and then escapes
-(`apps/web/components/audit/graph-logic.ts:148`), pinned by `components/audit/graph-logic.test.ts:109`.
+(`apps/web/components/audit/graph-logic.ts:146`), pinned by `components/audit/graph-logic.test.ts:109`.
 The other hits are comments.
 `grep -rn "dangerouslySetInnerHTML\|innerHTML\|srcDoc\|new Function\|__html" apps/web/app apps/web/components apps/web/lib --include=*.ts --include=*.tsx | grep -v "\.test\."`
 
