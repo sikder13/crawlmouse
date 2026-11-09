@@ -27,7 +27,7 @@ afterAll(() => rmSync(root, { recursive: true, force: true }));
 function semgrepJson({
   severity = 'ERROR',
   line = 2,
-  endLine = line,
+  endLine = undefined as number | undefined,
   path = FILE,
   results = 1,
   scanned = 3,
@@ -40,7 +40,7 @@ function semgrepJson({
       check_id: RULE,
       path,
       start: { line, col: 3, offset: 0 },
-      end: { line: endLine, col: 24, offset: 21 },
+      end: { line: endLine ?? line, col: 24, offset: 21 },
       extra: { severity, lines: 'requires login', fingerprint: 'requires login', message: 'm' },
     })),
     errors,
