@@ -1,7 +1,7 @@
 /**
  * Every action the account screens offer, and the route it posts or links to (D8). The previews
- * stop each form's submit, as KeepBar does; CC-26b implements these same paths, and CC-27 reuses
- * them. lib/v2/view/dashboard.ts re-exports them, where the brief looks for them.
+ * stop each form's submit, as KeepBar does; the step each entry's `owner` names builds the handler
+ * on that same path. lib/v2/view/dashboard.ts re-exports them, where the brief looks for them.
  */
 type Verb = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
@@ -10,14 +10,14 @@ export interface RouteSpec {
   /** The path, with `[id]`-style parameters, as ARCH-2 §5 names it. */
   route: string;
   /** Who builds the handler. */
-  owner: 'CC-26b' | 'CC-27' | 'built';
+  owner: 'CC-26b' | 'CC-27b' | 'built';
   /** What the handler must check before acting (ARCH-2 §5, DECISION-LOG E6). */
   guard: string;
 }
 
 /**
  * Every action the account screens offer, and the route it posts or links to. The previews stop
- * each form's submit (as KeepBar does); CC-26b implements these same paths.
+ * each form's submit (as KeepBar does); `owner` names the step that builds the handler.
  */
 export const ACCOUNT_ACTIONS = {
   addSite: {
@@ -84,7 +84,7 @@ export const ACCOUNT_ACTIONS = {
     owner: 'CC-26b',
     guard: 'Signed-in member of the site’s account.',
   },
-  changeLog: { verb: 'GET', route: '/changes', owner: 'CC-27', guard: 'Signed-in member.' },
+  changeLog: { verb: 'GET', route: '/changes', owner: 'CC-27b', guard: 'Signed-in member.' },
   keepPlan: {
     verb: 'POST',
     route: '/api/billing/checkout',
@@ -101,12 +101,12 @@ export const ACCOUNT_ACTIONS = {
   integrations: {
     verb: 'GET',
     route: '/settings/integrations',
-    owner: 'CC-27',
+    owner: 'CC-27b',
     guard: 'Owner or manager.',
   },
-  plan: { verb: 'GET', route: '/settings/plan', owner: 'CC-27', guard: 'Signed-in owner.' },
+  plan: { verb: 'GET', route: '/settings/plan', owner: 'CC-27b', guard: 'Signed-in owner.' },
   pricing: { verb: 'GET', route: '/pricing', owner: 'built', guard: 'None.' },
-  emailSettings: { verb: 'GET', route: '/settings', owner: 'CC-27', guard: 'Owner or manager.' },
+  emailSettings: { verb: 'GET', route: '/settings', owner: 'CC-27b', guard: 'Owner or manager.' },
   theme: {
     verb: 'PATCH',
     route: '/api/me',
@@ -116,13 +116,13 @@ export const ACCOUNT_ACTIONS = {
   reports: {
     verb: 'POST',
     route: '/api/reports',
-    owner: 'CC-27',
+    owner: 'CC-27b',
     guard: 'Signed-in member; exports need a paid tier.',
   },
   alertRules: {
     verb: 'PUT',
     route: '/api/sites/[id]/alert-rules',
-    owner: 'CC-27',
+    owner: 'CC-27b',
     guard: 'Signed-in member; Slack needs a paid tier.',
   },
   publicReport: {

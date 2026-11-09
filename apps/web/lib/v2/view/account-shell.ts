@@ -4,10 +4,11 @@
  * the counts and the trial's dates cannot differ from one screen to the next.
  */
 import { instant, type Change, type Site } from '@crawlmouse/types/v2';
+import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
 import { AGENCY_MONTHLY, PRO_MONTHLY } from '../../billing/prices';
 import { GATES, type Tier } from '../../entitlement-v2';
 import { ACCOUNT_COPY as COPY } from '../copy/account';
-import { calendarDays, dayDate, hourMinute } from '../format';
+import { calendarDays, dayDate, daysBefore, hourMinute } from '../format';
 import { plural } from '../words';
 import { PLAN_NAMES, primarySite, primarySites, resultChecks, type AccountView } from './account';
 import { ACCOUNT_NAV, action, type ActionView } from './account-actions';
@@ -69,7 +70,14 @@ export const newChanges = (v: AccountView): Change[] =>
 export const isFirstRun = (v: AccountView) =>
   v.d.sites.every((s) => resultChecks(v, s.id).length <= 1);
 
-function trialCard(v: AccountView): TrialCardView | null {
+/**
+ * Where the plan's terms and its Keep action are read: in the rail's trial card (the default),
+ * or on the page itself (the Trial-ending screen), which leaves the card its dates and what the
+ * card on file means.
+ */
+export type PlanPlace = 'rail' | 'page';
+
+function trialCard(v: AccountView, plan: PlanPlace): TrialCardView | null {
   const a = v.account;
   if (a.state !== 'pro_trial' && a.state !== 'agency_trial') return null;
   const zone = a.timezone;
@@ -78,16 +86,37 @@ function trialCard(v: AccountView): TrialCardView | null {
   const tier: Tier = a.state === 'pro_trial' ? 'pro' : 'agency';
   const freeSchedule = FREE_SCHEDULE[GATES.free.schedule];
   const price = tier === 'pro' ? PRO_MONTHLY : AGENCY_MONTHLY;
+  const title = `${PLAN_NAMES[tier]}, trial · ends ${dayDate(end, zone)}`;
+  const left =
+    days <= 0
+      ? `ends today at ${hourMinute(end, zone)}`
+      : `${days} ${plural(days, 'day', 'days')} left`;
+  if (plan === 'page') {
+    return {
+      title,
+      left,
+      note:
+        a.card_last4 === null
+          ? `${COPY.noCard} ${COPY.nothingCharged}`
+          : COPY.cardCharged(a.card_last4, dayDate(end, zone)),
+      billing: null,
+      keep: null,
+    };
+  }
+  const reminderDue =
+    instant(daysBefore(end, TRIAL_REMINDER_DAYS_BEFORE_END, zone)) <= instant(v.now);
   const firstRun = isFirstRun(v);
   return {
-    title: `${PLAN_NAMES[tier]}, trial · ends ${dayDate(end, zone)}`,
-    left:
-      days <= 0
-        ? `ends today at ${hourMinute(end, zone)}`
-        : `${days} ${plural(days, 'day', 'days')} left`,
+    title,
+    left,
     note: firstRun
       ? `${a.card_last4 === null ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
-      : COPY.trialLater(primarySite(v).host, freeSchedule, primarySites(v).length - 1),
+      : COPY.trialLater(
+          primarySite(v).host,
+          freeSchedule,
+          primarySites(v).length - 1,
+          reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
+        ),
     billing: firstRun ? action('plan', 'Billing') : null,
     keep: firstRun
       ? null
@@ -100,10 +129,14 @@ function trialCard(v: AccountView): TrialCardView | null {
   };
 }
 
-/** The frame for one account screen; `current` names the rail link it is. */
+/**
+ * The frame for one account screen; `current` names the rail link it is, or null on a page that is
+ * none of them. `plan: 'page'` is for a page that carries the plan's terms and Keep action itself.
+ */
 export function accountShellView(
   v: AccountView,
-  current: (typeof ACCOUNT_NAV)[number]['label'],
+  current: (typeof ACCOUNT_NAV)[number]['label'] | null,
+  { plan = 'rail' }: { plan?: PlanPlace } = {},
 ): ShellView {
   const fresh = newChanges(v).length;
   const seat = v.d.seats.find((s) => s.role === 'owner');
@@ -119,7 +152,7 @@ export function accountShellView(
       current: n.label === current,
       fresh: n.label === 'Changes' && fresh > 0,
     })),
-    trial: trialCard(v),
+    trial: trialCard(v, plan),
     theme: seat?.theme ?? 'system',
     themeAction: action('theme', 'Theme'),
   };

@@ -1,0 +1,47 @@
+/* The account Changes log (D3): no artboard, so it is laid out from the account screens' own parts. */
+
+.filters {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.groupName {
+  min-width: 48px;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+.link {
+  font-size: var(--v2-text-micro);
+  color: var(--v2-fg2);
+}
+
+/* The choice in force: heavier, in the text colour, and underlined, so it is told apart by more than
+   colour. */
+.link[aria-current='true'] {
+  color: var(--v2-fg);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+.empty {
+  padding: 16px;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}

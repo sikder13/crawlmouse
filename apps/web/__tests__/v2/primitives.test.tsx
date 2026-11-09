@@ -718,3 +718,50 @@ describe('CheckGlyphRow and CheckGlyph', () => {
     });
   });
 });
+
+describe('Switch', () => {
+  it('is a button with role="switch", named by its row text, on the artboards’ 36 × 20 track', async () => {
+    const { Switch } = await import('../../components/v2');
+    const out = html(<Switch label="New orphan pages" name="enabled" on action="/x" fields={{}} />);
+    expect(out).toMatch(
+      /<button [^>]*role="switch"[^>]*aria-checked="true"[^>]*aria-label="New orphan pages"/,
+    );
+    expect(rule(css('Switch'), '.switch')).toContain('width: 36px');
+    expect(rule(css('Switch'), '.switch')).toContain('height: 20px');
+    expect(rule(css('Switch'), ".switch[aria-checked='true']")).toContain(
+      'background: var(--v2-fg)',
+    );
+    expect(rule(css('Switch'), '.switch:focus-visible')).toContain(
+      'outline: 2px solid var(--v2-fg)',
+    );
+  });
+
+  it('keeps its state visible in forced colours, by border and system colour, not background alone', () => {
+    expect(css('Switch')).toMatch(
+      /@media \(forced-colors: active\)[\s\S]*\.switch \{\s*border: 1px solid ButtonText/,
+    );
+    expect(css('Switch')).toMatch(/aria-checked='true'\] \{[^}]*background: Highlight/);
+  });
+});
+
+describe('Select', () => {
+  it('is a native select set in the body face, with the field’s border, radius and focus ring', async () => {
+    const { Select } = await import('../../components/v2');
+    const out = html(
+      <Select
+        id="s"
+        label="Site"
+        hideLabel
+        name="site"
+        options={[{ value: 'a', label: 'a.com' }]}
+      />,
+    );
+    expect(out).toMatch(/<label [^>]*for="s"[^>]*data-v2-sr-only=""[^>]*>Site<\/label><select /);
+    expect(rule(css('Select'), '.select')).toContain('border: 1px solid var(--v2-ctl)');
+    expect(rule(css('Select'), '.select')).toContain('border-radius: var(--v2-radius-control)');
+    expect(rule(css('Select'), '.select')).toContain('font-family: inherit');
+    expect(rule(css('Select'), '.select:focus-visible')).toContain(
+      'outline: 2px solid var(--v2-fg)',
+    );
+  });
+});

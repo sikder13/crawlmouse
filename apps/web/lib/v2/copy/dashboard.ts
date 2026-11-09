@@ -6,10 +6,8 @@
 import { capitalise, numberWord, plural } from '../words';
 import type { Addition, CopyChange, LockedScreen } from '../copy-registry';
 import { RECHECK_MINUTES } from '../recheck';
+import { ALERTS_SENDER } from '../../auth/constants';
 import { TRIAL_DAYS } from './account';
-
-/** The one address change notes come from (FACTS: "alerts from alerts@crawlmouse.com"). */
-export const ALERTS_FROM = 'alerts@crawlmouse.com';
 
 export const DASHBOARD_COPY = {
   kept: (host: string) => `${host} is kept.`,
@@ -39,7 +37,7 @@ export const DASHBOARD_COPY = {
   emailKinds: (changeNotes: boolean, reminder: string | null) =>
     [
       'a sign-in link when you ask for one',
-      changeNotes ? `a note from ${ALERTS_FROM} when a check finds a change` : null,
+      changeNotes ? `a note from ${ALERTS_SENDER} when a check finds a change` : null,
       reminder ? `one reminder on ${reminder}, three days before the trial ends` : null,
     ].filter((k): k is string => k !== null),
   /** "a, b, and c", as the locked page lists them; "a and b" for two. */

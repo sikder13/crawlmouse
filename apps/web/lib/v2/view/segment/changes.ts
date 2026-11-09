@@ -26,6 +26,8 @@ import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
 
 export interface ChangeRowView {
   key: string;
+  /** The site's host, on a list that spans an account's sites (the Changes log); absent here. */
+  site?: string;
   when: string;
   kind: ChangeKind;
   pill: DoorView['pill'];
@@ -155,7 +157,8 @@ function causeOf(c: Change): string {
     : `First observed at this check. What we found: ${text}.`;
 }
 
-function rowOf(c: Change, check: Check, at: (ts: string) => string): ChangeRowView {
+/** One change as a row: `check` is the check that found it, `at` the clock its times are read by. */
+export function rowOf(c: Change, check: Check, at: (ts: string) => string): ChangeRowView {
   const crawler = c.ua ? check.crawlers.find((x) => x.ua === c.ua) : undefined;
   const n = c.notified;
   const channels = n

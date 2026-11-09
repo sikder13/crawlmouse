@@ -57,7 +57,7 @@ describe.each([
     expect(primaries(header)).toHaveLength(1);
   });
 
-  it('posts every form to a route CC-26b or CC-27 owns, never with a GET', () => {
+  it('posts every form to a route CC-26b or CC-27b owns, never with a GET', () => {
     const routes = Object.values(ACCOUNT_ACTIONS).map(
       (a) => new RegExp(`^${a.route.replace(/\[\w+\]/g, '[^/]+')}$`),
     );
