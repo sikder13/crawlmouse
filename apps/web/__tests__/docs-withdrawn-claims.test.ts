@@ -298,6 +298,33 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       '`.rsc/` appended and with `/.rsc` appended; the edge rules count those spellings.',
     allowedIn: [],
   },
+  // CC-SEC, the search_path ruling: an empty search_path leaves pg_temp searched first, so check 09
+  // no longer allows it. Withdrawn in e302578d (check 09's header, rendered into db-migrations.md) and
+  // 642dea0f (sec-baseline.md D6); registered here in a later commit, after the review found the
+  // registry had not been updated.
+  {
+    text: 'must be exactly "", "pg_catalog, pg_temp"',
+    withdrawnIn:
+      'infra/supabase/checks/09-definer-search-path.sql and docs/ops/db-migrations.md (e302578d)',
+    truth:
+      'Check 09 allows exactly "pg_catalog, pg_temp" and "pg_catalog, public, pg_temp"; an empty ' +
+      'setting is a finding, because it leaves pg_temp searched first.',
+    allowedIn: [],
+  },
+  {
+    text: 'exactly `""`, `pg_catalog, pg_temp`',
+    withdrawnIn: 'docs/specs/v2/sec-baseline.md, D6 check 09 (642dea0f)',
+    truth: 'Check 09 allows exactly `pg_catalog, pg_temp` and `pg_catalog, public, pg_temp`.',
+    allowedIn: [],
+  },
+  {
+    text: "`start_trial_with_ledger` keeps `''`",
+    withdrawnIn: 'docs/specs/v2/sec-baseline.md, D6 (642dea0f)',
+    truth:
+      '20261108000002 sets start_trial_with_ledger to pg_catalog, pg_temp and keeps its lock_timeout; ' +
+      "its rollback restores ''.",
+    allowedIn: [],
+  },
 ];
 
 /**

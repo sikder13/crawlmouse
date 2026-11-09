@@ -14,8 +14,8 @@
 -- v2_premake_month_partitions searched pg_catalog only and keeps to that, with pg_temp last.
 -- start_trial_with_ledger had search_path = '' (20261108000001). An empty path leaves pg_temp out
 -- as well, so pg_temp was searched first for relations and types. It gets pg_catalog, pg_temp:
--- pg_catalog alone, as before, with pg_temp last. ALTER FUNCTION ... SET changes only the setting
--- it names, so its lock_timeout stays.
+-- pg_catalog alone, as before, with pg_temp last. Its lock_timeout setting stays, in place:
+-- apps/web/__tests__/v2-definer-search-path.test.ts reads its settings after this runs.
 --
 -- infra/supabase/checks/09-definer-search-path.sql fails on a definer function this leaves out. The
 -- rollback restores each function's previous setting, read from production on 2026-11-08.

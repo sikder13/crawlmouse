@@ -161,7 +161,7 @@ describe('after 20261108000002: the same calls resolve the catalog type and retu
   });
 });
 
-describe("search_path = '' still searches pg_temp first, so check 09 does not allow it", () => {
+describe("search_path = '' still searches pg_temp first", () => {
   // A probe, not a production function: SECURITY DEFINER, owned by postgres, callable by
   // authenticated, with one variable whose type it names without a schema. With '' the caller's
   // temp domain named uuid stands in for it and the domain's CHECK runs as postgres; with pg_temp
