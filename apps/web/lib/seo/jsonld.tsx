@@ -109,7 +109,24 @@ export function breadcrumbLd(items: ReadonlyArray<{ name: string; path: string }
   };
 }
 
+/**
+ * JSON for the body of a <script> element. JSON.stringify leaves `<`, `>` and `&` as they are, so a
+ * string holding `</script>` or `<!--` would end or change the element; U+2028 and U+2029 are escaped
+ * too, for old JavaScript parsers. Each becomes its \uXXXX escape, which JSON.parse reads back as the
+ * same character, so the data means the same.
+ */
+export function scriptSafeJson(data: object | object[]): string {
+  return JSON.stringify(data)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
 /** Renders one or more JSON-LD objects as a <script type="application/ld+json"> tag. */
 export function JsonLd({ data }: { data: object | object[] }) {
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
+  return (
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: scriptSafeJson(data) }} />
+  );
 }
