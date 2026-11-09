@@ -28,15 +28,15 @@ import { PRODUCTION_REF, assertAllowed } from './target';
 /**
  * The production side of the workflows.
  *
- *   plan      db-apply-prod.yml, before the owner's approval, read-only: production's pending files,
+ *   plan      db-apply-prod.yml, before the apply job, read-only: production's pending files,
  *             checked against the passed dry run of the pull request; writes the manifest the apply
  *             must match.
- *   apply     db-apply-prod.yml, after the approval: re-checks the manifest against the checked-out
+ *   apply     db-apply-prod.yml, after the plan passed: re-checks the manifest against the checked-out
  *             files and against production, and production's fingerprint against the plan's; runs
  *             `supabase db push`, the checks and the fingerprint.
- *   rollback-plan  db-rollback-prod.yml, before the approval, read-only: the rollback file's sha256
+ *   rollback-plan  db-rollback-prod.yml, before the rollback job, read-only: the rollback file's sha256
  *             and that production records its migration as applied.
- *   rollback  db-rollback-prod.yml, after the approval: requires the planned sha256, runs the
+ *   rollback  db-rollback-prod.yml, after the plan passed: requires the planned sha256, runs the
  *             rollback file, then the checks and the fingerprint.
  *
  *   tsx scripts/db/production.ts plan --yes-production --dry-run-summary <json> \
@@ -189,7 +189,8 @@ async function checkAndPush(
   const problems = manifestProblems(manifest, await steps.pending());
   if (problems.length > 0) throw new Error(problems.join('\n'));
   if (manifest.length === 0) return false;
-  // The approval may come days after the plan: production must still be what the plan read.
+  // Production may have changed since the plan read it (a manual run, another apply): it must still be
+  // what the plan read.
   const drift = driftProblems(planned, await steps.fingerprint(), 'the plan');
   if (drift.length > 0) throw new Error(drift.join('\n'));
   const listed = await steps.listed();
@@ -247,7 +248,7 @@ async function apply(
 }
 
 /**
- * Before the approval: the rollback file's sha256, and that production records its migration as
+ * Before the rollback job: the rollback file's sha256, and that production records its migration as
  * applied. Writes the sha256 to `shaOut` for the rollback job to require.
  */
 async function rollbackPlan(token: string, file: string, shaOut: string): Promise<void> {
@@ -269,7 +270,7 @@ async function rollbackPlan(token: string, file: string, shaOut: string): Promis
         { file: migration.file, sha256: migration.sha256 },
       ]),
       '',
-      `Approving runs \`${file}\` (first row) and deletes the history row of \`${migration.file}\`, in one transaction.`,
+      `The rollback job runs \`${file}\` (first row) and deletes the history row of \`${migration.file}\`, in one transaction.`,
     ].join('\n'),
   );
 }
