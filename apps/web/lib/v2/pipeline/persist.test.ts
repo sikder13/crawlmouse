@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
 import { buildCheck, type BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
 import type { BatchResult, CrawlPage, UsageEvent } from '@crawlmouse/types/v2';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import ts from 'typescript';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
@@ -924,7 +925,41 @@ describe('a built check at the page cap (Q11)', () => {
 
 // ─── The one writer ───────────────────────────────────────────────────────────────────────────────
 
-const WRITTEN = [
+/**
+ * GUARD: a built check's rows are written by persist.ts, through migration 008's functions, and by
+ * no other code the scan reads (D5).
+ *
+ * WHAT IT SCANS: the .ts, .tsx, .js, .mjs, .cjs and .sql files under apps/web, inngest, scripts,
+ * packages and infra (`sources` below), leaving out files named `*.test.<ext>` or `*.spec.<ext>` and
+ * directories named node_modules, .next, .turbo, dist, coverage, `__tests__` or `test-support`. Two
+ * files may write: WRITER and MIGRATION. The tests below require writes found in both (so the scan is
+ * seen to work on the real code) and in no other file.
+ *
+ * WHAT COUNTS AS A WRITE, in code, read from the TypeScript AST (the `typescript` package):
+ *   - a call of `from` (`x.from(…)`, `x?.from(…)`, `x['from'](…)`, or a bare `from(…)`) whose first
+ *     argument names a WRITTEN table, unless that call's result is at once called with `.select(` (a
+ *     read). A builder held in a variable, passed on or returned therefore counts, whatever is done
+ *     with it later;
+ *   - a call of `rpc` whose first argument names a PERSIST_FUNCTIONS function;
+ *   - a string whose text holds SQL_WRITES.
+ * A name is a value the guard can work out (`valuesOf`): a string or template literal; a `const`
+ * declared in the same file with such a value; a property of a `const` object literal; a `const`
+ * imported by a relative or `@/` path, followed through `export { … } from` and `export *`; and `+`,
+ * templates and `?:` over those. Not seen: a name it cannot work out (a parameter, a `let`, a function's
+ * return, an import from a package, an expression with more than CANDIDATES possible values, or one
+ * more than 12 references deep), a write that does not go through `from` or `rpc` (a raw fetch of
+ * PostgREST), and rows a trigger or a foreign key's cascade changes.
+ *
+ * WHAT COUNTS AS A WRITE IN SQL (a .sql file with its comments removed, or a string in code):
+ * SQL_WRITES, that is INSERT INTO, UPDATE … SET and DELETE FROM one of WRITTEN, schema-qualified or not,
+ * quoted or not, and a SELECT, PERFORM, CALL or FROM of a persist function. Creating, altering,
+ * indexing, granting on, revoking on, triggering on or dropping these tables and functions is not a
+ * write, so the migrations that create them pass; MERGE, TRUNCATE and COPY are not seen.
+ */
+
+const WRITER = 'apps/web/lib/v2/pipeline/persist.ts';
+const MIGRATION = 'infra/supabase/migrations/20261109000001_v2_008_pipeline.sql';
+const WRITTEN = new Set([
   'page_results',
   'link_edges',
   'access_tests',
@@ -932,75 +967,605 @@ const WRITTEN = [
   'fix_events',
   'changes',
   'usage_events',
+  'measurement_lineages',
   'persist_chunks',
-];
-const TABLE = WRITTEN.join('|');
-const RPCS = 'persist_built_check|stage_check_rows';
-const QUOTED = `['"\`]`;
-/**
- * A write to one of WRITTEN, or a call of either persist function: a supabase-js insert, upsert,
- * update or delete on the table; SQL inserting into, updating or deleting from it; `.rpc(` with a
- * function's name or its constant; SQL selecting the function. A select from a table is not a write.
- */
-const WRITES = [
+]);
+const PERSIST_FUNCTIONS = new Set(['persist_built_check', 'stage_check_rows']);
+
+const named = (names: Set<string>) => `(?:"?public"?\\s*\\.\\s*)?"?(${[...names].join('|')})"?\\b`;
+const SQL_WRITES = [
+  new RegExp(`\\binsert\\s+into\\s+${named(WRITTEN)}`, 'gi'),
+  new RegExp(`\\bupdate\\s+(?:only\\s+)?${named(WRITTEN)}\\s+(?:as\\s+)?(?:\\w+\\s+)?set\\b`, 'gi'),
+  new RegExp(`\\bdelete\\s+from\\s+(?:only\\s+)?${named(WRITTEN)}`, 'gi'),
   new RegExp(
-    `\\.from\\(\\s*${QUOTED}(${TABLE})${QUOTED}\\s*\\)[^;]*?\\.(?:insert|upsert|update|delete)\\s*\\(`,
-    'g',
+    `\\b(?:select|perform|call|from)\\s+(?:\\*\\s+from\\s+)?${named(PERSIST_FUNCTIONS)}\\s*\\(`,
+    'gi',
   ),
-  new RegExp(`\\binsert\\s+into\\s+(?:"?public"?\\s*\\.\\s*)?"?(${TABLE})"?\\b`, 'gi'),
-  new RegExp(`\\bupdate\\s+(?:"?public"?\\s*\\.\\s*)?"?(${TABLE})"?\\s+(?:\\w+\\s+)?set\\b`, 'gi'),
-  new RegExp(`\\bdelete\\s+from\\s+(?:"?public"?\\s*\\.\\s*)?"?(${TABLE})"?\\b`, 'gi'),
-  new RegExp(`\\.rpc\\(\\s*(?:${QUOTED}(${RPCS})${QUOTED}|(PERSIST_RPC|STAGE_RPC)\\b)`, 'g'),
-  new RegExp(`\\bselect\\s+(?:"?public"?\\s*\\.\\s*)?(${RPCS})\\s*\\(`, 'gi'),
 ];
-const writesIn = (source: string): string[] =>
-  WRITES.flatMap((re) => [...source.matchAll(re)].map((m) => (m[1] ?? m[2])!));
+
+interface Write {
+  line: number;
+  name: string;
+}
+
+/** The SQL writes in `text`, each with its line counted from `firstLine`. */
+function sqlWrites(text: string, firstLine = 1): Write[] {
+  return SQL_WRITES.flatMap((re) =>
+    [...text.matchAll(re)].map((m) => ({
+      line: firstLine + (text.slice(0, m.index).match(/\n/g)?.length ?? 0),
+      name: m[1]!,
+    })),
+  ).sort((a, b) => a.line - b.line);
+}
+
+/** A .sql file's writes: its comments blanked (newlines kept, so lines still count), then SQL_WRITES. */
+const sqlFileWrites = (text: string): Write[] =>
+  sqlWrites(
+    text
+      .replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
+      .replace(/--[^\n]*/g, (c) => ' '.repeat(c.length)),
+  );
+
+/** A file's text by absolute path, or undefined when there is none. */
+type Load = (file: string) => string | undefined;
+
+const UNKNOWN = '\u0000';
+/** The most candidate values `valuesOf` keeps for one expression before giving up on it. */
+const CANDIDATES = 64;
+
+/** An expression without the wrappers that leave its value as it is. */
+function bare(e: ts.Expression): ts.Expression {
+  while (
+    ts.isParenthesizedExpression(e) ||
+    ts.isAsExpression(e) ||
+    ts.isSatisfiesExpression(e) ||
+    ts.isNonNullExpression(e) ||
+    ts.isTypeAssertionExpression(e)
+  )
+    e = e.expression;
+  return e;
+}
+
+const textOf = (e: ts.Expression): string | undefined => {
+  const b = bare(e);
+  return ts.isStringLiteralLike(b) ? b.text : undefined;
+};
+
+function product(parts: string[][]): string[] {
+  let out = [''];
+  for (const part of parts) {
+    out = out.flatMap((a) => part.map((b) => a + b));
+    if (out.length > CANDIDATES) return [UNKNOWN];
+  }
+  return out;
+}
+
+/** Works out the strings an expression can hold, as the header says; UNKNOWN stands for a part it cannot. */
+class Resolver {
+  private readonly parsed = new Map<string, ts.SourceFile | null>();
+  private readonly texts = new Map<string, string | undefined>();
+  private readonly declared = new Map<string, Map<string, ts.Expression[]>>();
+  constructor(private readonly read: Load) {}
+
+  private load(file: string): string | undefined {
+    if (!this.texts.has(file)) this.texts.set(file, this.read(file));
+    return this.texts.get(file);
+  }
+
+  /** Every `const` in `file` with an initializer, by name, in any scope. */
+  private consts(file: string): Map<string, ts.Expression[]> {
+    let found = this.declared.get(file);
+    if (!found) {
+      const map = new Map<string, ts.Expression[]>();
+      const sf = this.source(file);
+      const visit = (n: ts.Node) => {
+        if (
+          ts.isVariableDeclaration(n) &&
+          ts.isIdentifier(n.name) &&
+          n.initializer &&
+          ts.isVariableDeclarationList(n.parent) &&
+          n.parent.flags & ts.NodeFlags.Const
+        )
+          map.set(n.name.text, [...(map.get(n.name.text) ?? []), n.initializer]);
+        ts.forEachChild(n, visit);
+      };
+      if (sf) visit(sf);
+      this.declared.set(file, (found = map));
+    }
+    return found;
+  }
+
+  source(file: string): ts.SourceFile | null {
+    if (!this.parsed.has(file)) {
+      const text = this.load(file);
+      const kind = file.endsWith('.tsx')
+        ? ts.ScriptKind.TSX
+        : /\.[mc]?js$/.test(file)
+          ? ts.ScriptKind.JS
+          : ts.ScriptKind.TS;
+      this.parsed.set(
+        file,
+        text === undefined
+          ? null
+          : ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, kind),
+      );
+    }
+    return this.parsed.get(file)!;
+  }
+
+  valuesOf(expr: ts.Expression, file: string, depth = 0): string[] {
+    if (depth > 12) return [UNKNOWN];
+    const e = bare(expr);
+    if (ts.isStringLiteralLike(e) || ts.isNumericLiteral(e)) return [e.text];
+    if (ts.isTemplateExpression(e))
+      return product([
+        [e.head.text],
+        ...e.templateSpans.flatMap((s) => [
+          this.valuesOf(s.expression, file, depth + 1),
+          [s.literal.text],
+        ]),
+      ]);
+    if (ts.isBinaryExpression(e) && e.operatorToken.kind === ts.SyntaxKind.PlusToken)
+      return product([
+        this.valuesOf(e.left, file, depth + 1),
+        this.valuesOf(e.right, file, depth + 1),
+      ]);
+    if (ts.isConditionalExpression(e))
+      return [
+        ...this.valuesOf(e.whenTrue, file, depth + 1),
+        ...this.valuesOf(e.whenFalse, file, depth + 1),
+      ];
+    if (ts.isIdentifier(e)) {
+      const found = this.initializers(e.text, file, depth + 1);
+      return found.length
+        ? found.flatMap((i) => this.valuesOf(i.node, i.file, depth + 1))
+        : [UNKNOWN];
+    }
+    const key = ts.isPropertyAccessExpression(e)
+      ? e.name.text
+      : ts.isElementAccessExpression(e)
+        ? textOf(e.argumentExpression)
+        : undefined;
+    const base =
+      ts.isPropertyAccessExpression(e) || ts.isElementAccessExpression(e)
+        ? bare(e.expression)
+        : undefined;
+    if (key !== undefined && base && ts.isIdentifier(base)) {
+      const values = this.initializers(base.text, file, depth + 1).flatMap((i) => {
+        const object = bare(i.node);
+        if (!ts.isObjectLiteralExpression(object)) return [];
+        return object.properties.flatMap((p) => {
+          const name =
+            p.name && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name))
+              ? p.name.text
+              : undefined;
+          if (name !== key) return [];
+          if (ts.isPropertyAssignment(p)) return this.valuesOf(p.initializer, i.file, depth + 1);
+          if (ts.isShorthandPropertyAssignment(p)) return this.valuesOf(p.name, i.file, depth + 1);
+          return [];
+        });
+      });
+      return values.length ? values : [UNKNOWN];
+    }
+    return [UNKNOWN];
+  }
+
+  /** The initializers of the `const`s named `name` in `file`, or of the `const` it imports as `name`. */
+  private initializers(
+    name: string,
+    file: string,
+    depth: number,
+  ): { node: ts.Expression; file: string }[] {
+    const sf = this.source(file);
+    if (!sf || depth > 12) return [];
+    const local = this.consts(file).get(name);
+    if (local) return local.map((node) => ({ node, file }));
+    for (const s of sf.statements) {
+      if (!ts.isImportDeclaration(s) || !ts.isStringLiteral(s.moduleSpecifier)) continue;
+      const bindings = s.importClause?.namedBindings;
+      if (!bindings || !ts.isNamedImports(bindings)) continue;
+      const spec = bindings.elements.find((el) => el.name.text === name);
+      if (!spec) continue;
+      const target = this.module(file, s.moduleSpecifier.text);
+      return target ? this.exported((spec.propertyName ?? spec.name).text, target, depth + 1) : [];
+    }
+    return [];
+  }
+
+  /** What `file` exports as `name`: its own `const`, or a re-export followed to its module. */
+  private exported(
+    name: string,
+    file: string,
+    depth: number,
+  ): { node: ts.Expression; file: string }[] {
+    const sf = this.source(file);
+    if (!sf || depth > 12) return [];
+    for (const s of sf.statements) {
+      if (!ts.isExportDeclaration(s)) continue;
+      const from =
+        s.moduleSpecifier && ts.isStringLiteral(s.moduleSpecifier)
+          ? s.moduleSpecifier.text
+          : undefined;
+      if (!s.exportClause && from) {
+        const target = this.module(file, from);
+        const found = target ? this.exported(name, target, depth + 1) : [];
+        if (found.length) return found;
+        continue;
+      }
+      if (!s.exportClause || !ts.isNamedExports(s.exportClause)) continue;
+      const spec = s.exportClause.elements.find((el) => el.name.text === name);
+      if (!spec) continue;
+      const inner = (spec.propertyName ?? spec.name).text;
+      if (!from) return this.initializers(inner, file, depth + 1);
+      const target = this.module(file, from);
+      return target ? this.exported(inner, target, depth + 1) : [];
+    }
+    return this.initializers(name, file, depth + 1);
+  }
+
+  /** A relative or `@/` (apps/web) module specifier as a file the loader has. */
+  private module(from: string, specifier: string): string | undefined {
+    const base = specifier.startsWith('.')
+      ? resolve(dirname(from), specifier)
+      : specifier.startsWith('@/')
+        ? join(ROOT, 'apps/web', specifier.slice(2))
+        : undefined;
+    if (!base) return undefined;
+    const stem = base.replace(/\.[mc]?js$/, '');
+    return ['.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.tsx', '']
+      .map((ext) => stem + ext)
+      .find((f) => this.load(f) !== undefined);
+  }
+}
+
+/** The name a call is made by: `x.name(…)`, `x?.name(…)`, `x['name'](…)` or `name(…)`. */
+function calledName(call: ts.CallExpression): string | undefined {
+  const e = bare(call.expression);
+  if (ts.isPropertyAccessExpression(e)) return e.name.text;
+  if (ts.isElementAccessExpression(e)) return textOf(e.argumentExpression);
+  if (ts.isIdentifier(e)) return e.text;
+  return undefined;
+}
+
+/** `call`'s result is at once called with `.select(`. */
+function selected(call: ts.CallExpression): boolean {
+  let n: ts.Node = call;
+  while (ts.isParenthesizedExpression(n.parent) || ts.isNonNullExpression(n.parent)) n = n.parent;
+  const p = n.parent;
+  const named =
+    (ts.isPropertyAccessExpression(p) && p.name.text === 'select') ||
+    (ts.isElementAccessExpression(p) && textOf(p.argumentExpression) === 'select');
+  return (
+    named &&
+    (p as ts.PropertyAccessExpression | ts.ElementAccessExpression).expression === n &&
+    ts.isCallExpression(p.parent) &&
+    p.parent.expression === p
+  );
+}
+
+const isStringy = (n: ts.Node): n is ts.Expression =>
+  ts.isStringLiteralLike(n) ||
+  ts.isTemplateExpression(n) ||
+  (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken);
+
+/** The writes in one code file, as the header defines them. */
+function codeWrites(file: string, resolver: Resolver): Write[] {
+  const sf = resolver.source(file);
+  if (!sf) return [];
+  const out: Write[] = [];
+  const lineOf = (n: ts.Node) => sf.getLineAndCharacterOfPosition(n.getStart()).line + 1;
+  const names = (arg: ts.Expression | undefined, among: Set<string>) =>
+    arg ? [...new Set(resolver.valuesOf(arg, file).filter((v) => among.has(v)))] : [];
+  const visit = (n: ts.Node) => {
+    if (ts.isCallExpression(n)) {
+      const called = calledName(n);
+      if (called === 'from' && !selected(n))
+        for (const name of names(n.arguments[0], WRITTEN)) out.push({ line: lineOf(n), name });
+      if (called === 'rpc')
+        for (const name of names(n.arguments[0], PERSIST_FUNCTIONS))
+          out.push({ line: lineOf(n), name });
+    }
+    if (isStringy(n)) {
+      let up: ts.Node = n.parent;
+      while (ts.isParenthesizedExpression(up)) up = up.parent;
+      const inner =
+        ts.isTemplateSpan(up) ||
+        (ts.isBinaryExpression(up) && up.operatorToken.kind === ts.SyntaxKind.PlusToken);
+      if (!inner) {
+        const seen = new Set<string>();
+        for (const text of resolver.valuesOf(n, file))
+          for (const w of sqlWrites(text, lineOf(n)))
+            if (!seen.has(w.name) && seen.add(w.name)) out.push(w);
+      }
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+const readOrNone: Load = (file) => {
+  try {
+    return readFileSync(file, 'utf8');
+  } catch {
+    return undefined;
+  }
+};
+
+/** The names `source` writes, as file `file` among `others` (path → text); for the cases below. */
+function writesIn(source: string, others: Record<string, string> = {}, file = '/v/x.ts'): string[] {
+  const files: Record<string, string> = { ...others, [file]: source };
+  return codeWrites(file, new Resolver((f) => files[f])).map((w) => w.name);
+}
 
 const ROOT = resolve(__dirname, '../../../../..');
-const WRITER = 'apps/web/lib/v2/pipeline/persist.ts';
-const SKIP_DIR = new Set(['node_modules', '.next', '.turbo', '__tests__', 'test-support', 'dist']);
+const ROOTS = ['apps/web', 'inngest', 'scripts', 'packages', 'infra'];
+const SKIP_DIR = new Set([
+  'node_modules',
+  '.next',
+  '.turbo',
+  'dist',
+  'coverage',
+  '__tests__',
+  'test-support',
+]);
+const CODE = /\.(ts|tsx|js|mjs|cjs)$/;
 function sources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const at = join(dir, e.name);
     if (e.isDirectory()) return SKIP_DIR.has(e.name) ? [] : sources(at);
-    return /\.(ts|tsx|js|mjs|cjs|sql)$/.test(e.name) && !/\.test\.[a-z]+$/.test(e.name) ? [at] : [];
+    return (CODE.test(e.name) || e.name.endsWith('.sql')) && !/\.(test|spec)\.[a-z]+$/.test(e.name)
+      ? [relative(ROOT, at)]
+      : [];
   });
 }
 
-describe('persist.ts is the only code that writes a built check’s rows', () => {
-  it.each([
-    [`sb.from('changes').insert(rows)`, ['changes']],
-    [`sb\n  .from("page_results")\n  .upsert(rows, { onConflict: 'x' })`, ['page_results']],
-    ['sb.from(`site_fixes`).update({ rank: 1 }).eq("id", x)', ['site_fixes']],
-    [`sb.from('persist_chunks').delete().eq('check_id', id)`, ['persist_chunks']],
-    [`INSERT INTO public.link_edges (a) VALUES (1)`, ['link_edges']],
-    [`insert into "public"."fix_events" (a) select 1`, ['fix_events']],
-    [`insert   into\n access_tests (id)`, ['access_tests']],
-    [`update public.site_fixes f set rank = 1`, ['site_fixes']],
-    [`DELETE FROM usage_events where true`, ['usage_events']],
-    [`await sb.rpc('stage_check_rows', args)`, ['stage_check_rows']],
-    [`await sb.rpc(PERSIST_RPC, { p })`, ['PERSIST_RPC']],
-    [`select public.persist_built_check($1::jsonb)`, ['persist_built_check']],
-    // Reads, other tables, and prose are not writes.
-    [`sb.from('page_results').select('*').in('check_id', ids)`, []],
-    [`sb.from('changes').select('*'); other.insert(rows)`, []],
-    [`insert into public.changes_archive (a) values (1)`, []],
-    [`sb.from('checks').update(row)`, []],
-    [`// we update changes once the diff is read`, []],
-    [`persist_built_check (migration 008) writes the check`, []],
-  ])('the matcher reads %j as writing %j', (source, tables) => {
-    expect(writesIn(source)).toEqual(tables);
+describe('the one-writer guard: what counts as a write', () => {
+  const TABLES = {
+    '/v/tables.ts': `export const FIXES = 'site_fixes';\nexport const OTHER = 'checks';`,
+  };
+  it.each<[string, string, string[], Record<string, string>?]>([
+    ['an insert', `sb.from('changes').insert(rows)`, ['changes']],
+    [
+      'an upsert over lines',
+      `sb\n  .from("page_results")\n  .upsert(rows, { onConflict: 'x' })`,
+      ['page_results'],
+    ],
+    [
+      'an update, named by a template',
+      'sb.from(`site_fixes`).update({ rank: 1 }).eq("id", x)',
+      ['site_fixes'],
+    ],
+    ['a delete', `sb.from('persist_chunks').delete().eq('check_id', id)`, ['persist_chunks']],
+    [
+      'a held builder',
+      `const t = sb.from('site_fixes');\nawait t.update({ rank: 1 });`,
+      ['site_fixes'],
+    ],
+    [
+      'a held builder, upserted later',
+      `const q = sb.from('link_edges'); q.upsert(r);`,
+      ['link_edges'],
+    ],
+    [
+      'a const in the file',
+      `const FIXES = 'site_fixes';\nawait sb.from(FIXES).update(row);`,
+      ['site_fixes'],
+    ],
+    ['a const as const', `const T = 'fix_events' as const; sb.from(T).insert(r);`, ['fix_events']],
+    [
+      'a const object’s property',
+      `const T = { edges: 'link_edges' } as const; sb.from(T.edges).upsert(r);`,
+      ['link_edges'],
+    ],
+    [
+      'a const object’s element',
+      `const T = { u: 'usage_events' }; sb.from(T['u']).insert(r);`,
+      ['usage_events'],
+    ],
+    ['an element-access call', `sb['from']('usage_events').insert(r)`, ['usage_events']],
+    ['an optional chain', `sb?.from('changes')?.insert(r)`, ['changes']],
+    [
+      'a template over a const',
+      'const S = "site"; sb.from(`${S}_fixes`).update(r);',
+      ['site_fixes'],
+    ],
+    ['a concatenation', `sb.from('access_' + 'tests').insert(r)`, ['access_tests']],
+    ['either side of a conditional', `sb.from(ok ? 'checks' : 'changes').update(r)`, ['changes']],
+    [
+      'an imported const',
+      `import { FIXES } from './tables';\nsb.from(FIXES).update(r);`,
+      ['site_fixes'],
+      TABLES,
+    ],
+    [
+      'an imported const, renamed and re-exported',
+      `import { T as X } from './index.js';\nsb.from(X).delete();`,
+      ['site_fixes'],
+      { ...TABLES, '/v/index.ts': `export { FIXES as T } from './tables';` },
+    ],
+    [
+      'a const imported through export *',
+      `import { FIXES } from './all';\nconst t = sb.from(FIXES);`,
+      ['site_fixes'],
+      { ...TABLES, '/v/all.ts': `export * from './tables';` },
+    ],
+    ['an rpc by name', `await sb.rpc('stage_check_rows', args)`, ['stage_check_rows']],
+    [
+      'an rpc by a const',
+      `const FN = 'persist_built_check'; await sb.rpc(FN, { p });`,
+      ['persist_built_check'],
+    ],
+    [
+      'an rpc by an imported const',
+      `import { PERSIST_RPC } from './columns';\nawait sb.rpc(PERSIST_RPC, { p });`,
+      ['persist_built_check'],
+      { '/v/columns.ts': `export const PERSIST_RPC = 'persist_built_check';` },
+    ],
+    ['SQL inserting', `db.query('INSERT INTO public.link_edges (a) VALUES (1)')`, ['link_edges']],
+    [
+      'SQL inserting into a quoted name',
+      `db.query('insert into "public"."fix_events" (a) select 1')`,
+      ['fix_events'],
+    ],
+    ['SQL over lines', 'db.query(`insert   into\n access_tests (id)`)', ['access_tests']],
+    [
+      'SQL updating with an alias',
+      `db.query('update public.site_fixes f set rank = 1')`,
+      ['site_fixes'],
+    ],
+    ['SQL deleting', `db.query('DELETE FROM usage_events where true')`, ['usage_events']],
+    [
+      'SQL selecting the persist function',
+      `db.query('select public.persist_built_check($1::jsonb)')`,
+      ['persist_built_check'],
+    ],
+    [
+      'SQL reading from the stage function',
+      `db.query('select * from stage_check_rows($1, $2, $3, $4)')`,
+      ['stage_check_rows'],
+    ],
+    [
+      'SQL naming a const',
+      'const T = "changes"; db.query(`delete from public.${T} where id = $1`);',
+      ['changes'],
+    ],
+    [
+      'SQL split by +',
+      `db.query('update public.' + 'measurement_lineages set id = id')`,
+      ['measurement_lineages'],
+    ],
+    ['a read', `sb.from('page_results').select('*').in('check_id', ids)`, []],
+    ['a read in parentheses', `const r = (sb.from('changes'))!.select('id');`, []],
+    ['a read beside another write', `sb.from('changes').select('*'); other.insert(rows);`, []],
+    ['another table', `sb.from('checks').update(row)`, []],
+    [
+      'a const naming another table',
+      `import { OTHER } from './tables'; sb.from(OTHER).update(r);`,
+      [],
+      TABLES,
+    ],
+    [
+      'a name it cannot work out (not seen)',
+      `function f(table: string) { return sb.from(table).update(r); }`,
+      [],
+    ],
+    ['Array.from', `Array.from(rows)`, []],
+    ['another rpc', `sb.rpc('claim_check', args)`, []],
+    [
+      'a longer table name in SQL',
+      `db.query('insert into public.changes_archive (a) values (1)')`,
+      [],
+    ],
+    ['a comment', `// sb.from('site_fixes').update(r) and update changes set x = 1`, []],
+    [
+      'prose naming a function',
+      `const s = 'persist_built_check (migration 008) writes the check';`,
+      [],
+    ],
+    ['DDL in a string', `const s = 'drop function public.persist_built_check(jsonb)';`, []],
+    [
+      'a grant in a string',
+      `const s = 'grant select, insert, update, delete on table public.persist_chunks to r';`,
+      [],
+    ],
+  ])('%s: %j writes %j', (_label, source, names, others) => {
+    expect(writesIn(source, others)).toEqual(names);
   });
 
-  it('no other file under apps/web, inngest or scripts writes them or calls the persist functions', () => {
-    const files = ['apps/web', 'inngest', 'scripts']
-      .flatMap((d) => sources(join(ROOT, d)))
-      .filter((f) => relative(ROOT, f) !== WRITER);
-    expect(files.length, 'anti-vacuity: the scan reads files').toBeGreaterThan(200);
-    const writers = files
-      .map((f) => [relative(ROOT, f), writesIn(readFileSync(f, 'utf8'))] as const)
-      .filter(([, tables]) => tables.length > 0)
-      .map(([f, tables]) => `${f}: ${tables.join(', ')}`);
-    expect(writers).toEqual([]);
+  it.each<[string, string, string[]]>([
+    ['an insert', `insert into public.site_fixes (id) values ($1);`, ['site_fixes']],
+    [
+      'an insert in a comment',
+      `-- insert into public.site_fixes (id)\n/* delete from public.changes */ select 1;`,
+      [],
+    ],
+    [
+      'the DDL that creates and secures the tables',
+      [
+        'create table if not exists public.site_fixes (id uuid);',
+        'alter table public.changes add column x int;',
+        'create index if not exists e on public.link_edges (check_id);',
+        'revoke all on table public.fix_events from anon;',
+        'grant select, insert, update, delete on table public.persist_chunks to service_role;',
+        'create trigger t before update on public.site_fixes for each row execute function f();',
+        'drop function if exists public.persist_built_check(jsonb);',
+        'alter function public.stage_check_rows(uuid, text, integer, jsonb) owner to postgres;',
+        'drop table if exists public.persist_chunks;',
+      ].join('\n'),
+      [],
+    ],
+    [
+      'an update in a function body',
+      'create function f() returns void language sql as $$ update public.usage_events u set billable = false $$;',
+      ['usage_events'],
+    ],
+    [
+      'a delete in a CTE',
+      'with x as (delete from only public.measurement_lineages returning id) select 1;',
+      ['measurement_lineages'],
+    ],
+    [
+      'a PERFORM of the stage function',
+      `perform public.stage_check_rows(p, 'link_edges', 0, '[]');`,
+      ['stage_check_rows'],
+    ],
+  ])('in a .sql file, %s writes %j', (_label, sql, names) => {
+    expect(sqlFileWrites(sql).map((w) => w.name)).toEqual(names);
+  });
+
+  it('counts lines in a .sql file past the comments it blanks', () => {
+    expect(sqlFileWrites(`/* one\n two */\n-- three\ndelete from changes;`)).toEqual([
+      { line: 4, name: 'changes' },
+    ]);
+  });
+});
+
+describe('persist.ts and migration 008 are the only code that writes a built check’s rows', () => {
+  let files: string[];
+  let found: (Write & { file: string })[];
+  beforeAll(() => {
+    files = ROOTS.flatMap((d) => sources(join(ROOT, d)));
+    const resolver = new Resolver(readOrNone);
+    found = files.flatMap((f) =>
+      (f.endsWith('.sql')
+        ? sqlFileWrites(readFileSync(join(ROOT, f), 'utf8'))
+        : codeWrites(join(ROOT, f), resolver)
+      ).map((w) => ({ file: f, ...w })),
+    );
+  }, 60_000);
+
+  it('scans the roots: code and SQL in each', () => {
+    expect(files.length, 'anti-vacuity: the scan reads files').toBeGreaterThan(900);
+    for (const root of ROOTS)
+      expect(
+        files.some((f) => f.startsWith(`${root}/`)),
+        root,
+      ).toBe(true);
+    expect(files.filter((f) => f.startsWith('infra/supabase/migrations/')).length).toBeGreaterThan(
+      40,
+    );
+    expect(files).toContain(WRITER);
+    expect(files).toContain(MIGRATION);
+    expect(files.some((f) => /\.(test|spec)\./.test(f) || f.includes('/test-support/'))).toBe(
+      false,
+    );
+  });
+
+  it('finds the writes of persist.ts and of migration 008, each table and function by name', () => {
+    expect(found.filter((w) => w.file === WRITER).map((w) => w.name)).toEqual([
+      'stage_check_rows',
+      'persist_built_check',
+    ]);
+    expect(new Set(found.filter((w) => w.file === MIGRATION).map((w) => w.name))).toEqual(
+      new Set([...WRITTEN]),
+    );
+  });
+
+  it('finds no write in any other file', () => {
+    const others = found
+      .filter((w) => w.file !== WRITER && w.file !== MIGRATION)
+      .map((w) => `${w.file}:${w.line}: ${w.name}`);
+    expect(others).toEqual([]);
   });
 });

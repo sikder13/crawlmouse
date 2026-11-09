@@ -9,10 +9,17 @@
  * most CHUNK_BYTES of JSON (stage_check_rows), and one call to persist_built_check (migration 008)
  * then writes the whole check, staged rows included, in one transaction. Once the check is written,
  * staging answers false and persist_built_check {written: false}, so a retried persist step changes
- * nothing. persist.test.ts fails if a non-test file under apps/web, inngest or scripts other than
- * this one writes these rows or calls either function.
+ * nothing.
+ *
+ * The one-writer guard in persist.test.ts fails when a non-test file under apps/web, inngest, scripts,
+ * packages or infra, other than this one and migration 008, writes these tables or calls either
+ * function, as the guard's header defines a write: read from the TypeScript AST, a `from(…)` of one of
+ * the tables whose result is not at once `.select`ed, or an `rpc(…)` of either function, the name
+ * worked out from literals, `const`s and relative imports; and in SQL, an INSERT, UPDATE or DELETE.
+ * A name it cannot work out (a parameter, say) it does not see. The guard:
+ * pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/persist.test.ts -t "one-writer|only code"
  */
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import {
   AccessTestSchema,
   ChangeSchema,
@@ -177,15 +184,26 @@ export function pageVantage(pages: readonly CrawlPage[]): Map<string, PageVantag
   return vantage;
 }
 
+/** An rpc's answer: its data, or a throw naming the function, the error's code and its message. */
+function answer(rpc: string, { data, error }: { data: unknown; error: PostgrestError | null }) {
+  if (error) throw new Error(`${rpc}: ${error.code} ${error.message}`);
+  return data;
+}
+
 export function supabasePersistDb(sb: SupabaseClient): PersistDb {
-  const call = async (rpc: string, args: Record<string, unknown>) => {
-    const { data, error } = await sb.rpc(rpc, args);
-    if (error) throw new Error(`${rpc}: ${error.code} ${error.message}`);
-    return data as unknown;
-  };
+  // Each call names its function here, where the one-writer guard in persist.test.ts reads it.
   return {
-    stageCheckRows: (checkId, collection, chunk, rows) =>
-      call(STAGE_RPC, { p_check: checkId, p_collection: collection, p_chunk: chunk, p_rows: rows }),
-    persistBuiltCheck: (payload) => call(PERSIST_RPC, { p: payload }),
+    stageCheckRows: async (checkId, collection, chunk, rows) =>
+      answer(
+        STAGE_RPC,
+        await sb.rpc(STAGE_RPC, {
+          p_check: checkId,
+          p_collection: collection,
+          p_chunk: chunk,
+          p_rows: rows,
+        }),
+      ),
+    persistBuiltCheck: async (payload) =>
+      answer(PERSIST_RPC, await sb.rpc(PERSIST_RPC, { p: payload })),
   };
 }
