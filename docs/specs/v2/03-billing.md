@@ -241,7 +241,7 @@ refused 403 by the middleware before the route runs:
   replace them.
 - An applied checkout that replaces an `unpaid` or `paused` subscription does not cancel it (it is not
   "live"); the checkout route refuses while the account follows one (Q3), so only a race reaches it.
-- Two of CC-SEC's tests built their "after" database from every migration, so any later migration broke
+- Two of CC-SEC's tests built their "after" database from every migration, so this step's migration broke
   them; they now compare their own migration alone (`__tests__/v2-definer-search-path.test.ts`,
   `scripts/db/definer-search-path.test.ts`), and `__tests__/v2-billing-rpc.test.ts` runs check 09 with this
   step's function in place.
