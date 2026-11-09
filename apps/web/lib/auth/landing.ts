@@ -7,11 +7,11 @@
  */
 import { claimCheck, type ClaimDeps } from './claim';
 import {
+  bindingMatches,
   bindingMismatch,
   claimFromNext,
   claimRefusedDest,
   DASHBOARD,
-  emailBinding,
   type SignupCarry,
 } from './continue-intent';
 import type { Report } from './door-store';
@@ -28,7 +28,7 @@ export interface LandingInput {
   user: SignedInUser;
   /** The `post_login_next` cookie, unvalidated. */
   next: string | undefined;
-  /** The `cm_auth_for` cookie: whom the door request that set `next` and `signup` was for. */
+  /** The `cm_auth_for` cookie: whom this browser's last magic-link request, which set `next` and `signup`, was for. */
   boundTo: string | undefined;
   signup: SignupCarry | null;
   device: string | null;
@@ -49,10 +49,7 @@ export async function afterSignIn(
   const { user } = input;
   // The named site and a Keep's claim were asked for by one address; they count only when the link
   // signed that address in (not someone else's link opened in the same browser).
-  const bound =
-    input.boundTo !== undefined &&
-    user.email !== undefined &&
-    input.boundTo === emailBinding(user.email);
+  const bound = bindingMatches(input.boundTo, user.email);
   // Another address's link opened in a browser that asked for one: this browser's device id is the
   // victim's, and recording it under the other account would refuse the victim's own trial later.
   const device = bindingMismatch(input.boundTo, user.email) ? null : input.device;

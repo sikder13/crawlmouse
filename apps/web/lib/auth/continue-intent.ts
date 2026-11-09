@@ -15,19 +15,29 @@ export function isUuid(v: unknown): v is string {
   return typeof v === 'string' && UUID.test(v);
 }
 
-/** The address a door request was made for, as `cm_auth_for` holds it: a hash, never the address. */
+/** The address a magic-link request was made for, as `cm_auth_for` holds it: a hash, never the address. */
 export function emailBinding(email: string): string {
   return createHash('sha256').update(`cm-auth-for:${email.trim().toLowerCase()}`).digest('hex');
 }
 
 /**
- * The link signed in an address other than the one this browser's door request was for: someone
- * else's link opened here (login CSRF). With no `cm_auth_for` nothing is known either way, as for a
- * link opened on another device. CC-06c D9: such a sign-in records no device for the trial ledger
- * and claims none of this browser's anonymous v1 audits.
+ * The link signed in an address other than the one this browser's magic-link request was for:
+ * someone else's link opened here (login CSRF). CC-06c D9: such a sign-in records no device for the
+ * trial ledger. With no `cm_auth_for` this is false (nothing is known either way, as for a link opened
+ * on another device), so the device rule still records it; the anonymous-audit claim asks the
+ * stricter `bindingMatches` instead (A-8).
  */
 export function bindingMismatch(boundTo: string | undefined, email: string | undefined): boolean {
   return boundTo !== undefined && (email === undefined || boundTo !== emailBinding(email));
+}
+
+/**
+ * The link signed in the address this browser asked for: `cm_auth_for` is present and is that
+ * address's binding. Only then are this browser's anonymous v1 audits claimed (A-8). With no binding
+ * the browser asked for no link (or asked on another device), so the audits stay where they are.
+ */
+export function bindingMatches(boundTo: string | undefined, email: string | undefined): boolean {
+  return boundTo !== undefined && email !== undefined && boundTo === emailBinding(email);
 }
 
 /** A Keep's return target (D8): the claim, then the dashboard. */

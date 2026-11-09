@@ -169,16 +169,27 @@ export async function POST(req: Request) {
       maxAge: v2 ? AUTH_LINK_SECONDS : V1_NEXT_COOKIE_SECONDS,
       path: '/',
     });
+  } else {
+    // The binding below makes this address the one the browser asked for; an earlier request's
+    // return target must not ride along into its account.
+    res.cookies.set(COOKIES.next, '', { path: '/', maxAge: 0 });
   }
 
-  if (v2) {
-    res.cookies.set(COOKIES.binding, emailBinding(email), {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: secure(),
-      maxAge: AUTH_LINK_SECONDS,
-      path: '/',
-    });
+  // Every request binds this browser to the address it asked for, door or not (A-8): /login/verify
+  // claims this browser's anonymous audits only for a link to that address, so someone else's link
+  // opened here signs in without taking them. A hash, never the address.
+  res.cookies.set(COOKIES.binding, emailBinding(email), {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: secure(),
+    maxAge: AUTH_LINK_SECONDS,
+    path: '/',
+  });
+
+  if (!v2) {
+    // Likewise an earlier door request's named site (the door path below replaces or clears it).
+    res.cookies.set(COOKIES.signup, '', { path: '/', maxAge: 0 });
+  } else {
     const carry: SignupCarry = {};
     if (host) carry.site = host;
     if (zone) carry.tz = zone;
