@@ -562,6 +562,10 @@ describe('runFirstLogin under interleaving of its calls', () => {
       ...d,
       store: wrap(d.store, s),
       entitlement: wrap(d.entitlement, s),
+      // Not deps()'s vi.fn: a mock keeps the `this` of each call, here these deps and their store, so
+      // every run's database clone would stay alive until the worker ends (about 10 GB over these
+      // properties). These runs assert nothing about dispatch.
+      dispatch: async () => {},
     });
     // waitFor keeps releasing scheduled calls until both runs settle.
     return s.waitFor(
