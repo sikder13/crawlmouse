@@ -61,7 +61,7 @@
         "cache": "pass — dynamic; measured Cache-Control: private, no-cache, no-store",
         "redirect": "n/a — no redirect param",
         "errors": "pass — notFound() only",
-        "escaping": "pass — the audit URL is display text, never an href (components/audit/AuditUrlHeader.tsx:7); crawled titles/URLs are JSX text (components/audit/NodeDetail.tsx:7, FreeFixCard.tsx:11-12)",
+        "escaping": "pass — the audit URL is display text, never an href (components/audit/AuditUrlHeader.tsx:7); crawled titles/URLs are JSX text (components/audit/NodeDetail.tsx:7, FreeFixCard.tsx:11-12); the graph tooltip is innerHTML (react-force-graph nodeLabel) and gets nodeTooltipLabel, which decodes then escapes (components/audit/LinkGraph.tsx:96, components/audit/graph-logic.ts:148)",
         "abuse": "pass — re-audit/start actions are rate-limited (app/api/audits/[id]/reaudit/route.ts:67-93)"
       }
     },
