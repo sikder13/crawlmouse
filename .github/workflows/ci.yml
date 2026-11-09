@@ -382,7 +382,7 @@ jobs:
   # --update-snapshots and uploads them as proposed baselines, next to the diffs; nothing is
   # committed from CI. tests/visual/README.md says how to accept them.
   #
-  # Four shards, each under its own 45 minutes: one runner ran past that limit once the segment
+  # Six shards, each under its own 45 minutes: one runner ran past that limit once the segment
   # previews were added (owner ruling, CC-23).
   #
   # Skipped when the `changes` job finds nothing on the branch that can affect rendering.
