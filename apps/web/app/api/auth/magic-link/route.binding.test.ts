@@ -57,17 +57,20 @@ describe.each([
   it.each([
     ['a v1 sign-in', { email: 'Ada@Example.com' }],
     ['a sign-in with a return target', { email: 'ada@example.com', next: '/r/abc' }],
-  ])('%s is bound to its address: a hash, httpOnly, Lax, for the link lifetime', async (_n, body) => {
-    const res = await POST(request(body));
-    expect(res.status).toBe(200);
-    const cookie = binding(res);
-    expect(cookie?.split(';')[0]).toBe(`cm_auth_for=${emailBinding('ada@example.com')}`);
-    expect(cookie).not.toMatch(/ada/i);
-    expect(cookie).toMatch(/HttpOnly/i);
-    expect(cookie).toMatch(/SameSite=Lax/i);
-    expect(cookie).toMatch(new RegExp(`Max-Age=${AUTH_LINK_SECONDS}(;|$)`));
-    expect(cookie).toMatch(/Path=\//);
-  });
+  ])(
+    '%s is bound to its address: a hash, httpOnly, Lax, for the link lifetime',
+    async (_n, body) => {
+      const res = await POST(request(body));
+      expect(res.status).toBe(200);
+      const cookie = binding(res);
+      expect(cookie?.split(';')[0]).toBe(`cm_auth_for=${emailBinding('ada@example.com')}`);
+      expect(cookie).not.toMatch(/ada/i);
+      expect(cookie).toMatch(/HttpOnly/i);
+      expect(cookie).toMatch(/SameSite=Lax/i);
+      expect(cookie).toMatch(new RegExp(`Max-Age=${AUTH_LINK_SECONDS}(;|$)`));
+      expect(cookie).toMatch(/Path=\//);
+    },
+  );
 
   it("a new binding disowns an earlier request's named site and return target", async () => {
     // An earlier request (say a Keep for another address) left these behind; a request that names
