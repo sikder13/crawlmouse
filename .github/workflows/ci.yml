@@ -21,6 +21,43 @@ env:
   TURBO_TELEMETRY_DISABLED: '1'
 
 jobs:
+  # Whether the visual shards, security-browser and zap-baseline run: they do unless every file the
+  # branch changed is on the reviewed skip list in .github/workflows/scripts/changes.mjs. On main they
+  # always run. On a branch the whole branch is compared with its merge-base on main, not the last
+  # push: the required `visual` check attaches to the head commit, so a docs-only commit on top of a
+  # rendering change still runs the visuals. The runner's own node runs the script; nothing is
+  # installed.
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      visual: ${{ steps.decide.outputs.visual }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Did anything that can affect rendering change
+        id: decide
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$REF" = "refs/heads/main" ]; then
+            echo "main: everything runs"
+            echo "visual=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! base="$(git merge-base origin/main HEAD)"; then
+            echo "::warning::no merge-base with origin/main, so everything runs"
+            echo "visual=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Comparing against ${base}"
+          # --no-renames: a file moved out of a rendering path is listed under its old path as well.
+          git -c core.quotePath=false diff --name-only --no-renames -z "$base" HEAD > "$RUNNER_TEMP/changed"
+          node .github/workflows/scripts/changes.mjs < "$RUNNER_TEMP/changed" >> "$GITHUB_OUTPUT"
+
   lint:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -140,7 +177,8 @@ jobs:
   # the build above (docs/specs/v2/sec-baseline.md). Same runner image and checkout path as build, so
   # the downloaded .next starts as it was built.
   security-browser:
-    needs: build
+    needs: [build, changes]
+    if: needs.changes.outputs.visual == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -172,7 +210,8 @@ jobs:
   # triaged (docs/specs/v2/sec-baseline.md), within six minutes, its reports kept as an artifact.
   # /r/ci-fixture has no database behind it in CI, so ZAP sees the not-found page there.
   zap-baseline:
-    needs: build
+    needs: [build, changes]
+    if: needs.changes.outputs.visual == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 6
     continue-on-error: true
@@ -295,7 +334,11 @@ jobs:
   #
   # Four shards, each under its own 45 minutes: one runner ran past that limit once the segment
   # previews were added (owner ruling, CC-23).
+  #
+  # Skipped when the `changes` job finds nothing on the branch that can affect rendering.
   visual-shard:
+    needs: changes
+    if: needs.changes.outputs.visual == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -425,21 +468,37 @@ jobs:
           if-no-files-found: warn
 
   # The check named `visual`, as before the shards, for branch protection and for a reader of the
-  # PR: it passes only when every shard passed, and fails on a shard that failed, was cancelled or
-  # was skipped.
+  # PR. It passes when every shard passed, or when the shards were skipped because the `changes` job
+  # passed and found nothing that can affect rendering. Everything else fails: a shard that failed or
+  # was cancelled, and shards skipped because `changes` itself failed or was cancelled.
   visual:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: visual-shard
+    needs: [changes, visual-shard]
     if: ${{ always() }}
     permissions: {}
     steps:
-      - name: Every shard passed
+      - name: Every shard passed, or nothing that can affect rendering changed
         env:
           SHARDS: ${{ needs.visual-shard.result }}
+          CHANGES: ${{ needs.changes.result }}
+          VISUAL: ${{ needs.changes.outputs.visual }}
         run: |
-          echo "visual-shard: $SHARDS"
-          test "$SHARDS" = success
+          set -euo pipefail
+          echo "changes: $CHANGES (visual=${VISUAL}); visual-shard: $SHARDS"
+          if [ "$SHARDS" = success ]; then
+            exit 0
+          fi
+          if [ "$SHARDS" = skipped ] && [ "$CHANGES" = success ] && [ "$VISUAL" = false ]; then
+            echo "nothing that can affect rendering changed, so the shards were skipped"
+            exit 0
+          fi
+          if [ "$CHANGES" != success ]; then
+            echo "::error::the changes job is '$CHANGES', so whether the visuals were needed is unknown"
+          else
+            echo "::error::visual-shard is '$SHARDS' with visual=${VISUAL}"
+          fi
+          exit 1
 
   # gitleaks over the FULL history of every ref (gitleaks' default git log is
   # `--full-history --all`), hence fetch-depth: 0. Pinned by image digest.
