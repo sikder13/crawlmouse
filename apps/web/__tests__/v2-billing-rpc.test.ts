@@ -251,7 +251,7 @@ describe('grants: only service_role may call apply_stripe_event', () => {
     ]);
   });
 
-  it.each(['06-client-functions.sql', '08-v1-client-grants.sql'])(
+  it.each(['06-client-functions.sql', '08-v1-client-grants.sql', '09-definer-search-path.sql'])(
     'check %s finds nothing',
     async (file) => {
       const { rows } = await db.query(readFileSync(join(CHECKS_DIR, file), 'utf8'));
