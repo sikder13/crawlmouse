@@ -80,8 +80,20 @@ export interface PersistOutcome {
   counts: Readonly<Record<string, number>>;
 }
 
-/** The one call persistence makes: the RPC `persist_built_check(p jsonb)` (migration 008). */
+/** The bulk collections persistence stages in chunks before the final call (migration 008). */
+export type StagedCollection = 'page_results' | 'link_edges' | 'access_tests';
+
+/**
+ * The calls persistence makes (migration 008): `stage_check_rows` for each chunk of the bulk rows, then
+ * `persist_built_check(p jsonb)`, which writes the check whole in one transaction.
+ */
 export interface PersistDb {
+  stageCheckRows(
+    checkId: string,
+    collection: StagedCollection,
+    chunk: number,
+    rows: readonly unknown[],
+  ): Promise<unknown>;
   persistBuiltCheck(payload: unknown): Promise<unknown>;
 }
 
