@@ -16,9 +16,17 @@ import {
 } from '@crawlmouse/engine/v2/pipeline';
 import { DISCOVER_REQUEST_MS, DISCOVER_S, SITEMAP_URL_CAP } from './limits';
 
+/**
+ * The user agent our crawl identity sends: the worker's CRAWL_USER_AGENT
+ * (packages/worker/src/identities.ts), which the app cannot import (it does not depend on the worker
+ * package). discover.test.ts fails when the two differ.
+ */
+export const CRAWL_USER_AGENT =
+  'Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)';
+
 export interface DiscoverDeps {
   fetch: typeof safeFetch;
-  /** The user agent our crawl identity sends (the worker's CRAWL_USER_AGENT). */
+  /** CRAWL_USER_AGENT in production. */
   userAgent: string;
   /** Milliseconds since the epoch. */
   now: () => number;

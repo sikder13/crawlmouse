@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { safeFetch } from '@crawlmouse/engine/v2/pipeline';
-import { discoverSeeds } from './discover';
+import { CRAWL_USER_AGENT as WORKER_CRAWL_USER_AGENT } from '../../../../../packages/worker/src/identities';
+import { CRAWL_USER_AGENT, discoverSeeds } from './discover';
 import { DISCOVER_S, SITEMAP_URL_CAP } from './limits';
 
 type Fetch = typeof safeFetch;
@@ -20,6 +21,12 @@ function site(pages: Record<string, string>, clock = { now: 0 }, stepMs = 0) {
   }) as Fetch;
   return { requests, deps: { fetch, userAgent: UA, now: () => clock.now } };
 }
+
+describe('CRAWL_USER_AGENT', () => {
+  it('is the user agent the worker’s crawl identity sends', () => {
+    expect(CRAWL_USER_AGENT).toBe(WORKER_CRAWL_USER_AGENT);
+  });
+});
 
 describe('discoverSeeds (Q8)', () => {
   it('seeds the homepage and the sitemaps robots.txt names, as our crawler', async () => {
