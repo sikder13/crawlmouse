@@ -52,7 +52,7 @@ function timeline(choices: number[], settleActive: boolean): Status[] {
   const statuses: Status[] = [];
   let at: Status = 'active';
   for (const c of choices) {
-    const options = NEXT[at];
+    const options: readonly Status[] = NEXT[at];
     if (options.length === 0) break;
     at = options[c % options.length]!;
     statuses.push(at);
