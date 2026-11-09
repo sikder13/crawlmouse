@@ -7,6 +7,7 @@
  * its row written with this attempt's nonce, and posted. `batch_exists` counts as posted; `busy` and
  * `paused` are returned for the orchestration to wait on or end with; a timeout, a network error or
  * a 5xx asks the worker whether the batch arrived, and throws (so the step retries) when it did not.
+ * Every attempt writes the check's heartbeat.
  *
  * read. The result is checked against the contract and against the batch it should be, stored
  * gzipped, and its row marked done with a summary of counts and the worker release its rows name. A
@@ -131,53 +132,62 @@ export function batchSteps(
   const progress = (event: CheckRequested, at: BatchAt, so: RunSoFar, now: number) =>
     deps.store.progress(event.checkId, progressOf(phaseOf(at), so, now - so.startedAt), iso(now));
 
+  /** One post attempt: the batch the worker holds already, or one planned and posted now. */
+  async function attempt(event: CheckRequested, at: BatchAt, so: RunSoFar): Promise<PostOutput> {
+    const worker = workerOf();
+    const id = batchIdOf(event.checkId, at.batch);
+    const row = await deps.store.batch(event.checkId, at.batch);
+    if (row?.status === 'posted' && found((await worker.pollBatch(id)).status)) {
+      const planned = PlannedSchema.parse(row.summary);
+      return {
+        status: 'posted',
+        urls: planned.urls,
+        at: Date.parse(row.posted_at),
+        max_seconds: planned.max_seconds,
+      };
+    }
+
+    const planned = await plan(event, at);
+    if ('none' in planned) return { status: 'none', why: planned.none };
+    const now = deps.now();
+    const budget = at.kind === 'crawl' ? CRAWL_BATCH_BUDGET : ACCESS_BATCH_BUDGET;
+    const seconds = batchSeconds(phaseEndsAt(at, so), now, budget.max_seconds);
+    if (seconds === null) return { status: 'none', why: 'no_time' };
+
+    const nonce = deps.nonce();
+    const urls = planned.kind === 'crawl' ? planned.urls.length : planned.pages.length;
+    await deps.store.upsertBatch({
+      check_id: event.checkId,
+      batch: at.batch,
+      kind: at.kind,
+      nonce,
+      posted_at: iso(now),
+      summary: { urls, max_seconds: seconds },
+    });
+    const common = {
+      check_id: event.checkId,
+      site_id: event.siteId,
+      site_host: new URL(event.homepageUrl).hostname,
+      batch: at.batch,
+      nonce,
+      budget: { ...budget, max_seconds: seconds },
+    };
+    const body: BatchPost =
+      planned.kind === 'crawl'
+        ? { ...common, kind: 'crawl', urls: planned.urls }
+        : { ...common, kind: 'access', pages: planned.pages };
+    const sent = await send(worker, body, id);
+    if (sent !== true) return sent;
+    return { status: 'posted', urls, at: now, max_seconds: seconds };
+  }
+
   return {
     async post(event, at, so) {
-      const worker = workerOf();
-      const id = batchIdOf(event.checkId, at.batch);
-      const row = await deps.store.batch(event.checkId, at.batch);
-      if (row?.status === 'posted' && found((await worker.pollBatch(id)).status)) {
-        const planned = PlannedSchema.parse(row.summary);
-        return {
-          status: 'posted',
-          urls: planned.urls,
-          at: Date.parse(row.posted_at),
-          max_seconds: planned.max_seconds,
-        };
-      }
-
-      const planned = await plan(event, at);
-      if ('none' in planned) return { status: 'none', why: planned.none };
-      const now = deps.now();
-      const budget = at.kind === 'crawl' ? CRAWL_BATCH_BUDGET : ACCESS_BATCH_BUDGET;
-      const seconds = batchSeconds(phaseEndsAt(at, so), now, budget.max_seconds);
-      if (seconds === null) return { status: 'none', why: 'no_time' };
-
-      const nonce = deps.nonce();
-      const urls = planned.kind === 'crawl' ? planned.urls.length : planned.pages.length;
-      await deps.store.upsertBatch({
-        check_id: event.checkId,
-        batch: at.batch,
-        kind: at.kind,
-        nonce,
-        posted_at: iso(now),
-        summary: { urls, max_seconds: seconds },
-      });
-      const common = {
-        check_id: event.checkId,
-        site_id: event.siteId,
-        site_host: new URL(event.homepageUrl).hostname,
-        batch: at.batch,
-        nonce,
-        budget: { ...budget, max_seconds: seconds },
-      };
-      const body: BatchPost =
-        planned.kind === 'crawl'
-          ? { ...common, kind: 'crawl', urls: planned.urls }
-          : { ...common, kind: 'access', pages: planned.pages };
-      const sent = await send(worker, body, id);
-      if (sent !== true) return sent;
-      return { status: 'posted', urls, at: now, max_seconds: seconds };
+      const out = await attempt(event, at, so);
+      // Each attempt writes the heartbeat: a worker answering busy for minutes keeps a check
+      // waiting between posts, and the reaper reads a check without one as stalled (correctness 10).
+      await progress(event, at, so, deps.now());
+      return out;
     },
 
     async poll(event, at, so) {

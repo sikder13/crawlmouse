@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CheckRequested } from '../../../../../../inngest/check-events';
 import { getJson } from '../evidence';
-import { REAP_AFTER_S } from '../limits';
+import { DISCOVER_S, PACE, REAP_AFTER_S, RESERVE_S } from '../limits';
 import type { PipelineStore } from '../store';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import type { StepDeps } from './deps';
@@ -186,6 +186,25 @@ describe('the reaper’s cutoff (D13)', () => {
   it('is thirty minutes before now', () => {
     expect(REAP_AFTER_S).toBe(30 * 60);
     expect(reapCutoff(T0)).toBe('2026-11-08T11:30:00.000Z');
+  });
+
+  it('fails no check whose run may still be alive: REAP_AFTER_S is above the finish timeout plus the longest wait between heartbeats (correctness 10)', () => {
+    // The waits the orchestration makes between two heartbeat writes (claim, discover, post, poll and
+    // read write one), each from its bound; step latency comes on top. RESERVE_S is the time plan's
+    // allowance for render, build, persist and finalize, which write none; nothing inside those
+    // steps enforces it, the finish timeout does.
+    const waits = {
+      'a queued check’s claim waits while the site is busy': PACE.claimWaits * PACE.claimWaitS,
+      'discovery, claim to its end': DISCOVER_S,
+      'a post answered busy, to the next post': PACE.busyWaitS,
+      'a post, or a poll, to the next poll': PACE.pollMaxS,
+      'the last batch to the end of the run': RESERVE_S,
+    };
+    const longest = Math.max(...Object.values(waits));
+    expect(longest).toBe(waits['a queued check’s claim waits while the site is busy']);
+    // A run lives at most PACE.finishS (Inngest cancels it then, and the cancel handler fails its
+    // check), so the reaper's bound is above that plus the longest wait.
+    expect(REAP_AFTER_S).toBeGreaterThan(PACE.finishS + longest);
   });
 
   it('is what reapStalled asks the store for', async () => {

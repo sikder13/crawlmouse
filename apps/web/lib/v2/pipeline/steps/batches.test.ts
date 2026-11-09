@@ -49,7 +49,7 @@ async function setup(results = new Map<number, unknown>()) {
   const clock = { now: T0 };
   const iso = () => new Date(clock.now).toISOString();
   const { worker, posted, refuse, lost, held } = fakeWorker(results);
-  const { store, batches } = memoryStore(
+  const { store, batches, rows } = memoryStore(
     recordedInput().site,
     [queuedCheck(CHECK, SITE_ID, '2026-11-05T02:29:58.000Z', GRADE_VERSION)],
     iso,
@@ -76,6 +76,7 @@ async function setup(results = new Map<number, unknown>()) {
     lost,
     held,
     batches,
+    rows,
     evidence,
   };
 }
@@ -124,6 +125,18 @@ describe('post (finding 2)', () => {
       urls: (s.posted[0] as unknown as { urls: string[] }).urls,
     });
     expect(s.batches.get(`${CHECK}:1`)!.nonce).toBe('nonce-0000000000000002');
+  });
+
+  it('writes the heartbeat on each attempt, busy included, so a busy worker does not look like a stall (correctness 10)', async () => {
+    const s = await setup();
+    const heartbeat = () => s.rows.get(CHECK)!.heartbeat_at;
+    s.refuse.push('busy');
+    s.clock.now += 30_000;
+    expect(await s.steps.post(EVENT, CRAWL_1, SO)).toEqual({ status: 'busy', at: T0 + 30_000 });
+    expect(heartbeat()).toBe(new Date(T0 + 30_000).toISOString());
+    s.clock.now += 30_000;
+    expect(await s.steps.post(EVENT, CRAWL_1, SO)).toMatchObject({ status: 'posted' });
+    expect(heartbeat()).toBe(new Date(T0 + 60_000).toISOString());
   });
 
   it('answers busy and paused as outputs, and counts batch_exists as posted', async () => {
