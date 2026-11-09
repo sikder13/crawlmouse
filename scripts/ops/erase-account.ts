@@ -400,8 +400,12 @@ export async function executeErasure(
     }
     return plan;
   });
-  if (before.userId !== null) await deleteAuthUser(before.userId);
   const params = [before.userId, before.emails, before.accounts];
+  if (before.userId !== null) {
+    await deleteAuthUser(before.userId);
+    // Supabase Auth may log the deletion, naming the address, after the transaction cleared the log.
+    if ((await changesFor(db)).includes(AUDIT_LOG)) await db.query(typed(AUDIT_LOG.apply), params);
+  }
   const counts = await readCounts(db, params, await changesFor(db));
   const storage = await db.query<{ bucket: string; name: string }>(typed(STORAGE), params);
   return {

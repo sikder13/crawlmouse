@@ -241,7 +241,10 @@ async function person() {
        (gen_random_uuid(), json_build_object('actor_id', $1::text, 'actor_username', $2::text, 'action', 'login'), now()),
        (gen_random_uuid(), json_build_object('actor_id', $3::text, 'actor_username', $4::text, 'action', 'user_signedup',
           'traits', json_build_object('user_email', $2::text)), now()),
-       (gen_random_uuid(), json_build_object('actor_id', $3::text, 'actor_username', $4::text, 'action', 'login'), now())`,
+       (gen_random_uuid(), json_build_object('actor_id', $3::text, 'actor_username', $4::text, 'action', 'login'), now()),
+       -- one naming them by id alone, one by address alone
+       (gen_random_uuid(), json_build_object('actor_id', $1::text, 'action', 'token_refreshed'), now()),
+       (gen_random_uuid(), json_build_object('actor_username', $2::text, 'action', 'login_failed'), now())`,
     [id, email.toUpperCase(), bystander.ownerId, other],
   );
   return {
@@ -283,7 +286,8 @@ describe('erase-account (B-F2)', () => {
     // share link or API key this person created; seedWorld gives the account two sites, each with a
     // check and a report.
     expect(plan.counts).toEqual({
-      'auth.audit_log_entries deleted': 2, // their login, and the bystander's entry naming them
+      // their login, the bystander's entry naming them, one by id alone and one by address alone
+      'auth.audit_log_entries deleted': 4,
       'auth.users deleted': 1,
       'users deleted': 1,
       'audits deleted': 1,
@@ -329,7 +333,17 @@ describe('erase-account (B-F2)', () => {
     await removeObjects(listed.storage);
     const dry = await planErasure(db(), { email: p.email });
     expect(dry.refusals).toEqual([]);
-    const { before, after } = await executeErasure(db(), { email: p.email }, sqlDelete);
+    // Supabase Auth logs the deletion itself, naming the address, after the transaction.
+    const authLogsIt: DeleteAuthUser = async (userId) => {
+      await pglite.query(
+        `insert into auth.audit_log_entries (id, payload, created_at) values (gen_random_uuid(),
+           json_build_object('action', 'user_deleted', 'traits',
+             json_build_object('user_id', $1::text, 'user_email', $2::text)), now())`,
+        [userId, p.email],
+      );
+      await sqlDelete(userId);
+    };
+    const { before, after } = await executeErasure(db(), { email: p.email }, authLogsIt);
     expect(before.counts).toEqual(dry.counts);
     // Read again with the user id, addresses and accounts erased, not re-planned from the address.
     expect(Object.keys(after.counts)).toEqual(Object.keys(before.counts));
@@ -458,6 +472,22 @@ describe('erase-account (B-F2)', () => {
       await pglite.exec(`drop trigger late on public.audits`);
     }
     expect(await everything()).toBe(before);
+  }, 120_000);
+
+  it('the after-check reads the erased accounts by id', async () => {
+    const p = await person();
+    await removeObjects((await planErasure(db(), { userId: p.id })).storage);
+    // An account row with the erased id turning up again is what the after-check must report.
+    const { after } = await executeErasure(db(), { userId: p.id }, async (userId) => {
+      await sqlDelete(userId);
+      await pglite.query(
+        `insert into public.accounts (id, kind, state, tier, seat_limit, site_limit, state_history)
+         values ($1, 'personal', 'free', 'free', 1, 1, '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]')`,
+        [p.world.accountId],
+      );
+    });
+    expect(after.counts['accounts deleted']).toBe(1);
+    await pglite.query(`delete from public.accounts where id = $1`, [p.world.accountId]);
   }, 120_000);
 
   it('a failed Auth call leaves the user, and running it again finishes', async () => {
