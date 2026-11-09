@@ -12,6 +12,7 @@ const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({ rpc }) }));
 
 import { checkRateLimit } from './rate-limit';
+import { MAX_RATE_LIMIT_WINDOW_MS } from './rate-limit-window';
 
 describe('checkRateLimit', () => {
   beforeEach(() => {
@@ -57,5 +58,27 @@ describe('checkRateLimit', () => {
     rpc.mockResolvedValue({ data: null, error: { message: 'connection reset' } });
     const res = await checkRateLimit('domain:example.com', 1, 3_600_000, { failClosed: false });
     expect(res.allowed).toBe(true);
+  });
+});
+
+describe('checkRateLimit window length (B-F1)', () => {
+  beforeEach(() => {
+    rpc.mockReset();
+    rpc.mockResolvedValue({ data: 1, error: null });
+  });
+
+  // prune_rate_limits deletes rows older than PRUNE_AFTER_MS, so a longer window would lose its count.
+  it.each([MAX_RATE_LIMIT_WINDOW_MS + 1, 2 * MAX_RATE_LIMIT_WINDOW_MS, 0, -1, Number.NaN])(
+    'refuses a window of %s ms before counting',
+    async (windowMs) => {
+      await expect(checkRateLimit('bucket', 5, windowMs)).rejects.toThrow(/window/);
+      expect(rpc).not.toHaveBeenCalled();
+    },
+  );
+
+  it('accepts the longest window', async () => {
+    await expect(checkRateLimit('bucket', 5, MAX_RATE_LIMIT_WINDOW_MS)).resolves.toMatchObject({
+      allowed: true,
+    });
   });
 });
