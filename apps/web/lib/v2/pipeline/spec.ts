@@ -280,7 +280,7 @@ export function buildSpec20b(): string {
     '',
     '## Failure reasons',
     '',
-    '`checks.failure_reason` is readable by the site’s members, so the pipeline writes one of these words, and its stores refuse a word outside the list (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/store.test.ts`).',
+    '`checks.failure_reason` is readable by the site’s members, so the pipeline writes one of these words. Its stores refuse a word outside the list, and so do `fail_check` and `reap_stalled_checks`, which read it from `check_failure_reasons()`, a SQL function a test holds equal to the list (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/store.test.ts __tests__/v2-008-pipeline.test.ts`).',
     '',
     table(
       ['Reason', 'When'],
@@ -305,7 +305,7 @@ export function buildSpec20b(): string {
     '## Migrations',
     '',
     '- `20261108000003_v2_006d_contract_columns.sql` (Q1): the contract fields SPEC 06 left to CC-06d, so a built check can be stored and read back whole.',
-    `- \`20261109000001_v2_008_pipeline.sql\`: \`crawl_batches\` (${CRAWL_BATCH_COLUMNS.map(code).join(', ')}); on \`checks\` ${CHECK_PIPELINE_COLUMNS.map(code).join(', ')}; on \`sites\` ${SITE_SCHEDULE_COLUMNS.map(code).join(', ')}; the index \`checks_one_running_per_site\`; \`claim_check\`, \`fail_check\`, \`reap_stalled_checks\` (Q13); the persist staging and \`${PERSIST_RPC}\` (D5, Q11).`,
+    `- \`20261109000001_v2_008_pipeline.sql\`: \`crawl_batches\` (${CRAWL_BATCH_COLUMNS.map(code).join(', ')}); on \`checks\` ${CHECK_PIPELINE_COLUMNS.map(code).join(', ')}; on \`sites\` ${SITE_SCHEDULE_COLUMNS.map(code).join(', ')}; the index \`checks_one_running_per_site\`; \`claim_check\`, \`fail_check\`, \`reap_stalled_checks\` (Q13) and \`check_failure_reasons()\`; the persist staging and \`${PERSIST_RPC}\` (D5, Q11).`,
     '',
     '## Differences from ARCH-2 §4',
     '',
