@@ -41,12 +41,16 @@ async function migrated(include: (f: string) => boolean): Promise<PGlite> {
   return db;
 }
 
-/** A fresh session (plpgsql compiles a function once per session) on the database before or after. */
+/**
+ * A fresh session (plpgsql compiles a function once per session) on the database before or after this
+ * migration. Later migrations are left out of both, so the counts and the rollback's catalog compare
+ * this file's change alone; each later migration runs check 09 in its own test.
+ */
 async function database(state: 'before' | 'after'): Promise<PGlite> {
   const template =
     state === 'before'
       ? (beforeTemplate ??= migrated((f) => f < MIGRATION))
-      : (afterTemplate ??= migrated(() => true));
+      : (afterTemplate ??= migrated((f) => f <= MIGRATION));
   return (await template).clone() as Promise<PGlite>;
 }
 
