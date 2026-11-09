@@ -12,6 +12,9 @@ export const AGENCY_YEARLY = 990;
 export const EXTRA_SEAT = 12;
 /** An Agency site beyond the plan's 25, a month. */
 export const EXTRA_SITE = 3;
+/** The same two, a year: ten months' price, as the plans are. */
+export const EXTRA_SEAT_YEARLY = 120;
+export const EXTRA_SITE_YEARLY = 30;
 
 /** "$19". Whole dollars only: a fractional price would need a format decision first. */
 export function usd(dollars: number): string {
