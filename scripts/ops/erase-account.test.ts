@@ -244,7 +244,8 @@ async function person() {
        (gen_random_uuid(), json_build_object('actor_id', $3::text, 'actor_username', $4::text, 'action', 'login'), now()),
        -- one naming them by id alone, one by address alone
        (gen_random_uuid(), json_build_object('actor_id', $1::text, 'action', 'token_refreshed'), now()),
-       (gen_random_uuid(), json_build_object('actor_username', $2::text, 'action', 'login_failed'), now())`,
+       (gen_random_uuid(), json_build_object('actor_username', $2::text, 'action', 'login_failed'), now()),
+       (gen_random_uuid(), json_build_object('action', 'user_modified', 'traits', json_build_object('user_id', $1::text)), now())`,
     [id, email.toUpperCase(), bystander.ownerId, other],
   );
   return {
@@ -286,8 +287,9 @@ describe('erase-account (B-F2)', () => {
     // share link or API key this person created; seedWorld gives the account two sites, each with a
     // check and a report.
     expect(plan.counts).toEqual({
-      // their login, the bystander's entry naming them, one by id alone and one by address alone
-      'auth.audit_log_entries deleted': 4,
+      // their login, the bystander's entry naming them, one by actor id alone, one by address
+      // alone, one by traits.user_id alone
+      'auth.audit_log_entries deleted': 5,
       'auth.users deleted': 1,
       'users deleted': 1,
       'audits deleted': 1,

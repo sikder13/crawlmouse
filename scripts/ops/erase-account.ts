@@ -134,10 +134,12 @@ const AUDIT_LOG: Change = {
   key: 'auth.audit_log_entries deleted',
   count: `select count(*) from auth.audit_log_entries
            where ($1::uuid is not null and payload->>'actor_id' = $1::text)
+              or ($1::uuid is not null and payload->'traits'->>'user_id' = $1::text)
               or lower(payload->>'actor_username') = any($2::text[])
               or lower(payload->'traits'->>'user_email') = any($2::text[])`,
   apply: `delete from auth.audit_log_entries
            where ($1::uuid is not null and payload->>'actor_id' = $1::text)
+              or ($1::uuid is not null and payload->'traits'->>'user_id' = $1::text)
               or lower(payload->>'actor_username') = any($2::text[])
               or lower(payload->'traits'->>'user_email') = any($2::text[])`,
 };
