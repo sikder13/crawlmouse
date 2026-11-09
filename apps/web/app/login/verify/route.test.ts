@@ -423,8 +423,12 @@ describe('POST /login/verify verifies', () => {
       post({ cm_auth_otp: otp() }, { origin: ORIGIN, accept: 'application/json' }),
     );
     expect(await json.json()).toMatchObject({ next: '/dashboard', email: USER.email });
+    // The no-script post is a redirect: the address is in no header and no body.
     const plain = await POST(post({ cm_auth_otp: otp() }));
     expect(plain.status).toBe(303);
+    expect(plain.headers.get('location')).toBe(`${ORIGIN}/dashboard`);
+    for (const [name, value] of plain.headers)
+      expect(`${name}: ${value}`).not.toContain(USER.email);
     expect(await plain.text()).not.toContain(USER.email);
   });
 

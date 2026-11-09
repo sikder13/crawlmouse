@@ -112,7 +112,13 @@ describe('the Continue page after sign-in (Q3)', () => {
     expect(deleted).toEqual(['sb-proj-auth-token']);
   });
 
-  it('goes on at once when the answer names no address (an expired link)', async () => {
+  it('goes on at once when a sign-in answer names no address', async () => {
+    const { host, assigned } = await continueWith({ next: '/r/abc', events: [] });
+    expect(assigned).toEqual(['/r/abc']);
+    expect(host.textContent).not.toContain('Signed in as');
+  });
+
+  it('shows the expired state, naming nobody, when the link is refused', async () => {
     const { host, assigned } = await continueWith({
       next: '/login/verify/continue?state=expired',
       events: [],

@@ -95,4 +95,25 @@ describe('cleanupExpiredAuditsFn', () => {
       rateLimits: { deleted: 3, calls: 1, drained: true },
     });
   });
+
+  it('fails the prune step when the rpc fails, so Inngest retries it', async () => {
+    rpc.mockImplementation(async () => ({ data: null, error: { message: 'boom' } }));
+    const failed: string[] = [];
+    const step = {
+      run: async (id: string, fn: () => Promise<unknown>) => {
+        try {
+          return await fn();
+        } catch (e) {
+          failed.push(id);
+          throw e;
+        }
+      },
+    };
+    await expect(
+      (cleanupExpiredAuditsFn as unknown as { fn: (ctx: unknown) => Promise<unknown> }).fn({
+        step,
+      }),
+    ).rejects.toThrow(/boom/);
+    expect(failed).toEqual(['prune-rate-limits']);
+  });
 });
