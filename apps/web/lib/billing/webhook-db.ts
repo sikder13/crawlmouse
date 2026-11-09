@@ -67,7 +67,7 @@ export interface ApplyEventParams {
 /** What `apply_stripe_event` recorded, or what an earlier call had recorded (`decidedBefore`). */
 export interface RecordedDecision {
   decidedBefore: boolean;
-  /** Null only on a row v1 processed, which no v2 event shares. */
+  /** Null on a row with `processed_at` and no decision, as v1's handler leaves one. */
   handled: boolean | null;
   reason: string | null;
   effects: PlannedEffect[];

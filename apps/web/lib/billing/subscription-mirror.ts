@@ -1,10 +1,11 @@
 /**
  * A Stripe subscription as the `subscriptions` mirror stores it (migration 001), read through the
- * catalog's allow-list (CC-03 D3). A subscription is ours when its items are exactly one base price
- * of quantity 1 and, on Agency only, at most one seat and one site item, all of the catalog's
- * prices and all on the base price's interval; its extras are the seat and site quantities, which
- * the plan must sell. Anything else is refused, and the caller decides what a refusal means: a
- * grant is recorded, a revoke applies with the plan the mirror already holds (questions Q11).
+ * catalog's allow-list (CC-03 D3). A subscription is ours when its items are one base price of
+ * quantity 1 and, on Agency, up to one seat item and one site item, each a catalog price on the base
+ * price's interval; its extras are the seat and site quantities, which the plan must sell. Other
+ * shapes are refused (the cases are subscription-mirror.test.ts's), and the caller decides what a
+ * refusal means: a grant is recorded, a revoke applies with the plan the mirror already holds
+ * (questions Q11).
  */
 import type Stripe from 'stripe';
 import { limitsFor, type Extras, type PaidTier } from '../entitlement-v2';
@@ -63,7 +64,7 @@ function stripeFields(sub: Stripe.Subscription) {
 
 /**
  * The mirror row, plan, interval and extras of a subscription, or why it is not ours. A Stripe
- * error while the catalog resolves a price propagates: only a resolved "not ours" refuses.
+ * error while the catalog resolves a price propagates; a price the catalog resolves as not ours refuses.
  */
 export async function mirrorOf(sub: Stripe.Subscription, catalog: Catalog): Promise<MirrorResult> {
   const fields = stripeFields(sub);
@@ -71,7 +72,7 @@ export async function mirrorOf(sub: Stripe.Subscription, catalog: Catalog): Prom
     refused,
     priceIds: fields.price_ids,
   });
-  // A list that does not hold every item cannot show that every price is ours.
+  // With has_more the item list is cut, and a price past the cut could be anyone's.
   if (sub.items.has_more || sub.items.data.length === 0)
     return refuse('price not in the allow-list');
   const priced: { price: CatalogPrice; quantity: number }[] = [];

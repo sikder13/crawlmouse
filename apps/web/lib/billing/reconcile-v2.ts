@@ -13,7 +13,7 @@
  * - `double_billing`: a live (`trialing`, `active`, `past_due`) subscription with our prices that
  *   the account does not follow.
  * And from the ledger, `effects_unsent`: an event decided more than an hour ago whose effects were
- * never confirmed sent, which Stripe has likely stopped retrying.
+ * not confirmed sent, which Stripe has likely stopped retrying.
  *
  * `accountReconcileFromEnv` builds the run for the Inngest seam in inngest/billing.ts; it refuses to
  * run when the key's mode is not STRIPE_ACCOUNT_LIVEMODE's.
@@ -70,7 +70,7 @@ export interface ReconcileDeps {
   accounts(): AsyncIterable<ReconcileAccount[]>;
   /** The mirror rows of these accounts: id and status, by account. */
   mirrors(accountIds: string[]): Promise<Map<string, { id: string; status: string }[]>>;
-  /** Ledger rows decided before `before` whose effects were never confirmed sent. */
+  /** Ledger rows decided before `before` with no `processed_at`: effects not confirmed sent. */
   unsent(before: Date): Promise<{ id: string; accountId: string | null }[]>;
   /** The customer's subscriptions in Stripe, or null when Stripe has no such customer. */
   listSubscriptions(customerId: string): Promise<Stripe.Subscription[] | null>;

@@ -1,10 +1,10 @@
 /**
  * A verified Stripe event of the Crawlmouse account, turned into what the v2 webhook does with it
  * (CC-03 D4, D5; spec 03, "The webhook"): an entitlement event for the machine, or a decision that
- * is only recorded. Subscription status, plan and extras are read from Stripe at processing time;
- * from the payload only fields that do not change across API versions are read (ids, `type`,
- * `created`, `livemode`, `customer`, `client_reference_id`, `metadata`, `mode`, `status`, the
- * invoice's `parent`).
+ * is only recorded. From the payload it reads `type`, `created`, `livemode`, ids, `customer`,
+ * `client_reference_id`, `metadata`, `mode`, an update's `status` and an invoice's `parent` (or its
+ * older top-level `subscription`), fields that keep their meaning across API versions; subscription
+ * status, plan and extras come from Stripe at processing time.
  *
  * The rules this module adds to the machine's:
  * - A grant (a checkout, an agency trial start, an update to `active`) needs a subscription the
@@ -36,7 +36,7 @@ const LIVE: ReadonlySet<SubscriptionStatus> = new Set(['trialing', 'active', 'pa
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Something an operator should see, sent to Sentry by the route. Ids only, never an object. */
+/** Something an operator should see, sent to Sentry by the route. `detail` holds ids, as strings. */
 export interface Report {
   level: 'warning' | 'error';
   message: string;
@@ -302,8 +302,8 @@ class Normaliser {
 
   /**
    * The mirror row of a subscription whose prices are not ours: Stripe's fields and the plan the
-   * stored row holds. Null when it was never mirrored for this account, so it cannot be the
-   * subscription the account follows.
+   * stored row holds. Null when no row mirrors it for this account: a grant writes the mirror of
+   * the subscription it makes the account follow, so such a subscription is not the one followed.
    */
   private async storedRow(sub: Stripe.Subscription, accountId: string): Promise<MirrorRow | null> {
     const stored = await this.ctx.db.subscriptionById(sub.id);

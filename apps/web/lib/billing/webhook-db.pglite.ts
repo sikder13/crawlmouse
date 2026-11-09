@@ -1,10 +1,10 @@
 /**
  * The v2 webhook's port (./webhook-db.ts) over PGlite with every migration applied, and a world to
  * run the handler in: that database, the Stripe fake (./stripe.fake.ts) and the fake catalog.
- * Test-only: the webhook tests and the sandbox smoke import it, no route does.
+ * Test-only: for the webhook tests and the sandbox smoke.
  *
  * Each call is its own transaction as the service role, as each PostgREST request is. PGlite has
- * one connection, so two calls never overlap; `hooks.afterLoad` runs between a decision's read of
+ * one connection, so two calls run one after the other; `hooks.afterLoad` runs between a decision's read of
  * the account and its write, which is where two real deliveries interleave.
  */
 import type { PGlite, Transaction } from '@electric-sql/pglite';

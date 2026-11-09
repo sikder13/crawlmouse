@@ -1,6 +1,6 @@
 /**
  * The catalog without Stripe, for tests: each lookup key of `CATALOG` is the price `price_<key>`.
- * Test-only; no route imports it.
+ * Test-only.
  */
 import { CATALOG, lookupKey, type Catalog } from './catalog';
 

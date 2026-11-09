@@ -4,9 +4,9 @@
 -- apps/web/__tests__/v2-billing-rpc.test.ts (PGlite) and scripts/db/stripe-event-race.test.ts (two
 -- real transactions, CI's Postgres service).
 --
--- Additive: three nullable columns on stripe_events, null on every existing row and read by nothing
--- in v1, and one function. Every statement is re-runnable. The revert is
--- infra/supabase/rollbacks/20261110000001_v2_billing_rpc.revert.sql.
+-- Additive: three nullable columns on stripe_events, which v1's handler (apply-stripe-event.ts) does
+-- not read, and one function. The statements are re-runnable (the test applies the file twice).
+-- The revert is infra/supabase/rollbacks/20261110000001_v2_billing_rpc.revert.sql.
 --
 -- Tested by: pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-billing-rpc.test.ts
 
@@ -39,7 +39,7 @@ alter table public.stripe_events add column if not exists effects jsonb
 --   effects          the plan, an array
 -- Anything malformed raises 22023 before any lock is taken.
 --
--- In one transaction, taking locks in this order, as every caller does:
+-- In one transaction, taking its locks in this order:
 --   1. The ledger row FOR UPDATE. Missing raises P0002. Already decided (handled set) or processed
 --      returns {"decided": true} with what was recorded, writing nothing: the caller sends those
 --      effects, so two deliveries of one event decide it once.
@@ -49,7 +49,7 @@ alter table public.stripe_events add column if not exists effects jsonb
 --      'older than the subscription''s last event', with no effects. An event that is not gated
 --      and is that old still decides, but does not write its mirror over the newer one. A call
 --      whose mirror has the subscription live while the row has it ended (canceled or
---      incomplete_expired, which Stripe never leaves) read it before it ended: it writes nothing
+--      incomplete_expired, both terminal in Stripe) read it before it ended: it writes nothing
 --      either, and is recorded 'the subscription had ended', with no effects.
 --   3. The account FOR UPDATE when the call has a transition, an expected version or a customer to
 --      bind; a call with none of them does not read the account. Missing raises P0002; an expected

@@ -11,7 +11,8 @@
  *    `apply_stripe_event` call that also stores the planned effects. A decision made on an account
  *    that changed meanwhile, or a customer binding that lost a race, is normalised and decided again,
  *    at most three more times.
- * 4. Send exactly the effects the call recorded, then stamp `processed_at`.
+ * 4. Send the effects the call recorded (the stored plan, not the one it was asked to store), then
+ *    stamp `processed_at`.
  *
  * A failure anywhere throws, so the route answers 500 and Stripe retries.
  */

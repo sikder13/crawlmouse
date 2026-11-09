@@ -1,7 +1,7 @@
 /**
  * A Stripe account in memory, for the v2 webhook's tests: the subscriptions and charges the handler
  * retrieves (`StripeReads`), effect sinks whose cancellation ends a subscription here, and events
- * built and signed as Stripe sends them. Test-only; no route imports it.
+ * built and signed as Stripe sends them. Test-only.
  */
 import Stripe from 'stripe';
 import type { PaidTier } from '../entitlement-v2';
@@ -94,7 +94,7 @@ export class StripeFake implements StripeReads {
   readonly sent: InngestSend[] = [];
   readonly cancelled: PlannedCancel[] = [];
   readonly alerts: PlannedAlert[] = [];
-  /** Throws from every read while set, as a Stripe outage would. */
+  /** Thrown by the subscription and charge reads while set, as in a Stripe outage. */
   failReads: Error | null = null;
   /** Runs once, inside the next subscription read, before it answers. */
   onNextRead: (() => Promise<void>) | null = null;

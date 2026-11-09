@@ -1,8 +1,8 @@
 /**
  * The v2 webhook's event × state table (plan §4, plan review finding 17), as data. Test support: the
- * end-to-end test (./stripe-webhook.cases.test.ts) runs every entry against PGlite through the
- * handler, and spec 03's table is rendered from this array, so the spec cannot name a transition
- * the tests do not run (OPERATING-RULES §10).
+ * end-to-end test (./stripe-webhook.cases.test.ts) runs the entries against PGlite through the
+ * handler, and spec 03's table is to be rendered from this array, so the table names the
+ * transitions the tests run (OPERATING-RULES §10).
  *
  * Each entry sets an account up through the handler (`from`, described in `SETUPS`), puts the
  * subscription in Stripe in `stripe.status` (the status Stripe returns when the event is
@@ -97,7 +97,7 @@ const TRIAL_WILL_END = 'customer.subscription.trial_will_end';
 const PAYMENT_FAILED = 'invoice.payment_failed';
 
 export const WEBHOOK_CASES: readonly WebhookCase[] = Object.freeze([
-  // A paid checkout: no state guard, so it applies from every state (a disputed Free account too).
+  // A paid checkout: no state guard, so it applies from each state below (a disputed Free account too).
   c('free', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
   c('free_kept', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
   c('free_disputed', CHECKOUT, 'other', 'active', 'pro', 'pro', 'pro', 'applied'),
