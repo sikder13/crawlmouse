@@ -14,7 +14,7 @@ const FIRST_TRIAL =
 const SAME_BROWSER =
   'FACTS correction (CC-25 known gap): the named site and the kept audit ride a cookie in the browser that asked for the link; opened on another device, the link signs in without them.';
 const PIPELINE =
-  'FACTS correction (CC-25 D6): nothing starts or repeats a check, and nothing sends a change note, until CC-20b sets V2_PIPELINE=1 (and CC-28 sends from alerts@); until then the page says the site is kept, not that it is audited or re-checked. With V2_PIPELINE=1 the locked sentence renders, with the room condition.';
+  'FACTS correction (CC-25 D6): nothing starts or repeats a check, and nothing sends a change note, until V2_CHECKS_PUBLIC=1, which waits on requestCheck being called from the claim route and Sign-up, scheduled checks, and CC-28 sending from alerts@; until then the page says the site is kept, not that it is audited or re-checked. With V2_CHECKS_PUBLIC=1 the locked sentence renders, with the room condition.';
 const ANY_ACCOUNT =
   'FACTS correction (CC-25 review): Sign-up invites an existing account to use the same form, and a named site is added at any sign-in with room, so the sentence holds for a new account and an existing one; the trial comes only with a new account.';
 const DASHBOARD =
@@ -54,7 +54,7 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
       'Running an audit right now? Keep it from the audit page instead and it becomes your first site.',
     rendered: '',
     source:
-      'FACTS correction (CC-25 D6): no live page offers Keep until CC-20b serves the result page, with V2_PIPELINE=1, when the sentence renders.',
+      'FACTS correction (CC-25 D6): no live page offers Keep until the result page is served publicly, with V2_CHECKS_PUBLIC=1, when the sentence renders.',
   },
   {
     screen: 'signup',
