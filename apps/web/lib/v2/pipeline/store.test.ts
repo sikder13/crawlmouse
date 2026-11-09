@@ -95,6 +95,14 @@ describe('supabasePipelineStore: the race-critical statements are 008’s functi
     ]);
   });
 
+  it('refuses a failure reason outside FAILURE_REASONS before calling fail_check', async () => {
+    const { sb, calls } = recorder(ok(true));
+    await expect(
+      supabasePipelineStore(sb).fail(C, 'ECONNRESET at https://example.com' as never, null),
+    ).rejects.toThrow('outside FAILURE_REASONS');
+    expect(calls).toEqual([]);
+  });
+
   it('reaps through reap_stalled_checks with the cutoff it is given', async () => {
     const { sb, calls } = recorder(
       ok([

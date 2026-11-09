@@ -29,8 +29,8 @@ export type CheckFinished = {
 };
 
 /**
- * Every `checks.failure_reason` the pipeline writes. `failure_reason` is readable by the site's
- * members, so it is one of these words and never an error message, a URL or a stack.
+ * The reasons a check fails with. `checks.failure_reason` is readable by the site's members, so the
+ * pipeline's stores write one of these words (they refuse any other), not an error message.
  */
 export const FAILURE_REASONS = [
   /** CRAWL_PAUSED was set, or the worker answered that it is paused. */

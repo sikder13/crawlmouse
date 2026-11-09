@@ -1,8 +1,8 @@
 /**
  * What the check pipeline reads and writes in Postgres, outside persistence (persist.ts) and the
  * read-back (load.ts). Claim, fail and reap are migration 008's SQL functions, so the statements that
- * race run as one statement in the database; every other method is one select, insert or update.
- * A list read pages with `.range()` until a short page, so PostgREST's row cap cannot cut it.
+ * race run as one statement in the database; the others are single selects, inserts and updates. A
+ * list read repeats its select with `.range()`, PAGE_ROWS at a time, until a shorter page.
  *
  * `test-support/sql-store.ts` is the same interface over PGlite, with the same statements in SQL.
  */
@@ -15,7 +15,7 @@ import {
   type FixEvent,
   type Site,
 } from '@crawlmouse/types/v2';
-import type { FailureReason } from '../../../../../inngest/check-events';
+import { isFailureReason, type FailureReason } from '../../../../../inngest/check-events';
 import type { ReapedCheck } from '../../../../../inngest/check-reaper';
 import { checkFromRow, diffInputsFromRow, fixEventFromRow, fixFromRow, siteFromRow } from './rows';
 import type { CrawlBatchRow, CrawlBatchStatus } from './types';
@@ -58,7 +58,7 @@ export interface BatchEnd {
 export interface PipelineStore {
   /** `claim_check`: queued → running with `progress`, or again by the run that claimed it. */
   claim(checkId: string, runId: string, progress: Check['progress']): Promise<ClaimOutcome>;
-  /** `fail_check`, by the check's id or by the run that claimed it; true only on the transition. */
+  /** `fail_check`, by the check's id or by the run that claimed it; true when this call moved it. */
   fail(checkId: string | null, reason: FailureReason, runId: string | null): Promise<boolean>;
   /** `reap_stalled_checks`: checks whose heartbeat (or queue time) is before `cutoff`. */
   reap(cutoff: string): Promise<ReapedCheck[]>;
@@ -86,7 +86,10 @@ export interface PipelineStore {
   insertQueued(row: QueuedCheck): Promise<boolean>;
 }
 
-/** PostgREST's row cap is 1,000; a page of this size is never cut by it. */
+/**
+ * Supabase's PostgREST row cap (`max-rows`, 1,000 unless the project changes it): a page shorter than
+ * this is the last one. A project cap below it would end a list early.
+ */
 export const PAGE_ROWS = 1000;
 /** Ids per `in` filter, so the request URL stays short. */
 export const IN_LIST = 100;
@@ -99,7 +102,7 @@ function must<T>(what: string, { data, error }: Result<T>): T {
   return data as T;
 }
 
-/** Every row of a query, page by page until a short page. */
+/** The rows of a query, PAGE_ROWS at a time until a shorter page. */
 async function paged(
   what: string,
   page: (from: number, to: number) => PromiseLike<Result<Row[]>>,
@@ -129,6 +132,7 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
     },
 
     async fail(checkId, reason, runId) {
+      knownReason(reason);
       const out = must(
         'fail_check',
         await sb.rpc('fail_check', { p_check: checkId, p_reason: reason, p_run: runId }),
@@ -333,6 +337,12 @@ export function inLists(ids: readonly string[]): string[][] {
     lists[lists.length - 1]!.push(id);
   });
   return lists;
+}
+
+/** `failure_reason` is readable by the site's members: a word from FAILURE_REASONS, nothing else. */
+export function knownReason(reason: unknown): asserts reason is FailureReason {
+  if (!isFailureReason(reason))
+    throw new Error('pipeline store: a failure reason outside FAILURE_REASONS');
 }
 
 /** A finished or partial check row as the next check's diff reads it; null when it stored no diff inputs. */

@@ -1,6 +1,6 @@
 /**
  * The PipelineStore over SQL, for PGlite: the same statements as supabasePipelineStore, written out,
- * so the pipeline's integration tests and the live run (D14) run against every migration without a
+ * so the pipeline's integration tests and the live run (D14) run against the migrations without a
  * PostgREST. Rows are read as `to_jsonb(...)`, which gives PostgREST's JSON shapes (timestamps as
  * strings), and go through the same converters.
  */
@@ -9,6 +9,7 @@ import type { ReapedCheck } from '../../../../../../inngest/check-reaper';
 import { checkFromRow, fixEventFromRow, fixFromRow, siteFromRow } from '../rows';
 import {
   graded,
+  knownReason,
   statesOf,
   type ClaimOutcome,
   type PipelineStore,
@@ -39,6 +40,7 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
     },
 
     async fail(checkId, reason, runId) {
+      knownReason(reason);
       const { rows: r } = await db.query<{ moved: boolean }>(
         `select public.fail_check($1::uuid, $2, $3) as moved`,
         [checkId, reason, runId],
