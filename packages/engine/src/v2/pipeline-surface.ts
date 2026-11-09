@@ -25,6 +25,7 @@ export type {
   Seed,
 } from './build/index.js';
 export type { CheckSide } from './diff/types.js';
+export { stableId } from './diff/ids.js';
 export { GRADE_VERSION } from './grade/weights.js';
 export { renderCheck, inFlightFromEnv } from './render/run.js';
 export type { RenderOutcome } from './render/run.js';
