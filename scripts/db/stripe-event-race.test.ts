@@ -11,8 +11,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * Each race holds transaction A open after its call, starts B's call, waits until B is seen waiting
  * on a lock, commits A, and then lets B finish. What serialises each path is also removed in a
  * database built from an edited copy of the migration, where the same race must come out wrong:
- * those are the mutation checks, run whenever the file runs. The subscription path has two such
- * mechanisms, each enough alone, so its check removes both (spec 03, "Concurrency").
+ * those are the mutation checks, run whenever the file runs. On the subscription path the insert is
+ * the protection for a new row and the lock covers a row that exists (spec 03, "Concurrency"), so its
+ * checks vary both what is removed and whether the row exists.
  */
 
 const URL_ENV = process.env.TRIAL_RACE_DB_URL;
@@ -28,7 +29,7 @@ const MIGRATION = '20261110000001_v2_billing_rpc.sql';
 /**
  * What a mutated database leaves out of the migration. Each `for update` names a lock; `insert` is the
  * subscription row's `insert … on conflict do nothing`, which waits for a concurrent writer of that
- * row before the guard reads it (spec 03, "Concurrency": it serialises a call that carries a mirror row).
+ * row before the guard reads it (spec 03, "Concurrency": it is the only statement that creates the row, and it waits for a concurrent writer of it).
  */
 const EDITS = {
   ledger: { find: '     for update of e;\n', with: ';\n' },
@@ -374,28 +375,55 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
   });
 
   /** The newer event holds the subscription; the older one races it. */
-  async function olderAfterNewer(sql: Sql) {
+  /**
+   * The newer event holds the subscription; the older one races it. Without the insert no call
+   * creates a subscription row (it is the only statement that does), so `seed` writes the row the
+   * setup's checkout would have written, for the cases that need one to exist.
+   */
+  async function olderAfterNewer(sql: Sql, seed: boolean) {
     const { accountId, sub } = await onPro(sql);
+    if (seed) {
+      await sql`insert into public.subscriptions (id, account_id, status, plan, interval, price_ids,
+                  current_period_end, last_event_created)
+                values (${sub}, ${accountId}, 'active', 'pro', 'month', ${['price_crawlmouse_pro_monthly']},
+                        ${iso(30 * 86_400)}, ${iso(100)})
+                on conflict (id) do nothing`;
+    }
     const newer = await newerUnchanged(sql, accountId, sub);
     const older = await olderPastDue(sql, accountId, sub);
-    return { accountId, r: await race(sql, newer, older) };
+    return { accountId, sub, r: await race(sql, newer, older) };
   }
 
-  // Two mechanisms serialise the older behind the newer here, and each is enough alone
-  // (spec 03, "Concurrency"): the row lock, and the insert … on conflict that waits for the newer's
-  // uncommitted row before the guard reads it. Only with both gone does the race happen.
-  it.each(['subscription', 'insert'] as const)(
-    'without the %s mechanism alone, the other still serialises: the older waits, then is refused',
-    async (removed) => {
-      const { accountId, r } = await olderAfterNewer(dbs[removed]);
-      expect(r.waited).toBe(true);
-      expect(r.b).toMatchObject({ ok: { decided: false, handled: false, reason: OLDER } });
-      expect(await accountOf(dbs[removed], accountId)).toEqual({ state: 'pro', version: 1 });
-    },
-  );
+  const subscriptionRow = async (sql: Sql, sub: string) =>
+    (await sql`select status from public.subscriptions where id = ${sub}`)[0] ?? null;
 
-  it('mutation check: without the subscription lock and the insert, the older writes past_due after the newer', async () => {
-    const { accountId, r } = await olderAfterNewer(dbs.unguarded);
+  // What serialises this path (spec 03, "Concurrency"): the insert … on conflict, which waits for
+  // the newer's uncommitted row and is the only statement that creates a subscription row; and the
+  // row lock, which can lock only a row that exists.
+  it('without the lock, the insert alone prevents the race: the older waits, then is refused', async () => {
+    const { accountId, r } = await olderAfterNewer(dbs.subscription, false);
+    expect(r.waited).toBe(true);
+    expect(r.b).toMatchObject({ ok: { decided: false, handled: false, reason: OLDER } });
+    expect(await accountOf(dbs.subscription, accountId)).toEqual({ state: 'pro', version: 1 });
+  });
+
+  it('mutation check: without the insert, on a brand-new subscription, the lock locks nothing and the older writes past_due', async () => {
+    const { accountId, sub, r } = await olderAfterNewer(dbs.insert, false);
+    expect(r.b).toMatchObject({ ok: { decided: false, handled: true } });
+    expect(await accountOf(dbs.insert, accountId)).toEqual({ state: 'past_due', version: 2 });
+    expect(await subscriptionRow(dbs.insert, sub)).toBeNull();
+  });
+
+  it('without the insert, on a row that already exists, the lock alone prevents the race', async () => {
+    const { accountId, sub, r } = await olderAfterNewer(dbs.insert, true);
+    expect(r.waited).toBe(true);
+    expect(r.b).toMatchObject({ ok: { decided: false, handled: false, reason: OLDER } });
+    expect(await accountOf(dbs.insert, accountId)).toEqual({ state: 'pro', version: 1 });
+    expect(await subscriptionRow(dbs.insert, sub)).toMatchObject({ status: 'active' });
+  });
+
+  it('mutation check: without the insert and the lock, on a row that exists, the older writes past_due after the newer', async () => {
+    const { accountId, r } = await olderAfterNewer(dbs.unguarded, true);
     expect(r.b).toMatchObject({ ok: { decided: false, handled: true } });
     expect(await accountOf(dbs.unguarded, accountId)).toEqual({ state: 'past_due', version: 2 });
   });
