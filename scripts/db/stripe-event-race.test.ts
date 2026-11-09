@@ -9,9 +9,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * two transactions open at once.
  *
  * Each race holds transaction A open after its call, starts B's call, waits until B is seen waiting
- * on a lock, commits A, and then lets B finish. Each lock the function takes is also removed in a
+ * on a lock, commits A, and then lets B finish. What serialises each path is also removed in a
  * database built from an edited copy of the migration, where the same race must come out wrong:
- * those are the mutation checks, run whenever the file runs.
+ * those are the mutation checks, run whenever the file runs. The subscription path has two such
+ * mechanisms, each enough alone, so its check removes both (spec 03, "Concurrency").
  */
 
 const URL_ENV = process.env.TRIAL_RACE_DB_URL;
@@ -24,17 +25,26 @@ if (URL_ENV && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(URL_ENV).ho
 }
 
 const MIGRATION = '20261110000001_v2_billing_rpc.sql';
-const LOCKS = {
-  ledger: '     for update of e;\n',
-  subscription: '       for update of s;\n',
-  account: '       for update of a;\n',
+/**
+ * What a mutated database leaves out of the migration. Each `for update` names a lock; `insert` is the
+ * subscription row's `insert … on conflict do nothing`, which waits for a concurrent writer of that
+ * row before the guard reads it (spec 03, "Concurrency": it serialises a call that carries a mirror row).
+ */
+const EDITS = {
+  ledger: { find: '     for update of e;\n', with: ';\n' },
+  subscription: { find: '       for update of s;\n', with: ';\n' },
+  account: { find: '       for update of a;\n', with: ';\n' },
+  insert: {
+    find: /^      insert into public\.subscriptions \(id, account_id,[\s\S]*?on conflict \(id\) do nothing;\n/m,
+    with: '',
+  },
 } as const;
 /** How long to watch for B waiting. Below the function's 5 s lock_timeout, so B never times out. */
 const WAIT_WATCH_MS = 2000;
 const OLDER = "older than the subscription's last event";
 
 type Sql = postgres.Sql;
-type Lock = keyof typeof LOCKS;
+type Edit = keyof typeof EDITS;
 
 function urlFor(base: string, database: string): string {
   const u = new URL(base);
@@ -42,8 +52,8 @@ function urlFor(base: string, database: string): string {
   return u.toString();
 }
 
-/** A fresh database with the Supabase stand-ins and every migration, ours without `unlock`'s lock. */
-async function migrated(admin: Sql, name: string, unlock: Lock | null) {
+/** A fresh database with the Supabase stand-ins and every migration, ours without `edits`. */
+async function migrated(admin: Sql, name: string, edits: readonly Edit[]) {
   const { PLATFORM_SHIM, migrationFiles, readMigration } =
     await import('../../apps/web/__tests__/helpers/pglite-migrations');
   await admin.unsafe(`create database ${name}`);
@@ -57,11 +67,16 @@ async function migrated(admin: Sql, name: string, unlock: Lock | null) {
   await sql.unsafe(shim).simple();
   for (const f of migrationFiles()) {
     let text = readMigration(f);
-    if (f === MIGRATION && unlock !== null) {
-      if (text.split(LOCKS[unlock]).length !== 2) {
-        throw new Error(`the ${unlock} lock to remove is not in the migration exactly once`);
+    if (f === MIGRATION) {
+      for (const e of edits) {
+        const { find, with: replacement } = EDITS[e];
+        const count =
+          typeof find === 'string'
+            ? text.split(find).length - 1
+            : (text.match(new RegExp(find, 'gm')) ?? []).length;
+        if (count !== 1) throw new Error(`the ${e} edit does not match the migration exactly once`);
+        text = text.replace(find, replacement);
       }
-      text = text.replace(LOCKS[unlock], ';\n');
     }
     await sql.unsafe(text).simple();
   }
@@ -255,6 +270,8 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
     real: `stripe_race_${suffix}`,
     ledger: `stripe_race_ledger_${suffix}`,
     subscription: `stripe_race_subscription_${suffix}`,
+    insert: `stripe_race_insert_${suffix}`,
+    unguarded: `stripe_race_unguarded_${suffix}`,
     account: `stripe_race_account_${suffix}`,
   };
   let admin: Sql;
@@ -262,11 +279,13 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
 
   beforeAll(async () => {
     admin = postgres(URL_ENV!, { max: 1, onnotice: () => {} });
-    dbs.real = await migrated(admin, names.real, null);
-    dbs.ledger = await migrated(admin, names.ledger, 'ledger');
-    dbs.subscription = await migrated(admin, names.subscription, 'subscription');
-    dbs.account = await migrated(admin, names.account, 'account');
-  }, 180_000);
+    dbs.real = await migrated(admin, names.real, []);
+    dbs.ledger = await migrated(admin, names.ledger, ['ledger']);
+    dbs.subscription = await migrated(admin, names.subscription, ['subscription']);
+    dbs.insert = await migrated(admin, names.insert, ['insert']);
+    dbs.unguarded = await migrated(admin, names.unguarded, ['subscription', 'insert']);
+    dbs.account = await migrated(admin, names.account, ['account']);
+  }, 240_000);
 
   afterAll(async () => {
     for (const sql of Object.values(dbs)) await sql?.end({ timeout: 5 });
@@ -354,13 +373,31 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
     expect(await accountOf(dbs.real, accountId)).toEqual({ state: 'past_due', version: 2 });
   });
 
-  it('mutation check: without the subscription lock the older writes past_due after the newer', async () => {
-    const { accountId, sub } = await onPro(dbs.subscription);
-    const newer = await newerUnchanged(dbs.subscription, accountId, sub);
-    const older = await olderPastDue(dbs.subscription, accountId, sub);
-    const r = await race(dbs.subscription, newer, older);
+  /** The newer event holds the subscription; the older one races it. */
+  async function olderAfterNewer(sql: Sql) {
+    const { accountId, sub } = await onPro(sql);
+    const newer = await newerUnchanged(sql, accountId, sub);
+    const older = await olderPastDue(sql, accountId, sub);
+    return { accountId, r: await race(sql, newer, older) };
+  }
+
+  // Two mechanisms serialise the older behind the newer here, and each is enough alone
+  // (spec 03, "Concurrency"): the row lock, and the insert … on conflict that waits for the newer's
+  // uncommitted row before the guard reads it. Only with both gone does the race happen.
+  it.each(['subscription', 'insert'] as const)(
+    'without the %s mechanism alone, the other still serialises: the older waits, then is refused',
+    async (removed) => {
+      const { accountId, r } = await olderAfterNewer(dbs[removed]);
+      expect(r.waited).toBe(true);
+      expect(r.b).toMatchObject({ ok: { decided: false, handled: false, reason: OLDER } });
+      expect(await accountOf(dbs[removed], accountId)).toEqual({ state: 'pro', version: 1 });
+    },
+  );
+
+  it('mutation check: without the subscription lock and the insert, the older writes past_due after the newer', async () => {
+    const { accountId, r } = await olderAfterNewer(dbs.unguarded);
     expect(r.b).toMatchObject({ ok: { decided: false, handled: true } });
-    expect(await accountOf(dbs.subscription, accountId)).toEqual({ state: 'past_due', version: 2 });
+    expect(await accountOf(dbs.unguarded, accountId)).toEqual({ state: 'past_due', version: 2 });
   });
 
   // ── 3. a confirm and a commit on one account ──
@@ -396,8 +433,11 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
   });
 
   it('mutation check: without the account lock the confirm records a decision made on the old version', async () => {
+    // B's plain read of the version does not wait, and passes on version 0. B does wait afterwards:
+    // writing its ledger row's account_id takes FOR KEY SHARE on the account, which A's FOR UPDATE
+    // blocks. That wait comes after the decision, so it protects nothing (spec 03, "Concurrency").
     const { r } = await commitThenConfirm(dbs.account);
-    expect(r.waited).toBe(false);
+    expect(r.a).toMatchObject({ decided: false, handled: true, version: 1 });
     expect(r.b).toMatchObject({ ok: { decided: false, handled: false } });
   });
 });
