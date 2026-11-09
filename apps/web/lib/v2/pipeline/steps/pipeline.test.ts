@@ -106,8 +106,8 @@ async function runRecorded() {
     discover: { fetch: (async () => ({})) as never, userAgent: 'UA', now: () => clock.now },
   };
   const steps = checkSteps(deps);
-  // Discovery reads `<loc>` only (discover.ts); the recorded crawl was planned from seeds with
-  // lastmod, which stage 2's "newest" picks read. The recorded seeds stand in for discovery here.
+  // The recorded crawl was planned from the recording's seeds, lastmod dates included (stage 2's
+  // "newest" picks read them); they stand in for discovery here, so the planners meet the same seeds.
   steps.discover = async () => {
     await putJson(evidence, `anon/${SITE_ID}/${CHECK}/seeds.json.gz`, seedsOf(HOST));
     return { seeds: seedsOf(HOST).length, sitemap_urls: seedsOf(HOST).length - 1, at: clock.now };
