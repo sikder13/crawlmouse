@@ -3,7 +3,7 @@
 The controls a security reviewer checks first, put in place before the v2 opening: response headers
 and a content security policy, a registry of every route handler and how each is protected, a
 cross-site refusal for state changes, the end of an unused claim route, definer functions that search
-the caller's temporary schema last, CodeQL and a ZAP scan in CI, edge rate limits as reviewed data,
+the caller's temporary schema last, CodeQL (Semgrep once the repository is private) and a ZAP scan in CI, edge rate limits as reviewed data,
 an event for refusals, and an incident plan. No screen or copy changes.
 
 `docs/ops/security-baseline.md` lists what is enforced, report-only and advisory, each with its
@@ -322,15 +322,15 @@ those lines:
 pnpm --filter @crawlmouse/scripts exec vitest run db/definer-search-path.test.ts
 ```
 
-Pipeline: the dry run on the pull request, merge, then the owner approves `db-apply-prod.yml`.
+Pipeline: the dry run on the pull request, merge, then the owner runs `db-apply-prod.yml` (`docs/ops/db-migrations.md` §1).
 
 ### D7 — CodeQL
 
 The `codeql` job in `.github/workflows/ci.yml` runs `security-extended` over the JavaScript and
-TypeScript on every push and pull request. `.github/workflows/scripts/sarif-gate.mjs` fails it on a
+TypeScript on every push while the repository is public. `.github/workflows/scripts/sarif-gate.mjs` fails it on a
 result whose rule has security-severity 7.0 or more, reading the rules where CodeQL writes them
 (`tool.extensions`). It also fails a SARIF with no run or no extracted file. Uploads to code scanning
-happen from this repository's own pushes and pull requests; a fork's token cannot write them. Verify the
+happen from every run; CI runs on pushes only. Verify the
 gate:
 
 ```bash
@@ -353,29 +353,17 @@ not shipped, as each verdict says. The tests set the clock themselves and check 
 results it was written from (`apps/web/__tests__/security/codeql-2026-11-08.sarif.json`, trimmed from
 the stored analysis).
 
-Code scanning is free while the repository is public. Going private (planned before CC-29) needs GitHub
-Advanced Security, or this Semgrep OSS job in its place (ruling 9: it lives here, not commented out in
-the workflow):
+Code scanning is free only while the repository is public. CC-REPO (`docs/specs/v2/repo-private.md`
+D3, D4) put ruling 9's Semgrep job in place before the repository went private: the `codeql` job runs
+only while the repository is public, and a `semgrep` job with its own reviewed baseline
+(`.github/workflows/scripts/semgrep-baseline.json`, expiring 2026-12-08) runs on every push and uploads
+nothing to code scanning. Its first run found no result; Semgrep's community rules do not replace
+CodeQL's data-flow queries, so the three CodeQL results below that are real hardening stay tracked as
+CC-SEC-2. Verify the Semgrep gate:
 
-```yaml
-semgrep:
-  runs-on: ubuntu-24.04
-  timeout-minutes: 15
-  env:
-    # renovate: datasource=docker depName=semgrep/semgrep
-    SEMGREP_IMAGE: semgrep/semgrep:<version>@sha256:<digest of that version>
-  steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        persist-credentials: false
-    - name: semgrep
-      run: |
-        docker run --rm -v "$PWD:/src" -w /src "$SEMGREP_IMAGE" semgrep scan \
-          --config p/typescript --config p/nextjs --config p/react --config p/owasp-top-ten \
-          --severity ERROR --error --metrics off
+```bash
+pnpm --filter @crawlmouse/web exec vitest run __tests__/security/semgrep-gate.test.ts
 ```
-
-Pin the image when the job is turned on.
 
 ### D8 — ZAP baseline
 
@@ -486,12 +474,12 @@ All approved as recommended, with one addition to ruling 2.
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
 | CSP reports go from the browser straight to Sentry, so their `document-uri` (an `/audit/<id>` page, a capability) skips the app's scrubbing; add a Sentry server-side data-scrubbing rule for CSP events                                                                                                                                                                                                                                                                                | owner's CTO (Sentry settings)                   |
 | Check 09 leaves invoker functions out (D6, "Not covered"). An invoker function runs as `postgres` when a definer function calls it or a definer's write fires its trigger, under its own `search_path` if it sets one. Production holds invoker functions whose setting leaves `pg_temp` first (query under D6), among them 006c's two helpers, whose bodies 006c's temp-domain tests pin. Which of the others a definer reaches with a type written without its schema is not measured | owner ruling pending                            |
-| A CODEOWNERS entry for `.github/workflows/**`: the CodeQL gate and its baseline run from the pull request's own tree                                                                                                                                                                                                                                                                                                                                                                    | owner                                           |
+| A CODEOWNERS entry for `.github/workflows/**`: the CodeQL and Semgrep gates and their baselines run from the pull request's own tree                                                                                                                                                                                                                                                                                                                                                    | owner                                           |
 | `apps/web/lib/seo/jsonld.tsx` writes `JSON.stringify` output into a script element without escaping `<`; safe while its data is authored in the repo                                                                                                                                                                                                                                                                                                                                    | engineering                                     |
 | CI's `security-browser` run sends its sampled refusal events, server-side, to PostHog with the placeholder key, which PostHog refuses                                                                                                                                                                                                                                                                                                                                                   | accepted                                        |
 | CC-SEC-2, due 2026-12-08: `packages/engine/src/v2/layout/force-layout.ts:300` and `:426` key plain objects by crawled node ids; to a `Map`, converted to a plain object only at the client boundary (CC-20b tried `Object.create(null)` and reverted it: React cannot pass a null-prototype object to a client component). Crawl path: the step runs the live audit smoke (OPERATING-RULES §6)                                                                                          | engineering                                     |
 | CC-SEC-2, due 2026-12-08: `packages/engine/src/extract.ts:222` (152 before CC-20b re-wrapped it) skips link schemes by deny-list; to an http/https allow-list. Crawl path: live audit smoke                                                                                                                                                                                                                                                                                             | engineering                                     |
-| CodeQL baseline expires 2026-12-08: from 2026-12-09 every listed result fails the job again                                                                                                                                                                                                                                                                                                                                                                                             | engineering                                     |
+| CodeQL and Semgrep baselines expire 2026-12-08: from 2026-12-09 every listed result fails its job again                                                                                                                                                                                                                                                                                                                                                                                 | engineering                                     |
 | Enforce the full CSP after seven days of report-only data (CC-SEC-2)                                                                                                                                                                                                                                                                                                                                                                                                                    | engineering                                     |
 | Hash-based `script-src` in place of `'unsafe-inline'`                                                                                                                                                                                                                                                                                                                                                                                                                                   | engineering                                     |
 | `security.refused` for 401s and 429s, through one `requireUser()` helper in the routes                                                                                                                                                                                                                                                                                                                                                                                                  | engineering (CC-SEC-2)                          |
