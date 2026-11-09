@@ -205,11 +205,29 @@ pnpm --filter @crawlmouse/web exec vitest run __tests__/security/claim-route-rem
 ### D6 — definer functions search `pg_temp` last
 
 Migration `infra/supabase/migrations/20261108000002_v2_definer_search_path.sql` sets `search_path` on
-the 19 SECURITY DEFINER functions in `public` that left `pg_temp` out. The value is
-`pg_catalog, public, pg_temp`, except `v2_premake_month_partitions`, which searched `pg_catalog` alone
-and keeps to that with `pg_temp` last (ruling 6). Two things are unchanged: no body changes, and
-`start_trial_with_ledger` keeps `''`. The rollback restores each function's setting as production held
-it; both lists are in the two files.
+the 20 SECURITY DEFINER functions in `public`. On 2026-11-08 production held 20 and none named
+`pg_temp`:
+
+```sql
+select count(*) filter (where (select c from unnest(proconfig) c where c like 'search_path=%') like '%pg_temp%'), count(*)
+  from pg_proc where prosecdef and pronamespace = 'public'::regnamespace
+   and oid not in (select objid from pg_depend where deptype = 'e');
+```
+
+The value is `pg_catalog, public, pg_temp`, except on two functions that searched `pg_catalog` alone
+and keep to that with `pg_temp` last: `v2_premake_month_partitions` (ruling 6) and
+`start_trial_with_ledger`, whose `''` leaves `pg_temp` out like the others (the `search_path` ruling).
+`start_trial_with_ledger` keeps its `lock_timeout`. No body changes. The rollback restores each
+function's setting as production held it, `''` included; both lists are in the two files.
+
+**`''` is not enough.** An empty setting does not name `pg_temp`, so Postgres still searches it first
+for relations and types. A definer function with `search_path = ''` and one type written without its
+schema runs a caller's temp domain's CHECK as `postgres`; the same function with `pg_catalog, pg_temp`
+returns. Verify, on a probe function in PGlite:
+
+```bash
+pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-definer-search-path.test.ts -t "still searches pg_temp first"
+```
 
 **Why it matters, reproduced.** With `pg_temp` left out, Postgres searches it first for relations and
 types, even before `pg_catalog`. A caller's temp domain then stands in for a type, and its CHECK runs as
@@ -235,6 +253,25 @@ Using any of this needs a SQL session that can create temp objects. PostgREST gi
 defence-in-depth against a session that should not exist. Every role holds `TEMP` on the database:
 `select r, has_database_privilege(r, current_database(), 'TEMP') from unnest(array['anon','authenticated','crawl_worker','service_role']) r`.
 
+**Not covered: invoker functions.** Check 09 and this migration read SECURITY DEFINER functions
+only. An invoker function runs as the caller, but inside a definer function the caller is the owner:
+an invoker function the definer calls, or a trigger its write fires, runs as `postgres` with its own
+`search_path` setting, if it has one. On 2026-11-08 this query returned 27 invoker functions in
+`public` and `research` whose setting leaves `pg_temp` first, `trial_ledger_lock` and
+`trial_ledger_refusals` among them:
+
+```sql
+select n.nspname, p.proname, (select c from unnest(p.proconfig) c where c like 'search_path=%')
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname in ('public', 'research', 'partitions') and not p.prosecdef
+   and p.oid not in (select objid from pg_depend where deptype = 'e')
+   and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%' and c not like '%pg_temp%')
+ order by 1, 2;
+```
+
+Which of them a definer function reaches with a type or relation written without its schema is not
+measured. It is in the known gaps, with the owner.
+
 **Why reordering is safe.** Moving `pg_catalog` ahead of `public` changes a resolution only where a
 `public` object shares a name with a `pg_catalog` one. On 2026-11-08 none did, across relations, types,
 functions and operators. This query returned no row:
@@ -255,13 +292,14 @@ select distinct pub.n from pub join cat using (n);
 ```
 
 **Check 09** (`infra/supabase/checks/09-definer-search-path.sql`) allows a definer function in
-`public`, `research` or `partitions` exactly `""`, `pg_catalog, pg_temp` or
-`pg_catalog, public, pg_temp`. It also fails if a role other than a superuser or a member of `public`'s
+`public`, `research` or `partitions` exactly `pg_catalog, pg_temp` or `pg_catalog, public, pg_temp`.
+It finds `''`, because whether a body names every type with its schema is not something it can
+read. It also fails if a role other than a superuser or a member of `public`'s
 owner may create objects in `public`, because `public` ahead of `pg_temp` is safe only then. A rule of
 "ends in `pg_temp`" would pass `search_path = pg_temp` alone, which lets unqualified names fall through
 to the temp schema.
 
-**Fingerprint.** The migration changes the `functions` section only. Its 19 lines are in
+**Fingerprint.** The migration changes the `functions` section only. Its 20 lines are in
 `scripts/db/fixtures/20261108000002-expected-change.json`, read from production: each line as it stands,
 and the line with its SET clause replaced, md5'd there. Applied on PGlite, the migration produces exactly
 those lines:
@@ -418,31 +456,36 @@ All approved as recommended, with one addition to ruling 2.
     the SEO guards are the evidence that no indexed URL, title or canonical changed.
 11. D7, CodeQL's existing findings: the reviewed baseline above, expiring 2026-12-08; `**/tests/**`
     excluded; the three real hardening items to CC-SEC-2, due before the baseline expires.
+12. D6, `search_path = ''`: check 09 no longer allows it; `start_trial_with_ledger` goes to
+    `pg_catalog, pg_temp` in 20261108000002, keeping its `lock_timeout`, and the rollback restores
+    `''`; the fingerprint change grows to 20 lines; a PGlite case shows `''` with a type written
+    without its schema is shadowable.
 
 ## Known gaps and follow-ups
 
-| Item                                                                                                                                                                                                                                     | Owner                                           |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| CSP reports go from the browser straight to Sentry, so their `document-uri` (an `/audit/<id>` page, a capability) skips the app's scrubbing; add a Sentry server-side data-scrubbing rule for CSP events                                 | owner's CTO (Sentry settings)                   |
-| A CODEOWNERS entry for `.github/workflows/**`: the CodeQL gate and its baseline run from the pull request's own tree                                                                                                                     | owner                                           |
-| `apps/web/lib/seo/jsonld.tsx` writes `JSON.stringify` output into a script element without escaping `<`; safe while its data is authored in the repo                                                                                     | engineering                                     |
-| CI's `security-browser` run sends its sampled refusal events, server-side, to PostHog with the placeholder key, which PostHog refuses                                                                                                    | accepted                                        |
-| CC-SEC-2, due 2026-12-08: `packages/engine/src/v2/layout/force-layout.ts:300` and `:426` key plain objects by crawled node ids; to a `Map` or `Object.create(null)`. Crawl path: the step runs the live audit smoke (OPERATING-RULES §6) | engineering                                     |
-| CC-SEC-2, due 2026-12-08: `packages/engine/src/extract.ts:152` skips link schemes by deny-list; to an http/https allow-list. Crawl path: live audit smoke                                                                                | engineering                                     |
-| CodeQL baseline expires 2026-12-08: from 2026-12-09 every listed result fails the job again                                                                                                                                              | engineering                                     |
-| Enforce the full CSP after seven days of report-only data (CC-SEC-2)                                                                                                                                                                     | engineering                                     |
-| Hash-based `script-src` in place of `'unsafe-inline'`                                                                                                                                                                                    | engineering                                     |
-| `security.refused` for 401s and 429s, through one `requireUser()` helper in the routes                                                                                                                                                   | engineering (CC-SEC-2)                          |
-| `audits/[id]/reaudit` reads the audit row as the service role before refusing a caller with no session; nothing reaches the caller, and `route-anonymous.test.ts` pins the read                                                          | engineering                                     |
-| `checks/[id]/claim` and `auth/magic-link` keep their own looser origin checks; the middleware's runs first on both                                                                                                                       | engineering, at the next change to those routes |
-| `GET /billing` creates a Stripe portal session on a cookie-authorised GET                                                                                                                                                                | engineering                                     |
-| `/api/trpc` is a reserved surface with no caller                                                                                                                                                                                         | engineering (delete, like D5, or build on it)   |
-| The Inngest route's GET and PUT are not signature-verified; pin `INNGEST_SERVE_HOST` and keep the production signing key out of previews                                                                                                 | owner                                           |
-| `scripts/p5/driver.mjs` posts `/api/billing/checkout` with no Origin and now gets 403                                                                                                                                                    | engineering, if it is run again                 |
-| HSTS `includeSubDomains; preload`, after the subdomain check above                                                                                                                                                                       | owner                                           |
-| WAF tuning after four weeks of traffic                                                                                                                                                                                                   | owner's CTO                                     |
-| External penetration test before the first paid agency                                                                                                                                                                                   | owner                                           |
-| Renovate installation                                                                                                                                                                                                                    | owner                                           |
-| 2FA on every provider account                                                                                                                                                                                                            | owner                                           |
-| Supabase point-in-time recovery                                                                                                                                                                                                          | owner                                           |
-| Cloudflare AI-crawler and managed-robots settings (OPERATING-RULES §12)                                                                                                                                                                  | owner                                           |
+| Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Owner                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| CSP reports go from the browser straight to Sentry, so their `document-uri` (an `/audit/<id>` page, a capability) skips the app's scrubbing; add a Sentry server-side data-scrubbing rule for CSP events                                                                                                                                                                                                                                                            | owner's CTO (Sentry settings)                   |
+| Check 09 reads definer functions only. An invoker function runs as `postgres` when a definer function calls it or a definer's write fires its trigger, under its own `search_path` if it sets one. Production holds invoker functions whose setting leaves `pg_temp` first (query under D6), among them 006c's two helpers, whose bodies 006c's temp-domain tests pin. Which of the others a definer reaches with a type written without its schema is not measured | owner ruling pending                            |
+| A CODEOWNERS entry for `.github/workflows/**`: the CodeQL gate and its baseline run from the pull request's own tree                                                                                                                                                                                                                                                                                                                                                | owner                                           |
+| `apps/web/lib/seo/jsonld.tsx` writes `JSON.stringify` output into a script element without escaping `<`; safe while its data is authored in the repo                                                                                                                                                                                                                                                                                                                | engineering                                     |
+| CI's `security-browser` run sends its sampled refusal events, server-side, to PostHog with the placeholder key, which PostHog refuses                                                                                                                                                                                                                                                                                                                               | accepted                                        |
+| CC-SEC-2, due 2026-12-08: `packages/engine/src/v2/layout/force-layout.ts:300` and `:426` key plain objects by crawled node ids; to a `Map` or `Object.create(null)`. Crawl path: the step runs the live audit smoke (OPERATING-RULES §6)                                                                                                                                                                                                                            | engineering                                     |
+| CC-SEC-2, due 2026-12-08: `packages/engine/src/extract.ts:152` skips link schemes by deny-list; to an http/https allow-list. Crawl path: live audit smoke                                                                                                                                                                                                                                                                                                           | engineering                                     |
+| CodeQL baseline expires 2026-12-08: from 2026-12-09 every listed result fails the job again                                                                                                                                                                                                                                                                                                                                                                         | engineering                                     |
+| Enforce the full CSP after seven days of report-only data (CC-SEC-2)                                                                                                                                                                                                                                                                                                                                                                                                | engineering                                     |
+| Hash-based `script-src` in place of `'unsafe-inline'`                                                                                                                                                                                                                                                                                                                                                                                                               | engineering                                     |
+| `security.refused` for 401s and 429s, through one `requireUser()` helper in the routes                                                                                                                                                                                                                                                                                                                                                                              | engineering (CC-SEC-2)                          |
+| `audits/[id]/reaudit` reads the audit row as the service role before refusing a caller with no session; nothing reaches the caller, and `route-anonymous.test.ts` pins the read                                                                                                                                                                                                                                                                                     | engineering                                     |
+| `checks/[id]/claim` and `auth/magic-link` keep their own looser origin checks; the middleware's runs first on both                                                                                                                                                                                                                                                                                                                                                  | engineering, at the next change to those routes |
+| `GET /billing` creates a Stripe portal session on a cookie-authorised GET                                                                                                                                                                                                                                                                                                                                                                                           | engineering                                     |
+| `/api/trpc` is a reserved surface with no caller                                                                                                                                                                                                                                                                                                                                                                                                                    | engineering (delete, like D5, or build on it)   |
+| The Inngest route's GET and PUT are not signature-verified; pin `INNGEST_SERVE_HOST` and keep the production signing key out of previews                                                                                                                                                                                                                                                                                                                            | owner                                           |
+| `scripts/p5/driver.mjs` posts `/api/billing/checkout` with no Origin and now gets 403                                                                                                                                                                                                                                                                                                                                                                               | engineering, if it is run again                 |
+| HSTS `includeSubDomains; preload`, after the subdomain check above                                                                                                                                                                                                                                                                                                                                                                                                  | owner                                           |
+| WAF tuning after four weeks of traffic                                                                                                                                                                                                                                                                                                                                                                                                                              | owner's CTO                                     |
+| External penetration test before the first paid agency                                                                                                                                                                                                                                                                                                                                                                                                              | owner                                           |
+| Renovate installation                                                                                                                                                                                                                                                                                                                                                                                                                                               | owner                                           |
+| 2FA on every provider account                                                                                                                                                                                                                                                                                                                                                                                                                                       | owner                                           |
+| Supabase point-in-time recovery                                                                                                                                                                                                                                                                                                                                                                                                                                     | owner                                           |
+| Cloudflare AI-crawler and managed-robots settings (OPERATING-RULES §12)                                                                                                                                                                                                                                                                                                                                                                                             | owner                                           |
