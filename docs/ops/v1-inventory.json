@@ -214,10 +214,10 @@
       "path": "app/compare/page.tsx",
       "url": "/compare",
       "ruling": "retire",
-      "reason": "head-to-head leaves with v1; not in the sitemap, and ARCH-2 names no target for the index (questions Q2)",
+      "reason": "head-to-head leaves with v1; not in the sitemap; ARCH-2 names no target for the index, and the owner ruled 308 to / (Q2)",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "v2 competitor feature inside the account",
-      "redirect": "none",
+      "redirect": "/",
       "checks": {
         "input": "n/a — static page, reads no params, query or body (app/compare/page.tsx:7)",
         "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/compare/page.tsx:7)",
@@ -233,10 +233,10 @@
       "path": "app/compare/[a]/[b]/page.tsx",
       "url": "/compare/[a]/[b]",
       "ruling": "retire",
-      "reason": "kept 90 days with noindex; ARCH-2 says 301 to /r/[a], but [a] is an audit id and /r/ takes a minted slug, so that target would 404 (questions Q5); not in the sitemap",
+      "reason": "kept 90 days with noindex; ARCH-2 says 301 to /r/[a], but [a] is an audit id and /r/ takes a minted slug, so the owner ruled 308 to /audit/[a], the first audit's capability URL (Q5); not in the sitemap",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "v2 competitor feature inside the account",
-      "redirect": "none",
+      "redirect": "/audit/[a]",
       "checks": {
         "input": "pass — both ids checked with isUuid and a≠b before any read (app/compare/[a]/[b]/page.tsx:27)",
         "output": "pass — selects id, url only (app/compare/[a]/[b]/page.tsx:32); client gets the ids already in the URL plus domains (:46-49)",
@@ -1421,7 +1421,7 @@
       "items": ["public.rate_limits", "app/privacy/page.tsx"],
       "evidence": "apps/web/app/privacy/page.tsx:158",
       "what": "/privacy calls rate-limit records short-lived; production holds 1,138 rows, 1,027 older than 30 days, oldest 157 days, 468 keys embedding a raw IP and 52 a raw email; nothing deletes the table (measured 2026-11-09).",
-      "owner": "owner follow-up: a daily delete (Inngest cron or pg_cron migration), both outside this step (D11)"
+      "owner": "CC-V1FIX (owner ruled: a bounded daily delete of rows past their window, in the existing cleanup cron); hashing the keys is a follow-up"
     },
     {
       "id": "B-F2",
@@ -1429,7 +1429,7 @@
       "items": ["public.users", "app/privacy/page.tsx", "app/terms/page.tsx"],
       "evidence": "apps/web/app/privacy/page.tsx:151; apps/web/app/privacy/page.tsx:219; apps/web/app/terms/page.tsx:205",
       "what": "/privacy and /terms promise erasure on request; no code deletes public.users, public.users has no FK to auth.users, and the email also sits unlinked in rate_limits keys, email_events, audits.notify_email, waitlist and takedown_requests. Erasure is possible by hand in SQL; what is missing is the process and the cascade.",
-      "owner": "owner follow-up: an erasure runbook and an auth.users cascade migration (owner-applied)"
+      "owner": "CC-V1FIX (owner ruled: scripts/ops/erase-account.ts and docs/ops/erasure.md; a cascade migration if a table lacks one)"
     },
     {
       "id": "A-1",
@@ -1489,7 +1489,7 @@
       "items": ["app/r/[slug]/page.tsx"],
       "evidence": "apps/web/middleware.ts:62; apps/web/app/r/[slug]/page.tsx:23",
       "what": "the middleware sends X-Robots-Tag: noindex, nofollow, noarchive on every /r/ page, including the claimed, indexable reports the page marks index and the sitemap lists, so no report can be indexed (since 0478f107, before SPEC 04 made claimed reports indexable). A missing report's HTML also carries two robots metas. Changing the header changes what search engines index (§13).",
-      "owner": "owner decision (questions Q9): an SEO change, out of D11"
+      "owner": "CC-V1FIX (owner ruled Q9: drop X-Robots-Tag on /r/, keep it on /embed/)"
     },
     {
       "id": "B-F3",
@@ -1585,7 +1585,7 @@
       "items": ["app/login/verify/route.ts"],
       "evidence": "apps/web/lib/auth/continue-intent.ts:29; apps/web/app/api/auth/magic-link/route.ts:174; apps/web/app/login/verify/route.ts:122",
       "what": "login CSRF with data capture: an attacker requests a magic link for their own address and gets a victim to open it and press Continue; the victim is signed in as the attacker and the victim browser's anonymous audits move into the attacker's account. The foreign-link refusal needs the cm_auth_for cookie, which only the v2 door sets, so on v1 it never fires. Disclosed for v2 in docs/specs/v2/25-account-door.md. Not fixed here: refusing without the cookie switches off the anonymous-audit claim for every v1 sign-in, a §5 flow.",
-      "owner": "owner decision (questions Q8): §5 claim-on-signup flow"
+      "owner": "CC-V1FIX (owner ruled Q8, with §5 sign-off: cm_auth_for on every magic-link request; claim only on a matching cookie)"
     },
     {
       "id": "A-10",
