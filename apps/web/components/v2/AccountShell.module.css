@@ -1,0 +1,138 @@
+/* The account frame (Final-Dashboard .rail and main): a 200px rail beside the page. */
+
+/* Doubled so it outweighs PageShell's `.shell` (a column, the same element) whatever order the build
+   emits the two stylesheets in: at equal weight the production build put `.shell` last, and the rail
+   became a band across the top of every account screen. */
+.frame.frame {
+  flex-direction: row;
+  flex-wrap: wrap;
+  font-size: var(--v2-text-small);
+}
+
+.rail {
+  flex: 0 0 200px;
+  padding: 16px 12px;
+  border-right: 1px solid var(--v2-line);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  background: var(--v2-railbg);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--v2-control-h-sm);
+  padding: 0 10px;
+  border-radius: var(--v2-radius-control);
+  color: var(--v2-fg2);
+  text-decoration: none;
+}
+
+.link:hover {
+  background: var(--v2-s1);
+  color: var(--v2-fg);
+  text-decoration: none;
+}
+
+.current {
+  background: var(--v2-s2);
+  color: var(--v2-fg);
+  font-weight: 500;
+}
+
+.count {
+  margin-left: auto;
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  color: var(--v2-mut);
+}
+
+.fresh {
+  color: var(--v2-fg);
+}
+
+.card {
+  margin-top: auto;
+}
+
+/* Skip to the page: read first, and drawn only while it has focus. */
+.skip {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 2;
+  padding: 8px 12px;
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-s1);
+  color: var(--v2-fg);
+  clip-path: inset(50%);
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.skip:focus {
+  clip-path: none;
+  width: auto;
+  height: auto;
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+/* The account artboards' tables are tighter than the marketing pages': 10px 14px at 14px. */
+.main table td,
+.main table th {
+  padding: 10px 14px;
+  font-size: var(--v2-text-small);
+}
+
+/* On the account screens a row header reads as the row's first cell, not as a column header: the
+   row's colour, weight and size, outranking Table's `.table th`. Kept here, not on Table, because
+   the audit screens' row headers (CC-23's content grid) keep the column-header face. */
+.main table tbody th {
+  color: inherit;
+  font-weight: 400;
+  font-size: var(--v2-text-small);
+}
+
+.main {
+  flex: 999 1 520px;
+  min-width: 0;
+  padding: 20px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 760px) {
+  .rail {
+    flex: 1 1 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--v2-line);
+    gap: 10px;
+  }
+
+  .nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .card {
+    margin-top: 0;
+  }
+
+  .main {
+    padding: 20px var(--v2-gutter-phone);
+  }
+}

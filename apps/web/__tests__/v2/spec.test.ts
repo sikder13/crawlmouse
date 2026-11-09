@@ -8,6 +8,8 @@ import { SPEC_25_PATH, buildSpec25 } from './spec/build-spec-25';
 import { CLAIM_REFUSALS } from '../../lib/auth/claim';
 import { TRIAL_OUTCOMES } from '../../lib/auth/first-login';
 import { ACCOUNT_DOOR_CHANGES } from '../../lib/v2/copy/account-door';
+import { SPEC_26_PATH, buildSpec26 } from './spec/build-spec-26';
+import { SPEC_27_PATH, buildSpec27 } from './spec/build-spec-27';
 
 describe('docs/specs/v2/21-design-system.md', () => {
   it('is exactly what the generator writes from the code', async () => {
@@ -69,5 +71,34 @@ describe('docs/specs/v2/25-account-door.md', () => {
     expect(spec.match(/^\| (signup|check-email|check-email-no-audit) /gm)).toHaveLength(
       ACCOUNT_DOOR_CHANGES.length,
     );
+  }, 60_000);
+});
+
+describe('docs/specs/v2/26-dashboard-site.md', () => {
+  it('is exactly what the generator writes from the code', async () => {
+    expect(existsSync(SPEC_26_PATH), 'run __tests__/v2/generate-spec.ts').toBe(true);
+    expect(readFileSync(SPEC_26_PATH, 'utf8')).toBe(await buildSpec26());
+  }, 60_000);
+});
+
+describe('docs/specs/v2/27-account-screens.md', () => {
+  it('is exactly what the generator writes from the code', async () => {
+    expect(existsSync(SPEC_27_PATH), 'run __tests__/v2/generate-spec.ts').toBe(true);
+    expect(readFileSync(SPEC_27_PATH, 'utf8')).toBe(await buildSpec27());
+  }, 60_000);
+
+  it('lists every CC-27b route and requirement, and each correction of the four locked screens', async () => {
+    const { CC27B_REQUIREMENTS, CC27B_ROUTES } = await import('../../lib/v2/view/settings');
+    const { COPY_CHANGES } = await import('../../lib/v2/copy-registry');
+    const spec = await buildSpec27();
+    for (const r of Object.values(CC27B_ROUTES)) expect(spec).toContain(`\`${r.route}\``);
+    for (const r of CC27B_REQUIREMENTS)
+      expect(spec).toMatch(new RegExp(`^\\| ${r.what} +\\|`, 'm'));
+    const ours = COPY_CHANGES.filter((c) =>
+      ['alerts', 'reports', 'settings', 'trial-end'].includes(c.screen),
+    );
+    expect(
+      spec.match(/^\| (alerts|reports|settings|trial-end) +\| (facts|fixture|ruling|a11y) /gm),
+    ).toHaveLength(ours.length);
   }, 60_000);
 });

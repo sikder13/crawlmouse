@@ -11,10 +11,19 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 export function ScrollRegion({
   label,
   className,
+  startAtEnd = false,
+  describedBy,
   children,
 }: {
   label: string;
+  /**
+   * The id of text that says what the region holds, for content a screen reader cannot read
+   * itself (a drawing hidden from it): without it the tab stop is a named region with nothing in it.
+   */
+  describedBy?: string;
   className?: string;
+  /** Opens scrolled to its far end: a history whose latest point is the one that matters. */
+  startAtEnd?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -23,6 +32,7 @@ export function ScrollRegion({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    if (startAtEnd) el.scrollLeft = el.scrollWidth;
     // While it holds focus it stays in the tab order, or focus would fall back to the page.
     const check = () =>
       setScrolls(el.scrollWidth > el.clientWidth + 1 || document.activeElement === el);
@@ -51,14 +61,21 @@ export function ScrollRegion({
       mo?.disconnect();
       ro?.disconnect();
     };
-  }, []);
+  }, [startAtEnd]);
 
   return (
     <div
       ref={ref}
       className={className}
       data-v2-scroll-region=""
-      {...(scrolls ? { role: 'region', 'aria-label': label, tabIndex: 0 } : {})}
+      {...(scrolls
+        ? {
+            role: 'region',
+            'aria-label': label,
+            tabIndex: 0,
+            ...(describedBy ? { 'aria-describedby': describedBy } : {}),
+          }
+        : {})}
     >
       {children}
     </div>

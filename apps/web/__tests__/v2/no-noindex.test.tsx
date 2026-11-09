@@ -6,7 +6,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { PageShell } from '../../components/v2/PageShell';
 import { SiteFooter } from '../../components/v2/SiteFooter';
 import { MARKETING_NAV } from '../../components/v2/footer-links';
-import { RESULT_NAMES, crawlElement, homeElement, resultElement } from './_lib/screens';
+import {
+  ACCOUNT_ELEMENTS,
+  RESULT_NAMES,
+  crawlElement,
+  homeElement,
+  resultElement,
+} from './_lib/screens';
 import { WEB_ROOT } from './_lib/tokens-css';
 
 /**
@@ -110,6 +116,7 @@ describe('no v2 component sets a robots directive or a head element', () => {
       `Result: ${n}`,
       () => resultElement(n),
     ]),
+    ...Object.entries(ACCOUNT_ELEMENTS),
     [
       'the marketing shell',
       () => (

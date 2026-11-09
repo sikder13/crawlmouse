@@ -209,12 +209,14 @@ function recordingSection(): string {
   ].join('\n');
 }
 
-/** The segment pages' entries are SPEC 23's. */
-/** Screens with specs of their own: the segment pages (SPEC 23), the fix page and the explorer (SPEC 24), the account door (SPEC 25). */
+/**
+ * Screens with specs of their own: the segment pages (SPEC 23), the fix page and the explorer
+ * (SPEC 24), the account door (SPEC 25), the dashboard and the site page (SPEC 26).
+ */
 const isSegment = (screen: string) =>
   screen.startsWith('segment-') ||
-  screen === 'fix' ||
-  screen === 'link-map' ||
+  screen.startsWith('dashboard') ||
+  ['fix', 'link-map', 'site'].includes(screen) ||
   isAccountDoor(screen);
 /** The account door's screens are SPEC 25's. */
 const isAccountDoor = (screen: string) =>

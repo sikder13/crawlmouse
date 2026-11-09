@@ -112,7 +112,7 @@ const GROUPS: { group: CrawlerGroup; title: string; note: string }[] = [
 ];
 
 /** The matrix's cause column: what the engine found in the way. */
-const CAUSE_SHORT: Record<AccessCause, string> = {
+export const CAUSE_SHORT: Record<AccessCause, string> = {
   cloudflare_1020: 'Cloudflare firewall rule (error 1020)',
   bot_fight_mode: 'Bot Fight Mode challenge',
   client_rendered_template: 'client-rendered template',

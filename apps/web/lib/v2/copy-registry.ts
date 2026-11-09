@@ -11,6 +11,8 @@
  *   no field for it; `source` says how.
  * - `a11y`: the locked text cannot pass the accessibility checks as typed; `source` names the
  *   axe finding.
+ * - `ruling`: the owner ruled on the screen, or the step's brief leaves the element out; `source`
+ *   names the ruling or the brief.
  * The segment pages' entries live in copy/segment-*.ts, one file per page, and are listed here.
  * Elements the brief adds (`data-v2-addition` in the markup) are left out of the comparison and
  * listed in ADDITIONS instead.
@@ -19,6 +21,12 @@
 import { ACCESS_ADDITIONS, ACCESS_CHANGES } from './copy/segment-access';
 import { CHANGES_ADDITIONS, CHANGES_CHANGES } from './copy/segment-changes';
 import { CONTENT_ADDITIONS, CONTENT_CHANGES } from './copy/segment-content';
+import { DASHBOARD_ADDITIONS, DASHBOARD_CHANGES } from './copy/dashboard';
+import { SITE_ADDITIONS, SITE_CHANGES } from './copy/site';
+import { ALERTS_ADDITIONS, ALERTS_CHANGES } from './copy/alerts';
+import { REPORTS_ADDITIONS, REPORTS_CHANGES } from './copy/reports';
+import { SETTINGS_ADDITIONS, SETTINGS_CHANGES } from './copy/settings';
+import { TRIAL_END_ADDITIONS, TRIAL_END_CHANGES } from './copy/trial-end';
 import { FIX_ADDITIONS, FIX_CHANGES } from './copy/fix';
 import { LINK_MAP_ADDITIONS, LINK_MAP_CHANGES } from './copy/link-map';
 import { NOJS_ADDITIONS, NOJS_CHANGES } from './copy/segment-nojs';
@@ -40,11 +48,18 @@ export type LockedScreen =
   | 'segment-signals'
   | 'segment-changes'
   | 'fix'
-  | 'link-map';
+  | 'link-map'
+  | 'dashboard-day0'
+  | 'dashboard'
+  | 'site'
+  | 'alerts'
+  | 'reports'
+  | 'settings'
+  | 'trial-end';
 
 export interface CopyChange {
   screen: LockedScreen;
-  kind: 'facts' | 'fixture' | 'a11y';
+  kind: 'facts' | 'fixture' | 'a11y' | 'ruling';
   locked: string;
   rendered: string;
   source: string;
@@ -55,6 +70,11 @@ export interface CopyChange {
    * phone-width comparison leaves the entry out; every other reading still applies it.
    */
   hiddenOnPhone?: boolean;
+  /**
+   * The reverse: text the locked page hides on a phone and ours shows there (data, owner ruling
+   * 2026-11-08), so only the phone-width comparison applies the entry.
+   */
+  onlyOnPhone?: boolean;
 }
 
 const BASE_CHANGES: CopyChange[] = [
@@ -371,6 +391,12 @@ export const COPY_CHANGES: CopyChange[] = [
   ...FIX_CHANGES,
   ...LINK_MAP_CHANGES,
   ...ACCOUNT_DOOR_CHANGES,
+  ...DASHBOARD_CHANGES,
+  ...SITE_CHANGES,
+  ...ALERTS_CHANGES,
+  ...REPORTS_CHANGES,
+  ...SETTINGS_CHANGES,
+  ...TRIAL_END_CHANGES,
 ];
 
 export interface Addition {
@@ -433,6 +459,12 @@ export const ADDITIONS: Addition[] = [
   ...FIX_ADDITIONS,
   ...LINK_MAP_ADDITIONS,
   ...ACCOUNT_DOOR_ADDITIONS,
+  ...DASHBOARD_ADDITIONS,
+  ...SITE_ADDITIONS,
+  ...ALERTS_ADDITIONS,
+  ...REPORTS_ADDITIONS,
+  ...SETTINGS_ADDITIONS,
+  ...TRIAL_END_ADDITIONS,
 ];
 
 /**
@@ -462,7 +494,9 @@ export function applyChanges(
   { phone = false }: { phone?: boolean } = {},
 ): string {
   let text = locked;
-  for (const c of COPY_CHANGES.filter((x) => x.screen === screen && !(phone && x.hiddenOnPhone))) {
+  const applies = (x: CopyChange) =>
+    x.screen === screen && !(phone && x.hiddenOnPhone) && !(!phone && x.onlyOnPhone);
+  for (const c of COPY_CHANGES.filter(applies)) {
     const from = squash(c.locked);
     if (!text.includes(from))
       throw new Error(`Copy change no longer matches the locked ${screen}: "${c.locked}"`);

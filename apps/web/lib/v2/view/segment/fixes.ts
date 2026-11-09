@@ -128,7 +128,7 @@ function tally(fixes: readonly Fix[]): ProFixView['recommendations'] {
  * A grouped row's effect: both grades' points summed, and how many fixes have an AI readability
  * effect not yet estimated, so no part of the group's effect is left out.
  */
-function groupPoints(fixes: readonly Fix[]): string {
+export function groupPoints(fixes: readonly Fix[]): string {
   const seo = fixes.reduce((n, f) => n + (f.effect.technical_seo ?? 0), 0);
   const ai = fixes.reduce((n, f) => n + (f.effect.ai_readability ?? 0), 0);
   const pending = fixes.filter((f) => f.effect.ai_readability === null).length;

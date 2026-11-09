@@ -69,6 +69,31 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'that guard does not run on them in the suite',
+    withdrawnIn:
+      'docs/specs/v2/27-account-screens.md (Known gaps), CC-27 review round 2 (accessibility and deploy safety)',
+    truth:
+      'account-control-names.test.tsx reads ACCOUNT_ELEMENTS and CC27_ELEMENTS and requires their ' +
+      'paths to equal the account previews the registry lists, so the guard runs on every CC-27 preview.',
+    allowedIn: [],
+  },
+  {
+    text: 'CC-27 does not edit that file',
+    withdrawnIn: 'apps/web/__tests__/v2/_lib/screens.tsx, CC-27 review round 2',
+    truth: 'CC-27 extended account-control-names.test.tsx with the owner’s approval.',
+    allowedIn: [],
+  },
+  {
+    text: 'so it drops the crawler changes whose summaries describe the old ones',
+    withdrawnIn:
+      'docs/specs/v2/26-dashboard-site.md (Known gaps), CC-26 review round 2 (correctness and tests)',
+    truth:
+      'The verdict guard’s account-screen property keeps each crawler change, with a neutral ' +
+      'summary in place of one that describes the old verdict, and counts the runs that reach a ' +
+      'crawler change opened on a verdict that is not a block.',
+    allowedIn: [],
+  },
+  {
     text: 'and 2 challenged pages can reach 27 pages',
     withdrawnIn:
       'docs/specs/v2/20a-check-builder.md (Differences from ARCH-2), CC-20a mutation of the stage-1 bound',

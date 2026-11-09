@@ -87,6 +87,20 @@ From `apps/web/styles/v2/tokens.css`. The source column is the comment on each d
 
 Exported from `apps/web/components/v2/index.ts`. Summaries and prop notes are the components’ own doc comments.
 
+### AccountShell
+
+The signed-in frame: a rail of the account's pages beside the page itself (Final-Dashboard). It
+shares PageShell's canvas, type and element defaults, and has no site header or footer. On a
+phone the rail becomes a band across the top.
+
+| Prop        | Type                                | Required | Note                                                                                                                      |
+| ----------- | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `nav`       | `RailLink[]`                        | yes      | The rail's links, in order.                                                                                               |
+| `card`      | `ReactNode`                         | no       | The plan card under the links (the trial card), or nothing.                                                               |
+| `theme`     | `ReactNode`                         | no       | The theme row at the foot of the rail.                                                                                    |
+| `currentIs` | `"page" \| "location" \| undefined` | no       | `page` when this page is the rail entry itself (/dashboard); `location` when it sits under it (a site page, under Sites). |
+| `children`  | `ReactNode`                         | yes      |                                                                                                                           |
+
 ### BrandLink
 
 The brand: the CrawlmouseMark and the crawl + orange mouse wordmark, linking home.
@@ -124,6 +138,24 @@ A single object on a hairline surface (rules 2 and 8).
 | `style`      | `CSSProperties \| undefined`                   | no       |                                                                                       |
 | `aria-label` | `string \| undefined`                          | no       |                                                                                       |
 | `children`   | `ReactNode`                                    | yes      |                                                                                       |
+
+### CheckGlyph
+
+One check's verdict as a tinted glyph with its words for a screen reader (rule 7).
+
+| Prop   | Type             | Required | Note |
+| ------ | ---------------- | -------- | ---- |
+| `cell` | `CheckGlyphCell` | yes      |      |
+
+### CheckGlyphRow
+
+A crawler's verdicts across checks, one glyph per check, ● ▲ ■ ○ in each state's colour. The
+glyphs are drawn and hidden; `spoken` says the same in words, in order.
+
+| Prop     | Type                        | Required | Note |
+| -------- | --------------------------- | -------- | ---- |
+| `cells`  | `readonly CheckGlyphCell[]` | yes      |      |
+| `spoken` | `string`                    | yes      |      |
 
 ### CookieSettings
 
@@ -199,6 +231,21 @@ A letter grade and its score out of 100, or a withheld grade that shows neither.
 | `withheld` | `boolean \| undefined`            | no       | The evidence cannot support a letter, so none is shown.                                   |
 | `children` | `ReactNode`                       | no       | One or two sentences under the grade.                                                     |
 
+### GradeHistory
+
+Two grades across a site's checks, as an inline SVG. The drawing is hidden from assistive
+technology; the table under it, read instead, lists every value at every check (D9).
+
+| Prop      | Type                                                                                                               | Required | Note                                                                                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `label`   | `string`                                                                                                           | yes      | Names the chart's scroll region and its table.                                                                                                                |
+| `labels`  | `readonly string[]`                                                                                                | yes      | One axis label per check: "24 Oct", "26", "Thu 29".                                                                                                           |
+| `dates`   | `readonly string[]`                                                                                                | yes      | One date per check, in full, for the table the chart is read from.                                                                                            |
+| `series`  | `readonly [GradeSeries, GradeSeries]`                                                                              | yes      |                                                                                                                                                               |
+| `caption` | `string`                                                                                                           | yes      | What the chart shows, in a sentence: the table's caption.                                                                                                     |
+| `note`    | `{ series: 0 \| 1; text: string; } \| null \| undefined`                                                           | no       | A note above a series' first run: "AI readability · 41 since the first audit".                                                                                |
+| `marker`  | `{ series: 0 \| 1; index: number; text: string; verdicts?: readonly string[] \| undefined; } \| null \| undefined` | no       | A marked point, drawn in the bad tone: "Claude-SearchBot and ClaudeBot blocked · 22", with the verdicts its words name, so a test can hold "blocked" to them. |
+
 ### Heading
 
 A heading in the display face, weight 600, tracking −0.02em (rule 5).
@@ -237,6 +284,20 @@ The page frame: canvas colours, the header with the brand, and the footer.
 | `status`   | `ServiceStatus \| undefined`        | no       | What the footer's Status link shows (SiteFooter); the shell fetches nothing.                                                                           |
 | `children` | `ReactNode`                         | yes      |                                                                                                                                                        |
 
+### Select
+
+A labelled native select: the browser gives it its keyboard, its list and its form value.
+
+| Prop           | Type                      | Required | Note                                                            |
+| -------------- | ------------------------- | -------- | --------------------------------------------------------------- |
+| `id`           | `string`                  | yes      |                                                                 |
+| `label`        | `string`                  | yes      |                                                                 |
+| `hideLabel`    | `boolean \| undefined`    | no       | The label is hidden visually and stays for screen readers.      |
+| `name`         | `string`                  | yes      |                                                                 |
+| `options`      | `readonly SelectOption[]` | yes      |                                                                 |
+| `defaultValue` | `string \| undefined`     | no       |                                                                 |
+| `form`         | `string \| undefined`     | no       | The id of a form the select belongs to when it sits outside it. |
+
 ### SiteFooter
 
 The site footer: the brand block, and the four columns of links from footer-links.ts.
@@ -254,17 +315,60 @@ A tinted pill: a status glyph and a short label (rule 7).
 | `state`    | `PillState` | yes      |      |
 | `children` | `ReactNode` | yes      |      |
 
+### Switch
+
+An on/off setting: a native button with role="switch" and aria-checked, inside a POST form. A
+native button is in the tab order and answers Enter and Space, so it needs no key handling of its
+own. The routes are not built yet (CC-27b), so the submit is stopped; the switch still flips.
+
+The form posts the state the switch moves to, `!checked`. The browser reads the form after the
+click's handlers and React's re-render, so the switch flips in a later task: flipped in the click
+handler, the field would already hold the next click's value when the form is read.
+
+| Prop     | Type                     | Required | Note                                                                        |
+| -------- | ------------------------ | -------- | --------------------------------------------------------------------------- |
+| `label`  | `string`                 | yes      | The setting's own row text, which names the switch (DESIGN-LOCK §7.6).      |
+| `name`   | `string`                 | yes      | The field the form posts: "true" or "false", the state the switch moves to. |
+| `on`     | `boolean`                | yes      |                                                                             |
+| `action` | `string`                 | yes      | Where the new state is posted.                                              |
+| `fields` | `Record<string, string>` | yes      | Other fields the post carries, the setting's id among them.                 |
+
 ### Table
 
 A table of records that scrolls sideways on a phone rather than squeezing (phone rules).
 
-| Prop        | Type                  | Required | Note                                                                           |
-| ----------- | --------------------- | -------- | ------------------------------------------------------------------------------ |
-| `label`     | `string`              | yes      | Names the table, and the scroll region when it overflows.                      |
-| `columns`   | `TableColumn[]`       | yes      |                                                                                |
-| `rows`      | `TableRow[]`          | yes      |                                                                                |
-| `heading`   | `ReactNode`           | no       | Rendered inside the scroll region, above the table (a heading row with pills). |
-| `className` | `string \| undefined` | no       |                                                                                |
+| Prop            | Type                   | Required | Note                                                                                                                                                                                                                                                  |
+| --------------- | ---------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `label`         | `string`               | yes      | Names the table, and the scroll region when it overflows.                                                                                                                                                                                             |
+| `columns`       | `TableColumn[]`        | yes      |                                                                                                                                                                                                                                                       |
+| `rows`          | `TableRow[]`           | yes      |                                                                                                                                                                                                                                                       |
+| `heading`       | `ReactNode`            | no       | Rendered inside the scroll region, above the table (a heading row with pills).                                                                                                                                                                        |
+| `headersHidden` | `boolean \| undefined` | no       | The column headers are read by assistive technology but not drawn, for a table the locked screen shows without a header row; each column still has its name. The header row stays in the table's layout, zero height, so every cell keeps its header. |
+| `rowHeader`     | `boolean \| undefined` | no       | The first cell of each row names the row (`<th scope="row">`), so a control later in the row is read with the row it acts on.                                                                                                                         |
+| `className`     | `string \| undefined`  | no       |                                                                                                                                                                                                                                                       |
+
+### ThemeControl
+
+System, Light or Dark (DESIGN-LOCK §2: three states, default System). The choice applies at once
+and is kept in this browser; saving it to the account is the form's job, which a preview stops.
+
+| Prop      | Type          | Required | Note                                                                                     |
+| --------- | ------------- | -------- | ---------------------------------------------------------------------------------------- |
+| `initial` | `ThemeChoice` | yes      | The signed-in seat's saved theme.                                                        |
+| `action`  | `string`      | yes      | Where the choice is saved (PATCH /api/me {theme}); the form names the verb in `_method`. |
+
+### TrialCard
+
+The rail's trial banner: when the trial ends, how long is left, and what Free keeps. On a phone
+it is a single strip with the action still in reach (DESIGN-LOCK §6, phone rules).
+
+| Prop       | Type        | Required | Note                                                                             |
+| ---------- | ----------- | -------- | -------------------------------------------------------------------------------- |
+| `title`    | `string`    | yes      | "Pro, trial · ends Sat 7 Nov".                                                   |
+| `left`     | `string`    | yes      | "8 days left".                                                                   |
+| `note`     | `string`    | yes      | What happens when the trial ends. Hidden on a phone, where the card is one line. |
+| `aside`    | `ReactNode` | no       | Beside the days left: the billing link on the first run.                         |
+| `children` | `ReactNode` | no       | Under the note: keeping the plan.                                                |
 
 ### VerdictCell
 
@@ -361,64 +465,87 @@ Learn opens as a disclosure (NavMenu). Log in is the header's action, at `/login
 
 From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are served by `next dev` only: when `NODE_ENV` is `production` the group layout and each page call `previewOnly()`, which returns a 404, and `apps/web/__tests__/v2/preview-guard.test.ts` calls every page under that setting. The visual harness in `tests/visual` captures each one at 1280 and 390 pixels, light and dark, and a screen that plays a recording once at each moment listed, opened paused there; `tests/visual/README.md` says how to run it and how to update a baseline.
 
-| Page                                | Path                                                     | Kind      | Opened at                            |
-| ----------------------------------- | -------------------------------------------------------- | --------- | ------------------------------------ |
-| Button                              | `/v2-preview/button`                                     | primitive |                                      |
-| StatusPill                          | `/v2-preview/status-pill`                                | primitive |                                      |
-| Grade                               | `/v2-preview/grade`                                      | primitive |                                      |
-| VerdictCell                         | `/v2-preview/verdict-cell`                               | primitive |                                      |
-| CoverageLine                        | `/v2-preview/coverage-line`                              | primitive |                                      |
-| Card                                | `/v2-preview/card`                                       | primitive |                                      |
-| Table                               | `/v2-preview/table`                                      | primitive |                                      |
-| Field                               | `/v2-preview/field`                                      | primitive |                                      |
-| PageShell                           | `/v2-preview/page-shell`                                 | primitive |                                      |
-| Final-Home                          | `/v2-preview/screens/home`                               | screen    |                                      |
-| Final-Crawl                         | `/v2-preview/screens/crawl`                              | screen    | `?at=47000`, `?at=128000`, `?at=end` |
-| Crawl, clean re-run                 | `/v2-preview/screens/crawl/clean`                        | screen    | `?at=end`                            |
-| Crawl, challenged                   | `/v2-preview/screens/crawl/challenged`                   | screen    | `?at=end`                            |
-| Final-Result                        | `/v2-preview/screens/result`                             | screen    |                                      |
-| Result, clean bill                  | `/v2-preview/screens/result/clean`                       | screen    |                                      |
-| Result, withheld                    | `/v2-preview/screens/result/challenged`                  | screen    |                                      |
-| Result, loading                     | `/v2-preview/screens/result/loading`                     | screen    |                                      |
-| Result, not started                 | `/v2-preview/screens/result/empty`                       | screen    |                                      |
-| Result, failed                      | `/v2-preview/screens/result/error`                       | screen    |                                      |
-| Result, expired                     | `/v2-preview/screens/result/expired`                     | screen    |                                      |
-| Final-Segment                       | `/v2-preview/screens/segment/access`                     | screen    |                                      |
-| Crawler access, clean bill          | `/v2-preview/screens/segment/access/clean`               | screen    |                                      |
-| Crawler access, withheld            | `/v2-preview/screens/segment/access/challenged`          | screen    |                                      |
-| Final-Seg-JS                        | `/v2-preview/screens/segment/nojs`                       | screen    |                                      |
-| Without JavaScript, clean bill      | `/v2-preview/screens/segment/nojs/clean`                 | screen    |                                      |
-| Without JavaScript, withheld        | `/v2-preview/screens/segment/nojs/challenged`            | screen    |                                      |
-| Final-Seg-Structure                 | `/v2-preview/screens/segment/structure`                  | screen    |                                      |
-| Structure, clean bill               | `/v2-preview/screens/segment/structure/clean`            | screen    |                                      |
-| Structure, withheld                 | `/v2-preview/screens/segment/structure/challenged`       | screen    |                                      |
-| Final-Seg-Content                   | `/v2-preview/screens/segment/content`                    | screen    |                                      |
-| Content, clean bill                 | `/v2-preview/screens/segment/content/clean`              | screen    |                                      |
-| Content, withheld                   | `/v2-preview/screens/segment/content/challenged`         | screen    |                                      |
-| Final-Seg-Signals                   | `/v2-preview/screens/segment/signals`                    | screen    |                                      |
-| Signals, clean bill                 | `/v2-preview/screens/segment/signals/clean`              | screen    |                                      |
-| Signals, withheld                   | `/v2-preview/screens/segment/signals/challenged`         | screen    |                                      |
-| Final-Seg-Changes                   | `/v2-preview/screens/segment/changes`                    | screen    |                                      |
-| Changes, clean bill                 | `/v2-preview/screens/segment/changes/clean`              | screen    |                                      |
-| Changes, withheld                   | `/v2-preview/screens/segment/changes/challenged`         | screen    |                                      |
-| Changes, after a re-check           | `/v2-preview/screens/segment/changes/history`            | screen    |                                      |
-| Changes, withheld, after a re-check | `/v2-preview/screens/segment/changes/challenged-history` | screen    |                                      |
-| Final-Fix                           | `/v2-preview/screens/fix`                                | screen    |                                      |
-| Fix 1, bad site                     | `/v2-preview/screens/fix/first`                          | screen    |                                      |
-| Fix 3, bad site                     | `/v2-preview/screens/fix/third`                          | screen    |                                      |
-| Fix, challenged site                | `/v2-preview/screens/fix/challenged`                     | screen    |                                      |
-| Fix, on Pro                         | `/v2-preview/screens/fix/locked`                         | screen    |                                      |
-| Fix, resolved                       | `/v2-preview/screens/fix/resolved`                       | screen    |                                      |
-| Final-LinkMap                       | `/v2-preview/screens/map`                                | screen    |                                      |
-| Link map, every page                | `/v2-preview/screens/map/all`                            | screen    |                                      |
-| Link map, clean bill                | `/v2-preview/screens/map/clean`                          | screen    |                                      |
-| Link map, withheld                  | `/v2-preview/screens/map/challenged`                     | screen    |                                      |
-| Link map, 2,000 pages               | `/v2-preview/screens/map/large`                          | screen    |                                      |
-| Final-Signup                        | `/v2-preview/screens/signup`                             | screen    |                                      |
-| Sign-up, sending                    | `/v2-preview/screens/signup/submitting`                  | screen    |                                      |
-| Sign-up, rate limited               | `/v2-preview/screens/signup/rate-limited`                | screen    |                                      |
-| Final-CheckEmail                    | `/v2-preview/screens/check-email/from-audit`             | screen    |                                      |
-| Final-CheckEmail-NoAudit            | `/v2-preview/screens/check-email/named-site`             | screen    |                                      |
-| Check-email, sign-in                | `/v2-preview/screens/check-email/signin`                 | screen    |                                      |
-| Continue                            | `/v2-preview/screens/continue`                           | screen    |                                      |
-| Continue, link expired              | `/v2-preview/screens/continue/expired`                   | screen    |                                      |
+| Page                                         | Path                                                     | Kind      | Opened at                            |
+| -------------------------------------------- | -------------------------------------------------------- | --------- | ------------------------------------ |
+| Button                                       | `/v2-preview/button`                                     | primitive |                                      |
+| StatusPill                                   | `/v2-preview/status-pill`                                | primitive |                                      |
+| Grade                                        | `/v2-preview/grade`                                      | primitive |                                      |
+| VerdictCell                                  | `/v2-preview/verdict-cell`                               | primitive |                                      |
+| CoverageLine                                 | `/v2-preview/coverage-line`                              | primitive |                                      |
+| Card                                         | `/v2-preview/card`                                       | primitive |                                      |
+| Table                                        | `/v2-preview/table`                                      | primitive |                                      |
+| Field                                        | `/v2-preview/field`                                      | primitive |                                      |
+| Select                                       | `/v2-preview/select`                                     | primitive |                                      |
+| Switch                                       | `/v2-preview/switch`                                     | primitive |                                      |
+| PageShell                                    | `/v2-preview/page-shell`                                 | primitive |                                      |
+| AccountShell                                 | `/v2-preview/account-shell`                              | primitive |                                      |
+| TrialCard                                    | `/v2-preview/trial-card`                                 | primitive |                                      |
+| ThemeControl                                 | `/v2-preview/theme-control`                              | primitive |                                      |
+| GradeHistory                                 | `/v2-preview/grade-history`                              | primitive |                                      |
+| CheckGlyphRow                                | `/v2-preview/check-glyph-row`                            | primitive |                                      |
+| Final-Home                                   | `/v2-preview/screens/home`                               | screen    |                                      |
+| Final-Crawl                                  | `/v2-preview/screens/crawl`                              | screen    | `?at=47000`, `?at=128000`, `?at=end` |
+| Crawl, clean re-run                          | `/v2-preview/screens/crawl/clean`                        | screen    | `?at=end`                            |
+| Crawl, challenged                            | `/v2-preview/screens/crawl/challenged`                   | screen    | `?at=end`                            |
+| Final-Result                                 | `/v2-preview/screens/result`                             | screen    |                                      |
+| Result, clean bill                           | `/v2-preview/screens/result/clean`                       | screen    |                                      |
+| Result, withheld                             | `/v2-preview/screens/result/challenged`                  | screen    |                                      |
+| Result, loading                              | `/v2-preview/screens/result/loading`                     | screen    |                                      |
+| Result, not started                          | `/v2-preview/screens/result/empty`                       | screen    |                                      |
+| Result, failed                               | `/v2-preview/screens/result/error`                       | screen    |                                      |
+| Result, expired                              | `/v2-preview/screens/result/expired`                     | screen    |                                      |
+| Final-Segment                                | `/v2-preview/screens/segment/access`                     | screen    |                                      |
+| Crawler access, clean bill                   | `/v2-preview/screens/segment/access/clean`               | screen    |                                      |
+| Crawler access, withheld                     | `/v2-preview/screens/segment/access/challenged`          | screen    |                                      |
+| Final-Seg-JS                                 | `/v2-preview/screens/segment/nojs`                       | screen    |                                      |
+| Without JavaScript, clean bill               | `/v2-preview/screens/segment/nojs/clean`                 | screen    |                                      |
+| Without JavaScript, withheld                 | `/v2-preview/screens/segment/nojs/challenged`            | screen    |                                      |
+| Final-Seg-Structure                          | `/v2-preview/screens/segment/structure`                  | screen    |                                      |
+| Structure, clean bill                        | `/v2-preview/screens/segment/structure/clean`            | screen    |                                      |
+| Structure, withheld                          | `/v2-preview/screens/segment/structure/challenged`       | screen    |                                      |
+| Final-Seg-Content                            | `/v2-preview/screens/segment/content`                    | screen    |                                      |
+| Content, clean bill                          | `/v2-preview/screens/segment/content/clean`              | screen    |                                      |
+| Content, withheld                            | `/v2-preview/screens/segment/content/challenged`         | screen    |                                      |
+| Final-Seg-Signals                            | `/v2-preview/screens/segment/signals`                    | screen    |                                      |
+| Signals, clean bill                          | `/v2-preview/screens/segment/signals/clean`              | screen    |                                      |
+| Signals, withheld                            | `/v2-preview/screens/segment/signals/challenged`         | screen    |                                      |
+| Final-Seg-Changes                            | `/v2-preview/screens/segment/changes`                    | screen    |                                      |
+| Changes, clean bill                          | `/v2-preview/screens/segment/changes/clean`              | screen    |                                      |
+| Changes, withheld                            | `/v2-preview/screens/segment/changes/challenged`         | screen    |                                      |
+| Changes, after a re-check                    | `/v2-preview/screens/segment/changes/history`            | screen    |                                      |
+| Changes, withheld, after a re-check          | `/v2-preview/screens/segment/changes/challenged-history` | screen    |                                      |
+| Final-Fix                                    | `/v2-preview/screens/fix`                                | screen    |                                      |
+| Fix 1, bad site                              | `/v2-preview/screens/fix/first`                          | screen    |                                      |
+| Fix 3, bad site                              | `/v2-preview/screens/fix/third`                          | screen    |                                      |
+| Fix, challenged site                         | `/v2-preview/screens/fix/challenged`                     | screen    |                                      |
+| Fix, on Pro                                  | `/v2-preview/screens/fix/locked`                         | screen    |                                      |
+| Fix, resolved                                | `/v2-preview/screens/fix/resolved`                       | screen    |                                      |
+| Final-Dashboard-Day0                         | `/v2-preview/screens/dashboard/day0`                     | screen    |                                      |
+| Final-Dashboard                              | `/v2-preview/screens/dashboard`                          | screen    |                                      |
+| Dashboard, clean (stand-in Free account, H5) | `/v2-preview/screens/dashboard/clean`                    | screen    |                                      |
+| Dashboard, withheld                          | `/v2-preview/screens/dashboard/withheld`                 | screen    |                                      |
+| Final-Site                                   | `/v2-preview/screens/site`                               | screen    |                                      |
+| Site, clean (stand-in Free account)          | `/v2-preview/screens/site/clean`                         | screen    |                                      |
+| Site, withheld                               | `/v2-preview/screens/site/withheld`                      | screen    |                                      |
+| Final-Alerts                                 | `/v2-preview/screens/alerts`                             | screen    |                                      |
+| Alerts, free                                 | `/v2-preview/screens/alerts/free`                        | screen    |                                      |
+| Final-Reports                                | `/v2-preview/screens/reports`                            | screen    |                                      |
+| Reports, Agency (Northwind, owner ruling 8)  | `/v2-preview/screens/reports/agency`                     | screen    |                                      |
+| Final-Settings                               | `/v2-preview/screens/settings`                           | screen    |                                      |
+| Settings, free                               | `/v2-preview/screens/settings/free`                      | screen    |                                      |
+| Settings, delete (owner ruling 12)           | `/v2-preview/screens/settings/delete`                    | screen    |                                      |
+| Final-TrialEnd                               | `/v2-preview/screens/trial-end`                          | screen    |                                      |
+| Changes log                                  | `/v2-preview/screens/changes-log`                        | screen    | ``, `?kind=opened`                   |
+| Final-LinkMap                                | `/v2-preview/screens/map`                                | screen    |                                      |
+| Link map, every page                         | `/v2-preview/screens/map/all`                            | screen    |                                      |
+| Link map, clean bill                         | `/v2-preview/screens/map/clean`                          | screen    |                                      |
+| Link map, withheld                           | `/v2-preview/screens/map/challenged`                     | screen    |                                      |
+| Link map, 2,000 pages                        | `/v2-preview/screens/map/large`                          | screen    |                                      |
+| Final-Signup                                 | `/v2-preview/screens/signup`                             | screen    |                                      |
+| Sign-up, sending                             | `/v2-preview/screens/signup/submitting`                  | screen    |                                      |
+| Sign-up, rate limited                        | `/v2-preview/screens/signup/rate-limited`                | screen    |                                      |
+| Final-CheckEmail                             | `/v2-preview/screens/check-email/from-audit`             | screen    |                                      |
+| Final-CheckEmail-NoAudit                     | `/v2-preview/screens/check-email/named-site`             | screen    |                                      |
+| Check-email, sign-in                         | `/v2-preview/screens/check-email/signin`                 | screen    |                                      |
+| Continue                                     | `/v2-preview/screens/continue`                           | screen    |                                      |
+| Continue, link expired                       | `/v2-preview/screens/continue/expired`                   | screen    |                                      |

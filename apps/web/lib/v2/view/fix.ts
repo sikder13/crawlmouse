@@ -5,6 +5,7 @@
  * packet at all, so no part of it can reach the page: everything but the open branch takes the
  * fix as `withoutPacket` copies it, and fix.test.ts makes the field throw when read.
  */
+import { RECHECK_MINUTES } from '../recheck';
 import type { Check, CrawlerResult, Fix, FixtureDataset } from '@crawlmouse/types/v2';
 import { instant } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
@@ -475,7 +476,7 @@ export function fixView(
       ? null
       : {
           heading: "When you've shipped it",
-          body: `Mark it done and we re-crawl ${pages} now, about 2 minutes. With an account the before and after is kept in Changes; without one the new result replaces this audit. If the number does not move, the fix stays open and the packet says what we saw.`,
+          body: `Mark it done and we re-crawl ${pages} now, about ${RECHECK_MINUTES} minutes. With an account the before and after is kept in Changes; without one the new result replaces this audit. If the number does not move, the fix stays open and the packet says what we saw.`,
           action: { label: 'Mark done and re-check now', href: keepHref },
         };
   if (!p) {

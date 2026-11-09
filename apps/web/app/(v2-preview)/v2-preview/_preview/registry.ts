@@ -24,7 +24,14 @@ export const PREVIEWS: PreviewEntry[] = [
   { path: '/v2-preview/card', name: 'Card', kind: 'primitive' },
   { path: '/v2-preview/table', name: 'Table', kind: 'primitive' },
   { path: '/v2-preview/field', name: 'Field', kind: 'primitive' },
+  { path: '/v2-preview/select', name: 'Select', kind: 'primitive' },
+  { path: '/v2-preview/switch', name: 'Switch', kind: 'primitive' },
   { path: '/v2-preview/page-shell', name: 'PageShell', kind: 'primitive' },
+  { path: '/v2-preview/account-shell', name: 'AccountShell', kind: 'primitive' },
+  { path: '/v2-preview/trial-card', name: 'TrialCard', kind: 'primitive' },
+  { path: '/v2-preview/theme-control', name: 'ThemeControl', kind: 'primitive' },
+  { path: '/v2-preview/grade-history', name: 'GradeHistory', kind: 'primitive' },
+  { path: '/v2-preview/check-glyph-row', name: 'CheckGlyphRow', kind: 'primitive' },
   { path: '/v2-preview/screens/home', name: 'Final-Home', kind: 'screen' },
   {
     path: '/v2-preview/screens/crawl',
@@ -148,6 +155,50 @@ export const PREVIEWS: PreviewEntry[] = [
   { path: '/v2-preview/screens/fix/locked', name: 'Fix, on Pro', kind: 'screen' },
   // A kept site's resolved fix: nothing on the page to act on.
   { path: '/v2-preview/screens/fix/resolved', name: 'Fix, resolved', kind: 'screen', orange: 0 },
+  { path: '/v2-preview/screens/dashboard/day0', name: 'Final-Dashboard-Day0', kind: 'screen' },
+  { path: '/v2-preview/screens/dashboard', name: 'Final-Dashboard', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/dashboard/clean',
+    name: 'Dashboard, clean (stand-in Free account, H5)',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/dashboard/withheld', name: 'Dashboard, withheld', kind: 'screen' },
+  { path: '/v2-preview/screens/site', name: 'Final-Site', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/site/clean',
+    name: 'Site, clean (stand-in Free account)',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/site/withheld', name: 'Site, withheld', kind: 'screen' },
+  { path: '/v2-preview/screens/alerts', name: 'Final-Alerts', kind: 'screen' },
+  // The stand-in Free account has sent nothing, so there is no open fix to act on.
+  { path: '/v2-preview/screens/alerts/free', name: 'Alerts, free', kind: 'screen', orange: 0 },
+  { path: '/v2-preview/screens/reports', name: 'Final-Reports', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/reports/agency',
+    name: 'Reports, Agency (Northwind, owner ruling 8)',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/settings', name: 'Final-Settings', kind: 'screen' },
+  { path: '/v2-preview/screens/settings/free', name: 'Settings, free', kind: 'screen' },
+  // Its one action deletes, which the Settings artboard draws quiet, never as the best action.
+  {
+    path: '/v2-preview/screens/settings/delete',
+    name: 'Settings, delete (owner ruling 12)',
+    kind: 'screen',
+    orange: 0,
+  },
+  { path: '/v2-preview/screens/trial-end', name: 'Final-TrialEnd', kind: 'screen' },
+  // The account Changes log has no artboard (CC-27 D3), and nothing on it is the reader's action.
+  {
+    path: '/v2-preview/screens/changes-log',
+    name: 'Changes log',
+    kind: 'screen',
+    moments: [
+      { name: 'all', query: '', orange: 0 },
+      { name: 'opened', query: '?kind=opened', orange: 0 },
+    ],
+  },
   { path: '/v2-preview/screens/map', name: 'Final-LinkMap', kind: 'screen' },
   { path: '/v2-preview/screens/map/all', name: 'Link map, every page', kind: 'screen' },
   // No fix to open from any page: the keep bar's button is the orange element.

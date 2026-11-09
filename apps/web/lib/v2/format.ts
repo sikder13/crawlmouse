@@ -57,6 +57,127 @@ export function weekdayTime(ts: string, timeZone: string): string {
   return `${p.weekday} ${p.hour}:${p.minute}`;
 }
 
+/** "Thu", in the given zone. */
+export function weekday(ts: string, timeZone: string): string {
+  return parts(ts, { weekday: 'short' }, timeZone).weekday!;
+}
+
+/** "Thursday", in the given zone: "Since Thursday's check". */
+export function weekdayLong(ts: string, timeZone: string): string {
+  return parts(ts, { weekday: 'long' }, timeZone).weekday!;
+}
+
+/** "Sat 24 Oct", in the given zone. */
+export function dayDate(ts: string, timeZone: string): string {
+  const p = parts(ts, { weekday: 'short', day: 'numeric', month: 'short' }, timeZone);
+  return `${p.weekday} ${p.day} ${p.month}`;
+}
+
+/** "24 Oct", in the given zone. */
+export function dayMonth(ts: string, timeZone: string): string {
+  const p = parts(ts, { day: 'numeric', month: 'short' }, timeZone);
+  return `${p.day} ${p.month}`;
+}
+
+/** "24", in the given zone: a chart axis after its first label. */
+export function dayOfMonth(ts: string, timeZone: string): string {
+  return parts(ts, { day: 'numeric' }, timeZone).day!;
+}
+
+/** "06:02", in the given zone. */
+export function hourMinute(ts: string, timeZone: string): string {
+  const p = parts(ts, { hour: '2-digit', minute: '2-digit' }, timeZone);
+  return `${p.hour}:${p.minute}`;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The calendar date an instant falls on in the zone, as midnight UTC of that date. */
+function localDate(ts: string, timeZone: string): number {
+  const p = parts(ts, { year: 'numeric', month: '2-digit', day: '2-digit' }, timeZone);
+  return Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day));
+}
+
+/** How many dates apart two instants are on the zone's calendar; negative when `to` is earlier. */
+export function calendarDays(from: string, to: string, timeZone: string): number {
+  return Math.round((localDate(to, timeZone) - localDate(from, timeZone)) / DAY_MS);
+}
+
+/** Whether two instants fall on the same date in the zone ("last check today 06:02"). */
+export const sameDay = (a: string, b: string, timeZone: string) =>
+  calendarDays(a, b, timeZone) === 0;
+
+/** How far the zone's clock is ahead of UTC at an instant, in milliseconds. */
+function offsetAt(t: number, timeZone: string): number {
+  const p = parts(
+    new Date(t).toISOString(),
+    {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    },
+    timeZone,
+  );
+  const wall = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    Number(p.hour),
+    Number(p.minute),
+    Number(p.second),
+  );
+  return wall - Math.floor(t / 1000) * 1000;
+}
+
+/**
+ * The instant at which the zone's clock reads `hour`:00 on a date (given as midnight UTC of that
+ * date). The offset is read a second time at the first guess, so an hour on the far side of a
+ * change of offset lands on the right instant.
+ */
+function atLocalHour(date: number, hour: number, timeZone: string): number {
+  return atLocalTime(date, hour * 60 * 60 * 1000, timeZone);
+}
+
+/** The instant the zone's clock reads `ms` past midnight on a date given as midnight UTC. */
+function atLocalTime(date: number, ms: number, timeZone: string): number {
+  const wall = date + ms;
+  const first = wall - offsetAt(wall, timeZone);
+  return wall - offsetAt(first, timeZone);
+}
+
+/**
+ * The same clock time `days` calendar days earlier in the zone: "three days before the trial ends"
+ * as the account reads it, which differs from 72 hours across a change of offset.
+ */
+export function daysBefore(ts: string, days: number, timeZone: string): string {
+  const t = Date.parse(ts);
+  const date = localDate(ts, timeZone);
+  const clock = t + offsetAt(t, timeZone) - date;
+  return new Date(atLocalTime(date - days * DAY_MS, clock, timeZone)).toISOString();
+}
+
+/**
+ * The next weekly check after `now`: the first instant strictly after it at which the zone's clock
+ * reads the schedule's ISO weekday (1 Monday … 7 Sunday) and hour.
+ */
+export function nextWeekly(
+  schedule: { iso_weekday: number; hour_local: number },
+  now: string,
+  timeZone: string,
+): string {
+  const today = localDate(now, timeZone);
+  for (let i = 0; i <= 7; i++) {
+    const date = today + i * DAY_MS;
+    if ((new Date(date).getUTCDay() || 7) !== schedule.iso_weekday) continue;
+    const at = atLocalHour(date, schedule.hour_local, timeZone);
+    if (at > Date.parse(now)) return new Date(at).toISOString();
+  }
+  throw new Error(`No weekly check within eight days of ${now}`);
+}
+
 /** "2 min 11 s", "54 s". */
 export function duration(ms: number): string {
   // Whole seconds elapsed, as the crawl screen's clock counts them, so the two never disagree.

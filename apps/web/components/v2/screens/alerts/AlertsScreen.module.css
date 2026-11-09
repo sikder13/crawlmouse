@@ -1,0 +1,16 @@
+/* Final-Alerts: the Fired list, then the channels and the rules side by side. */
+
+.when {
+  white-space: nowrap;
+  color: var(--v2-mut);
+}
+
+.to {
+  color: var(--v2-mut);
+}
+
+.empty {
+  padding: 16px;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}

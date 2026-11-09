@@ -1,0 +1,59 @@
+/* The rail's theme row: three pill-shaped buttons (Final-Dashboard .theme). */
+
+.control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 6px;
+  font-size: 12px;
+  margin: 0;
+}
+
+.label {
+  color: var(--v2-mut);
+}
+
+.group {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  height: var(--v2-pill-h);
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--v2-radius-pill);
+  background: var(--v2-neubg);
+  color: var(--v2-neu);
+  font: inherit;
+  font-size: var(--v2-text-micro);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.choice[aria-pressed='true'] {
+  background: var(--v2-fg);
+  color: var(--v2-bg);
+}
+
+.choice:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 3px;
+}
+
+/* Forced colours repaint backgrounds, so the pressed choice is marked in system colours too. */
+@media (forced-colors: active) {
+  .choice {
+    border: 1px solid ButtonText;
+  }
+
+  .choice[aria-pressed='true'] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+}
