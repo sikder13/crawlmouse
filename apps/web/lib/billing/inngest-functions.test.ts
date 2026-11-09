@@ -50,6 +50,36 @@ afterEach(() => {
   clients.made = [];
 });
 
+describe('billingFunctions and the nightly reconcile (CC-03 D10)', () => {
+  /** Runs the nightly handler with a fake `step` and answers the step ids it ran. */
+  async function nightlySteps(): Promise<string[]> {
+    const { reconcileBillingHandler } = await import('../../../../inngest/billing');
+    const ran: string[] = [];
+    const step = {
+      run: async (id: string, body: () => unknown) => {
+        ran.push(id);
+        return id === 'reconcile-dry-run' ? { dryRun: true } : undefined;
+      },
+    };
+    await reconcileBillingHandler({ step } as never);
+    return ran;
+  }
+
+  it('leaves the nightly run as v1’s step alone with V2_BILLING unset', async () => {
+    const { billingFunctions } = await import('./inngest-functions');
+    billingFunctions({ V2_BILLING: '1' });
+    billingFunctions({});
+    expect(await nightlySteps()).toEqual(['reconcile-dry-run']);
+  });
+
+  it('adds the v2 reconcile as the nightly run’s second step with V2_BILLING=1', async () => {
+    const { billingFunctions } = await import('./inngest-functions');
+    billingFunctions({ V2_BILLING: '1' });
+    expect(await nightlySteps()).toEqual(['reconcile-dry-run', 'reconcile-accounts']);
+    billingFunctions({});
+  });
+});
+
 describe('billingFunctions (CC-03 D9)', () => {
   it('is empty unless V2_BILLING is 1', async () => {
     const { billingFunctions } = await import('./inngest-functions');
