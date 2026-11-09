@@ -27,6 +27,9 @@ export interface CheckRequest {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Where a site's crawl starts: its host's root, in the engine's canonical spelling. */
+export const homepageOf = (host: string): string => canonicalizeUrl(`https://${host}/`);
+
 /**
  * Inserts the check (`on conflict (id) do nothing`) and sends the event, whose `id` Inngest
  * deduplicates on. The event is sent whether or not the row was new, so a retry after a send that
@@ -66,7 +69,7 @@ export async function requestCheck(
       siteId: site.id,
       accountId: site.account_id,
       host: site.host,
-      homepageUrl: canonicalizeUrl(`https://${site.host}/`),
+      homepageUrl: homepageOf(site.host),
       trigger: req.trigger,
       pageCap: DEFAULT_PAGE_CAP,
       ...(req.requestedByUserId === undefined ? {} : { requestedByUserId: req.requestedByUserId }),

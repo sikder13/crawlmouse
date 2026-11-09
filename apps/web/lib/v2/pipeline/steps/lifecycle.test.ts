@@ -20,7 +20,13 @@ const T0 = Date.UTC(2026, 10, 8, 12, 0, 0);
 
 function deps(env: Record<string, string> = {}, now = T0) {
   const store = {
-    claim: vi.fn(async () => 'claimed' as const),
+    claim: vi.fn(async (): Promise<'claimed' | 'site_busy' | 'gone'> => 'claimed'),
+    requestSite: vi.fn(async (id: string) => ({
+      id,
+      account_id: 'a0000000-0000-4000-8000-000000000001',
+      host: 'kept.example',
+      next_check_at: null,
+    })),
     fail: vi.fn(async () => true),
     siteOf: vi.fn(async (): Promise<string | null> => EVENT.siteId),
     progress: vi.fn(async () => {}),
@@ -61,12 +67,13 @@ describe('claim (findings 9, 10)', () => {
 
   it('claims through the store with the first step’s progress, timed from the first attempt', async () => {
     const { d, store } = deps({ CRAWL_PAUSED: '0' });
-    store.claim.mockResolvedValueOnce('site_busy' as never);
+    store.claim.mockResolvedValueOnce('site_busy');
     const steps = lifecycleSteps(d);
     expect(await steps.claim(EVENT, { runId: 'run-1', startedAt: null })).toEqual({
       outcome: 'site_busy',
       at: T0,
     });
+    expect(store.siteOf).not.toHaveBeenCalled();
     await steps.claim(EVENT, { runId: 'run-1', startedAt: T0 - 60_000 });
     const [first, second] = store.claim.mock.calls as unknown as [
       string,
@@ -78,6 +85,25 @@ describe('claim (findings 9, 10)', () => {
     expect(first![2].steps[0]).toEqual({ phase: 'robots_and_sitemap', state: 'now' });
     expect(first![2].elapsed_ms).toBe(0);
     expect(second![2].elapsed_ms).toBe(60_000);
+  });
+});
+
+describe('claim reads the claimed check’s site from the database (security 6)', () => {
+  it('names the row’s site, and that site’s account, host and homepage', async () => {
+    const { d, store } = deps();
+    store.siteOf.mockResolvedValueOnce('s-in-db');
+    expect(await lifecycleSteps(d).claim(EVENT, { runId: 'run-1', startedAt: null })).toEqual({
+      outcome: 'claimed',
+      at: T0,
+      site: {
+        siteId: 's-in-db',
+        accountId: 'a0000000-0000-4000-8000-000000000001',
+        host: 'kept.example',
+        homepageUrl: 'https://kept.example',
+      },
+    });
+    expect(store.siteOf).toHaveBeenCalledWith(EVENT.checkId);
+    expect(store.requestSite).toHaveBeenCalledWith('s-in-db');
   });
 });
 

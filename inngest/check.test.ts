@@ -11,6 +11,7 @@ import {
   runCheck,
   type BatchAt,
   type CancelledRun,
+  type ClaimedSite,
   type CheckStepTools,
   type CheckSteps,
   type PollOutput,
@@ -30,6 +31,13 @@ const EVENT: CheckRequested = {
 const RELEASE = 'abcdef012345';
 /** A site id other than the event's, as the database might hold it. */
 const DB_SITE = '33333333-3333-4333-8333-333333333333';
+/** The event's site, as a claim reads it back when the database agrees with the event. */
+const SITE_OF_EVENT: ClaimedSite = {
+  siteId: EVENT.siteId,
+  accountId: EVENT.accountId,
+  host: EVENT.host,
+  homepageUrl: EVENT.homepageUrl,
+};
 const T0 = Date.UTC(2026, 10, 8, 12, 0, 0);
 
 /** A fake `step`: records every id, `sleep` advances the clock and returns at once. */
@@ -62,6 +70,8 @@ interface Script {
   crawlBatches?: number;
   stage2?: boolean;
   claims?: ('claimed' | 'site_busy' | 'gone' | 'paused')[];
+  /** The site the claim reads from the database; the event's when unset. */
+  site?: ClaimedSite;
   poll?: (at: BatchAt, n: number) => PollOutput['status'] | PollOutput;
   post?: (at: BatchAt, n: number) => PostOutput | undefined;
   read?: (at: BatchAt) => ReadOutput | undefined;
@@ -76,7 +86,12 @@ function fakeSteps(clock: { now: number }, script: Script = {}) {
   let postN = 0;
   const crawlBatches = script.crawlBatches ?? 2;
   const steps: CheckSteps = {
-    claim: async () => ({ outcome: script.claims?.[claimN++] ?? 'claimed', at: clock.now }),
+    claim: async () => {
+      const outcome = script.claims?.[claimN++] ?? 'claimed';
+      return outcome === 'claimed'
+        ? { outcome, at: clock.now, site: script.site ?? SITE_OF_EVENT }
+        : { outcome, at: clock.now };
+    },
     discover: async () => ({ seeds: 3, sitemap_urls: 2, at: clock.now }),
     post: async (_e, at) => {
       posts.push({ at });
@@ -247,6 +262,47 @@ describe('runCheck: claim', () => {
         data: { checkId: EVENT.checkId, siteId: DB_SITE, reason: 'paused' },
       },
     ]);
+  });
+
+  it('fails the check internal, running nothing else, when its row names another site than the event (security 6)', async () => {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock, { site: { ...SITE_OF_EVENT, siteId: DB_SITE } });
+    fake.steps.fail = async () => ({ failed: true, siteId: DB_SITE });
+    const result = await runCheck(
+      { event: { data: EVENT }, step: step.tools, runId: 'r' },
+      fake.steps,
+    );
+    expect(step.ids).toEqual(['claim', 'fail', 'emit-failed']);
+    expect(result).toEqual({ status: 'failed', reason: 'internal' });
+    expect(step.events[0]!.payload).toMatchObject({ data: { siteId: DB_SITE } });
+  });
+
+  it('gives the steps after the claim the host, account and homepage the database holds (security 6)', async () => {
+    const site: ClaimedSite = {
+      siteId: EVENT.siteId,
+      accountId: '44444444-4444-4444-8444-444444444444',
+      host: 'kept.example',
+      homepageUrl: 'https://kept.example',
+    };
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock, { site });
+    const seen: CheckRequested[] = [];
+    for (const name of ['discover', 'post', 'poll', 'read', 'render', 'build'] as const) {
+      const inner = fake.steps[name] as (e: CheckRequested, ...rest: never[]) => Promise<never>;
+      fake.steps[name] = (async (e: CheckRequested, ...rest: never[]) => {
+        seen.push(e);
+        return inner(e, ...rest);
+      }) as never;
+    }
+    await runCheck({ event: { data: EVENT }, step: step.tools, runId: 'r' }, fake.steps);
+    expect(seen.length).toBeGreaterThan(6);
+    for (const e of seen) expect(e).toEqual({ ...EVENT, ...site });
+    expect(step.events.at(-1)!.payload).toMatchObject({
+      name: 'check.finished',
+      data: { siteId: EVENT.siteId, accountId: site.accountId },
+    });
   });
 
   it('fails the check paused when the claim reads CRAWL_PAUSED', async () => {

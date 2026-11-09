@@ -82,7 +82,14 @@ export interface RunSoFar {
   release: string | null;
 }
 
-export type ClaimOutput = { outcome: 'claimed' | 'site_busy' | 'gone' | 'paused'; at: number };
+/**
+ * The claimed check's site as the database holds it: its row's site, and that site's account, host
+ * and homepage. The steps after the claim are given these in place of the event's (security 6).
+ */
+export type ClaimedSite = Pick<CheckRequested, 'siteId' | 'accountId' | 'host' | 'homepageUrl'>;
+export type ClaimOutput =
+  | { outcome: 'claimed'; at: number; site: ClaimedSite }
+  | { outcome: 'site_busy' | 'gone' | 'paused'; at: number };
 export type DiscoverOutput = { seeds: number; sitemap_urls: number; at: number };
 export type PostOutput =
   | { status: 'posted'; urls: number; at: number; max_seconds: number }
@@ -178,26 +185,31 @@ export async function runCheck(
   steps: CheckSteps,
 ): Promise<CheckRunResult> {
   const { step, runId } = ctx;
-  const data = ctx.event.data;
+  const event = ctx.event.data;
   const run = <T>(id: string, fn: () => Promise<T>): Promise<T> =>
     step.run(id, async () => sized(id, await fn()));
 
   const endFailed = async (reason: FailureReason): Promise<CheckRunResult> => {
-    const out = await run('fail', () => steps.fail(data, reason));
-    if (out.failed) await step.sendEvent('emit-failed', failedEvent(data.checkId, out, reason));
+    const out = await run('fail', () => steps.fail(event, reason));
+    if (out.failed) await step.sendEvent('emit-failed', failedEvent(event.checkId, out, reason));
     return { status: 'failed', reason };
   };
 
   // ── claim ──
-  let claim = await run('claim', () => steps.claim(data, { runId, startedAt: null }));
+  let claim = await run('claim', () => steps.claim(event, { runId, startedAt: null }));
   const startedAt = claim.at;
   for (let i = 1; claim.outcome === 'site_busy' && i <= PACE.claimWaits; i++) {
     await step.sleep(`claim-wait-${i}`, PACE.claimWaitS * 1000);
-    claim = await run(`claim-${i}`, () => steps.claim(data, { runId, startedAt }));
+    claim = await run(`claim-${i}`, () => steps.claim(event, { runId, startedAt }));
   }
-  if (claim.outcome === 'gone') return { status: 'gone' };
-  if (claim.outcome === 'paused') return endFailed('paused');
-  if (claim.outcome === 'site_busy') return endFailed('site_busy');
+  if (claim.outcome !== 'claimed') {
+    // `paused` and `site_busy` are the check's failure reasons as they are.
+    return claim.outcome === 'gone' ? { status: 'gone' } : endFailed(claim.outcome);
+  }
+  // The event's site is trusted no further than the claim (security 6): a check whose row names
+  // another site fails, and the steps after the claim run on the site the database holds.
+  if (claim.site.siteId !== event.siteId) return endFailed('internal');
+  const data: CheckRequested = { ...event, ...claim.site };
 
   const so: RunSoFar = {
     startedAt,

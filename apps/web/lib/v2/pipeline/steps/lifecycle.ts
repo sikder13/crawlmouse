@@ -6,6 +6,7 @@ import type {
   CancelledCheck,
   CancelledRun,
   CheckSteps,
+  ClaimedSite,
   FailOutput,
 } from '../../../../../../inngest/check';
 import type { FailureReason } from '../../../../../../inngest/check-events';
@@ -14,6 +15,7 @@ import { isCrawlPaused } from '../../../crawl-pause';
 import { discoverSeeds } from '../discover';
 import { putJson } from '../evidence';
 import { REAP_AFTER_S } from '../limits';
+import { homepageOf } from '../request';
 import type { PipelineStore } from '../store';
 import type { StepDeps } from './deps';
 import { progressOf } from './progress';
@@ -25,7 +27,7 @@ export function lifecycleSteps(deps: StepDeps): Pick<CheckSteps, 'claim' | 'disc
   return {
     /**
      * CRAWL_PAUSED first (v1's rule, Q12), then `claim_check`. `at` is this attempt's time; the first
-     * attempt's is the time plan's zero.
+     * attempt's is the time plan's zero. A claimed check's site is read back from the database.
      */
     async claim(event, { runId, startedAt }) {
       const at = deps.now();
@@ -36,7 +38,8 @@ export function lifecycleSteps(deps: StepDeps): Pick<CheckSteps, 'claim' | 'disc
         runId,
         progressOf('robots_and_sitemap', NOTHING_YET, elapsed),
       );
-      return { outcome, at };
+      if (outcome !== 'claimed') return { outcome, at };
+      return { outcome, at, site: await claimedSite(deps.store, event.checkId) };
     },
 
     async discover(event, so) {
@@ -52,6 +55,22 @@ export function lifecycleSteps(deps: StepDeps): Pick<CheckSteps, 'claim' | 'disc
     },
 
     fail: (event, reason) => failCheck(deps.store, event.checkId, reason),
+  };
+}
+
+/** A claimed check's site as the database holds it: the row's site, its account and host. */
+async function claimedSite(
+  store: Pick<PipelineStore, 'siteOf' | 'requestSite'>,
+  checkId: string,
+): Promise<ClaimedSite> {
+  const siteId = await store.siteOf(checkId);
+  if (siteId === null) throw new Error(`claim: check ${checkId} has no row after its claim`);
+  const site = await store.requestSite(siteId);
+  return {
+    siteId: site.id,
+    accountId: site.account_id,
+    host: site.host,
+    homepageUrl: homepageOf(site.host),
   };
 }
 
