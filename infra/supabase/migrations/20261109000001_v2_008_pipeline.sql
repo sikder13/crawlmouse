@@ -320,8 +320,8 @@ $$;
 --      (otherwise the event is skipped and counted as skipped).
 --   6. updates the check's pipeline-owned columns last, so every checks_* CHECK holds as it ends.
 -- Each insert's row count must equal the expected count, checked as it is made; a difference raises.
--- It never writes expires_at, result_email, deferred_until or failure_reason. Returns
--- {"written": true, "counts": {…}}.
+-- It does not write expires_at, result_email, deferred_until or failure_reason (persist.test.ts,
+-- "does not write"). Returns {"written": true, "counts": {…}}.
 
 create or replace function public.persist_built_check(p jsonb)
 returns jsonb

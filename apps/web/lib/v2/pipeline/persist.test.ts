@@ -25,7 +25,8 @@ import type { PageVantage, PersistDb, PersistInput } from './types';
  * chunks (stage_check_rows), and persist_built_check (migration 008) writes the check whole or
  * refuses. The check is the engine's own build of the
  * recorded site (packages/engine/fixtures/v2/build), so the rows are what the pipeline will send.
- * Reading a persisted check back, idempotency and atomicity are round-trip.test.ts.
+ * Reading a persisted check back, idempotency and atomicity are round-trip.test.ts; a site's second
+ * check, persisted over its first, is recheck.test.ts.
  */
 
 const crawlRows = (batches: readonly unknown[]): CrawlPage[] =>
@@ -418,20 +419,50 @@ describe('persist_built_check, through persistBuiltCheck', () => {
     expect(rows[0]!.n).toBe(built.page_results.length);
   });
 
-  it('never writes expires_at, result_email or deferred_until', async () => {
+  it('does not write expires_at, result_email, deferred_until or failure_reason', async () => {
+    // checks_deferred_until and checks_failure_reason hold both columns null on a running check and
+    // on a finished one, so a write of the payload's nulls could not be told from no write. This copy
+    // of the database drops the two constraints, so each column can hold a value the payload's differs
+    // from, and a write shows.
+    await db.query(
+      `alter table public.checks drop constraint checks_deferred_until,
+                                 drop constraint checks_failure_reason`,
+    );
     await seedRunningCheck(db, site(), { ...checkOf(), expires_at: null });
-    const email = { sent_at: null, link_expires_at: '2026-12-05T02:29:58Z' };
-    await db.query(`update public.checks set result_email = $2::jsonb where id = $1`, [
-      built.check.id,
-      JSON.stringify(email),
+    const seeded = {
+      expires_at: null,
+      result_email: { sent_at: null, link_expires_at: '2026-12-05T02:29:58Z' },
+      deferred_until: '2026-11-05 03:00:00', // UTC
+      failure_reason: 'seeded-reason',
+    };
+    await db.query(
+      `update public.checks
+          set result_email = $2::jsonb, deferred_until = ($3::timestamp at time zone 'UTC'),
+              failure_reason = $4
+        where id = $1`,
+      [
+        built.check.id,
+        JSON.stringify(seeded.result_email),
+        seeded.deferred_until,
+        seeded.failure_reason,
+      ],
+    );
+    // Anti-vacuity: the payload's check differs from the row in each of the four.
+    const sent = persistCalls(inputOf()).payload.check as Record<string, unknown>;
+    expect(sent.expires_at).not.toBeNull();
+    expect([sent.result_email, sent.deferred_until, sent.failure_reason]).toEqual([
+      null,
+      null,
+      null,
     ]);
-    expect(built.check.expires_at).not.toBeNull(); // anti-vacuity: the payload carries one
     await persistBuiltCheck(pglitePersistDb(db), inputOf());
     const { rows } = await db.query<Record<string, unknown>>(
-      `select expires_at, result_email, deferred_until from public.checks where id = $1`,
+      `select status, expires_at, result_email,
+              (deferred_until at time zone 'UTC')::text as deferred_until, failure_reason
+         from public.checks where id = $1`,
       [built.check.id],
     );
-    expect(rows[0]).toEqual({ expires_at: null, result_email: email, deferred_until: null });
+    expect(rows[0]).toEqual({ status: built.check.status, ...seeded });
   });
 
   it('refuses a check that does not exist', async () => {
