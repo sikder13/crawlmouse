@@ -50,7 +50,7 @@ describe('stripeAccount', () => {
     [
       {
         STRIPE_ACCOUNT_SECRET_KEY: 'sk_test_x',
-        NEXT_PUBLIC_SUPABASE_URL: 'https://EZSPNFEYZWSISYMYTSSM.supabase.co.:443/',
+        NEXT_PUBLIC_SUPABASE_URL: 'https://EZSPNFEYZWSISYMYTSSM.supabase.co.:8443/rest/v1',
       },
       'live mode only',
     ],
