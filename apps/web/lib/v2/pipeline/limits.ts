@@ -9,7 +9,9 @@ export { FAILURE_REASONS, type FailureReason } from '../../../../../inngest/chec
 /**
  * Of the run's 20 minutes, what render, build, persist and finalize keep after the last batch. Render
  * runs with a daily budget that refuses (Q7), so today it returns at once; a deadline inside
- * renderCheck has to come before rendering is enabled.
+ * renderCheck has to come before rendering is enabled. Persist is one step whatever
+ * persistBuiltCheck sends inside it (Q11: staged chunks, then the finishing RPC); its duration at the
+ * page cap is not measured against this reserve yet.
  */
 export const RESERVE_S = 180;
 /** The crawl phase's ceiling: ENGINE-GAP §8's Free-tier HTTP-phase ceiling. */
