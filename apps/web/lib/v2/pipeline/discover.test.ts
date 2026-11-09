@@ -55,6 +55,24 @@ describe('discoverSeeds (Q8)', () => {
     for (const r of requests) expect(r.opts?.userAgent).toBe(UA);
   });
 
+  // safeFetch takes options that switch its SSRF guard off (bypassSsrf) or swap its DNS lookup
+  // (resolver); OPERATING-RULES §5 protects the guard. Discovery asks for the user agent and the two
+  // time bounds and nothing else, so neither can be added without this going red.
+  it('asks safeFetch for the user agent and the time bounds only: no SSRF bypass, no resolver (§5)', async () => {
+    const { deps, requests } = site({
+      'https://example.com/robots.txt': 'Sitemap: https://example.com/a.xml\n',
+      'https://example.com/a.xml': urlset(['https://example.com/p/1']),
+    });
+    await discoverSeeds('https://example.com', deps);
+    expect(requests.length).toBeGreaterThan(0);
+    for (const r of requests)
+      expect(Object.keys(r.opts ?? {}).sort()).toEqual([
+        'timeoutMs',
+        'totalDeadlineMs',
+        'userAgent',
+      ]);
+  });
+
   it('keeps http(s) locations only', async () => {
     const { deps } = site({
       'https://example.com/sitemap.xml': urlset([
