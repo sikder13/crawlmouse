@@ -72,9 +72,13 @@ describe.skipIf(KEY === null)('the sandbox smoke (D12)', () => {
   const accounts = { pro: '', agencyTrial: '' };
 
   async function account(): Promise<string> {
+    // Two statements: the sign-up trigger's rows are not visible to the insert's own snapshot.
+    const user = await db.query<{ id: string }>(
+      `insert into auth.users (id, email) values (gen_random_uuid(), gen_random_uuid() || '@example.com') returning id`,
+    );
     const { rows } = await db.query<{ a: string }>(
-      `with u as (insert into auth.users (id, email) values (gen_random_uuid(), gen_random_uuid() || '@example.com') returning id)
-       select default_account_id as a from public.users where id = (select id from u)`,
+      `select default_account_id as a from public.users where id = $1`,
+      [user.rows[0]!.id],
     );
     return rows[0]!.a;
   }
