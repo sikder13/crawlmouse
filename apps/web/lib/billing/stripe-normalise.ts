@@ -9,14 +9,14 @@
  * The rules this module adds to the machine's:
  * - A grant (a checkout, an agency trial start, an update to `active`) needs a subscription the
  *   allow-list accepts; a revoke applies whatever the prices, with the plan the mirror holds
- *   (questions Q11).
+ *   (spec 03, Q11).
  * - An update whose status is no longer the subscription's, and a payment failure on a subscription
  *   that is not `past_due` or `unpaid`, are recorded as superseded: the event that made the change
- *   carries it (plan review, finding 2).
+ *   carries it (spec 03, review finding 2).
  * - An event whose customer has no account throws while it is under an hour old, so Stripe retries
- *   while the binding checkout may still be in flight, and is recorded after that (questions Q16).
+ *   while the binding checkout may still be in flight, and is recorded after that (spec 03, Q16).
  * - A checkout that grants nothing leaves its subscription orphaned; a live one is cancelled
- *   (questions Q10). `orphanEffects` plans that, here and in ./stripe-webhook.ts.
+ *   (spec 03, Q10). `orphanEffects` plans that, here and in ./stripe-webhook.ts.
  *
  * Any Stripe error propagates, so the event is answered 500 and retried rather than recorded.
  */

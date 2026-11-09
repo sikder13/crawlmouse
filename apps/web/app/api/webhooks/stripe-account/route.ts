@@ -13,7 +13,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
  * STRIPE_ACCOUNT_WEBHOOK_SECRET. The v1 endpoint, /api/webhooks/stripe, is separate and unchanged.
  *
  * The signature is checked on the raw body before anything else is called or parsed; the flag is
- * read after it (questions Q8), so with V2_BILLING unset a verified event gets a 404. What it logs
+ * read after it (spec 03, Q8), so with V2_BILLING unset a verified event gets a 404. What it logs
  * is a fixed line, the event's type and id, and an error's message; not the body or the signature.
  */
 

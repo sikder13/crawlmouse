@@ -60,7 +60,7 @@ export function stripeReads(stripe: Stripe): StripeReads {
 
 /**
  * The effects of an applied or ignored transition: the machine's, a cancellation of a disputed
- * account's subscription (questions Q13), and for a checkout the orphan rules (Q10): its own
+ * account's subscription (spec 03, Q13), and for a checkout the orphan rules (Q10): its own
  * subscription when its grant was ignored for any reason but already being the current one, the
  * subscription it replaced when it applied.
  */

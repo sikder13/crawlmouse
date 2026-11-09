@@ -5,7 +5,7 @@
  * price's interval; its extras are the seat and site quantities, which the plan must sell. Other
  * shapes are refused (the cases are subscription-mirror.test.ts's), and the caller decides what a
  * refusal means: a grant is recorded, a revoke applies with the plan the mirror already holds
- * (questions Q11).
+ * (spec 03, Q11).
  */
 import type Stripe from 'stripe';
 import { limitsFor, type Extras, type PaidTier } from '../entitlement-v2';

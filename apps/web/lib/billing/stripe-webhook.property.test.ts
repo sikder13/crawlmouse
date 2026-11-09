@@ -7,7 +7,7 @@ import { webhookWorld, type WebhookWorld } from './webhook-db.pglite';
 vi.mock('server-only', () => ({}));
 
 /**
- * Convergence (plan review, finding 2.4): Stripe is modelled as a timeline of one Pro
+ * Convergence (spec 03, review finding 2.4): Stripe is modelled as a timeline of one Pro
  * subscription's statuses, and a subscription read returns the status at the moment of the read.
  * Each event is delivered at or after the step that created it, some more than once, and some
  * while another delivery is between its read and its write (two deliveries at once: one reads,

@@ -1,5 +1,5 @@
 /**
- * The v2 webhook's event × state table (plan §4, plan review finding 17), as data. Test support: the
+ * The v2 webhook's event × state table (spec 03, review finding 17), as data. Test support: the
  * end-to-end test (./stripe-webhook.cases.test.ts) runs the entries against PGlite through the
  * handler, and spec 03's table is to be rendered from this array, so the table names the
  * transitions the tests run (OPERATING-RULES §10).
@@ -13,7 +13,7 @@
  * null, and Stripe is left as the setup left it.
  *
  * Reachable cells only. A card-required Pro trial is not reachable in CC-03: nothing starts one
- * (questions Q9), so it has no column here. Our clock's events (trial reminder, expiry, the
+ * (spec 03, Q9), so it has no column here. Our clock's events (trial reminder, expiry, the
  * past-due lapse) are not Stripe's and are not in this table.
  */
 import type { AccountState } from '@crawlmouse/types/v2';
