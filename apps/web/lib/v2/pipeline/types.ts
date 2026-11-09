@@ -4,37 +4,16 @@
  * directory; this file holds no behaviour beyond the evidence path.
  */
 import type { BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
-import type { Check, CrawlPage, FixtureDataset } from '@crawlmouse/types/v2';
+import type { CrawlPage, FixtureDataset } from '@crawlmouse/types/v2';
 import type { BatchKind } from '../../worker-client/types';
 
-/** `check.requested` (ARCH-2 §4.1), less what this step does not run: renderAll, deploy meta, fix ids. */
-export interface CheckRequested {
-  checkId: string;
-  siteId: string;
-  /** Null for a site no account keeps. */
-  accountId: string | null;
-  /** The site's host, lower case, no port. */
-  host: string;
-  /** Where the crawl starts, in the engine's canonical spelling. */
-  homepageUrl: string;
-  trigger: Check['trigger'];
-  /** The most pages the crawl may fetch. */
-  pageCap: number;
-  requestedByUserId?: string;
-}
-
-export interface CheckFinished {
-  checkId: string;
-  siteId: string;
-  accountId: string | null;
-  status: 'finished' | 'partial';
-}
-
-export interface CheckFailed {
-  checkId: string;
-  siteId: string;
-  reason: string;
-}
+/** The pipeline's events live with the Inngest functions that send and receive them. */
+export type {
+  CheckCancelRequested,
+  CheckFailed,
+  CheckFinished,
+  CheckRequested,
+} from '../../../../../inngest/check-events';
 
 /** One batch of one check: `batch` is the worker's batch number, unique within the check. */
 export interface BatchRef {
