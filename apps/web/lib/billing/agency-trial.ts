@@ -3,7 +3,7 @@
  * 14-day trial, the card taken now and the plan charged when the trial ends unless it is cancelled;
  * with no card on file at the end, Stripe cancels it.
  *
- * The request names the account (questions Q15): ARCH-2 §2.4 makes an agency trial a second account,
+ * The request names the account (spec 03, Q15): ARCH-2 §2.4 makes an agency trial a second account,
  * which CC-29 creates. It is refused up front with `trialRefusal`'s reason, the same check the
  * webhook's `agency_trial_started` makes, on the account as this request reads it.
  */

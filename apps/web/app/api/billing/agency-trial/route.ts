@@ -16,7 +16,7 @@ const report = (message: string, extra: Readonly<Record<string, string>>) => {
 
 /**
  * Start the Agency trial with a card (CC-03 D7). A 404 with V2_BILLING unset. The request names the
- * account (questions Q15), which must answer 'owner' to the caller's own session before the
+ * account (spec 03, Q15), which must answer 'owner' to the caller's own session before the
  * service-role client is made.
  */
 export async function POST(req: Request) {

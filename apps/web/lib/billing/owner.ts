@@ -1,5 +1,5 @@
 /**
- * Which account a v2 billing request acts on (CC-03 D6–D8, questions Q15). A request may name one;
+ * Which account a v2 billing request acts on (CC-03 D6–D8, spec 03 Q15). A request may name one;
  * CC-27's forms name none, and then it is the account of the caller's one active owner seat.
  *
  * This decides which account, not whether the caller owns it: each route then asks

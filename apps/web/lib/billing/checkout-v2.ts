@@ -5,10 +5,10 @@
  * comes back through the webhook.
  *
  * Refused, before any Stripe call: a plan the account already holds or exceeds (`plan_held`), and any
- * account that still follows a subscription (`subscription_open`, questions Q3), because a second
+ * account that still follows a subscription (`subscription_open`, spec 03 Q3), because a second
  * checkout would open a second subscription that Stripe keeps charging. Opening a session expires
- * the customer's other open ones, and each lasts 31 minutes (plan review, finding 1); a subscription
- * a checkout still leaves orphaned is the webhook's to cancel (questions Q10). Card only (questions
+ * the customer's other open ones, and each lasts 31 minutes (spec 03, review finding 1); a subscription
+ * a checkout still leaves orphaned is the webhook's to cancel (spec 03, Q10). Card only (spec 03,
  * Q12): a delayed method such as a bank debit can leave the subscription `incomplete` when the
  * checkout completes, and the machine grants nothing on that.
  *

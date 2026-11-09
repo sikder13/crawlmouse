@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// POST /api/billing/agency-trial (CC-03 D7, questions Q15). The session client, the service-role
+// POST /api/billing/agency-trial (CC-03 D7, spec 03 Q15). The session client, the service-role
 // client and the Stripe client are fakes; the handler (lib/billing/agency-trial.ts) runs for real.
 
 const h = vi.hoisted(() => {

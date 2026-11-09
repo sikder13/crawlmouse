@@ -8,7 +8,7 @@
  * with 503 `billing_unavailable`. `planOfPrice` is the webhook's allow-list: an id the listing does not
  * hold is listed again, at most once a minute after the last successful listing, and only an id absent
  * from a successful listing is answered null. A listing that fails throws, so the webhook answers 500
- * and Stripe retries instead of the event being recorded as foreign (plan review, finding 4).
+ * and Stripe retries instead of the event being recorded as foreign (spec 03, review finding 4).
  */
 import type Stripe from 'stripe';
 import type { PaidTier } from '../entitlement-v2';

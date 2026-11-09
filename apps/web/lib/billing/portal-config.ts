@@ -1,5 +1,5 @@
 /**
- * The Stripe customer portal configuration v2 opens (CC-03 D8, questions Q7): payment method update,
+ * The Stripe customer portal configuration v2 opens (CC-03 D8, spec 03 Q7): payment method update,
  * invoice history and cancellation at the end of the period without proration, and nothing else. The
  * account's default configuration allows plan changes and customer details, so v2 uses its own, found
  * by `metadata.crawlmouse_key`, created on first use and updated back when its features have drifted.

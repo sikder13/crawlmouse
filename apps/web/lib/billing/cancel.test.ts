@@ -116,7 +116,7 @@ describe('cancelSubscription', () => {
     it.each([
       ['active: at the period end', 'active', PERIOD_END],
       ['trialing: at the trial end', 'trialing', TRIAL_END],
-      ['past_due: at once (questions Q14)', 'past_due', NOW.toISOString()],
+      ['past_due: at once (spec 03, Q14)', 'past_due', NOW.toISOString()],
       ['unpaid: at once', 'unpaid', NOW.toISOString()],
       ['paused: at once', 'paused', NOW.toISOString()],
       ['canceled: nothing left to end', 'canceled', null],

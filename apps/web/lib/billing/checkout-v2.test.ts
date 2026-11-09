@@ -204,7 +204,7 @@ describe('parseCheckout', () => {
   });
 });
 
-describe('checkoutV2 refusals (questions Q3), before any Stripe call', () => {
+describe('checkoutV2 refusals (spec 03, Q3), before any Stripe call', () => {
   it.each([
     ['Pro, buying Pro', STATES.pro, 'pro'],
     ['Agency, buying Agency', STATES.agency, 'agency'],
