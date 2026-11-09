@@ -7,6 +7,7 @@ import {
   type EffectSinks,
   type InngestSend,
   type PlannedAlert,
+  type PlannedCancel,
   type PlannedEffect,
 } from './effects';
 import { FREE_START, next, type Effect, type EntitlementSnapshot } from './state-machine';
@@ -106,6 +107,7 @@ describe('planEffects', () => {
       kind: 'alert',
       reason: 'dispute',
       accountId: ACCOUNT,
+      subscriptionId: null,
       source: 'evt_dispute',
     });
   });
@@ -164,7 +166,18 @@ describe('PlannedEffectsSchema', () => {
       [{ kind: 'send', id: 'x', name: 'trial.converted', data: { accountId: 'a', more: 1 } }],
     ],
     ['an empty id', [{ kind: 'send', id: '', name: 'trial.converted', data: { accountId: 'a' } }]],
-    ['not an array', { kind: 'alert', reason: 'dispute', accountId: 'a', source: 's' }],
+    [
+      'not an array',
+      { kind: 'alert', reason: 'dispute', accountId: 'a', subscriptionId: null, source: 's' },
+    ],
+    [
+      'a cancel of something not a subscription',
+      [{ kind: 'cancel', subscriptionId: 'cus_1', reason: 'orphaned', source: 's' }],
+    ],
+    [
+      'a cancel for a reason the webhook has none of',
+      [{ kind: 'cancel', subscriptionId: 'sub_1', reason: 'unpaid', source: 's' }],
+    ],
   ])('refuses %s', (_label, stored) => {
     expect(PlannedEffectsSchema.safeParse(stored).success).toBe(false);
   });
@@ -172,7 +185,14 @@ describe('PlannedEffectsSchema', () => {
 
 describe('dispatchPlanned', () => {
   const plan: PlannedEffect[] = [
-    { kind: 'alert', reason: 'dispute', accountId: ACCOUNT, source: 'evt_1' },
+    {
+      kind: 'alert',
+      reason: 'dispute',
+      accountId: ACCOUNT,
+      subscriptionId: 'sub_1',
+      source: 'evt_1',
+    },
+    { kind: 'cancel', subscriptionId: 'sub_1', reason: 'disputed', source: 'evt_1' },
     { kind: 'send', id: 'a', name: 'trial.converted', data: { accountId: ACCOUNT } },
     {
       kind: 'send',
@@ -192,16 +212,19 @@ describe('dispatchPlanned', () => {
         calls.push(`send:${events.map((e) => e.id).join(',')}`);
         await send(events);
       }),
-      alert: vi.fn((a: PlannedAlert) => {
+      cancel: vi.fn(async (c: PlannedCancel) => {
+        calls.push(`cancel:${c.subscriptionId}`);
+      }),
+      alert: vi.fn(async (a: PlannedAlert) => {
         calls.push(`alert:${a.reason}`);
       }),
     };
   }
 
-  it('sends every event in one call, without the plan tag, then raises the alerts', async () => {
+  it('sends every event in one call, without the plan tag, then cancels, then raises the alerts', async () => {
     const s = sinks();
     await dispatchPlanned(plan, s);
-    expect(s.calls).toEqual(['send:a,b', 'alert:dispute']);
+    expect(s.calls).toEqual(['send:a,b', 'cancel:sub_1', 'alert:dispute']);
     expect(s.send).toHaveBeenCalledWith([
       { id: 'a', name: 'trial.converted', data: { accountId: ACCOUNT } },
       {
@@ -218,11 +241,20 @@ describe('dispatchPlanned', () => {
     expect(s.calls).toEqual(['alert:dispute']);
   });
 
-  it('throws when the send fails, before any alert', async () => {
+  it('throws when the send fails, before any cancellation or alert', async () => {
     const s = sinks(async () => {
       throw new Error('inngest down');
     });
     await expect(dispatchPlanned(plan, s)).rejects.toThrow('inngest down');
+    expect(s.cancel).not.toHaveBeenCalled();
     expect(s.alert).not.toHaveBeenCalled();
+  });
+
+  it('waits for an alert to be delivered, and fails when it is not', async () => {
+    const s = sinks();
+    s.alert = vi.fn(async () => {
+      throw new Error('not delivered');
+    });
+    await expect(dispatchPlanned([plan[0]!], s)).rejects.toThrow('not delivered');
   });
 });

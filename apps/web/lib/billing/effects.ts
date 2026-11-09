@@ -5,15 +5,19 @@
  * `planEffects` turns a transition's effects into what is sent. Each Inngest event's id is fixed by
  * its name, the account and the source of the change (a Stripe event id, or a key of our clock), so a
  * plan sent twice delivers each event once: Inngest drops an event whose id it saw in the last 24
- * hours. The webhook stores the plan with its decision and sends it again on a retry (questions Q1).
+ * hours. The webhook stores the plan with its decision and sends it again on a retry (spec 03, "The webhook").
+ *
+ * The webhook adds `cancel` entries of its own (spec 03, "Stripe writes from the webhook"); the machine plans none.
  *
  * `relimit`, `pause_others`, `pause_over_limit` and `resume` plan nothing: since migration 003
  * `apply_entitlement_transition` applies them in the transaction that writes the state, so carrying
- * them out here would apply them twice (questions Q2).
+ * them out here would apply them twice (spec 03, "Effects").
  */
 import { z } from 'zod';
 import { AccountStateSchema } from '@crawlmouse/types/v2';
 import type { Effect, EntitlementSnapshot } from './state-machine';
+
+const SUBSCRIPTION_ID = /^sub_[A-Za-z0-9_]+$/;
 
 export const PlannedEffectSchema = z.union([
   z.strictObject({
@@ -53,8 +57,21 @@ export const PlannedEffectSchema = z.union([
   }),
   z.strictObject({
     kind: z.literal('alert'),
-    reason: z.literal('dispute'),
-    accountId: z.string().min(1),
+    reason: z.enum(['dispute', 'orphaned_subscription']),
+    /** Null for an orphaned subscription whose checkout named no account we know. */
+    accountId: z.string().min(1).nullable(),
+    subscriptionId: z.string().regex(SUBSCRIPTION_ID).nullable(),
+    source: z.string().min(1),
+  }),
+  /**
+   * Cancel a Stripe subscription at once, without proration. Planned by the webhook, never by the
+   * machine: for a subscription a checkout left the account not following (`orphaned`),
+   * and for the followed one of a disputed account (`disputed`).
+   */
+  z.strictObject({
+    kind: z.literal('cancel'),
+    subscriptionId: z.string().regex(SUBSCRIPTION_ID),
+    reason: z.enum(['orphaned', 'disputed']),
     source: z.string().min(1),
   }),
 ]);
@@ -62,6 +79,7 @@ export const PlannedEffectSchema = z.union([
 export type PlannedEffect = z.infer<typeof PlannedEffectSchema>;
 export type PlannedSend = Extract<PlannedEffect, { kind: 'send' }>;
 export type PlannedAlert = Extract<PlannedEffect, { kind: 'alert' }>;
+export type PlannedCancel = Extract<PlannedEffect, { kind: 'cancel' }>;
 
 /** A stored plan, read back from `stripe_events.effects`: refused whole when any entry is malformed. */
 export const PlannedEffectsSchema = z.array(PlannedEffectSchema);
@@ -91,7 +109,13 @@ function planOne(effect: Effect, ctx: EffectContext): PlannedEffect | null {
         data: { accountId, template: effect.template },
       };
     case 'founder_alert':
-      return { kind: 'alert', reason: effect.reason, accountId, source };
+      return {
+        kind: 'alert',
+        reason: effect.reason,
+        accountId,
+        subscriptionId: ctx.after.subscriptionId,
+        source,
+      };
     case 'event': {
       const id = `${effect.name}:${accountId}:${source}`;
       switch (effect.name) {
@@ -137,11 +161,17 @@ export interface InngestSend {
 export interface EffectSinks {
   /** Sends Inngest events in one call. */
   send(events: readonly InngestSend[]): Promise<void>;
-  /** Raises a founder alert (Sentry). */
-  alert(alert: PlannedAlert): void;
+  /** Cancels a subscription at once; done when it has already ended. */
+  cancel(cancel: PlannedCancel): Promise<void>;
+  /** Raises a founder alert (Sentry), resolving once it has been delivered. */
+  alert(alert: PlannedAlert): Promise<void>;
 }
 
-/** Sends every event of the plan in one call, then raises its alerts. A failed send throws. */
+/**
+ * Carries out a plan: every event in one send, then each cancellation, then each alert, each awaited.
+ * Anything that fails throws, so the caller does not mark the plan done and sends it again; the event
+ * ids and the cancellations' idempotency keys make a repeat harmless.
+ */
 export async function dispatchPlanned(
   planned: readonly PlannedEffect[],
   sinks: EffectSinks,
@@ -150,5 +180,6 @@ export async function dispatchPlanned(
   if (sends.length > 0) {
     await sinks.send(sends.map(({ id, name, data }) => ({ id, name, data })));
   }
-  for (const p of planned) if (p.kind === 'alert') sinks.alert(p);
+  for (const p of planned) if (p.kind === 'cancel') await sinks.cancel(p);
+  for (const p of planned) if (p.kind === 'alert') await sinks.alert(p);
 }
