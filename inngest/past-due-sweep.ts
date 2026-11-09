@@ -1,5 +1,5 @@
 /**
- * pastDueSweepFn, `crawlmouse.billing.past-due-sweep` (CC-03 D9c, questions Q6): every hour, applies
+ * pastDueSweepFn, `crawlmouse.billing.past-due-sweep` (CC-03 D9c): every hour, applies
  * `past_due_lapsed` to past-due accounts whose grace may have run out, and `trial_expired` to no-card
  * trials whose end has passed (the backstop for a trial whose `trial.started` was never sent). The
  * list only narrows which accounts to look at; for each one the entitlement machine decides, on the
