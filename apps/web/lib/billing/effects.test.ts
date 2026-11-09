@@ -250,11 +250,11 @@ describe('dispatchPlanned', () => {
     expect(s.alert).not.toHaveBeenCalled();
   });
 
-  it('waits for an alert to be delivered, and fails when it is not', async () => {
+  it('waits for an alert to be raised, and fails when raising it fails', async () => {
     const s = sinks();
     s.alert = vi.fn(async () => {
-      throw new Error('not delivered');
+      throw new Error('not raised');
     });
-    await expect(dispatchPlanned([plan[0]!], s)).rejects.toThrow('not delivered');
+    await expect(dispatchPlanned([plan[0]!], s)).rejects.toThrow('not raised');
   });
 });

@@ -15,10 +15,11 @@ const ALERT_FLUSH_MS = 2000;
 
 /**
  * Where effects go in production: Inngest for events, the Crawlmouse Stripe account for
- * cancellations, Sentry for founder alerts. An alert resolves once Sentry's client has flushed it,
- * because a Vercel function can freeze as soon as it answers and the caller marks the plan done after
- * it; a flush that times out fails the dispatch. A flush succeeds when Sentry answered at all, a 429
- * included, so a rate-limited alert can still be lost.
+ * cancellations, Sentry for founder alerts. An alert resolves once Sentry's client has flushed its
+ * queue, because a Vercel function can freeze as soon as it answers and the caller marks the plan done
+ * after it; a flush that times out fails the dispatch. A flush that empties the queue succeeds whether
+ * or not Sentry accepted the event (a 429, a network error, an event the SDK dropped), so an alert can
+ * still be lost; the plan keeps it in `stripe_events.effects`.
  */
 export function productionSinks(): EffectSinks {
   return {
@@ -52,7 +53,7 @@ export function productionSinks(): EffectSinks {
         return;
       }
       if (!(await Sentry.flush(ALERT_FLUSH_MS)))
-        throw new Error('the founder alert was not delivered');
+        throw new Error('the founder alert was not flushed in time');
     },
   };
 }

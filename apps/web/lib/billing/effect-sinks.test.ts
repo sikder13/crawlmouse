@@ -75,7 +75,7 @@ describe('productionSinks', () => {
 
   it('fails when Sentry has not taken the alert in time', async () => {
     h.flush.mockResolvedValue(false);
-    await expect(productionSinks().alert(alert)).rejects.toThrow('not delivered');
+    await expect(productionSinks().alert(alert)).rejects.toThrow('not flushed in time');
   });
 
   it('does not fail where Sentry is off, and logs the alert instead', async () => {

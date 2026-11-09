@@ -55,7 +55,7 @@ customer's open sessions); a late or concurrently decided revoke could undo a pa
 out-of-order guard runs inside `apply_stripe_event` under row locks, and a superseded event applies
 nothing); a livemode refusal must not look processed (finding 3); a transient Stripe error must be retried,
 never recorded (finding 4); cards only (finding 6: Q12); a dispute and a past-due cancel stop the charges
-(findings 8 and 9: Q13, Q14); which account a route bills (finding 11: Q15); a founder alert is delivered
+(findings 8 and 9: Q13, Q14); which account a route bills (finding 11: Q15); a founder alert is flushed
 before the event is marked done (finding 15).
 
 ## The webhook
@@ -246,7 +246,7 @@ refused 403 by the middleware before the route runs:
   `STRIPE_ACCOUNT_WEBHOOK_SECRET`, `STRIPE_ACCOUNT_LIVEMODE`. Production keeps `V2_BILLING` unset.
 
 - **Mode.** The v2 Stripe client (`lib/billing/stripe-account.ts`) refuses a key whose mode is not
-  `STRIPE_ACCOUNT_LIVEMODE`'s, and a test key on `VERCEL_ENV=production`; the billing routes and the
+  `STRIPE_ACCOUNT_LIVEMODE`'s, and a test key on `VERCEL_ENV=production` or over the production database; the billing routes and the
   webhook then answer 500 and the reconcile's step fails, before any write
   (`pnpm --filter @crawlmouse/web exec vitest run lib/billing/stripe-account.test.ts`).
 - **Prices.** Change a Stripe price and `prices.ts` in one deploy. A session opened before it and paid after
@@ -271,12 +271,17 @@ refused 403 by the middleware before the route runs:
   `scripts/db/check.test.ts`, and `__tests__/v2-billing-rpc.test.ts` runs it with this step's function in
   place.
 - Two events of one subscription stamped in the same second with opposite statuses, read out of order, can
-  leave the earlier one's status (review round 1, money m1); nothing in this step produces such a pair.
+  leave the earlier one's status (review round 1, money m1): a paying account left `past_due` is lapsed to
+  Free by the sweep after its grace, and the reconcile reports the mirror against Stripe. Nothing in this
+  step produces such a pair.
 - If v1 ever checked out on the Crawlmouse account while this endpoint is registered there, its sessions
   name no v2 account and, on our prices, would be cancelled as orphans: the cutover moves v1 off before
   pointing either at the other's account (review round 1, money m5).
-- A founder alert is delivered once Sentry's client has flushed it; a rate-limited Sentry can drop it. The
-  plan, alert included, stays in `stripe_events.effects`.
+- A founder alert counts as raised once Sentry's client has flushed its queue, which also succeeds when
+  Sentry refused the event or the network failed, so an alert can be lost. The plan, alert included, stays
+  in `stripe_events.effects`.
+- Test mode is refused on `VERCEL_ENV=production` and over the production Supabase project (previews hold
+  its service-role key). A preview that is to try v2 billing in test mode needs a database of its own.
 - Sentry's request data probably includes the `stripe-signature` header (the scrub removes cookies and
   bodies); v1's webhook has the same shape. The billing routes have no rate limit of their own, as v1's
   checkout has none.
