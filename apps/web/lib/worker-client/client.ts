@@ -39,7 +39,7 @@ export const WORKER_REFUSALS: ReadonlyMap<string, { status: number; kind: Worker
     ['jwt_scope', { status: 403, kind: 'forbidden' }],
     ['invalid_json', { status: 400, kind: 'invalid' }],
     ['invalid_body', { status: 400, kind: 'invalid' }],
-    ['body_timeout', { status: 408, kind: 'invalid' }],
+    ['body_timeout', { status: 408, kind: 'timeout' }],
     ['too_large', { status: 413, kind: 'too_large' }],
     ['not_found', { status: 404, kind: 'server' }],
     ['internal', { status: 500, kind: 'server' }],
@@ -52,7 +52,9 @@ export const WORKER_REFUSALS: ReadonlyMap<string, { status: number; kind: Worker
 function kindOfStatus(status: number): WorkerErrorKind {
   if (status === 401) return 'unauthorized';
   if (status === 403) return 'forbidden';
-  if (status === 400 || status === 408) return 'invalid';
+  if (status === 400) return 'invalid';
+  // The body did not arrive in time: refused before the nonce was spent, so sending it again is safe.
+  if (status === 408) return 'timeout';
   if (status === 413) return 'too_large';
   if (status === 429) return 'busy';
   return 'server';
