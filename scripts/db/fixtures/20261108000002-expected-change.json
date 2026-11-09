@@ -1,5 +1,5 @@
 {
-  "measured": "production ezspnfeyzwsisymytssm (PostgreSQL 17.6) read on 2026-11-08 through the read-only endpoint, in fingerprint.sql's format for the functions section. 'removed' is each definer function's line as production holds it; 'added' is the same line with md5 of pg_get_functiondef taken after replacing its one SET search_path line with the setting 20261108000002_v2_definer_search_path.sql writes. scripts/db/fingerprint.ts --expect reads them; scripts/db/definer-search-path.test.ts checks the migration changes exactly these signatures.",
+  "measured": "production ezspnfeyzwsisymytssm (PostgreSQL 17.6) read on 2026-11-08 through the read-only endpoint, in fingerprint.sql's format for the functions section. 'removed' is each definer function's line as production holds it; 'added' is the same line with md5 of pg_get_functiondef taken after replacing its one SET search_path line with the setting 20261108000002_v2_definer_search_path.sql writes (start_trial_with_ledger's line read and predicted the same way on 2026-11-08, from SET search_path TO '' to SET search_path TO 'pg_catalog', 'pg_temp'). scripts/db/fingerprint.ts --expect reads them; scripts/db/definer-search-path.test.ts checks the migration changes exactly these signatures.",
   "removed": {
     "functions": [
       "public.alert_events_rule_scope() kind=f owner=postgres security_definer=t definition=5b1947f2c11c15b9894ebda4548cbe22",
@@ -17,6 +17,7 @@
       "public.is_member(p_account uuid) kind=f owner=postgres security_definer=t definition=4d7f69ad00e26d7dcf4a8bbe92be336b",
       "public.is_member_for_site(p_site uuid) kind=f owner=postgres security_definer=t definition=8ab5935e912294f1045a3a9e9109524f",
       "public.member_role(p_account uuid) kind=f owner=postgres security_definer=t definition=bddc1c922e04c2176688324f588f564e",
+      "public.start_trial_with_ledger(p_account_id uuid, p_hashes jsonb, p_transition jsonb) kind=f owner=postgres security_definer=t definition=ab3e79f63ec6e349aea8f1de2997291d",
       "public.usage_counts(p_account uuid) kind=f owner=postgres security_definer=t definition=231f03a9b27957cd78fc7e8b9cf7dccf",
       "public.usage_events_append_only() kind=f owner=postgres security_definer=t definition=c7d6a2387f483ecfff37825240e3aaf7",
       "public.usage_events_references() kind=f owner=postgres security_definer=t definition=c52af8e8cc6de198885ff59dc3c9ac59",
@@ -40,6 +41,7 @@
       "public.is_member(p_account uuid) kind=f owner=postgres security_definer=t definition=55e2ffc33e71bb4f0bb56fc30474c82f",
       "public.is_member_for_site(p_site uuid) kind=f owner=postgres security_definer=t definition=81c87f00c2847ba6d9e900ad7a7dcc3f",
       "public.member_role(p_account uuid) kind=f owner=postgres security_definer=t definition=08ed518534788a57558e3c7e676e4bf6",
+      "public.start_trial_with_ledger(p_account_id uuid, p_hashes jsonb, p_transition jsonb) kind=f owner=postgres security_definer=t definition=669a6625aab6d551df2a39789148217b",
       "public.usage_counts(p_account uuid) kind=f owner=postgres security_definer=t definition=3df6c7ab76e9d079b7186920ec8f0d81",
       "public.usage_events_append_only() kind=f owner=postgres security_definer=t definition=95336857fde080595e4e319f2a5c366b",
       "public.usage_events_references() kind=f owner=postgres security_definer=t definition=83484d777973acd95396ae8494e53915",

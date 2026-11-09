@@ -5,7 +5,7 @@ import { compareFingerprints, readFingerprint, type ExpectedChange } from './fin
 import { migratedDb, pgliteDb } from './test-support';
 
 // 20261108000002_v2_definer_search_path.sql changes the functions section of the fingerprint and
-// nothing else, by exactly the 19 lines its fixture lists. The fixture was read from production and
+// nothing else, by exactly the 20 lines its fixture lists. The fixture was read from production and
 // its 'added' md5s predicted there by text replacement; applying the migration on PGlite, which
 // renders these definitions as production does, yields the same lines.
 
@@ -21,12 +21,12 @@ describe('the expected change of 20261108000002', () => {
   const removed = fixture.removed!.functions!;
   const added = fixture.added!.functions!;
 
-  it('lists 19 functions, each removed and added once, in the functions section only', () => {
+  it('lists 20 functions, each removed and added once, in the functions section only', () => {
     expect(Object.keys(fixture.removed!)).toEqual(['functions']);
     expect(Object.keys(fixture.added!)).toEqual(['functions']);
-    expect(removed).toHaveLength(19);
+    expect(removed).toHaveLength(20);
     expect(added.map(signature)).toEqual(removed.map(signature));
-    expect(new Set(removed.map(signature)).size).toBe(19);
+    expect(new Set(removed.map(signature)).size).toBe(20);
   });
 
   it('changes only the definition of each line', () => {

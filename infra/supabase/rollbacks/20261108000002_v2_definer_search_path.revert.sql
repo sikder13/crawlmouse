@@ -19,6 +19,7 @@ alter function public.handle_new_user() set search_path = public, pg_catalog;
 alter function public.is_member(uuid) set search_path = public, pg_catalog;
 alter function public.is_member_for_site(uuid) set search_path = public, pg_catalog;
 alter function public.member_role(uuid) set search_path = public, pg_catalog;
+alter function public.start_trial_with_ledger(uuid, jsonb, jsonb) set search_path = '';
 alter function public.usage_counts(uuid) set search_path = pg_catalog, public;
 alter function public.usage_events_append_only() set search_path = pg_catalog, public;
 alter function public.usage_events_references() set search_path = pg_catalog, public;

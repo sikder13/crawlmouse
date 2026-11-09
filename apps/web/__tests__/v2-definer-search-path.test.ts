@@ -248,7 +248,7 @@ describe('check 09', () => {
 });
 
 describe('the migration sets what it says and its rollback restores the catalog exactly', () => {
-  it('every definer function in public searches pg_temp last; v2_premake_month_partitions adds no schema', async () => {
+  it('every definer function in public searches pg_temp last; two of them name no other schema', async () => {
     const db = await database('after');
     try {
       const { rows } = await db.query<{ name: string; config: string[] }>(
@@ -258,14 +258,16 @@ describe('the migration sets what it says and its rollback restores the catalog 
       expect(rows).toHaveLength(20);
       for (const r of rows) {
         const path = r.config.find((c) => c.startsWith('search_path='));
-        const want =
-          r.name === 'start_trial_with_ledger'
-            ? 'search_path=""'
-            : r.name === 'v2_premake_month_partitions'
-              ? 'search_path=pg_catalog, pg_temp'
-              : 'search_path=pg_catalog, public, pg_temp';
+        const want = ['start_trial_with_ledger', 'v2_premake_month_partitions'].includes(r.name)
+          ? 'search_path=pg_catalog, pg_temp'
+          : 'search_path=pg_catalog, public, pg_temp';
         expect(path, r.name).toBe(want);
       }
+      // ALTER FUNCTION ... SET changes the setting it names and keeps the others, in their place.
+      expect(rows.find((r) => r.name === 'start_trial_with_ledger')!.config).toEqual([
+        'search_path=pg_catalog, pg_temp',
+        'lock_timeout=3s',
+      ]);
     } finally {
       await db.close();
     }
