@@ -166,7 +166,7 @@ export function buildSpec20b(): string {
         [
           code(CHECK_CANCELLED_FN_ID),
           '`inngest/function.cancelled` of the check function',
-          'fails the run’s check `canceled`; `onFailure` does not fire on a cancel or a timeout',
+          'fails `canceled` the check the cancelled run’s event named, or else the check its run claimed; `onFailure` does not fire on a cancel or a timeout',
         ],
         [
           code(CHECK_REAPER_FN_ID),
@@ -185,7 +185,7 @@ export function buildSpec20b(): string {
       [
         [
           '`claim`, then `claim-wait-{i}` / `claim-{i}`',
-          '`CRAWL_PAUSED`; `claim_check`',
+          '`CRAWL_PAUSED`; `claim_check`; the claimed check’s site, host and account from the database (a site other than the event’s fails `internal`)',
           `\`checks\` queued → running (${PACE.claimWaits} waits of ${PACE.claimWaitS} s while the site has a check running)`,
         ],
         [
@@ -196,7 +196,7 @@ export function buildSpec20b(): string {
         [
           '`crawl-{n}-post`',
           'seeds and stored batches → `nextCrawlBatch`',
-          '`crawl_batches` (upsert); the worker’s `POST /batch`',
+          '`checks.heartbeat_at`, `progress`; `crawl_batches` (upsert, never over a done batch); the worker’s `POST /batch`',
         ],
         [
           '`crawl-{n}-wait-{i}`, `crawl-{n}-poll-{i}`',
@@ -228,8 +228,8 @@ export function buildSpec20b(): string {
           '`built.json.gz`',
           `staged chunks, then \`${PERSIST_RPC}\` in one transaction (Q11)`,
         ],
+        ['`emit`', '', '`check.finished`, under the id `check-finished:{check_id}`'],
         ['`finalize`', '', 'removes `built.json.gz`'],
-        ['`emit`', '', '`check.finished`'],
       ],
     ),
     '',
@@ -316,5 +316,14 @@ export function buildSpec20b(): string {
     '- **Sitemaps are read by the app** (Q8); the worker reads robots.txt for itself and the sitemap’s status only.',
     '- **Persistence is staged** (Q11): the bulk rows go in chunks while the check runs, and one transaction moves them and flips the status.',
     '- **No rendering in production yet** (Q7): the daily budget refuses until a durable one exists.',
+    '',
+    '## Differences from the brief',
+    '',
+    '- **`emit` runs before `finalize`.** D3 listed `finalize` then `emit`; a finalize that failed after the check was written would have left it finished with no `check.finished` (review round 1). A cancel or timeout between `persist` and `emit` still loses the event (follow-up).',
+    '- **Migration 006d ships here** (Q1): without CC-06d’s columns a built check could not be stored whole.',
+    '- **`loadCheck` returns `provenance: "measured"`** (Q2), not FixtureDataset’s `"fixture"`.',
+    '- **`V2_PIPELINE` registers the functions only** (Q6); the account door’s promises about checks moved to `V2_CHECKS_PUBLIC`.',
+    '- **Persistence is staged** (Q11) and **008 adds an index and four SQL functions** beyond D6’s list (Q13, review round 1).',
+    '- **v1’s audit function clamps its concurrency to the plan cap**, not 100 (Q3).',
   ].join('\n');
 }

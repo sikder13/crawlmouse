@@ -26,29 +26,29 @@ A `check.requested` event becomes a finished, persisted, readable check: `reques
 
 ## Functions
 
-| Id                           | Trigger                                            | What it does                                                                                                                              |
-| ---------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `crawlmouse.check.run`       | `check.requested`                                  | runs one check (below)                                                                                                                    |
-| `crawlmouse.check.cancelled` | `inngest/function.cancelled` of the check function | fails the run’s check `canceled`; `onFailure` does not fire on a cancel or a timeout                                                      |
-| `crawlmouse.check.reaper`    | cron `*/10 * * * *`                                | fails a queued or running check whose heartbeat (or, unclaimed, its queue time) is older than 30 minutes, and releases its posted batches |
+| Id                           | Trigger                                            | What it does                                                                                                                                      |
+| ---------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `crawlmouse.check.run`       | `check.requested`                                  | runs one check (below)                                                                                                                            |
+| `crawlmouse.check.cancelled` | `inngest/function.cancelled` of the check function | fails `canceled` the check the cancelled run’s event named, or else the check its run claimed; `onFailure` does not fire on a cancel or a timeout |
+| `crawlmouse.check.reaper`    | cron `*/10 * * * *`                                | fails a queued or running check whose heartbeat (or, unclaimed, its queue time) is older than 30 minutes, and releases its posted batches         |
 
 Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 5` (Inngest Free), which the registered functions’ limits are clamped to, v1’s audit function included (Q3; `pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts` sweeps them). The check function’s account-wide limit is `INNGEST_CHECK_CONCURRENCY`, default 2. Its per-site key does not keep two checks of a site apart, because Inngest counts executing steps and a sleeping run holds none; the database does (`checks_one_running_per_site`, Q13).
 
 ## The steps of a check
 
-| Step                                         | Reads                                                                                          | Writes                                                                         |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `claim`, then `claim-wait-{i}` / `claim-{i}` | `CRAWL_PAUSED`; `claim_check`                                                                  | `checks` queued → running (5 waits of 60 s while the site has a check running) |
-| `discover`                                   | robots.txt and the sitemaps, from the app through `safeFetch` (Q8)                             | `seeds.json.gz`                                                                |
-| `crawl-{n}-post`                             | seeds and stored batches → `nextCrawlBatch`                                                    | `crawl_batches` (upsert); the worker’s `POST /batch`                           |
-| `crawl-{n}-wait-{i}`, `crawl-{n}-poll-{i}`   | the worker’s `GET /batch/{id}`                                                                 | `checks.heartbeat_at`, `progress`                                              |
-| `crawl-{n}-read`                             | the result, parsed with `BatchResultSchema`                                                    | `batch-{n}.json.gz`; `crawl_batches` done                                      |
-| `access-{s}-…`                               | stored batches → `assemble` → `sample` (stage 2 only when needed)                              | as crawl; batch numbers continue the crawl’s                                   |
-| `render`                                     | `renderCandidates`, the previous check’s page states                                           | `render.json.gz` (Q7: the daily budget refuses)                                |
-| `build`                                      | everything above, the previous graded check and its `diff_inputs`, the site’s fixes and events | `built.json.gz`, `map.json.gz` (`checkMap`)                                    |
-| `persist`                                    | `built.json.gz`                                                                                | staged chunks, then `persist_built_check` in one transaction (Q11)             |
-| `finalize`                                   |                                                                                                | removes `built.json.gz`                                                        |
-| `emit`                                       |                                                                                                | `check.finished`                                                               |
+| Step                                         | Reads                                                                                                                                        | Writes                                                                                                           |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `claim`, then `claim-wait-{i}` / `claim-{i}` | `CRAWL_PAUSED`; `claim_check`; the claimed check’s site, host and account from the database (a site other than the event’s fails `internal`) | `checks` queued → running (5 waits of 60 s while the site has a check running)                                   |
+| `discover`                                   | robots.txt and the sitemaps, from the app through `safeFetch` (Q8)                                                                           | `seeds.json.gz`                                                                                                  |
+| `crawl-{n}-post`                             | seeds and stored batches → `nextCrawlBatch`                                                                                                  | `checks.heartbeat_at`, `progress`; `crawl_batches` (upsert, never over a done batch); the worker’s `POST /batch` |
+| `crawl-{n}-wait-{i}`, `crawl-{n}-poll-{i}`   | the worker’s `GET /batch/{id}`                                                                                                               | `checks.heartbeat_at`, `progress`                                                                                |
+| `crawl-{n}-read`                             | the result, parsed with `BatchResultSchema`                                                                                                  | `batch-{n}.json.gz`; `crawl_batches` done                                                                        |
+| `access-{s}-…`                               | stored batches → `assemble` → `sample` (stage 2 only when needed)                                                                            | as crawl; batch numbers continue the crawl’s                                                                     |
+| `render`                                     | `renderCandidates`, the previous check’s page states                                                                                         | `render.json.gz` (Q7: the daily budget refuses)                                                                  |
+| `build`                                      | everything above, the previous graded check and its `diff_inputs`, the site’s fixes and events                                               | `built.json.gz`, `map.json.gz` (`checkMap`)                                                                      |
+| `persist`                                    | `built.json.gz`                                                                                                                              | staged chunks, then `persist_built_check` in one transaction (Q11)                                               |
+| `emit`                                       |                                                                                                                                              | `check.finished`, under the id `check-finished:{check_id}`                                                       |
+| `finalize`                                   |                                                                                                                                              | removes `built.json.gz`                                                                                          |
 
 Each step returns under 4096 bytes as JSON; bulk data goes to the private `evidence` bucket, at `{account_id|anon}/{site_id}/{check_id}/{name}.json.gz`.
 
@@ -78,7 +78,7 @@ The worst case these allow fits the finish timeout, and the worst-case step coun
 
 ## Failure reasons
 
-`checks.failure_reason` is readable by the site’s members, so the pipeline writes one of these words, and its stores refuse a word outside the list (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/store.test.ts`).
+`checks.failure_reason` is readable by the site’s members, so the pipeline writes one of these words. Its stores refuse a word outside the list, and so do `fail_check` and `reap_stalled_checks`, which read it from `check_failure_reasons()`, a SQL function a test holds equal to the list (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/store.test.ts __tests__/v2-008-pipeline.test.ts`).
 
 | Reason               | When                                                                                |
 | -------------------- | ----------------------------------------------------------------------------------- |
@@ -103,12 +103,12 @@ The worst case these allow fits the finish timeout, and the worst-case step coun
 | `deploy`                                     | `check:{site}:deploy:{bucket}`, a 600-second bucket           |
 | `first_audit`, and any site no account keeps | by a fresh check id                                           |
 
-A bucketed key’s check id is the engine’s `stableId` of the key, so two requests in one bucket insert one row and send one event (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/request.test.ts`). A site no account keeps gets `expires_at` 30 days out. No caps are enforced here (CC-26b).
+A bucketed key’s check id is the engine’s `stableId` of the key, so two requests in one bucket insert one row and send events of one id, which Inngest keeps once (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/request.test.ts`). A site no account keeps gets `expires_at` 30 days out. No caps are enforced here (CC-26b).
 
 ## Migrations
 
 - `20261108000003_v2_006d_contract_columns.sql` (Q1): the contract fields SPEC 06 left to CC-06d, so a built check can be stored and read back whole.
-- `20261109000001_v2_008_pipeline.sql`: `crawl_batches` (`check_id`, `batch`, `kind`, `nonce`, `status`, `posted_at`, `finished_at`, `summary`, `result_path`); on `checks` `inngest_run_id`, `heartbeat_at`, `diff_inputs`, `map_path`; on `sites` `next_check_at`, `schedule_offset_min`; the index `checks_one_running_per_site`; `claim_check`, `fail_check`, `reap_stalled_checks` (Q13); the persist staging and `persist_built_check` (D5, Q11).
+- `20261109000001_v2_008_pipeline.sql`: `crawl_batches` (`check_id`, `batch`, `kind`, `nonce`, `status`, `posted_at`, `finished_at`, `summary`, `result_path`); on `checks` `inngest_run_id`, `heartbeat_at`, `diff_inputs`, `map_path`; on `sites` `next_check_at`, `schedule_offset_min`; the index `checks_one_running_per_site`; `claim_check`, `fail_check`, `reap_stalled_checks` (Q13) and `check_failure_reasons()`; the persist staging and `persist_built_check` (D5, Q11).
 
 ## Differences from ARCH-2 §4
 
@@ -119,3 +119,12 @@ A bucketed key’s check id is the engine’s `stableId` of the key, so two requ
 - **Sitemaps are read by the app** (Q8); the worker reads robots.txt for itself and the sitemap’s status only.
 - **Persistence is staged** (Q11): the bulk rows go in chunks while the check runs, and one transaction moves them and flips the status.
 - **No rendering in production yet** (Q7): the daily budget refuses until a durable one exists.
+
+## Differences from the brief
+
+- **`emit` runs before `finalize`.** D3 listed `finalize` then `emit`; a finalize that failed after the check was written would have left it finished with no `check.finished` (review round 1). A cancel or timeout between `persist` and `emit` still loses the event (follow-up).
+- **Migration 006d ships here** (Q1): without CC-06d’s columns a built check could not be stored whole.
+- **`loadCheck` returns `provenance: "measured"`** (Q2), not FixtureDataset’s `"fixture"`.
+- **`V2_PIPELINE` registers the functions only** (Q6); the account door’s promises about checks moved to `V2_CHECKS_PUBLIC`.
+- **Persistence is staged** (Q11) and **008 adds an index and four SQL functions** beyond D6’s list (Q13, review round 1).
+- **v1’s audit function clamps its concurrency to the plan cap**, not 100 (Q3).
