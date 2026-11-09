@@ -34,10 +34,21 @@ describe('handleEdge', () => {
     expect(res.cookies.get(CONSENT_REQUIRED_COOKIE)).toBeDefined();
   });
 
-  it('adds X-Robots-Tag noindex on /r/ report pages', async () => {
-    const req = new NextRequest(new Request('https://crawlmouse.com/r/abc'));
+  // A-7: each report page's robots meta decides whether it is indexed (app/r/[slug]/page.tsx), so the
+  // middleware sends no header that would override a claimed, indexable report.
+  it.each(['/r/abc', '/r/abc/opengraph-image', '/r/abc?ref=x'])(
+    'sends no X-Robots-Tag on the report path %s',
+    async (path) => {
+      const req = new NextRequest(new Request(`https://crawlmouse.com${path}`));
+      const res = await handleEdge(req, refreshWithAuthCookie);
+      expect(res.headers.get('X-Robots-Tag')).toBeNull();
+    },
+  );
+
+  it('keeps X-Robots-Tag noindex on /embed/ badges', async () => {
+    const req = new NextRequest(new Request('https://crawlmouse.com/embed/example.com'));
     const res = await handleEdge(req, refreshWithAuthCookie);
-    expect(res.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow, noarchive');
   });
 
   it('does not add X-Robots-Tag on app pages', async () => {

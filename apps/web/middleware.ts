@@ -47,7 +47,7 @@ export function guardApi(req: NextRequest, report: (r: Refusal) => void): NextRe
  * Edge request handler. API paths go to guardApi only. For pages, order matters: refresh the
  * Supabase session FIRST (middleware is a write-allowed context, so a logged-in visitor's rotated
  * tokens are persisted here — the durable half of the CRAWLMOUSE-7/-8 /dashboard fix), THEN layer the
- * consent cookie + the X-Robots rule onto the SAME response. Those layers are purely additive, so
+ * consent cookie + the /embed/ X-Robots rule onto the SAME response. Those layers are purely additive, so
  * they never clobber the refreshed auth cookies. `refresh` and `report` are injected in tests.
  */
 export async function handleEdge(
@@ -59,7 +59,9 @@ export async function handleEdge(
 
   const res = await refresh(req);
 
-  if (req.nextUrl.pathname.startsWith('/r/') || req.nextUrl.pathname.startsWith('/embed/')) {
+  // The embed badge is a widget, never a page to index. Report pages (/r/) get no header: each one's
+  // robots meta decides (app/r/[slug]/page.tsx generateMetadata), so a claimed report can be indexed.
+  if (req.nextUrl.pathname.startsWith('/embed/')) {
     res.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
   }
 
@@ -83,8 +85,7 @@ export function middleware(req: NextRequest, event: NextFetchEvent): Promise<Nex
 
 // Every path but the PostHog reverse proxy (/ingest), the signed webhooks, Next internals and the
 // favicon: pages for the session refresh and the consent cookie, the other API routes for guardApi,
-// which /ingest and the webhooks do not need. The X-Robots rule above still applies only to /r/ and
-// /embed/.
+// which /ingest and the webhooks do not need. The X-Robots rule above applies only to /embed/.
 export const config = {
   matcher: ['/((?!ingest|api/webhooks/|_next/static|_next/image|favicon.ico).*)'],
 };
