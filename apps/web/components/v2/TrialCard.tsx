@@ -31,7 +31,9 @@ export function TrialCard({ title, left, note, aside, children }: TrialCardProps
           </>
         ) : null}
       </div>
-      <div className={styles.note}>{note}</div>
+      <div className={styles.note} data-v2-phone-secondary="">
+        {note}
+      </div>
       {children ? <div className={styles.actions}>{children}</div> : null}
     </div>
   );

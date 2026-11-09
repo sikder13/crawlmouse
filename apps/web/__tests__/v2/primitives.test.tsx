@@ -608,10 +608,12 @@ describe('AccountShell and TrialCard (behaviour: account-shell.test.tsx)', () =>
     expect(src).toMatch(/className=\{`\$\{shell\.shell\} /);
   });
 
-  it('keeps the trial card’s action in reach on a phone and hides its note there (DESIGN-LOCK §6)', () => {
+  it('keeps the trial card’s action in reach on a phone, and its note out of sight but read (DESIGN-LOCK §6, owner ruling 2026-11-08)', () => {
     const src = css('TrialCard');
     const phone = src.slice(src.indexOf('@media (max-width: 760px)'));
-    expect(phone).toMatch(/\.note \{\s*display: none;/);
+    const note = phone.match(/\.note \{[^}]*\}/)![0];
+    expect(note).toMatch(/clip-path: inset\(50%\)/);
+    expect(note).not.toMatch(/display: none|visibility: hidden/);
     expect(phone).not.toMatch(/\.actions \{[^}]*display: none/);
   });
 });

@@ -31,38 +31,36 @@ export const NOT_THIS_STEP: Record<string, string> = {
 
 /**
  * Contract fields no column holds yet, each with where it will be stored. CC-12d added them to the
- * contract; their columns and CHECKs come with a migration the owner applies (CC-06c). The release
+ * contract; their columns and CHECKs come with a migration the owner applies (CC-06d). The release
  * is also the row's measurement lineage's, and the contract's fixture test holds the two equal.
  * v2-contract-guard.test.ts leaves each out of its column checks, and fails once one is stored under
  * its own name or as flattened columns, so an entry cannot outlive its reason.
  */
 export const NOT_STORED_YET: Record<string, string> = {
-  'PageResult.title': 'stored by CC-06c',
-  'PageResult.meta_description': 'stored by CC-06c',
-  'AccessTest.identity_role': 'stored by CC-06c',
-  'AccessTest.tagged': 'stored by CC-06c',
-  'AccessTest.witness': 'stored by CC-06c',
-  'AccessTest.fly_region': 'stored by CC-06c',
-  'AccessTest.request_signing': 'stored by CC-06c',
-  'AccessTest.signature_verified': 'stored by CC-06c',
-  'AccessTest.timing': 'stored by CC-06c',
-  'AccessTest.worker_release': 'stored by CC-06c (the lineage names the same release)',
+  'PageResult.title': 'stored by CC-06d',
+  'PageResult.meta_description': 'stored by CC-06d',
+  'AccessTest.identity_role': 'stored by CC-06d',
+  'AccessTest.tagged': 'stored by CC-06d',
+  'AccessTest.witness': 'stored by CC-06d',
+  'AccessTest.fly_region': 'stored by CC-06d',
+  'AccessTest.request_signing': 'stored by CC-06d',
+  'AccessTest.signature_verified': 'stored by CC-06d',
+  'AccessTest.timing': 'stored by CC-06d',
+  'AccessTest.worker_release': 'stored by CC-06d (the lineage names the same release)',
 };
 
 /**
  * Values the contract added to an enum that a column's CHECK does not hold yet, by table.column:
- * stored by CC-06c. The guard compares the CHECK with the enum less these, and fails once the CHECK
+ * stored by CC-06d. The guard compares the CHECK with the enum less these, and fails once the CHECK
  * holds one of them.
  */
 export const VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {
   'access_tests.source_ip_class': ['other_egress'],
-  // CC-17's two content fix types (owner ruling, 2026-11-05): written only after CC-06c's CHECK
-  'site_fixes.type': ['missing_schema_description', 'no_question_headings'],
 };
 
 /**
  * The same, for the research ledger's enum CHECKs (06b), by table.column in schema `research`:
- * SignalKind's four CC-12d values, stored by CC-06c. v2-006b-data-foundations.test.ts compares each
+ * SignalKind's four CC-12d values, stored by CC-06d. v2-006b-data-foundations.test.ts compares each
  * CHECK with its enum less these, and fails once the CHECK holds one of them.
  */
 export const LEDGER_VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {
@@ -209,6 +207,9 @@ export const RULE_CHECKS: Record<string, { table: string; constraint: string }> 
   report_slug: { table: 'reports', constraint: 'reports_slug' },
   report_open_tracking: { table: 'reports', constraint: 'reports_open_tracking' },
   fix_gone: { table: 'site_fixes', constraint: 'site_fixes_gone' },
+  // CC-17's two effect rules, CHECKs since 006c.
+  effect_seo_pending: { table: 'site_fixes', constraint: 'site_fixes_effect_seo_pending' },
+  effect_absorbed: { table: 'site_fixes', constraint: 'site_fixes_effect_absorbed' },
   access_request_line: { table: 'access_tests', constraint: 'access_tests_request_line' },
   change_severity: { table: 'changes', constraint: 'changes_severity' },
   change_resolved_info: { table: 'changes', constraint: 'changes_resolved_info' },
@@ -257,10 +258,6 @@ export const RULES_AT_WRITE: Record<string, string> = {
   withheld_reasons_match: 'compares the reasons with the components inside checks.ai_readability',
   fewer_crawlers: 'reads the Access component inside checks.ai_readability',
   content_score_withheld: 'compares two fields inside checks.content',
-  effect_seo_pending:
-    'inside site_fixes.effect; added by CC-17 after the v2-003 migration, and a CHECK like site_fixes_effect_pending needs a migration, which the owner applies',
-  effect_absorbed:
-    'sums two numbers inside site_fixes.effect; added by CC-17 after the v2-003 migration, which the owner applies',
   time_zone:
     'a value shape: report_schedules.timezone is text; Postgres cannot check a name against the Intl zone list the contract uses',
   coverage_robots: 'compares counts inside checks.coverage',
@@ -276,15 +273,15 @@ export const RULES_AT_WRITE: Record<string, string> = {
 /** Rules of entities or primitives this step does not store. */
 export const RULES_NOT_THIS_STEP: Record<string, string> = {
   cloudflare_unique: 'crawler registry (no table)',
-  access_identity_ua: 'AccessTest fields stored by CC-06c',
-  control_untagged: 'AccessTest fields stored by CC-06c',
-  access_witness: 'AccessTest fields stored by CC-06c',
-  witness_other: 'AccessTest fields stored by CC-06c',
-  fly_region: 'AccessTest fields stored by CC-06c',
-  timing_order: 'AccessTest fields stored by CC-06c',
-  worker_request: 'AccessTest fields stored by CC-06c',
-  worker_request_whole: 'AccessTest fields stored by CC-06c',
-  head_text_absent: 'PageResult fields stored by CC-06c',
+  access_identity_ua: 'AccessTest fields stored by CC-06d',
+  control_untagged: 'AccessTest fields stored by CC-06d',
+  access_witness: 'AccessTest fields stored by CC-06d',
+  witness_other: 'AccessTest fields stored by CC-06d',
+  fly_region: 'AccessTest fields stored by CC-06d',
+  timing_order: 'AccessTest fields stored by CC-06d',
+  worker_request: 'AccessTest fields stored by CC-06d',
+  worker_request_whole: 'AccessTest fields stored by CC-06d',
+  head_text_absent: 'PageResult fields stored by CC-06d',
   declaration_answer: 'worker batch result (no table)',
   declaration_bytes: 'worker batch result (no table)',
   declaration_media_type: 'worker batch result (no table)',
@@ -340,10 +337,10 @@ export const NESTED: Record<string, string[]> = {
 
 /** Enums no table of this step holds, and where they live. */
 export const NOT_STORED_HERE: Record<string, string> = {
-  IdentityRole: 'AccessTest.identity_role, stored by CC-06c',
-  WitnessRole: 'AccessTest.witness, stored by CC-06c',
-  RequestSigning: 'AccessTest.request_signing, stored by CC-06c',
-  SignatureVerification: 'AccessTest.signature_verified, stored by CC-06c',
+  IdentityRole: 'AccessTest.identity_role, stored by CC-06d',
+  WitnessRole: 'AccessTest.witness, stored by CC-06d',
+  RequestSigning: 'AccessTest.request_signing, stored by CC-06d',
+  SignatureVerification: 'AccessTest.signature_verified, stored by CC-06d',
   CloudflareCategory: 'crawler registry seed data',
   BatchPartialReason: 'worker batch result (no table)',
   DeclarationPath: 'worker batch result (no table)',

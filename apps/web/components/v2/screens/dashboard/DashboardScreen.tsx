@@ -48,6 +48,11 @@ function Strip({ strip }: { strip: NonNullable<DashboardView['strip']> }) {
               {h.delta}
             </span>
           ) : null}
+          {h.fresh ? (
+            <span className={styles.noun} data-v2-addition="" data-v2-health-fresh="">
+              {h.fresh}
+            </span>
+          ) : null}
         </div>
         {h.excluded ? (
           <div className={styles.excluded} data-v2-addition="">
@@ -294,8 +299,12 @@ function TopFixes({ top }: { top: NonNullable<DashboardView['topFixes']> }) {
             <span key="t">
               {r.title}
               {r.effort ? (
-                // The locked page hides the effort on a phone (table.fx td:nth-child(2) .mut).
-                <span className={`${shared.muted} ${shared.hidePhone}`}> · {r.effort}</span>
+                // Data, so it shows on a phone too, where the locked page hides it (owner ruling
+                // 2026-11-08); it wraps under the title in the narrow column.
+                <span className={shared.muted} data-v2-effort="">
+                  {' '}
+                  · {r.effort}
+                </span>
               ) : null}
             </span>,
             r.effect,

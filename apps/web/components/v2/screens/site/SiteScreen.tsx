@@ -144,7 +144,13 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
                     ) : null}
                     {f.note ? (
                       // The locked page hides this note on a phone (table.fx td:nth-child(2) .mut).
-                      <span className={`${shared.muted} ${shared.hidePhone}`}> · {f.note}</span>
+                      <span
+                        className={`${shared.muted} ${shared.phoneSecondary}`}
+                        data-v2-phone-secondary=""
+                      >
+                        {' '}
+                        · {f.note}
+                      </span>
                     ) : null}
                     {f.diff ? <div className={styles.diff}>{f.diff}</div> : null}
                   </span>,

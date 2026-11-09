@@ -5,21 +5,21 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import fc from 'fast-check';
-import {
-  gridSerialize,
-  sentryReport,
-  SERIALIZE_WINDOW_MS,
-  supabaseDoorStore,
-  type IncrementCell,
-} from './stores';
+import { sentryReport, supabaseDoorStore } from './stores';
+import { MalformedTrialDecisionError, type TrialTransition } from './trial-decision';
 
 type Answer = { data?: unknown; error?: { code?: string; message: string } | null; count?: number };
 
 /** A query builder whose every filter returns itself, and which resolves to the next answer. */
 function fakeSb(answers: Answer[]) {
   const calls: { table: string; ops: [string, unknown[]][] }[] = [];
+  const rpcs: { fn: string; args: unknown }[] = [];
   const sb = {
+    async rpc(fn: string, args: unknown) {
+      rpcs.push({ fn, args });
+      const answer = answers.shift() ?? { data: null, error: null };
+      return { data: answer.data ?? null, error: answer.error ?? null };
+    },
     from(table: string) {
       const call = { table, ops: [] as [string, unknown[]][] };
       calls.push(call);
@@ -46,7 +46,7 @@ function fakeSb(answers: Answer[]) {
       return builder;
     },
   };
-  return { sb: sb as unknown as SupabaseClient, calls };
+  return { sb: sb as unknown as SupabaseClient, calls, rpcs };
 }
 
 describe('supabaseDoorStore', () => {
@@ -80,23 +80,6 @@ describe('supabaseDoorStore', () => {
     expect(f.calls[0]!.ops).toContainEqual(['is', ['account_id', null]]);
   });
 
-  it('priorLedger keeps only rows whose kind matches the hash it was asked for', async () => {
-    const f = fakeSb([
-      {
-        data: [
-          { kind: 'email', value_hash: 'h1', created_at: '2026-11-01T00:00:00Z' },
-          { kind: 'device', value_hash: 'h1', created_at: '2026-11-01T00:00:00Z' },
-        ],
-      },
-    ]);
-    const rows = await supabaseDoorStore(f.sb).priorLedger(
-      [{ kind: 'email', value_hash: 'h1' }],
-      new Date('2025-11-05T00:00:00Z'),
-    );
-    expect(rows).toEqual([{ kind: 'email', created_at: new Date('2026-11-01T00:00:00Z') }]);
-    expect(f.calls[0]!.ops).toContainEqual(['gt', ['created_at', '2025-11-05T00:00:00.000Z']]);
-  });
-
   it('loadMember is null for a user with no default account, and never queries accounts then', async () => {
     const f = fakeSb([{ data: { default_account_id: null } }]);
     await expect(supabaseDoorStore(f.sb).loadMember('u')).resolves.toBeNull();
@@ -109,62 +92,46 @@ describe('supabaseDoorStore', () => {
   });
 });
 
-describe('gridSerialize', () => {
-  const W = SERIALIZE_WINDOW_MS;
-  /** An in-memory increment_rate_limit: one count per (key, window start). */
-  function cells() {
-    const counts = new Map<string, number>();
-    const increment: IncrementCell = async (key, start) => {
-      const k = `${key}@${start.toISOString()}`;
-      counts.set(k, (counts.get(k) ?? 0) + 1);
-      return counts.get(k)!;
-    };
-    return { increment, counts };
-  }
-  const BOUNDARY = Math.ceil(Date.parse('2026-11-05T12:00:00Z') / W) * W;
+describe('supabaseDoorStore.startTrial', () => {
+  const hashes = [{ kind: 'email' as const, value_hash: 'a'.repeat(64) }];
+  const transition = { event: 'trial_started', p_account_id: 'acc' } as unknown as TrialTransition;
 
-  it('refuses the second of two calls a few seconds apart across a window boundary', async () => {
-    const { increment } = cells();
-    await expect(gridSerialize(increment, () => new Date(BOUNDARY - 2000))('k')).resolves.toBe(
-      true,
-    );
-    await expect(gridSerialize(increment, () => new Date(BOUNDARY + 2000))('k')).resolves.toBe(
-      false,
-    );
+  it('calls start_trial_with_ledger with the account, the hashes and the transition', async () => {
+    const f = fakeSb([{ data: { outcome: 'started', hits: [] } }]);
+    await expect(supabaseDoorStore(f.sb).startTrial('acc', hashes, transition)).resolves.toEqual({
+      outcome: 'started',
+      hits: [],
+    });
+    expect(f.rpcs).toEqual([
+      {
+        fn: 'start_trial_with_ledger',
+        args: { p_account_id: 'acc', p_hashes: hashes, p_transition: transition },
+      },
+    ]);
   });
 
-  it('refuses any second call less than half a window after the first, wherever the boundaries fall', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        fc.integer({ min: 0, max: 10 * W }),
-        fc.integer({ min: 0, max: W / 2 - 1 }),
-        async (t, gap) => {
-          const { increment } = cells();
-          const at = BOUNDARY + t;
-          expect(await gridSerialize(increment, () => new Date(at))('k')).toBe(true);
-          expect(await gridSerialize(increment, () => new Date(at + gap))('k')).toBe(false);
-        },
-      ),
-    );
+  it('a refusal carries the kinds that refused', async () => {
+    const f = fakeSb([{ data: { outcome: 'refused', hits: ['email', 'ip24'] } }]);
+    await expect(supabaseDoorStore(f.sb).startTrial('acc', hashes, transition)).resolves.toEqual({
+      outcome: 'refused',
+      hits: ['email', 'ip24'],
+    });
   });
 
-  it('a different key, or a call a full window later in both grids, takes its own slot', async () => {
-    const { increment } = cells();
-    const at = () => new Date(BOUNDARY + 1000);
-    await gridSerialize(increment, at)('k');
-    await expect(gridSerialize(increment, at)('other')).resolves.toBe(true);
+  it('an error throws with its SQLSTATE', async () => {
+    const f = fakeSb([{ error: { code: '55P03', message: 'lock timeout' } }]);
     await expect(
-      gridSerialize(increment, () => new Date(BOUNDARY + 1000 + 2 * W))('k'),
-    ).resolves.toBe(true);
+      supabaseDoorStore(f.sb).startTrial('acc', hashes, transition),
+    ).rejects.toMatchObject({ code: '55P03' });
   });
 
-  it('a cell the store cannot count refuses', async () => {
-    await expect(
-      gridSerialize(
-        async () => null,
-        () => new Date(BOUNDARY),
-      )('k'),
-    ).resolves.toBe(false);
+  it('an answer that is not a decision throws MalformedTrialDecisionError', async () => {
+    for (const data of [null, { outcome: 'started' }, { outcome: 'maybe', hits: [] }]) {
+      const f = fakeSb([{ data }]);
+      await expect(
+        supabaseDoorStore(f.sb).startTrial('acc', hashes, transition),
+      ).rejects.toBeInstanceOf(MalformedTrialDecisionError);
+    }
   });
 });
 

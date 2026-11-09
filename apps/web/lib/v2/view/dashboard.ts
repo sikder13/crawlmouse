@@ -95,6 +95,11 @@ export interface HealthView {
   deltaTone: 'default' | 'bad';
   /** "1 site excluded: AI readability withheld", or null when every site counts (D5). */
   excluded: string | null;
+  /**
+   * "1 new": the sites graded now that are on a first baseline (no result at the earlier check, or
+   * a new baseline since it), which the move leaves out (owner ruling 2026-11-08). Null when none is.
+   */
+  fresh: string | null;
 }
 
 export interface CountView {
@@ -406,18 +411,41 @@ const meanOf = (pairs: Iterable<[number, number]>) => {
 
 /**
  * The health move compares like with like: the mean of the sites graded at both moments, then and
- * now. A site graded at only one of them is left out of both means.
+ * now. A site graded at only one of them is left out of both means, and so is a site on a first
+ * baseline (`fresh`), whose earlier result does not compare with its latest (owner ruling 2026-11-08).
  */
 export function moveOver(
   then: ReadonlyMap<string, [number, number]>,
   now: ReadonlyMap<string, [number, number]>,
+  fresh: ReadonlySet<string> = new Set(),
 ) {
-  const both = [...now.keys()].filter((id) => then.has(id));
+  const both = [...now.keys()].filter((id) => then.has(id) && !fresh.has(id));
   return {
     both,
     a: meanOf(both.map((id) => then.get(id)!)),
     b: meanOf(both.map((id) => now.get(id)!)),
   };
+}
+
+/**
+ * The sites graded now that are on a first baseline at `at`: no result yet when `then` was read,
+ * or a `baseline` change recorded after it (the grading changed, and earlier results are not
+ * compared). Read from the records, so the "N new" beside the move is counted, never typed.
+ */
+export function firstBaselines(
+  v: AccountView,
+  then: AccountView,
+  graded: Iterable<string>,
+  at: number,
+): Set<string> {
+  const out = new Set<string>();
+  for (const id of graded) {
+    const rebased = v.d.changes.some(
+      (c) => c.site_id === id && c.kind === 'baseline' && instant(c.detected_at) > at,
+    );
+    if (latest(then, id) === null || rebased) out.add(id);
+  }
+  return out;
 }
 
 function health(d: FixtureDataset, viewer: Viewer, v: AccountView): HealthView {
@@ -434,23 +462,29 @@ function health(d: FixtureDataset, viewer: Viewer, v: AccountView): HealthView {
   const prev = sinceCheck(v);
   let delta: string | null = null;
   let deltaTone: HealthView['deltaTone'] = 'default';
+  let fresh: string | null = null;
   if (prev && value !== null) {
     // The account may have begun after that check finished (its first audit runs before sign-up):
     // read the sites as they stood then, from the moment the account can be read at all.
     const at = Math.max(instant(prev.finished_at!), instant(firstRunNow(d, viewer)));
-    const then = healthAt(viewAt(d, { ...viewer, now: new Date(at).toISOString() }));
-    const { both, a, b } = moveOver(then.values, now.values);
+    const vThen = viewAt(d, { ...viewer, now: new Date(at).toISOString() });
+    const then = healthAt(vThen);
+    const newOnes = firstBaselines(v, vThen, now.values.keys(), at);
+    const { both, a, b } = moveOver(then.values, now.values, newOnes);
     if (a !== null && b !== null) {
+      // Sites left out for another reason than a first baseline (graded then, withheld now) are
+      // said with the count the move is taken over.
       const over =
-        both.length === now.values.size
+        both.length === now.values.size - newOnes.size
           ? ''
           : `, over the ${both.length} ${plural(both.length, 'site', 'sites')} graded at both`;
       const name = sinceName(v, prev);
       delta = `${move(a, b)} since ${'weekday' in name ? name.short : name.date}${over}`;
       deltaTone = b < a ? 'bad' : 'default';
+      fresh = newOnes.size ? `${newOnes.size} new` : null;
     }
   }
-  return { value: value === null ? '—' : String(value), delta, deltaTone, excluded };
+  return { value: value === null ? '—' : String(value), delta, deltaTone, excluded, fresh };
 }
 
 /** The grade moves recorded at a check, as "AI readability D → F" (FACTS row 98, Q12). */

@@ -211,7 +211,7 @@ const DAY0: CopyChange[] = [
     screen: 'dashboard-day0',
     kind: 'fixture',
     locked: 'Cloudflare · about 10 min',
-    // The locked page hides the effort on a phone, and so does ours.
+    // The locked page hides the effort on a phone; ours shows it there (the phone-only rows below).
     hiddenOnPhone: true,
     rendered: 'Cloudflare · about 10 minutes',
     source:
@@ -230,7 +230,7 @@ const DAY0: CopyChange[] = [
     locked: 'collections · about 20 min',
     rendered: 'collections · about 20 minutes',
     source: 'The fixture’s effort is 20 minutes, worded by effortText, as on the fix page',
-    // The locked page hides the effort on a phone, and so does ours.
+    // The locked page hides the effort on a phone; ours shows it there (the phone-only rows below).
     hiddenOnPhone: true,
   },
   {
@@ -274,6 +274,34 @@ const DAY0: CopyChange[] = [
       'one reminder on Wed 4 Nov, three days before the trial ends. If you keep Pro, Stripe sends the receipts.',
     source:
       'FACTS A8 (row 181) and A9; the date is trial_ends_at less three days in the account’s zone (D4, Q4): 5 Nov 02:41Z is Wed 4 Nov there',
+  },
+  // ── On a phone: the effort, which the locked page hides there (applied after the rows above) ──
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    onlyOnPhone: true,
+    locked: 'through Cloudflare +24 AI',
+    rendered: 'through Cloudflare · about 10 minutes +24 AI',
+    source:
+      'Owner ruling 2026-11-08 (ruling 1): the effort is data, so a phone shows it, where the locked page hides it',
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    onlyOnPhone: true,
+    locked: 'Server-render the product template +22 AI',
+    rendered: 'Server-render the product template · one template, one deploy +22 AI',
+    source:
+      'Owner ruling 2026-11-08 (ruling 1): the effort is data, so a phone shows it, where the locked page hides it',
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    onlyOnPhone: true,
+    locked: 'from their collections +4 SEO',
+    rendered: 'from their collections · about 20 minutes +4 SEO',
+    source:
+      'Owner ruling 2026-11-08 (ruling 1): the effort is data, so a phone shows it, where the locked page hides it',
   },
 ];
 
@@ -482,6 +510,11 @@ export const DASHBOARD_ADDITIONS: Addition[] = [
     screen: 'dashboard',
     what: 'Under the health mean, the sites it leaves out and why ("1 site excluded: AI readability withheld"), shown only when one is',
     source: 'CC-26 brief, D5',
+  },
+  {
+    screen: 'dashboard',
+    what: 'Beside the health move, the sites on a first baseline it leaves out ("1 new"), counted from the records, shown only when one is',
+    source: 'Owner ruling 2026-11-08 (ruling 2)',
   },
   {
     screen: 'dashboard',

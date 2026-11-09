@@ -41,6 +41,7 @@ const { captureMessage } = vi.hoisted(() => ({ captureMessage: vi.fn() }));
 vi.mock('@sentry/nextjs', () => ({ captureMessage }));
 
 import { GET, POST } from './route';
+import { emailBinding } from '@/lib/auth/continue-intent';
 
 const ORIGIN = 'https://crawlmouse.com';
 const CANARY = 'link-canary-one';
@@ -229,6 +230,41 @@ describe('POST /login/verify verifies', () => {
     expect(anonUpdate.mock.calls[0]![0].is).toEqual(['user_id', null]);
   });
 
+  it('skips the v1 claim when the link signs in an address other than the one this browser asked for (D9)', async () => {
+    anon.id = 'anon-1';
+    await POST(post({ cm_auth_otp: otp(), cm_auth_for: emailBinding('someone-else@example.com') }));
+    expect(anonUpdate).not.toHaveBeenCalled();
+    expect(clearAnonSession).not.toHaveBeenCalled();
+  });
+
+  it("keeps this browser's own door request (binding, named site, return target) after someone else's link", async () => {
+    const jar = {
+      cm_auth_otp: otp(),
+      cm_auth_for: emailBinding('someone-else@example.com'),
+      cm_auth_signup: JSON.stringify({ site: 'mine.example' }),
+      post_login_next: '/r/abc',
+    };
+    const kept = setCookies(await POST(post(jar)));
+    for (const name of ['cm_auth_for', 'cm_auth_signup', 'post_login_next'])
+      expect(
+        kept.find((c) => c.startsWith(`${name}=`)),
+        name,
+      ).toBeUndefined();
+    const own = setCookies(await POST(post({ ...jar, cm_auth_for: emailBinding(USER.email) })));
+    for (const name of ['cm_auth_for', 'cm_auth_signup', 'post_login_next'])
+      expect(
+        own.find((c) => c.startsWith(`${name}=`)),
+        name,
+      ).toMatch(/Max-Age=0/);
+  });
+
+  it('claims as before when the binding is the verified address, or there is none', async () => {
+    anon.id = 'anon-1';
+    await POST(post({ cm_auth_otp: otp(), cm_auth_for: emailBinding(USER.email) }));
+    await POST(post({ cm_auth_otp: otp() }));
+    expect(anonUpdate).toHaveBeenCalledTimes(2);
+  });
+
   it('ends the anonymous session after claiming it, and not before a sign-in', async () => {
     anon.id = 'anon-1';
     await POST(post({ cm_auth_otp: otp() }));
@@ -299,7 +335,7 @@ describe('POST /login/verify verifies', () => {
           cookie: cookieHeader({
             cm_auth_otp: otp(),
             cm_auth_signup: JSON.stringify({ site: 'acme.com', tz: 'Europe/Kyiv' }),
-            cm_auth_for: 'binding-hash',
+            cm_auth_for: emailBinding(USER.email),
             cm_auth_device: 'dev-1',
           }),
         },
@@ -310,7 +346,7 @@ describe('POST /login/verify verifies', () => {
       expect.objectContaining({
         user: USER,
         signup: { site: 'acme.com', tz: 'Europe/Kyiv' },
-        boundTo: 'binding-hash',
+        boundTo: emailBinding(USER.email),
         device: 'dev-1',
         ip: '203.0.113.9',
       }),
