@@ -283,20 +283,28 @@ describe('supabasePipelineStore: lists are read whole', () => {
   const rows = (n: number, from = 0) =>
     Array.from({ length: n }, (_, i) => ({ id: `f${from + i}` }));
 
-  it('pages a list past PostgREST’s row cap until a short page', async () => {
-    const { sb, calls } = recorder(ok(rows(PAGE_ROWS)), ok(rows(3, PAGE_ROWS)));
+  it('pages a list past PostgREST’s row cap, and stops on an empty page', async () => {
+    const { sb, calls } = recorder(ok(rows(PAGE_ROWS)), ok(rows(3, PAGE_ROWS)), ok([]));
     const fixes = await supabasePipelineStore(sb).fixes(S);
     expect(fixes).toHaveLength(PAGE_ROWS + 3);
     expect(calls.map((c) => c.chain.find(([m]) => m === 'range'))).toEqual([
       ['range', [0, PAGE_ROWS - 1]],
       ['range', [PAGE_ROWS, 2 * PAGE_ROWS - 1]],
+      ['range', [PAGE_ROWS + 3, 2 * PAGE_ROWS + 2]],
     ]);
   });
 
-  it('asks again after a page of exactly the cap, and stops on an empty one', async () => {
-    const { sb, calls } = recorder(ok(rows(PAGE_ROWS)), ok([]));
-    expect(await supabasePipelineStore(sb).batches(C)).toHaveLength(PAGE_ROWS);
-    expect(calls).toHaveLength(2);
+  it('reads the whole list when the server caps pages below PAGE_ROWS', async () => {
+    const cap = 400;
+    const { sb, calls } = recorder(ok(rows(cap)), ok(rows(cap, cap)), ok(rows(7, 2 * cap)), ok([]));
+    const fixes = await supabasePipelineStore(sb).fixes(S);
+    expect(fixes.map((f) => f.id)).toEqual(rows(2 * cap + 7).map((r) => r.id));
+    expect(calls.map((c) => c.chain.find(([m]) => m === 'range')![1][0])).toEqual([
+      0,
+      cap,
+      2 * cap,
+      2 * cap + 7,
+    ]);
   });
 
   it('reads fix events in id lists of IN_LIST', async () => {

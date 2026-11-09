@@ -2,7 +2,7 @@
  * What the check pipeline reads and writes in Postgres, outside persistence (persist.ts) and the
  * read-back (load.ts). Claim, fail and reap are migration 008's SQL functions, so the statements that
  * race run as one statement in the database; the others are single selects, inserts and updates. A
- * list read repeats its select with `.range()`, PAGE_ROWS at a time, until a shorter page.
+ * list read repeats its select with `.range()` from where the rows so far end, until an empty page.
  *
  * `test-support/sql-store.ts` is the same interface over PGlite, with the same statements in SQL.
  */
@@ -87,8 +87,8 @@ export interface PipelineStore {
 }
 
 /**
- * Supabase's PostgREST row cap (`max-rows`, 1,000 unless the project changes it): a page shorter than
- * this is the last one. A project cap below it would end a list early.
+ * Rows asked for per page. PostgREST may return fewer (its `max-rows` cap, 1,000 unless the project
+ * changes it), so a list reads on from where the last page ended until a page comes back empty.
  */
 export const PAGE_ROWS = 1000;
 /** Ids per `in` filter, so the request URL stays short. */
@@ -102,16 +102,19 @@ function must<T>(what: string, { data, error }: Result<T>): T {
   return data as T;
 }
 
-/** The rows of a query, PAGE_ROWS at a time until a shorter page. */
+/**
+ * Every row of a query: each page starts where the rows so far end, and an empty page ends the list,
+ * so a server cap below PAGE_ROWS shortens the pages and never the list.
+ */
 async function paged(
   what: string,
   page: (from: number, to: number) => PromiseLike<Result<Row[]>>,
 ): Promise<Row[]> {
   const rows: Row[] = [];
-  for (let from = 0; ; from += PAGE_ROWS) {
-    const got = must(what, await page(from, from + PAGE_ROWS - 1)) ?? [];
+  for (;;) {
+    const got = must(what, await page(rows.length, rows.length + PAGE_ROWS - 1)) ?? [];
+    if (got.length === 0) return rows;
     rows.push(...got);
-    if (got.length < PAGE_ROWS) return rows;
   }
 }
 
