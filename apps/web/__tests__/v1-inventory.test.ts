@@ -22,7 +22,9 @@ import {
   isFlagGated,
   deleteProblems,
   pageUrl,
+  redirectProblems,
   refProblems,
+  servedFunctionNames,
   urlMatches,
   v1InngestFunctions,
   v1MetadataFiles,
@@ -125,25 +127,38 @@ describe('the finders see what they claim to see', () => {
       ]);
     }));
 
-  it('a file is flag-gated only when it refuses with a v2 flag off, read through the AST', () =>
+  it('a file is flag-gated only when every handler is a 404 with a v2 flag off', () =>
     withDir((dir) => {
-      const refuse =
-        'export async function POST() { if (!billingV2Enabled()) return null; return 1; }';
+      const imp = "import { billingV2Enabled } from '@/lib/billing/flags';";
+      const gate = 'if (!billingV2Enabled()) return new Response(null, { status: 404 });';
       writeFixture(dir, {
-        'gated.ts': `import { billingV2Enabled } from '@/lib/billing/flags';\n${refuse}`,
-        'aliased.ts': `import { accountDoorEnabled as on } from '../../lib/auth/flags';\nexport function GET() { if (!on()) { return 404; } }`,
-        'branch.ts': `import { accountDoorEnabled } from '@/lib/auth/flags';\nexport function GET() { const v2 = accountDoorEnabled(); return v2; }`,
-        'typeonly.ts': `import type { billingV2Enabled } from '@/lib/billing/flags';\n${refuse}`,
-        'comment.ts': `// import { billingV2Enabled } from '@/lib/billing/flags';\n${refuse}`,
-        'other.ts': `import { billingV2Enabled } from '@/lib/x';\n${refuse}`,
+        'gated.ts': `${imp}\nexport async function POST() { ${gate} return 1; }`,
+        'helper404.ts': `${imp}\nexport async function POST() { if (!billingV2Enabled()) return refuse(404, 'x'); return 1; }`,
+        'page.tsx': `import { accountDoorEnabled as on } from '../../lib/auth/flags';\nexport default function P() { if (!on()) { return notFound(); } return 1; }`,
+        'arrow.ts': `${imp}\nexport const GET = async () => { ${gate} return 1; };`,
+        'fallback.ts': `${imp}\nexport async function GET() { if (!billingV2Enabled()) return legacy(); return 2; }`,
+        'helperonly.ts': `${imp}\nfunction h() { ${gate} }\nexport async function GET() { h(); return 1; }`,
+        'onegated.ts': `${imp}\nexport async function GET() { ${gate} return 1; }\nexport async function POST() { return 2; }`,
+        'nested.ts': `${imp}\nexport async function GET() { if (x) { ${gate} } return 1; }`,
+        'branch.ts': `${imp}\nexport function GET() { const v2 = billingV2Enabled(); return v2; }`,
+        'typeonly.ts': `import type { billingV2Enabled } from '@/lib/billing/flags';\nexport async function POST() { ${gate} }`,
+        'comment.ts': `// ${imp}\nexport async function POST() { ${gate} }`,
+        'other.ts': `import { billingV2Enabled } from '@/lib/x';\nexport async function POST() { ${gate} }`,
       });
-      expect(isFlagGated(join(dir, 'gated.ts'))).toBe(true);
-      expect(isFlagGated(join(dir, 'aliased.ts'))).toBe(true);
-      expect(isFlagGated(join(dir, 'branch.ts'))).toBe(false);
-      expect(isFlagGated(join(dir, 'typeonly.ts'))).toBe(false);
-      expect(isFlagGated(join(dir, 'comment.ts'))).toBe(false);
-      expect(isFlagGated(join(dir, 'other.ts'))).toBe(false);
+      const gated = (f: string) => isFlagGated(join(dir, f));
+      const yes = ['gated.ts', 'helper404.ts', 'page.tsx', 'arrow.ts'];
+      expect(yes.filter(gated)).toEqual(yes);
+      const no = ['fallback.ts', 'helperonly.ts', 'onegated.ts', 'nested.ts', 'branch.ts'];
+      expect([...no, 'typeonly.ts', 'comment.ts', 'other.ts'].filter(gated)).toEqual([]);
     }));
+
+  it('the flag rule hides exactly the v2 routes on disk today (a new one is a choice, not a slip)', () => {
+    // A merge that adds a flag-gated v2 route outside the v2 groups adds it here, on purpose.
+    const hidden = [...v1Pages(), ...v1MetadataFiles(), ...v1Routes()].filter((p) =>
+      isFlagGated(join(WEB, p)),
+    );
+    expect(hidden).toEqual(['app/api/checks/[id]/claim/route.ts']);
+  });
 
   it('top-level exported Inngest functions with their cron, and not a factory-built one', () =>
     withDir((dir) => {
@@ -175,6 +190,8 @@ describe('the finders see what they claim to see', () => {
       'an id constant',
       "const I = 'z';\nexport const z = inngest.createFunction({ id: I }, {}, h);",
     ],
+    ['an IIFE', "export const z = (() => inngest.createFunction({ id: 'z' }, {}, h))();"],
+    ['an element access', "export const z = inngest['createFunction']({ id: 'z' }, {}, h);"],
   ])('an Inngest shape the finder cannot read throws: %s', (_name, text) =>
     withDir((dir) => {
       writeFixture(dir, { 'probe.ts': text });
@@ -202,6 +219,15 @@ describe('the finders see what they claim to see', () => {
       ]);
     }));
 
+  it('the serve route registers exactly the v1 functions the finder sees', () => {
+    const served = servedFunctionNames(join(WEB, 'app/api/webhooks/inngest/route.ts'));
+    // null would mean the route builds the list with a call (CC-20b's shape); this check then fails
+    // and is rewritten with that merge, rather than passing unread.
+    expect(served).not.toBeNull();
+    const found = v1InngestFunctions().map((f) => f.path.split('#')[1]);
+    expect([...served!].sort()).toEqual([...found].sort());
+  });
+
   it("a file:line reference is checked against the file it names, or the entry's own", () => {
     const lines: Record<string, number> = { 'apps/web/app/x/route.ts': 40, 'inngest/a.ts': 10 };
     const count = (p: string) => lines[p] ?? 0;
@@ -219,6 +245,12 @@ describe('the finders see what they claim to see', () => {
     expect(refProblems('inngest/a.ts:11', undefined, count)).toEqual(['inngest/a.ts:11']);
     expect(refProblems('lib/missing.ts:1', undefined, count)).toEqual(['lib/missing.ts:1']);
     expect(refProblems('at 13:25 UTC, 0 3 * * *', undefined, count)).toEqual([]);
+    const local = (seg: string) => seg === 'x';
+    expect(refProblems('x/route.ts:40', undefined, count, local)).toEqual([]);
+    expect(refProblems('x/route.ts:41', undefined, count, local)).toEqual(['x/route.ts:41']);
+    expect(refProblems('x/nope.ts:1', undefined, count, local)).toEqual(['unresolved x/nope.ts:1']);
+    expect(refProblems('dep/dist/index.js:543', undefined, count, local)).toEqual([]);
+    expect(refProblems('(x/route.ts:41)', undefined, count, local)).toEqual(['x/route.ts:41']);
   });
 
   it('reads the real tree (anti-vacuity)', () => {
@@ -282,7 +314,7 @@ describe('the inventory matches the tree', () => {
 
 describe('every ruling is one of three and carries its consequence (D2, D3)', () => {
   const REDIRECT: Record<Kind, RegExp> = {
-    page: /^(\/\S*|410|none)$/,
+    page: /^(\/\S*|410|none|same)$/,
     route: /^(\/\S*|alias|none)$/,
     metadata: /^(\/\S*|none)$/,
     inngest: /^n\/a$/,
@@ -325,13 +357,27 @@ describe('every ruling is one of three and carries its consequence (D2, D3)', ()
     ]);
   });
 
-  it('a retired page that redirects to a path names a page the inventory serves', () => {
-    const pageUrls = items.filter((e) => e.kind === 'page').map((e) => e.url!);
-    const targets = items.filter(
-      (e) => e.kind === 'page' && e.ruling === 'retire' && e.redirect!.startsWith('/'),
-    );
-    expect(targets.length).toBeGreaterThan(0);
-    expect(targets.filter((e) => !pageUrls.includes(e.redirect!)).map((e) => e.path)).toEqual([]);
+  it('a retired page that redirects to a path names a keep page, not a pattern or itself', () => {
+    expect(redirectProblems(items)).toEqual([]);
+    const page = (path: string, url: string, ruling: string, redirect?: string) => ({
+      kind: 'page',
+      path,
+      url,
+      ruling,
+      redirect,
+    });
+    const keep = page('app/k/page.tsx', '/k', 'keep');
+    const a = (to: string) => page('app/a/page.tsx', '/a', 'retire', to);
+    expect(redirectProblems([keep, a('/k')])).toEqual([]);
+    expect(redirectProblems([keep, a('/a')])).toEqual([
+      'app/a/page.tsx: redirects to itself (use same)',
+    ]);
+    expect(redirectProblems([keep, a('/r/[x]')])).toEqual([
+      'app/a/page.tsx: redirects to a pattern, /r/[x]',
+    ]);
+    expect(redirectProblems([keep, page('app/b/page.tsx', '/b', 'retire'), a('/b')])).toEqual([
+      'app/a/page.tsx: /b is not a keep page',
+    ]);
   });
 
   it('every file:line in evidence, checks and findings holds on the tracked tree', () => {
@@ -415,7 +461,10 @@ describe('the sitemap (§13): nothing in it is deleted, and a retired URL in it 
       [],
     );
     const noTarget = served.filter(
-      (e) => e.ruling === 'retire' && inSitemap(e) && !e.redirect!.startsWith('/'),
+      (e) =>
+        e.ruling === 'retire' &&
+        inSitemap(e) &&
+        !(e.redirect!.startsWith('/') || e.redirect === 'same'),
     );
     expect(noTarget.map((e) => e.path)).toEqual([]);
     expect(served.filter(inSitemap).map((e) => e.path)).toContain('app/r/[slug]/page.tsx');

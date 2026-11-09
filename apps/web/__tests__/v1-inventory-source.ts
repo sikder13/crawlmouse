@@ -5,9 +5,10 @@
  *
  * What counts as v2, and is therefore not listed (the rule, not a list of items):
  * - app files under a `(v2-preview)` or `(account)` route group, at any depth;
- * - an app file that refuses whenever a v2 flag is off (`isFlagGated`): that is how v2 routes outside
+ * - an app file that is a 404 whenever a v2 flag is off (`isFlagGated`): that is how v2 routes outside
  *   those groups gate themselves (`api/checks/[id]/claim` on `accountDoorEnabled`, CC-03's new billing
- *   routes on `billingV2Enabled`). A v1 file with a v2 branch does not refuse, so it stays v1;
+ *   routes on `billingV2Enabled`). A v1 file with a v2 branch is not a 404 with the flag off, so it
+ *   stays v1;
  * - an Inngest function built inside a function body (a factory) rather than as a top-level
  *   `export const x = inngest.createFunction(…)`; the v2 functions are registered that way, behind
  *   their flags;
@@ -17,7 +18,7 @@
  * this); a `create table` inside a dynamic `execute`, or a `--` inside a SQL string literal; parallel
  * (`@slot`) and intercepting (`(.)x`) segments, none of which exist under app/ today.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 
@@ -69,19 +70,69 @@ export const v1MetadataFiles = (dir = APP_DIR): string[] =>
 export const v1Routes = (dir = APP_DIR): string[] =>
   walkApp(dir, ROUTE_FILE).map((rel) => `app/${rel}`);
 
+const HANDLER_NAMES = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
+
+/** The bodies of a module's route handlers and its default export (a page). */
+function handlerBodies(sf: ts.SourceFile): ts.Block[] {
+  const exported = (n: ts.Node) =>
+    (ts.canHaveModifiers(n) ? (ts.getModifiers(n) ?? []) : []).some(
+      (m) => m.kind === ts.SyntaxKind.ExportKeyword,
+    );
+  const isDefault = (n: ts.Node) =>
+    (ts.canHaveModifiers(n) ? (ts.getModifiers(n) ?? []) : []).some(
+      (m) => m.kind === ts.SyntaxKind.DefaultKeyword,
+    );
+  const out: ts.Block[] = [];
+  for (const st of sf.statements) {
+    if (ts.isFunctionDeclaration(st) && exported(st) && st.body) {
+      if (isDefault(st) || (st.name && HANDLER_NAMES.has(st.name.text))) out.push(st.body);
+    }
+    if (ts.isVariableStatement(st) && exported(st)) {
+      for (const d of st.declarationList.declarations) {
+        const init = d.initializer;
+        if (
+          ts.isIdentifier(d.name) &&
+          HANDLER_NAMES.has(d.name.text) &&
+          init &&
+          (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) &&
+          ts.isBlock(init.body)
+        ) {
+          out.push(init.body);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** True when `node` holds a 404: the numeric literal, or a `notFound()` call. */
+function holds404(node: ts.Node): boolean {
+  if (ts.isNumericLiteral(node) && node.text === '404') return true;
+  if (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === 'notFound'
+  ) {
+    return true;
+  }
+  return ts.forEachChild(node, holds404) ?? false;
+}
+
 /**
- * True when the file refuses whenever a v2 flag is off: it imports a `…Enabled` reader (a value
- * import, not `import type`) from a module whose path ends in `/flags`, and some function in it has
- * a top-level `if (!reader()) return …`. Importing a reader is not enough: a v1 route that gained a
- * v2 branch (`api/auth/magic-link`, `login/verify`) imports one and still serves v1 with the flag off.
+ * True when the file is a 404 whenever a v2 flag is off: it imports a `…Enabled` reader (a value
+ * import, not `import type`) from a module whose path ends in `/flags`, and every route handler it
+ * exports (and its default export, for a page) has, at the top level of its body,
+ * `if (!reader()) return …` with a 404 in the returned value (`{ status: 404 }`, `refuse(404, …)`,
+ * `notFound()`). A v1 route with a v2 branch, a flag-off fallback that serves v1, or a helper's early
+ * return does not qualify, so such a file stays v1 and needs an entry.
  */
 export function isFlagGated(file: string): boolean {
   const sf = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
   const readers = new Set<string>();
-  for (const s of sf.statements) {
-    if (!ts.isImportDeclaration(s) || !ts.isStringLiteral(s.moduleSpecifier)) continue;
-    if (!/\/flags$/.test(s.moduleSpecifier.text) || s.importClause?.isTypeOnly) continue;
-    const named = s.importClause?.namedBindings;
+  for (const st of sf.statements) {
+    if (!ts.isImportDeclaration(st) || !ts.isStringLiteral(st.moduleSpecifier)) continue;
+    if (!/\/flags$/.test(st.moduleSpecifier.text) || st.importClause?.isTypeOnly) continue;
+    const named = st.importClause?.namedBindings;
     if (!named || !ts.isNamedImports(named)) continue;
     for (const e of named.elements) {
       if (!e.isTypeOnly && /Enabled$/.test((e.propertyName ?? e.name).text))
@@ -89,29 +140,25 @@ export function isFlagGated(file: string): boolean {
     }
   }
   if (readers.size === 0) return false;
-  const returns = (st: ts.Statement): boolean =>
-    ts.isReturnStatement(st) || (ts.isBlock(st) && st.statements.some(ts.isReturnStatement));
   const refusesWhenOff = (st: ts.Statement): boolean => {
-    if (!ts.isIfStatement(st) || !returns(st.thenStatement)) return false;
+    if (!ts.isIfStatement(st)) return false;
     const cond = st.expression;
-    return (
+    const negatesReader =
       ts.isPrefixUnaryExpression(cond) &&
       cond.operator === ts.SyntaxKind.ExclamationToken &&
       ts.isCallExpression(cond.operand) &&
       ts.isIdentifier(cond.operand.expression) &&
-      readers.has(cond.operand.expression.text)
-    );
+      readers.has(cond.operand.expression.text);
+    if (!negatesReader) return false;
+    const ret = ts.isReturnStatement(st.thenStatement)
+      ? st.thenStatement
+      : ts.isBlock(st.thenStatement)
+        ? st.thenStatement.statements.find(ts.isReturnStatement)
+        : undefined;
+    return ret?.expression !== undefined && holds404(ret.expression);
   };
-  let found = false;
-  const visit = (node: ts.Node) => {
-    if (found) return;
-    if (ts.isFunctionLike(node) && 'body' in node && node.body && ts.isBlock(node.body)) {
-      if (node.body.statements.some(refusesWhenOff)) found = true;
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sf);
-  return found;
+  const bodies = handlerBodies(sf);
+  return bodies.length > 0 && bodies.every((b) => b.statements.some(refusesWhenOff));
 }
 
 /** The URL a page file serves: route groups dropped, `page.tsx` dropped. */
@@ -161,6 +208,40 @@ function crons(trigger: ts.Expression | undefined, where: string): string[] {
   });
 }
 
+/** A function that is not run where it is written; an immediately invoked one runs at load. */
+function isFactoryBody(node: ts.Node): boolean {
+  if (!ts.isFunctionLike(node)) return false;
+  let outer: ts.Node = node;
+  while (ts.isParenthesizedExpression(outer.parent)) outer = outer.parent;
+  return !(ts.isCallExpression(outer.parent) && outer.parent.expression === outer);
+}
+
+/**
+ * The identifiers in the serve route's `functions: [ … ]` array, or null when `functions` is not an
+ * array literal (CC-20b's branch builds it with a call). Spread elements are skipped.
+ */
+export function servedFunctionNames(routeFile: string): string[] | null {
+  const sf = ts.createSourceFile(
+    routeFile,
+    readFileSync(routeFile, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  let names: string[] | null = null;
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isPropertyAssignment(node) &&
+      node.name.getText() === 'functions' &&
+      ts.isArrayLiteralExpression(node.initializer)
+    ) {
+      names = node.initializer.elements.filter(ts.isIdentifier).map((e) => e.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return names;
+}
+
 /**
  * Every `createFunction(…)` call in each non-test module of `dir`. A call inside a function body is
  * a factory's (the v2 rule) and is skipped; a call written as the top-level
@@ -175,11 +256,14 @@ export function v1InngestFunctions(dir = INNGEST_DIR): InngestFunction[] {
     const text = readFileSync(join(dir, file), 'utf8');
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     const visit = (node: ts.Node, inFunction: boolean) => {
+      const callee = ts.isCallExpression(node) ? node.expression : undefined;
       const isCall =
-        ts.isCallExpression(node) &&
-        ((ts.isPropertyAccessExpression(node.expression) &&
-          node.expression.name.text === 'createFunction') ||
-          (ts.isIdentifier(node.expression) && node.expression.text === 'createFunction'));
+        callee !== undefined &&
+        ((ts.isPropertyAccessExpression(callee) && callee.name.text === 'createFunction') ||
+          (ts.isIdentifier(callee) && callee.text === 'createFunction') ||
+          (ts.isElementAccessExpression(callee) &&
+            ts.isStringLiteralLike(callee.argumentExpression) &&
+            callee.argumentExpression.text === 'createFunction'));
       if (isCall && !inFunction) {
         const call = node as ts.CallExpression;
         const decl = call.parent;
@@ -205,7 +289,7 @@ export function v1InngestFunctions(dir = INNGEST_DIR): InngestFunction[] {
           cron: found[0] ?? null,
         });
       }
-      ts.forEachChild(node, (child) => visit(child, inFunction || ts.isFunctionLike(node)));
+      ts.forEachChild(node, (child) => visit(child, inFunction || isFactoryBody(node)));
     };
     visit(sf, false);
   }
@@ -238,18 +322,35 @@ const WEB_PREFIX = /^((app|lib|components)\/|middleware\.ts$)/;
 const FULL_REF =
   /(?<![\w/.])((?:apps|packages|inngest|infra|docs|scripts|app|lib|components)\/[\w./()[\]-]+|middleware\.ts):(\d+(?:[-,]\s?\d+)*)/g;
 const BARE_REF = /(?<![\w/.[\]()-])([\w-]+\.(?:tsx?|jsx?|mjs|sql|json)):(\d+)/g;
+/** One path segment: a route group `(name)` whole, or a run without brackets. */
+const SEGMENT = String.raw`(?:\([\w.-]+\)|[\w.[\]-]+)`;
+const PATH_REF = new RegExp(
+  String.raw`(?<![\w/.@-])((?:${SEGMENT}\/)+${SEGMENT}\.(?:tsx?|jsx?|mjs|sql|json)):(\d+(?:[-,]\s?\d+)*)`,
+  'g',
+);
+/** Where a folder-relative reference may start, tried in order. */
+const REF_ROOTS = ['apps/web/app/', 'apps/web/', 'packages/engine/src/', 'inngest/', ''];
+const localDir = (segment: string): boolean =>
+  REF_ROOTS.some((r) => {
+    const p = join(REPO_ROOT, r, segment);
+    return existsSync(p) && statSync(p).isDirectory();
+  });
 const RELATIVE_REF = /(?<![\w\])])(?:^|(?<=[\s(,]))(?<!\S\S:):(\d+(?:[-,]\s?\d+)*)/g;
 
 /**
  * The file:line references in `text` that do not hold: a full path (`apps/…`, `inngest/…`, or
  * apps/web-relative `app/…`, `lib/…`, `components/…`) that is not a tracked file or is shorter than
  * the line; a relative `(:45-47)` when there is no `own` file to read it against, or past its end; a
- * bare `route.ts:12` that names no folder. `lineCount` returns 0 for a file that is not tracked.
+ * bare `route.ts:12` that names no folder; a folder-relative `api/x/route.ts:3` that resolves under
+ * none of `REF_ROOTS` although its first folder is one of ours. A path whose first folder is not ours
+ * (`got-scraping/dist/index.js:543`, a dependency's file) is not checked. `lineCount` returns 0 for a
+ * file that is not tracked.
  */
 export function refProblems(
   text: string,
   own: string | undefined,
   lineCount: (repoPath: string) => number,
+  isLocalDir: (segment: string) => boolean = localDir,
 ): string[] {
   const bad: string[] = [];
   const maxLine = (spec: string) => Math.max(...spec.split(/[-,]\s?/).map(Number));
@@ -258,13 +359,49 @@ export function refProblems(
     if (maxLine(m[2]!) > lineCount(repoPath(m[1]!))) bad.push(m[0]);
   }
   const withoutFull = text.replace(FULL_REF, ' ');
-  for (const m of withoutFull.matchAll(BARE_REF)) bad.push(`bare ${m[0]}`);
-  const withoutAny = withoutFull.replace(BARE_REF, ' ');
+  for (const m of withoutFull.matchAll(PATH_REF)) {
+    const found = REF_ROOTS.map((r) => r + m[1]!).find((p) => lineCount(p) > 0);
+    if (found !== undefined) {
+      if (maxLine(m[2]!) > lineCount(found)) bad.push(m[0]);
+    } else if (isLocalDir(m[1]!.split('/')[0]!)) {
+      bad.push(`unresolved ${m[0]}`);
+    }
+  }
+  const withoutPaths = withoutFull.replace(PATH_REF, ' ');
+  for (const m of withoutPaths.matchAll(BARE_REF)) bad.push(`bare ${m[0]}`);
+  const withoutAny = withoutPaths.replace(BARE_REF, ' ');
   for (const m of withoutAny.matchAll(RELATIVE_REF)) {
     if (own === undefined) bad.push(`relative ${m[0]} with no file`);
     else if (maxLine(m[1]!) > lineCount(repoPath(own))) bad.push(`${own}${m[0]}`);
   }
   return bad;
+}
+
+/**
+ * A retired page's redirect: `same` (v2 serves the URL), `410`, `none`, or a path that is the URL of
+ * a `keep` page, with no dynamic segment, and not the page's own URL.
+ */
+export function redirectProblems(
+  entries: readonly {
+    kind: string;
+    path: string;
+    ruling: string;
+    url?: string;
+    redirect?: string;
+  }[],
+): string[] {
+  const keepUrls = new Set(
+    entries.filter((e) => e.kind === 'page' && e.ruling === 'keep').map((e) => e.url),
+  );
+  return entries
+    .filter((e) => e.kind === 'page' && e.ruling === 'retire' && e.redirect?.startsWith('/'))
+    .flatMap((e) => {
+      const to = e.redirect!;
+      if (to === e.url) return [`${e.path}: redirects to itself (use same)`];
+      if (to.includes('[')) return [`${e.path}: redirects to a pattern, ${to}`];
+      if (!keepUrls.has(to)) return [`${e.path}: ${to} is not a keep page`];
+      return [];
+    });
 }
 
 /** D3's conditions on `delete` entries that the tree can show: an app file, gone, with its query. */

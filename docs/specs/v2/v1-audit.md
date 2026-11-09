@@ -32,13 +32,14 @@ The finders in `apps/web/__tests__/v1-inventory-source.ts` list, from the tree:
 - every `page.*`, Next metadata or special file (`layout`, `opengraph-image`, `icon`, `apple-icon`,
   `not-found`, `global-error`, `sitemap` and the rest of Next's conventions) and `route.*` under
   `apps/web/app`, except under a `(v2-preview)` or `(account)` route group at any depth, and except a
-  file that refuses whenever a v2 flag is off: it imports a `…Enabled` reader from a `…/flags` module
-  and has a top-level `if (!reader()) return …` (`api/checks/[id]/claim` today; CC-03's new billing
-  routes once merged). A v1 route with a v2 branch (`api/auth/magic-link`, `login/verify`) does not
-  refuse, so it stays listed, and the test pins both;
+  file that is a 404 whenever a v2 flag is off: it imports a `…Enabled` reader from a `…/flags` module
+  and every handler it exports opens a top-level `if (!reader()) return …` with a 404 (`api/checks/[id]/claim` today; CC-03's new billing
+  routes once merged, which then join the test's pinned list of what the rule hides). A v1 route with a
+  v2 branch (`api/auth/magic-link`, `login/verify`) is not a 404 with the flag off, so it stays listed;
 - every `createFunction` call in the `inngest` package: one written as a top-level
-  `export const x = inngest.createFunction(…)` is a v1 function, with the cron in its trigger; one
-  inside a function body is a factory's, which is how CC-20b and CC-03 build theirs behind their
+  `export const x = inngest.createFunction(…)` is a v1 function, with the cron in its trigger, and the serve route's
+  `functions` list is checked against them; one inside a function body that is not run where it is
+  written is a factory's, which is how CC-20b and CC-03 build theirs behind their
   flags, so it is not listed; any other shape makes the finder throw;
 - every table created by a migration whose file name is a timestamp followed by `_v2_` is v2; every
   other migration's tables are listed (so `…_engine_v2_crawl_health.sql`, which is v1's, is read).
@@ -74,11 +75,11 @@ rows that matter here are reproduced below so this repository holds the basis of
 <!-- v1-inventory:cutover -->
 | kind | item | replaced by | redirect |
 | --- | --- | --- | --- |
-| page | `/` (`app/page.tsx`) | v2 Home (CC-21 screens/home), same URL | / |
-| page | `/audit/[id]` (`app/audit/[id]/page.tsx`) | v2 result and segment pages under /audit/[id] (CC-22), same ids | /audit/[id] |
+| page | `/` (`app/page.tsx`) | v2 Home (CC-21 screens/home), same URL | same |
+| page | `/audit/[id]` (`app/audit/[id]/page.tsx`) | v2 result and segment pages under /audit/[id] (CC-22), same ids | same |
 | page | `/compare` (`app/compare/page.tsx`) | v2 competitor feature inside the account | none |
 | page | `/compare/[a]/[b]` (`app/compare/[a]/[b]/page.tsx`) | v2 competitor feature inside the account | none |
-| page | `/dashboard` (`app/dashboard/page.tsx`) | v2 Dashboard home (CC-26), same URL | /dashboard |
+| page | `/dashboard` (`app/dashboard/page.tsx`) | v2 Dashboard home (CC-26), same URL | same |
 | page | `/top/[platform]` (`app/top/[platform]/page.tsx`) | nothing; leaderboards are removed at cutover | 410 |
 | route | `app/api/audits/[id]/cancel/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | alias |
 | route | `app/api/audits/[id]/export/route.ts` | /api/checks/* (CC-22), behind a 90-day alias for cached clients | alias |
@@ -287,7 +288,7 @@ text).
 <!-- v1-inventory:findings -->
 | id | severity | item | evidence | what happens | fixed in / owner |
 | --- | --- | --- | --- | --- | --- |
-| C-1 | major | `inngest/audit.ts#auditFn` | node_modules got-scraping@4.2.1 dist/index.js:543-552,577-585; packages/engine/src/crawler.ts:575 | got-scraping's header generator opens a TLS connection (ALPN probe) to each new https host:port with system DNS, ignoring the pinned dnsLookup. With a rebinding hostname (needs only a DNS server the attacker runs) the probe handshakes with an internal ip:port; reproduced: a 1,604-byte ClientHello reached 127.0.0.1, and with useHeaderGenerator:false nothing arrived. No HTTP request is sent on the probe and no body is read, but a failed probe fails the request and the page is stored with status 0, so one audit of https://rebind.example:PORT/ URLs (no port check; same-host strategy matches the hostname only) reads one bit per URL: a blind internal TLS port scan. The request itself still goes over the pinned connection. | CC-SEC-2 (engine; crawl-path change needs the deployed-function smoke) |
+| C-1 | major | `inngest/audit.ts#auditFn` | got-scraping 4.2.1, dist/index.js lines 543-552 and 577-585 (a dependency); packages/engine/src/crawler.ts:575 | got-scraping's header generator opens a TLS connection (ALPN probe) to each new https host:port with system DNS, ignoring the pinned dnsLookup. With a rebinding hostname (needs only a DNS server the attacker runs) the probe handshakes with an internal ip:port; reproduced: a 1,604-byte ClientHello reached 127.0.0.1, and with useHeaderGenerator:false nothing arrived. No HTTP request is sent on the probe and no body is read, but a failed probe fails the request and the page is stored with status 0, so one audit of https://rebind.example:PORT/ URLs (no port check; same-host strategy matches the hostname only) reads one bit per URL: a blind internal TLS port scan. The request itself still goes over the pinned connection. The port-scan oracle is read from the code, not reproduced; CC-SEC-2 confirms it when fixing. | CC-SEC-2 (engine; crawl-path change needs the deployed-function smoke) |
 | B-F1 | major | `public.rate_limits`, `app/privacy/page.tsx` | apps/web/app/privacy/page.tsx:158 | /privacy calls rate-limit records short-lived; production holds 1,138 rows, 1,027 older than 30 days, oldest 157 days, 468 keys embedding a raw IP and 52 a raw email; nothing deletes the table (measured 2026-11-09). | owner follow-up: a daily delete (Inngest cron or pg_cron migration), both outside this step (D11) |
 | B-F2 | major | `public.users`, `app/privacy/page.tsx`, `app/terms/page.tsx` | apps/web/app/privacy/page.tsx:151; apps/web/app/privacy/page.tsx:219; apps/web/app/terms/page.tsx:205 | /privacy and /terms promise erasure on request; no code deletes public.users, public.users has no FK to auth.users, and the email also sits unlinked in rate_limits keys, email_events, audits.notify_email, waitlist and takedown_requests. Erasure is possible by hand in SQL; what is missing is the process and the cascade. | owner follow-up: an erasure runbook and an auth.users cascade migration (owner-applied) |
 | A-7 | major | `app/r/[slug]/page.tsx` | apps/web/middleware.ts:62; apps/web/app/r/[slug]/page.tsx:23 | the middleware sends X-Robots-Tag: noindex, nofollow, noarchive on every /r/ page, including the claimed, indexable reports the page marks index and the sitemap lists, so no report can be indexed (since 0478f107, before SPEC 04 made claimed reports indexable). A missing report's HTML also carries two robots metas. Changing the header changes what search engines index (§13). | owner decision (questions Q9): an SEO change, out of D11 |
@@ -309,7 +310,7 @@ text).
 | C-5 | minor | `app/api/webhooks/inngest/route.ts` | apps/web/app/api/webhooks/inngest/route.ts:31 | with INNGEST_DEV set in production the SDK accepts unsigned invocations; nothing in the repo sets it, production env could not be read. | owner: confirm INNGEST_DEV is absent with vercel env ls production |
 | C-6 | minor | `inngest/audit.ts#auditFn` | packages/engine/src/crawler.ts:550 | the Crawlee path passes extraHeaders without safeFetch's forbidden-header filter; no web route sets it today. | CC-SEC-2 |
 | D9-1 | minor | `app/blog/[slug]/page.tsx` | apps/web/lib/seo/jsonld.tsx:118 | JSON-LD was serialised with bare JSON.stringify into a script tag; every caller passes our own constants today, so this was hardening. | fixed in `fed2923e` |
-| A-10 | minor | `app/api/admin/takedown/process/route.ts` | apps/web/app/api/admin/takedown/process/route.ts:34 | the per-IP throttle runs after the secret check, so wrong-secret guesses are not throttled; it matters only if ADMIN_SECRET is short. | lead follow-up |
+| A-10 | minor | `app/api/admin/takedown/process/route.ts` | apps/web/app/api/admin/takedown/process/route.ts:34 | the per-IP throttle runs after the secret check, so wrong-secret guesses are not throttled; it matters only if ADMIN_SECRET is short. The code comment above it (app/api/admin/takedown/process/route.ts:35) says the throttle caps a brute force; the follow-up corrects it too. | lead follow-up |
 | A-11 | minor | `app/api/audits/[id]/notify/route.ts` | apps/web/app/api/audits/[id]/notify/route.ts:36; inngest/notify.ts:43 | anyone holding an audit id can replace notify_email on a running audit: the owner's address is overwritten and an arbitrary address gets a mail with the /audit/<id> link. Capped at 10 per IP and 5 per address a day. | lead follow-up (retired at cutover) |
 | C-7 | minor | `inngest/billing.ts#reconcileBillingManualFn` | inngest/billing-helpers.ts:127 | with STRIPE_RECONCILE_LIVEMODE unset the livemode guard does not run, including on a manual full (writing) run; D6 asks for a livemode guard. | owner: set STRIPE_RECONCILE_LIVEMODE=true in production (CC-03 owns inngest/billing.ts) |
 | B-F8 | minor | `app/api/reports/[slug]/logo/route.ts`, `app/privacy/page.tsx` | apps/web/lib/report-brand.ts:7 | customer logo uploads sit in the public report-logos storage bucket with no retention and are not named on /privacy. | owner (legal text) and lead follow-up |
@@ -324,7 +325,7 @@ re-persist of an audit's own pages, links and findings (`inngest/persist-results
 frontier's settle function (`infra/supabase/migrations/20260806000001_spec51a_stage6_frontier_functions.sql:149`):
 `grep -rnE "\.delete\(\)|delete from" inngest apps/web/lib apps/web/app infra/supabase/migrations --include=*.ts --include=*.sql | grep -v "\.test\." | grep -v _v2_`.
 `cron.job` on production holds one job, `v2_premake_month_partitions`. Row counts and ages behind each
-verdict are in the findings above (B-F1 to B-F7), and are a reading of that day, not a standing
+verdict are in the findings above (B-F1 to B-F8), and are a reading of that day, not a standing
 property.
 
 | table                          | writers                                                                                                                                                                                                                                                                                                                                                              | readers                                                                                                                                                                                                                                       | personal data                                                                                                                                                                                               | cleanup                                                                                                             | verdict                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -387,8 +388,9 @@ The network search: `grep -rnE "\bfetch\(|https?\.request|net\.connect|tls\.conn
 
 ## D9 — the JSON-LD sink
 
-`apps/web/lib/seo/jsonld.tsx` serialised with bare `JSON.stringify` into a `<script>`. Every caller
-passes our own constants (the blog registry, author records, the checker page), so nothing crawled
+`apps/web/lib/seo/jsonld.tsx` serialised with bare `JSON.stringify` into a `<script>`. Its callers,
+listed by `grep -rln "<JsonLd" apps/web/app apps/web/components apps/web/lib | grep -v "\.test\."`, pass
+our own constants (the blog registry, author records, the checker page), so nothing crawled
 reached it; it is fixed regardless (D9-1, `fed2923e`): `scriptSafeJson` escapes `<`, `>`, `&`, U+2028 and
 U+2029 as `\u` escapes, which `JSON.parse` reads back to the same object. Test:
 `pnpm --filter @crawlmouse/web exec vitest run lib/seo/jsonld.test.tsx`. The search below returns one

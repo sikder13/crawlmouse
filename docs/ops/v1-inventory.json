@@ -11,7 +11,7 @@
       "reason": "v2 serves a new Home at the same URL; the v1 component goes at cutover",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "v2 Home (CC-21 screens/home), same URL",
-      "redirect": "/",
+      "redirect": "same",
       "checks": {
         "input": "n/a — static page, reads no params, query or body (app/page.tsx:1)",
         "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/page.tsx:1)",
@@ -54,7 +54,7 @@
       "reason": "capability URL kept; V2_READS switches it to read checks",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "v2 result and segment pages under /audit/[id] (CC-22), same ids",
-      "redirect": "/audit/[id]",
+      "redirect": "same",
       "checks": {
         "input": "pass — id is an .eq filter on the admin client (app/audit/[id]/page.tsx:33); non-uuid makes Postgres reject the cast, data is null → notFound(); measured 404 for /audit/garbage; ?view accepts only 'ai' (:27-28)",
         "output": "pass — capability read selects id, url only (app/audit/[id]/page.tsx:33); the rest arrives through the SSE projection chokepoint, which emits no user_id or session id (lib/audit-stream-projection.ts:249-275)",
@@ -255,7 +255,7 @@
       "reason": "v2 serves the dashboard at the same URL",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "replacedBy": "v2 Dashboard home (CC-26), same URL",
-      "redirect": "/dashboard",
+      "redirect": "same",
       "checks": {
         "input": "pass — only ?upgraded, compared to '1' (app/dashboard/page.tsx:35)",
         "output": "pass — reads the signed-in user's own rows (app/dashboard/page.tsx:30-43); nothing of another user",
@@ -399,7 +399,7 @@
         "cache": "pass — revalidate=300 (app/r/[slug]/page.tsx:17) is safe because the page reads no cookies or session; owner state is fetched client-side with no-store (app/api/reports/[slug]/mine/route.ts:23)",
         "redirect": "n/a — no redirect or next param",
         "errors": "pass — a read error returns null (lib/reports.ts:43-50) and renders the 404 page, no upstream text",
-        "escaping": "pass — crawled domain, titles and URLs are JSX text in server components (components/report/ReportBody.tsx:1 (crawled text reaches the page only as JSX children), ReportBody.tsx); no crawled href; the white-label logo src is built from our storage base plus a logoPath constrained to `${slug}/[A-Za-z0-9._-]+` (lib/report-brand.ts:23-27, app/api/reports/[slug]/white-label/route.ts:54-60); brandName is JSX text (components/report/ReportBrandHeader.tsx:26)",
+        "escaping": "pass — crawled domain, titles and URLs are JSX text in server components (components/report/sections.tsx:52-56, where crawled text is rendered as JSX children); no crawled href; the white-label logo src is built from our storage base plus a logoPath constrained to `${slug}/[A-Za-z0-9._-]+` (lib/report-brand.ts:23-27, app/api/reports/[slug]/white-label/route.ts:54-60); brandName is JSX text (components/report/ReportBrandHeader.tsx:26)",
         "abuse": "n/a — read only"
       },
       "e2e": {
@@ -466,10 +466,10 @@
       "reason": "legal page and form, kept",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "checks": {
-        "input": "n/a — static page, reads no params, query or body (app/takedown/page.tsx:1)",
-        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/takedown/page.tsx:1)",
-        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/takedown/page.tsx:1)",
-        "redirect": "n/a — no redirect or next param (app/takedown/page.tsx:1)",
+        "input": "n/a — static page, reads no params, query or body (app/takedown/page.tsx:1-12; the form is the client component app/takedown/TakedownForm.tsx, which posts to /api/takedown)",
+        "output": "pass — renders build-time copy and a client form; no DB read, no user or internal id in the HTML or RSC payload (app/takedown/page.tsx:1-12; the form is the client component app/takedown/TakedownForm.tsx, which posts to /api/takedown)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/takedown/page.tsx:1-12; the form is the client component app/takedown/TakedownForm.tsx, which posts to /api/takedown)",
+        "redirect": "n/a — no redirect or next param (app/takedown/page.tsx:1-12; the form is the client component app/takedown/TakedownForm.tsx, which posts to /api/takedown)",
         "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
         "escaping": "pass — server error codes are mapped to fixed copy before display (app/takedown/TakedownForm.tsx:47)",
         "abuse": "pass — the form posts to /api/takedown (per-IP 5 and per-domain 3 per day, app/api/takedown/route.ts:35-40); no mail is sent"
@@ -1411,8 +1411,8 @@
       "id": "C-1",
       "severity": "major",
       "items": ["inngest/audit.ts#auditFn"],
-      "evidence": "node_modules got-scraping@4.2.1 dist/index.js:543-552,577-585; packages/engine/src/crawler.ts:575",
-      "what": "got-scraping's header generator opens a TLS connection (ALPN probe) to each new https host:port with system DNS, ignoring the pinned dnsLookup. With a rebinding hostname (needs only a DNS server the attacker runs) the probe handshakes with an internal ip:port; reproduced: a 1,604-byte ClientHello reached 127.0.0.1, and with useHeaderGenerator:false nothing arrived. No HTTP request is sent on the probe and no body is read, but a failed probe fails the request and the page is stored with status 0, so one audit of https://rebind.example:PORT/ URLs (no port check; same-host strategy matches the hostname only) reads one bit per URL: a blind internal TLS port scan. The request itself still goes over the pinned connection.",
+      "evidence": "got-scraping 4.2.1, dist/index.js lines 543-552 and 577-585 (a dependency); packages/engine/src/crawler.ts:575",
+      "what": "got-scraping's header generator opens a TLS connection (ALPN probe) to each new https host:port with system DNS, ignoring the pinned dnsLookup. With a rebinding hostname (needs only a DNS server the attacker runs) the probe handshakes with an internal ip:port; reproduced: a 1,604-byte ClientHello reached 127.0.0.1, and with useHeaderGenerator:false nothing arrived. No HTTP request is sent on the probe and no body is read, but a failed probe fails the request and the page is stored with status 0, so one audit of https://rebind.example:PORT/ URLs (no port check; same-host strategy matches the hostname only) reads one bit per URL: a blind internal TLS port scan. The request itself still goes over the pinned connection. The port-scan oracle is read from the code, not reproduced; CC-SEC-2 confirms it when fixing.",
       "owner": "CC-SEC-2 (engine; crawl-path change needs the deployed-function smoke)"
     },
     {
@@ -1592,7 +1592,7 @@
       "severity": "minor",
       "items": ["app/api/admin/takedown/process/route.ts"],
       "evidence": "apps/web/app/api/admin/takedown/process/route.ts:34",
-      "what": "the per-IP throttle runs after the secret check, so wrong-secret guesses are not throttled; it matters only if ADMIN_SECRET is short.",
+      "what": "the per-IP throttle runs after the secret check, so wrong-secret guesses are not throttled; it matters only if ADMIN_SECRET is short. The code comment above it (app/api/admin/takedown/process/route.ts:35) says the throttle caps a brute force; the follow-up corrects it too.",
       "owner": "lead follow-up"
     },
     {
