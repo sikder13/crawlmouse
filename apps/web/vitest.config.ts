@@ -27,5 +27,10 @@ export default defineConfig({
     // ownership/badge security boundary. File isolation is what keeps those module-mocks from leaking
     // across files; a future `isolate: false` speed tweak would silently make the boundary tests flaky.
     isolate: true,
+    // In CI, two test processes rather than the default (one per core but one). Several files here
+    // hold PGlite databases, which live outside the JS heap, at 1–2 GB a process (measured peak per
+    // file); three at once left too little of the runner's memory, and the job was stopped by a
+    // runner shutdown. Local runs keep the default.
+    ...(process.env.CI ? { poolOptions: { forks: { maxForks: 2, minForks: 1 } } } : {}),
   },
 });
