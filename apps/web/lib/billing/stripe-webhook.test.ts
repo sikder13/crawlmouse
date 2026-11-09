@@ -520,6 +520,18 @@ describe.each(PORTS)('through the %s port', (p) => {
       });
     });
 
+    it('a refused completion for another subscription than the one the account follows cancels that one', async () => {
+      // Two tabs: the account pays on A and follows it; B is paid after a deploy that changed prices.ts.
+      const { accountId, customer, current } = await account('pro');
+      const b = sub(customer, { priceIds: ['price_someone_elses'] });
+      await w.deliver(checkoutEvent(accountId, customer, b.id, BASE + 300));
+      expect(w.stripe.cancelled.map((c) => [c.subscriptionId, c.reason])).toEqual([
+        [b.id, 'orphaned'],
+      ]);
+      expect(w.stripe.live()).toEqual([current!.id]);
+      expect((await accountRow(accountId)).current_subscription_id).toBe(current!.id);
+    });
+
     it('our checkout on a trial outside it cancels the trial, which has charged nothing, and does not alert', async () => {
       const { accountId, customer } = await account();
       const s = sub(customer, { status: 'trialing', priceIds: ['price_someone_elses'] });
@@ -1026,6 +1038,16 @@ describe.each(PORTS)('through the %s port', (p) => {
         await w.deliver(checkoutEvent(accountId, current!.customer, current!.id, BASE + 300)),
       ).toMatchObject({ reason: 'the checkout is for another customer' });
       expect(w.stripe.cancelled).toEqual([]);
+      expect(w.stripe.live()).toEqual([current!.id]);
+    });
+
+    it('a mismatched completion for another subscription than the one the account follows cancels that one', async () => {
+      const { accountId, current } = await account('pro');
+      const b = sub('cus_elsewhere');
+      await w.deliver(checkoutEvent(accountId, 'cus_elsewhere', b.id, BASE + 300));
+      expect(w.stripe.cancelled.map((c) => [c.subscriptionId, c.reason])).toEqual([
+        [b.id, 'orphaned'],
+      ]);
       expect(w.stripe.live()).toEqual([current!.id]);
     });
 
