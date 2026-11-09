@@ -159,12 +159,16 @@ describe('registration with V2_PIPELINE unset (D3)', () => {
     }
   });
 
-  it('syncs the configs it synced before this change', () => {
+  it('syncs the configs it synced before this change', async () => {
+    // auditFn reads the variable when its module loads: load it afresh with the variable unset.
     vi.stubEnv('INNGEST_AUDIT_CONCURRENCY', undefined);
+    vi.resetModules();
+    const fresh = await import('./functions');
+    vi.unstubAllEnvs();
     expect(
       JSON.parse(
         JSON.stringify(
-          inngestFunctions({}).map((fn) =>
+          fresh.inngestFunctions({}).map((fn) =>
             (fn as unknown as { getConfig(o: unknown): unknown }).getConfig({
               baseUrl: new URL('https://crawlmouse.com/api/webhooks/inngest'),
               appPrefix: 'crawlmouse',
