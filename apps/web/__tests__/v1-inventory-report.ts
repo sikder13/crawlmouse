@@ -15,7 +15,22 @@ export type InventoryEntry = {
   evidence: string;
   replacedBy?: string;
   redirect?: string;
+  checks?: Partial<Record<CheckKey, string>>;
 };
+
+/** D4's seven checks, in the order the report shows them. */
+export const CHECK_KEYS = [
+  'input',
+  'output',
+  'cache',
+  'redirect',
+  'errors',
+  'escaping',
+  'abuse',
+] as const;
+export type CheckKey = (typeof CHECK_KEYS)[number];
+/** A check's verdict word, the text before its ` — `. */
+export const verdictOf = (text: string | undefined): string => text?.split(' — ')[0]?.trim() ?? '';
 
 const KINDS = ['page', 'metadata', 'route', 'inngest', 'cron', 'table'] as const;
 const RULINGS: readonly Ruling[] = ['keep', 'retire', 'delete'];
@@ -65,10 +80,23 @@ export function renderRulings(items: readonly InventoryEntry[]): string {
   ].join('\n');
 }
 
+export function renderChecks(items: readonly InventoryEntry[]): string {
+  const rows = items.filter((e) => e.checks !== undefined);
+  return [
+    `| item | ruling | ${CHECK_KEYS.join(' | ')} |`,
+    `| --- | --- | ${CHECK_KEYS.map(() => '---').join(' | ')} |`,
+    ...rows.map(
+      (e) =>
+        `| ${label(e)} | ${e.ruling} | ${CHECK_KEYS.map((k) => verdictOf(e.checks![k])).join(' | ')} |`,
+    ),
+  ].join('\n');
+}
+
 export const BLOCKS: Record<string, (items: readonly InventoryEntry[]) => string> = {
   counts: renderCounts,
   cutover: renderCutover,
   rulings: renderRulings,
+  checks: renderChecks,
 };
 
 const blockPattern = (name: string) =>

@@ -191,6 +191,19 @@ rows that matter here are reproduced below so this repository holds the basis of
 <!-- /v1-inventory:rulings -->
 <!-- prettier-ignore-end -->
 
+## D4 security rows
+
+One row per `keep` and `retire` page and route (a `retire` item is live until the cutover). Each cell
+is the verdict word; the full verdict with its evidence is the entry's `checks` in
+`docs/ops/v1-inventory.json`.
+
+<!-- prettier-ignore-start -->
+<!-- v1-inventory:checks -->
+| item | ruling | input | output | cache | redirect | errors | escaping | abuse |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+<!-- /v1-inventory:checks -->
+<!-- prettier-ignore-end -->
+
 ## Findings
 
 _Filled at integration._
