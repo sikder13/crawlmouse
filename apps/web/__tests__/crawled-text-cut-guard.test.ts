@@ -288,6 +288,34 @@ const INVENTORY: [entry: string, why: string][] = [
     "CODE-POINT slice of a URL pathname for the CC-22 crawl screen's log (development-only, never persisted). The receiver is `[...path]`, an array of code points, so a pair cannot be split; a pathname from the URL parser is percent-encoded ASCII in any case. The cut is visible (an ellipsis) and the whole path is rendered beside it for screen readers.",
   ],
   [
+    "apps/web/lib/v2/copy/dashboard.ts :: ? `${kinds.slice(0, -1).join(', ')}, and ${kinds.at(-1)}`",
+    'ARRAY slice over the kinds of email an account gets (clauses the copy writes, no crawled text) in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. It joins every kind but the last before ", and", as the locked page lists them.',
+  ],
+  [
+    'apps/web/lib/v2/view/dashboard.ts :: const shown = all.slice(-HISTORY_CHECKS);',
+    'ARRAY slice over check records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The six latest checks the history chart draws; its title states how many checks there are in all.',
+  ],
+  [
+    'apps/web/lib/v2/view/dashboard.ts :: const shown = resultChecks(v, site.id).slice(-HISTORY_CHECKS);',
+    'ARRAY slice over check records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The same six checks, for the crawler-access-by-check rows under the chart.',
+  ],
+  [
+    'apps/web/lib/v2/view/dashboard.ts :: rows: fixes.slice(0, TOP_FIXES).map((f) => ({',
+    'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The three fixes the first-run dashboard starts with; the line under them states how many more there are.',
+  ],
+  [
+    'apps/web/lib/v2/view/site.ts :: const rest = byNumber.slice(SHOWN_FIXES);',
+    'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every fix after the five the site page lists, shown as one row that states their count, sections and summed effect.',
+  ],
+  [
+    'apps/web/lib/v2/view/site.ts :: const rows = byNumber.slice(0, SHOWN_FIXES).map((f) => fixRow(v, result, f, fixes));',
+    'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The five fixes the site page lists by number; the rest are the row above.',
+  ],
+  [
+    'apps/web/lib/v2/view/site.ts :: const shown = all.slice(-SHOWN_CHECKS);',
+    'ARRAY slice over check records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The six latest checks the grades and the crawler grid show; the heading states how many.',
+  ],
+  [
     'apps/web/lib/v2/view/free-fixes.ts :: return fixesAsOf(d, check).slice(0, FREE_FIXES);',
     'ARRAY slice over fix records in the v2 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The fixes the Free plan opens (FACTS: three per audit), the one rule the Result, the segments and the fix page share.',
   ],

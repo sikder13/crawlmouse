@@ -27,6 +27,12 @@ export { Table, type TableProps, type TableColumn, type TableRow } from './Table
 export { Field, type FieldProps } from './Field';
 export { Heading, type HeadingProps } from './Heading';
 export { PageShell, type PageShellProps } from './PageShell';
+export { AccountShell, type AccountShellProps, type RailLink } from './AccountShell';
+export { TrialCard, type TrialCardProps } from './TrialCard';
+export { GradeHistory, type GradeHistoryProps, type GradeSeries } from './GradeHistory';
+export { CheckGlyph, CheckGlyphRow, type CheckGlyphCell } from './CheckGlyphRow';
+export { ThemeControl, type ThemeControlProps } from './ThemeControl';
+export { THEME_CHOICES, type ThemeChoice } from './theme-choices';
 export { BrandLink } from './BrandLink';
 export { NavMenu } from './NavMenu';
 export { SiteFooter, type SiteFooterProps, type ServiceStatus } from './SiteFooter';

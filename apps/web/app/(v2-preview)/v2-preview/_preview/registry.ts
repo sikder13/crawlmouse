@@ -25,6 +25,11 @@ export const PREVIEWS: PreviewEntry[] = [
   { path: '/v2-preview/table', name: 'Table', kind: 'primitive' },
   { path: '/v2-preview/field', name: 'Field', kind: 'primitive' },
   { path: '/v2-preview/page-shell', name: 'PageShell', kind: 'primitive' },
+  { path: '/v2-preview/account-shell', name: 'AccountShell', kind: 'primitive' },
+  { path: '/v2-preview/trial-card', name: 'TrialCard', kind: 'primitive' },
+  { path: '/v2-preview/theme-control', name: 'ThemeControl', kind: 'primitive' },
+  { path: '/v2-preview/grade-history', name: 'GradeHistory', kind: 'primitive' },
+  { path: '/v2-preview/check-glyph-row', name: 'CheckGlyphRow', kind: 'primitive' },
   { path: '/v2-preview/screens/home', name: 'Final-Home', kind: 'screen' },
   {
     path: '/v2-preview/screens/crawl',
@@ -148,6 +153,21 @@ export const PREVIEWS: PreviewEntry[] = [
   { path: '/v2-preview/screens/fix/locked', name: 'Fix, on Pro', kind: 'screen' },
   // A kept site's resolved fix: nothing on the page to act on.
   { path: '/v2-preview/screens/fix/resolved', name: 'Fix, resolved', kind: 'screen', orange: 0 },
+  { path: '/v2-preview/screens/dashboard/day0', name: 'Final-Dashboard-Day0', kind: 'screen' },
+  { path: '/v2-preview/screens/dashboard', name: 'Final-Dashboard', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/dashboard/clean',
+    name: 'Dashboard, clean (stand-in Free account, H5)',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/dashboard/withheld', name: 'Dashboard, withheld', kind: 'screen' },
+  { path: '/v2-preview/screens/site', name: 'Final-Site', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/site/clean',
+    name: 'Site, clean (stand-in Free account)',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/site/withheld', name: 'Site, withheld', kind: 'screen' },
   { path: '/v2-preview/screens/map', name: 'Final-LinkMap', kind: 'screen' },
   { path: '/v2-preview/screens/map/all', name: 'Link map, every page', kind: 'screen' },
   // No fix to open from any page: the keep bar's button is the orange element.

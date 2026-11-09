@@ -1,3 +1,4 @@
+import { RECHECK_MINUTES } from '../../../../lib/v2/recheck';
 import type { FocusEvent, ReactNode } from 'react';
 import { Button } from '../../Button';
 import { Card } from '../../Card';
@@ -137,7 +138,7 @@ function OpenFix({ f, primary, ask }: { f: OpenFixView; primary: boolean; ask: s
           <div className={styles.handoff}>{f.handoff}</div>
           <PacketActions prompt={f.prompt} primary={primary} ask={ask}>
             <Button variant="quiet" size="sm" href={ask}>
-              Mark done and re-check now, about 2 minutes
+              {`Mark done and re-check now, about ${RECHECK_MINUTES} minutes`}
             </Button>
           </PacketActions>
         </div>

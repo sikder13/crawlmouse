@@ -8,6 +8,7 @@ import { SPEC_25_PATH, buildSpec25 } from './spec/build-spec-25';
 import { CLAIM_REFUSALS } from '../../lib/auth/claim';
 import { TRIAL_OUTCOMES } from '../../lib/auth/first-login';
 import { ACCOUNT_DOOR_CHANGES } from '../../lib/v2/copy/account-door';
+import { SPEC_26_PATH, buildSpec26 } from './spec/build-spec-26';
 
 describe('docs/specs/v2/21-design-system.md', () => {
   it('is exactly what the generator writes from the code', async () => {
@@ -69,5 +70,12 @@ describe('docs/specs/v2/25-account-door.md', () => {
     expect(spec.match(/^\| (signup|check-email|check-email-no-audit) /gm)).toHaveLength(
       ACCOUNT_DOOR_CHANGES.length,
     );
+  }, 60_000);
+});
+
+describe('docs/specs/v2/26-dashboard-site.md', () => {
+  it('is exactly what the generator writes from the code', async () => {
+    expect(existsSync(SPEC_26_PATH), 'run __tests__/v2/generate-spec.ts').toBe(true);
+    expect(readFileSync(SPEC_26_PATH, 'utf8')).toBe(await buildSpec26());
   }, 60_000);
 });

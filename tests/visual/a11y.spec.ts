@@ -72,15 +72,19 @@ async function axe(
 const serious = (f: Finding) => f.impact === 'serious' || f.impact === 'critical';
 
 /**
- * axe, in three passes. First the page as rendered. Then with the decorative link map hidden (axe
- * cannot see the background behind the overlays drawn over it) and every scroll region scrolled
+ * axe, in three passes. First the page as rendered. Then with the decorative link map and the grade
+ * history chart hidden (axe cannot see the background behind their text) and every scroll region scrolled
  * to its far end (axe cannot judge a column scrolled out of view), then scrolled halfway. A
  * violation at any impact in any pass fails, and so does a serious finding axe could not decide
  * in every pass.
  */
 async function axePasses(page: Page, scope = 'body') {
   const first = await axe(page, scope);
-  await page.addStyleTag({ content: 'svg[data-v2-map] { visibility: hidden !important; }' });
+  // The grade history chart (data-v2-chart) likewise: axe cannot find the background behind SVG
+  // text. Its labels are --v2-mut and --v2-fg2 on --v2-s1, pairs tokens.test.ts holds to 4.5:1.
+  await page.addStyleTag({
+    content: 'svg[data-v2-map], svg[data-v2-chart] { visibility: hidden !important; }',
+  });
   await page.evaluate(() => {
     document.querySelectorAll('[data-v2-scroll-region]').forEach((r) => {
       (r as HTMLElement).scrollLeft = (r as HTMLElement).scrollWidth;

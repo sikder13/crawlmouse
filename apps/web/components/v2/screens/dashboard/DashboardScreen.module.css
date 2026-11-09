@@ -1,0 +1,145 @@
+/* Final-Dashboard: the delta strip, the history card and the first-run cards. */
+
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  padding: 0;
+  overflow: hidden;
+  background: var(--v2-line2);
+}
+
+.cell {
+  flex: 1 1 140px;
+  padding: 14px 16px;
+  background: var(--v2-s1);
+}
+
+.cellLabel,
+.small,
+.noun,
+.excluded {
+  color: var(--v2-mut);
+  font-size: 12px;
+}
+
+.cellRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.big {
+  font-family: var(--v2-font-mono);
+  font-size: 20px;
+}
+
+.show {
+  color: var(--v2-mut);
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.rowActions {
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+.legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 2px solid var(--v2-fg);
+}
+
+.dashed {
+  border-top: 2px dashed var(--v2-fg2);
+}
+
+.byCheck {
+  padding: 10px 16px 0;
+  border-top: 1px solid var(--v2-line);
+}
+
+.byCheck .small {
+  margin-bottom: 6px;
+}
+
+/* The locked rows are compact: 4px above and below, the crawler in a 120px column. Two classes deep
+   so it outranks the account shell's `.main table td`. */
+.byCheck .byCheckTable tbody td,
+.byCheck .byCheckTable tbody th {
+  padding: 4px 0;
+}
+
+.byCheck .byCheckTable tbody th {
+  width: 120px;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 10px;
+}
+
+.legendGlyph {
+  width: 9px;
+  height: 9px;
+}
+
+.startPro {
+  padding: 0;
+  overflow: hidden;
+}
+
+.startBody {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.startBody p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--v2-fg2);
+}
+
+.threeKinds {
+  padding: 16px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.threeText {
+  color: var(--v2-fg2);
+}
+
+.lead {
+  color: var(--v2-fg);
+  font-weight: 500;
+}
+
+/* "Crawler access now" sits in a third of the row: its pills wrap rather than widen the table. */
+.nowPill [data-v2-pill] {
+  white-space: normal;
+  height: auto;
+  min-height: var(--v2-pill-h);
+  padding-top: 3px;
+  padding-bottom: 3px;
+  line-height: 1.3;
+}

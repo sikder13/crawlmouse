@@ -7,6 +7,9 @@ import { scoreToLetter } from '../../../../packages/engine/src/grade';
 import {
   Button,
   Card,
+  CheckGlyph,
+  CheckGlyphRow,
+  GradeHistory,
   CoverageLine,
   coverageText,
   EVIDENCE_CLASSES,
@@ -26,6 +29,7 @@ import {
   type Verdict,
 } from '../../components/v2';
 import { WEB_ROOT } from './_lib/tokens-css';
+import { spokenRun, verdictCell } from '../../components/v2/screens/account/verdict-cells';
 
 const html = (el: React.ReactElement) => renderToStaticMarkup(el);
 const css = (name: string) =>
@@ -399,6 +403,41 @@ describe('Card', () => {
   });
 });
 
+describe('Table, with its headers hidden', () => {
+  it('keeps every column named for a screen reader and draws no header row', () => {
+    const out = html(
+      <Table
+        label="Fixes"
+        headersHidden
+        columns={[{ header: 'No.' }, { header: 'Fix' }]}
+        rows={[{ key: 'a', cells: ['1', 'Link the orphans'] }]}
+      />,
+    );
+    expect(out).toMatch(
+      /<thead class="[^"]+" data-v2-hidden-head=""><tr><th scope="col"[^>]*><span[^>]*data-v2-sr-only="">No\.<\/span><\/th>/,
+    );
+    // The header row stays a table row: no absolute positioning takes it out of the table.
+    expect(out).not.toMatch(/<thead[^>]*data-v2-sr-only/);
+    expect(html(<Table label="x" columns={[{ header: 'a' }]} rows={[]} />)).toContain(
+      '<thead><tr>',
+    );
+  });
+});
+
+describe('Table, with row headers', () => {
+  it('makes each row’s first cell its header, and only that cell', () => {
+    const out = html(
+      <Table
+        label="Settings"
+        rowHeader
+        columns={[{ header: 'Setting' }, { header: 'Value' }]}
+        rows={[{ key: 's', cells: ['Schedule', 'weekly'] }]}
+      />,
+    );
+    expect(out).toMatch(/<tbody><tr><th scope="row"[^>]*>Schedule<\/th><td[^>]*>weekly<\/td>/);
+  });
+});
+
 describe('Table', () => {
   const out = html(
     <Table
@@ -542,5 +581,140 @@ describe('PageShell', () => {
     expect(r).toContain('background: var(--v2-bg)');
     expect(r).toContain('color: var(--v2-fg)');
     expect(r).toContain('font-family: var(--v2-font-body)');
+  });
+});
+
+describe('forced colours on the account controls', () => {
+  it('marks the pressed theme and the switch’s state in system colours, not background alone', () => {
+    const theme = css('ThemeControl');
+    expect(theme).toMatch(
+      /@media \(forced-colors: active\)[\s\S]*aria-pressed='true'[\s\S]*Highlight/,
+    );
+    const site = readFileSync(
+      join(WEB_ROOT, 'components', 'v2', 'screens', 'site', 'SiteScreen.module.css'),
+      'utf8',
+    );
+    expect(site).toMatch(
+      /@media \(forced-colors: active\)[\s\S]*\.switch \{\s*border: 1px solid ButtonText/,
+    );
+    expect(site).toMatch(/aria-checked='true'\] \{[^}]*background: Highlight/);
+  });
+});
+
+describe('AccountShell and TrialCard (behaviour: account-shell.test.tsx)', () => {
+  it('shares PageShell’s canvas class, so its colours, type and 600 weight are not copied', () => {
+    const src = readFileSync(join(WEB_ROOT, 'components', 'v2', 'AccountShell.tsx'), 'utf8');
+    expect(src).toContain("import shell from './PageShell.module.css'");
+    expect(src).toMatch(/className=\{`\$\{shell\.shell\} /);
+  });
+
+  it('keeps the trial card’s action in reach on a phone, and its note out of sight but read (DESIGN-LOCK §6, owner ruling 2026-11-08)', () => {
+    const src = css('TrialCard');
+    const phone = src.slice(src.indexOf('@media (max-width: 760px)'));
+    const note = phone.match(/\.note \{[^}]*\}/)![0];
+    expect(note).toMatch(/clip-path: inset\(50%\)/);
+    expect(note).not.toMatch(/display: none|visibility: hidden/);
+    expect(phone).not.toMatch(/\.actions \{[^}]*display: none/);
+  });
+});
+
+describe('GradeHistory', () => {
+  const props = {
+    label: 'site · 3 checks',
+    labels: ['24 Oct', '26', 'Thu 29'],
+    dates: ['Sat 24 Oct', 'Mon 26 Oct', 'Thu 29 Oct'],
+    caption: 'Technical SEO 79 at all three checks; AI readability 41, then 22',
+  };
+  const out = html(
+    <GradeHistory
+      {...props}
+      series={[
+        { name: 'Technical SEO', values: [79, null, 80] },
+        { name: 'AI readability', values: [41, 41, 22], dashed: true },
+      ]}
+    />,
+  );
+
+  it('hides the drawing and gives a table of every value at every check instead (D9)', () => {
+    expect(out).toMatch(/<svg [^>]*aria-hidden="true"/);
+    expect(out).toContain(`>${props.caption}</caption>`);
+    // The caption is what the scroll region's tab stop points at on a phone (aria-describedby).
+    expect(out).toMatch(/<caption id="[^"]+">/);
+    const cells = [...out.matchAll(/<td>([^<]*)<\/td>/g)].map((m) => m[1]);
+    expect(cells).toEqual(['79', '41', 'not graded', '41', '80', '22']);
+    expect([...out.matchAll(/<th scope="row">([^<]*)<\/th>/g)].map((m) => m[1])).toEqual(
+      props.dates,
+    );
+  });
+
+  it('reads, in its table, every word the drawing writes besides its axis', () => {
+    const out = html(
+      <GradeHistory
+        {...props}
+        series={[
+          { name: 'Technical SEO', values: [79, 79, 80] },
+          { name: 'AI readability', values: [41, 41, 22], dashed: true },
+        ]}
+        note={{ series: 1, text: 'AI readability · 41 since the first audit' }}
+        marker={{ series: 1, index: 2, text: 'ClaudeBot blocked · 22' }}
+      />,
+    );
+    const drawn = [...out.matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map((m) => m[1]!);
+    const axis = new Set([...props.labels, '100', '75', '50', '25']);
+    const caption = out.match(/<caption[^>]*>([\s\S]*?)<\/caption>/)![1]!.replace(/<[^>]+>/g, '');
+    for (const t of drawn.filter((t) => !axis.has(t))) expect(caption).toContain(t);
+    expect(drawn.filter((t) => !axis.has(t))).toHaveLength(2);
+  });
+
+  it('breaks a line where a check gave no score, and dashes the second series', () => {
+    const lines = [...out.matchAll(/<polyline [^>]*points="([^"]+)"/g)].map((m) => m[1]);
+    expect(lines).toHaveLength(3); // 79 | 80 apart, and the AI line whole
+    expect(out).toMatch(/stroke-dasharray="4 3"/);
+  });
+
+  it('refuses a series that does not match the checks, or a score outside 0 to 100', () => {
+    const bad = (values: (number | null)[]) => () =>
+      html(
+        <GradeHistory
+          {...props}
+          series={[
+            { name: 'a', values },
+            { name: 'b', values: [1, 2, 3] },
+          ]}
+        />,
+      );
+    expect(bad([1, 2])).toThrow(/2 values for 3 checks/);
+    expect(bad([1, 2, 101])).toThrow(/outside 0–100/);
+  });
+});
+
+describe('CheckGlyphRow and CheckGlyph', () => {
+  const cells = [
+    verdictCell('allowed_thin', 'ai_training'),
+    verdictCell('disallowed_by_robots', 'ai_training'),
+  ];
+
+  it('draws one hidden glyph per check and says the run in words', () => {
+    const out = html(<CheckGlyphRow cells={cells} spoken={spokenRun(cells)} />);
+    expect(out.match(/data-v2-glyph=/g)).toHaveLength(2);
+    expect(out).toMatch(/<span [^>]*aria-hidden="true"><svg/);
+    expect(out).toContain('allowed, thin at check 1, then blocked by robots.txt at check 2');
+    expect(out).toContain('data-v2-verdicts="allowed_thin disallowed_by_robots"');
+  });
+
+  it('labels a grid cell with its verdict’s words, so no cell is a bare glyph', () => {
+    const out = html(<CheckGlyph cell={cells[1]!} />);
+    expect(out).toContain('data-v2-verdict="disallowed_by_robots"');
+    expect(out).toMatch(/data-v2-sr-only="">blocked by robots.txt</);
+  });
+
+  it('reads Google and Bing from robots.txt (FACTS B2), and a challenge as a challenge (I2)', () => {
+    expect(verdictCell('allowed', 'search_engine').label).toBe('allowed by robots.txt');
+    expect(verdictCell('allowed', 'ai_search').label).toBe('allowed');
+    expect(verdictCell('challenged_ua', 'ai_search')).toEqual({
+      state: 'unverified',
+      label: VERDICTS.challenged_ua.label,
+      verdict: 'challenged_ua',
+    });
   });
 });

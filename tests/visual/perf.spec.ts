@@ -449,3 +449,117 @@ async function measure(
   ].filter((x): x is string => x !== null);
   return { measured, broken, before, after };
 }
+
+/**
+ * The account screens (CC-26): static pages, so the budget is what follows the load: the fonts and
+ * one scroll to the foot. Long tasks are judged from the load event on, and layout shift over the
+ * whole trace, each on the median of RUNS runs against BUDGET (blocking). Frame intervals over the
+ * scroll, and the longest task while the page loads, are printed and attached, not judged.
+ * Why the load is not judged: on the production build every preview has one task of about 90 to
+ * 190 ms while it parses and hydrates the bundle they share. A control on 6 Nov 2026 (`fcfc8175`,
+ * five loads each, 1280px) read medians of 126 ms on the Button primitive's page, 121 ms on Result
+ * and 161 ms on Crawler access, beside 173 ms on the dashboard and 97 ms on the site page; after the
+ * load event no page read a task over 10 ms. The load task is the shared bundle's, not a screen's.
+ */
+const ACCOUNT_SCREENS = [
+  '/v2-preview/screens/dashboard/day0',
+  '/v2-preview/screens/dashboard',
+  '/v2-preview/screens/dashboard/clean',
+  '/v2-preview/screens/dashboard/withheld',
+  '/v2-preview/screens/site',
+  '/v2-preview/screens/site/clean',
+  '/v2-preview/screens/site/withheld',
+] as const;
+
+async function loadAndScroll(browser: Browser, path: string, width: number, tracePath: string) {
+  const context = await browser.newContext({
+    viewport: { width, height: width < 600 ? 844 : 900 },
+  });
+  const page = await context.newPage();
+  await browser.startTracing(page, { path: tracePath, categories: CATEGORIES });
+  await page.goto(path, { waitUntil: 'load' });
+  await page.evaluate(() => document.fonts.ready);
+  const frames = await page.evaluate(async () => {
+    const gaps: number[] = [];
+    let last = performance.now();
+    const end = last + 1500;
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    await new Promise<void>((done) => {
+      const tick = (t: number) => {
+        gaps.push(t - last);
+        last = t;
+        if (t < end) requestAnimationFrame(tick);
+        else done();
+      };
+      requestAnimationFrame(tick);
+    });
+    return gaps;
+  });
+  await browser.stopTracing();
+  await context.close();
+  return { trace: fromTrace(tracePath), afterLoad: afterLoad(tracePath), frames };
+}
+
+/** The longest main-thread task that starts after the load event, and whether the trace holds one. */
+function afterLoad(path: string) {
+  const events = (
+    JSON.parse(readFileSync(path, 'utf8')) as { traceEvents: (TraceEvent & { ts?: number })[] }
+  ).traceEvents;
+  const mains = new Set(
+    events
+      .filter((e) => e.name === 'thread_name' && e.args?.name === 'CrRendererMain')
+      .map((e) => `${e.pid}:${e.tid}`),
+  );
+  const load = events.find((e) => e.name === 'MarkLoad')?.ts;
+  const after = events.filter(
+    (e) =>
+      e.name === 'RunTask' &&
+      e.ph === 'X' &&
+      mains.has(`${e.pid}:${e.tid}`) &&
+      load !== undefined &&
+      (e.ts ?? 0) >= load,
+  );
+  return {
+    loaded: load !== undefined,
+    tasks: after.length,
+    longestMs: Math.round(Math.max(0, ...after.map((e) => e.dur ?? 0)) / 1000),
+  };
+}
+
+test.describe('account screens performance', () => {
+  test.describe.configure({ timeout: RUNS * 30_000 });
+
+  for (const path of ACCOUNT_SCREENS) {
+    for (const width of [1280, 390]) {
+      test(`${path} at ${width}px: no stall and no layout shift`, async ({ browser }, testInfo) => {
+        const runs = [];
+        for (let i = 0; i < RUNS; i++) {
+          runs.push(
+            await loadAndScroll(browser, path, width, testInfo.outputPath(`trace-${i}.json`)),
+          );
+        }
+        for (const r of runs) {
+          expect(r.trace.mainThreads, `${INVALID}: no main thread in the trace`).toBeGreaterThan(0);
+          expect(r.afterLoad.loaded, `${INVALID}: no load event in the trace`).toBe(true);
+          expect(r.afterLoad.tasks, `${INVALID}: no task after the load`).toBeGreaterThan(0);
+          expect(r.frames.length, `${INVALID}: too few frames`).toBeGreaterThan(20);
+        }
+        const longest = median(runs.map((r) => r.afterLoad.longestMs));
+        const loading = median(runs.map((r) => Math.max(0, ...r.trace.long)));
+        const shift = median(runs.map((r) => r.trace.shift));
+        const sorted = runs.map((r) => [...r.frames].sort((a, b) => a - b));
+        const p95 = median(sorted.map((g) => g[Math.floor(g.length * 0.95)] ?? 0));
+        console.log(
+          `[perf] ${path} ${width}px: longest task after load ${fmt(longest)} ms, shift ${fmt(shift)}; advisory: longest while loading ${fmt(loading)} ms, p95 frame ${fmt(p95)} ms`,
+        );
+        testInfo.annotations.push({ type: 'advisory', description: `p95 frame ${fmt(p95)} ms` });
+        expect(longest, `median longest task after the load, of ${RUNS} runs`).toBeLessThanOrEqual(
+          BUDGET.stallMs,
+        );
+        expect(shift, `median layout shift of ${RUNS} runs`).toBeLessThanOrEqual(
+          BUDGET.layoutShift,
+        );
+      });
+    }
+  }
+});
