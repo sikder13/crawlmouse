@@ -76,7 +76,8 @@ signature.
 2. **Normalise** (`lib/billing/stripe-normalise.ts`). Each Stripe event becomes one of the machine's events,
    a record-only decision, or a refusal. Subscription status and extras are read from Stripe at processing
    time; `at` is `event.created` for every Stripe event (review finding 12). The payload is read only for
-   version-stable fields (ids, `type`, `created`, `livemode`, `customer`, `client_reference_id`,
+   version-stable fields (ids, `type`, `created`, `livemode`, `customer`, `client_reference_id`, a
+   checkout's `mode`, an update's `status` for the superseded rule,
    `metadata`, `subscription`, an invoice's `parent`). A Stripe error here propagates: the event is retried,
    never recorded as foreign (review finding 4). Prices go through the allow-list; grants need allow-listed
    prices and revokes do not (Q11). An update whose retrieved status differs from its payload's, and a
@@ -115,11 +116,14 @@ Postgres: `scripts/db/stripe-event-race.test.ts`, run by CI's `db-cli-files` job
 The webhook plans a `cancel` effect, durable in the same stored plan (Q10, Q13):
 
 - **Orphaned.** A checkout whose grant is ignored for any reason but "already the current subscription"
-  (an unknown account and a customer mismatch included) and whose subscription is live (`trialing`,
-  `active`, `past_due`); and the subscription an applied checkout replaced, when it is still live. Only a
-  subscription on our own prices is cancelled. A `trialing` one costs nothing; a paid one also raises
-  `billing.orphaned_subscription` naming it, for a refund by hand.
-- **Disputed.** A dispute cancels the account's followed subscription.
+  (a customer mismatch included) and whose subscription is live (`trialing`, `active`, `past_due`); a
+  checkout our route opened (its `client_reference_id` and `metadata.account_id` name the account) whose
+  prices or extras the allow-list refuses, as after a deploy that changed `prices.ts` while the session
+  was open (review round 1, M1); and the subscription an applied checkout replaced, when it is still
+  live. A checkout that names no account of ours is cancelled only when its prices are ours. A
+  `trialing` one costs nothing; a paid one also raises `billing.orphaned_subscription` at error level,
+  naming it, for a refund by hand.
+- **Disputed.** A dispute cancels the account's followed subscription, whatever its prices.
 
 A cancellation is at once, without proration, under the idempotency key `cancel:<subscription>:<reason>`,
 and is skipped when Stripe already shows the subscription ended (`lib/billing/effect-sinks.ts`).
@@ -202,7 +206,7 @@ With the flag unset, checkout, portal and status are pinned to main's behaviour:
 `pnpm --filter @crawlmouse/web exec vitest run app/api/billing/checkout/route.v1-pin.test.ts app/api/billing/portal/route.v1-pin.test.ts app/api/billing/status/route.v1-pin.test.ts`.
 The v1 webhook (`app/api/webhooks/stripe/`) is not edited.
 
-**Registry (D11).** `lib/security/route-policy.ts` lists the agency trial and cancel as `member` routes with
+**Registry (D11).** `lib/security/route-policy.ts` lists the four billing routes as `member` routes with
 the strict origin rule, and the v2 webhook as a `webhook` with `verifier: 'constructEvent'`. A POST from
 another site, or with neither `Origin` nor `Sec-Fetch-Site: same-origin`, to any of the four billing routes is
 refused 403 by the middleware before the route runs:
@@ -230,6 +234,14 @@ refused 403 by the middleware before the route runs:
 - New variables (`turbo.json` `build.env`): `V2_BILLING`, `STRIPE_ACCOUNT_SECRET_KEY`,
   `STRIPE_ACCOUNT_WEBHOOK_SECRET`, `STRIPE_ACCOUNT_LIVEMODE`. Production keeps `V2_BILLING` unset.
 
+- **Mode.** The v2 Stripe client (`lib/billing/stripe-account.ts`) refuses a key whose mode is not
+  `STRIPE_ACCOUNT_LIVEMODE`'s, and a test key on `VERCEL_ENV=production`; checkout, the webhook and the
+  reconcile then answer 500 and write nothing.
+- **Prices.** Change a Stripe price and `prices.ts` in one deploy. A session opened before it and paid after
+  is refused on its prices, cancelled and alerted. Subscribers left on a retired price keep their plan while
+  it is listed; once it is not, their revokes still apply (Q11) but a restore is refused, so moving them to
+  the new price is part of any price change.
+
 ## Known gaps
 
 - A clock step retried after its commit loses that step's `entitlement.changed` (review finding 13); nothing
@@ -243,7 +255,18 @@ refused 403 by the middleware before the route runs:
   "live"); the checkout route refuses while the account follows one (Q3), so only a race reaches it.
 - Two of CC-SEC's tests built their "after" database from every migration, so this step's migration broke
   them; they now compare their own migration alone (`__tests__/v2-definer-search-path.test.ts`,
-  `scripts/db/definer-search-path.test.ts`), and `__tests__/v2-billing-rpc.test.ts` runs check 09 with this
-  step's function in place.
+  `scripts/db/definer-search-path.test.ts`). Check 09 over every migration runs in
+  `scripts/db/check.test.ts`, and `__tests__/v2-billing-rpc.test.ts` runs it with this step's function in
+  place.
+- Two events of one subscription stamped in the same second with opposite statuses, read out of order, can
+  leave the earlier one's status (review round 1, money m1); nothing in this step produces such a pair.
+- If v1 ever checked out on the Crawlmouse account while this endpoint is registered there, its sessions
+  name no v2 account and, on our prices, would be cancelled as orphans: the cutover moves v1 off before
+  pointing either at the other's account (review round 1, money m5).
+- A founder alert is delivered once Sentry's client has flushed it; a rate-limited Sentry can drop it. The
+  plan, alert included, stays in `stripe_events.effects`.
+- Sentry's request data probably includes the `stripe-signature` header (the scrub removes cookies and
+  bodies); v1's webhook has the same shape. The billing routes have no rate limit of their own, as v1's
+  checkout has none.
 - Upgrades Pro → Agency are a subscription change, not a checkout: CC-29 or CC-31. Seat and site quantities:
   CC-31. The card-required Pro trial: Q9.
