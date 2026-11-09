@@ -11,15 +11,9 @@
  *     root, `<p>` of 14 words: main text 110 characters, still no content hash (under the 100 tokens
  *     a hash needs), `client_rendered` true, 0 links. v1's classifier keeps such a page as content.
  */
-import {
-  CrawlPageSchema,
-  type ContentFeaturesRow,
-  type CrawlPage,
-  type Site,
-} from '@crawlmouse/types/v2';
+import { CrawlPageSchema, type ContentFeaturesRow, type CrawlPage } from '@crawlmouse/types/v2';
 import type { BuildInput } from '../../../src/v2/build/types.js';
-import { recordedInput } from './recorded.js';
-import { CHECK, SITE, crawlBatch, crawlRow } from './rows.js';
+import { crawlRow, oneBatchBuild } from './rows.js';
 
 export const SHELL_HOST = 'https://shell-site.test';
 
@@ -89,28 +83,8 @@ function shellRow(url: string, o: ShellOptions): CrawlPage {
 }
 
 /** The shell site's BuildInput: one crawl batch of every route, no access batch, no render. */
-export function shellBuild(o: ShellOptions): BuildInput {
-  const base = recordedInput();
-  const site: Site = { ...base.site, id: SITE, host: new URL(SHELL_HOST).host };
-  return {
-    ...base,
-    check: { ...base.check, id: CHECK, site_id: SITE },
-    site,
-    homepage_url: SHELL_HOST,
-    seeds: [
-      { url: `${SHELL_HOST}/`, source: 'homepage', lastmod: null },
-      ...SHELL_ROUTES.filter((p) => p !== '/').map((p) => ({
-        url: shellUrl(p),
-        source: 'sitemap' as const,
-        lastmod: null,
-      })),
-    ],
-    batches: [
-      crawlBatch(
-        0,
-        SHELL_ROUTES.map((p) => shellRow(shellUrl(p), o)),
-      ),
-    ],
-    render: null,
-  };
-}
+export const shellBuild = (o: ShellOptions): BuildInput =>
+  oneBatchBuild(
+    SHELL_HOST,
+    SHELL_ROUTES.map((p) => shellRow(shellUrl(p), o)),
+  );
