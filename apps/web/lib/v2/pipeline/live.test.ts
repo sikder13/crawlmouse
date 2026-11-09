@@ -45,9 +45,10 @@ const configured = ['CRAWL_WORKER_URL', 'WORKER_SIGNING_SECRET', 'WORKER_JWT_PRI
 
 /**
  * The JS shell does not exercise D8 (no orphan or deep-page finding on a site served for JavaScript to
- * fill in): in the recorded run (2026-11-08) its homepage was the only page reachable, with no links
- * and no sitemap, so no page could be orphaned or deep. D8 is proven on the engine fixtures. A run's
- * summary carries `d8` when its own counts show that shape.
+ * fill in): in the recorded runs (2026-11-08) its homepage was the only page crawled. It has no links,
+ * and its sitemap's nine URLs are on `alynthe.com` while the site is `www.alynthe.com`, a host the
+ * planner does not seed (CC-20a's `crawlableSeeds`; a recorded follow-up). D8 is proven on the engine
+ * fixtures. A run's summary carries `d8` when its own counts show that shape.
  */
 const HOSTS = [
   { host: 'books.toscrape.com', shape: 'static' },
@@ -168,11 +169,11 @@ describe.skipIf(!configured)('the pipeline on the staging worker, against PGlite
         changes: dataset.changes.length,
         emitted,
         reach,
-        // From this run's counts: a run that read only the homepage, with no links and no sitemap
-        // URL, has no page that could be orphaned or deep, so it cannot exercise D8. Null otherwise.
+        // From this run's counts: a run that crawled one page and found no link has no page that
+        // could be orphaned or deep, whatever its sitemap listed, so it cannot exercise D8.
         d8:
-          reach.pages <= 1 && reach.link_edges === 0 && reach.sitemap_urls === 0
-            ? 'not exercised: only the homepage was reachable (no links, no sitemap URLs)'
+          reach.pages <= 1 && reach.link_edges === 0
+            ? `not exercised: one page crawled, no links (${reach.sitemap_urls ?? 0} sitemap URLs, none seeded)`
             : null,
       };
       console.log(`live ${JSON.stringify(summary)}`);
