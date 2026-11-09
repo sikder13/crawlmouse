@@ -74,16 +74,16 @@ A spelling that answers 405 must be one the rule's regex accepts:
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/security/firewall.test.ts` holds each rule to
 the list above. If the loop shows a new one, add it to the test and the regex first.
 
-Then, a minute after the sign-in loop, send the same loop to an upper-case `.rsc` spelling of the
-check-claim route. It must also end in the edge's denial; Vercel's own 403 page, not the app's JSON,
-answers the 31st:
+Then, a minute after the sign-in loop, send the same loop to the check-claim route spelled in upper
+case with a lower-case `.rsc`, the spelling that reaches the route. With no Origin, the app answers
+the first 30 with its own 403 JSON; the 31st must get the edge's denial, Vercel's own 403 page:
 
 ```bash
 for i in $(seq 1 31); do curl -s -o /dev/null -w '%{http_code} %{content_type}\n' -X POST https://crawlmouse.com/API/CHECKS/00000000-0000-4000-8000-000000000000/CLAIM.rsc; done | sort | uniq -c
 ```
 
-The challenge on GET `/login` and `/signup` does not count their `.rsc` spellings. Those return the
-page's RSC payload (`text/x-component`), not its HTML.
+The challenge rule does not count `/login.rsc` or `/signup.rsc`. Both answer 200 with an RSC payload
+(`text/x-component`), not HTML.
 
 ## Roll back
 

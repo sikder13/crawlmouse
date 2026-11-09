@@ -227,8 +227,11 @@ function's setting as production held it, `''` included; both lists are in the t
 
 **`''` is not enough.** An empty setting does not name `pg_temp`, so Postgres still searches it first
 for relations and types. A type written without its schema can then resolve to a caller's temp domain.
-Grammar keywords (`integer`, `numeric`, `bit`, `interval`) cannot: they resolve to `pg_catalog` on any
-path. When the domain is checked, as it is on assignment to a variable, its CHECK runs as `postgres`.
+A grammar keyword, such as `integer`, `numeric`, `bit` or `interval`, is not looked up on the path: the
+parser names its `pg_catalog` type itself. 006c's helpers keep `''`, and its temp-domain cases plant
+`int4`, `bit`, `numeric` and `interval` domains that their bodies' keywords do not reach
+(`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006c-trial-function.test.ts -t "temporary objects"`).
+When the domain is checked, as it is on assignment to a variable, its CHECK runs as `postgres`.
 The probe below is a definer function with `search_path = ''` and one `uuid` variable: the caller's
 domain's CHECK runs as `postgres`, and the same function with `pg_catalog, pg_temp` returns. Verify,
 in PGlite:
