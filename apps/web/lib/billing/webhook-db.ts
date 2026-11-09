@@ -87,7 +87,6 @@ export interface WebhookDb {
   begin(event: LedgerEvent): Promise<LedgerState>;
   /** Writes the row undecided (`handled` and `processed_at` null) with the reason; a row already there is left. */
   recordRefused(event: LedgerEvent, reason: 'livemode_mismatch'): Promise<void>;
-  /** A live account, or null. */
   /** A live account, its Stripe customer and the subscription it follows; null for none. */
   accountById(id: string): Promise<{
     id: string;
