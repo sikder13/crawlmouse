@@ -451,21 +451,26 @@ describe('transport failures', () => {
     });
   });
 
-  it('a redirect is not followed: the signed request goes nowhere else', async () => {
+  it('a redirect is not followed: no signed request goes anywhere else', async () => {
     const hits: string[] = [];
     const elsewhere = await listen((req, res) => {
       hits.push(req.url ?? '');
       res.end('{}');
     });
-    const url = await listen((_req, res) => {
-      res.writeHead(307, { location: `${elsewhere}/batch` });
+    const url = await listen((req, res) => {
+      res.writeHead(307, { location: `${elsewhere}${req.url}` });
       res.end();
     });
-    expect(shape(await refusal(over(url).postBatch(crawl())))).toEqual({
-      kind: 'network',
-      status: null,
-      code: null,
-    });
+    const client = over(url);
+    // Node's fetch fails a POST's redirect by itself (the sent bytes are detached), so the signed GETs
+    // are the requests that show whether a redirect is followed.
+    for (const call of [
+      () => client.postBatch(crawl()),
+      () => client.pollBatch(`${CHECK}:1`),
+      () => client.readMetrics(),
+    ]) {
+      expect(shape(await refusal(call()))).toEqual({ kind: 'network', status: null, code: null });
+    }
     expect(hits).toEqual([]);
   });
 });
