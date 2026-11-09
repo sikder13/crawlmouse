@@ -16,6 +16,7 @@ import {
 } from '@crawlmouse/types/v2';
 import { toPersistableText } from '../../text-safety.js';
 import { severityOf } from './severity.js';
+import { templateNoun } from '../build/template-noun.js';
 import { FIX_SUBJECT } from './subjects.js';
 import { stableId } from './ids.js';
 import type { LineDiff } from './robots-diff.js';
@@ -311,7 +312,7 @@ export function fixRow(
       kind,
       subject: FIX_SUBJECT[fix.type],
       summary: kind === 'opened' ? fix.title : `Resolved: ${fix.title}`,
-      where: fix.template_key ?? 'all pages',
+      where: fix.template_key === null ? 'all pages' : templateNoun(fix.template_key),
       pages_affected: fix.affected_pages,
       ua: fix.crawler_uas.length === 1 ? fix.crawler_uas[0]! : null,
       grade_deltas: [],

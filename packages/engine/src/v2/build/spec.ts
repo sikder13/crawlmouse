@@ -21,7 +21,8 @@ import {
 import { code, table } from '../detectors/spec.js';
 import { GRADE_VERSION } from '../grade/weights.js';
 import { FREE_MAX_RENDERS } from '../render/sample.js';
-import { SAMPLE_MAX_PAGES } from './assemble.js';
+import { assemble, SAMPLE_MAX_PAGES } from './assemble.js';
+import { readBatches } from './batches.js';
 import { buildCheck } from './build.js';
 import { DETECTORS_RUN } from './diff.js';
 import {
@@ -238,6 +239,11 @@ function homepageRedirects(batches: readonly BatchResult[]): BatchResult[] {
 
 export function renderBuildSpec(): string {
   const golden = buildCheck(recordedBuild());
+  const recorded = recordedBuild();
+  const shells = assemble(
+    recorded,
+    readBatches(recorded.batches, recorded.check, recorded.lineage.worker_release),
+  ).client_rendered;
   const crawlOnlyOf = (batches: readonly BatchResult[]) =>
     buildCheck({
       ...recordedInput(),
@@ -294,6 +300,8 @@ export function renderBuildSpec(): string {
       "5. The `Check` record, then `diffCheck` with this check's side.",
       '6. Lineage and usage, then validation.',
     ].join('\n'),
+    '## Pages served for JavaScript to fill in',
+    `The structure detectors' \`client_rendered\` input (SPEC 16; OPERATING-RULES §5) says whether the homepage is served for JavaScript to fill in, and lists the template key of every page that is: one whose crawl row v1's JS detector reads as an app shell on the bytes the worker read (\`content_features.client_rendered\`), or one the render found an \`empty_shell\`. v1's own suppression in the Technical SEO grade still reads the homepage's \`content_features.client_rendered\` alone. On the built-site fixture the homepage is ${shells.homepage ? '' : 'not '}listed, and the templates are ${shells.templates.length ? shells.templates.map(code).join(', ') : 'none'}.`,
     '## Status',
     'A check is `partial` when a batch carries a reason marked partial below, when the crawl planner still has URLs to fetch (`nextCrawlBatch` is not null: the crawl was stopped, or a batch was lost), or when a page the sample planned has no crawler test. The structure detectors read `partial` as "the crawl was cut short" (`detectors/scope.ts` `isTruncated`), so they are told `partial` only for a reason marked as cutting the crawl on a crawl batch, or for a crawl the planner would go on with.',
     table(['Reason', 'Check', 'Cuts the crawl', 'Why'], rule),

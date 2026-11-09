@@ -12,6 +12,7 @@ import type { AccessDetection } from '../access/types.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
 import { FIX_SECTION } from '../diff/subjects.js';
 import type { DetectorOutcome, FixDraft } from '../diff/types.js';
+import { namesOnePage, templateNoun } from '../build/template-noun.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
 import type { Detection } from '../detectors/types.js';
 import { effectsOf, type FixRecord } from './effects.js';
@@ -33,21 +34,28 @@ export const STRUCTURE_CLASS: Readonly<Partial<Record<FixType, RecommendationCla
 /** The structure detectors read our own crawl, so a finding is likely, not confirmed. */
 const CRAWL_CONFIDENCE: Confidence = 'likely';
 
-/** A fix's title, from its record. */
+/** "its" or "their", for the pages a template key names. */
+const possessive = (key: string) => (namesOnePage(key) ? 'its' : 'their');
+
+/**
+ * A fix's title, from its record: the subject is a page URL, a crawler, or, for the fixes that name a
+ * template, its key, which the title names by its noun (`templateNoun`).
+ */
 export const TITLES: Readonly<Partial<Record<FixType, (subject: string) => string>>> = {
   orphan_pages: (s) => `Link to ${s} from another page`,
   deep_pages: (s) => `Bring ${s} within 3 clicks of the homepage`,
   generic_anchor_text: (s) => `Use descriptive link text on ${s}`,
   redirect_chain: (s) => `Link straight to where ${s} redirects`,
-  duplicate_pagination: (s) => `Make the later pages of ${s} distinct`,
+  duplicate_pagination: (k) => `Make the later pages of ${templateNoun(k)} distinct`,
   canonical_mismatch: (s) => `Correct the canonical of ${s}`,
   hreflang_gap: (s) => `Complete the hreflang annotations of ${s}`,
   edge_rule_blocks_crawler: (s) => `Let ${s} through the user-agent rule`,
-  quotable_opening: (s) => `Open ${s} pages with a direct answer`,
-  missing_author_date: (s) => `Show an author and a date on ${s} pages`,
-  specs_as_images: (s) => `Give the specifications on ${s} pages as text`,
-  missing_schema_description: (s) => `Describe ${s} pages in their schema.org markup`,
-  no_question_headings: (s) => `Phrase a section heading on ${s} pages as a question`,
+  quotable_opening: (k) => `Open ${templateNoun(k)} with a direct answer`,
+  missing_author_date: (k) => `Show an author and a date on ${templateNoun(k)}`,
+  specs_as_images: (k) => `Give the specifications on ${templateNoun(k)} as text`,
+  missing_schema_description: (k) =>
+    `Describe ${templateNoun(k)} in ${possessive(k)} schema.org markup`,
+  no_question_headings: (k) => `Phrase a section heading on ${templateNoun(k)} as a question`,
 };
 
 function draft(f: FixRecord, effect: Effect, rank: number, absorbed_by: string | null): FixDraft {

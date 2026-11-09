@@ -3,10 +3,12 @@
  *
  * The cap-safe rule (docs/tickets/2026-08-07-orphan-under-cap.md): "no inbound link" is proven only
  * when every page that could link was read, which `absenceUnproven` in scope.ts decides. Otherwise
- * the record is indeterminate. One inbound link is proof on any crawl.
+ * the record is indeterminate. One inbound link is proof on any crawl. A page served for JavaScript
+ * to fill in, or on a site whose homepage is, is indeterminate instead of detected (`clientRendered`).
  */
 import {
   absenceUnproven,
+  clientRendered,
   goneRecords,
   isGradeable,
   record,
@@ -25,6 +27,13 @@ export function detectOrphans(input: DetectorInput): Detection[] {
       const base = { measured: inbound.length, affected: [p.url], pages: [p.url], edges: inbound };
       if (inbound.length > 0)
         return record('orphan_pages', p.url, { ...base, state: 'not_detected' });
+      if (clientRendered(s, p)) {
+        return record('orphan_pages', p.url, {
+          ...base,
+          state: 'indeterminate',
+          reason: 'client_rendered',
+        });
+      }
       const unproven = absenceUnproven(s);
       if (unproven !== null) {
         return record('orphan_pages', p.url, { ...base, state: 'indeterminate', reason: unproven });

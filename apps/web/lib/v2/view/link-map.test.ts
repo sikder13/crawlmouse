@@ -1,3 +1,4 @@
+import { checkMap } from '@crawlmouse/engine/v2/pipeline';
 import { describe, expect, it } from 'vitest';
 import { findCheck, fixture } from '../fixtures';
 import { generatedGraph } from '../generated-graph';
@@ -94,6 +95,26 @@ describe('linkMapView: the hubs and their neighbours (Final-LinkMap)', () => {
     });
   });
 
+  it('says "not read" for a page whose links were not all read, never its count as links out', () => {
+    // A page whose links were not all read has no count: links_out is 0 for a 404, partial for a cut body.
+    const d = structuredClone(fixture('bad-site'));
+    const page = d.page_results.find(
+      (p) => p.check_id === BAD && p.url.endsWith('/products/ridge-2p'),
+    )!;
+    page.links_read = false;
+    const ridge = linkMapView(d, BAD, { scope: 'hubs', asFirstSeen: true, hrefs }).details[
+      '/products/ridge-2p'
+    ]!;
+    expect(ridge.facts.find((f) => f.label === 'Links out')).toEqual({
+      label: 'Links out',
+      value: 'not read',
+    });
+    expect(ridge.linksTo.heading).toBe('Links to · not read');
+    expect(ridge.linksTo.more).toBeNull();
+    // What the crawl did record from it is still listed.
+    expect(ridge.linksTo.paths).toEqual(v.details['/products/ridge-2p']!.linksTo.paths);
+  });
+
   it('lists the crawler requests the record holds for a page, and says how many it holds', () => {
     const access = v.details['/products/ridge-2p']!.access!;
     expect(access.rows.map((r) => [r.ua, r.verdict, r.words])).toEqual([
@@ -152,5 +173,49 @@ describe('linkMapView: every page', () => {
     expect(v.nodes).toHaveLength(findCheck(d, id).coverage!.pages_crawled);
     expect(v.explore).toBeNull();
     expect(Object.keys(v.details)).toHaveLength(0);
+  });
+});
+
+describe('the drawing a finished check stores (checkMap, CC-20b D10)', () => {
+  const pathOf = (url: string) => {
+    const u = new URL(url);
+    return `${u.pathname}${u.search}`;
+  };
+
+  // The built check, which the check builder made; and the bad site's, whose hubs include a
+  // JavaScript-only page, the one kind the layout places by whether the map is finished.
+  it.each(['built-site', 'bad-site'] as const)(
+    'is the drawing the explorer draws of the %s check: the same pages, kinds, lines and places',
+    (name) => {
+      const d = fixture(name);
+      const id = FIRST_AUDIT[name];
+      const stored = checkMap(
+        d.page_results.filter((p) => p.check_id === id),
+        d.link_edges.filter((e) => e.check_id === id),
+      );
+      const fromStored = stored.nodes.map((n) => ({
+        path: pathOf(n.id),
+        kind: n.kind,
+        x: stored.positions[n.id]!.x,
+        y: stored.positions[n.id]!.y,
+        parent: n.parent ? pathOf(n.parent) : null,
+        js: n.via === 'javascript',
+      }));
+      const drawn = linkMapView(d, id, { scope: 'hubs', hrefs }).nodes.map(
+        ({ path, kind, x, y, parent, js }) => ({ path, kind, x, y, parent, js }),
+      );
+      expect(drawn.length).toBeGreaterThan(1);
+      expect(fromStored).toEqual(drawn);
+    },
+  );
+
+  it('the bad site’s drawing holds a JavaScript-only page, so the comparison sees the finished layout', () => {
+    const d = fixture('bad-site');
+    const id = FIRST_AUDIT['bad-site'];
+    const stored = checkMap(
+      d.page_results.filter((p) => p.check_id === id),
+      d.link_edges.filter((e) => e.check_id === id),
+    );
+    expect(stored.nodes.some((n) => n.kind === 'js_only')).toBe(true);
   });
 });
