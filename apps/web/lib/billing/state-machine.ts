@@ -376,8 +376,11 @@ function sameExtras(a: Extras, b: Extras): boolean {
   return a.seats === b.seats && a.sites === b.sites;
 }
 
-/** Why a Free account may not start a trial, or null when it may. */
-function trialRefusal(s: EntitlementSnapshot, at: Date): string | null {
+/**
+ * Why a Free account may not start a trial, or null when it may. The Agency trial route asks it before
+ * opening a checkout, so it refuses what the webhook would later ignore (CC-03 D7).
+ */
+export function trialRefusal(s: EntitlementSnapshot, at: Date): string | null {
   if (s.state !== 'free') return 'only a Free account starts a trial';
   if (s.trialUsedAt !== null) return 'the account has used its trial';
   if (s.disputedAt !== null) return 'a disputed account gets no trial';
