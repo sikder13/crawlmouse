@@ -35,7 +35,9 @@ The finders in `apps/web/__tests__/v1-inventory-source.ts` list, from the tree:
   file that is a 404 whenever a v2 flag is off: it imports a `…Enabled` reader from a `…/flags` module
   and every handler it exports opens a top-level `if (!reader()) return …` with a 404 (`api/checks/[id]/claim` today; CC-03's new billing
   routes once merged, which then join the test's pinned list of what the rule hides). A v1 route with a
-  v2 branch (`api/auth/magic-link`, `login/verify`) is not a 404 with the flag off, so it stays listed;
+  v2 branch (`api/auth/magic-link`, `login/verify`) is not a 404 with the flag off, so it stays listed. The rule
+  reads a 404 as `notFound()`, a `status: 404` property, or a call whose first argument is 404, so it
+  cannot tell `legacy(404)` from `refuse(404, …)`; the pinned list is what catches such a file;
 - every `createFunction` call in the `inngest` package: one written as a top-level
   `export const x = inngest.createFunction(…)` is a v1 function, with the cron in its trigger, and the serve route's
   `functions` list is checked against them; one inside a function body that is not run where it is
