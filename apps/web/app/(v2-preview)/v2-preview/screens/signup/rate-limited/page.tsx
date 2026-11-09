@@ -3,5 +3,5 @@ import { previewOnly } from '../../../_preview/guard';
 
 export default function SignupRateLimitedPreview() {
   previewOnly();
-  return <SignupScreen pipeline={false} initial="rate_limited" />;
+  return <SignupScreen checksPublic={false} initial="rate_limited" />;
 }

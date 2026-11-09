@@ -18,6 +18,7 @@ import {
 import { canonicalizeUrl } from '../../url-canonical.js';
 import { assemble } from './assemble.js';
 import { readBatches } from './batches.js';
+import { MAX_TEMPLATE_KEY_LENGTH, MAX_URL_LENGTH } from '../batch-bounds.js';
 import { nextCrawlBatch, sample, STAGE1_CHALLENGED, STAGE1_MAX_PAGES } from './plan.js';
 import type { Seed } from './types.js';
 
@@ -67,6 +68,48 @@ describe('stage 1', () => {
     const s = sample(assembled(rows));
     expect(s.stage1).toHaveLength(STAGE1_MAX_PAGES);
     expect(s.stage1.filter((p) => p.picked_for === 'challenged')).toHaveLength(STAGE1_CHALLENGED);
+  });
+});
+
+describe('stage 1 bounds', () => {
+  // An access batch's template keys are bounded by the worker (invalid_body past it); a crawler trap
+  // (/a/b/a/b/…) gives a key per depth, each longer than the last.
+  // A row made on a short URL and then given a long one: the fixture's title is `Page <url>`, which a
+  // URL this long would push past the title's own bound.
+  const longRow = (path: string, challengedRow = false) => ({
+    ...(challengedRow ? challenged('/trap') : ok('/trap')),
+    url: at(path),
+    final_url: at(path),
+  });
+  /** A path whose template key is `length` characters: `/a` segments, and one `/bb` for an odd length. */
+  const keyed = (length: number) =>
+    `${'/a'.repeat(Math.floor(length / 2) - (length % 2))}${length % 2 ? '/bb' : ''}`;
+
+  it('samples a page whose template key is at the worker’s limit, and none past it', () => {
+    const rows = [ok(''), ok('/plain/page'), longRow(keyed(MAX_TEMPLATE_KEY_LENGTH))];
+    const at_limit = assembled(rows);
+    const page = at_limit.pages.find((p) => p.url === at(keyed(MAX_TEMPLATE_KEY_LENGTH)))!;
+    expect(page.template_key.length).toBe(MAX_TEMPLATE_KEY_LENGTH);
+    expect(sample(at_limit).stage1.map((p) => p.url)).toContain(page.url);
+
+    const past = assembled([
+      ok(''),
+      ok('/plain/page'),
+      longRow(keyed(MAX_TEMPLATE_KEY_LENGTH + 1)),
+    ]);
+    const over = past.pages.find((p) => p.url === at(keyed(MAX_TEMPLATE_KEY_LENGTH + 1)))!;
+    expect(over.template_key.length).toBe(MAX_TEMPLATE_KEY_LENGTH + 1);
+    expect(sample(past).stage1.map((p) => p.url)).not.toContain(over.url);
+    expect(sample(past).stage1.map((p) => p.url)).toContain(at('/plain/page'));
+  });
+
+  it('samples no challenged page whose template key is past the worker’s limit', () => {
+    const path = keyed(MAX_TEMPLATE_KEY_LENGTH + 1);
+    const a = assembled([ok(''), ok('/plain/page'), longRow(path, true)]);
+    expect(a.pages.find((p) => p.url === at(path))!.template_key.length).toBe(
+      MAX_TEMPLATE_KEY_LENGTH + 1,
+    );
+    expect(sample(a).stage1.map((p) => p.url)).not.toContain(at(path));
   });
 });
 
@@ -255,5 +298,102 @@ describe('nextCrawlBatch', () => {
         500,
       ),
     ).toBeNull();
+  });
+
+  // The worker refuses a whole batch holding one URL off the site's default port (jwt_scope,
+  // packages/worker/src/server.ts), so a crawled link such as a leftover dev link must not be planned.
+  it('plans no discovered link on another port, nor the www twin’s, and coverage does not count one', () => {
+    const ported = [
+      'https://p.test:8443/admin',
+      'http://www.p.test:8080/',
+      'https://p.test:443/kept',
+    ];
+    const batch = crawlBatch(
+      0,
+      [crawlRow({ url: HOME, outcome: 'fetched', status: 200 })],
+      [],
+      [...ported, at('/ok')],
+    );
+    const seeds: Seed[] = [{ url: HOME, source: 'homepage', lastmod: null }];
+    // https://p.test:443/kept is the default port written out: the URL parser drops it.
+    expect(nextCrawlBatch(seeds, [batch], 500)).toEqual([at('/kept'), at('/ok')]);
+    const a = assemble(
+      {
+        check: { id: CHECK, site_id: SITE, page_cap: 500 } as never,
+        homepage_url: HOME,
+        seeds,
+        render: null,
+      },
+      readBatches([batch], { id: CHECK, site_id: SITE }, 'unreleased'),
+    );
+    expect(a.coverage.pages_discovered).toBe(3);
+  });
+
+  // The worker refuses a whole batch holding a URL over its request limit (invalid_body), and a
+  // sitemap's <loc> can be any length.
+  it('plans a URL at the worker’s URL limit, and none past it, from a sitemap or a link', () => {
+    // HOME is 14 characters and the path's slash one more.
+    const of = (length: number, tail: string) =>
+      at(`/${tail}${'x'.repeat(length - HOME.length - 1 - tail.length)}`);
+    const seedAt = of(MAX_URL_LENGTH, 's');
+    const seedPast = of(MAX_URL_LENGTH + 1, 's');
+    const linkAt = of(MAX_URL_LENGTH, 'l');
+    const linkPast = of(MAX_URL_LENGTH + 1, 'l');
+    for (const [u, n] of [
+      [seedAt, MAX_URL_LENGTH],
+      [seedPast, MAX_URL_LENGTH + 1],
+      [linkAt, MAX_URL_LENGTH],
+      [linkPast, MAX_URL_LENGTH + 1],
+    ] as const)
+      expect(canonicalizeUrl(u).length).toBe(n);
+    const seeds: Seed[] = [
+      { url: HOME, source: 'homepage', lastmod: null },
+      { url: seedAt, source: 'sitemap', lastmod: null },
+      { url: seedPast, source: 'sitemap', lastmod: null },
+    ];
+    const batch = crawlBatch(
+      0,
+      [crawlRow({ url: HOME, outcome: 'fetched', status: 200 })],
+      [],
+      [linkAt, linkPast],
+    );
+    expect(nextCrawlBatch(seeds, [batch], 500)).toEqual([seedAt, linkAt]);
+    // Coverage counts the two within the limit, and the homepage; the two past it are not discovered.
+    const a = assemble(
+      {
+        check: { id: CHECK, site_id: SITE, page_cap: 500 } as never,
+        homepage_url: HOME,
+        seeds,
+        render: null,
+      },
+      readBatches([batch], { id: CHECK, site_id: SITE }, 'unreleased'),
+    );
+    expect(a.coverage.pages_discovered).toBe(3);
+  });
+
+  it('measures a URL as the crawl spells it: a path short as written but past the limit once encoded', () => {
+    // Each 'é' is one character as written and six once percent-encoded (%C3%A9).
+    const raw = at(`/${'é'.repeat(400)}`);
+    expect(raw.length).toBeLessThanOrEqual(MAX_URL_LENGTH);
+    expect(canonicalizeUrl(raw).length).toBeGreaterThan(MAX_URL_LENGTH);
+    const seeds: Seed[] = [
+      { url: HOME, source: 'homepage', lastmod: null },
+      { url: raw, source: 'sitemap', lastmod: null },
+    ];
+    const batch = crawlBatch(
+      0,
+      [crawlRow({ url: HOME, outcome: 'fetched', status: 200 })],
+      [],
+      [raw],
+    );
+    expect(nextCrawlBatch(seeds, [batch], 500)).toBeNull();
+  });
+
+  it('crawls no sitemap seed on another port', () => {
+    const seeds: Seed[] = [
+      { url: HOME, source: 'homepage', lastmod: null },
+      { url: 'https://p.test:8443/x/ported', source: 'sitemap', lastmod: null },
+    ];
+    expect(nextCrawlBatch(seeds, [], 500)).toEqual([HOME]);
   });
 });

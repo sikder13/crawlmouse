@@ -7,7 +7,7 @@ export default function CheckEmailNamedSitePreview() {
     <CheckEmailScreen
       kind="named-site"
       site={'acme-outdoors.com'}
-      pipeline={false}
+      checksPublic={false}
       email="you@company.com"
     />
   );

@@ -13,21 +13,23 @@ v2_tables(rel) as (
   values
     ('public.access_tests'), ('public.accounts'), ('public.agency_brands'), ('public.alert_events'),
     ('public.alert_rules'), ('public.api_keys'), ('public.changes'), ('public.check_ledger_links'),
-    ('public.checks'), ('public.deploy_hooks'), ('public.evidence_blobs'), ('public.fix_events'),
-    ('public.link_edges'), ('public.measurement_lineages'), ('public.page_results'),
-    ('public.report_schedules'), ('public.reports'), ('public.seat_sites'), ('public.seats'),
-    ('public.share_links'), ('public.site_fixes'), ('public.sites'), ('public.subscriptions'),
-    ('public.trial_ledger'), ('public.usage_events')
+    ('public.checks'), ('public.crawl_batches'), ('public.deploy_hooks'), ('public.evidence_blobs'),
+    ('public.fix_events'), ('public.link_edges'), ('public.measurement_lineages'),
+    ('public.page_results'), ('public.persist_chunks'), ('public.report_schedules'),
+    ('public.reports'), ('public.seat_sites'), ('public.seats'), ('public.share_links'),
+    ('public.site_fixes'), ('public.sites'), ('public.subscriptions'), ('public.trial_ledger'),
+    ('public.usage_events')
 ),
 -- (relation, role, privilege, columns); null columns is a grant on the whole table.
 declared(rel, role, privilege, columns) as (
   values
     ('public.access_tests', 'authenticated', 'SELECT', array[
       'body_excerpt', 'byte_count', 'cause', 'check_id', 'check_month', 'evidence_class',
-      'final_url', 'headers', 'http_version', 'id', 'identity_sent', 'limitations',
-      'lineage_id', 'measurement_status', 'method', 'page_url', 'raw_status',
-      'request_headers', 'source_ip_class', 'template_key', 'tested_at', 'ua', 'verdict',
-      'word_count']),
+      'final_url', 'fly_region', 'headers', 'http_version', 'id', 'identity_role',
+      'identity_sent', 'limitations', 'lineage_id', 'measurement_status', 'method',
+      'page_url', 'raw_status', 'request_headers', 'request_signing', 'signature_verified',
+      'source_ip_class', 'tagged', 'template_key', 'tested_at', 'timing', 'ua', 'verdict',
+      'witness', 'word_count', 'worker_release']),
     ('public.accounts', 'authenticated', 'SELECT', array[
       'card_last4', 'competitor_limit', 'created_at', 'current_subscription_id',
       'deleted_at', 'disputed_at', 'email_change_notes', 'email_trial_reminder',
@@ -84,9 +86,9 @@ declared(rel, role, privilege, columns) as (
       'content_simhash', 'crawlers_reached', 'crawlers_reading_text', 'depth', 'final_url',
       'found_via', 'headers', 'hreflang', 'identity_sent', 'is_html', 'is_orphan',
       'js_only', 'kind', 'lineage_id', 'links_in', 'links_out', 'links_read',
-      'pagerank_share', 'redirect', 'request_headers', 'robots_search', 'sampled',
-      'sitemap_lastmod', 'source_ip_class', 'status_code', 'suggested_parent_url',
-      'template_key', 'url', 'url_hash', 'without_js']),
+      'meta_description', 'pagerank_share', 'redirect', 'request_headers', 'robots_search',
+      'sampled', 'sitemap_lastmod', 'source_ip_class', 'status_code', 'suggested_parent_url',
+      'template_key', 'title', 'url', 'url_hash', 'without_js']),
     ('public.page_results', 'crawl_worker', 'INSERT', null),
     ('public.report_schedules', 'authenticated', 'SELECT', array[
       'account_id', 'cadence', 'created_at', 'iso_weekday', 'last_run_at', 'next_run_at',

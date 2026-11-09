@@ -1,5 +1,5 @@
 {
-  "$comment": "Trimmed from the SARIF GitHub stored for the codeql job on 2026-11-08 (analysis 2122616052, commit 6938fb47): its high-severity results outside tests/, and each rule's id and security-severity. GitHub stores a SARIF without its tool notifications, so this one has no extracted-file count; the baseline test reads results only.",
+  "$comment": "Trimmed from the SARIF GitHub stored for the codeql job on 2026-11-08 (analysis 2122616052, commit 6938fb47): its high-severity results outside tests/, and each rule's id and security-severity. GitHub stores a SARIF without its tool notifications, so this one has no extracted-file count; the baseline test reads results only. One result was re-read on 2026-11-09 from analysis 2124854701 (commit 173c0b0b): js/incomplete-url-scheme-check in packages/engine/src/extract.ts, at line 222 with a new fingerprint after Prettier re-wrapped its if (CC-20b).",
   "version": "2.1.0",
   "runs": [
     {
@@ -153,13 +153,13 @@
                   "uri": "packages/engine/src/extract.ts"
                 },
                 "region": {
-                  "startLine": 152
+                  "startLine": 222
                 }
               }
             }
           ],
           "partialFingerprints": {
-            "primaryLocationLineHash": "52a3a31abe2ab219:1"
+            "primaryLocationLineHash": "7fdae392710e939:1"
           }
         },
         {

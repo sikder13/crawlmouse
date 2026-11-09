@@ -75,6 +75,13 @@ export interface DetectorInput {
   disallowed: readonly { url: string; robots_search: SearchRobots }[];
   /** The previous graded check's coverage, for comparing samples; null when there is none. */
   previous_coverage: Coverage | null;
+  /**
+   * What is served for JavaScript to fill in: the homepage, and the template keys of other pages.
+   * Links such a page makes in the browser are not in the HTML the crawl read, so the crawl cannot
+   * prove a page has no link or no short path (`clientRendered` in scope.ts). The builder fills it
+   * (build/assemble.ts).
+   */
+  client_rendered: { homepage: boolean; templates: readonly string[] };
 }
 
 /** Why a detector could not decide. */
@@ -97,6 +104,7 @@ export const INDETERMINATE_REASONS = [
   'canonical_target_not_fetched',
   'canonical_target_not_read',
   'member_not_crawled',
+  'client_rendered',
 ] as const;
 export type IndeterminateReason = (typeof INDETERMINATE_REASONS)[number];
 

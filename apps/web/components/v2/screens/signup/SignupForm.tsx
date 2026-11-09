@@ -30,10 +30,10 @@ export function checkEmailHref(body: LinkRequest): string {
  * LiveRegion, in the accessibility tree from the first render.
  */
 export function SignupForm({
-  pipeline,
+  checksPublic,
   initial,
 }: {
-  pipeline: boolean;
+  checksPublic: boolean;
   initial?: SignupFormState;
 }) {
   const ids = useId();
@@ -82,7 +82,7 @@ export function SignupForm({
         aria-describedby={`${ids}-site-help${refused === 'invalid_site' ? ` ${ids}-error` : ''}`}
       />
       <div id={`${ids}-site-help`} className={styles.help}>
-        {siteHelper(pipeline)}
+        {siteHelper(checksPublic)}
       </div>
       {sender.widget}
       <Button type="submit" variant="primary" disabled={busy} className={styles.submit}>

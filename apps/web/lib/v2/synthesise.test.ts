@@ -210,3 +210,14 @@ describe('a check whose templates do not add up', () => {
     expect(() => synthesise(recordingSpec('bad-site'), d)).toThrow(/hold 216 pages.*crawled 214/);
   });
 });
+
+describe('a fixture page whose links were not all read', () => {
+  it('is refused: a stream counts the links in each response, and it has no count to give', () => {
+    const d = structuredClone(fixture('bad-site'));
+    const page = d.page_results.find((p) => p.check_id === CHECKS.badFirstAudit)!;
+    page.links_read = false;
+    expect(() => synthesise(recordingSpec('bad-site'), d)).toThrow(
+      `synthesise: the links of ${page.url} were not all read`,
+    );
+  });
+});

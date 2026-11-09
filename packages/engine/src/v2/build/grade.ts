@@ -52,6 +52,7 @@ export function gradeAssembled(
     edges: assembled.edges,
     disallowed: assembled.disallowed,
     previous_coverage: input.previous?.check.coverage ?? null,
+    client_rendered: assembled.client_rendered,
   });
   const orphans = new Set(
     structure

@@ -5,7 +5,7 @@
  * re-roots at other pages, and the result is no longer clicks from the homepage. Pages outside the
  * crawl can only add links, and links can only shorten a path, so an observed depth within the limit
  * is proven on any crawl, while one past it is proven only when `absenceUnproven` (scope.ts) finds
- * nothing the crawl missed.
+ * nothing the crawl missed, and the page is not served for JavaScript to fill in (`clientRendered`).
  */
 import type { Coverage } from '@crawlmouse/types/v2';
 import Graph from 'graphology';
@@ -14,6 +14,7 @@ import type { SiteGraph } from '../../graph.js';
 import {
   absenceUnproven,
   byText,
+  clientRendered,
   isGradeable,
   record,
   scopeOf,
@@ -113,6 +114,13 @@ export function detectDeepPages(input: DetectorInput): Detection[] {
         });
       if (depth !== null && depth <= MAX_HEALTHY_DEPTH)
         return record('deep_pages', p.url, { ...base, state: 'not_detected' });
+      if (clientRendered(s, p)) {
+        return record('deep_pages', p.url, {
+          ...base,
+          state: 'indeterminate',
+          reason: 'client_rendered',
+        });
+      }
       const unproven = absenceUnproven(s);
       if (unproven !== null) {
         return record('deep_pages', p.url, { ...base, state: 'indeterminate', reason: unproven });

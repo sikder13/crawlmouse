@@ -34,7 +34,7 @@ import { isGraded, type TechnicalSeoInput } from '../grade/technical-seo.js';
 import type { RenderOutcome } from '../render/run.js';
 import type { Batches } from './batches.js';
 import { fileEdges, landingsOf } from './filing.js';
-import { crawlableSeeds, landedOn, nextCrawlBatch } from './plan.js';
+import { crawlableDiscovered, crawlableSeeds, landedOn, nextCrawlBatch } from './plan.js';
 import { decideStatus, type StatusDecision } from './status.js';
 import type { BuildInput, Seed } from './types.js';
 
@@ -57,7 +57,10 @@ export interface Assembled {
   content: ReadonlyMap<string, ContentFeatures>;
   /** The homepage row's CMS; null when the homepage was not read as HTML. */
   cms: CmsName | null;
+  /** v1's JS detector read the homepage as an app shell: what v1's grade suppresses orphans on. */
   homepage_client_rendered: boolean;
+  /** What the structure detectors hold back on as served for JavaScript to fill in (`clientRenderedOf`). */
+  client_rendered: DetectorInput['client_rendered'];
   coverage: Coverage;
   refusal: TechnicalSeoInput['refusal'];
   status: StatusDecision;
@@ -202,6 +205,7 @@ export function assemble(
     (crawlerRows.get(t.page_url) ?? crawlerRows.set(t.page_url, []).get(t.page_url)!).push(t);
   }
   const rendered = renderedPages(input.render, rows);
+  const client_rendered = clientRenderedOf(homepage, content, rendered);
   const seeds = seedMap(input.seeds);
 
   const pages: PageResult[] = pageRows.map((r) => {
@@ -247,7 +251,7 @@ export function assemble(
   const rowUrls = new Set(allRows.map((r) => r.url));
   const crawlable = crawlableSeeds(input.seeds);
   const found = [
-    ...batches.crawl.flatMap((b) => b.discovered_urls),
+    ...crawlableDiscovered(input.seeds, batches.crawl),
     ...crawlable.map((s) => canonicalizeUrl(s.url)),
   ];
   const unread = [...new Set(found)].filter((u) => !rowUrls.has(u) && !landed.has(u)).sort();
@@ -308,6 +312,7 @@ export function assemble(
     content,
     cms,
     homepage_client_rendered,
+    client_rendered,
     coverage,
     refusal: {
       excludedPageCount: accounting.excluded.reduce((n, e) => n + e.count, 0),
@@ -349,6 +354,27 @@ function templatesOf(pages: readonly PageResult[]): Coverage['templates'] {
       // No labeller exists yet: the label is the template key (SPEC 20a).
       .map(([template_key, pages]) => ({ template_key, label: template_key, pages }))
   );
+}
+
+/**
+ * What the check holds as served for JavaScript to fill in (OPERATING-RULES §5): a page v1's JS
+ * detector reads as an app shell on the bytes the worker read (`content_features.client_rendered`,
+ * content/read.ts), or one the render found an `empty_shell` (render/state.ts). It says whether the
+ * homepage is one, and lists the template key of every one, sorted. The render's state widens v1's
+ * signal here only: the grade still reads `homepage_client_rendered`, v1's alone.
+ */
+function clientRenderedOf(
+  homepage: string,
+  content: ReadonlyMap<string, ContentFeatures>,
+  rendered: ReadonlyMap<string, NonNullable<PageResult['without_js']>>,
+): DetectorInput['client_rendered'] {
+  const shell = (url: string) =>
+    content.get(url)?.client_rendered === true || rendered.get(url)?.state === 'empty_shell';
+  const urls = [...new Set([...content.keys(), ...rendered.keys()])].filter(shell);
+  return {
+    homepage: shell(homepage),
+    templates: [...new Set(urls.map(templateKeyFor))].sort(byText),
+  };
 }
 
 function renderedPages(

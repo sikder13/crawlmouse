@@ -5,7 +5,8 @@
  * to the lower URL), the cut v1's structure score uses. On a truncated crawl they are the hubs of
  * what was crawled. A hub's own links are all on the hub, so its share is measured whole, unless the
  * page found more links than were recorded; then the share is a range and decides only if the whole
- * range falls on one side of a threshold. Between the two thresholds the record is `indeterminate`,
+ * range falls on one side of a threshold. A hub whose links were not all read has no total to take a
+ * share of, so it is `indeterminate`. Between the two thresholds the record is `indeterminate`,
  * which the lifecycle reads as "leave an open fix open, open no new one".
  */
 import { byText, record, scopeOf } from './scope.js';
@@ -31,14 +32,22 @@ export function detectGenericAnchors(input: DetectorInput): Detection[] {
   return hubsOf(input).map((hub) => {
     const recorded = s.out.get(hub) ?? [];
     const generic = recorded.filter((e) => e.is_generic_anchor);
-    const total = Math.max(s.linksOut(hub), recorded.length);
-    const unrecorded = total - recorded.length;
+    const found = s.linksOut(hub);
     const base = {
       measured: recorded.length === 0 ? null : generic.length / recorded.length,
       affected: [hub],
       pages: [hub],
       edges: generic,
     };
+    if (found === null) {
+      return record('generic_anchor_text', hub, {
+        ...base,
+        state: 'indeterminate',
+        reason: 'links_not_fully_recorded',
+      });
+    }
+    const total = Math.max(found, recorded.length);
+    const unrecorded = total - recorded.length;
     if (total < MIN_HUB_OUTLINKS) {
       return record('generic_anchor_text', hub, {
         ...base,
