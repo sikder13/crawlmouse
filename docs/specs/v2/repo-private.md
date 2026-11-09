@@ -87,7 +87,13 @@ It parses both files with `yaml` (YAML 1.2, so the key `on` stays a string; YAML
 - a `secrets.` reference outside `steps` or in workflow-level `env`;
 - an `authorize` job that has an environment, a secret or a permission;
 - a guard whose `env:` mapping is not exactly the five context names, in any copy;
-- copies of the guard script that are not identical.
+- copies of the guard script that are not identical;
+- a guard that is present but would not run as written: a guard step with any key besides `name`,
+  `env` and `run` (an `if:`, `continue-on-error`, a `shell:`), `defaults` at workflow level or on
+  `authorize` or a secret-holding job, `continue-on-error` on those jobs or their steps, an `if:` or
+  `needs` on `authorize`, more than one step in `authorize`, or an `always()`, `failure()` or
+  `cancelled()` in a secret-holding job's `if:`. Each of these is a fixture the test applies to the
+  real files and expects rejected.
 
 The test runs the guard's script with bash and checks it:
 
@@ -95,10 +101,12 @@ The test runs the guard's script with bash and checks it:
 - it refuses each of these: another dispatcher, a re-run by another account, another ref, another
   event, an empty owner, an empty value.
 
-Across every workflow in the repository, the test checks two more things:
+Across every workflow in the repository, the test checks these:
 
-- only these two files bind `environment: production`;
-- no workflow grants `actions: write` or `write-all`.
+- only these two files bind the `production` environment, its name compared without case;
+- outside them, no environment name is an expression (`${{`);
+- no workflow binds `spike` (below);
+- every workflow declares top-level `permissions`, and none grants `actions: write` or `write-all`.
 
 ## D3 — Semgrep replaces CodeQL, in CI only
 
@@ -194,7 +202,9 @@ The decision is a skip list, not a list of rendering paths. The previews import 
 sed -n '/^export const SKIP/,/^];/p;/^export const KEEP/,/^];/p' .github/workflows/scripts/changes.mjs
 ```
 
-The jobs are skipped only when every changed file is on `SKIP` and none is on `KEEP`. An empty change
+The jobs are skipped only when every changed file is on `SKIP` and none is on `KEEP`. `KEEP` holds all
+of `apps/web/app` and `apps/web/components`, test files included, because Tailwind's `content` globs scan
+them for class names, a reading the import walker does not see. An empty change
 list runs them.
 
 The test walks the import closure of several roots and fails if any file in it is skippable:
