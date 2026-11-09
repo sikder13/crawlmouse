@@ -46,7 +46,11 @@ alter table public.stripe_events add column if not exists effects jsonb
 --   2. The subscription row FOR UPDATE, inserted first from the mirror when missing. A row of
 --      another account raises 23514. A gated event strictly older than the row's last_event_created
 --      writes neither mirror nor transition nor binding: it is recorded handled = false,
---      'older than the subscription''s last event', with no effects.
+--      'older than the subscription''s last event', with no effects. An event that is not gated
+--      and is that old still decides, but does not write its mirror over the newer one. A call
+--      whose mirror has the subscription live while the row has it ended (canceled or
+--      incomplete_expired, which Stripe never leaves) read it before it ended: it writes nothing
+--      either, and is recorded 'the subscription had ended', with no effects.
 --   3. The account FOR UPDATE when the call has a transition, an expected version or a customer to
 --      bind; a call with none of them does not read the account. Missing raises P0002; an expected
 --      version that is not the account's raises 40001. The customer is bound where the account has
@@ -74,6 +78,7 @@ declare
   c_iso constant text :=
     '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$';
   c_older constant text := 'older than the subscription''s last event';
+  c_ended constant text := 'the subscription had ended';
   v_event_id text;
   v_created timestamptz;
   v_account uuid;
@@ -123,6 +128,7 @@ declare
   v_sub_found boolean := false;
   v_sub_account uuid;
   v_sub_last timestamptz;
+  v_sub_status text;
   v_version integer;
   v_bound text;
 begin
@@ -316,8 +322,8 @@ begin
               v_m_period_end, v_m_trial_end, v_m_cancel, v_m_canceled_at, v_m_ended_at, v_m_prices)
       on conflict (id) do nothing;
     end if;
-    select s.account_id, s.last_event_created
-      into v_sub_account, v_sub_last
+    select s.account_id, s.last_event_created, s.status
+      into v_sub_account, v_sub_last, v_sub_status
       from public.subscriptions s
      where s.id = v_sub_id
        for update of s;
@@ -326,16 +332,26 @@ begin
       raise exception 'apply_stripe_event: subscription % belongs to another account', v_sub_id
         using errcode = '23514';
     end if;
-    if v_sub_found and v_gated and v_created < v_sub_last then
+    if v_sub_found and (
+         (v_gated and v_created < v_sub_last)
+         or (v_sub_status in ('canceled', 'incomplete_expired')
+             and v_m_status not in ('canceled', 'incomplete_expired'))) then
+      v_reason := case when v_gated and v_created < v_sub_last then c_older else c_ended end;
       update public.stripe_events
-         set account_id = v_account, handled = false, handled_reason = c_older, effects = '[]'::jsonb
+         set account_id = v_account, handled = false, handled_reason = v_reason, effects = '[]'::jsonb
        where id = v_event_id;
       return jsonb_build_object(
         'decided', false,
         'handled', false,
-        'reason', c_older,
+        'reason', v_reason,
         'effects', '[]'::jsonb,
         'version', (select a.entitlement_version from public.accounts a where a.id = v_account));
+    end if;
+    if v_sub_found and v_created < v_sub_last then
+      -- Not gated, and older than the mark: the stored mirror is the newer read.
+      v_m := null;
+      v_m_status := null; v_m_plan := null; v_m_interval := null; v_m_seats := null;
+      v_m_sites := null; v_m_cancel := null; v_m_prices := null;
     end if;
   end if;
 

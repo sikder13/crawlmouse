@@ -618,15 +618,57 @@ describe('the out-of-order guard', () => {
     }
   });
 
-  it('an older event that is not gated passes, and the mark does not move back', async () => {
+  it('an older event that is not gated decides, keeps the newer mirror, and the mark does not move back', async () => {
     const { account, sub } = await following(100);
     const before = (await subRow(db, sub))!.last_event_id;
     const { r } = await pastDue(account, sub, 50, false);
     expect(r).toMatchObject({ handled: true, version: 2 });
+    expect((await accountRow(db, account)).state).toBe('past_due');
     const s = (await subRow(db, sub))!;
-    expect(s.status).toBe('past_due');
+    expect(s.status).toBe('active');
     expect(s.last_event_created!.toISOString()).toBe(iso(100));
     expect(s.last_event_id).toBe(before);
+  });
+
+  it('a newer event that is not gated writes its mirror', async () => {
+    const { account, sub } = await following(100);
+    await pastDue(account, sub, 150, false);
+    expect((await subRow(db, sub))!.status).toBe('past_due');
+  });
+
+  it('a read that has the subscription live, on a row that has it ended, writes nothing', async () => {
+    for (const ended of ['canceled', 'incomplete_expired']) {
+      for (const gated of [true, false]) {
+        const { account, sub } = await following(100);
+        await db.query(`update public.subscriptions set status = $2 where id = $1`, [sub, ended]);
+        const accountBefore = await accountRow(db, account);
+        const { id, r } = await pastDue(account, sub, 300, gated);
+        expect(r).toEqual({
+          decided: false,
+          handled: false,
+          reason: 'the subscription had ended',
+          effects: [],
+          version: 1,
+        });
+        expect(await accountRow(db, account)).toEqual(accountBefore);
+        expect((await subRow(db, sub))!.status).toBe(ended);
+        expect((await eventRow(db, id)).handled_reason).toBe('the subscription had ended');
+      }
+    }
+  });
+
+  it('a read that has the subscription ended, on a row that has it ended, decides', async () => {
+    const { account, sub } = await following(100);
+    await db.query(`update public.subscriptions set status = 'canceled' where id = $1`, [sub]);
+    const id = eventId();
+    await ledger(db, id);
+    const r = await call(db, {
+      ...recordOnly(id, account, 300),
+      subscription: { id: sub, gated: true, mirror: mirror(sub, 'canceled') },
+      expected_version: 1,
+      handled_reason: 'not the current subscription',
+    });
+    expect(r).toMatchObject({ decided: false, reason: 'not the current subscription' });
   });
 
   it('an event without mirror data advances the mark and keeps the mirror', async () => {
