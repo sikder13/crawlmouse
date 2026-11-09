@@ -1,9 +1,20 @@
 name: DB rollback on production
 
-# Runs one tracked rollback file on production, after the owner approves: the file's bytes and the
-# deletion of its migration's history row, in one transaction, then the checks and the fingerprint.
-# Run from main only. db-apply-prod.yml never runs a rollback; this workflow is the only way one
-# reaches production. docs/ops/db-migrations.md is the runbook.
+# Runs one tracked rollback file on production when the owner dispatches it from main: the file's
+# bytes and the deletion of its migration's history row, in one transaction, then the checks and the
+# fingerprint. db-apply-prod.yml never runs a rollback; this workflow is the only way one reaches
+# production. docs/ops/db-migrations.md is the runbook.
+#
+# The approval is the owner's own dispatch. The `production` environment holds the production
+# secrets and deploys from main only; it has no required reviewer, because on a private repository
+# under a personal GitHub Pro account environment reviewers are not enforced. The `authorize` job
+# (no environment, no secret, no permission) refuses unless the run is a workflow_dispatch from
+# main, dispatched and run by the repository owner, and `plan` and `rollback` run the same check
+# as their first step: a re-run of a failed job does not re-run a passed `authorize`, and only a
+# step in the re-run job sees who re-ran it (github.triggering_actor).
+#
+# What the check tells apart is accounts, not the owner's own tools: any token that acts as the
+# owner and can write Actions (a `gh` login included) passes it.
 
 on:
   workflow_dispatch:
@@ -17,13 +28,40 @@ permissions:
   contents: read
 
 # A group of its own: GitHub replaces a pending run in a group when a newer one queues, so sharing
-# db-apply-prod.yml's group would let a push drop a queued rollback.
+# db-apply-prod.yml's group would let an apply dispatched while a rollback waits drop the rollback,
+# or the reverse.
 concurrency:
   group: db-production-rollback
   cancel-in-progress: false
 
 jobs:
+  authorize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Only the owner, dispatching from main
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OWNER: ${{ github.repository_owner }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          refuse() {
+            echo "::error::$1"
+            exit 1
+          }
+          [ -n "$OWNER" ] || refuse "the repository owner is empty"
+          [ "$EVENT" = workflow_dispatch ] || refuse "started by the event '$EVENT', not workflow_dispatch"
+          [ "$ACTOR" = "$OWNER" ] || refuse "dispatched by '$ACTOR', not the owner '$OWNER'"
+          [ "$TRIGGERING_ACTOR" = "$OWNER" ] || refuse "run or re-run by '$TRIGGERING_ACTOR', not the owner '$OWNER'"
+          [ "$REF" = refs/heads/main ] || refuse "dispatched from '$REF', not refs/heads/main"
+          echo "dispatched and run by the owner '$OWNER', from main"
+
   plan:
+    needs: authorize
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -32,6 +70,25 @@ jobs:
     outputs:
       sha256: ${{ steps.plan.outputs.sha256 }}
     steps:
+      - name: Only the owner, dispatching from main
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OWNER: ${{ github.repository_owner }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          refuse() {
+            echo "::error::$1"
+            exit 1
+          }
+          [ -n "$OWNER" ] || refuse "the repository owner is empty"
+          [ "$EVENT" = workflow_dispatch ] || refuse "started by the event '$EVENT', not workflow_dispatch"
+          [ "$ACTOR" = "$OWNER" ] || refuse "dispatched by '$ACTOR', not the owner '$OWNER'"
+          [ "$TRIGGERING_ACTOR" = "$OWNER" ] || refuse "run or re-run by '$TRIGGERING_ACTOR', not the owner '$OWNER'"
+          [ "$REF" = refs/heads/main ] || refuse "dispatched from '$REF', not refs/heads/main"
+          echo "dispatched and run by the owner '$OWNER', from main"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -50,15 +107,35 @@ jobs:
           echo "sha256=$sha" >> "$GITHUB_OUTPUT"
 
   rollback:
-    needs: plan
+    needs: [authorize, plan]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # Required reviewer: the owner. Deployment branches: main only.
+    # Holds SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD; deployment branches: main only. No
+    # reviewer: the owner's dispatch is the approval, checked by the first step.
     environment: production
     permissions:
       contents: read
     steps:
+      - name: Only the owner, dispatching from main
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OWNER: ${{ github.repository_owner }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          refuse() {
+            echo "::error::$1"
+            exit 1
+          }
+          [ -n "$OWNER" ] || refuse "the repository owner is empty"
+          [ "$EVENT" = workflow_dispatch ] || refuse "started by the event '$EVENT', not workflow_dispatch"
+          [ "$ACTOR" = "$OWNER" ] || refuse "dispatched by '$ACTOR', not the owner '$OWNER'"
+          [ "$TRIGGERING_ACTOR" = "$OWNER" ] || refuse "run or re-run by '$TRIGGERING_ACTOR', not the owner '$OWNER'"
+          [ "$REF" = refs/heads/main ] || refuse "dispatched from '$REF', not refs/heads/main"
+          echo "dispatched and run by the owner '$OWNER', from main"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -76,7 +153,7 @@ jobs:
             --expect-sha256 "$SHA256"
 
   report:
-    needs: [plan, rollback]
+    needs: [authorize, plan, rollback]
     if: ${{ failure() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5

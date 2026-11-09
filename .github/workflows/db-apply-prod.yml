@@ -1,22 +1,29 @@
 name: DB apply to production
 
-# Applies pending migration files to production, after the owner approves. docs/ops/db-migrations.md
-# is the runbook.
+# Applies pending migration files to production when the owner dispatches it from main. Nothing
+# starts it on its own: merging a pull request does not. docs/ops/db-migrations.md is the runbook.
 #
-#   plan    no approval needed, read-only: finds the merged pull request and its passed dry run,
-#           reads production's pending files and refuses any the dry run did not apply byte for
-#           byte. The job summary lists each pending file with its sha256, next to the dry run's.
-#   apply   bound to the `production` environment, so it waits for the owner's approval. It
-#           re-checks the files against the approved manifest and production's fingerprint against
-#           the one the plan read, runs `supabase db push`, the checks
-#           and the fingerprint. It never retries and never runs a rollback.
-#   report  opens an issue when either job fails.
+#   authorize  no environment, no secret, no permission: refuses unless the run is a
+#              workflow_dispatch from main, dispatched and run by the repository owner.
+#   plan       read-only: finds the merged pull request and its passed dry run, reads production's
+#              pending files and refuses any the dry run did not apply byte for byte. The job
+#              summary lists each pending file with its sha256, next to the dry run's.
+#   apply      bound to the `production` environment, which holds the production secrets and
+#              deploys from main only. It re-checks the files against the manifest and production's
+#              fingerprint against the one the plan read, runs `supabase db push`, the checks and
+#              the fingerprint. It never retries and never runs a rollback.
+#   report     opens an issue when any job fails.
+#
+# The approval is the owner's own dispatch. The environment has no required reviewer: on a private
+# repository under a personal GitHub Pro account, environment reviewers are not enforced. So
+# `plan` and `apply` each run the same check as `authorize` as their first step, before anything
+# is checked out or any secret is read. A re-run of a failed job does not re-run a passed
+# `authorize`, and only a step in the re-run job sees who re-ran it (github.triggering_actor).
+#
+# What the check tells apart is accounts, not the owner's own tools: any token that acts as the
+# owner and can write Actions (a `gh` login included) passes it.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'infra/supabase/migrations/**'
   workflow_dispatch:
     inputs:
       dry_run_pr:
@@ -33,7 +40,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  authorize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Only the owner, dispatching from main
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OWNER: ${{ github.repository_owner }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          refuse() {
+            echo "::error::$1"
+            exit 1
+          }
+          [ -n "$OWNER" ] || refuse "the repository owner is empty"
+          [ "$EVENT" = workflow_dispatch ] || refuse "started by the event '$EVENT', not workflow_dispatch"
+          [ "$ACTOR" = "$OWNER" ] || refuse "dispatched by '$ACTOR', not the owner '$OWNER'"
+          [ "$TRIGGERING_ACTOR" = "$OWNER" ] || refuse "run or re-run by '$TRIGGERING_ACTOR', not the owner '$OWNER'"
+          [ "$REF" = refs/heads/main ] || refuse "dispatched from '$REF', not refs/heads/main"
+          echo "dispatched and run by the owner '$OWNER', from main"
+
   plan:
+    needs: authorize
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -48,6 +81,25 @@ jobs:
       production: ${{ steps.plan.outputs.production }}
       pending: ${{ steps.plan.outputs.pending }}
     steps:
+      - name: Only the owner, dispatching from main
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OWNER: ${{ github.repository_owner }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          refuse() {
+            echo "::error::$1"
+            exit 1
+          }
+          [ -n "$OWNER" ] || refuse "the repository owner is empty"
+          [ "$EVENT" = workflow_dispatch ] || refuse "started by the event '$EVENT', not workflow_dispatch"
+          [ "$ACTOR" = "$OWNER" ] || refuse "dispatched by '$ACTOR', not the owner '$OWNER'"
+          [ "$TRIGGERING_ACTOR" = "$OWNER" ] || refuse "run or re-run by '$TRIGGERING_ACTOR', not the owner '$OWNER'"
+          [ "$REF" = refs/heads/main ] || refuse "dispatched from '$REF', not refs/heads/main"
+          echo "dispatched and run by the owner '$OWNER', from main"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -56,18 +108,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          EVENT: ${{ github.event_name }}
-          SHA: ${{ github.sha }}
           INPUT_PR: ${{ inputs.dry_run_pr }}
         run: |
           set -euo pipefail
-          if [ "$EVENT" = "push" ]; then
-            pr=$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '[.[] | select(.merged_at != null)][0].number // empty')
-          else
-            pr="$INPUT_PR"
-          fi
+          pr="$INPUT_PR"
           if ! [[ "$pr" =~ ^[0-9]+$ ]]; then
-            echo "::error::no merged pull request for $SHA; dispatch with dry_run_pr"
+            echo "::error::dry_run_pr is not a pull request number ($pr)"
             exit 1
           fi
           state=$(gh pr view "$pr" --repo "$REPO" --json state --jq .state)
@@ -109,15 +155,35 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   apply:
-    needs: plan
+    needs: [authorize, plan]
     if: needs.plan.outputs.pending != '0'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # Required reviewer: the owner. Deployment branches: main only.
+    # Holds SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD; deployment branches: main only. No
+    # reviewer: the owner's dispatch is the approval, checked by the first step.
     environment: production
     permissions:
       contents: read
     steps:
+      - name: Only the owner, dispatching from main
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OWNER: ${{ github.repository_owner }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          refuse() {
+            echo "::error::$1"
+            exit 1
+          }
+          [ -n "$OWNER" ] || refuse "the repository owner is empty"
+          [ "$EVENT" = workflow_dispatch ] || refuse "started by the event '$EVENT', not workflow_dispatch"
+          [ "$ACTOR" = "$OWNER" ] || refuse "dispatched by '$ACTOR', not the owner '$OWNER'"
+          [ "$TRIGGERING_ACTOR" = "$OWNER" ] || refuse "run or re-run by '$TRIGGERING_ACTOR', not the owner '$OWNER'"
+          [ "$REF" = refs/heads/main ] || refuse "dispatched from '$REF', not refs/heads/main"
+          echo "dispatched and run by the owner '$OWNER', from main"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -138,7 +204,7 @@ jobs:
             --manifest "$RUNNER_TEMP/manifest.json" --expect-production "$RUNNER_TEMP/production.json"
 
   report:
-    needs: [plan, apply]
+    needs: [authorize, plan, apply]
     if: ${{ failure() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
