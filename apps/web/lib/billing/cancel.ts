@@ -6,7 +6,7 @@
  * An `active` or `trialing` subscription is set to cancel at the end of its period, so the plan, or the
  * trial with its card, runs to its end. A `past_due`, `unpaid` or `paused` one is cancelled at once:
  * left to its period end, a retry of its open invoice could still charge someone who pressed Cancel
- * (questions Q14).
+ * (spec 03, "Cancel").
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
@@ -39,11 +39,7 @@ export interface CancelAccounts {
 export interface CancelStripe {
   subscriptions: {
     retrieve(id: string): PromiseLike<Stripe.Subscription>;
-    update(
-      id: string,
-      params: Stripe.SubscriptionUpdateParams,
-      options: { idempotencyKey: string },
-    ): PromiseLike<Stripe.Subscription>;
+    update(id: string, params: Stripe.SubscriptionUpdateParams): PromiseLike<Stripe.Subscription>;
     cancel(
       id: string,
       params: Stripe.SubscriptionCancelParams,
@@ -129,11 +125,12 @@ export async function cancelSubscription(
     return { ok: true, step: 'done', endsAt: now.toISOString() };
   }
   if (!AT_PERIOD_END.has(sub.status)) return NO_SUBSCRIPTION;
-  const updated = await deps.stripe.subscriptions.update(
-    followed.id,
-    { cancel_at_period_end: true },
-    { idempotencyKey: `cancel:${followed.id}` },
-  );
+  // No idempotency key: setting the flag again changes nothing, and a key would make Stripe replay
+  // the first answer to a second cancellation within 24 hours of a renewal in the portal, writing
+  // nothing while the screen said it was done.
+  const updated = await deps.stripe.subscriptions.update(followed.id, {
+    cancel_at_period_end: true,
+  });
   return {
     ok: true,
     step: 'done',

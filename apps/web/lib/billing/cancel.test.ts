@@ -137,13 +137,20 @@ describe('cancelSubscription', () => {
   });
 
   describe('the second click', () => {
-    it('cancels an active subscription at the period end, once, with the key cancel:<sub>', async () => {
+    it('cancels an active subscription at the period end, once, with no idempotency key', async () => {
       expect(await run(true)).toEqual({ ok: true, step: 'done', endsAt: PERIOD_END });
       expect(log).toEqual([`retrieve ${SUB}`, 'update']);
-      expect(update.mock.calls).toEqual([
-        [SUB, { cancel_at_period_end: true }, { idempotencyKey: `cancel:${SUB}` }],
-      ]);
+      expect(update.mock.calls).toEqual([[SUB, { cancel_at_period_end: true }]]);
       expect(cancel).not.toHaveBeenCalled();
+    });
+
+    it('writes again on a second cancellation, as after a renewal in the portal', async () => {
+      await run(true);
+      await run(true);
+      expect(update.mock.calls).toEqual([
+        [SUB, { cancel_at_period_end: true }],
+        [SUB, { cancel_at_period_end: true }],
+      ]);
     });
 
     it('answers the earliest period end of the items', async () => {
@@ -158,9 +165,7 @@ describe('cancelSubscription', () => {
         items: items(TRIAL_END) as never,
       };
       expect(await run(true)).toEqual({ ok: true, step: 'done', endsAt: TRIAL_END });
-      expect(update.mock.calls).toEqual([
-        [SUB, { cancel_at_period_end: true }, { idempotencyKey: `cancel:${SUB}` }],
-      ]);
+      expect(update.mock.calls).toEqual([[SUB, { cancel_at_period_end: true }]]);
     });
 
     it.each(['past_due', 'unpaid', 'paused'] as const)(

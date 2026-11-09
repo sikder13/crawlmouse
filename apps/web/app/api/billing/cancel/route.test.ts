@@ -164,9 +164,7 @@ describe('POST /api/billing/cancel', () => {
       `stripe.subscriptions.retrieve ${SUB}`,
       'stripe.subscriptions.update',
     ]);
-    expect(h.update.mock.calls).toEqual([
-      [SUB, { cancel_at_period_end: true }, { idempotencyKey: `cancel:${SUB}` }],
-    ]);
+    expect(h.update.mock.calls).toEqual([[SUB, { cancel_at_period_end: true }]]);
   });
 
   it('a form second click goes back to Settings › Plan, done', async () => {
