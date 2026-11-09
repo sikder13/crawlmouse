@@ -564,7 +564,7 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       scope,
     });
     const at = randomUUID();
-    const access = { ...ROWS.access_tests(at, checkId), lineage_id: lineage };
+    const access: Row = { ...ROWS.access_tests(at, checkId), lineage_id: lineage };
     if (!with006d) {
       delete access.identity_role;
       delete access.tagged;
