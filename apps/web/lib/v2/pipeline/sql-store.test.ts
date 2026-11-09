@@ -300,12 +300,17 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
     const newer = built.check;
     const H = 60 * MIN;
     const at = shift;
-    // `before` was queued and finished before `newer`; `older` was queued between the two and claims
-    // only now, after `newer` has finished.
+    // `before` was queued and finished before `newer`; `after` was queued after `newer` and finished
+    // before it; `older` was queued before both and claims only now, after `newer` has finished.
     const before = 'b0000000-0000-4000-8000-0000000000f1';
     await copyCheck(db, newer.id, before, {
       queued: at(newer.queued_at, -2 * H),
       finished: at(newer.finished_at!, -H),
+    });
+    const after = 'b0000000-0000-4000-8000-0000000000f3';
+    await copyCheck(db, newer.id, after, {
+      queued: at(newer.queued_at, MIN),
+      finished: at(newer.finished_at!, -MIN),
     });
     const older = await check(db, newer.site_id, {
       status: 'running',
@@ -313,8 +318,10 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
       queued: at(newer.queued_at, -H),
       run: 'run-older',
     });
+    // By queue order the graded check last queued is `after`; by finish order it is `newer`.
     expect((await store.previousGraded(newer.site_id, older))?.check.id).toBe(newer.id);
-    expect((await store.previousGraded(newer.site_id, newer.id))?.check.id).toBe(before);
+    expect((await store.previousGraded(newer.site_id, newer.id))?.check.id).toBe(after);
+    expect((await store.previousGraded(newer.site_id, after))?.check.id).toBe(newer.id);
   }, 60_000);
 
   it('writes the diff baseline as the check’s previous_check_id, on its row and on its changes (correctness 1)', async () => {
