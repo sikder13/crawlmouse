@@ -17,6 +17,10 @@
  *   while the binding checkout may still be in flight, and is recorded after that (spec 03, Q16).
  * - A checkout that grants nothing leaves its subscription orphaned; a live one is cancelled
  *   (spec 03, Q10). `orphanEffects` plans that, here and in ./stripe-webhook.ts.
+ * - A checkout whose subscription is still `incomplete` throws, so it is retried rather than
+ *   decided: Stripe settles the subscription `active` on the first payment or `incomplete_expired`
+ *   23 hours later, and retries a live-mode event for up to three days (a sandbox's, three times
+ *   over a few hours). Decided while `incomplete`, it would grant nothing and cancel nothing.
  *
  * Any Stripe error propagates, so the event is answered 500 and retried rather than recorded.
  */
@@ -222,6 +226,9 @@ class Normaliser {
     if (subscriptionId === null) return this.record(null, 'the checkout names no subscription');
     const customer = idOf(s.customer);
     const sub = await this.ctx.stripe.retrieveSubscription(subscriptionId);
+    if (sub.status === 'incomplete') {
+      throw new Error(`the subscription of stripe event ${this.event.id} is still incomplete`);
+    }
     const mirror = await mirrorOf(sub, this.ctx.catalog);
     const own = { subscriptionId: sub.id, status: sub.status };
     const ours = !('refused' in mirror);

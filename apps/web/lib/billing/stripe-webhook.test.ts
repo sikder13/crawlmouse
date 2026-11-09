@@ -601,6 +601,40 @@ describe.each(PORTS)('through the %s port', (p) => {
     });
   });
 
+  describe('a checkout read while its subscription is incomplete throws, so Stripe retries it', () => {
+    it('a checkout whose subscription is still incomplete, retried once the first payment settles it', async () => {
+      const { accountId, customer } = await account();
+      const s = sub(customer, { status: 'incomplete' });
+      const e = checkoutEvent(accountId, customer, s.id, BASE + 100);
+      await expect(w.deliver(e)).rejects.toThrow(/is still incomplete/);
+      expect(await ledgerRow(e.id)).toMatchObject({ handled: null, processed_at: null });
+      expect((await accountRow(accountId)).state).toBe('free');
+      // The payment succeeds, and Stripe's retry of the event grants.
+      w.stripe.update(s.id, { status: 'active' });
+      expect(await w.deliver(e)).toEqual({ outcome: 'applied', accountId, reason: null });
+      expect(await accountRow(accountId)).toMatchObject({
+        state: 'pro',
+        current_subscription_id: s.id,
+      });
+    });
+
+    it('a checkout whose subscription is still incomplete, retried once Stripe has given up on it', async () => {
+      const { accountId, customer } = await account();
+      const s = sub(customer, { status: 'incomplete' });
+      const e = checkoutEvent(accountId, customer, s.id, BASE + 100);
+      await expect(w.deliver(e)).rejects.toThrow(/is still incomplete/);
+      w.stripe.update(s.id, { status: 'incomplete_expired' });
+      expect(await w.deliver(e)).toEqual({
+        outcome: 'ignored',
+        accountId,
+        reason: 'the subscription is incomplete_expired',
+      });
+      expect((await accountRow(accountId)).state).toBe('free');
+      expect(w.stripe.cancelled).toEqual([]);
+      expect(w.stripe.alerts).toEqual([]);
+    });
+  });
+
   // ─── at ────────────────────────────────────────────────────────────────────────────────────────────
 
   describe('`at` is event.created', () => {
