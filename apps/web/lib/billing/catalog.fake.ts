@@ -12,7 +12,7 @@ export function fakeCatalog(): Catalog {
       return fakePriceId(lookupKey(plan, interval, kind));
     },
     async planOfPrice(priceId) {
-      const key = priceId.startsWith('price_') ? priceId.slice('price_'.length) : null;
+      const key = /^price_(.+)$/.exec(priceId)?.[1] ?? null;
       const entry = key !== null && Object.hasOwn(CATALOG, key) ? CATALOG[key]! : null;
       return entry === null
         ? null
