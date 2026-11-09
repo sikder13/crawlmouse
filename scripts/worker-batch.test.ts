@@ -348,8 +348,9 @@ describe('no secret leaves the script', () => {
 /**
  * A server shaped like the worker, scripted onto the paths the worker in process cannot be made to
  * take: a batch that failed inside it, a batch it lost, metrics it refused, a batch that never ends.
- * Every answer echoes the signatures and the JWT it was sent, so a leak would reach the script's
- * output through any of them. `sent` keeps both for the assertion.
+ * Every answer echoes the signatures and the JWT it was sent; the client drops the echo on these
+ * paths, so what catches a leak is the planted values and `sent` (both signatures and the JWT), each
+ * checked against everything the script printed.
  */
 async function scripted(mode: 'failed' | 'lost' | 'metrics_refused' | 'never_done') {
   const sent: string[] = [];
