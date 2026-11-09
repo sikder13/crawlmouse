@@ -117,13 +117,12 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
       return r ? String(r.id) : null;
     },
 
-    async previousGraded(siteId, checkId, queuedAt): Promise<CheckSide | null> {
+    async previousGraded(siteId, checkId): Promise<CheckSide | null> {
       const r = await one(
         `select to_jsonb(c) as row from public.checks c
           where c.site_id = $1 and c.id <> $2 and c.status in ('finished', 'partial')
-            and c.queued_at <= $3::timestamptz
-          order by c.queued_at desc, c.id desc limit 1`,
-        [siteId, checkId, queuedAt],
+          order by c.finished_at desc, c.id desc limit 1`,
+        [siteId, checkId],
       );
       return r ? graded(r) : null;
     },

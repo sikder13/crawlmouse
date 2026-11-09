@@ -276,7 +276,7 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
     },
     previousGraded: {
       answers: [ok(null)],
-      call: (s) => s.previousGraded(S, C, 'T'),
+      call: (s) => s.previousGraded(S, C),
       calls: [
         {
           root: ['from', 'checks'],
@@ -285,8 +285,7 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
             ['eq', ['site_id', S]],
             ['neq', ['id', C]],
             ['in', ['status', ['finished', 'partial']]],
-            ['lte', ['queued_at', 'T']],
-            ['order', ['queued_at', { ascending: false }]],
+            ['order', ['finished_at', { ascending: false }]],
             ['order', ['id', { ascending: false }]],
             ['limit', [1]],
             ['maybeSingle', []],
@@ -431,11 +430,11 @@ describe('supabasePipelineStore: answers', () => {
     const inputs = { page_cap: 500, robots_txt: '', detectors: [], indeterminate: [] };
     const { sb } = recorder(ok({ id: 'p1', diff_inputs: inputs }), ok(null));
     const store = supabasePipelineStore(sb);
-    expect(await store.previousGraded(S, C, 'T')).toEqual({
+    expect(await store.previousGraded(S, C)).toEqual({
       check: { id: 'p1', diff_inputs: inputs },
       ...inputs,
     });
-    expect(await store.previousGraded(S, C, 'T')).toBeNull();
+    expect(await store.previousGraded(S, C)).toBeNull();
   });
 
   it('says whether it inserted a queued check', async () => {

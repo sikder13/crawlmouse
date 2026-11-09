@@ -71,8 +71,11 @@ export interface PipelineStore {
   requestSite(siteId: string): Promise<RequestSite>;
   /** The site's latest other check queued no later than this one; null when there is none. */
   previousCheckId(siteId: string, checkId: string, queuedAt: string): Promise<string | null>;
-  /** The site's latest other finished or partial check queued no later, with its diff inputs. */
-  previousGraded(siteId: string, checkId: string, queuedAt: string): Promise<CheckSide | null>;
+  /**
+   * The diff's baseline: the site's other finished or partial check that finished last, with its diff
+   * inputs. By `finished_at`, not queue order: claims are not in queue order (correctness 4).
+   */
+  previousGraded(siteId: string, checkId: string): Promise<CheckSide | null>;
   fixes(siteId: string): Promise<Fix[]>;
   fixEvents(fixIds: readonly string[]): Promise<FixEvent[]>;
   /** Each page's `without_js` state in a check, where it was measured. */
@@ -223,7 +226,7 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
       return row ? String(row.id) : null;
     },
 
-    async previousGraded(siteId, checkId, queuedAt) {
+    async previousGraded(siteId, checkId) {
       const row = must<Row | null>(
         'previous graded check',
         await sb
@@ -232,8 +235,7 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
           .eq('site_id', siteId)
           .neq('id', checkId)
           .in('status', ['finished', 'partial'])
-          .lte('queued_at', queuedAt)
-          .order('queued_at', { ascending: false })
+          .order('finished_at', { ascending: false })
           .order('id', { ascending: false })
           .limit(1)
           .maybeSingle(),

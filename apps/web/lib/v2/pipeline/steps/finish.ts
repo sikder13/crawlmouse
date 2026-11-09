@@ -7,8 +7,8 @@
  *
  * build calls buildCheck on what the check stored and what the database holds (finding 14: the
  * engine SHA is VERCEL_GIT_COMMIT_SHA, 40 hex, or the step fails; the worker release is the batches'
- * one release; `previous_check_id` is the site's latest other check, `previous` its latest graded one
- * with its diff inputs; the page cap is the event's). It stores the built check with the pages'
+ * one release; `previous_check_id` is the site's latest other check by queue time, `previous` the
+ * graded one that finished last, with its diff inputs; the page cap is the event's). It stores the built check with the pages'
  * vantage (pageVantage), and the map drawing (D10). persist hands that to persistBuiltCheck, the one writer (D5).
  * finalize deletes the built check, which is scratch; the map drawing stays.
  */
@@ -57,11 +57,11 @@ export function finishSteps(
         loadSeeds(deps, event),
         loadResults(deps, event),
       ]);
-      const { check, assembled } = await assembledSoFar(deps, event, seeds, results);
+      const { assembled } = await assembledSoFar(deps, event, seeds, results);
       const sampled = sample(assembled);
       const [fixes, previous] = await Promise.all([
         deps.store.fixes(event.siteId),
-        deps.store.previousGraded(event.siteId, event.checkId, check.queued_at),
+        deps.store.previousGraded(event.siteId, event.checkId),
       ]);
       const states = previous ? await deps.store.pageStates(previous.check.id) : new Map();
       const outcome = await renderCheck({
@@ -89,7 +89,7 @@ export function finishSteps(
       if (!results.some(isCrawl) || release === null) throw new CheckFailure('worker_unavailable');
       const [previousCheckId, previous, fixes, render] = await Promise.all([
         deps.store.previousCheckId(event.siteId, event.checkId, check.queued_at),
-        deps.store.previousGraded(event.siteId, event.checkId, check.queued_at),
+        deps.store.previousGraded(event.siteId, event.checkId),
         deps.store.fixes(event.siteId),
         getJson(deps.evidence, pathOf(event, 'render')) as Promise<RenderOutcome>,
       ]);
