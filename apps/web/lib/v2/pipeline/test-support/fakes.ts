@@ -1,6 +1,7 @@
 /**
  * Fakes for the step tests: a PipelineStore in memory that keeps the rules the steps rely on (claim
- * only from queued, fail only from queued or running, a batch ended only while posted), and a
+ * only from queued, fail only from queued or running and true again for the same reason, a batch ended only while posted and never
+ * posted again once done), and a
  * WorkerClient that serves batch results the test hands it. PGlite runs the real statements
  * (sql-store.ts); these keep the step tests to the step's own logic.
  */
@@ -13,7 +14,13 @@ import {
   type PollResult,
   type WorkerClient,
 } from '../../../worker-client/types';
-import type { ClaimOutcome, PipelineStore, QueuedCheck, RequestSite } from '../store';
+import {
+  batchDone,
+  type ClaimOutcome,
+  type PipelineStore,
+  type QueuedCheck,
+  type RequestSite,
+} from '../store';
 import type { CrawlBatchRow } from '../types';
 
 type CheckRow = Check & { inngest_run_id: string | null; heartbeat_at: string | null };
@@ -97,6 +104,8 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
       const r = checkId
         ? rows.get(checkId)
         : [...rows.values()].find((o) => o.inngest_run_id === runId);
+      // fail_check's answer: true for a check already failed with this reason (a retried call).
+      if (r?.status === 'failed' && r.failure_reason === reason) return true;
       if (!r || (r.status !== 'queued' && r.status !== 'running')) return false;
       end(r, reason);
       release(r.id);
@@ -108,6 +117,9 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
     async checkOfRun(runId) {
       const r = [...rows.values()].find((o) => o.inngest_run_id === runId);
       return r ? { checkId: r.id, siteId: r.site_id } : null;
+    },
+    async siteOf(checkId) {
+      return rows.get(checkId)?.site_id ?? null;
     },
     async progress(checkId, progress, at) {
       const r = rows.get(checkId);
@@ -152,6 +164,9 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
         .sort((a, b) => a.batch - b.batch);
     },
     async upsertBatch(row) {
+      if (batches.get(key(row.check_id, row.batch))?.status === 'done') {
+        throw batchDone(row.check_id, row.batch);
+      }
       batches.set(key(row.check_id, row.batch), {
         ...row,
         status: 'posted',

@@ -135,6 +135,38 @@ describe('requestCheck (D13)', () => {
     });
   });
 
+  it('a bucketed request retried after its send failed finds its row and sends the same event id (correctness 7)', async () => {
+    const h = harness();
+    const send = h.deps.send;
+    h.deps.send = async () => {
+      throw new Error('send failed');
+    };
+    await expect(requestCheck(h.deps, { siteId: SITE.id, trigger: 'manual' })).rejects.toThrow(
+      'send failed',
+    );
+    h.deps.send = send;
+    const retry = await requestCheck(h.deps, { siteId: SITE.id, trigger: 'manual' });
+    expect(retry.created).toBe(false);
+    expect(h.rows.size).toBe(1);
+    expect(h.sent.map((e) => e.id)).toEqual([`check:${SITE.id}:manual:${NOON / 120_000}`]);
+  });
+
+  it('a first audit retried after its send failed writes a second row and sends a second event id (correctness 7)', async () => {
+    const h = harness();
+    const send = h.deps.send;
+    h.deps.send = async () => {
+      throw new Error('send failed');
+    };
+    await expect(requestCheck(h.deps, { siteId: SITE.id, trigger: 'first_audit' })).rejects.toThrow(
+      'send failed',
+    );
+    h.deps.send = send;
+    const retry = await requestCheck(h.deps, { siteId: SITE.id, trigger: 'first_audit' });
+    expect(retry.created).toBe(true);
+    expect(h.rows.size).toBe(2);
+    expect(h.sent.map((e) => e.id)).toEqual([`check:${SITE.id}:first_audit:${retry.checkId}`]);
+  });
+
   it('derives a version-8 UUID from the key that the contract accepts', () => {
     const id = checkIdOfKey(`check:${SITE.id}:manual:1`);
     expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);

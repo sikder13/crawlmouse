@@ -3,9 +3,14 @@
  * (claim, fail, reap) and the one-statement methods, against migration 008's columns and functions.
  */
 import type { PGlite } from '@electric-sql/pglite';
+import { buildCheck } from '@crawlmouse/engine/v2/pipeline';
+import type { BatchResult, CrawlPage } from '@crawlmouse/types/v2';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, asRole, freshDb } from '../../../__tests__/helpers/pglite-migrations';
+import { pageVantage, persistBuiltCheck } from './persist';
 import { reapStalled } from './steps';
+import { pglitePersistDb, seedRunningCheck } from './test-support/pglite';
 import { sqlPipelineStore, type SqlDb } from './test-support/sql-store';
 
 const NOW = Date.parse('2026-11-08T12:00:00.000Z');
@@ -83,6 +88,14 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
     expect(await store.claim(id, 'run-2', PROGRESS as never)).toBe('gone');
     expect((await statusOf(db, id)).status).toBe('running');
     expect(await store.checkOfRun('run-1')).toEqual({ checkId: id, siteId: expect.any(String) });
+  });
+
+  it('reads the site a check belongs to', async () => {
+    const { db, store } = await fresh();
+    const s = await site(db);
+    const id = await check(db, s, { status: 'queued', heartbeat: ago(0) });
+    expect(await store.siteOf(id)).toBe(s);
+    expect(await store.siteOf('c0000000-0000-4000-8000-00000000dead')).toBeNull();
   });
 
   it('answers site_busy while another check of the site runs', async () => {
@@ -177,6 +190,19 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
       summary: { pages: 3 },
       result_path: 'anon/x/y/batch-1.json.gz',
     });
+    // A done batch is not posted again (correctness 3): its stored result stays where its row says.
+    await expect(
+      store.upsertBatch({
+        ...posted,
+        nonce: 'c'.repeat(24),
+        summary: { urls: 3, max_seconds: 70 },
+      }),
+    ).rejects.toThrow('is done; it is not posted again');
+    expect(await store.batch(id, 1)).toMatchObject({
+      status: 'done',
+      nonce: 'b'.repeat(24),
+      result_path: 'anon/x/y/batch-1.json.gz',
+    });
   });
 
   it('inserts a queued check once by id, and reads the request site', async () => {
@@ -223,4 +249,66 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
     expect(await store.previousCheckId(s, later, ago(5 * MIN))).toBe(second);
     expect(await store.previousCheckId(s, first, ago(30 * MIN))).toBeNull();
   });
+
+  /**
+   * A copy of check `from` under `id`, queued, started and finished at the times given: every column
+   * the table does not generate, so the copy is a graded check as the persisted one is.
+   */
+  async function copyCheck(
+    db: PGlite,
+    from: string,
+    id: string,
+    at: { queued: string; finished: string },
+  ): Promise<void> {
+    const { rows } = await db.query<{ column_name: string }>(
+      `select column_name from information_schema.columns
+        where table_schema = 'public' and table_name = 'checks' and is_generated = 'NEVER'
+        order by ordinal_position`,
+    );
+    const set: Record<string, string> = {
+      id: '$2::uuid',
+      queued_at: '$3::timestamptz',
+      started_at: '$3::timestamptz',
+      finished_at: '$4::timestamptz',
+    };
+    const cols = rows.map((r) => r.column_name);
+    await db.query(
+      `insert into public.checks (${cols.join(', ')})
+       select ${cols.map((c) => set[c] ?? c).join(', ')} from public.checks where id = $1`,
+      [from, id, at.queued, at.finished],
+    );
+  }
+
+  it('takes the diff baseline as the site’s check that finished last, in whatever order the checks were queued (correctness 4)', async () => {
+    const { db, store } = await fresh();
+    const input = recordedBuild();
+    const built = buildCheck(input);
+    await seedRunningCheck(db, input.site, input.check);
+    const crawl = (input.batches as BatchResult[]).flatMap((b): CrawlPage[] =>
+      b.kind === 'crawl' ? b.pages : [],
+    );
+    await persistBuiltCheck(pglitePersistDb(db), {
+      built,
+      vantage: pageVantage(crawl),
+      map_path: null,
+    });
+    const newer = built.check;
+    const H = 60 * MIN;
+    const at = (iso: string, ms: number) => new Date(Date.parse(iso) + ms).toISOString();
+    // `before` was queued and finished before `newer`; `older` was queued between the two and claims
+    // only now, after `newer` has finished.
+    const before = 'b0000000-0000-4000-8000-0000000000f1';
+    await copyCheck(db, newer.id, before, {
+      queued: at(newer.queued_at, -2 * H),
+      finished: at(newer.finished_at!, -H),
+    });
+    const older = await check(db, newer.site_id, {
+      status: 'running',
+      heartbeat: ago(0),
+      queued: at(newer.queued_at, -H),
+      run: 'run-older',
+    });
+    expect((await store.previousGraded(newer.site_id, older))?.check.id).toBe(newer.id);
+    expect((await store.previousGraded(newer.site_id, newer.id))?.check.id).toBe(before);
+  }, 60_000);
 });

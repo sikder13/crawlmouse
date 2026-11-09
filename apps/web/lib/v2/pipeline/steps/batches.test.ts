@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { NonRetriableError } from 'inngest';
 import { GRADE_VERSION } from '@crawlmouse/engine/v2/pipeline';
 import type { BatchResult } from '@crawlmouse/types/v2';
 import type { BatchAt, RunSoFar } from '../../../../../../inngest/check';
@@ -48,7 +49,7 @@ async function setup(results = new Map<number, unknown>()) {
   const clock = { now: T0 };
   const iso = () => new Date(clock.now).toISOString();
   const { worker, posted, refuse, lost, held } = fakeWorker(results);
-  const { store, batches } = memoryStore(
+  const { store, batches, rows } = memoryStore(
     recordedInput().site,
     [queuedCheck(CHECK, SITE_ID, '2026-11-05T02:29:58.000Z', GRADE_VERSION)],
     iso,
@@ -60,12 +61,24 @@ async function setup(results = new Map<number, unknown>()) {
   const deps = {
     store,
     evidence,
-    worker,
+    worker: () => worker,
     now: () => clock.now,
     nonce: () => `nonce-${String(++nonces).padStart(16, '0')}`,
     env: {},
   } as unknown as StepDeps;
-  return { steps: batchSteps(deps), deps, clock, posted, refuse, lost, held, batches, evidence };
+  return {
+    steps: batchSteps(deps),
+    deps,
+    worker,
+    clock,
+    posted,
+    refuse,
+    lost,
+    held,
+    batches,
+    rows,
+    evidence,
+  };
 }
 
 describe('post (finding 2)', () => {
@@ -114,6 +127,18 @@ describe('post (finding 2)', () => {
     expect(s.batches.get(`${CHECK}:1`)!.nonce).toBe('nonce-0000000000000002');
   });
 
+  it('writes the heartbeat on each attempt, busy included, so a busy worker does not look like a stall (correctness 10)', async () => {
+    const s = await setup();
+    const heartbeat = () => s.rows.get(CHECK)!.heartbeat_at;
+    s.refuse.push('busy');
+    s.clock.now += 30_000;
+    expect(await s.steps.post(EVENT, CRAWL_1, SO)).toEqual({ status: 'busy', at: T0 + 30_000 });
+    expect(heartbeat()).toBe(new Date(T0 + 30_000).toISOString());
+    s.clock.now += 30_000;
+    expect(await s.steps.post(EVENT, CRAWL_1, SO)).toMatchObject({ status: 'posted' });
+    expect(heartbeat()).toBe(new Date(T0 + 60_000).toISOString());
+  });
+
   it('answers busy and paused as outputs, and counts batch_exists as posted', async () => {
     const s = await setup();
     s.refuse.push('busy', 'paused', 'batch_exists');
@@ -124,14 +149,14 @@ describe('post (finding 2)', () => {
 
   it('after a timeout, asks the worker: posted when it holds the batch, a retry when not', async () => {
     const s = await setup();
-    const real = s.deps.worker!.postBatch;
-    s.deps.worker!.postBatch = async (b) => {
+    const real = s.worker.postBatch;
+    s.worker.postBatch = async (b) => {
       await real(b);
       throw new WorkerError('timeout', null, null);
     };
     expect(await s.steps.post(EVENT, CRAWL_1, SO)).toMatchObject({ status: 'posted' });
     s.refuse.push('network');
-    s.deps.worker!.postBatch = real;
+    s.worker.postBatch = real;
     await expect(
       s.steps.post(EVENT, { kind: 'crawl', batch: 2, stage: null }, SO),
     ).rejects.toMatchObject({ name: 'WorkerError', kind: 'network' });
@@ -148,10 +173,36 @@ describe('post (finding 2)', () => {
 
   it('without worker credentials, fails the check worker_unavailable', async () => {
     const s = await setup();
-    const steps = batchSteps({ ...s.deps, worker: null });
+    const steps = batchSteps({ ...s.deps, worker: () => null });
     await expect(steps.post(EVENT, CRAWL_1, SO)).rejects.toThrow(
       'check failed: worker_unavailable',
     );
+  });
+
+  it('fails the check worker_unavailable, non-retriably, when the client cannot be built (correctness 1)', async () => {
+    const s = await setup();
+    const steps = batchSteps({
+      ...s.deps,
+      worker: () => {
+        throw new Error('WORKER_JWT_PRIVATE_KEY_PKCS8_B64 is not a base64 PKCS8 DER private key');
+      },
+    });
+    for (const call of [
+      () => steps.post(EVENT, CRAWL_1, SO),
+      () => steps.poll(EVENT, CRAWL_1, SO),
+      () => steps.read(EVENT, CRAWL_1, SO),
+    ]) {
+      const failure = await call().then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(failure).toBeInstanceOf(NonRetriableError);
+      expect(failure).toMatchObject({ message: 'check failed: worker_unavailable' });
+    }
+    // failBatch needs no worker, so it still ends a batch.
+    await s.steps.post(EVENT, CRAWL_1, SO);
+    await steps.failBatch(EVENT, CRAWL_1);
+    expect(s.batches.get(`${CHECK}:1`)!.status).toBe('failed');
   });
 
   it('cuts max_seconds to what the crawl ceiling leaves, and posts nothing under the minimum', async () => {
@@ -221,7 +272,7 @@ describe('poll (finding 13)', () => {
 
   it('reads a worker that did not answer as unreachable, not as a failure', async () => {
     const s = await setup();
-    s.deps.worker!.pollBatch = async () => {
+    s.worker.pollBatch = async () => {
       throw new WorkerError('timeout', null, null);
     };
     expect(await s.steps.poll(EVENT, CRAWL_1, SO)).toEqual({ status: 'unreachable', at: T0 });
@@ -247,6 +298,22 @@ describe('read (finding 3)', () => {
       summary: { release: 'unreleased', pages: 50 },
     });
     expect(s.evidence.objects.has(`anon/${SITE_ID}/${CHECK}/batch-1.json.gz`)).toBe(true);
+  });
+
+  it('returns the stored summary of a row already done, without asking the worker (correctness 3)', async () => {
+    const recorded = readRecorded('batches');
+    const s = await setup(new Map([[1, renumbered(recorded[0]!, 1)]]));
+    await s.steps.post(EVENT, CRAWL_1, SO);
+    const first = await s.steps.read(EVENT, CRAWL_1, SO);
+    // A retry of the step after it stored the result, against a worker restarted since.
+    s.worker.pollBatch = async () => {
+      throw new Error('read asked the worker for a batch it had read');
+    };
+    expect(await s.steps.read(EVENT, CRAWL_1, SO)).toEqual(first);
+    expect(s.batches.get(`${CHECK}:1`)).toMatchObject({
+      status: 'done',
+      result_path: `anon/${SITE_ID}/${CHECK}/batch-1.json.gz`,
+    });
   });
 
   it('gives not_found when the worker no longer holds the batch', async () => {

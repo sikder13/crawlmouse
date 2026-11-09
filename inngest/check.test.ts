@@ -10,6 +10,8 @@ import {
   createCheckFn,
   runCheck,
   type BatchAt,
+  type CancelledRun,
+  type ClaimedSite,
   type CheckStepTools,
   type CheckSteps,
   type PollOutput,
@@ -27,6 +29,15 @@ const EVENT: CheckRequested = {
   pageCap: 500,
 };
 const RELEASE = 'abcdef012345';
+/** A site id other than the event's, as the database might hold it. */
+const DB_SITE = '33333333-3333-4333-8333-333333333333';
+/** The event's site, as a claim reads it back when the database agrees with the event. */
+const SITE_OF_EVENT: ClaimedSite = {
+  siteId: EVENT.siteId,
+  accountId: EVENT.accountId,
+  host: EVENT.host,
+  homepageUrl: EVENT.homepageUrl,
+};
 const T0 = Date.UTC(2026, 10, 8, 12, 0, 0);
 
 /** A fake `step`: records every id, `sleep` advances the clock and returns at once. */
@@ -59,6 +70,8 @@ interface Script {
   crawlBatches?: number;
   stage2?: boolean;
   claims?: ('claimed' | 'site_busy' | 'gone' | 'paused')[];
+  /** The site the claim reads from the database; the event's when unset. */
+  site?: ClaimedSite;
   poll?: (at: BatchAt, n: number) => PollOutput['status'] | PollOutput;
   post?: (at: BatchAt, n: number) => PostOutput | undefined;
   read?: (at: BatchAt) => ReadOutput | undefined;
@@ -73,7 +86,12 @@ function fakeSteps(clock: { now: number }, script: Script = {}) {
   let postN = 0;
   const crawlBatches = script.crawlBatches ?? 2;
   const steps: CheckSteps = {
-    claim: async () => ({ outcome: script.claims?.[claimN++] ?? 'claimed', at: clock.now }),
+    claim: async () => {
+      const outcome = script.claims?.[claimN++] ?? 'claimed';
+      return outcome === 'claimed'
+        ? { outcome, at: clock.now, site: script.site ?? SITE_OF_EVENT }
+        : { outcome, at: clock.now };
+    },
     discover: async () => ({ seeds: 3, sitemap_urls: 2, at: clock.now }),
     post: async (_e, at) => {
       posts.push({ at });
@@ -106,7 +124,7 @@ function fakeSteps(clock: { now: number }, script: Script = {}) {
     build: async () => ({ status: 'finished', pages: 100, fixes: 3 }),
     persist: async () => ({ written: true }),
     finalize: async () => ({}),
-    fail: async () => ({ failed: true }),
+    fail: async () => ({ failed: true, siteId: EVENT.siteId }),
   };
   return { steps, posts, failed };
 }
@@ -145,8 +163,8 @@ describe('runCheck: the step order', () => {
       'render',
       'build',
       'persist',
-      'finalize',
       'emit',
+      'finalize',
     ]);
     expect(result).toEqual({ status: 'finished' });
     // One batch-number sequence per check: access continues after the crawl.
@@ -165,12 +183,13 @@ describe('runCheck: the step order', () => {
     expect(second.ids).toEqual(first.ids);
   });
 
-  it('emits check.finished with the built status', async () => {
+  it('emits check.finished with the built status, under an event id of its own (correctness 5)', async () => {
     const { events } = await drive();
     expect(events).toEqual([
       {
         id: 'emit',
         payload: {
+          id: `check-finished:${EVENT.checkId}`,
           name: 'check.finished',
           data: {
             checkId: EVENT.checkId,
@@ -224,8 +243,65 @@ describe('runCheck: claim', () => {
     ]);
     expect(result).toEqual({ status: 'failed', reason: 'site_busy' });
     expect(events[0]!.payload).toEqual({
+      id: `check-failed:${EVENT.checkId}`,
       name: 'check.failed',
       data: { checkId: EVENT.checkId, siteId: EVENT.siteId, reason: 'site_busy' },
+    });
+  });
+
+  it('names in check.failed the site the fail step read from the database', async () => {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock, { claims: ['paused'] });
+    fake.steps.fail = async () => ({ failed: true, siteId: DB_SITE });
+    await runCheck({ event: { data: EVENT }, step: step.tools, runId: 'r' }, fake.steps);
+    expect(step.events.map((e) => e.payload)).toEqual([
+      {
+        id: `check-failed:${EVENT.checkId}`,
+        name: 'check.failed',
+        data: { checkId: EVENT.checkId, siteId: DB_SITE, reason: 'paused' },
+      },
+    ]);
+  });
+
+  it('fails the check internal, running nothing else, when its row names another site than the event (security 6)', async () => {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock, { site: { ...SITE_OF_EVENT, siteId: DB_SITE } });
+    fake.steps.fail = async () => ({ failed: true, siteId: DB_SITE });
+    const result = await runCheck(
+      { event: { data: EVENT }, step: step.tools, runId: 'r' },
+      fake.steps,
+    );
+    expect(step.ids).toEqual(['claim', 'fail', 'emit-failed']);
+    expect(result).toEqual({ status: 'failed', reason: 'internal' });
+    expect(step.events[0]!.payload).toMatchObject({ data: { siteId: DB_SITE } });
+  });
+
+  it('gives the steps after the claim the host, account and homepage the database holds (security 6)', async () => {
+    const site: ClaimedSite = {
+      siteId: EVENT.siteId,
+      accountId: '44444444-4444-4444-8444-444444444444',
+      host: 'kept.example',
+      homepageUrl: 'https://kept.example',
+    };
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock, { site });
+    const seen: CheckRequested[] = [];
+    for (const name of ['discover', 'post', 'poll', 'read', 'render', 'build'] as const) {
+      const inner = fake.steps[name] as (e: CheckRequested, ...rest: never[]) => Promise<never>;
+      fake.steps[name] = (async (e: CheckRequested, ...rest: never[]) => {
+        seen.push(e);
+        return inner(e, ...rest);
+      }) as never;
+    }
+    await runCheck({ event: { data: EVENT }, step: step.tools, runId: 'r' }, fake.steps);
+    expect(seen.length).toBeGreaterThan(6);
+    for (const e of seen) expect(e).toEqual({ ...EVENT, ...site });
+    expect(step.events.at(-1)!.payload).toMatchObject({
+      name: 'check.finished',
+      data: { siteId: EVENT.siteId, accountId: site.accountId },
     });
   });
 
@@ -547,9 +623,10 @@ function configOf(fn: unknown) {
 
 describe('createCheckFn (D3)', () => {
   const noSteps = () => fakeSteps({ now: T0 }).steps;
+  const noFail = async () => ({ failed: false }) as const;
 
   it('declares the D3 options', () => {
-    const [main] = configOf(createCheckFn(noSteps, {}));
+    const [main] = configOf(createCheckFn(noSteps, noFail, {}));
     expect(main).toMatchObject({
       id: `${inngest.id}-${CHECK_FN_ID}`,
       triggers: [{ event: 'check.requested' }],
@@ -567,7 +644,8 @@ describe('createCheckFn (D3)', () => {
   it('reads the account-wide limit from INNGEST_CHECK_CONCURRENCY under the plan cap', () => {
     const limitOf = (v: string) =>
       (
-        configOf(createCheckFn(noSteps, { INNGEST_CHECK_CONCURRENCY: v }))[0]!.concurrency as {
+        configOf(createCheckFn(noSteps, noFail, { INNGEST_CHECK_CONCURRENCY: v }))[0]!
+          .concurrency as {
           limit: number;
         }[]
       )[1]!.limit;
@@ -575,14 +653,19 @@ describe('createCheckFn (D3)', () => {
     expect(limitOf('50')).toBe(5);
   });
 
-  it('onFailure fails the check with the error’s reason and sends check.failed', async () => {
+  it('onFailure fails the check with the error’s reason through `fail` alone, and sends check.failed', async () => {
     const calls: unknown[] = [];
-    const steps = fakeSteps({ now: T0 }).steps;
-    steps.fail = async (event, reason) => {
-      calls.push([event.checkId, reason]);
-      return { failed: true };
-    };
-    const fn = createCheckFn(() => steps, {}) as unknown as {
+    // onFailure builds no step bodies (correctness 1): `steps` throws if it is called.
+    const fn = createCheckFn(
+      () => {
+        throw new Error('onFailure built the step bodies');
+      },
+      async (checkId, reason) => {
+        calls.push([checkId, reason]);
+        return { failed: true, siteId: DB_SITE };
+      },
+      {},
+    ) as unknown as {
       onFailureFn: (ctx: unknown) => Promise<void>;
     };
     const step = fakeStep({ now: T0 });
@@ -598,8 +681,9 @@ describe('createCheckFn (D3)', () => {
       {
         id: 'emit-failed',
         payload: {
+          id: `check-failed:${EVENT.checkId}`,
           name: 'check.failed',
-          data: { checkId: EVENT.checkId, siteId: EVENT.siteId, reason: 'worker_redeployed' },
+          data: { checkId: EVENT.checkId, siteId: DB_SITE, reason: 'worker_redeployed' },
         },
       },
     ]);
@@ -610,7 +694,13 @@ describe('createCheckCancelledFn (finding 4)', () => {
   it('triggers on the function_id the SDK gives checkFn, as its own onFailure handler does', () => {
     // The SDK builds checkFn's failure handler with a trigger on inngest/function.failed filtered to
     // checkFn's function_id; inngest/function.cancelled carries the same function_id.
-    const [, failure] = configOf(createCheckFn(() => fakeSteps({ now: T0 }).steps, {}));
+    const [, failure] = configOf(
+      createCheckFn(
+        () => fakeSteps({ now: T0 }).steps,
+        async () => ({ failed: false }) as const,
+        {},
+      ),
+    );
     const sdkFilter = (failure!.triggers as { expression: string }[])[0]!.expression;
     const [cancelled] = configOf(createCheckCancelledFn(async () => null));
     expect(cancelled!.triggers).toEqual([
@@ -619,29 +709,60 @@ describe('createCheckCancelledFn (finding 4)', () => {
     expect(sdkFilter).toBe(`event.data.function_id == '${inngest.id}-${CHECK_FN_ID}'`);
   });
 
-  async function cancel(failed: { checkId: string; siteId: string } | null) {
-    const runs: string[] = [];
-    const fn = createCheckCancelledFn(async (runId) => {
-      runs.push(runId);
+  async function cancel(
+    failed: { checkId: string; siteId: string } | null,
+    data: Record<string, unknown> = { run_id: 'run-9', function_id: 'x' },
+  ) {
+    const runs: CancelledRun[] = [];
+    const fn = createCheckCancelledFn(async (run) => {
+      runs.push(run);
       return failed;
     }) as unknown as { fn: (ctx: unknown) => Promise<unknown> };
     const step = fakeStep({ now: T0 });
-    const out = await fn.fn({
-      event: { data: { run_id: 'run-9', function_id: 'x' } },
-      step: step.tools,
-    });
+    const out = await fn.fn({ event: { data }, step: step.tools });
     return { runs, out, events: step.events };
   }
 
   it('fails the run’s check canceled and sends check.failed', async () => {
-    const { runs, events } = await cancel({ checkId: EVENT.checkId, siteId: EVENT.siteId });
-    expect(runs).toEqual(['run-9']);
+    const { events } = await cancel({ checkId: EVENT.checkId, siteId: EVENT.siteId });
     expect(events.map((e) => e.payload)).toEqual([
       {
+        id: `check-failed:${EVENT.checkId}`,
         name: 'check.failed',
         data: { checkId: EVENT.checkId, siteId: EVENT.siteId, reason: 'canceled' },
       },
     ]);
+  });
+
+  it('names the check by the triggering event’s checkId when the payload carries it (correctness 2)', async () => {
+    // Inngest's system-event reference documents `data.event`, the event that triggered the run; the
+    // SDK's type for inngest/function.cancelled leaves it out.
+    const { runs } = await cancel(null, {
+      run_id: 'run-9',
+      function_id: 'x',
+      event: { name: 'check.requested', data: EVENT },
+    });
+    expect(runs).toEqual([{ checkId: EVENT.checkId, runId: 'run-9' }]);
+  });
+
+  it('falls back to the run id when the payload has no check id it can read as a uuid', async () => {
+    const shapes: Record<string, unknown>[] = [
+      { run_id: 'run-9', function_id: 'x' },
+      { run_id: 'run-9', function_id: 'x', event: null },
+      { run_id: 'run-9', function_id: 'x', event: 'check.requested' },
+      { run_id: 'run-9', function_id: 'x', event: { data: null } },
+      { run_id: 'run-9', function_id: 'x', event: { data: { checkId: 42 } } },
+      { run_id: 'run-9', function_id: 'x', event: { data: { checkId: 'not-a-uuid' } } },
+      {
+        run_id: 'run-9',
+        function_id: 'x',
+        event: { data: { checkId: `${EVENT.checkId}' or true` } },
+      },
+    ];
+    for (const data of shapes) {
+      const { runs } = await cancel(null, data);
+      expect(runs, JSON.stringify(data)).toEqual([{ checkId: null, runId: 'run-9' }]);
+    }
   });
 
   it('sends nothing when no check moved', async () => {

@@ -92,7 +92,7 @@ async function runRecorded() {
     store,
     evidence,
     persistDb: UNUSED_DB,
-    worker,
+    worker: () => worker,
     now: () => clock.now,
     nonce: () => `nonce-${String(++nonces).padStart(16, '0')}`,
     env: { VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40) },
@@ -131,7 +131,7 @@ async function runRecorded() {
 }
 
 describe('checkSteps under runCheck, on the recorded worker batches', () => {
-  it('runs claim to emit in the order the recorded check was planned', async () => {
+  it('runs claim to finalize in the order the recorded check was planned', async () => {
     const { result, ids } = await runRecorded();
     expect(result.status === 'finished' || result.status === 'partial').toBe(true);
     const batch = (p: string) => [`${p}-post`, `${p}-wait-1`, `${p}-poll-1`, `${p}-read`];
@@ -146,8 +146,8 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
       'render',
       'build',
       'persist',
-      'finalize',
       'emit',
+      'finalize',
     ]);
   });
 

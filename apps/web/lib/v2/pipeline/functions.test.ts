@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { generateKeyPairSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { NonRetriableError } from 'inngest';
+import { GRADE_VERSION, safeFetch } from '@crawlmouse/engine/v2/pipeline';
 import { auditFn } from '../../../../../inngest/audit';
 import {
   cleanupExpiredAuditsFn,
@@ -9,8 +12,17 @@ import {
 } from '../../../../../inngest/billing';
 import { CHECK_CANCELLED_FN_ID, CHECK_FN_ID } from '../../../../../inngest/check';
 import { CHECK_REAPER_FN_ID } from '../../../../../inngest/check-reaper';
+import { inngest } from '../../../../../inngest/client';
+import type { CheckRequested } from '../../../../../inngest/check-events';
 import { PLAN_CONCURRENCY_CAP } from '../../../../../inngest/concurrency';
-import { inngestFunctions } from './functions';
+import { recordedInput } from '../../../../../packages/engine/fixtures/v2/build/recorded';
+import { workerClientFromEnv } from '../../worker-client/client';
+import { CRAWL_USER_AGENT } from './discover';
+import { inngestFunctions, stepDeps, type StepStores, type Wiring } from './functions';
+import { NO_DAILY_BUDGET } from './steps';
+import type { PipelineStore } from './store';
+import { memoryStore, queuedCheck } from './test-support/fakes';
+import { memoryEvidenceStore } from './test-support/memory-evidence';
 
 type Config = { id: string; concurrency?: number | { limit: number } | { limit: number }[] };
 const configsOf = (fns: readonly unknown[]): Config[] =>
@@ -268,4 +280,215 @@ describe('no registered function can declare a concurrency limit above the plan 
       { limit: 1 },
     ]);
   });
+});
+
+/** persistDb is not reached in these tests: each method throws if it is. */
+const UNUSED_DB: StepStores['persistDb'] = {
+  persistBuiltCheck: async () => {
+    throw new Error('persistDb is not called in this test');
+  },
+  stageCheckRows: async () => {
+    throw new Error('persistDb is not called in this test');
+  },
+};
+
+describe('stepDeps: the step bodies’ dependencies as production wires them (quality 3, security 3)', () => {
+  const stores: StepStores = {
+    store: {} as PipelineStore,
+    evidence: memoryEvidenceStore(),
+    persistDb: UNUSED_DB,
+  };
+
+  it('discovers through the engine’s safeFetch, the SSRF guard (§5), as our crawler', () => {
+    const deps = stepDeps({}, stores);
+    expect(deps.discover.fetch).toBe(safeFetch);
+    expect(deps.discover.userAgent).toBe(CRAWL_USER_AGENT);
+  });
+
+  it('renders with the daily budget that refuses (Q7)', () => {
+    expect(stepDeps({}, stores).render.daily).toBe(NO_DAILY_BUDGET);
+  });
+
+  it('runs over the stores it is given', () => {
+    const deps = stepDeps({}, stores);
+    expect(deps.store).toBe(stores.store);
+    expect(deps.evidence).toBe(stores.evidence);
+    expect(deps.persistDb).toBe(stores.persistDb);
+  });
+});
+
+/** An Ed25519 private key in the environment's form, so only the URL is wrong. */
+const GOOD_KEY = generateKeyPairSync('ed25519')
+  .privateKey.export({ format: 'der', type: 'pkcs8' })
+  .toString('base64');
+
+const BAD_WORKER_ENVS = {
+  'a malformed key': {
+    CRAWL_WORKER_URL: 'https://worker.example.com',
+    WORKER_SIGNING_SECRET: 'secret',
+    WORKER_JWT_PRIVATE_KEY_PKCS8_B64: 'bm90IGEga2V5',
+  },
+  'a worker URL with no scheme': {
+    CRAWL_WORKER_URL: 'worker.example.com',
+    WORKER_SIGNING_SECRET: 'secret',
+    WORKER_JWT_PRIVATE_KEY_PKCS8_B64: GOOD_KEY,
+  },
+} as const;
+
+describe('a worker variable that makes no client (correctness 1)', () => {
+  const site = { ...recordedInput().site, host: '127.0.0.1' };
+  // An IP literal the SSRF guard refuses before any request: discovery reads nothing and sends
+  // nothing off this machine, and the check reaches its first batch with the homepage as its seed.
+  const EVENT: CheckRequested = {
+    checkId: 'c0000000-0000-4000-8000-0000000000e1',
+    siteId: site.id,
+    accountId: null,
+    host: site.host,
+    homepageUrl: 'https://127.0.0.1',
+    trigger: 'manual',
+    pageCap: 500,
+  };
+
+  type Fn = {
+    fn: (ctx: unknown) => Promise<unknown>;
+    onFailureFn: (ctx: unknown) => Promise<unknown>;
+  };
+
+  function wired(env: Record<string, string>) {
+    const memory = memoryStore(
+      site,
+      [queuedCheck(EVENT.checkId, site.id, '2026-11-08T12:00:00.000Z', GRADE_VERSION)],
+      () => new Date().toISOString(),
+    );
+    const reap = vi.fn(async () => [
+      { checkId: EVENT.checkId, siteId: site.id, reason: 'stalled' as const },
+    ]);
+    const store: PipelineStore = { ...memory.store, reap };
+    const wiring: Wiring = {
+      store: () => store,
+      stores: () => ({ store, evidence: memoryEvidenceStore(), persistDb: UNUSED_DB }),
+    };
+    const fns = inngestFunctions({ V2_PIPELINE: '1', ...env }, wiring);
+    const byId = (id: string) =>
+      fns.find((f) => configsOf([f])[0]!.id === `crawlmouse-${id}`) as unknown as Fn;
+    return {
+      rows: memory.rows,
+      reap,
+      checkFn: byId(CHECK_FN_ID),
+      cancelled: byId(CHECK_CANCELLED_FN_ID),
+      reaper: byId(CHECK_REAPER_FN_ID),
+    };
+  }
+
+  /** A step that runs its body at once and records what is sent. */
+  function tools() {
+    const sent: unknown[] = [];
+    return {
+      sent,
+      step: {
+        run: async (_id: string, fn: () => Promise<unknown>) => fn(),
+        sleep: async () => {},
+        sendEvent: async (_id: string, payload: unknown) => void sent.push(payload),
+      },
+    };
+  }
+
+  for (const [name, env] of Object.entries(BAD_WORKER_ENVS)) {
+    describe(name, () => {
+      it('is an environment the worker client refuses to build from', () => {
+        expect(() => workerClientFromEnv(env)).toThrow();
+      });
+
+      it('the reaper still reaps, and sends check.failed for what it reaped', async () => {
+        const w = wired(env);
+        const t = tools();
+        // The reaper sends from inside its step with the client's own send; nothing leaves here.
+        const send = vi.spyOn(inngest, 'send').mockResolvedValue({ ids: [] });
+        let sent: unknown[];
+        try {
+          await w.reaper.fn({ step: t.step });
+          sent = send.mock.calls.map(([events]) => events);
+        } finally {
+          send.mockRestore();
+        }
+        expect(w.reap).toHaveBeenCalledTimes(1);
+        expect(sent).toEqual([
+          [
+            {
+              id: `check-failed:${EVENT.checkId}`,
+              name: 'check.failed',
+              data: { checkId: EVENT.checkId, siteId: site.id, reason: 'stalled' },
+            },
+          ],
+        ]);
+      });
+
+      it('the cancel handler still fails the check its run claimed', async () => {
+        const w = wired(env);
+        Object.assign(w.rows.get(EVENT.checkId)!, { status: 'running', inngest_run_id: 'run-9' });
+        await w.cancelled.fn({
+          event: { data: { function_id: `crawlmouse-${CHECK_FN_ID}`, run_id: 'run-9' } },
+          step: tools().step,
+        });
+        expect(w.rows.get(EVENT.checkId)).toMatchObject({
+          status: 'failed',
+          failure_reason: 'canceled',
+        });
+      });
+
+      it('the cancel handler fails a check cancelled before its claim, by the event’s check id', async () => {
+        const w = wired(env);
+        await w.cancelled.fn({
+          event: {
+            data: {
+              function_id: `crawlmouse-${CHECK_FN_ID}`,
+              run_id: 'run-never-claimed',
+              event: { name: 'check.requested', data: EVENT },
+            },
+          },
+          step: tools().step,
+        });
+        expect(w.rows.get(EVENT.checkId)).toMatchObject({
+          status: 'failed',
+          failure_reason: 'canceled',
+        });
+      });
+
+      it('onFailure still fails the check', async () => {
+        const w = wired(env);
+        await w.checkFn.onFailureFn({
+          event: { data: { event: { data: EVENT } } },
+          error: new Error('boom'),
+          step: tools().step,
+        });
+        expect(w.rows.get(EVENT.checkId)).toMatchObject({
+          status: 'failed',
+          failure_reason: 'internal',
+        });
+      });
+
+      it('a check fails worker_unavailable at its first batch instead of staying queued', async () => {
+        const w = wired(env);
+        const t = tools();
+        const error = await w.checkFn
+          .fn({ event: { data: EVENT }, step: t.step, runId: 'run-1' })
+          .then(
+            () => null,
+            (e: unknown) => e,
+          );
+        expect(error).toBeInstanceOf(NonRetriableError);
+        expect(error).toMatchObject({ message: 'check failed: worker_unavailable' });
+        // Inngest then runs onFailure with that error.
+        await w.checkFn.onFailureFn({
+          event: { data: { event: { data: EVENT } } },
+          error,
+          step: t.step,
+        });
+        expect(w.rows.get(EVENT.checkId)).toMatchObject({
+          status: 'failed',
+          failure_reason: 'worker_unavailable',
+        });
+      });
+    });
+  }
 });

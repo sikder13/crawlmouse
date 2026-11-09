@@ -1,9 +1,16 @@
 /**
  * D14, the live run: a check of a real site through the deployed staging worker, with the pipeline's
- * own steps and orchestration (`runCheck` over `checkSteps`), wired as production wires them
- * (functions.ts `stepDeps`) except for two stores: PGlite with every migration instead of the
- * production database, and an in-memory bucket instead of Storage. Nothing here reads or writes
- * production data.
+ * own steps and orchestration (`runCheck` over `checkSteps`) over functions.ts `stepDeps`, the builder
+ * production calls. What differs from production:
+ *
+ * - the store implementation: `sqlPipelineStore` over PGlite with every migration, where production
+ *   runs `supabasePipelineStore` over PostgREST; persistence writes to the same PGlite;
+ * - the evidence store: a bucket in memory, where production uses Storage;
+ * - the environment: this process's, with VERCEL_GIT_COMMIT_SHA set to the commit under test;
+ * - the step tools: each step body runs once, as it is reached, with no memoisation, no retries and
+ *   no replays, and each sleep is a real wait; checkFn's onFailure and the cancel handler do not run.
+ *
+ * Nothing here reads or writes production data.
  *
  * Skipped, not failed, unless the three worker values are in the environment, as the operator keeps
  * them in the gitignored scripts/.env.local:
@@ -16,19 +23,17 @@
  * step ids and the site's own URLs.
  */
 import { execFileSync } from 'node:child_process';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
 import type { PGlite } from '@electric-sql/pglite';
-import { capsFromEnv, clientFromEnv, safeFetch } from '@crawlmouse/engine/v2/pipeline';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { runCheck, type CheckStepTools } from '../../../../../inngest/check';
+import { runCheck, type CheckStepTools, type DiscoverOutput } from '../../../../../inngest/check';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
-import { workerClientFromEnv } from '../../worker-client/client';
-import { CRAWL_USER_AGENT } from './discover';
+import { stepDeps } from './functions';
 import { loadCheck } from './load';
 import { requestCheck } from './request';
-import { NO_DAILY_BUDGET, checkSteps, type StepDeps } from './steps';
+import { checkSteps } from './steps';
 import { memoryEvidenceStore } from './test-support/memory-evidence';
 import { pgliteCheckReader, pglitePersistDb } from './test-support/pglite';
 import { sqlPipelineStore } from './test-support/sql-store';
@@ -38,6 +43,12 @@ const configured = ['CRAWL_WORKER_URL', 'WORKER_SIGNING_SECRET', 'WORKER_JWT_PRI
   .map((k) => env[k])
   .every((v) => typeof v === 'string' && v.length > 0);
 
+/**
+ * The JS shell does not exercise D8 (no orphan or deep-page finding on a site served for JavaScript to
+ * fill in): in the recorded run (2026-11-08) its homepage was the only page reachable, with no links
+ * and no sitemap, so no page could be orphaned or deep. D8 is proven on the engine fixtures. A run's
+ * summary carries `d8` when its own counts show that shape.
+ */
 const HOSTS = [
   { host: 'books.toscrape.com', shape: 'static' },
   { host: 'www.alynthe.com', shape: 'client-rendered shell (CC-12b smoke)' },
@@ -70,31 +81,21 @@ describe.skipIf(!configured)('the pipeline on the staging worker, against PGlite
         { siteId, trigger: 'first_audit' },
       );
 
-      const deps: StepDeps = {
-        store,
-        evidence: memoryEvidenceStore(),
-        persistDb: pglitePersistDb(db),
-        worker: workerClientFromEnv(env),
-        now: Date.now,
-        nonce: () => randomBytes(24).toString('base64url'),
-        env: { VERCEL_GIT_COMMIT_SHA: headSha() },
-        render: {
-          client: clientFromEnv(env),
-          caps: capsFromEnv(env),
-          daily: NO_DAILY_BUDGET,
-          inFlight: 2,
-        },
-        discover: { fetch: safeFetch, userAgent: CRAWL_USER_AGENT, now: Date.now },
-      };
+      const deps = stepDeps(
+        { ...env, VERCEL_GIT_COMMIT_SHA: headSha() },
+        { store, evidence: memoryEvidenceStore(), persistDb: pglitePersistDb(db) },
+      );
 
       const steps: { id: string; ms: number }[] = [];
       const slept: { id: string; ms: number }[] = [];
       const emitted: string[] = [];
+      const outputs = new Map<string, unknown>();
       const tools: CheckStepTools = {
         run: async (id, fn) => {
           const t = Date.now();
           const out = JSON.parse(JSON.stringify(await fn()));
           steps.push({ id, ms: Date.now() - t });
+          outputs.set(id, out);
           return out;
         },
         sleep: async (id, ms) => {
@@ -114,6 +115,12 @@ describe.skipIf(!configured)('the pipeline on the staging worker, against PGlite
       const dataset = await loadCheck(pgliteCheckReader(db), checkId);
       const check = dataset.checks[0]!;
       const fixes = dataset.fixes.map((f) => `${f.type}:${f.last_state}`).sort();
+      const discovered = outputs.get('discover') as DiscoverOutput | undefined;
+      const reach = {
+        pages: dataset.page_results.length,
+        link_edges: dataset.link_edges.length,
+        sitemap_urls: discovered?.sitemap_urls ?? null,
+      };
       const summary = {
         host,
         shape,
@@ -160,16 +167,20 @@ describe.skipIf(!configured)('the pipeline on the staging worker, against PGlite
         fixes,
         changes: dataset.changes.length,
         emitted,
+        reach,
+        // From this run's counts: a run that read only the homepage, with no links and no sitemap
+        // URL, has no page that could be orphaned or deep, so it cannot exercise D8. Null otherwise.
+        d8:
+          reach.pages <= 1 && reach.link_edges === 0 && reach.sitemap_urls === 0
+            ? 'not exercised: only the homepage was reachable (no links, no sitemap URLs)'
+            : null,
       };
       console.log(`live ${JSON.stringify(summary)}`);
       if (env.LIVE_OUT) appendFileSync(env.LIVE_OUT, `${JSON.stringify(summary)}\n`);
 
+      expect(result.status).toBe(check.status);
       expect(['finished', 'partial']).toContain(check.status);
       expect(emitted).toEqual(['emit']);
-      if (host === 'www.alynthe.com') {
-        // D8: a site served for JavaScript to fill in has no orphan or deep-page finding detected.
-        expect(fixes.filter((f) => /^(orphan_pages|deep_pages):detected$/.test(f))).toEqual([]);
-      }
     },
     25 * 60_000,
   );

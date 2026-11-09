@@ -8,6 +8,7 @@ import type { CheckSide } from '@crawlmouse/engine/v2/pipeline';
 import type { ReapedCheck } from '../../../../../../inngest/check-reaper';
 import { checkFromRow, fixEventFromRow, fixFromRow, siteFromRow } from '../rows';
 import {
+  batchDone,
   graded,
   knownReason,
   statesOf,
@@ -69,6 +70,14 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
       return r ? { checkId: String(r.id), siteId: String(r.site_id) } : null;
     },
 
+    async siteOf(checkId) {
+      const r = await one(
+        `select jsonb_build_object('site_id', site_id) as row from public.checks where id = $1`,
+        [checkId],
+      );
+      return r ? String(r.site_id) : null;
+    },
+
     async progress(checkId, progress, at) {
       await db.query(
         `update public.checks set progress = $2::jsonb, heartbeat_at = $3::timestamptz
@@ -117,13 +126,12 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
       return r ? String(r.id) : null;
     },
 
-    async previousGraded(siteId, checkId, queuedAt): Promise<CheckSide | null> {
+    async previousGraded(siteId, checkId): Promise<CheckSide | null> {
       const r = await one(
         `select to_jsonb(c) as row from public.checks c
           where c.site_id = $1 and c.id <> $2 and c.status in ('finished', 'partial')
-            and c.queued_at <= $3::timestamptz
-          order by c.queued_at desc, c.id desc limit 1`,
-        [siteId, checkId, queuedAt],
+          order by c.finished_at desc, c.id desc limit 1`,
+        [siteId, checkId],
       );
       return r ? graded(r) : null;
     },
@@ -171,16 +179,19 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
     },
 
     async upsertBatch(row) {
-      await db.query(
+      const { rows: written } = await db.query(
         `insert into public.crawl_batches
            (check_id, batch, kind, nonce, status, posted_at, finished_at, summary, result_path)
          values ($1, $2, $3, $4, 'posted', $5::timestamptz, null, $6::jsonb, null)
          on conflict (check_id, batch) do update set
            kind = excluded.kind, nonce = excluded.nonce, status = excluded.status,
            posted_at = excluded.posted_at, finished_at = null, summary = excluded.summary,
-           result_path = null`,
+           result_path = null
+         where public.crawl_batches.status <> 'done'
+         returning batch`,
         [row.check_id, row.batch, row.kind, row.nonce, row.posted_at, JSON.stringify(row.summary)],
       );
+      if (written.length === 0) throw batchDone(row.check_id, row.batch);
     },
 
     async endBatch(checkId, batch, end) {

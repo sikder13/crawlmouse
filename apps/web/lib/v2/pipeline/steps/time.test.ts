@@ -80,6 +80,13 @@ describe('the time plan', () => {
  * step costs `latencyS` of queue and run time, a sleep costs its length, and the worker finishes a
  * batch only at its last poll before the deadline.
  */
+const SITE = {
+  siteId: 's',
+  accountId: null,
+  host: 'example.com',
+  homepageUrl: 'https://example.com',
+};
+
 function simulate(opts: { latencyS: number; busyClaims: number; slowBatches: boolean }) {
   const clock = { now: T0 };
   const ids: string[] = [];
@@ -103,10 +110,10 @@ function simulate(opts: { latencyS: number; busyClaims: number; slowBatches: boo
   const posted = new Map<number, { at: number; seconds: number }>();
   let claims = 0;
   const steps: CheckSteps = {
-    claim: async () => ({
-      outcome: claims++ < opts.busyClaims ? 'site_busy' : 'claimed',
-      at: clock.now,
-    }),
+    claim: async () =>
+      claims++ < opts.busyClaims
+        ? { outcome: 'site_busy', at: clock.now }
+        : { outcome: 'claimed', at: clock.now, site: SITE },
     discover: async () => {
       clock.now += DISCOVER_S * S;
       return { seeds: 1, sitemap_urls: 0, at: clock.now };
@@ -138,14 +145,11 @@ function simulate(opts: { latencyS: number; busyClaims: number; slowBatches: boo
     build: async () => ({ status: 'partial', pages: 50, fixes: 0 }),
     persist: async () => ({ written: true }),
     finalize: async () => ({}),
-    fail: async () => ({ failed: true }),
+    fail: async () => ({ failed: true, siteId: 's' }),
   };
   const event = {
+    ...SITE,
     checkId: 'c',
-    siteId: 's',
-    accountId: null,
-    host: 'example.com',
-    homepageUrl: 'https://example.com',
     trigger: 'manual' as const,
     pageCap: 100_000,
   };

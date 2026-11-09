@@ -58,12 +58,18 @@ export interface BatchEnd {
 export interface PipelineStore {
   /** `claim_check`: queued → running with `progress`, or again by the run that claimed it. */
   claim(checkId: string, runId: string, progress: Check['progress']): Promise<ClaimOutcome>;
-  /** `fail_check`, by the check's id or by the run that claimed it; true when this call moved it. */
+  /**
+   * `fail_check`, by the check's id or by the run that claimed it: true when the check is failed with
+   * `reason` after the call, whether this call moved it or an earlier one with the same reason did (a
+   * retried call); false when it had ended otherwise.
+   */
   fail(checkId: string | null, reason: FailureReason, runId: string | null): Promise<boolean>;
   /** `reap_stalled_checks`: checks whose heartbeat (or queue time) is before `cutoff`. */
   reap(cutoff: string): Promise<ReapedCheck[]>;
   /** The check a run claimed, if any. */
   checkOfRun(runId: string): Promise<{ checkId: string; siteId: string } | null>;
+  /** The site a check belongs to, as its row holds it; null when there is no such check. */
+  siteOf(checkId: string): Promise<string | null>;
   /** The heartbeat and progress of a running check. */
   progress(checkId: string, progress: NonNullable<Check['progress']>, at: string): Promise<void>;
   check(checkId: string): Promise<Check>;
@@ -71,15 +77,21 @@ export interface PipelineStore {
   requestSite(siteId: string): Promise<RequestSite>;
   /** The site's latest other check queued no later than this one; null when there is none. */
   previousCheckId(siteId: string, checkId: string, queuedAt: string): Promise<string | null>;
-  /** The site's latest other finished or partial check queued no later, with its diff inputs. */
-  previousGraded(siteId: string, checkId: string, queuedAt: string): Promise<CheckSide | null>;
+  /**
+   * The diff's baseline: the site's other finished or partial check that finished last, with its diff
+   * inputs. By `finished_at`, not queue order: claims are not in queue order (correctness 4).
+   */
+  previousGraded(siteId: string, checkId: string): Promise<CheckSide | null>;
   fixes(siteId: string): Promise<Fix[]>;
   fixEvents(fixIds: readonly string[]): Promise<FixEvent[]>;
   /** Each page's `without_js` state in a check, where it was measured. */
   pageStates(checkId: string): Promise<Map<string, JsTextState>>;
   batch(checkId: string, batch: number): Promise<CrawlBatchRow | null>;
   batches(checkId: string): Promise<CrawlBatchRow[]>;
-  /** Writes the batch's row as posted, with this attempt's nonce, over an earlier attempt's. */
+  /**
+   * Writes the batch's row as posted, with this attempt's nonce, over an earlier attempt's; throws,
+   * writing nothing, when the row is done, so a stored result is never orphaned (correctness 3).
+   */
   upsertBatch(row: PostedBatch): Promise<void>;
   endBatch(checkId: string, batch: number, end: BatchEnd): Promise<void>;
   /** Inserts a queued check unless its id exists; true when it inserted. */
@@ -168,6 +180,14 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
       return row ? { checkId: String(row.id), siteId: String(row.site_id) } : null;
     },
 
+    async siteOf(checkId) {
+      const row = must<Row | null>(
+        'site of check',
+        await sb.from('checks').select('site_id').eq('id', checkId).maybeSingle(),
+      );
+      return row ? String(row.site_id) : null;
+    },
+
     async progress(checkId, progress, at) {
       must(
         'progress',
@@ -223,7 +243,7 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
       return row ? String(row.id) : null;
     },
 
-    async previousGraded(siteId, checkId, queuedAt) {
+    async previousGraded(siteId, checkId) {
       const row = must<Row | null>(
         'previous graded check',
         await sb
@@ -232,8 +252,7 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
           .eq('site_id', siteId)
           .neq('id', checkId)
           .in('status', ['finished', 'partial'])
-          .lte('queued_at', queuedAt)
-          .order('queued_at', { ascending: false })
+          .order('finished_at', { ascending: false })
           .order('id', { ascending: false })
           .limit(1)
           .maybeSingle(),
@@ -293,18 +312,29 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
     },
 
     async upsertBatch(row) {
-      must(
-        'upsert batch',
-        await sb.from('crawl_batches').upsert(
-          {
-            ...row,
-            status: 'posted',
-            finished_at: null,
-            result_path: null,
-          },
-          { onConflict: 'check_id,batch' },
-        ),
+      // PostgREST's upsert takes no condition on the row it would write over, so a new row is
+      // inserted, and an existing one is written over only while it is not done.
+      const posted = { ...row, status: 'posted', finished_at: null, result_path: null };
+      const inserted = must<Row[]>(
+        'insert batch',
+        await sb
+          .from('crawl_batches')
+          .upsert(posted, { onConflict: 'check_id,batch', ignoreDuplicates: true })
+          .select('batch'),
       );
+      if ((inserted ?? []).length > 0) return;
+      const { check_id: checkId, batch, ...fields } = posted;
+      const reposted = must<Row[]>(
+        'repost batch',
+        await sb
+          .from('crawl_batches')
+          .update(fields)
+          .eq('check_id', checkId)
+          .eq('batch', batch)
+          .neq('status', 'done')
+          .select('batch'),
+      );
+      if ((reposted ?? []).length === 0) throw batchDone(checkId, batch);
     },
 
     async endBatch(checkId, batch, end) {
@@ -331,6 +361,10 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
     },
   };
 }
+
+/** upsertBatch's refusal of a done batch. */
+export const batchDone = (checkId: string, batch: number): Error =>
+  new Error(`pipeline store: batch ${batch} of check ${checkId} is done; it is not posted again`);
 
 /** `ids` in lists of at most IN_LIST, in order. */
 export function inLists(ids: readonly string[]): string[][] {

@@ -10,8 +10,8 @@
  * check.test.ts moves the system clock between invocations).
  *
  * Step order: claim (with `claim-wait-{i}` / `claim-{i}` while the site is busy) → discover → crawl
- * batches `crawl-{n}` → access batches `access-{stage}` → render → build → persist → finalize →
- * emit. A batch is `{p}-post` (busy: `{p}-post-busy-{k}`, `{p}-post-{k}`), then `{p}-wait-{i}` and
+ * batches `crawl-{n}` → access batches `access-{stage}` → render → build → persist → emit →
+ * finalize. A batch is `{p}-post` (busy: `{p}-post-busy-{k}`, `{p}-post-{k}`), then `{p}-wait-{i}` and
  * `{p}-poll-{i}` until the batch is done, failed or past its deadline, then `{p}-read`. A batch the
  * worker lost is posted once more (`{p}-repost`), read as `{p}-read-2`; a second loss or the deadline
  * is `{p}-fail`, and the phase ends there. Batch numbers are one sequence over the check.
@@ -21,6 +21,8 @@ import { inngest } from './client';
 import { checkConcurrencyLimit } from './concurrency';
 import {
   CheckFailure,
+  checkFailedEventId,
+  checkFinishedEventId,
   failureReasonOf,
   type CheckFailed,
   type CheckFinished,
@@ -80,7 +82,14 @@ export interface RunSoFar {
   release: string | null;
 }
 
-export type ClaimOutput = { outcome: 'claimed' | 'site_busy' | 'gone' | 'paused'; at: number };
+/**
+ * The claimed check's site as the database holds it: its row's site, and that site's account, host
+ * and homepage. The steps after the claim are given these in place of the event's (security 6).
+ */
+export type ClaimedSite = Pick<CheckRequested, 'siteId' | 'accountId' | 'host' | 'homepageUrl'>;
+export type ClaimOutput =
+  | { outcome: 'claimed'; at: number; site: ClaimedSite }
+  | { outcome: 'site_busy' | 'gone' | 'paused'; at: number };
 export type DiscoverOutput = { seeds: number; sitemap_urls: number; at: number };
 export type PostOutput =
   | { status: 'posted'; urls: number; at: number; max_seconds: number }
@@ -108,7 +117,11 @@ export type ReadOutput =
 export type RenderOutput = { rendered: number; not_rendered: number };
 export type BuildOutput = { status: 'finished' | 'partial'; pages: number; fixes: number };
 export type PersistOutput = { written: boolean };
-export type FailOutput = { failed: boolean };
+/**
+ * Whether the check is failed with the reason asked for (by this call, or by an earlier one with the
+ * same reason that this call retries), and if so the site the database holds it under.
+ */
+export type FailOutput = { failed: false } | { failed: true; siteId: string };
 type Empty = Record<string, never>;
 
 /**
@@ -130,7 +143,7 @@ export interface CheckSteps {
   build(event: CheckRequested, so: RunSoFar): Promise<BuildOutput>;
   persist(event: CheckRequested): Promise<PersistOutput>;
   finalize(event: CheckRequested): Promise<Empty>;
-  /** Marks the check failed unless it has ended; `failed` says whether this call moved it. */
+  /** Marks the check failed unless it has ended; `failed` says whether it is failed with `reason`. */
   fail(event: CheckRequested, reason: FailureReason): Promise<FailOutput>;
 }
 
@@ -142,8 +155,8 @@ export interface CheckStepTools {
   sendEvent(
     id: string,
     payload:
-      | { name: 'check.finished'; data: CheckFinished }
-      | { name: 'check.failed'; data: CheckFailed },
+      | { id: string; name: 'check.finished'; data: CheckFinished }
+      | { id: string; name: 'check.failed'; data: CheckFailed },
   ): Promise<unknown>;
 }
 
@@ -175,31 +188,31 @@ export async function runCheck(
   steps: CheckSteps,
 ): Promise<CheckRunResult> {
   const { step, runId } = ctx;
-  const data = ctx.event.data;
+  const event = ctx.event.data;
   const run = <T>(id: string, fn: () => Promise<T>): Promise<T> =>
     step.run(id, async () => sized(id, await fn()));
 
   const endFailed = async (reason: FailureReason): Promise<CheckRunResult> => {
-    const { failed } = await run('fail', () => steps.fail(data, reason));
-    if (failed) {
-      await step.sendEvent('emit-failed', {
-        name: 'check.failed',
-        data: { checkId: data.checkId, siteId: data.siteId, reason },
-      });
-    }
+    const out = await run('fail', () => steps.fail(event, reason));
+    if (out.failed) await step.sendEvent('emit-failed', failedEvent(event.checkId, out, reason));
     return { status: 'failed', reason };
   };
 
   // ── claim ──
-  let claim = await run('claim', () => steps.claim(data, { runId, startedAt: null }));
+  let claim = await run('claim', () => steps.claim(event, { runId, startedAt: null }));
   const startedAt = claim.at;
   for (let i = 1; claim.outcome === 'site_busy' && i <= PACE.claimWaits; i++) {
     await step.sleep(`claim-wait-${i}`, PACE.claimWaitS * 1000);
-    claim = await run(`claim-${i}`, () => steps.claim(data, { runId, startedAt }));
+    claim = await run(`claim-${i}`, () => steps.claim(event, { runId, startedAt }));
   }
-  if (claim.outcome === 'gone') return { status: 'gone' };
-  if (claim.outcome === 'paused') return endFailed('paused');
-  if (claim.outcome === 'site_busy') return endFailed('site_busy');
+  if (claim.outcome !== 'claimed') {
+    // `paused` and `site_busy` are the check's failure reasons as they are.
+    return claim.outcome === 'gone' ? { status: 'gone' } : endFailed(claim.outcome);
+  }
+  // The event's site is trusted no further than the claim (security 6): a check whose row names
+  // another site fails, and the steps after the claim run on the site the database holds.
+  if (claim.site.siteId !== event.siteId) return endFailed('internal');
+  const data: CheckRequested = { ...event, ...claim.site };
 
   const so: RunSoFar = {
     startedAt,
@@ -296,8 +309,9 @@ export async function runCheck(
     run('build', () => steps.build(data, soFar())),
   );
   await failingAs('persist_failed', () => run('persist', () => steps.persist(data)));
-  await run('finalize', () => steps.finalize(data));
+  // Before finalize: a finalize that fails after the check is persisted cannot cost its event.
   await step.sendEvent('emit', {
+    id: checkFinishedEventId(data.checkId),
     name: 'check.finished',
     data: {
       checkId: data.checkId,
@@ -306,7 +320,21 @@ export async function runCheck(
       status: built.status,
     },
   });
+  await run('finalize', () => steps.finalize(data));
   return { status: built.status };
+}
+
+/** check.failed for a check a fail step failed, naming the site the database holds it under. */
+function failedEvent(
+  checkId: string,
+  out: Extract<FailOutput, { failed: true }>,
+  reason: FailureReason,
+) {
+  return {
+    id: checkFailedEventId(checkId),
+    name: 'check.failed' as const,
+    data: { checkId, siteId: out.siteId, reason },
+  };
 }
 
 /**
@@ -326,11 +354,17 @@ type Env = Readonly<Record<string, string | undefined>>;
 
 /**
  * checkFn. `steps` is called once per invocation, so the deps are built where the step runs.
+ * onFailure calls `fail` and never `steps`: failing a check needs the database only, so a dependency
+ * the steps need and cannot build does not keep a failed check from being marked failed.
  * Concurrency: one check per site at a time, and an account-wide limit under the plan cap
  * (concurrency.ts). Inngest counts executing steps, so a run asleep between polls holds no slot:
  * `claim_check` keeps one check per site running in the database (plan §10, finding 1).
  */
-export function createCheckFn(steps: () => CheckSteps, env: Env = process.env) {
+export function createCheckFn(
+  steps: () => CheckSteps,
+  fail: (checkId: string, reason: FailureReason) => Promise<FailOutput>,
+  env: Env = process.env,
+) {
   return inngest.createFunction(
     {
       id: CHECK_FN_ID,
@@ -340,15 +374,10 @@ export function createCheckFn(steps: () => CheckSteps, env: Env = process.env) {
       retries: 2,
       cancelOn: [{ event: 'check.cancel.requested', match: 'data.checkId' }],
       onFailure: async ({ event, error, step }) => {
-        const data = event.data.event.data;
+        const { checkId } = event.data.event.data;
         const reason = failureReasonOf(error);
-        const { failed } = await step.run('fail', () => steps().fail(data, reason));
-        if (failed) {
-          await step.sendEvent('emit-failed', {
-            name: 'check.failed',
-            data: { checkId: data.checkId, siteId: data.siteId, reason },
-          });
-        }
+        const out = await step.run('fail', () => fail(checkId, reason));
+        if (out.failed) await step.sendEvent('emit-failed', failedEvent(checkId, out, reason));
       },
     },
     { event: 'check.requested' },
@@ -368,17 +397,42 @@ export function createCheckFn(steps: () => CheckSteps, env: Env = process.env) {
   );
 }
 
-/** The check a cancelled run had claimed, when `fail_check` moved it to failed. */
+/** The check a cancelled run was for, when `fail_check` answered that it is failed `canceled`. */
 export type CancelledCheck = { checkId: string; siteId: string };
 
 /**
+ * A cancelled run: the check id of the event that triggered it, when the payload carries one that
+ * reads as a uuid (null otherwise), and the run's id.
+ */
+export type CancelledRun = { checkId: string | null; runId: string };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The triggering event's check id in an `inngest/function.cancelled` payload, at `data.event.data`.
+ * Inngest's system-event reference documents `data.event`; the SDK's type leaves it out, so it is
+ * read from `unknown`, and anything but a uuid string is null.
+ */
+export function cancelledCheckId(data: unknown): string | null {
+  const event = isRecord(data) ? data.event : undefined;
+  const eventData = isRecord(event) ? event.data : undefined;
+  const checkId = isRecord(eventData) ? eventData.checkId : undefined;
+  return typeof checkId === 'string' && UUID.test(checkId) ? checkId : null;
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
  * `crawlmouse.check.cancelled`: a cancelled checkFn run (check.cancel.requested, or the finish
- * timeout: Inngest reports both as `inngest/function.cancelled`, whose payload names only the
- * function and the run) fails the check that run claimed, with `canceled`, and sends check.failed
- * when that moved it. onFailure does not run for a cancelled run.
+ * timeout: Inngest reports both as `inngest/function.cancelled`) fails its check with `canceled`, and
+ * sends check.failed when the check is failed `canceled` (one event id per check, so a second send,
+ * from onFailure or a retry, starts nothing). The check is the triggering event's, so a cancel before the
+ * claim fails it too; a payload without that id falls back to the check the run claimed (correctness
+ * 2). onFailure does not run for a cancelled run.
  */
 export function createCheckCancelledFn(
-  failCancelled: (runId: string) => Promise<CancelledCheck | null>,
+  failCancelled: (run: CancelledRun) => Promise<CancelledCheck | null>,
 ) {
   return inngest.createFunction(
     { id: CHECK_CANCELLED_FN_ID, retries: 2 },
@@ -387,12 +441,13 @@ export function createCheckCancelledFn(
       if: `event.data.function_id == '${inngest.id}-${CHECK_FN_ID}'`,
     },
     async ({ event, step }) => {
-      const failed = await step.run('fail', () => failCancelled(event.data.run_id));
+      const run: CancelledRun = { checkId: cancelledCheckId(event.data), runId: event.data.run_id };
+      const failed = await step.run('fail', () => failCancelled(run));
       if (failed) {
-        await step.sendEvent('emit-failed', {
-          name: 'check.failed',
-          data: { checkId: failed.checkId, siteId: failed.siteId, reason: 'canceled' },
-        });
+        await step.sendEvent(
+          'emit-failed',
+          failedEvent(failed.checkId, { failed: true, siteId: failed.siteId }, 'canceled'),
+        );
       }
       return { failed: failed !== null };
     },
