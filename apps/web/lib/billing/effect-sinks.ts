@@ -15,14 +15,16 @@ const ALERT_FLUSH_MS = 2000;
 
 /**
  * Where effects go in production: Inngest for events, the Crawlmouse Stripe account for
- * cancellations, Sentry for founder alerts. An alert is flushed before it resolves, because a Vercel
- * function can freeze as soon as it answers, and the caller marks the plan done after it.
+ * cancellations, Sentry for founder alerts. An alert resolves once Sentry's client has flushed it,
+ * because a Vercel function can freeze as soon as it answers and the caller marks the plan done after
+ * it; a flush that times out fails the dispatch. A flush succeeds when Sentry answered at all, a 429
+ * included, so a rate-limited alert can still be lost.
  */
 export function productionSinks(): EffectSinks {
   return {
     async send(events) {
-      // Each event matches one entry of PlannedEffectSchema, whose shapes are inngest/client.ts's.
-      await inngest.send(events as unknown as Parameters<typeof inngest.send>[0]);
+      // No cast: the compiler holds each planned event to inngest/client.ts's type for its name.
+      await inngest.send([...events]);
     },
     async cancel({ subscriptionId, reason }) {
       const stripe = stripeAccount();

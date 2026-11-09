@@ -4,8 +4,10 @@
  *
  * `planEffects` turns a transition's effects into what is sent. Each Inngest event's id is fixed by
  * its name, the account and the source of the change (a Stripe event id, or a key of our clock), so a
- * plan sent twice delivers each event once: Inngest drops an event whose id it saw in the last 24
- * hours. The webhook stores the plan with its decision and sends it again on a retry (spec 03, "The webhook").
+ * plan sent again within 24 hours delivers each event once: Inngest drops an id it saw in that window.
+ * Sent again later (Stripe retries for three days), an event is delivered again, so whoever consumes
+ * it must take a repeat. The webhook stores the plan with its decision and sends it again on a retry
+ * (spec 03, "The webhook").
  *
  * The webhook adds `cancel` entries of its own (spec 03, "Stripe writes from the webhook"); the machine plans none.
  *
@@ -151,11 +153,17 @@ export function planEffects(effects: readonly Effect[], ctx: EffectContext): Pla
   return effects.map((e) => planOne(e, ctx)).filter((p): p is PlannedEffect => p !== null);
 }
 
-/** An Inngest event as sent: a planned send without its tag. */
-export interface InngestSend {
-  id: string;
-  name: PlannedSend['name'];
-  data: PlannedSend['data'];
+/** An Inngest event as sent: a planned send without its tag, each name with its own data. */
+export type InngestSend = PlannedSend extends infer P
+  ? P extends PlannedSend
+    ? Omit<P, 'kind'>
+    : never
+  : never;
+
+/** The send without its tag; the variant's name and data stay paired. */
+function untagged(p: PlannedSend): InngestSend {
+  const { kind: _kind, ...event } = p;
+  return event;
 }
 
 export interface EffectSinks {
@@ -163,14 +171,18 @@ export interface EffectSinks {
   send(events: readonly InngestSend[]): Promise<void>;
   /** Cancels a subscription at once; done when it has already ended. */
   cancel(cancel: PlannedCancel): Promise<void>;
-  /** Raises a founder alert (Sentry), resolving once it has been delivered. */
+  /**
+   * Raises a founder alert (Sentry), resolving once Sentry's client has flushed it. A Sentry that
+   * rate-limits can still drop it; the plan, alert included, stays in `stripe_events.effects`.
+   */
   alert(alert: PlannedAlert): Promise<void>;
 }
 
 /**
  * Carries out a plan: every event in one send, then each cancellation, then each alert, each awaited.
- * Anything that fails throws, so the caller does not mark the plan done and sends it again; the event
- * ids and the cancellations' idempotency keys make a repeat harmless.
+ * Anything that fails throws, so the caller does not mark the plan done and sends it again. On a
+ * repeat, an event is dropped by Inngest within 24 hours of its first send, a cancellation is skipped
+ * once Stripe shows the subscription ended, and an alert is raised again.
  */
 export async function dispatchPlanned(
   planned: readonly PlannedEffect[],
@@ -178,7 +190,7 @@ export async function dispatchPlanned(
 ): Promise<void> {
   const sends = planned.filter((p): p is PlannedSend => p.kind === 'send');
   if (sends.length > 0) {
-    await sinks.send(sends.map(({ id, name, data }) => ({ id, name, data })));
+    await sinks.send(sends.map(untagged));
   }
   for (const p of planned) if (p.kind === 'cancel') await sinks.cancel(p);
   for (const p of planned) if (p.kind === 'alert') await sinks.alert(p);
