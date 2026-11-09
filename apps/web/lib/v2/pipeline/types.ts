@@ -89,6 +89,7 @@ export interface PersistDb {
 export type ReadTable =
   | 'checks'
   | 'sites'
+  | 'report_schedules'
   | 'accounts'
   | 'seats'
   | 'page_results'
