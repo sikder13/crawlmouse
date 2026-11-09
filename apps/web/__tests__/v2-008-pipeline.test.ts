@@ -7,6 +7,7 @@ import {
   CHECK_PIPELINE_COLUMNS,
   CRAWL_BATCH_COLUMNS,
   PERSIST_RPC,
+  PIPELINE_FUNCTIONS,
   SITE_SCHEDULE_COLUMNS,
 } from '../lib/v2/pipeline/columns';
 import { FAILURE_REASONS } from '../lib/v2/pipeline/limits';
@@ -187,7 +188,7 @@ describe('access', () => {
     expect(rows).toEqual([]);
   });
 
-  it('the six functions: service_role alone may execute them', async () => {
+  it('the functions columns.ts lists: service_role alone may execute them, each with its search_path', async () => {
     const { rows } = await db.query<{
       name: string;
       definer: boolean;
@@ -206,11 +207,9 @@ describe('access', () => {
               has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth,
               has_function_privilege('service_role', p.oid, 'EXECUTE') as sr
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-        where n.nspname = 'public'
-          and p.proname in ('check_failure_reasons', 'claim_check', 'fail_check', 'reap_stalled_checks',
-                            'stage_check_rows', $1)
+        where n.nspname = 'public' and p.proname = any($1)
         order by 1`,
-      [PERSIST_RPC],
+      [[...PIPELINE_FUNCTIONS]],
     );
     const invoker = {
       definer: false,
@@ -221,19 +220,16 @@ describe('access', () => {
       auth: false,
       sr: true,
     };
-    expect(rows).toEqual([
-      { name: 'check_failure_reasons', ...invoker },
-      { name: 'claim_check', ...invoker },
-      { name: 'fail_check', ...invoker },
-      {
-        name: PERSIST_RPC,
-        ...invoker,
-        definer: true,
-        config: ['search_path=pg_catalog, pg_temp'],
-      },
-      { name: 'reap_stalled_checks', ...invoker },
-      { name: 'stage_check_rows', ...invoker },
-    ]);
+    // The persist RPC alone is a definer, with the narrower path D6 names (owner ruling Q13 for the rest).
+    expect(rows).toEqual(
+      [...PIPELINE_FUNCTIONS]
+        .sort()
+        .map((name) =>
+          name === PERSIST_RPC
+            ? { name, ...invoker, definer: true, config: ['search_path=pg_catalog, pg_temp'] }
+            : { name, ...invoker },
+        ),
+    );
   });
 
   it('a client cannot call persist_built_check', async () => {
