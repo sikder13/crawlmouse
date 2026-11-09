@@ -755,13 +755,13 @@ describe.each(PORTS)('through the %s port', (p) => {
       ]);
     });
 
-    it.each([
+    it.each<[string, Partial<FakeSubscription>]>([
       ['a price outside the allow-list', { priceIds: ['price_someone_elses'] }],
       [
         'our Agency prices with 26 extra sites, which the plan does not sell',
         { plan: 'agency', sites: 26 },
       ],
-    ] as const)(
+    ])(
       'a checkout naming no account of ours, on %s, is recorded and cancels nothing',
       async (_what, change) => {
         // Not ours by its account nor by its prices: a founder's Payment Link, say. Left alone.
