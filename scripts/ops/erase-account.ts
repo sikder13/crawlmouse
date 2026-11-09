@@ -53,18 +53,22 @@ export const REDACTED_EMAIL = 'redacted@erased.invalid';
 
 const LIVE_SUBSCRIPTION = `status not in ('canceled', 'incomplete_expired')`;
 
+type Change = { key: string; count: string; apply: string };
+
 /**
  * Each change `--yes` makes, as the rows it touches. $1 user id (null when no user), $2 lower-cased
- * addresses, $3 accounts to delete. `count` counts what `apply` changes; the tests hold the two to
- * each other, and run every `count` again after `apply` and expect zero.
+ * addresses, $3 accounts to delete. `count` counts the rows `apply` changes: executeErasure runs
+ * each `apply` with `returning 1`, counts what it changed, and rolls the whole transaction back
+ * unless that equals the count the plan read in the same transaction.
  */
-const CHANGES: ReadonlyArray<{ key: string; count: string; apply: string }> = [
+const CHANGES: ReadonlyArray<Change> = [
   {
+    // Not the user's own audits, which go with the user; with no user, every audit holding it.
     key: 'audits.notify_email nulled',
     count: `select count(*) from public.audits where lower(notify_email) = any($2::text[])
-              and user_id is distinct from $1::uuid`,
+              and ($1::uuid is null or user_id is distinct from $1::uuid)`,
     apply: `update public.audits set notify_email = null where lower(notify_email) = any($2::text[])
-              and user_id is distinct from $1::uuid`,
+              and ($1::uuid is null or user_id is distinct from $1::uuid)`,
   },
   {
     key: 'email_events deleted',
@@ -121,6 +125,29 @@ const CHANGES: ReadonlyArray<{ key: string; count: string; apply: string }> = [
     apply: `delete from public.accounts where id = any($3::uuid[])`,
   },
 ];
+
+/**
+ * Supabase Auth's audit log, where the project keeps one (production has the table; it held no row
+ * on 2026-11-09). An entry names the user by id and address in its JSON payload.
+ */
+const AUDIT_LOG: Change = {
+  key: 'auth.audit_log_entries deleted',
+  count: `select count(*) from auth.audit_log_entries
+           where ($1::uuid is not null and payload->>'actor_id' = $1::text)
+              or lower(payload->>'actor_username') = any($2::text[])
+              or lower(payload->'traits'->>'user_email') = any($2::text[])`,
+  apply: `delete from auth.audit_log_entries
+           where ($1::uuid is not null and payload->>'actor_id' = $1::text)
+              or lower(payload->>'actor_username') = any($2::text[])
+              or lower(payload->'traits'->>'user_email') = any($2::text[])`,
+};
+
+async function changesFor(db: Db): Promise<Change[]> {
+  const [row] = await db.query<{ t: string | null }>(
+    `select to_regclass('auth.audit_log_entries')::text as t`,
+  );
+  return row!.t === null ? [...CHANGES] : [AUDIT_LOG, ...CHANGES];
+}
 
 /** What goes with the auth user, through public.users's cascades. Counted only; the delete is one. */
 const WITH_USER: ReadonlyArray<{ key: string; count: string }> = [
@@ -229,6 +256,16 @@ export function typed(sql: string): string {
 const count = async (db: Db, sql: string, params: unknown[]) =>
   Number((await db.query<{ count: string | number }>(typed(sql), params))[0]!.count);
 
+/** Every count `--yes` reports, for these parameters: [user id, addresses, accounts]. */
+async function readCounts(db: Db, params: unknown[], changes: readonly Change[]) {
+  const counts: Record<string, number> = {};
+  if (params[0] !== null) {
+    for (const c of WITH_USER) counts[c.key] = await count(db, c.count, params);
+  }
+  for (const c of [...changes, ...WITH_ACCOUNTS]) counts[c.key] = await count(db, c.count, params);
+  return counts;
+}
+
 /** Reads what an erasure would do. Changes nothing. */
 export async function planErasure(db: Db, target: ErasureTarget): Promise<ErasurePlan> {
   if (Boolean(target.email) === Boolean(target.userId)) {
@@ -291,14 +328,16 @@ export async function planErasure(db: Db, target: ErasureTarget): Promise<Erasur
   }
 
   const params = [userId, emails, accounts];
-  const counts: Record<string, number> = {};
-  if (userId !== null) {
-    for (const c of WITH_USER) counts[c.key] = await count(db, c.count, params);
-  }
-  for (const c of [...CHANGES, ...WITH_ACCOUNTS]) counts[c.key] = await count(db, c.count, params);
+  const counts = await readCounts(db, params, await changesFor(db));
   const kept: Record<string, number> = {};
   for (const c of KEPT) kept[c.key] = await count(db, c.count, params);
   const storage = await db.query<{ bucket: string; name: string }>(typed(STORAGE), params);
+  if (storage.length > 0) {
+    // The rows that name them go with --yes, after which nothing can list them.
+    refusals.push(
+      `${storage.length} storage objects are still stored; delete them through the Storage API first (docs/ops/erasure.md §4)`,
+    );
+  }
   const mintedReports =
     userId === null
       ? []
@@ -323,33 +362,64 @@ export async function planErasure(db: Db, target: ErasureTarget): Promise<Erasur
 /** Deletes the auth user. Production: the Auth admin API. Tests: SQL on PGlite. */
 export type DeleteAuthUser = (userId: string) => Promise<void>;
 
+export interface AfterCounts {
+  counts: Record<string, number>;
+  storage: StorageObject[];
+}
+
 /**
- * Carries out an erasure. Plans again inside the transaction (holding the user's row), refuses
- * on any refusal, applies CHANGES, commits, then deletes the auth user. Returns the plan read
- * afterwards, whose changed and cascaded counts are all zero when it worked.
+ * Carries out an erasure. Plans again inside the transaction and refuses on any refusal. Applies
+ * each change and rolls everything back unless the rows it changed equal the rows the plan counted,
+ * so a row that changed in between, or a change that touches more than its count, commits nothing.
+ * Then deletes the auth user. `after` reads every count again with the same user id, addresses and
+ * accounts; each is zero when the erasure is complete. A failure after the commit (the Auth call)
+ * leaves the user, and running it again finishes the job.
  */
 export async function executeErasure(
   db: Db,
   target: ErasureTarget,
   deleteAuthUser: DeleteAuthUser,
-): Promise<{ before: ErasurePlan; after: ErasurePlan | null }> {
+): Promise<{ before: ErasurePlan; after: AfterCounts }> {
   const before = await db.transaction(async (tx) => {
-    if (target.userId) {
-      await tx.query(`select 1 from public.users where id = $1::uuid for update`, [target.userId]);
-    }
     const plan = await planErasure(tx, target);
     if (plan.refusals.length > 0) {
       throw new Error(`refusing to erase:\n- ${plan.refusals.join('\n- ')}`);
     }
     const params = [plan.userId, plan.emails, plan.accounts];
-    for (const c of CHANGES) await tx.query(typed(c.apply), params);
+    for (const c of await changesFor(tx)) {
+      const changed = await count(
+        tx,
+        `with done as (${c.apply} returning 1) select count(*) from done`,
+        params,
+      );
+      if (changed !== plan.counts[c.key]) {
+        throw new Error(
+          `${c.key}: counted ${plan.counts[c.key]}, changed ${changed}; nothing was committed`,
+        );
+      }
+    }
     return plan;
   });
   if (before.userId !== null) await deleteAuthUser(before.userId);
-  // The user is gone, so the address is the only name left to plan by.
-  const after =
-    before.emails.length > 0 ? await planErasure(db, { email: before.emails[0] }) : null;
-  return { before, after };
+  const params = [before.userId, before.emails, before.accounts];
+  const counts = await readCounts(db, params, await changesFor(db));
+  const storage = await db.query<{ bucket: string; name: string }>(typed(STORAGE), params);
+  return {
+    before,
+    after: { counts, storage: storage.map((o) => ({ bucket: o.bucket, name: o.name })) },
+  };
+}
+
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+/**
+ * Whether the database URL and the Auth API URL name the same project: the same Supabase ref, or,
+ * where the database names none (a local stack), both on this machine.
+ */
+export function sameProject(dbUrl: string, apiUrl: string): boolean {
+  const ref = refOfUrl(dbUrl);
+  if (ref !== null) return refOfApiUrl(apiUrl) === ref;
+  return LOOPBACK.has(new URL(dbUrl).hostname) && LOOPBACK.has(new URL(apiUrl).hostname);
 }
 
 /** The Auth admin API's delete, for the project the database URL names. */
@@ -427,13 +497,15 @@ async function main(): Promise<void> {
     if (!apiUrl || !key) {
       throw new Error('--yes needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
     }
-    if (refOfApiUrl(apiUrl) !== ref) {
+    if (!sameProject(url, apiUrl)) {
       throw new Error('NEXT_PUBLIC_SUPABASE_URL names a different project than the database URL');
     }
     const { before, after } = await executeErasure(db, target, adminApiDelete(apiUrl, key));
     console.log(render(before));
-    console.log('\nErased. Counts read again afterwards:\n');
-    if (after) console.log(render(after));
+    console.log('\nErased. Counts read again afterwards (each should be 0):\n');
+    for (const [k, n] of Object.entries(after.counts))
+      console.log(`  ${String(n).padStart(6)}  ${k}`);
+    console.log(`  ${String(after.storage.length).padStart(6)}  storage objects still listed`);
   } finally {
     await db.close();
   }

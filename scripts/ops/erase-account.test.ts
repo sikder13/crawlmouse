@@ -10,6 +10,7 @@ import {
   adminApiDelete,
   executeErasure,
   planErasure,
+  sameProject,
   type DeleteAuthUser,
 } from './erase-account';
 
@@ -25,7 +26,25 @@ const sqlDelete: DeleteAuthUser = async (id) => {
 
 beforeAll(async () => {
   pglite = await migratedDb();
+  // Supabase Auth's audit log, with its columns (auth schema, GoTrue's migrations). The shared shim
+  // does not model it; production has the table, empty when measured on 2026-11-09.
+  await pglite.exec(`create table auth.audit_log_entries (
+    instance_id uuid, id uuid primary key, payload json, created_at timestamptz,
+    ip_address varchar(64) not null default '')`);
 }, 300_000);
+
+/** The Storage API's delete, as the runbook does it (§4): the objects the plan lists. */
+async function removeObjects(objects: readonly { bucket: string; name: string }[]) {
+  await pglite.transaction(async (tx) => {
+    await tx.query(`select set_config('storage.allow_delete_query', 'true', true)`);
+    for (const o of objects) {
+      await tx.query(`delete from storage.objects where bucket_id = $1 and name = $2`, [
+        o.bucket,
+        o.name,
+      ]);
+    }
+  });
+}
 afterAll(async () => {
   await pglite.close();
 });
@@ -166,6 +185,65 @@ async function person() {
      values ('report-logos', $1, $2), ('report-logos', $3, $4)`,
     [`${slug}/own.png`, id, `${slug}/other.png`, bystander.ownerId],
   );
+  // The other four path columns, for this person's account and the bystander's: an agency logo, a
+  // report file, a crawl batch's result and a check's map, each with its object in its bucket.
+  const pathsOf = async (accountId: string, who: string) => {
+    const at = (kind: string) => `${who}/${kind}-${tag}`;
+    await pglite.query(
+      `insert into public.agency_brands (account_id, agency_name, logo_path) values ($1, 'Agency', $2)`,
+      [accountId, at('logo.png')],
+    );
+    await pglite.query(
+      `update public.reports set storage_path = $2
+        where id = (select id from public.reports where account_id = $1 order by id limit 1)`,
+      [accountId, at('report.pdf')],
+    );
+    const check = (
+      await pglite.query<{ id: string }>(
+        `select c.id from public.checks c join public.sites s on s.id = c.site_id
+          where s.account_id = $1 order by c.id limit 1`,
+        [accountId],
+      )
+    ).rows[0]!.id;
+    await pglite.query(`update public.checks set map_path = $2 where id = $1`, [
+      check,
+      at('map.json'),
+    ]);
+    await pglite.query(
+      `update public.crawl_batches set result_path = $2
+        where check_id = (select b.check_id from public.crawl_batches b join public.checks c on c.id = b.check_id
+                            join public.sites s on s.id = c.site_id where s.account_id = $1
+                           order by b.check_id limit 1)`,
+      [accountId, at('batch.json')],
+    );
+    const objects = [
+      { bucket: 'report-logos', name: at('logo.png') },
+      { bucket: 'reports', name: at('report.pdf') },
+      { bucket: 'evidence', name: at('map.json') },
+      { bucket: 'evidence', name: at('batch.json') },
+    ];
+    for (const o of objects) {
+      await pglite.query(`insert into storage.objects (bucket_id, name) values ($1, $2)`, [
+        o.bucket,
+        o.name,
+      ]);
+    }
+    return objects;
+  };
+  const pathObjects = await pathsOf(world.accountId, 'own');
+  await pathsOf(bystander.accountId, 'theirs');
+  await pglite.query(
+    `insert into public.sessions (user_id, expires_at) values ($1, now() + interval '1 day')`,
+    [id],
+  );
+  await pglite.query(
+    `insert into auth.audit_log_entries (id, payload, created_at) values
+       (gen_random_uuid(), json_build_object('actor_id', $1::text, 'actor_username', $2::text, 'action', 'login'), now()),
+       (gen_random_uuid(), json_build_object('actor_id', $3::text, 'actor_username', $4::text, 'action', 'user_signedup',
+          'traits', json_build_object('user_email', $2::text)), now()),
+       (gen_random_uuid(), json_build_object('actor_id', $3::text, 'actor_username', $4::text, 'action', 'login'), now())`,
+    [id, email.toUpperCase(), bystander.ownerId, other],
+  );
   return {
     id,
     email,
@@ -177,6 +255,7 @@ async function person() {
     storage: [
       ...named.map((name) => ({ bucket: 'evidence', name })),
       { bucket: 'report-logos', name: `${slug}/own.png` },
+      ...pathObjects,
     ].sort((a, b) => `${a.bucket}/${a.name}`.localeCompare(`${b.bucket}/${b.name}`)),
   };
 }
@@ -196,11 +275,25 @@ describe('erase-account (B-F2)', () => {
 
     expect(plan.userId).toBe(p.id);
     expect(plan.accounts).toEqual([p.world.accountId]);
-    expect(plan.refusals).toEqual([]);
-    expect(plan.counts).toMatchObject({
+    // The listed objects must go through the Storage API before --yes removes the rows naming them.
+    expect(plan.refusals).toEqual([
+      `${p.storage.length} storage objects are still stored; delete them through the Storage API first (docs/ops/erasure.md §4)`,
+    ]);
+    // Every count, each from the fixture: none of domain_verifications, embed_badges, or a
+    // share link or API key this person created; seedWorld gives the account two sites, each with a
+    // check and a report.
+    expect(plan.counts).toEqual({
+      'auth.audit_log_entries deleted': 2, // their login, and the bystander's entry naming them
       'auth.users deleted': 1,
       'users deleted': 1,
       'audits deleted': 1,
+      'sessions deleted': 1,
+      'domain_verifications deleted': 0,
+      'embed_badges deleted': 0,
+      'seats deleted (own)': 1,
+      'public_reports.minted_by nulled': 1,
+      'share_links.created_by nulled': 0,
+      'api_keys.created_by nulled': 0,
       'audits.notify_email nulled': 2,
       'email_events deleted': 1,
       'waitlist deleted': 1,
@@ -209,11 +302,10 @@ describe('erase-account (B-F2)', () => {
       'seats deleted (invitations in other accounts)': 1,
       'reports.recipient_email nulled': 1,
       'sites.client_contact_email nulled': 1,
-      'seats deleted (own)': 1,
-      'public_reports.minted_by nulled': 1,
       'accounts deleted': 1,
       'sites deleted': 2,
       'checks deleted': 2,
+      'reports deleted': 2,
     });
     expect(plan.kept).toEqual({
       'trial_ledger (peppered hashes; account reference set null)': 1,
@@ -228,13 +320,29 @@ describe('erase-account (B-F2)', () => {
     const bystanderSites = await n(`select count(*) from public.sites where account_id = $1`, [
       p.bystander.accountId,
     ]);
+    const listed = await planErasure(db(), { email: p.email });
+    const withObjects = await everything();
+    await expect(executeErasure(db(), { email: p.email }, sqlDelete)).rejects.toThrow(
+      /storage objects are still stored/,
+    );
+    expect(await everything()).toBe(withObjects);
+    await removeObjects(listed.storage);
     const dry = await planErasure(db(), { email: p.email });
+    expect(dry.refusals).toEqual([]);
     const { before, after } = await executeErasure(db(), { email: p.email }, sqlDelete);
     expect(before.counts).toEqual(dry.counts);
-    expect(after).not.toBeNull();
-    for (const [key, value] of Object.entries(after!.counts)) {
+    // Read again with the user id, addresses and accounts erased, not re-planned from the address.
+    expect(Object.keys(after.counts)).toEqual(Object.keys(before.counts));
+    expect(Object.keys(after.counts)).toContain('users deleted');
+    for (const [key, value] of Object.entries(after.counts)) {
       expect(`${key}=${value}`).toBe(`${key}=0`);
     }
+    expect(after.storage).toEqual([]);
+    expect(
+      await n(`select count(*) from auth.audit_log_entries where payload->>'actor_id' = $1`, [
+        p.bystander.ownerId,
+      ]),
+    ).toBe(1);
 
     // The person and their account are gone, with what hangs from them.
     expect(await n(`select count(*) from auth.users where id = $1`, [p.id])).toBe(0);
@@ -322,6 +430,7 @@ describe('erase-account (B-F2)', () => {
     const byId = await planErasure(db(), { userId: p.id });
     const byEmail = await planErasure(db(), { email: p.email });
     expect(byId).toEqual(byEmail);
+    await removeObjects(byId.storage);
     await executeErasure(db(), { userId: p.id }, sqlDelete);
     const snapshot = await everything();
     const again = await executeErasure(db(), { email: p.email }, sqlDelete);
@@ -330,6 +439,44 @@ describe('erase-account (B-F2)', () => {
       expect(`${key}=${value}`).toBe(`${key}=0`);
     }
     expect(await everything()).toBe(snapshot);
+  }, 120_000);
+
+  it('rolls everything back when an apply changes other than it counted', async () => {
+    const p = await person();
+    await removeObjects((await planErasure(db(), { userId: p.id })).storage);
+    const before = await everything();
+    // A row that starts to hold the address between the plan's count and the apply.
+    await pglite.exec(`create function pg_temp.late() returns trigger language plpgsql as $$
+      begin insert into public.waitlist (email, source) values ('${p.email}', 'late'); return null; end $$`);
+    await pglite.exec(`create trigger late after update on public.audits
+      for each statement execute function pg_temp.late()`);
+    try {
+      await expect(executeErasure(db(), { userId: p.id }, sqlDelete)).rejects.toThrow(
+        /waitlist deleted: counted 1, changed 2; nothing was committed/,
+      );
+    } finally {
+      await pglite.exec(`drop trigger late on public.audits`);
+    }
+    expect(await everything()).toBe(before);
+  }, 120_000);
+
+  it('a failed Auth call leaves the user, and running it again finishes', async () => {
+    const p = await person();
+    await removeObjects((await planErasure(db(), { userId: p.id })).storage);
+    await expect(
+      executeErasure(db(), { userId: p.id }, async () => {
+        throw new Error('Auth admin delete failed: HTTP 503');
+      }),
+    ).rejects.toThrow(/HTTP 503/);
+    expect(await n(`select count(*) from auth.users where id = $1`, [p.id])).toBe(1);
+    expect(await n(`select count(*) from public.accounts where id = $1`, [p.world.accountId])).toBe(
+      0,
+    );
+    const { after } = await executeErasure(db(), { userId: p.id }, sqlDelete);
+    for (const [key, value] of Object.entries(after.counts)) {
+      expect(`${key}=${value}`).toBe(`${key}=0`);
+    }
+    expect(await n(`select count(*) from public.users where id = $1`, [p.id])).toBe(0);
   }, 120_000);
 
   it('refuses while other people are seated on an account the person owns, and changes nothing', async () => {
@@ -347,6 +494,7 @@ describe('erase-account (B-F2)', () => {
 
   it('refuses while pro_until is in the future or a subscription is live; a canceled one does not stop it', async () => {
     const p = await person();
+    await removeObjects((await planErasure(db(), { userId: p.id })).storage);
     await pglite.query(
       `update public.users set pro_until = now() + interval '1 day' where id = $1`,
       [p.id],
@@ -413,9 +561,18 @@ describe('erase-account (B-F2)', () => {
     await pglite.query(`insert into public.rate_limits values ('magic:email:' || $1, now(), 1)`, [
       email,
     ]);
+    // An anonymous audit that asked to notify this address: no user on either side.
+    await pglite.query(
+      `insert into public.audits (url, user_id, notify_email) values ('https://n.example/', null, $1)`,
+      [email.toUpperCase()],
+    );
     const plan = await planErasure(db(), { email });
     expect(plan.userId).toBeNull();
-    expect(plan.counts).toMatchObject({ 'waitlist deleted': 1, 'rate_limits deleted': 1 });
+    expect(plan.counts).toMatchObject({
+      'waitlist deleted': 1,
+      'rate_limits deleted': 1,
+      'audits.notify_email nulled': 1,
+    });
     expect(plan.counts).not.toHaveProperty('auth.users deleted');
     let called = false;
     await executeErasure(db(), { email }, async () => {
@@ -423,7 +580,20 @@ describe('erase-account (B-F2)', () => {
     });
     expect(called).toBe(false);
     expect(await n(`select count(*) from public.waitlist where email = $1`, [email])).toBe(0);
+    expect(
+      await n(`select count(*) from public.audits where lower(notify_email) = $1`, [email]),
+    ).toBe(0);
   });
+
+  it('works where Supabase Auth keeps no audit log table', async () => {
+    const bare = await migratedDb();
+    const email = `bare-${++serial}@example.com`;
+    await bare.query(`insert into auth.users (id, email) values (gen_random_uuid(), $1)`, [email]);
+    const plan = await planErasure(pgliteDb(bare), { email });
+    expect(plan.counts).not.toHaveProperty('auth.audit_log_entries deleted');
+    expect(plan.counts).toMatchObject({ 'users deleted': 1 });
+    await bare.close();
+  }, 300_000);
 
   it('takes exactly one of --email and --user-id, and an id that names a user', async () => {
     await expect(planErasure(db(), {})).rejects.toThrow(/exactly one/);
@@ -432,6 +602,30 @@ describe('erase-account (B-F2)', () => {
     );
     await expect(planErasure(db(), { userId: randomUUID() })).rejects.toThrow(
       /no user has that id/,
+    );
+  });
+});
+
+describe('sameProject', () => {
+  it('needs the same Supabase ref, or a database and API both on this machine', () => {
+    const db = (host: string) =>
+      `postgres://postgres.${host}:x@aws-0.pooler.supabase.com:6543/postgres`;
+    expect(
+      sameProject(db('abcdefghijklmnopqrst'), 'https://abcdefghijklmnopqrst.supabase.co'),
+    ).toBe(true);
+    expect(
+      sameProject(db('abcdefghijklmnopqrst'), 'https://tsrqponmlkjihgfedcba.supabase.co'),
+    ).toBe(false);
+    expect(sameProject(db('abcdefghijklmnopqrst'), 'https://auth.example.com')).toBe(false);
+    expect(sameProject('postgres://u:x@127.0.0.1:54322/postgres', 'http://localhost:54321')).toBe(
+      true,
+    );
+    // Neither names a project, and neither is local: two unknowns are not a match.
+    expect(sameProject('postgres://u:x@db.example.com/postgres', 'https://auth.example.com')).toBe(
+      false,
+    );
+    expect(sameProject('postgres://u:x@127.0.0.1/postgres', 'https://auth.example.com')).toBe(
+      false,
     );
   });
 });
