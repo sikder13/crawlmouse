@@ -246,7 +246,8 @@ describe('the finders see what they claim to see', () => {
     expect(found.length).toBeGreaterThan(0);
     expect(served).toHaveLength(found.length);
     expect(new Set(served)).toEqual(new Set(found));
-  });
+    // Importing the function module loads the pipeline and the engine: seconds, not milliseconds.
+  }, 60_000);
 
   it("a file:line reference is checked against the file it names, or the entry's own", () => {
     const lines: Record<string, number> = { 'apps/web/app/x/route.ts': 40, 'inngest/a.ts': 10 };
