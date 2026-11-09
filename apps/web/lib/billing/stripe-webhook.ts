@@ -61,8 +61,9 @@ export function stripeReads(stripe: Stripe): StripeReads {
 /**
  * The effects of an applied or ignored transition: the machine's, a cancellation of a disputed
  * account's subscription (spec 03, Q13), and for a checkout the orphan rules (Q10): its own
- * subscription when its grant was ignored for any reason but already being the current one, the
- * subscription it replaced when it applied.
+ * subscription when its grant was ignored and the account does not already follow it (a repeated
+ * completion, for a paid checkout or an agency trial alike), the subscription it replaced when it
+ * applied.
  */
 async function planFor(
   d: Extract<Decision, { kind: 'apply' }>,
@@ -83,7 +84,7 @@ async function planFor(
   }
   if (d.checkout !== null) {
     if (transition.outcome === 'ignored') {
-      if (transition.reason !== 'already the current subscription') {
+      if (before.subscriptionId !== d.checkout.subscriptionId) {
         planned.push(...orphanEffects(d.checkout, d.accountId, source));
       }
     } else if (before.subscriptionId !== null && before.subscriptionId !== followed) {

@@ -715,6 +715,26 @@ describe.each(PORTS)('through the %s port', (p) => {
       expect(w.stripe.alerts).toEqual([]);
     });
 
+    it('a second checkout event for the agency trial the account follows cancels nothing', async () => {
+      const { accountId, customer } = await account();
+      const s = sub(customer, { plan: 'agency', status: 'trialing', trialEnd: BASE + 15 * DAY });
+      await w.deliver(checkoutEvent(accountId, customer, s.id, BASE + 100));
+      // A completion for the same subscription again, under another event id: the trial machine's
+      // first refusal is "only a Free account starts a trial", not "already the current subscription".
+      expect(await w.deliver(checkoutEvent(accountId, customer, s.id, BASE + 101))).toEqual({
+        outcome: 'ignored',
+        accountId,
+        reason: 'only a Free account starts a trial',
+      });
+      expect(w.stripe.cancelled).toEqual([]);
+      expect(w.stripe.alerts).toEqual([]);
+      expect(w.stripe.live()).toEqual([s.id]);
+      expect(await accountRow(accountId)).toMatchObject({
+        state: 'agency_trial',
+        current_subscription_id: s.id,
+      });
+    });
+
     it('a checkout naming no account of ours is recorded, and its live subscription cancelled', async () => {
       const s = sub('cus_stranger');
       const e = checkoutEvent('7d0a4f43-7f1c-4c55-9f3a-8f9f7b0e2c11', 'cus_stranger', s.id, BASE);
