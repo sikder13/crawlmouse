@@ -81,19 +81,26 @@ It parses both files with `yaml` (YAML 1.2, so the key `on` stays a string; YAML
 - a trigger other than `workflow_dispatch`, in any spelling GitHub accepts. Fixtures vary the
   spelling: a string, a list, a map, a quoted key, and the 1.1 `true:` key, plus `workflow_call`,
   `repository_dispatch` and `schedule`;
-- a job-level `uses:`;
-- a job holding an environment or a `secrets.` reference that does not `need` `authorize`, or whose
-  step 0 is not the guard;
-- a `secrets.` reference outside `steps` or in workflow-level `env`;
-- an `authorize` job that has an environment, a secret or a permission;
-- a guard whose `env:` mapping is not exactly the five context names, in any copy;
-- copies of the guard script that are not identical;
-- a guard that is present but would not run as written: a guard step with any key besides `name`,
-  `env` and `run` (an `if:`, `continue-on-error`, a `shell:`), `defaults` at workflow level or on
-  `authorize` or a secret-holding job, `continue-on-error` on those jobs or their steps, an `if:` or
-  `needs` on `authorize`, more than one step in `authorize`, or an `always()`, `failure()` or
-  `cancelled()` in a secret-holding job's `if:`. Each of these is a fixture the test applies to the
-  real files and expects rejected.
+- anything `guardProblems` (`scripts/db/workflow-file.ts`) reports. Its doc comment lists the
+  checks. The test applies the fixtures in `BYPASSES` and `MORE_BYPASSES` to the parsed real files
+  and expects each rejected with a named problem (the `describe` block named "bypasses of the
+  guard"). The checks:
+  - no workflow-level `defaults` or `env`, and no job-level `uses:`;
+  - an `authorize` job with no environment, no `secrets` reference, `permissions: {}`, no `needs`,
+    no `if:` and one step;
+  - at least one job holding an environment or a `secrets` reference; each such job needs
+    `authorize`, has no status function (`success(`, `failure(`, `always(`, `cancelled(`) in its
+    `if:`, and no `secrets` reference outside its steps;
+  - on `authorize` and each such job: no job-level `env`, `defaults`, `continue-on-error`,
+    `container` or `services`; `runs-on: ubuntu-24.04`; step 0 is the guard, with exactly the keys
+    `name`, `env` and `run`, the five-line `env:` mapping, and no expression in its script; no step
+    has `continue-on-error`;
+  - the same guard script in every copy.
+
+  Why `env` is refused at workflow and job level: it reaches the guard's process. The test runs the
+  real script as GitHub runs a bash step (`bash --noprofile --norc -eo pipefail`) and shows that
+  `BASH_ENV` pointing at a file holding `exit 0`, or an exported `BASH_FUNC_[%%` replacing `[`, makes
+  it pass a non-owner.
 
 The test runs the guard's script with bash and checks it:
 
