@@ -44,9 +44,10 @@ afterEach(async () => {
   await db?.close();
 });
 
-function deps(
-  over: Partial<FirstLoginDeps> = {},
-): FirstLoginDeps & { report: ReturnType<typeof vi.fn> } {
+function deps(over: Partial<FirstLoginDeps> = {}): FirstLoginDeps & {
+  report: ReturnType<typeof vi.fn>;
+  dispatch: ReturnType<typeof vi.fn<FirstLoginDeps['dispatch']>>;
+} {
   return {
     store: pgliteDoorStore(db),
     entitlement: pgliteEntitlementStore(db),
@@ -54,8 +55,12 @@ function deps(
     report: vi.fn(),
     pepper: PEPPER,
     now: () => NOW,
+    dispatch: vi.fn<FirstLoginDeps['dispatch']>(async () => {}),
     ...over,
-  } as FirstLoginDeps & { report: ReturnType<typeof vi.fn> };
+  } as FirstLoginDeps & {
+    report: ReturnType<typeof vi.fn>;
+    dispatch: ReturnType<typeof vi.fn<FirstLoginDeps['dispatch']>>;
+  };
 }
 
 async function input(email: string, over: Partial<FirstLoginInput> = {}): Promise<FirstLoginInput> {
@@ -334,6 +339,115 @@ describe('runFirstLogin', () => {
 
   it('every event name it emits is a funnel event', () => {
     for (const name of ['trial_started', 'site_added']) expect(FUNNEL_EVENTS).toContain(name);
+  });
+});
+
+describe('the started trial’s effects are dispatched (CC-03 D9b)', () => {
+  // 14 days after NOW, written out.
+  const TRIAL_END = '2026-11-19T12:00:00.000Z';
+
+  it('a started trial dispatches trial.started with the trial’s end, and entitlement.changed', async () => {
+    const i = await input('dispatch@example.com');
+    const d = deps();
+    expect((await runFirstLogin(d, i)).trial).toBe('started');
+    const { id } = await accountOf(db, i.userId);
+    expect(d.dispatch.mock.calls).toEqual([
+      [
+        [
+          {
+            kind: 'send',
+            id: `trial.started:${id}:trial-start`,
+            name: 'trial.started',
+            data: { accountId: id, trialEndsAt: TRIAL_END, variant: 'no_card' },
+          },
+          {
+            kind: 'send',
+            id: `entitlement.changed:${id}:trial-start`,
+            name: 'entitlement.changed',
+            data: { accountId: id, from: 'free', to: 'pro_trial' },
+          },
+        ],
+      ],
+    ]);
+    // The end it announces is the end the database holds.
+    expect((await accountOf(db, i.userId)).trial_ends_at!.toISOString()).toBe(TRIAL_END);
+  });
+
+  it('denied: a ledger row refused it, and nothing is dispatched', async () => {
+    await priorTrial({ email: 'refused@example.com', device: null, ip: 'unknown' }, 5);
+    const i = await input('refused@example.com');
+    const d = deps();
+    expect((await runFirstLogin(d, i)).trial).toBe('denied');
+    expect(d.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('not_eligible, decided by next() or by the trial function: nothing is dispatched', async () => {
+    const disputed = await input('noteligible@example.com');
+    await db.query(`update public.accounts set disputed_at = now() where id = $1`, [
+      (await accountOf(db, disputed.userId)).id,
+    ]);
+    const byNext = deps();
+    expect((await runFirstLogin(byNext, disputed)).trial).toBe('not_eligible');
+    expect(byNext.dispatch).not.toHaveBeenCalled();
+
+    const i = await input('fn-noteligible@example.com');
+    const store = {
+      ...pgliteDoorStore(db),
+      startTrial: async () => ({ outcome: 'not_eligible' as const, hits: [] as [] }),
+    };
+    const byFunction = deps({ store });
+    expect((await runFirstLogin(byFunction, i)).trial).toBe('not_eligible');
+    expect(byFunction.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('failed: the trial function errored, and nothing is dispatched', async () => {
+    const i = await input('dispatch-failed@example.com');
+    const store = {
+      ...pgliteDoorStore(db),
+      startTrial: () => Promise.reject(Object.assign(new Error('rpc failed'), { code: '55P03' })),
+    };
+    const d = deps({ store });
+    expect((await runFirstLogin(d, i)).trial).toBe('failed');
+    expect(d.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('not_first, no_pepper and no_account: nothing is dispatched', async () => {
+    const later = await input('later@example.com', {
+      emailConfirmedAt: '2026-08-01T10:00:00Z',
+      lastSignInAt: '2026-11-05T11:59:59Z',
+    });
+    const noPepper = await input('pepperless@example.com');
+    const noAccount = await input('pre001@example.com');
+    await db.query(`update public.users set default_account_id = null where id = $1`, [
+      noAccount.userId,
+    ]);
+    const cases = [
+      [later, deps(), 'not_first'],
+      [noPepper, deps({ pepper: null }), 'no_pepper'],
+      [noAccount, deps(), 'no_account'],
+    ] as const;
+    for (const [i, d, outcome] of cases) {
+      expect((await runFirstLogin(d, i)).trial).toBe(outcome);
+      expect(d.dispatch).not.toHaveBeenCalled();
+    }
+  });
+
+  it('a dispatch that throws is reported with the account id only, and the trial still started', async () => {
+    const i = await input('send-down@example.com');
+    const d = deps({
+      dispatch: vi.fn(async () => {
+        throw new Error('inngest send failed for send-down@example.com');
+      }),
+    });
+    const r = await runFirstLogin(d, i);
+    const a = await accountOf(db, i.userId);
+    expect(r.trial).toBe('started');
+    expect(r.events).toEqual([
+      { name: 'trial_started', props: { kind: 'pro', variant: 'no_card' } },
+    ]);
+    expect(a.state).toBe('pro_trial');
+    expect(d.report).toHaveBeenCalledWith('trial-dispatch-failed', { accountId: a.id });
+    expect(JSON.stringify(d.report.mock.calls)).not.toContain('send-down@example.com');
   });
 });
 
