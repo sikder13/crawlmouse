@@ -1,9 +1,9 @@
 name: CI
 
+# Pushes only: a pull request's checks are the ones its head commit's push ran. protect-main requires
+# the branch to be up to date with main before merging, so the tested head carries main's tree.
 on:
   push:
-    branches: ['**']
-  pull_request:
     branches: ['**']
 
 permissions:
@@ -13,7 +13,7 @@ permissions:
 # run is cancelled or replaced: GitHub also drops a PENDING run when a newer one joins its group, and the
 # Prettier job on main checks only what that push added.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: true
 
 env:
@@ -54,15 +54,11 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Check changed files
         env:
-          EVENT_NAME: ${{ github.event_name }}
           PUSH_BEFORE: ${{ github.event.before }}
           REF: ${{ github.ref }}
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            # The checkout is GitHub's merge commit; its first parent is the base it merged against.
-            base="$(git rev-parse HEAD^1)"
-          elif [ "$REF" = "refs/heads/main" ]; then
+          if [ "$REF" = "refs/heads/main" ]; then
             base="$PUSH_BEFORE"
           else
             base="$(git merge-base origin/main HEAD)"
@@ -499,8 +495,8 @@ jobs:
 
   # Migration files are append-only: once on main, a migration file is applied or about to be, and
   # an edit would never reach production (scripts/db/dry-run.ts refuses it too, but the dry run runs
-  # only on pull requests that touch the database). This job runs on every push and pull request,
-  # so it can be a required check.
+  # only on pull requests that touch the database). This job runs on every push, so it can be a
+  # required check.
   migrations-append-only:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -511,14 +507,11 @@ jobs:
           persist-credentials: false
       - name: Migration files are only ever added
         env:
-          EVENT_NAME: ${{ github.event_name }}
           PUSH_BEFORE: ${{ github.event.before }}
           REF: ${{ github.ref }}
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            base="$(git rev-parse HEAD^1)"
-          elif [ "$REF" = "refs/heads/main" ]; then
+          if [ "$REF" = "refs/heads/main" ]; then
             base="$PUSH_BEFORE"
           else
             base="$(git merge-base origin/main HEAD)"
