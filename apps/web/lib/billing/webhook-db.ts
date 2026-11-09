@@ -88,7 +88,12 @@ export interface WebhookDb {
   /** Writes the row undecided (`handled` and `processed_at` null) with the reason; a row already there is left. */
   recordRefused(event: LedgerEvent, reason: 'livemode_mismatch'): Promise<void>;
   /** A live account, or null. */
-  accountById(id: string): Promise<{ id: string; stripeCustomerId: string | null } | null>;
+  /** A live account, its Stripe customer and the subscription it follows; null for none. */
+  accountById(id: string): Promise<{
+    id: string;
+    stripeCustomerId: string | null;
+    currentSubscriptionId: string | null;
+  } | null>;
   /** The live account bound to a customer, or null. */
   accountByCustomer(customerId: string): Promise<string | null>;
   subscriptionById(id: string): Promise<StoredMirror | null>;
@@ -278,13 +283,17 @@ export function supabaseWebhookDb(sb: SupabaseClient): WebhookDb {
       if (!UUID.test(id)) return null;
       const { data, error } = await sb
         .from('accounts')
-        .select('id, stripe_customer_id')
+        .select('id, stripe_customer_id, current_subscription_id')
         .eq('id', id)
         .is('deleted_at', null)
         .maybeSingle();
       if (error) failed('accounts read', error);
       return data
-        ? { id: data.id as string, stripeCustomerId: data.stripe_customer_id as string | null }
+        ? {
+            id: data.id as string,
+            stripeCustomerId: data.stripe_customer_id as string | null,
+            currentSubscriptionId: data.current_subscription_id as string | null,
+          }
         : null;
     },
     async accountByCustomer(customerId) {

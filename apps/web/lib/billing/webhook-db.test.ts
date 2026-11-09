@@ -181,11 +181,15 @@ describe('recordRefused', () => {
 describe('the account and mirror reads', () => {
   it('accountById: a live account with its customer; a deleted one, an unknown one and a non-UUID are null', async () => {
     const id = await w.account('cus_a');
-    expect(await port.accountById(id)).toEqual({ id, stripeCustomerId: 'cus_a' });
+    expect(await port.accountById(id)).toEqual({
+      id,
+      stripeCustomerId: 'cus_a',
+      currentSubscriptionId: null,
+    });
     expect(log).toEqual([
       [
         ['from', 'accounts'],
-        ['select', 'id, stripe_customer_id'],
+        ['select', 'id, stripe_customer_id, current_subscription_id'],
         ['eq', 'id', id],
         ['is', 'deleted_at', null],
         ['maybeSingle'],

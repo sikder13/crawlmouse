@@ -71,13 +71,24 @@ export function pgliteWebhookDb(db: PGlite, hooks: PgliteHooks = {}): WebhookDb 
     },
     async accountById(id) {
       const { rows } = await svc(db, (tx) =>
-        tx.query<{ id: string; stripe_customer_id: string | null }>(
-          `select id, stripe_customer_id from public.accounts
+        tx.query<{
+          id: string;
+          stripe_customer_id: string | null;
+          current_subscription_id: string | null;
+        }>(
+          `select id, stripe_customer_id, current_subscription_id from public.accounts
             where id::text = $1 and deleted_at is null`,
           [id],
         ),
       );
-      return rows[0] ? { id: rows[0].id, stripeCustomerId: rows[0].stripe_customer_id } : null;
+      const r = rows[0];
+      return r
+        ? {
+            id: r.id,
+            stripeCustomerId: r.stripe_customer_id,
+            currentSubscriptionId: r.current_subscription_id,
+          }
+        : null;
     },
     async accountByCustomer(customerId) {
       const { rows } = await svc(db, (tx) =>

@@ -251,12 +251,14 @@ class Normaliser {
         ],
       });
     }
+    // The subscription the account already follows is never an orphan of a later completion for it.
+    const followed = account.currentSubscriptionId === sub.id;
     if ('refused' in mirror) {
       // The checkout names the account in client_reference_id and metadata alike, as our route opens
       // it: the subscription is ours whatever the listing says now (a deploy that changed prices.ts
       // while the session was open), so it is cancelled rather than left charging for nothing.
       return this.record(account.id, mirror.refused, {
-        effects: orphanEffects(own, account.id, this.event.id),
+        effects: followed ? [] : orphanEffects(own, account.id, this.event.id),
         reports: [
           { ...priceReport('billing.webhook.foreign_price', mirror, sub.id), level: 'error' },
         ],

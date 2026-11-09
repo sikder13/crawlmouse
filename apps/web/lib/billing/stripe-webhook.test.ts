@@ -505,6 +505,21 @@ describe.each(PORTS)('through the %s port', (p) => {
       expect(w.stripe.live()).toEqual([]);
     });
 
+    it('a second completion for the subscription the account follows, refused on its prices, cancels nothing', async () => {
+      // A redelivery under a new event id, read by a deploy whose catalog no longer lists the price.
+      const { accountId, customer, current } = await account('pro');
+      const refusing: Catalog = { ...fakeCatalog(), planOfPrice: async () => null };
+      const again = checkoutEvent(accountId, customer, current!.id, BASE + 300);
+      expect((await w.deliver(again, { catalog: refusing })).outcome).toBe('recorded');
+      expect(w.stripe.cancelled).toEqual([]);
+      expect(w.stripe.alerts).toEqual([]);
+      expect(w.stripe.live()).toEqual([current!.id]);
+      expect(await accountRow(accountId)).toMatchObject({
+        state: 'pro',
+        current_subscription_id: current!.id,
+      });
+    });
+
     it('our checkout on a trial outside it cancels the trial, which has charged nothing, and does not alert', async () => {
       const { accountId, customer } = await account();
       const s = sub(customer, { status: 'trialing', priceIds: ['price_someone_elses'] });
