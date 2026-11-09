@@ -1,0 +1,38 @@
+/* A table of settings (DESIGN-LOCK §7.7): label, value, control. On a phone it stacks rather than
+   scrolls: the label and value on the left, the control on the right. Alerts and Settings use it. */
+
+.settings td:last-child,
+.settings th:last-child {
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .settings tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
+    border-bottom: 1px solid var(--v2-line2);
+  }
+
+  .settings tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .settings td,
+  .settings th {
+    border-bottom: 0 !important;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* Every cell but the last stacks in the first column; the control spans the rows on the right. */
+  .settings :is(td, th):not(:last-child) {
+    grid-column: 1;
+  }
+
+  .settings :is(td, th):last-child {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+  }
+}

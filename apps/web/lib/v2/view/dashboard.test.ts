@@ -325,6 +325,31 @@ describe('The first-run note follows the site’s schedule', () => {
   });
 });
 
+describe('Change notes name one sender', () => {
+  it('the day-0 sentence names CC-25’s ALERTS_SENDER, and the dashboard copy keeps no second one', async () => {
+    const { ALERTS_SENDER } = await import('../../auth/constants');
+    expect(day0().threeKinds!.body).toContain(
+      `a note from ${ALERTS_SENDER} when a check finds a change`,
+    );
+    expect(Object.keys(await import('../copy/dashboard'))).not.toContain('ALERTS_FROM');
+  });
+});
+
+describe('Who builds each account route', () => {
+  it('the account pages CC-27 previews are wired by CC-27b, as the CC-27 brief says', () => {
+    const cc27b = Object.entries(ACCOUNT_ACTIONS)
+      .filter(([, a]) => a.owner === 'CC-27b')
+      .map(([key]) => key)
+      .sort();
+    expect(cc27b).toEqual(
+      ['alertRules', 'changeLog', 'emailSettings', 'integrations', 'plan', 'reports'].sort(),
+    );
+    expect(new Set(Object.values(ACCOUNT_ACTIONS).map((a) => a.owner))).toEqual(
+      new Set(['CC-26b', 'CC-27b', 'built']),
+    );
+  });
+});
+
 describe('A site on its first baseline is left out of the health move (owner ruling 2026-11-08)', () => {
   // A copy of bad-site in which redbirdaviation.com's re-graded check (the new baseline, Fri 30 Oct)
   // scores 100 and 100. Worked by hand, earlier moment Thu 29 Oct 12:42Z:

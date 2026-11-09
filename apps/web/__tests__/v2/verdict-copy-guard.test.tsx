@@ -13,6 +13,7 @@ import { accessView } from '../../lib/v2/view/segment/access';
 import type { SegmentKey } from '../../lib/v2/view/segment/frame';
 import {
   ACCOUNT_ELEMENTS,
+  CC27_ELEMENTS,
   SEGMENT_VARIANTS,
   changesHistoryElement,
   segmentElement,
@@ -165,15 +166,18 @@ describe('verdict copy guard', () => {
 
   it('covers every account screen in the preview registry, counted apart from the segments', () => {
     const paths = PREVIEWS.map((p) => p.path).filter((p) =>
-      /\/screens\/(dashboard|site)(\/|$)/.test(p),
+      /\/screens\/(dashboard|site|changes-log|alerts|reports|settings|trial-end)(\/|$)/.test(p),
     );
-    expect(paths.sort()).toEqual(Object.keys(ACCOUNT_ELEMENTS).sort());
+    expect(paths.sort()).toEqual(
+      [...Object.keys(ACCOUNT_ELEMENTS), ...Object.keys(CC27_ELEMENTS)].sort(),
+    );
   });
 
-  it.each(Object.keys(ACCOUNT_ELEMENTS))(
+  const accountElements = { ...ACCOUNT_ELEMENTS, ...CC27_ELEMENTS };
+  it.each(Object.keys(accountElements))(
     '%s: "blocked" only beside a blocking verdict, in what is seen and what is heard',
     (path) => {
-      const markup = renderToStaticMarkup(ACCOUNT_ELEMENTS[path]!());
+      const markup = renderToStaticMarkup(accountElements[path]!());
       expect(problems(markup)).toEqual([]);
       expect(pageProblems(markup)).toEqual([]);
     },
