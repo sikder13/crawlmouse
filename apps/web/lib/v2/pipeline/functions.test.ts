@@ -1,0 +1,267 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { auditFn } from '../../../../../inngest/audit';
+import {
+  cleanupExpiredAuditsFn,
+  reconcileBillingFn,
+  reconcileBillingManualFn,
+} from '../../../../../inngest/billing';
+import { CHECK_CANCELLED_FN_ID, CHECK_FN_ID } from '../../../../../inngest/check';
+import { CHECK_REAPER_FN_ID } from '../../../../../inngest/check-reaper';
+import { PLAN_CONCURRENCY_CAP } from '../../../../../inngest/concurrency';
+import { inngestFunctions } from './functions';
+
+type Config = { id: string; concurrency?: number | { limit: number } | { limit: number }[] };
+const configsOf = (fns: readonly unknown[]): Config[] =>
+  fns.flatMap((fn) =>
+    (fn as { getConfig(o: { baseUrl: URL; appPrefix: string }): Config[] }).getConfig({
+      baseUrl: new URL('https://crawlmouse.com/api/webhooks/inngest'),
+      appPrefix: 'crawlmouse',
+    }),
+  );
+
+/**
+ * v1's four functions as Inngest syncs them, with INNGEST_AUDIT_CONCURRENCY unset: recorded from
+ * the contracts commit (ecee3c9c, before CC-20b's changes) and equal at this branch's head.
+ */
+const V1_CONFIGS = [
+  [
+    {
+      id: 'crawlmouse-crawlmouse.audit',
+      name: 'crawlmouse.audit',
+      triggers: [
+        {
+          event: 'audit.requested',
+        },
+      ],
+      steps: {
+        step: {
+          id: 'step',
+          name: 'step',
+          runtime: {
+            type: 'http',
+            url: 'https://crawlmouse.com/api/webhooks/inngest?fnId=crawlmouse-crawlmouse.audit&stepId=step',
+          },
+          retries: {
+            attempts: 1,
+          },
+        },
+      },
+      concurrency: {
+        limit: 5,
+      },
+      cancel: [
+        {
+          event: 'audit.cancel.requested',
+          if: 'event.data.auditId == async.data.auditId',
+        },
+      ],
+    },
+    {
+      id: 'crawlmouse-crawlmouse.audit-failure',
+      name: 'crawlmouse.audit (failure)',
+      triggers: [
+        {
+          event: 'inngest/function.failed',
+          expression: "event.data.function_id == 'crawlmouse-crawlmouse.audit'",
+        },
+      ],
+      steps: {
+        step: {
+          id: 'step',
+          name: 'step',
+          runtime: {
+            type: 'http',
+            url: 'https://crawlmouse.com/api/webhooks/inngest?fnId=crawlmouse-crawlmouse.audit-failure&stepId=step',
+          },
+          retries: {
+            attempts: 1,
+          },
+        },
+      },
+    },
+  ],
+  [
+    {
+      id: 'crawlmouse-crawlmouse.stripe-reconcile',
+      name: 'crawlmouse.stripe-reconcile',
+      triggers: [
+        {
+          cron: '0 3 * * *',
+        },
+      ],
+      steps: {
+        step: {
+          id: 'step',
+          name: 'step',
+          runtime: {
+            type: 'http',
+            url: 'https://crawlmouse.com/api/webhooks/inngest?fnId=crawlmouse-crawlmouse.stripe-reconcile&stepId=step',
+          },
+        },
+      },
+    },
+  ],
+  [
+    {
+      id: 'crawlmouse-crawlmouse.stripe-reconcile-manual',
+      name: 'crawlmouse.stripe-reconcile-manual',
+      triggers: [
+        {
+          event: 'billing.reconcile.requested',
+        },
+      ],
+      steps: {
+        step: {
+          id: 'step',
+          name: 'step',
+          runtime: {
+            type: 'http',
+            url: 'https://crawlmouse.com/api/webhooks/inngest?fnId=crawlmouse-crawlmouse.stripe-reconcile-manual&stepId=step',
+          },
+        },
+      },
+    },
+  ],
+  [
+    {
+      id: 'crawlmouse-crawlmouse.audits-ttl-cleanup',
+      name: 'crawlmouse.audits-ttl-cleanup',
+      triggers: [
+        {
+          cron: '0 4 * * *',
+        },
+      ],
+      steps: {
+        step: {
+          id: 'step',
+          name: 'step',
+          runtime: {
+            type: 'http',
+            url: 'https://crawlmouse.com/api/webhooks/inngest?fnId=crawlmouse-crawlmouse.audits-ttl-cleanup&stepId=step',
+          },
+        },
+      },
+    },
+  ],
+];
+
+describe('registration with V2_PIPELINE unset (D3)', () => {
+  it('is v1’s four functions, the same objects, in today’s order', () => {
+    for (const env of [{}, { V2_PIPELINE: '0' }, { V2_PIPELINE: 'true' }, { V2_PIPELINE: '' }]) {
+      const fns = inngestFunctions(env);
+      expect(fns).toHaveLength(4);
+      expect(fns[0]).toBe(auditFn);
+      expect(fns[1]).toBe(reconcileBillingFn);
+      expect(fns[2]).toBe(reconcileBillingManualFn);
+      expect(fns[3]).toBe(cleanupExpiredAuditsFn);
+    }
+  });
+
+  it('syncs the configs it synced before this change', () => {
+    vi.stubEnv('INNGEST_AUDIT_CONCURRENCY', undefined);
+    expect(
+      JSON.parse(
+        JSON.stringify(
+          inngestFunctions({}).map((fn) =>
+            (fn as unknown as { getConfig(o: unknown): unknown }).getConfig({
+              baseUrl: new URL('https://crawlmouse.com/api/webhooks/inngest'),
+              appPrefix: 'crawlmouse',
+            }),
+          ),
+        ),
+      ),
+    ).toEqual(V1_CONFIGS);
+  });
+
+  it('is what the serve route registers', () => {
+    const route = readFileSync(
+      fileURLToPath(new URL('../../../app/api/webhooks/inngest/route.ts', import.meta.url)),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    expect(route).toMatch(/functions:\s*inngestFunctions\(process\.env\)\s*,?\s*\}\)/);
+    expect(route).toMatch(/from\s*['"]@\/lib\/v2\/pipeline\/functions['"]/);
+  });
+});
+
+describe('registration with V2_PIPELINE=1 (D3)', () => {
+  it('adds checkFn, its cancel handler and the reaper after v1’s four', () => {
+    const fns = inngestFunctions({ V2_PIPELINE: '1' });
+    expect(fns.slice(0, 4)).toEqual([
+      auditFn,
+      reconcileBillingFn,
+      reconcileBillingManualFn,
+      cleanupExpiredAuditsFn,
+    ]);
+    expect(
+      configsOf(fns.slice(4))
+        .map((c) => c.id)
+        .filter((id) => !id.endsWith('-failure')),
+    ).toEqual([
+      `crawlmouse-${CHECK_FN_ID}`,
+      `crawlmouse-${CHECK_CANCELLED_FN_ID}`,
+      `crawlmouse-${CHECK_REAPER_FN_ID}`,
+    ]);
+  });
+});
+
+/** Every declared concurrency limit of every config. */
+const limitsOf = (configs: readonly Config[]): number[] =>
+  configs.flatMap((c) => {
+    const k = c.concurrency;
+    if (k === undefined) return [];
+    if (typeof k === 'number') return [k];
+    return (Array.isArray(k) ? k : [k]).map((o) => o.limit);
+  });
+
+const SWEEP = [undefined, '', '0', '-1', '2', '5', '6', '50', '1000', 'abc', '5.5'] as const;
+
+describe('no registered function can declare a concurrency limit above the plan cap (D4)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  // auditFn reads INNGEST_AUDIT_CONCURRENCY when its module loads, so each case loads the modules
+  // afresh, as a new deployment does.
+  for (const flag of [undefined, '1'] as const) {
+    for (const audit of SWEEP) {
+      it(`V2_PIPELINE=${String(flag)}, INNGEST_AUDIT_CONCURRENCY=${String(audit)}, every INNGEST_CHECK_CONCURRENCY`, async () => {
+        vi.stubEnv('V2_PIPELINE', flag);
+        vi.stubEnv('INNGEST_AUDIT_CONCURRENCY', audit);
+        vi.resetModules();
+        const fresh = await import('./functions');
+        for (const check of SWEEP) {
+          vi.stubEnv('INNGEST_CHECK_CONCURRENCY', check);
+          const configs = configsOf(fresh.inngestFunctions(process.env));
+          expect(configs.length).toBe(flag === '1' ? 9 : 5);
+          const limits = limitsOf(configs);
+          expect(limits.length).toBeGreaterThan(0);
+          for (const limit of limits) {
+            expect(
+              limit,
+              `${configs.map((c) => c.id).join(', ')}: ${limits.join(', ')}`,
+            ).toBeLessThanOrEqual(PLAN_CONCURRENCY_CAP);
+            expect(limit).toBeGreaterThanOrEqual(1);
+          }
+        }
+      });
+    }
+  }
+
+  it('the sweep reaches the values it sets: a limit of 2 from each variable', async () => {
+    vi.stubEnv('V2_PIPELINE', '1');
+    vi.stubEnv('INNGEST_AUDIT_CONCURRENCY', '2');
+    vi.stubEnv('INNGEST_CHECK_CONCURRENCY', '1');
+    vi.resetModules();
+    const fresh = await import('./functions');
+    const configs = configsOf(fresh.inngestFunctions(process.env));
+    expect(configs.find((c) => c.id === 'crawlmouse-crawlmouse.audit')!.concurrency).toEqual({
+      limit: 2,
+    });
+    expect(configs.find((c) => c.id === `crawlmouse-${CHECK_FN_ID}`)!.concurrency).toEqual([
+      { key: 'event.data.siteId', limit: 1 },
+      { limit: 1 },
+    ]);
+  });
+});
