@@ -118,14 +118,19 @@ Postgres: `scripts/db/stripe-event-race.test.ts`, run by CI's `db-cli-files` job
 
 The webhook plans a `cancel` effect, durable in the same stored plan (Q10, Q13):
 
-- **Orphaned.** A checkout whose grant is ignored, unless the account already follows that very
-  subscription (a paid checkout and an agency trial alike; a customer mismatch included) and whose subscription is live (`trialing`, `active`, `past_due`); a
-  checkout our route opened (its `client_reference_id` and `metadata.account_id` name the account) whose
-  prices or extras the allow-list refuses, as after a deploy that changed `prices.ts` while the session
-  was open (review round 1, M1); and the subscription an applied checkout replaced, when it is still
-  live. A checkout that names no account of ours is cancelled only when its prices are ours. A
+- **Orphaned.** Each of these, when its subscription is live (`trialing`, `active`, `past_due`) and is not
+  the one the account already follows:
+  - a checkout whose grant the machine ignores (a paid checkout and an agency trial alike);
+  - a checkout naming the account whose customer is another one (a customer mismatch);
+  - a checkout our route opened (its `client_reference_id` and `metadata.account_id` name the account)
+    whose prices or extras the allow-list refuses, as after a deploy that changed `prices.ts` while the
+    session was open (review round 1, M1);
+  - the subscription an applied checkout replaced, whatever its prices.
+
+  A checkout that names no account of ours is cancelled only when its prices and extras are ours. A
   `trialing` one costs nothing; a paid one also raises `billing.orphaned_subscription` at error level,
   naming it, for a refund by hand.
+
 - **Disputed.** A dispute cancels the account's followed subscription, whatever its prices.
 
 A cancellation is at once, without proration, under the idempotency key `cancel:<subscription>:<reason>`,
