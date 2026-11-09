@@ -48,18 +48,19 @@ export function pgliteCheckReader(db: Db): CheckReader {
   };
 }
 
-/**
- * `site`, and `check` running as claim_check leaves a check: what persist_built_check writes over. The
- * site's schedule is flattened as the sites table stores it; a client report is not seeded.
- */
-export async function seedRunningCheck(
-  db: Db,
-  site: Site,
-  check: Pick<
-    BuildInput['check'],
-    'id' | 'site_id' | 'trigger' | 'grade_version' | 'queued_at' | 'started_at' | 'expires_at'
-  >,
-): Promise<void> {
+type SeededCheck = Pick<
+  BuildInput['check'],
+  'id' | 'site_id' | 'trigger' | 'grade_version' | 'queued_at' | 'started_at' | 'expires_at'
+>;
+
+/** `site`, and `check` running as claim_check leaves a check: what persist_built_check writes over. */
+export async function seedRunningCheck(db: Db, site: Site, check: SeededCheck): Promise<void> {
+  await seedSite(db, site);
+  await seedRunning(db, check);
+}
+
+/** `site`, its schedule flattened as the sites table stores it; a client report is not seeded. */
+export async function seedSite(db: Db, site: Site): Promise<void> {
   await db.query(
     `insert into public.sites (id, account_id, host, staging_of_site_id, client_name,
                                client_contact_name, client_contact_email, schedule_cadence,
@@ -83,6 +84,10 @@ export async function seedRunningCheck(
       site.created_at,
     ],
   );
+}
+
+/** `check` of a site already seeded, running as claim_check leaves a check. */
+export async function seedRunning(db: Db, check: SeededCheck): Promise<void> {
   await db.query(
     `insert into public.checks (id, site_id, status, trigger, grade_version, queued_at, started_at,
                                 expires_at, progress, inngest_run_id, heartbeat_at)

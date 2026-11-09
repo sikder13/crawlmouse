@@ -27,7 +27,7 @@
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261109000001_v2_008_pipeline.revert.sql.
 -- Tested by: pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-008-pipeline.test.ts \
---   lib/v2/pipeline/persist.test.ts lib/v2/pipeline/round-trip.test.ts
+--   lib/v2/pipeline/persist.test.ts lib/v2/pipeline/round-trip.test.ts lib/v2/pipeline/recheck.test.ts
 
 -- ─── crawl_batches: one row per batch the pipeline posted to the worker ───────────────────────────
 
