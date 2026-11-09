@@ -114,6 +114,20 @@ READ COMMITTED, `P0002` ledger row or account missing, `40001` stale version, `2
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-billing-rpc.test.ts`; the races on a real
 Postgres: `scripts/db/stripe-event-race.test.ts`, run by CI's `db-cli-files` job (Q17).
 
+### Concurrency
+
+What serialises two calls of `apply_stripe_event`, as `scripts/db/stripe-event-race.test.ts` measures it on
+CI's Postgres (each mechanism is removed in a mutated database there):
+
+- **One event delivered twice:** the ledger row's `for update`.
+- **Two events on one subscription:** the subscription row's `for update`, and before it the
+  `insert … on conflict do nothing` of a call that carries a mirror row, which waits for a concurrent
+  writer's uncommitted row; the guard then reads that writer's `last_event_created`. Each is enough alone
+  for a call with a mirror row; a call without one (a superseded event) has the lock only.
+- **A confirm and a commit on one account:** the account row's `for update`, taken before the version is
+  read. Without it, the confirm still waits later, on the `FOR KEY SHARE` lock that writing its ledger row's
+  `account_id` takes, but only after deciding on the old version.
+
 ### Stripe writes from the webhook
 
 The webhook plans a `cancel` effect, durable in the same stored plan (Q10, Q13):
