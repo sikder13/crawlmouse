@@ -116,16 +116,6 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
       return r as unknown as RequestSite;
     },
 
-    async previousCheckId(siteId, checkId, queuedAt) {
-      const r = await one(
-        `select jsonb_build_object('id', id) as row from public.checks
-          where site_id = $1 and id <> $2 and queued_at <= $3::timestamptz
-          order by queued_at desc, id desc limit 1`,
-        [siteId, checkId, queuedAt],
-      );
-      return r ? String(r.id) : null;
-    },
-
     async previousGraded(siteId, checkId): Promise<CheckSide | null> {
       const r = await one(
         `select to_jsonb(c) as row from public.checks c

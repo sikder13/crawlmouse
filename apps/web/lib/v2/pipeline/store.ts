@@ -75,11 +75,10 @@ export interface PipelineStore {
   check(checkId: string): Promise<Check>;
   site(siteId: string): Promise<Site>;
   requestSite(siteId: string): Promise<RequestSite>;
-  /** The site's latest other check queued no later than this one; null when there is none. */
-  previousCheckId(siteId: string, checkId: string, queuedAt: string): Promise<string | null>;
   /**
    * The diff's baseline: the site's other finished or partial check that finished last, with its diff
-   * inputs. By `finished_at`, not queue order: claims are not in queue order (correctness 4).
+   * inputs. By `finished_at`, not queue order: claims are not in queue order (correctness 4). Its id
+   * is the built check's `previous_check_id` (steps/finish.ts).
    */
   previousGraded(siteId: string, checkId: string): Promise<CheckSide | null>;
   fixes(siteId: string): Promise<Fix[]>;
@@ -224,23 +223,6 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
           .eq('id', siteId)
           .single(),
       );
-    },
-
-    async previousCheckId(siteId, checkId, queuedAt) {
-      const row = must<Row | null>(
-        'previous check',
-        await sb
-          .from('checks')
-          .select('id')
-          .eq('site_id', siteId)
-          .neq('id', checkId)
-          .lte('queued_at', queuedAt)
-          .order('queued_at', { ascending: false })
-          .order('id', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      );
-      return row ? String(row.id) : null;
     },
 
     async previousGraded(siteId, checkId) {

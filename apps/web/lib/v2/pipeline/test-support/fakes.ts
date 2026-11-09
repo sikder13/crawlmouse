@@ -140,9 +140,6 @@ export function memoryStore(site: Site, checks: Check[], now: () => string) {
     async requestSite(): Promise<RequestSite> {
       return { id: site.id, account_id: site.account_id, host: site.host, next_check_at: null };
     },
-    async previousCheckId() {
-      return null;
-    },
     async previousGraded() {
       return null;
     },
