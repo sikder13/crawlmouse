@@ -50,7 +50,7 @@ Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 5` (Inngest Free), which the 
 | `emit`                                       |                                                                                                                                              | `check.finished`, under the id `check-finished:{check_id}`                                                       |
 | `finalize`                                   |                                                                                                                                              | removes `built.json.gz`                                                                                          |
 
-Each step returns under 4096 bytes as JSON, which `sized` in `inngest/check.ts` enforces (`pnpm --filter @crawlmouse/inngest exec vitest run check.test.ts`); bulk data goes to the private `evidence` bucket, at `{account_id|anon}/{site_id}/{check_id}/{name}.json.gz`.
+`runCheck` (`inngest/check.ts`) runs each of its steps through `sized`, which throws, naming the step, when an output is 4096 bytes or more as JSON (`pnpm --filter @crawlmouse/inngest exec vitest run check.test.ts` proves it on `discover`); bulk data goes to the private `evidence` bucket, at `{account_id|anon}/{site_id}/{check_id}/{name}.json.gz`.
 
 ## Polling and time
 
