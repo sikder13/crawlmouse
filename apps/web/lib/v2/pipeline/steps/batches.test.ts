@@ -147,7 +147,20 @@ describe('post (finding 2)', () => {
     expect(s.posted).toHaveLength(1);
   });
 
-  it('writes the heartbeat on each attempt, busy included, so a busy worker does not look like a stall (correctness 10)', async () => {
+  it('writes the heartbeat on an attempt that returns, and none on one that throws', async () => {
+    const s = await setup();
+    const heartbeat = () => s.rows.get(CHECK)!.heartbeat_at;
+    // The claim wrote it at T0. The worker does not answer and does not hold the batch: a retry.
+    s.refuse.push('network');
+    s.clock.now += 30_000;
+    await expect(s.steps.post(EVENT, CRAWL_1, SO)).rejects.toMatchObject({ kind: 'network' });
+    expect(heartbeat()).toBe(new Date(T0).toISOString());
+    s.clock.now += 30_000;
+    expect(await s.steps.post(EVENT, CRAWL_1, SO)).toMatchObject({ status: 'posted' });
+    expect(heartbeat()).toBe(new Date(T0 + 60_000).toISOString());
+  });
+
+  it('writes the heartbeat on each attempt that returns, busy included, so a busy worker does not look like a stall (correctness 10)', async () => {
     const s = await setup();
     const heartbeat = () => s.rows.get(CHECK)!.heartbeat_at;
     s.refuse.push('busy');

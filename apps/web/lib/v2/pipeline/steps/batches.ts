@@ -7,7 +7,7 @@
  * its row written with this attempt's nonce, and posted. `batch_exists` counts as posted; `busy` and
  * `paused` are returned for the orchestration to wait on or end with; a timeout, a network error or
  * a 5xx asks the worker whether the batch arrived, and throws (so the step retries) when it did not.
- * Every attempt writes the check's heartbeat.
+ * An attempt that returns writes the heartbeat of a running check; one that throws writes none.
  *
  * read. The result is checked against the contract and against the batch it should be, stored
  * gzipped, and its row marked done with a summary of counts and the worker release its rows name. A
@@ -184,8 +184,9 @@ export function batchSteps(
   return {
     async post(event, at, so) {
       const out = await attempt(event, at, so);
-      // Each attempt writes the heartbeat: a worker answering busy for minutes keeps a check
-      // waiting between posts, and the reaper reads a check without one as stalled (correctness 10).
+      // An attempt that returns writes the heartbeat (one that throws writes none): a worker
+      // answering busy for minutes keeps a check waiting between posts, and the reaper reads a check
+      // without one as stalled (correctness 10).
       await progress(event, at, so, deps.now());
       return out;
     },
