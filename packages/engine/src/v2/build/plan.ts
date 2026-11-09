@@ -73,7 +73,7 @@ export function nextCrawlBatch(
   const next: string[] = [];
   for (const raw of queue) {
     const url = canonicalizeUrl(raw);
-    if (asked.has(url) || url.length > MAX_URL_LENGTH) continue;
+    if (asked.has(url)) continue;
     asked.add(url);
     next.push(url);
     if (next.length === room) break;
