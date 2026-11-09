@@ -117,7 +117,10 @@ export type ReadOutput =
 export type RenderOutput = { rendered: number; not_rendered: number };
 export type BuildOutput = { status: 'finished' | 'partial'; pages: number; fixes: number };
 export type PersistOutput = { written: boolean };
-/** Whether the call failed the check, and if so the site the database holds it under. */
+/**
+ * Whether the check is failed with the reason asked for (by this call, or by an earlier one with the
+ * same reason that this call retries), and if so the site the database holds it under.
+ */
 export type FailOutput = { failed: false } | { failed: true; siteId: string };
 type Empty = Record<string, never>;
 
@@ -394,7 +397,7 @@ export function createCheckFn(
   );
 }
 
-/** The check a cancelled run was for, when `fail_check` moved it to failed. */
+/** The check a cancelled run was for, when `fail_check` answered that it is failed `canceled`. */
 export type CancelledCheck = { checkId: string; siteId: string };
 
 /**
@@ -423,7 +426,8 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 /**
  * `crawlmouse.check.cancelled`: a cancelled checkFn run (check.cancel.requested, or the finish
  * timeout: Inngest reports both as `inngest/function.cancelled`) fails its check with `canceled`, and
- * sends check.failed when that moved it. The check is the triggering event's, so a cancel before the
+ * sends check.failed when the check is failed `canceled` (one event id per check, so a second send,
+ * from onFailure or a retry, starts nothing). The check is the triggering event's, so a cancel before the
  * claim fails it too; a payload without that id falls back to the check the run claimed (correctness
  * 2). onFailure does not run for a cancelled run.
  */

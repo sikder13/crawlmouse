@@ -92,7 +92,7 @@ export async function failCheck(
 
 /**
  * The cancel handler's work: the triggering event's check failed `canceled`, whether or not a run had
- * claimed it; without that id, the check the run claimed. Null when no check moved.
+ * claimed it; without that id, the check the run claimed. Null when no check is failed `canceled`.
  */
 export async function failCancelled(
   store: Pick<PipelineStore, 'checkOfRun' | 'fail' | 'siteOf'>,

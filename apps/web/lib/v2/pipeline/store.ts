@@ -58,7 +58,11 @@ export interface BatchEnd {
 export interface PipelineStore {
   /** `claim_check`: queued → running with `progress`, or again by the run that claimed it. */
   claim(checkId: string, runId: string, progress: Check['progress']): Promise<ClaimOutcome>;
-  /** `fail_check`, by the check's id or by the run that claimed it; true when this call moved it. */
+  /**
+   * `fail_check`, by the check's id or by the run that claimed it: true when the check is failed with
+   * `reason` after the call, whether this call moved it or an earlier one with the same reason did (a
+   * retried call); false when it had ended otherwise.
+   */
   fail(checkId: string | null, reason: FailureReason, runId: string | null): Promise<boolean>;
   /** `reap_stalled_checks`: checks whose heartbeat (or queue time) is before `cutoff`. */
   reap(cutoff: string): Promise<ReapedCheck[]>;

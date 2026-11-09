@@ -453,7 +453,7 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
 });
 
 describe('supabasePipelineStore: answers', () => {
-  it('fails by check or by run, and says whether fail_check moved it', async () => {
+  it('fails by check or by run, and gives fail_check’s answer', async () => {
     const { sb } = recorder(ok(true), ok(false));
     const store = supabasePipelineStore(sb);
     expect(await store.fail(C, 'paused', null)).toBe(true);
