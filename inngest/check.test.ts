@@ -10,6 +10,7 @@ import {
   createCheckFn,
   runCheck,
   type BatchAt,
+  type CancelledRun,
   type CheckStepTools,
   type CheckSteps,
   type PollOutput,
@@ -652,23 +653,22 @@ describe('createCheckCancelledFn (finding 4)', () => {
     expect(sdkFilter).toBe(`event.data.function_id == '${inngest.id}-${CHECK_FN_ID}'`);
   });
 
-  async function cancel(failed: { checkId: string; siteId: string } | null) {
-    const runs: string[] = [];
-    const fn = createCheckCancelledFn(async (runId) => {
-      runs.push(runId);
+  async function cancel(
+    failed: { checkId: string; siteId: string } | null,
+    data: Record<string, unknown> = { run_id: 'run-9', function_id: 'x' },
+  ) {
+    const runs: CancelledRun[] = [];
+    const fn = createCheckCancelledFn(async (run) => {
+      runs.push(run);
       return failed;
     }) as unknown as { fn: (ctx: unknown) => Promise<unknown> };
     const step = fakeStep({ now: T0 });
-    const out = await fn.fn({
-      event: { data: { run_id: 'run-9', function_id: 'x' } },
-      step: step.tools,
-    });
+    const out = await fn.fn({ event: { data }, step: step.tools });
     return { runs, out, events: step.events };
   }
 
   it('fails the run’s check canceled and sends check.failed', async () => {
-    const { runs, events } = await cancel({ checkId: EVENT.checkId, siteId: EVENT.siteId });
-    expect(runs).toEqual(['run-9']);
+    const { events } = await cancel({ checkId: EVENT.checkId, siteId: EVENT.siteId });
     expect(events.map((e) => e.payload)).toEqual([
       {
         id: `check-failed:${EVENT.checkId}`,
@@ -676,6 +676,37 @@ describe('createCheckCancelledFn (finding 4)', () => {
         data: { checkId: EVENT.checkId, siteId: EVENT.siteId, reason: 'canceled' },
       },
     ]);
+  });
+
+  it('names the check by the triggering event’s checkId when the payload carries it (correctness 2)', async () => {
+    // Inngest's system-event reference documents `data.event`, the event that triggered the run; the
+    // SDK's type for inngest/function.cancelled leaves it out.
+    const { runs } = await cancel(null, {
+      run_id: 'run-9',
+      function_id: 'x',
+      event: { name: 'check.requested', data: EVENT },
+    });
+    expect(runs).toEqual([{ checkId: EVENT.checkId, runId: 'run-9' }]);
+  });
+
+  it('falls back to the run id when the payload has no check id it can read as a uuid', async () => {
+    const shapes: Record<string, unknown>[] = [
+      { run_id: 'run-9', function_id: 'x' },
+      { run_id: 'run-9', function_id: 'x', event: null },
+      { run_id: 'run-9', function_id: 'x', event: 'check.requested' },
+      { run_id: 'run-9', function_id: 'x', event: { data: null } },
+      { run_id: 'run-9', function_id: 'x', event: { data: { checkId: 42 } } },
+      { run_id: 'run-9', function_id: 'x', event: { data: { checkId: 'not-a-uuid' } } },
+      {
+        run_id: 'run-9',
+        function_id: 'x',
+        event: { data: { checkId: `${EVENT.checkId}' or true` } },
+      },
+    ];
+    for (const data of shapes) {
+      const { runs } = await cancel(null, data);
+      expect(runs, JSON.stringify(data)).toEqual([{ checkId: null, runId: 'run-9' }]);
+    }
   });
 
   it('sends nothing when no check moved', async () => {

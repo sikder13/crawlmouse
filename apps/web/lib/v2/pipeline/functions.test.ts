@@ -418,6 +418,24 @@ describe('a worker variable that makes no client (correctness 1)', () => {
         });
       });
 
+      it('the cancel handler fails a check cancelled before its claim, by the event’s check id', async () => {
+        const w = wired(env);
+        await w.cancelled.fn({
+          event: {
+            data: {
+              function_id: `crawlmouse-${CHECK_FN_ID}`,
+              run_id: 'run-never-claimed',
+              event: { name: 'check.requested', data: EVENT },
+            },
+          },
+          step: tools().step,
+        });
+        expect(w.rows.get(EVENT.checkId)).toMatchObject({
+          status: 'failed',
+          failure_reason: 'canceled',
+        });
+      });
+
       it('onFailure still fails the check', async () => {
         const w = wired(env);
         await w.checkFn.onFailureFn({

@@ -2,7 +2,12 @@
  * The steps that start and end a check outside its batches: claim, discover and fail, and what the
  * cancel handler and the reaper run.
  */
-import type { CancelledCheck, CheckSteps, FailOutput } from '../../../../../../inngest/check';
+import type {
+  CancelledCheck,
+  CancelledRun,
+  CheckSteps,
+  FailOutput,
+} from '../../../../../../inngest/check';
 import type { FailureReason } from '../../../../../../inngest/check-events';
 import type { ReapedCheck } from '../../../../../../inngest/check-reaper';
 import { isCrawlPaused } from '../../../crawl-pause';
@@ -66,14 +71,21 @@ export async function failCheck(
   return { failed: true, siteId };
 }
 
-/** The cancel handler's work: the check the run claimed, failed `canceled`; null when none moved. */
+/**
+ * The cancel handler's work: the triggering event's check failed `canceled`, whether or not a run had
+ * claimed it; without that id, the check the run claimed. Null when no check moved.
+ */
 export async function failCancelled(
-  store: Pick<PipelineStore, 'checkOfRun' | 'fail'>,
-  runId: string,
+  store: Pick<PipelineStore, 'checkOfRun' | 'fail' | 'siteOf'>,
+  run: CancelledRun,
 ): Promise<CancelledCheck | null> {
-  const claimed = await store.checkOfRun(runId);
+  if (run.checkId !== null) {
+    const out = await failCheck(store, run.checkId, 'canceled');
+    return out.failed ? { checkId: run.checkId, siteId: out.siteId } : null;
+  }
+  const claimed = await store.checkOfRun(run.runId);
   if (claimed === null) return null;
-  return (await store.fail(null, 'canceled', runId)) ? claimed : null;
+  return (await store.fail(null, 'canceled', run.runId)) ? claimed : null;
 }
 
 /** The reaper's cutoff: a heartbeat before it is REAP_AFTER_S old. */

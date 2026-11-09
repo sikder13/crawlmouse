@@ -85,7 +85,7 @@ export function inngestFunctions(
       (checkId, reason) => failCheck(wiring.store(env), checkId, reason),
       env,
     ),
-    createCheckCancelledFn((runId) => failCancelled(wiring.store(env), runId)),
+    createCheckCancelledFn((run) => failCancelled(wiring.store(env), run)),
     createCheckReaperFn(() => reapStalled(wiring.store(env), Date.now)),
   ];
 }

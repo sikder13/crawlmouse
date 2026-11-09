@@ -382,17 +382,41 @@ export function createCheckFn(
   );
 }
 
-/** The check a cancelled run had claimed, when `fail_check` moved it to failed. */
+/** The check a cancelled run was for, when `fail_check` moved it to failed. */
 export type CancelledCheck = { checkId: string; siteId: string };
 
 /**
+ * A cancelled run: the check id of the event that triggered it, when the payload carries one that
+ * reads as a uuid (null otherwise), and the run's id.
+ */
+export type CancelledRun = { checkId: string | null; runId: string };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The triggering event's check id in an `inngest/function.cancelled` payload, at `data.event.data`.
+ * Inngest's system-event reference documents `data.event`; the SDK's type leaves it out, so it is
+ * read from `unknown`, and anything but a uuid string is null.
+ */
+export function cancelledCheckId(data: unknown): string | null {
+  const event = isRecord(data) ? data.event : undefined;
+  const eventData = isRecord(event) ? event.data : undefined;
+  const checkId = isRecord(eventData) ? eventData.checkId : undefined;
+  return typeof checkId === 'string' && UUID.test(checkId) ? checkId : null;
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
  * `crawlmouse.check.cancelled`: a cancelled checkFn run (check.cancel.requested, or the finish
- * timeout: Inngest reports both as `inngest/function.cancelled`, whose payload names only the
- * function and the run) fails the check that run claimed, with `canceled`, and sends check.failed
- * when that moved it. onFailure does not run for a cancelled run.
+ * timeout: Inngest reports both as `inngest/function.cancelled`) fails its check with `canceled`, and
+ * sends check.failed when that moved it. The check is the triggering event's, so a cancel before the
+ * claim fails it too; a payload without that id falls back to the check the run claimed (correctness
+ * 2). onFailure does not run for a cancelled run.
  */
 export function createCheckCancelledFn(
-  failCancelled: (runId: string) => Promise<CancelledCheck | null>,
+  failCancelled: (run: CancelledRun) => Promise<CancelledCheck | null>,
 ) {
   return inngest.createFunction(
     { id: CHECK_CANCELLED_FN_ID, retries: 2 },
@@ -401,7 +425,8 @@ export function createCheckCancelledFn(
       if: `event.data.function_id == '${inngest.id}-${CHECK_FN_ID}'`,
     },
     async ({ event, step }) => {
-      const failed = await step.run('fail', () => failCancelled(event.data.run_id));
+      const run: CancelledRun = { checkId: cancelledCheckId(event.data), runId: event.data.run_id };
+      const failed = await step.run('fail', () => failCancelled(run));
       if (failed) {
         await step.sendEvent(
           'emit-failed',

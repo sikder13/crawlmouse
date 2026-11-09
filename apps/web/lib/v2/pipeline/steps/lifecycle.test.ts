@@ -119,25 +119,39 @@ describe('fail', () => {
   });
 });
 
-describe('failCancelled (finding 4)', () => {
+describe('failCancelled (finding 4, correctness 2)', () => {
   const store = (claimed: { checkId: string; siteId: string } | null, moved: boolean) => ({
     checkOfRun: vi.fn(async () => claimed),
     fail: vi.fn(async () => moved),
+    siteOf: vi.fn(async (): Promise<string | null> => 's-in-db'),
   });
 
-  it('fails the check the run claimed, by run id, with canceled', async () => {
-    const s = store({ checkId: 'c', siteId: 's' }, true);
-    expect(await failCancelled(s, 'run-9')).toEqual({ checkId: 'c', siteId: 's' });
-    expect(s.fail).toHaveBeenCalledWith(null, 'canceled', 'run-9');
+  it('fails the triggering event’s check by its id, claimed or not, with canceled', async () => {
+    const s = store(null, true);
+    expect(await failCancelled(s, { checkId: 'c', runId: 'run-9' })).toEqual({
+      checkId: 'c',
+      siteId: 's-in-db',
+    });
+    expect(s.fail).toHaveBeenCalledWith('c', 'canceled', null);
+    expect(s.checkOfRun).not.toHaveBeenCalled();
   });
 
   it('gives null when the check had already ended', async () => {
-    expect(await failCancelled(store({ checkId: 'c', siteId: 's' }, false), 'run-9')).toBeNull();
+    expect(await failCancelled(store(null, false), { checkId: 'c', runId: 'run-9' })).toBeNull();
   });
 
-  it('gives null, failing nothing, when the run claimed no check', async () => {
+  it('without the event’s check id, fails the check the run claimed, by run id', async () => {
+    const s = store({ checkId: 'c', siteId: 's' }, true);
+    expect(await failCancelled(s, { checkId: null, runId: 'run-9' })).toEqual({
+      checkId: 'c',
+      siteId: 's',
+    });
+    expect(s.fail).toHaveBeenCalledWith(null, 'canceled', 'run-9');
+  });
+
+  it('gives null, failing nothing, when it has no check id and the run claimed no check', async () => {
     const s = store(null, true);
-    expect(await failCancelled(s, 'run-9')).toBeNull();
+    expect(await failCancelled(s, { checkId: null, runId: 'run-9' })).toBeNull();
     expect(s.fail).not.toHaveBeenCalled();
   });
 });
