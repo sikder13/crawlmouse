@@ -323,7 +323,7 @@ ${D8_QUERY}
 
 - **A failed decision is not retried** (D11). First login is detected once (\`isFirstLogin\`); a sign-up whose call failed stays Free, and Sentry has \`auth.trial-decision-failed\`.
 - **The ${timeout} lock timeout can cost a trial.** A first login that waits longer than that, for instance on a busy shared network's \`ip24\` lock, fails and is not retried.
-- **A browser with no \`cm_auth_for\` sends its device.** A link opened where no door request was made (another device, or a browser that never asked) cannot be told apart from someone else's link, so D9 does not apply there.
+- **A browser with no \`cm_auth_for\` sends its device.** A link opened where no magic-link request was made (another device, or a browser that never asked) cannot be told apart from someone else's link, so D9 does not apply there.
 - **Two clocks.** \`next()\` dates the trial with the app's clock; the ledger windows and the rows' \`created_at\` use the database's \`now()\`.
 - **The race test runs only in CI's \`db-cli-files\` job**; \`pnpm test\` skips it, because no local Postgres server is assumed. It refuses a \`TRIAL_RACE_DB_URL\` that is not on this machine.
 - **Definer functions outside this migration.** Read from \`pg_proc\`, those whose \`search_path\` does not name \`pg_temp\` last, with the client roles that may call each: ${await otherDefiners(db)}. Migration 20261108000002 (CC-SEC, \`docs/specs/v2/sec-baseline.md\`) set it last on the rest, and the catalog check \`09-definer-search-path.sql\` fails on one that does not.

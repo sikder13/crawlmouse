@@ -69,6 +69,14 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'carries no binding, and then its anonymous v1 audits are claimed',
+    withdrawnIn: 'docs/specs/v2/25-account-door.md (Known risks), CC-V1FIX A-8',
+    truth:
+      'Every magic-link request sets cm_auth_for, and /login/verify claims anonymous v1 audits ' +
+      'only when it is the binding of the address the link signed in (bindingMatches).',
+    allowedIn: [],
+  },
+  {
     text: 'that guard does not run on them in the suite',
     withdrawnIn:
       'docs/specs/v2/27-account-screens.md (Known gaps), CC-27 review round 2 (accessibility and deploy safety)',
