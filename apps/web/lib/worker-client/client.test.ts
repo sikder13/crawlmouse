@@ -649,6 +649,23 @@ describe('createWorkerClient', () => {
     }
   });
 
+  it('refuses plain http to another machine, and takes it to this one', () => {
+    for (const url of [
+      'http://worker.test',
+      'http://crawlmouse-worker-staging.fly.dev',
+      'http://10.0.0.1',
+    ]) {
+      expect(() =>
+        createWorkerClient({ url, signingSecret: 's'.repeat(32), privateKey: key }),
+      ).toThrow(/^CRAWL_WORKER_URL must be https unless the worker is on this machine$/);
+    }
+    for (const url of ['http://127.0.0.1:9', 'http://localhost:8080', 'http://[::1]:8080']) {
+      expect(() =>
+        createWorkerClient({ url, signingSecret: 's'.repeat(32), privateKey: key }),
+      ).not.toThrow();
+    }
+  });
+
   it('refuses an empty signing secret or a key that is not Ed25519', () => {
     expect(() =>
       createWorkerClient({ url: 'https://worker.test', signingSecret: '', privateKey: key }),

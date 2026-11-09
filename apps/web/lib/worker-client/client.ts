@@ -101,8 +101,16 @@ function checkedBase(url: string): string {
       `${WORKER_URL_ENV} must be an http(s) URL with no credentials, query or fragment`,
     );
   }
+  // A signed request carries its JWT in the body: in clear it could be replayed within the signature
+  // window. Plain http is for a worker on this machine (the tests, a local worker) only.
+  if (parsed.protocol === 'http:' && !LOOPBACK.has(parsed.hostname)) {
+    throw new Error(`${WORKER_URL_ENV} must be https unless the worker is on this machine`);
+  }
   return url;
 }
+
+/** Hostnames that name this machine, as URL parses them (an IPv6 literal keeps its brackets). */
+const LOOPBACK: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
   const base = checkedBase(opts.url);
