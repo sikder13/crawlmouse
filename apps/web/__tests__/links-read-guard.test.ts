@@ -18,7 +18,8 @@ import { describe, expect, it } from 'vitest';
  * hide one: a property access (`p.links_out`, `p?.links_out`, `p!.links_out`), an element access
  * with the literal name (`p['links_out']`), and a destructuring (`{ links_out }`,
  * `{ links_out: n }`, `{ ['links_out']: n }`). Not a read: the target of a plain `=` assignment, an object-literal key, and
- * anything in a type. Each form is varied in the cases below, both ways.
+ * anything in a type. Each form has a case below that the guard names; a property access, an
+ * element access and a destructuring also have one that passes beside a `links_read` read.
  */
 
 const REPO = resolve(__dirname, '../../..');
