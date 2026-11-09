@@ -40,12 +40,17 @@ export function stripeAccount(env: Env = process.env): Stripe {
   return client;
 }
 
-/** The production Supabase project (PROJECT_OVERVIEW §9). Previews hold its service-role key too. */
+/**
+ * The production Supabase project's default host (PROJECT_OVERVIEW §9). Previews hold its service-role
+ * key too. A custom domain for the project would reach it under another name: add it here first.
+ */
 const PRODUCTION_SUPABASE_HOST = 'ezspnfeyzwsisymytssm.supabase.co';
 
+/** Whether the URL names that host: case, port, path and a trailing root dot do not change it. */
 function onProductionDatabase(env: Env): boolean {
   try {
-    return new URL(env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname === PRODUCTION_SUPABASE_HOST;
+    const host = new URL(env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname.replace(/\.$/, '');
+    return host === PRODUCTION_SUPABASE_HOST;
   } catch {
     return false;
   }

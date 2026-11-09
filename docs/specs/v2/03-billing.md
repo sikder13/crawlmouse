@@ -118,14 +118,15 @@ Postgres: `scripts/db/stripe-event-race.test.ts`, run by CI's `db-cli-files` job
 
 The webhook plans a `cancel` effect, durable in the same stored plan (Q10, Q13):
 
-- **Orphaned.** Each of these, when its subscription is live (`trialing`, `active`, `past_due`) and is not
-  the one the account already follows:
+- **Orphaned.** Each of these, when its subscription is live (`trialing`, `active`, `past_due`):
   - a checkout whose grant the machine ignores (a paid checkout and an agency trial alike);
   - a checkout naming the account whose customer is another one (a customer mismatch);
   - a checkout our route opened (its `client_reference_id` and `metadata.account_id` name the account)
     whose prices or extras the allow-list refuses, as after a deploy that changed `prices.ts` while the
     session was open (review round 1, M1);
   - the subscription an applied checkout replaced, whatever its prices.
+
+  The three checkouts are exempt when their subscription is the one the account already follows.
 
   A checkout that names no account of ours is cancelled only when its prices and extras are ours. A
   `trialing` one costs nothing; a paid one also raises `billing.orphaned_subscription` at error level,
@@ -251,7 +252,9 @@ refused 403 by the middleware before the route runs:
   `STRIPE_ACCOUNT_WEBHOOK_SECRET`, `STRIPE_ACCOUNT_LIVEMODE`. Production keeps `V2_BILLING` unset.
 
 - **Mode.** The v2 Stripe client (`lib/billing/stripe-account.ts`) refuses a key whose mode is not
-  `STRIPE_ACCOUNT_LIVEMODE`'s, and a test key on `VERCEL_ENV=production` or over the production database; the billing routes and the
+  `STRIPE_ACCOUNT_LIVEMODE`'s, and a test key on `VERCEL_ENV=production` or when `NEXT_PUBLIC_SUPABASE_URL`
+  names the production project's default host (`ezspnfeyzwsisymytssm.supabase.co`; a custom domain for it
+  would have to be added to the check); the billing routes and the
   webhook then answer 500 and the reconcile's step fails, before any write
   (`pnpm --filter @crawlmouse/web exec vitest run lib/billing/stripe-account.test.ts`).
 - **Prices.** Change a Stripe price and `prices.ts` in one deploy. A session opened before it and paid after
@@ -285,8 +288,9 @@ refused 403 by the middleware before the route runs:
 - A founder alert counts as raised once Sentry's client has flushed its queue, which also succeeds when
   Sentry refused the event or the network failed, so an alert can be lost. The plan, alert included, stays
   in `stripe_events.effects`.
-- Test mode is refused on `VERCEL_ENV=production` and over the production Supabase project (previews hold
-  its service-role key). A preview that is to try v2 billing in test mode needs a database of its own.
+- Test mode is refused on `VERCEL_ENV=production` and when the Supabase URL names the production project's
+  default host (previews hold its service-role key); a custom domain for that project is not recognised. A
+  preview that is to try v2 billing in test mode needs a database of its own.
 - Sentry's request data probably includes the `stripe-signature` header (the scrub removes cookies and
   bodies); v1's webhook has the same shape. The billing routes have no rate limit of their own, as v1's
   checkout has none.
