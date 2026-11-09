@@ -87,7 +87,7 @@ The type CHECK is found by the catalog, not by name: 003 wrote it inline, and Po
 
 ### Write-time rules: which became CHECKs (D7)
 
-A rule becomes a CHECK here only where it is a predicate on the row's own columns and the owner ruled it one (2026-11-08): CC-17's two effect rules. The others stay with the writer, which parses the row with the contract schema: those reading inside a jsonb document of a table only the server writes under owner ruling 1 (2026-11-02), and `time_zone`, `crawled_text_budget`, `crawled_text_surrogate` because they are value shapes a CHECK does not hold as the contract does. The list is `RULES_AT_WRITE` and `RULE_CHECKS` in `apps/web/__tests__/helpers/v2-contract-storage.ts`:
+A rule becomes a CHECK here only where it is a predicate on the row's own columns and the owner ruled it one (2026-11-08): CC-17's two effect rules. The others stay with the writer, which parses the row with the contract schema: those reading inside a jsonb document of a table only the server writes under owner ruling 1 (2026-11-02); `time_zone`, `crawled_text_budget`, `crawled_text_surrogate` because they are value shapes a CHECK does not hold as the contract does; and, since 006d, `access_identity_ua`, `control_untagged`, `access_witness`, `witness_other`, `fly_region`, `timing_order`, `worker_request`, `worker_request_whole`, rules of an `access_tests` row, which only `persist_built_check` writes, after the pipeline parses the row with `AccessTestSchema`. The list is `RULES_AT_WRITE` and `RULE_CHECKS` in `apps/web/__tests__/helpers/v2-contract-storage.ts`:
 
 | Rule                     | Where it is checked                               | Why                                                                                                                                                                                                |
 | ------------------------ | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -117,6 +117,14 @@ A rule becomes a CHECK here only where it is a predicate on the row's own column
 | `change_baseline`        | the writer (owner ruling 1)                       | reads changes.grade_deltas, a jsonb array, with subject and fix_id                                                                                                                                 |
 | `crawled_text_budget`    | the writer: a value shape                         | a value shape: the UTF-8 byte budget of crawled text (link_edges.anchor_text, access_tests.identity_sent and body_excerpt, and inside jsonb; inside page_results’ jsonb, the shape CHECKs hold it) |
 | `crawled_text_surrogate` | the writer: a value shape                         | a value shape on crawled text; the writer cuts text with the engine’s toPersistableText (packages/engine/src/text-safety.ts)                                                                       |
+| `access_identity_ua`     | the writer: persist_built_check (006d)            | an access_tests row: only the server writes that table, through persist_built_check after the pipeline parses the row with AccessTestSchema; a CHECK only where the owner rules one (2026-11-08)   |
+| `control_untagged`       | the writer: persist_built_check (006d)            | an access_tests row: only the server writes that table, through persist_built_check after the pipeline parses the row with AccessTestSchema; a CHECK only where the owner rules one (2026-11-08)   |
+| `access_witness`         | the writer: persist_built_check (006d)            | an access_tests row: only the server writes that table, through persist_built_check after the pipeline parses the row with AccessTestSchema; a CHECK only where the owner rules one (2026-11-08)   |
+| `witness_other`          | the writer: persist_built_check (006d)            | an access_tests row: only the server writes that table, through persist_built_check after the pipeline parses the row with AccessTestSchema; a CHECK only where the owner rules one (2026-11-08)   |
+| `fly_region`             | the writer: persist_built_check (006d)            | an access_tests row: only the server writes that table, through persist_built_check after the pipeline parses the row with AccessTestSchema; a CHECK only where the owner rules one (2026-11-08)   |
+| `timing_order`           | the writer: persist_built_check (006d)            | an access_tests row: only the server writes that table, through persist_built_check after the pipeline parses the row with AccessTestSchema; a CHECK only where the owner rules one (2026-11-08)   |
+| `worker_request`         | the writer: persist_built_check (006d)            | an access_tests row: only the server writes that table, through persist_built_check after the pipeline parses the row with AccessTestSchema; a CHECK only where the owner rules one (2026-11-08)   |
+| `worker_request_whole`   | the writer: persist_built_check (006d)            | an access_tests row: only the server writes that table, through persist_built_check after the pipeline parses the row with AccessTestSchema; a CHECK only where the owner rules one (2026-11-08)   |
 
 Enums inside jsonb columns, enforced by the same writer (`NESTED`):
 
@@ -147,6 +155,7 @@ Enums inside jsonb columns, enforced by the same writer (`NESTED`):
 | `TechnicalSeoPending`  | `site_fixes.effect`                                                                           |
 | `Verdict`              | `checks.crawlers`, `page_results.robots_search`                                               |
 | `WithheldReason`       | `checks.ai_readability`, `site_fixes.effect`                                                  |
+| `WitnessRole`          | `access_tests.witness`                                                                        |
 
 ## Production, measured before approval (D8)
 

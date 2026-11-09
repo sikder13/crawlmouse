@@ -369,7 +369,7 @@ function contractLists(jsonbChecks: string): string {
     '',
     '### Contract rules the database does not check',
     '',
-    `Where a rule reads inside jsonb on a table only the server writes, it is the writer’s (owner ruling 1). The site_fixes CHECKs that read inside jsonb are the exceptions, each with the migration that made it: ${jsonbChecks}. Those there by 007 were CHECKs before the ruling and stay; those added later are CC-17’s effect rules, which the owner ruled CHECKs for CC-06c (2026-11-08; docs/specs/v2/06c-trial-function.md). The table gives the reason for each rule here. The writer must parse the row with the contract schema before inserting it; nothing in this step does, because nothing writes these tables yet (follow-up below).`,
+    `Where a rule reads inside jsonb on a table only the server writes, it is the writer’s (owner ruling 1). The site_fixes CHECKs that read inside jsonb are the exceptions, each with the migration that made it: ${jsonbChecks}. Those there by 007 were CHECKs before the ruling and stay; those added later are CC-17’s effect rules, which the owner ruled CHECKs for CC-06c (2026-11-08; docs/specs/v2/06c-trial-function.md). The table gives the reason for each rule here. The writer must parse the row with the contract schema before inserting it: \`persistBuiltCheck\` (\`apps/web/lib/v2/pipeline/persist.ts\`, CC-20b) does, before \`persist_built_check\` (migration 008) writes the check.`,
     '',
     table(
       ['Rule', 'Why not a CHECK'],

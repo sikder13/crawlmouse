@@ -49,7 +49,7 @@ Policies:
 
 Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
-Which tables name it. The measurement tables carry a required `lineage_id`: `access_tests`, `link_edges`, `page_results`, and `research.check_runs`. `checks.lineage_id` names the lineage of the grading and is set exactly when the check has results (`checks_lineage`). `research.crawler_observations` reach theirs through their run. Every other table with a `check_id` is declared derived: `alert_events`, `changes`, `check_ledger_links`, `evidence_blobs`, `fix_events`, `frontier`, `frontier_politeness`, `public_reports`, `usage_events`. A table with a `check_id` in neither list fails `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "lineage"`.
+Which tables name it. The measurement tables carry a required `lineage_id`: `access_tests`, `link_edges`, `page_results`, and `research.check_runs`. `checks.lineage_id` names the lineage of the grading and is set exactly when the check has results (`checks_lineage`). `research.crawler_observations` reach theirs through their run. Every other table with a `check_id` is declared derived: `alert_events`, `changes`, `check_ledger_links`, `crawl_batches`, `persist_chunks`, `evidence_blobs`, `fix_events`, `frontier`, `frontier_politeness`, `public_reports`, `usage_events`. A table with a `check_id` in neither list fails `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "lineage"`.
 
 Where the values come from. The schema requires them now; producing them is a follow-up, because nothing in the engine or the worker carries a version today:
 
@@ -227,10 +227,10 @@ CHECKs:
 - `check_runs_frontend_framework_check`: `CHECK ((frontend_framework = ANY (ARRAY['nextjs'::text, 'shopify_liquid'::text, 'shopify_hydrogen'::text, 'wordpress'::text, 'webflow'::text, 'generic'::text])))`
 - `check_runs_observed_month`: `CHECK ((EXTRACT(day FROM observed_month) = (1)::numeric))`
 - `check_runs_shares`: `CHECK ((((share_2xx >= (0)::numeric) AND (share_2xx <= (1)::numeric)) AND ((share_3xx >= (0)::numeric) AND (share_3xx <= (1)::numeric)) AND ((share_4xx >= (0)::numeric) AND (share_4xx <= (1)::numeric)) AND ((share_5xx >= (0)::numeric) AND (share_5xx <= (1)::numeric)) AND ((share_unanswered >= (0)::numeric) AND (share_unanswered <= (1)::numeric)) AND ((((((share_2xx + share_3xx) + share_4xx) + share_5xx) + share_unanswered) = (0)::numeric) OR ((((((share_2xx + share_3xx) + share_4xx) + share_5xx) + share_unanswered) >= 0.98) AND (((((share_2xx + share_3xx) + share_4xx) + share_5xx) + share_unanswered) <= 1.02)))))`
-- `check_runs_signals_detected_check`: `CHECK ((signals_detected <@ ARRAY['schema_org'::text, 'content_signals'::text, 'web_bot_auth'::text, 'llms_txt'::text, 'mcp_server_card'::text, 'markdown_negotiation'::text, 'agent_skills_index'::text]))`
+- `check_runs_signals_detected_check`: `CHECK ((signals_detected <@ ARRAY['schema_org'::text, 'content_signals'::text, 'web_bot_auth'::text, 'llms_txt'::text, 'mcp_server_card'::text, 'markdown_negotiation'::text, 'agent_skills_index'::text, 'ucp'::text, 'rsl'::text, 'agent_card'::text, 'llms_full'::text]))`
 - `check_runs_signals_detected_distinct`: `CHECK (research.text_array_distinct(signals_detected))`
 - `check_runs_signals_disjoint`: `CHECK ((NOT (signals_detected && signals_indeterminate)))`
-- `check_runs_signals_indeterminate_check`: `CHECK ((signals_indeterminate <@ ARRAY['schema_org'::text, 'content_signals'::text, 'web_bot_auth'::text, 'llms_txt'::text, 'mcp_server_card'::text, 'markdown_negotiation'::text, 'agent_skills_index'::text]))`
+- `check_runs_signals_indeterminate_check`: `CHECK ((signals_indeterminate <@ ARRAY['schema_org'::text, 'content_signals'::text, 'web_bot_auth'::text, 'llms_txt'::text, 'mcp_server_card'::text, 'markdown_negotiation'::text, 'agent_skills_index'::text, 'ucp'::text, 'rsl'::text, 'agent_card'::text, 'llms_full'::text]))`
 - `check_runs_signals_indeterminate_distinct`: `CHECK (research.text_array_distinct(signals_indeterminate))`
 - `check_runs_signals_indeterminate_ndims`: `CHECK (((NOT (array_ndims(signals_indeterminate) IS DISTINCT FROM 1)) OR (cardinality(signals_indeterminate) = 0)))`
 - `check_runs_signals_ndims`: `CHECK (((NOT (array_ndims(signals_detected) IS DISTINCT FROM 1)) OR (cardinality(signals_detected) = 0)))`
