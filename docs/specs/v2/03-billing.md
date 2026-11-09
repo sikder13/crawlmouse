@@ -82,7 +82,10 @@ signature.
    never recorded as foreign (review finding 4). Prices go through the allow-list; grants need allow-listed
    prices and revokes do not (Q11). An update whose retrieved status differs from its payload's, and a
    payment failure whose retrieved status is not `past_due` or `unpaid`, are recorded `superseded` and apply
-   nothing: the event that made the change carries it.
+   nothing: the event that made the change carries it. A checkout whose subscription Stripe still shows
+   `incomplete` throws, so Stripe retries it until the subscription is `active` or, after 23 hours,
+   `incomplete_expired` (review round 1, money m2). Live mode retries for three days; a sandbox retries a few
+   times over hours, so a sandbox checkout left `incomplete` longer can run out of retries.
 3. **Decide** through `applyEntitlementTransition` with a store whose `commit` and `confirm` call one RPC,
    `apply_stripe_event(p jsonb)`, below. A version conflict re-runs steps 2–3, at most three more times.
 4. **Dispatch** exactly the effects the RPC recorded (`lib/billing/effects.ts`), then stamp `processed_at`.
@@ -115,8 +118,8 @@ Postgres: `scripts/db/stripe-event-race.test.ts`, run by CI's `db-cli-files` job
 
 The webhook plans a `cancel` effect, durable in the same stored plan (Q10, Q13):
 
-- **Orphaned.** A checkout whose grant is ignored for any reason but "already the current subscription"
-  (a customer mismatch included) and whose subscription is live (`trialing`, `active`, `past_due`); a
+- **Orphaned.** A checkout whose grant is ignored, unless the account already follows that very
+  subscription (a paid checkout and an agency trial alike; a customer mismatch included) and whose subscription is live (`trialing`, `active`, `past_due`); a
   checkout our route opened (its `client_reference_id` and `metadata.account_id` name the account) whose
   prices or extras the allow-list refuses, as after a deploy that changed `prices.ts` while the session
   was open (review round 1, M1); and the subscription an applied checkout replaced, when it is still
