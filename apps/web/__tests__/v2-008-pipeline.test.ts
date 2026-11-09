@@ -9,6 +9,7 @@ import {
   PERSIST_RPC,
   SITE_SCHEDULE_COLUMNS,
 } from '../lib/v2/pipeline/columns';
+import { FAILURE_REASONS } from '../lib/v2/pipeline/limits';
 import { catalogSnapshot } from './helpers/catalog-snapshot';
 import {
   applyAllMigrations,
@@ -22,10 +23,11 @@ import { before, through } from './helpers/v2-check-tables';
 /**
  * Migration 008 (CC-20b, D6, Q11 and Q13): crawl_batches and persist_chunks, the pipeline's columns
  * on checks and sites, the one-running-check-per-site index, the state functions claim_check,
- * fail_check and reap_stalled_checks, and stage_check_rows and persist_built_check. What the last two
- * write, and that a check is written once and whole, is tested through their one caller
- * (apps/web/lib/v2/pipeline/persist.test.ts, round-trip.test.ts) on a check the engine built; this
- * file holds the catalog, the grants and the three state functions.
+ * fail_check and reap_stalled_checks, the failure reasons they may write (check_failure_reasons, held
+ * equal to the pipeline's FAILURE_REASONS here), and stage_check_rows and persist_built_check. What
+ * the last two write, and that a check is written once and whole, is tested through their one caller
+ * (apps/web/lib/v2/pipeline/persist.test.ts, round-trip.test.ts, recheck.test.ts) on a check the
+ * engine built; this file holds the catalog, the grants, the reasons and the three state functions.
  *
  * PGlite has one backend, so two transactions never overlap here: "two claims at once" below runs
  * them in turn, which is the order a real race resolves in once the first commits.
@@ -185,7 +187,7 @@ describe('access', () => {
     expect(rows).toEqual([]);
   });
 
-  it('the five functions: service_role alone may execute them', async () => {
+  it('the six functions: service_role alone may execute them', async () => {
     const { rows } = await db.query<{
       name: string;
       definer: boolean;
@@ -205,7 +207,8 @@ describe('access', () => {
               has_function_privilege('service_role', p.oid, 'EXECUTE') as sr
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public'
-          and p.proname in ('claim_check', 'fail_check', 'reap_stalled_checks', 'stage_check_rows', $1)
+          and p.proname in ('check_failure_reasons', 'claim_check', 'fail_check', 'reap_stalled_checks',
+                            'stage_check_rows', $1)
         order by 1`,
       [PERSIST_RPC],
     );
@@ -219,6 +222,7 @@ describe('access', () => {
       sr: true,
     };
     expect(rows).toEqual([
+      { name: 'check_failure_reasons', ...invoker },
       { name: 'claim_check', ...invoker },
       { name: 'fail_check', ...invoker },
       {
@@ -370,15 +374,91 @@ describe('fail_check', () => {
     expect((await stateOf(check)).failure_reason).toBe('canceled');
   });
 
-  it('is false, and writes nothing, for an ended check, an unknown one, or no id and no run', async () => {
+  it('is true again, and writes nothing, for a retried call: the check already failed with this reason', async () => {
+    const check = await aQueuedCheck(await aSite());
+    await claim(check, 'run-retried');
+    await aBatch(check, 0, 'posted');
+    expect(await fail(check, 'worker_unavailable')).toBe(true);
+    const ended = await stateOf(check);
+    expect(await fail(check, 'worker_unavailable')).toBe(true);
+    expect(await fail(null, 'worker_unavailable', 'run-retried')).toBe(true);
+    expect(await stateOf(check)).toEqual(ended);
+    expect(await batchStatuses(check)).toEqual(['released']);
+  });
+
+  it('is false, and writes nothing, for a check ended with another reason, an unknown one, or no id and no run', async () => {
     const check = await aQueuedCheck(await aSite());
     await fail(check, 'stalled');
     const ended = await stateOf(check);
     expect(await fail(check, 'paused')).toBe(false);
+    expect(await fail(null, 'paused', 'run-never-seen')).toBe(false);
     expect(await stateOf(check)).toEqual(ended);
     expect(await fail(randomUUID(), 'paused')).toBe(false);
     expect(await fail(null, 'paused', null)).toBe(false);
     expect(await fail(null, 'paused', 'run-never-seen')).toBe(false);
+  });
+});
+
+describe('the failure reasons', () => {
+  it('check_failure_reasons() is the pipeline’s FAILURE_REASONS, in order', async () => {
+    const { rows } = await db.query<{ r: string[] }>(`select public.check_failure_reasons() as r`);
+    expect(rows[0]!.r).toEqual([...FAILURE_REASONS]);
+  });
+
+  it.each([...FAILURE_REASONS])('fail_check writes %s', async (reason) => {
+    const check = await aQueuedCheck(await aSite());
+    expect(await fail(check, reason)).toBe(true);
+    expect((await stateOf(check)).failure_reason).toBe(reason);
+  });
+
+  it.each([['timeout'], ['Request timed out: https://example.test/secret'], [''], [null]])(
+    'fail_check refuses %j, and writes nothing',
+    async (reason) => {
+      const check = await aQueuedCheck(await aSite());
+      await claim(check, 'run-refused');
+      const before = await stateOf(check);
+      await expect(
+        db.query(`select public.fail_check($1, $2, null)`, [check, reason]),
+      ).rejects.toThrow(/fail_check: the reason is not one of check_failure_reasons\(\)/);
+      expect(await stateOf(check)).toEqual(before);
+    },
+  );
+
+  it('reap_stalled_checks refuses, and writes nothing, when a reason it writes is not in the list', async () => {
+    const d = (await db.clone()) as PGlite;
+    try {
+      const site = randomUUID();
+      await d.query(
+        `insert into public.sites (id, account_id, host) values ($1, null, 'r.example')`,
+        [site],
+      );
+      const check = randomUUID();
+      await d.query(
+        `insert into public.checks (id, site_id, status, trigger, grade_version, queued_at)
+         values ($1, $2, 'queued', 'manual', '2.0.0', now() - interval '2 hours')`,
+        [check, site],
+      );
+      const reap = () =>
+        d.query(`select * from public.reap_stalled_checks(now() - interval '30 minutes')`);
+      // A list holding one of the two reasons the reaper writes, then the other.
+      for (const kept of ['stalled', 'not_started']) {
+        await d.query(
+          `create or replace function public.check_failure_reasons() returns text[] language sql
+             immutable set search_path = pg_catalog, public, pg_temp
+             as $$ select array['${kept}']::text[] $$`,
+        );
+        await expect(reap()).rejects.toThrow(
+          /reap_stalled_checks: not_started and stalled are not both in check_failure_reasons\(\)/,
+        );
+        const { rows } = await d.query<{ status: string }>(
+          `select status from public.checks where id = $1`,
+          [check],
+        );
+        expect(rows[0]!.status).toBe('queued');
+      }
+    } finally {
+      await d.close();
+    }
   });
 });
 

@@ -2,7 +2,10 @@
 --
 -- Additive. It creates public.crawl_batches and public.persist_chunks; adds checks.inngest_run_id,
 -- heartbeat_at, diff_inputs and map_path, and sites.next_check_at and schedule_offset_min; adds the
--- unique partial index checks_one_running_per_site and the reaper's index; and creates five functions:
+-- unique partial index checks_one_running_per_site and the reaper's index; and creates six functions:
+--   check_failure_reasons: the words a pipeline function may write to checks.failure_reason, which
+--     members of the site read; __tests__/v2-008-pipeline.test.ts holds it equal to FAILURE_REASONS in
+--     inngest/check-events.ts;
 --   claim_check, fail_check, reap_stalled_checks: a check's state moves, each one statement the
 --     pipeline (inngest/check.ts, through apps/web/lib/v2/pipeline) calls as service_role;
 --   stage_check_rows: one chunk of a built check's bulk rows, staged while the check runs;
@@ -14,17 +17,17 @@
 -- Access. RLS is on for crawl_batches and persist_chunks, which no client role or crawl_worker may
 -- touch; service_role reads and writes them. The new checks and sites columns are not granted to any
 -- client role: 003 grants authenticated SELECT on checks and sites column by column, so a column added
--- later stays hidden. Only service_role may execute the five functions.
+-- later stays hidden. Only service_role may execute the six functions.
 --
 -- search_path. persist_built_check is SECURITY DEFINER (it creates a month's partitions, which
 -- service_role may not), with search_path pg_catalog, pg_temp and every other name schema-qualified;
--- the other four are SECURITY INVOKER with search_path pg_catalog, public, pg_temp (owner ruling,
+-- the other five are SECURITY INVOKER with search_path pg_catalog, public, pg_temp (owner ruling,
 -- 2026-11-08).
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261109000001_v2_008_pipeline.revert.sql.
 -- Tested by: pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-008-pipeline.test.ts \
---   lib/v2/pipeline/persist.test.ts lib/v2/pipeline/round-trip.test.ts
+--   lib/v2/pipeline/persist.test.ts lib/v2/pipeline/round-trip.test.ts lib/v2/pipeline/recheck.test.ts
 
 -- ─── crawl_batches: one row per batch the pipeline posted to the worker ───────────────────────────
 
@@ -111,6 +114,20 @@ create unique index if not exists checks_one_running_per_site on public.checks (
 create index if not exists checks_heartbeat_idx on public.checks ((coalesce(heartbeat_at, queued_at)))
   where status in ('queued', 'running');
 
+-- ─── check_failure_reasons ────────────────────────────────────────────────────────────────────────
+-- The pipeline's closed list of failure reasons, FAILURE_REASONS in inngest/check-events.ts, in its
+-- order. fail_check and reap_stalled_checks raise rather than write a reason outside it.
+
+create or replace function public.check_failure_reasons()
+returns text[]
+language sql
+immutable
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select array['paused', 'site_busy', 'canceled', 'stalled', 'not_started', 'worker_redeployed',
+               'worker_unavailable', 'build_failed', 'persist_failed', 'internal']::text[]
+$$;
+
 -- ─── claim_check ──────────────────────────────────────────────────────────────────────────────────
 -- 'claimed' when it moved the check from queued to running (start time to the millisecond, the
 -- precision a JavaScript Date holds; progress, run and heartbeat), and again when the check already
@@ -156,15 +173,24 @@ $$;
 -- ─── fail_check ───────────────────────────────────────────────────────────────────────────────────
 -- Moves a queued or running check to failed with p_reason, found by p_check, or by its run when
 -- p_check is null: finished now, started now if it never started (the contract gives a failed check a
--- start), progress cleared, its posted batches released and its staged chunks deleted. True only when
--- it made that move.
+-- start), progress cleared, its posted batches released and its staged chunks deleted, in one
+-- statement. True when it made that move, and when the check it finds is already failed with
+-- p_reason (a retried call, which writes nothing); false otherwise. Raises, writing nothing, for a
+-- p_reason outside check_failure_reasons().
 
 create or replace function public.fail_check(p_check uuid, p_reason text, p_run text default null)
 returns boolean
-language sql
+language plpgsql
 volatile
 set search_path = pg_catalog, public, pg_temp
 as $$
+declare
+  v_moved boolean;
+begin
+  if p_reason is null or not (p_reason = any (public.check_failure_reasons())) then
+    raise exception 'fail_check: the reason is not one of check_failure_reasons()'
+      using errcode = '22023';
+  end if;
   with failed as (
     update public.checks c
        set status = 'failed',
@@ -182,25 +208,39 @@ as $$
   ), unstaged as (
     delete from public.persist_chunks s where s.check_id in (select f.id from failed f)
   )
-  select exists (select 1 from failed)
+  select exists (select 1 from failed) into v_moved;
+  return v_moved or exists (
+    select 1 from public.checks c
+     where c.status = 'failed' and c.failure_reason = p_reason
+       and case when p_check is not null then c.id = p_check else c.inngest_run_id = p_run end);
+end;
 $$;
 
 -- ─── reap_stalled_checks ──────────────────────────────────────────────────────────────────────────
 -- In one statement: every queued or running check whose heartbeat (its queue time when it has none)
 -- is before p_cutoff fails as fail_check fails one, with reason not_started when no run claimed it and
 -- stalled when one did; its posted batches are released and its staged chunks deleted. Returns the
--- checks it failed.
+-- checks it failed. Raises first, writing nothing, unless both reasons are in check_failure_reasons().
 
 create or replace function public.reap_stalled_checks(p_cutoff timestamptz)
 returns table (check_id uuid, site_id uuid, reason text)
-language sql
+language plpgsql
 volatile
 set search_path = pg_catalog, public, pg_temp
 as $$
+declare
+  v_not_started constant text := 'not_started';
+  v_stalled constant text := 'stalled';
+begin
+  if not (array[v_not_started, v_stalled] <@ public.check_failure_reasons()) then
+    raise exception 'reap_stalled_checks: not_started and stalled are not both in check_failure_reasons()'
+      using errcode = '22023';
+  end if;
+  return query
   with reaped as (
     update public.checks c
        set status = 'failed',
-           failure_reason = case when c.inngest_run_id is null then 'not_started' else 'stalled' end,
+           failure_reason = case when c.inngest_run_id is null then v_not_started else v_stalled end,
            finished_at = date_trunc('milliseconds', now()),
            started_at = coalesce(c.started_at, date_trunc('milliseconds', now())),
            progress = null
@@ -214,7 +254,8 @@ as $$
   ), unstaged as (
     delete from public.persist_chunks s where s.check_id in (select r.id from reaped r)
   )
-  select r.id, r.site_id, r.failure_reason from reaped r
+  select r.id, r.site_id, r.failure_reason from reaped r;
+end;
 $$;
 
 -- ─── stage_check_rows ─────────────────────────────────────────────────────────────────────────────
@@ -279,8 +320,8 @@ $$;
 --      (otherwise the event is skipped and counted as skipped).
 --   6. updates the check's pipeline-owned columns last, so every checks_* CHECK holds as it ends.
 -- Each insert's row count must equal the expected count, checked as it is made; a difference raises.
--- It never writes expires_at, result_email, deferred_until or failure_reason. Returns
--- {"written": true, "counts": {…}}.
+-- It does not write expires_at, result_email, deferred_until or failure_reason (persist.test.ts,
+-- "does not write"). Returns {"written": true, "counts": {…}}.
 
 create or replace function public.persist_built_check(p jsonb)
 returns jsonb
@@ -608,17 +649,18 @@ $$;
 
 -- ─── Ownership and grants ─────────────────────────────────────────────────────────────────────────
 
+alter function public.check_failure_reasons() owner to postgres;
 alter function public.claim_check(uuid, text, jsonb) owner to postgres;
 alter function public.fail_check(uuid, text, text) owner to postgres;
 alter function public.reap_stalled_checks(timestamptz) owner to postgres;
 alter function public.stage_check_rows(uuid, text, integer, jsonb) owner to postgres;
 alter function public.persist_built_check(jsonb) owner to postgres;
 
-revoke all on function public.claim_check(uuid, text, jsonb), public.fail_check(uuid, text, text),
-  public.reap_stalled_checks(timestamptz), public.stage_check_rows(uuid, text, integer, jsonb),
-  public.persist_built_check(jsonb)
+revoke all on function public.check_failure_reasons(), public.claim_check(uuid, text, jsonb),
+  public.fail_check(uuid, text, text), public.reap_stalled_checks(timestamptz),
+  public.stage_check_rows(uuid, text, integer, jsonb), public.persist_built_check(jsonb)
   from public, anon, authenticated, service_role;
-grant execute on function public.claim_check(uuid, text, jsonb), public.fail_check(uuid, text, text),
-  public.reap_stalled_checks(timestamptz), public.stage_check_rows(uuid, text, integer, jsonb),
-  public.persist_built_check(jsonb)
+grant execute on function public.check_failure_reasons(), public.claim_check(uuid, text, jsonb),
+  public.fail_check(uuid, text, text), public.reap_stalled_checks(timestamptz),
+  public.stage_check_rows(uuid, text, integer, jsonb), public.persist_built_check(jsonb)
   to service_role;
