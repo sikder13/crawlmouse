@@ -78,7 +78,7 @@ describe('middleware (exported entrypoint)', () => {
       {
         reason: 'cross_site',
         route: 'api/billing/portal',
-        class: 'user',
+        class: 'member',
         method: 'POST',
         status: 403,
       },

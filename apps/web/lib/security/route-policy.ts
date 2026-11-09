@@ -100,8 +100,8 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     origin: 'strict',
   },
   { route: 'api/billing/cancel', methods: ['POST'], class: 'member', origin: 'strict' },
-  { route: 'api/billing/checkout', methods: ['POST'], class: 'user', origin: 'strict' },
-  { route: 'api/billing/portal', methods: ['POST'], class: 'user', origin: 'strict' },
+  { route: 'api/billing/checkout', methods: ['POST'], class: 'member', origin: 'strict' },
+  { route: 'api/billing/portal', methods: ['POST'], class: 'member', origin: 'strict' },
   { route: 'api/billing/status', methods: ['GET'], class: 'user', origin: 'any' },
   { route: 'api/checks/[id]/claim', methods: ['POST'], class: 'user', origin: 'strict' },
   {
