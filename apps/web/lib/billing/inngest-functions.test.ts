@@ -56,7 +56,7 @@ describe('billingFunctions and the nightly reconcile (CC-03 D10)', () => {
     const { reconcileBillingHandler } = await import('../../../../inngest/billing');
     const ran: string[] = [];
     const step = {
-      run: async (id: string, body: () => unknown) => {
+      run: async (id: string, _body: () => unknown) => {
         ran.push(id);
         return id === 'reconcile-dry-run' ? { dryRun: true } : undefined;
       },
