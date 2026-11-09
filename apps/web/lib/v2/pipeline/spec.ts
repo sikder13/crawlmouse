@@ -236,7 +236,7 @@ export function buildSpec20b(): string {
       ],
     ),
     '',
-    `Each step returns under ${STEP_OUTPUT_BYTES} bytes as JSON; bulk data goes to the private \`${EVIDENCE_BUCKET}\` bucket, at \`${evidencePath(EXAMPLE_OWNER, 'batch-0').replace('anon/', '{account_id|anon}/').replace('batch-0', '{name}')}\`.`,
+    `Each step returns under ${STEP_OUTPUT_BYTES} bytes as JSON, which \`sized\` in \`inngest/check.ts\` enforces (\`pnpm --filter @crawlmouse/inngest exec vitest run check.test.ts\`); bulk data goes to the private \`${EVIDENCE_BUCKET}\` bucket, at \`${evidencePath(EXAMPLE_OWNER, 'batch-0').replace('anon/', '{account_id|anon}/').replace('batch-0', '{name}')}\`.`,
     '',
     '## Polling and time',
     '',
