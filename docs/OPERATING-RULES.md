@@ -214,6 +214,15 @@ These are load-bearing. Touching them is a regression unless explicitly approved
   repo default is squash-merge, flag it before merging.
 - **Migrations are owner-applied only**, via runbook, with the exact SQL approved and dry-run first.
   Never apply them autonomously.
+- **Coding sessions never start a production workflow.** `db-apply-prod.yml` and
+  `db-rollback-prod.yml` run only when the owner dispatches them from `main`
+  (`docs/ops/db-migrations.md`). A session does not dispatch, re-run or cancel either, in any form,
+  on any branch, even with a token that could. Their owner check tells accounts apart, not tools, so
+  this rule is the control for a session that holds the owner's login.
+- **The secret-scan discipline outlives the repository going private.** The repository was public
+  from 2026-08 until the owner's flip after CC-REPO (`docs/specs/v2/repo-private.md`); its history
+  was world-readable and copies of it may exist anywhere. Scan before every push as before, and treat
+  any secret ever committed as exposed.
 - **New worktree setup:** `apps/web/.env.local` is gitignored and therefore absent from a fresh
   worktree, so `next build` fails there on `/api/billing/checkout` page-data collection. Copy it in
   from an existing checkout before running the build gate. This failure is environmental, not a branch
