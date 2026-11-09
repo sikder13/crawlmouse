@@ -11,6 +11,7 @@
  */
 import type { AccessTest, CrawlBatchResult, Fix, PageResult } from '@crawlmouse/types/v2';
 import { inSiteScope } from '../../extract.js';
+import { MAX_TEMPLATE_KEY_LENGTH, MAX_URL_LENGTH } from '../batch-bounds.js';
 import { canonicalizeUrl } from '../../url-canonical.js';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
 import { FREE_MAX_RENDERS, type RenderCandidate } from '../render/sample.js';
@@ -72,7 +73,7 @@ export function nextCrawlBatch(
   const next: string[] = [];
   for (const raw of queue) {
     const url = canonicalizeUrl(raw);
-    if (asked.has(url)) continue;
+    if (asked.has(url) || url.length > MAX_URL_LENGTH) continue;
     asked.add(url);
     next.push(url);
     if (next.length === room) break;
@@ -82,8 +83,8 @@ export function nextCrawlBatch(
 
 /**
  * The seeds the crawl requests: the homepage's, and the sitemap's on the homepage's host and the
- * default port. A sitemap can list another host (www against the apex) or port; those are neither
- * crawled nor counted as discovered.
+ * default port, within the worker's URL limit. A sitemap can list another host (www against the
+ * apex), port, or a URL past that limit; those are neither crawled nor counted as discovered.
  */
 export function crawlableSeeds(seeds: readonly Seed[]): Seed[] {
   const home = seeds.find((s) => s.source === 'homepage');
@@ -91,14 +92,17 @@ export function crawlableSeeds(seeds: readonly Seed[]): Seed[] {
   return seeds.filter((s) => {
     if (s.source === 'homepage' || host === null) return true;
     const url = new URL(s.url);
-    return url.hostname === host && url.port === '';
+    return (
+      url.hostname === host && url.port === '' && canonicalizeUrl(s.url).length <= MAX_URL_LENGTH
+    );
   });
 }
 
 /**
  * The URLs the batches discovered that the worker would fetch for the site (`inSiteScope`: its host or
- * the www twin, on the default port), batch by batch in the order each found them. A link to another
- * port is neither crawled nor counted as discovered: a batch holding it would be refused whole.
+ * the www twin, on the default port; within MAX_URL_LENGTH), batch by batch in the order each found
+ * them. Any other link is neither crawled nor counted as discovered: a batch holding it would be
+ * refused whole.
  */
 export function crawlableDiscovered(
   seeds: readonly Seed[],
@@ -108,7 +112,11 @@ export function crawlableDiscovered(
   const site = home ? new URL(home.url) : null;
   return crawl
     .flatMap((b) => b.discovered_urls)
-    .filter((u) => site === null || inSiteScope(new URL(u), site));
+    .filter(
+      (u) =>
+        canonicalizeUrl(u).length <= MAX_URL_LENGTH &&
+        (site === null || inSiteScope(new URL(u), site)),
+    );
 }
 
 /**
@@ -170,7 +178,10 @@ export function sample(
   assembled: Pick<Assembled, 'pages' | 'rows' | 'homepage_url' | 'access_tests'>,
 ): Sample {
   const { pages, rows, homepage_url } = assembled;
-  const eligible = pages.filter((p) => p.status_code === 200 && p.is_html);
+  // A page whose template key the worker would refuse in an access batch is not tested.
+  const eligible = pages.filter(
+    (p) => p.status_code === 200 && p.is_html && p.template_key.length <= MAX_TEMPLATE_KEY_LENGTH,
+  );
   const picked: SampledPage[] = [];
   const taken = new Set<string>();
   const covered = new Set<string>();

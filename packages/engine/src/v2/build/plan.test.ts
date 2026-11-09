@@ -18,6 +18,7 @@ import {
 import { canonicalizeUrl } from '../../url-canonical.js';
 import { assemble } from './assemble.js';
 import { readBatches } from './batches.js';
+import { MAX_TEMPLATE_KEY_LENGTH, MAX_URL_LENGTH } from '../batch-bounds.js';
 import { nextCrawlBatch, sample, STAGE1_CHALLENGED, STAGE1_MAX_PAGES } from './plan.js';
 import type { Seed } from './types.js';
 
@@ -67,6 +68,24 @@ describe('stage 1', () => {
     const s = sample(assembled(rows));
     expect(s.stage1).toHaveLength(STAGE1_MAX_PAGES);
     expect(s.stage1.filter((p) => p.picked_for === 'challenged')).toHaveLength(STAGE1_CHALLENGED);
+  });
+});
+
+describe('stage 1 bounds', () => {
+  // An access batch's template keys are bounded by the worker (invalid_body past it); a crawler trap
+  // (/a/b/a/b/…) gives a key per depth, each longer than the last.
+  it('samples no page whose template key is over the worker’s limit', () => {
+    const deep = `/${Array.from({ length: Math.ceil(MAX_TEMPLATE_KEY_LENGTH / 2) + 1 }, () => 'a').join('/')}`;
+    // The fixture's title is `Page <url>`, which a URL this long would push past the title's own
+    // bound; the row is made on a short URL and then given the long one.
+    const trap = { ...ok('/trap'), url: at(deep), final_url: at(deep) };
+    const rows = [ok(''), ok('/plain/page'), trap];
+    const a = assembled(rows);
+    expect(a.pages.find((p) => p.url === at(deep))!.template_key.length).toBeGreaterThan(
+      MAX_TEMPLATE_KEY_LENGTH,
+    );
+    expect(sample(a).stage1.map((p) => p.url)).not.toContain(at(deep));
+    expect(sample(a).stage1.map((p) => p.url)).toContain(at('/plain/page'));
   });
 });
 
@@ -284,6 +303,23 @@ describe('nextCrawlBatch', () => {
       readBatches([batch], { id: CHECK, site_id: SITE }, 'unreleased'),
     );
     expect(a.coverage.pages_discovered).toBe(3);
+  });
+
+  // The worker refuses a whole batch holding a URL over its request limit (invalid_body), and a
+  // sitemap's <loc> can be any length.
+  it('plans no URL over the worker’s URL limit, from a sitemap or a link', () => {
+    const long = at(`/${'x'.repeat(MAX_URL_LENGTH)}`);
+    const seeds: Seed[] = [
+      { url: HOME, source: 'homepage', lastmod: null },
+      { url: long, source: 'sitemap', lastmod: null },
+    ];
+    const batch = crawlBatch(
+      0,
+      [crawlRow({ url: HOME, outcome: 'fetched', status: 200 })],
+      [],
+      [`${long}/linked`, at('/ok')],
+    );
+    expect(nextCrawlBatch(seeds, [batch], 500)).toEqual([at('/ok')]);
   });
 
   it('crawls no sitemap seed on another port', () => {

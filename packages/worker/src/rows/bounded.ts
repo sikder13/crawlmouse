@@ -1,4 +1,8 @@
-import { ROBOTS_PARSE_LIMIT_BYTES, toPersistableText } from '@crawlmouse/engine/worker';
+import {
+  MAX_URL_LENGTH,
+  ROBOTS_PARSE_LIMIT_BYTES,
+  toPersistableText,
+} from '@crawlmouse/engine/worker';
 import {
   DECLARATION_MEDIA_TYPE_BYTES,
   JSON_LD_TYPE_BYTES,
@@ -39,8 +43,11 @@ const exact = (chars: number): WholeCap => ({ kind: 'exact', chars });
 /** UTF-8 bytes a string of `chars` UTF-16 units can take: at most three per unit. */
 const MAX_BYTES_PER_CHAR = 3;
 
-/** The longest URL the worker reads, follows, links from or stores; the request schema holds URLs to the same. */
-export const MAX_URL_LENGTH = 2048;
+/**
+ * The longest URL the worker reads, follows, links from or stores; the request schema holds URLs to
+ * the same. The engine's (v2/batch-bounds.ts), which the check builder's planner reads too.
+ */
+export { MAX_URL_LENGTH };
 
 export const CAPS = {
   url: whole(MAX_URL_LENGTH),

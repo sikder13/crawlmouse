@@ -17,6 +17,7 @@ export {
 } from '../robots.js';
 export type { ParsedRobots, RobotsRules } from '../robots.js';
 export { extractPage, inSiteScope, sameHostIgnoringWww } from '../extract.js';
+export { MAX_TEMPLATE_KEY_LENGTH, MAX_URL_LENGTH } from './batch-bounds.js';
 export type { ExtractedLink, ExtractedPage } from '../extract.js';
 export { toPersistableText } from '../text-safety.js';
 export { canonicalizeUrl } from '../url-canonical.js';

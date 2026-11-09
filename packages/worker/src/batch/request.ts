@@ -1,4 +1,8 @@
-import { canonicalizeUrl } from '@crawlmouse/engine/worker';
+import {
+  canonicalizeUrl,
+  MAX_TEMPLATE_KEY_LENGTH,
+  MAX_URL_LENGTH,
+} from '@crawlmouse/engine/worker';
 import { z } from 'zod';
 import { HttpUrlSchema, IdSchema, TemplateKeySchema } from '@crawlmouse/types/v2';
 
@@ -20,7 +24,7 @@ const BudgetSchema = z.strictObject({
   max_seconds: z.int().min(1).max(BUDGET_CEILINGS.max_seconds),
 });
 
-const UrlSchema = HttpUrlSchema.max(2048);
+const UrlSchema = HttpUrlSchema.max(MAX_URL_LENGTH);
 /** A URL listed twice would be fetched twice; compared as the crawl compares pages (fragment, host case and the rest). */
 const distinct = (urls: readonly string[]): boolean =>
   new Set(urls.map((u) => (URL.canParse(u) ? canonicalizeUrl(u) : u))).size === urls.length;
@@ -44,7 +48,12 @@ export const BatchRequestSchema = z.discriminatedUnion('kind', [
     kind: z.literal('access'),
     ...common,
     pages: z
-      .array(z.strictObject({ url: UrlSchema, template_key: TemplateKeySchema.max(512) }))
+      .array(
+        z.strictObject({
+          url: UrlSchema,
+          template_key: TemplateKeySchema.max(MAX_TEMPLATE_KEY_LENGTH),
+        }),
+      )
       .min(1)
       .max(MAX_URLS_PER_BATCH)
       .refine((pages) => distinct(pages.map((p) => p.url)), 'duplicate URL'),
