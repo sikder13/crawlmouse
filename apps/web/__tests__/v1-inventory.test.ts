@@ -31,7 +31,7 @@ import {
 import {
   BLOCKS,
   CHECK_KEYS,
-  type Inventory,
+  type Finding,
   readBlock,
   renderCounts,
   renderCutover,
@@ -63,7 +63,10 @@ type Entry = {
 
 const WEB = join(REPO_ROOT, 'apps/web');
 const INVENTORY = join(REPO_ROOT, 'docs/ops/v1-inventory.json');
-const inventory = JSON.parse(readFileSync(INVENTORY, 'utf8')) as Inventory & { items: Entry[] };
+const inventory = JSON.parse(readFileSync(INVENTORY, 'utf8')) as {
+  items: Entry[];
+  findings: Finding[];
+};
 const items = inventory.items;
 const live = items.filter((e) => e.ruling !== 'delete');
 const pathsOf = (kind: Kind) =>
