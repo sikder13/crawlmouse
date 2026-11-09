@@ -373,6 +373,17 @@ export const ROWS = {
     occurred_at: T2,
     idempotency_key: `check:${id}`,
   }),
+  crawl_batches: (checkId: string, batch: number): Row => ({
+    check_id: checkId,
+    batch,
+    kind: 'crawl',
+    nonce: `fixture-nonce-${String(batch).padStart(4, '0')}`,
+    status: 'posted',
+    posted_at: T1,
+    finished_at: null,
+    summary: null,
+    result_path: null,
+  }),
 } as const;
 
 /** A valid research.check_runs row (the ledger is not in `public`, so not in ROWS). */
@@ -435,11 +446,13 @@ export async function premakeTestMonths(db: Db): Promise<void> {
 export type NewTable = keyof typeof ROWS;
 /** The public tables 006b creates. */
 export const TABLES_006B: readonly NewTable[] = ['check_ledger_links', 'usage_events'];
+/** The public table 008 creates. */
+export const TABLES_008: readonly NewTable[] = ['crawl_batches'];
 /** The tables 003 creates. */
 export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
-  .filter((t) => !TABLES_006B.includes(t))
+  .filter((t) => !TABLES_006B.includes(t) && !TABLES_008.includes(t))
   .sort();
-/** Every public table 003 and 006b create. */
+/** Every public table 003, 006b and 008 create. */
 export const ALL_NEW_TABLES = (Object.keys(ROWS) as NewTable[]).sort();
 
 /** Where a seeded row belongs: one of the account's two sites, or the account as a whole. */
@@ -473,6 +486,11 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.usage_events')::text as t`,
   );
   const with006b = found[0]!.t !== null;
+  // Nor, migrated before 008, crawl_batches.
+  const { rows: batches } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.crawl_batches')::text as t`,
+  );
+  const with008 = batches[0]!.t !== null;
   // A database migrated before 006d (the revert tests of 003 to 006c) has no identity columns.
   const { rows: identity } = await db.query<{ n: number }>(
     `select count(*)::int as n from pg_attribute
@@ -557,6 +575,14 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       );
       const usage = randomUUID();
       await put('usage_events', ROWS.usage_events(usage, accountId, checkId), { id: usage }, scope);
+    }
+    if (with008) {
+      await put(
+        'crawl_batches',
+        ROWS.crawl_batches(checkId, 0),
+        { check_id: checkId, batch: 0 },
+        scope,
+      );
     }
     const fixId = randomUUID();
     await put('site_fixes', ROWS.site_fixes(fixId, siteId, checkId, ++k), { id: fixId }, scope);

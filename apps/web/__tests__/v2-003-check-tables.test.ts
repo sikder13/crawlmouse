@@ -31,6 +31,7 @@ import {
   type World,
 } from './helpers/v2-check-tables';
 import { RULE_CHECKS } from './helpers/v2-contract-storage';
+import { CHECK_PIPELINE_COLUMNS, SITE_SCHEDULE_COLUMNS } from '../lib/v2/pipeline/columns';
 
 /**
  * Migration 003 of the v2 build: the check-data tables. Everything runs the real migration files
@@ -184,6 +185,9 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
     case 'usage_events':
       await needCheck();
       return ROWS.usage_events(randomUUID(), world.accountId, check);
+    case 'crawl_batches':
+      await needCheck();
+      return ROWS.crawl_batches(check, 0);
   }
 }
 
@@ -248,8 +252,9 @@ describe('the row builders', () => {
 /** Columns `authenticated` may not select; `null` = no client privilege of any kind. */
 const HIDDEN: Record<NewTable, string[] | null> = {
   measurement_lineages: [],
-  sites: [],
-  checks: [],
+  // 008's pipeline columns: no client reads them.
+  sites: [...SITE_SCHEDULE_COLUMNS],
+  checks: [...CHECK_PIPELINE_COLUMNS],
   page_results: [],
   link_edges: [],
   access_tests: [],
@@ -267,6 +272,7 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   seat_sites: [],
   check_ledger_links: null,
   usage_events: null,
+  crawl_batches: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -320,6 +326,8 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   };
   if (table === 'alert_rules') expectedTable.authenticated = 'd';
   if (table === 'page_results') expectedTable.crawl_worker = 'a';
+  // 008 grants service_role the four statements the pipeline runs, not every privilege.
+  if (table === 'crawl_batches') expectedTable.service_role = 'arwd';
   const actualTable = Object.fromEntries(tableAcl.map((a) => [a.grantee, sorted(a.privileges)]));
   for (const g of new Set([...Object.keys(expectedTable), ...Object.keys(actualTable)])) {
     if ((actualTable[g] ?? '') !== sorted(expectedTable[g] ?? ''))
@@ -478,6 +486,11 @@ const RULE_CASES: Record<
   string,
   { table: NewTable | 'seats'; row: () => Promise<Record<string, unknown>> }
 > = {
+  // 008.
+  sites_schedule_offset_min: {
+    table: 'sites',
+    row: async () => ({ ...(await freshRow('sites')), schedule_offset_min: 60 }),
+  },
   sites_schedule_complete: {
     table: 'sites',
     row: async () => ({ ...(await freshRow('sites')), schedule_cadence: null }),

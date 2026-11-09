@@ -17,6 +17,7 @@ export const DERIVED_TABLES = [
   'alert_events',
   'changes',
   'check_ledger_links',
+  'crawl_batches',
   'evidence_blobs',
   'fix_events',
   'frontier',
