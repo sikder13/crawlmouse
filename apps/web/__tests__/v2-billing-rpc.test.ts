@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import type { PGlite } from '@electric-sql/pglite';
+import { PGlite } from '@electric-sql/pglite';
+import { pageinspect } from '@electric-sql/pglite/contrib/pageinspect';
+import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { next, type EntitlementEvent } from '../lib/billing/state-machine';
 import {
@@ -14,6 +16,7 @@ import {
   applyAllMigrations,
   asRole,
   freshDb,
+  PLATFORM_SHIM,
   readMigration,
   readRollback,
 } from './helpers/pglite-migrations';
@@ -792,6 +795,135 @@ describe("a caller's temporary objects are not used by the function", () => {
       await d.close();
     }
   });
+});
+
+// ─── The locks ─────────────────────────────────────────────────────────────────────────────────────
+
+describe('the rows the call holds FOR UPDATE until its transaction ends (PGlite: read from the tuple header)', () => {
+  // PGlite cannot run a second transaction against a held lock. What it can show: a row this
+  // transaction locked and did not update carries the transaction's id as xmax, and pageinspect's
+  // flags say which lock: FOR UPDATE sets HEAP_XMAX_EXCL_LOCK and HEAP_KEYS_UPDATED, where the KEY
+  // SHARE a foreign key check takes sets neither. Each case runs on the real migration and on a copy
+  // with that one lock removed, where it must not hold. The races themselves are
+  // scripts/db/stripe-event-race.test.ts.
+  const LOCKS = {
+    ledger: '     for update of e;\n',
+    subscription: '       for update of s;\n',
+    account: '       for update of a;\n',
+  } as const;
+  type Lock = keyof typeof LOCKS;
+
+  async function inspectable(unlock: Lock | null): Promise<PGlite> {
+    const d = new PGlite({ extensions: { pgcrypto, pageinspect } });
+    await d.exec(PLATFORM_SHIM);
+    await applyAllMigrations(d, (sql) => {
+      if (
+        unlock === null ||
+        !sql.includes('create or replace function public.apply_stripe_event')
+      ) {
+        return sql;
+      }
+      if (sql.split(LOCKS[unlock]).length !== 2)
+        throw new Error(`the ${unlock} lock is not there once`);
+      return sql.replace(LOCKS[unlock], ';\n');
+    });
+    await d.exec('create extension pageinspect');
+    return d;
+  }
+
+  /** Whether the transaction that ran `p` holds `table`'s row `id` FOR UPDATE when the call returns. */
+  async function heldForUpdate(d: PGlite, p: unknown, table: string, id: string): Promise<boolean> {
+    return asRole(d, 'service_role', null, async (tx) => {
+      await tx.query(`select public.apply_stripe_event($1::jsonb)`, [JSON.stringify(p)]);
+      await tx.exec('reset role'); // pageinspect is the superuser's
+      const { rows } = await tx.query<{ mine: boolean; flags: string[] }>(
+        `with t as (select (ctid::text::point)[0]::int as blk, (ctid::text::point)[1]::int as lp
+                      from public.${table} where id = $1)
+         select h.t_xmax = pg_current_xact_id()::xid as mine, f.raw_flags as flags
+           from t, heap_page_items(get_raw_page('public.${table}', t.blk)) h,
+                heap_tuple_infomask_flags(h.t_infomask, h.t_infomask2) f
+          where h.lp = t.lp`,
+        [id],
+      );
+      const r = rows[0]!;
+      return (
+        r.mine &&
+        ['HEAP_XMAX_LOCK_ONLY', 'HEAP_XMAX_EXCL_LOCK', 'HEAP_KEYS_UPDATED'].every((f) =>
+          r.flags.includes(f),
+        )
+      );
+    });
+  }
+
+  /** The ledger row of an event decided before: the call reads it and writes nothing. */
+  async function ledgerCase(d: PGlite) {
+    const id = eventId();
+    await ledger(d, id);
+    await call(d, recordOnly(id, null));
+    return heldForUpdate(d, recordOnly(id, null), 'stripe_events', id);
+  }
+
+  /** The subscription row under an older gated event, which writes nothing to it. */
+  async function subscriptionCase(d: PGlite) {
+    const account = await freshAccount(d);
+    const sub = subId();
+    await proCheckout(d, account, sub, 100);
+    const id = eventId();
+    await ledger(d, id);
+    return heldForUpdate(
+      d,
+      {
+        ...recordOnly(id, account, 50),
+        subscription: { id: sub, gated: true, mirror: mirror(sub) },
+      },
+      'subscriptions',
+      sub,
+    );
+  }
+
+  /** The account under a confirm, which writes nothing to it. */
+  async function accountCase(d: PGlite) {
+    const account = await freshAccount(d);
+    const id = eventId();
+    await ledger(d, id);
+    return heldForUpdate(
+      d,
+      { ...recordOnly(id, account), expected_version: 0 },
+      'accounts',
+      account,
+    );
+  }
+
+  const cases: [Lock, (d: PGlite) => Promise<boolean>][] = [
+    ['ledger', ledgerCase],
+    ['subscription', subscriptionCase],
+    ['account', accountCase],
+  ];
+
+  let real: PGlite;
+  beforeAll(async () => {
+    real = await inspectable(null);
+  }, 120_000);
+  afterAll(async () => {
+    await real?.close();
+  });
+
+  it.each(cases)('the %s row is held', async (_lock, run) => {
+    expect(await run(real)).toBe(true);
+  });
+
+  it.each(cases)(
+    'mutation check: without its lock the %s row is not held',
+    async (lock, run) => {
+      const d = await inspectable(lock);
+      try {
+        expect(await run(d)).toBe(false);
+      } finally {
+        await d.close();
+      }
+    },
+    120_000,
+  );
 });
 
 // ─── Apply, re-apply, revert ───────────────────────────────────────────────────────────────────────
