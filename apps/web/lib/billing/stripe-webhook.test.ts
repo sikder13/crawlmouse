@@ -621,6 +621,32 @@ describe.each(PORTS)('through the %s port', (p) => {
       ]);
     });
 
+    it.each([
+      ['a price outside the allow-list', { priceIds: ['price_someone_elses'] }],
+      [
+        'our Agency prices with 26 extra sites, which the plan does not sell',
+        { plan: 'agency', sites: 26 },
+      ],
+    ] as const)(
+      'a checkout naming no account of ours, on %s, is recorded and cancels nothing',
+      async (_what, change) => {
+        // Not ours by its account nor by its prices: a founder's Payment Link, say. Left alone.
+        const s = sub('cus_stranger', change);
+        const e = checkoutEvent('7d0a4f43-7f1c-4c55-9f3a-8f9f7b0e2c11', 'cus_stranger', s.id, BASE);
+        expect(await w.deliver(e)).toEqual({
+          outcome: 'recorded',
+          accountId: null,
+          reason: 'no account for the checkout',
+        });
+        expect(w.stripe.cancelled).toEqual([]);
+        expect(w.stripe.alerts).toEqual([]);
+        expect(w.stripe.live()).toEqual([s.id]);
+        expect(w.reports.map((r) => r.message)).toEqual([
+          'billing.webhook.checkout_without_account',
+        ]);
+      },
+    );
+
     it('a checkout whose metadata names another account is treated as naming none', async () => {
       const { accountId, customer } = await account();
       const s = sub(customer);
