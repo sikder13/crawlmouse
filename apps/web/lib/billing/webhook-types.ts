@@ -22,8 +22,10 @@ export type WebhookOutcome =
   | { outcome: 'refused'; reason: 'livemode_mismatch' }
   /**
    * The event was decided: `applied` changed the account or sent an effect, `ignored` is the
-   * machine's no, and `recorded` never reached the machine (recorded-only types, a price outside the
-   * allow-list, an unknown account).
+   * machine's no, and `recorded` is a decision the webhook's own rules made: recorded-only types, a
+   * price outside the allow-list, an unknown account, a superseded event, and an event the RPC's
+   * guard refused after the machine had answered (older than the subscription's last event, or its
+   * subscription had ended).
    */
   | {
       outcome: 'applied' | 'ignored' | 'recorded';
