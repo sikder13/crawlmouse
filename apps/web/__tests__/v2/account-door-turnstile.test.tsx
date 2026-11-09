@@ -52,7 +52,7 @@ function mountForm() {
   const host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
-  act(() => root!.render(<SignupForm pipeline={false} />));
+  act(() => root!.render(<SignupForm checksPublic={false} />));
   (host.querySelector('input[name="email"]') as HTMLInputElement).value = 'a@b.co';
   return host;
 }
@@ -116,7 +116,9 @@ describe('Check-email: Send the link again', () => {
     document.body.appendChild(host);
     root = createRoot(host);
     act(() =>
-      root!.render(<CheckEmailScreen kind="signin" site={null} pipeline={false} email="a@b.co" />),
+      root!.render(
+        <CheckEmailScreen kind="signin" site={null} checksPublic={false} email="a@b.co" />,
+      ),
     );
     const again = () =>
       [...host.querySelectorAll('button')].find((b) => b.textContent === 'Send the link again')!;
@@ -138,7 +140,9 @@ describe('Check-email: Send the link again', () => {
     document.body.appendChild(host);
     root = createRoot(host);
     act(() =>
-      root!.render(<CheckEmailScreen kind="signin" site={null} pipeline={false} email="a@b.co" />),
+      root!.render(
+        <CheckEmailScreen kind="signin" site={null} checksPublic={false} email="a@b.co" />,
+      ),
     );
     const again = () =>
       [...host.querySelectorAll('button')].find((b) => b.textContent === 'Send the link again')!;
@@ -161,10 +165,10 @@ describe('Check-email: Send the link again', () => {
 
 describe('the live regions are in the page from the first render', () => {
   it.each([
-    ['Sign-up', renderToStaticMarkup(<SignupScreen pipeline={false} />)],
+    ['Sign-up', renderToStaticMarkup(<SignupScreen checksPublic={false} />)],
     [
       'Check-email',
-      renderToStaticMarkup(<CheckEmailScreen kind="signin" site={null} pipeline={false} />),
+      renderToStaticMarkup(<CheckEmailScreen kind="signin" site={null} checksPublic={false} />),
     ],
     ['Continue, expired', renderToStaticMarkup(<ContinueScreen state="expired" />)],
   ])('%s renders an alert and a status region while both are empty', (_, html) => {

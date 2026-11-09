@@ -129,6 +129,13 @@ function set(r: Rec, path: string, v: unknown): Rec {
   return out;
 }
 
+const ABSENT_HEAD_TEXT = [
+  { text: null, chars: 0, cut: false },
+  { text: null, chars: 7, cut: false },
+  { text: null, chars: 0, cut: true },
+  { text: 'Tents', chars: 5, cut: true },
+];
+
 /** Values that break a rule the fixtures only ever satisfy. */
 function extras(rule: string): Record<string, unknown[]> {
   const packet = recordsOf('Fix')
@@ -238,6 +245,11 @@ function extras(rule: string): Record<string, unknown[]> {
         { cadence: 'weekly', iso_weekday: 1, hour_local: null },
         { cadence: 'on_deploy', iso_weekday: null, hour_local: 6 },
       ],
+    },
+    // Absent text with no length and no cut accepts; a length, or a cut, refuses.
+    head_text_absent: {
+      title: ABSENT_HEAD_TEXT,
+      meta_description: ABSENT_HEAD_TEXT,
     },
   };
   return table[rule] ?? {};
@@ -677,6 +689,34 @@ const headersDomain = (): unknown[] => [
     { numRuns: 100, seed: 20261103 },
   ),
 ];
+/**
+ * A title or meta description (006d): text within `budget` UTF-8 bytes or null, its length in code
+ * points, and whether it was cut. Absent text with a length is the head_text_absent rule CHECK's to
+ * refuse, so here it is a value the shape accepts.
+ */
+const headTextDomain = (budget: number) => (): unknown[] => [
+  null,
+  ...around(
+    { text: 'Tents', chars: 5, cut: false },
+    {
+      text: [...crawled(budget), null, 5, ['Tents']],
+      chars: [...WORDS, '5'],
+      cut: [true, 'false', null, 0],
+    },
+  ),
+  { text: null, chars: 7, cut: true },
+  ...fc.sample(
+    fc.record({
+      text: fc.oneof(fc.constant(null), fc.string({ maxLength: budget + 8 })),
+      chars: fc.oneof(
+        fc.integer({ min: -2, max: 2 ** 31 }),
+        fc.double({ noNaN: true, min: -1, max: 9 }),
+      ),
+      cut: fc.oneof(fc.boolean(), fc.constant(null)),
+    }),
+    { numRuns: 200, seed: 20261108 },
+  ),
+];
 /** The URL strings inside a value of `field`, where the contract's HttpUrl applies. */
 const URL_LEAVES: Record<string, (v: unknown) => unknown[]> = {
   url: (v) => [v],
@@ -727,6 +767,8 @@ const DOMAINS: Record<string, () => unknown[]> = {
       ['0001-01-01', '9999-12-31', '10000-01-01', '0001-01-01 BC', '0044-03-15 BC', '2026-10-01'],
     ),
   without_js: withoutJs,
+  title: headTextDomain(512),
+  meta_description: headTextDomain(1024),
   final_url: url,
   redirect: redirectDomain,
   canonical_declared: canonicalDomain,

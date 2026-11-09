@@ -30,43 +30,25 @@ export const NOT_THIS_STEP: Record<string, string> = {
 };
 
 /**
- * Contract fields no column holds yet, each with where it will be stored. CC-12d added them to the
- * contract; their columns and CHECKs come with a migration the owner applies (CC-06d). The release
- * is also the row's measurement lineage's, and the contract's fixture test holds the two equal.
- * v2-contract-guard.test.ts leaves each out of its column checks, and fails once one is stored under
- * its own name or as flattened columns, so an entry cannot outlive its reason.
+ * Contract fields no column holds yet, each with where it will be stored: none since 006d stored
+ * CC-12d's. v2-contract-guard.test.ts leaves each entry out of its column checks, and fails once one
+ * is stored under its own name or as flattened columns, so an entry cannot outlive its reason.
  */
-export const NOT_STORED_YET: Record<string, string> = {
-  'PageResult.title': 'stored by CC-06d',
-  'PageResult.meta_description': 'stored by CC-06d',
-  'AccessTest.identity_role': 'stored by CC-06d',
-  'AccessTest.tagged': 'stored by CC-06d',
-  'AccessTest.witness': 'stored by CC-06d',
-  'AccessTest.fly_region': 'stored by CC-06d',
-  'AccessTest.request_signing': 'stored by CC-06d',
-  'AccessTest.signature_verified': 'stored by CC-06d',
-  'AccessTest.timing': 'stored by CC-06d',
-  'AccessTest.worker_release': 'stored by CC-06d (the lineage names the same release)',
-};
+export const NOT_STORED_YET: Record<string, string> = {};
 
 /**
- * Values the contract added to an enum that a column's CHECK does not hold yet, by table.column:
- * stored by CC-06d. The guard compares the CHECK with the enum less these, and fails once the CHECK
- * holds one of them.
+ * Values the contract added to an enum that a column's CHECK does not hold yet, by table.column: none
+ * since 006d. The guard compares the CHECK with the enum less these, and fails once the CHECK holds
+ * one of them.
  */
-export const VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {
-  'access_tests.source_ip_class': ['other_egress'],
-};
+export const VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {};
 
 /**
- * The same, for the research ledger's enum CHECKs (06b), by table.column in schema `research`:
- * SignalKind's four CC-12d values, stored by CC-06d. v2-006b-data-foundations.test.ts compares each
- * CHECK with its enum less these, and fails once the CHECK holds one of them.
+ * The same, for the research ledger's enum CHECKs (06b), by table.column in schema `research`: none
+ * since 006d. v2-006b-data-foundations.test.ts compares each CHECK with its enum less these, and fails
+ * once the CHECK holds one of them.
  */
-export const LEDGER_VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {
-  'check_runs.signals_detected': ['ucp', 'rsl', 'agent_card', 'llms_full'],
-  'check_runs.signals_indeterminate': ['ucp', 'rsl', 'agent_card', 'llms_full'],
-};
+export const LEDGER_VALUES_NOT_STORED_YET: Record<string, readonly string[]> = {};
 
 /** A contract object stored as `<field>_<key>` columns of the same table. */
 export const FLATTENED: Record<string, string> = { 'Site.schedule': 'sites' };
@@ -175,6 +157,9 @@ export const SHAPE_CHECKS: Record<
     field: 'content_failures',
     exact: 'with the column’s enum CHECK, which refuses an unknown value; exact over known values',
   },
+  // 006d. Whether text and chars agree is the head_text_absent rule CHECK's.
+  page_results_title: { table: 'page_results', field: 'title', exact: true },
+  page_results_meta_description: { table: 'page_results', field: 'meta_description', exact: true },
 };
 
 /** Rules that are CHECK constraints: the table and the constraint. */
@@ -220,6 +205,7 @@ export const RULE_CHECKS: Record<string, { table: string; constraint: string }> 
   canonical_href: { table: 'page_results', constraint: 'page_results_canonical_href' },
   robots_verdict: { table: 'page_results', constraint: 'page_results_robots_verdict' },
   robots_ua_unique: { table: 'page_results', constraint: 'page_results_robots_ua_unique' },
+  head_text_absent: { table: 'page_results', constraint: 'page_results_head_text_absent' },
   usage_billable: { table: 'usage_events', constraint: 'usage_events_billable' },
 };
 
@@ -235,10 +221,14 @@ export const GENERATED_STATUS: Record<string, string> = {
   'access_tests.measurement_status': 'verdictStatus',
 };
 
+const ACCESS_ROW_AT_WRITE =
+  'an access_tests row: only the server writes that table, through persist_built_check after the pipeline parses the row with AccessTestSchema; a CHECK only where the owner rules one (2026-11-08)';
+
 /**
- * Rules the database does not check, with the reason: most read inside a jsonb document of a table
- * only the server writes (owner ruling 1, 2026-11-02), and three are value shapes. A writer must
- * parse the row with the contract's schema before inserting it.
+ * Rules the database does not check, with the reason: those reading inside a jsonb document of a table
+ * only the server writes (owner ruling 1, 2026-11-02), the value shapes (a reason that starts "a value
+ * shape"), and the rules of an access_tests row (a reason that starts "an access_tests row"). A writer
+ * must parse the row with the contract's schema before inserting it.
  */
 export const RULES_AT_WRITE: Record<string, string> = {
   check_result_link: 'compares two timestamps inside checks.result_email',
@@ -268,20 +258,21 @@ export const RULES_AT_WRITE: Record<string, string> = {
     'a value shape: the UTF-8 byte budget of crawled text (link_edges.anchor_text, access_tests.identity_sent and body_excerpt, and inside jsonb; inside page_results’ jsonb, the shape CHECKs hold it)',
   crawled_text_surrogate:
     'a value shape on crawled text; the writer cuts text with the engine’s toPersistableText (packages/engine/src/text-safety.ts)',
+  // AccessTest's CC-12d rules (006d). access_tests is written only by persist_built_check (008),
+  // after the pipeline parses each row with AccessTestSchema (apps/web/lib/v2/pipeline/persist.ts).
+  access_identity_ua: ACCESS_ROW_AT_WRITE,
+  control_untagged: ACCESS_ROW_AT_WRITE,
+  access_witness: ACCESS_ROW_AT_WRITE,
+  witness_other: ACCESS_ROW_AT_WRITE,
+  fly_region: ACCESS_ROW_AT_WRITE,
+  timing_order: ACCESS_ROW_AT_WRITE,
+  worker_request: ACCESS_ROW_AT_WRITE,
+  worker_request_whole: ACCESS_ROW_AT_WRITE,
 };
 
 /** Rules of entities or primitives this step does not store. */
 export const RULES_NOT_THIS_STEP: Record<string, string> = {
   cloudflare_unique: 'crawler registry (no table)',
-  access_identity_ua: 'AccessTest fields stored by CC-06d',
-  control_untagged: 'AccessTest fields stored by CC-06d',
-  access_witness: 'AccessTest fields stored by CC-06d',
-  witness_other: 'AccessTest fields stored by CC-06d',
-  fly_region: 'AccessTest fields stored by CC-06d',
-  timing_order: 'AccessTest fields stored by CC-06d',
-  worker_request: 'AccessTest fields stored by CC-06d',
-  worker_request_whole: 'AccessTest fields stored by CC-06d',
-  head_text_absent: 'PageResult fields stored by CC-06d',
   declaration_answer: 'worker batch result (no table)',
   declaration_bytes: 'worker batch result (no table)',
   declaration_media_type: 'worker batch result (no table)',
@@ -333,14 +324,11 @@ export const NESTED: Record<string, string[]> = {
   TechnicalSeoPending: ['site_fixes.effect'],
   Verdict: ['checks.crawlers', 'page_results.robots_search'],
   WithheldReason: ['checks.ai_readability', 'site_fixes.effect'],
+  WitnessRole: ['access_tests.witness'],
 };
 
 /** Enums no table of this step holds, and where they live. */
 export const NOT_STORED_HERE: Record<string, string> = {
-  IdentityRole: 'AccessTest.identity_role, stored by CC-06d',
-  WitnessRole: 'AccessTest.witness, stored by CC-06d',
-  RequestSigning: 'AccessTest.request_signing, stored by CC-06d',
-  SignatureVerification: 'AccessTest.signature_verified, stored by CC-06d',
   CloudflareCategory: 'crawler registry seed data',
   BatchPartialReason: 'worker batch result (no table)',
   DeclarationPath: 'worker batch result (no table)',

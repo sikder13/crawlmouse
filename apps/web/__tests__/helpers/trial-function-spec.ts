@@ -132,11 +132,15 @@ async function checksTable(db: PGlite): Promise<string> {
   );
 }
 
-/** RULES_AT_WRITE says which of its entries are value shapes, in the reason it gives. */
+/**
+ * RULES_AT_WRITE says which of its entries are value shapes, and which are rules of an access_tests
+ * row (006d), in the reason it gives; the rest read inside jsonb under owner ruling 1.
+ */
 const isValueShape = (why: string) => why.startsWith('a value shape');
-const valueShapes = () =>
+const isAccessRow = (why: string) => why.startsWith('an access_tests row');
+const rulesWhere = (pick: (why: string) => boolean) =>
   Object.entries(RULES_AT_WRITE)
-    .filter(([, why]) => isValueShape(why))
+    .filter(([, why]) => pick(why))
     .map(([r]) => code(r))
     .join(', ');
 
@@ -151,7 +155,11 @@ function writeTimeTable(): string {
       ]),
       ...Object.entries(RULES_AT_WRITE).map(([r, why]) => [
         code(r),
-        isValueShape(why) ? 'the writer: a value shape' : 'the writer (owner ruling 1)',
+        isValueShape(why)
+          ? 'the writer: a value shape'
+          : isAccessRow(why)
+            ? 'the writer: persist_built_check (006d)'
+            : 'the writer (owner ruling 1)',
         why,
       ]),
     ],
@@ -276,7 +284,7 @@ The type CHECK is found by the catalog, not by name: 003 wrote it inline, and Po
 
 ### Write-time rules: which became CHECKs (D7)
 
-A rule becomes a CHECK here only where it is a predicate on the row's own columns and the owner ruled it one (2026-11-08): CC-17's two effect rules. The others stay with the writer, which parses the row with the contract schema: those reading inside a jsonb document of a table only the server writes under owner ruling 1 (2026-11-02), and ${valueShapes()} because they are value shapes a CHECK does not hold as the contract does. The list is \`RULES_AT_WRITE\` and \`RULE_CHECKS\` in \`apps/web/__tests__/helpers/v2-contract-storage.ts\`:
+A rule becomes a CHECK here only where it is a predicate on the row's own columns and the owner ruled it one (2026-11-08): CC-17's two effect rules. The others stay with the writer, which parses the row with the contract schema: those reading inside a jsonb document of a table only the server writes under owner ruling 1 (2026-11-02); ${rulesWhere(isValueShape)} because they are value shapes a CHECK does not hold as the contract does; and, since 006d, ${rulesWhere(isAccessRow)}, rules of an \`access_tests\` row, which only \`persist_built_check\` writes, after the pipeline parses the row with \`AccessTestSchema\`. The list is \`RULES_AT_WRITE\` and \`RULE_CHECKS\` in \`apps/web/__tests__/helpers/v2-contract-storage.ts\`:
 
 ${writeTimeTable()}
 

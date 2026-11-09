@@ -7,7 +7,7 @@ export default function CheckEmailFromAuditPreview() {
     <CheckEmailScreen
       kind="from-audit"
       site={'example-outfitter.com'}
-      pipeline={false}
+      checksPublic={false}
       email="you@company.com"
     />
   );

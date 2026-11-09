@@ -15,6 +15,8 @@ import {
   type LinkEdge,
 } from '@crawlmouse/types/v2';
 import { templateKeyFor } from '../../../src/analysis/template-key.js';
+import type { BuildInput } from '../../../src/v2/build/types.js';
+import { recordedInput } from './recorded.js';
 
 export const CHECK = 'c0000000-0000-4000-8000-00000000b0c1';
 export const SITE = 'c0000000-0000-4000-8000-00000000b0a1';
@@ -175,4 +177,30 @@ export function accessBatch(n: number, access_tests: AccessTest[]): AccessBatchR
     kind: 'access',
     access_tests,
   });
+}
+
+/**
+ * A BuildInput of one crawl batch of `rows` on `homepage` (in canonical spelling), every other row a
+ * sitemap seed, the recorded check's settings otherwise; no access batch, no render.
+ */
+export function oneBatchBuild(
+  homepage: string,
+  pages: CrawlPage[],
+  link_edges: LinkEdge[] = [],
+): BuildInput {
+  const base = recordedInput();
+  return {
+    ...base,
+    check: { ...base.check, id: CHECK, site_id: SITE },
+    site: { ...base.site, id: SITE, host: new URL(homepage).host },
+    homepage_url: homepage,
+    seeds: [
+      { url: `${homepage}/`, source: 'homepage', lastmod: null },
+      ...pages
+        .filter((p) => p.url !== homepage)
+        .map((p) => ({ url: p.url, source: 'sitemap' as const, lastmod: null })),
+    ],
+    batches: [crawlBatch(0, pages, link_edges)],
+    render: null,
+  };
 }

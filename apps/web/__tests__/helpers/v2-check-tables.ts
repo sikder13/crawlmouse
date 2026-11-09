@@ -67,7 +67,7 @@ export async function personalAccount(
   return { accountId: rows[0]!.account_id, seatId: rows[0]!.seat_id };
 }
 
-const SHA = (n: number) => n.toString(16).padStart(64, '0');
+export const SHA = (n: number) => n.toString(16).padStart(64, '0');
 const CRAWL_UA = 'Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)';
 /** sha256 hex of the UTF-8 URL: what page_results.url_hash and the link_edges hashes hold. */
 export const urlHash = (url: string) => createHash('sha256').update(url, 'utf8').digest('hex');
@@ -201,6 +201,9 @@ export const ROWS = {
     byte_count: 1000,
     word_count: 120,
     body_excerpt: '<html>',
+    // 006d's NOT NULL columns; seedWorld leaves them out on a database migrated before 006d.
+    identity_role: 'crawler',
+    tagged: true,
   }),
   site_fixes: (id: string, siteId: string, checkId: string, n: number): Row => ({
     id,
@@ -370,6 +373,23 @@ export const ROWS = {
     occurred_at: T2,
     idempotency_key: `check:${id}`,
   }),
+  crawl_batches: (checkId: string, batch: number): Row => ({
+    check_id: checkId,
+    batch,
+    kind: 'crawl',
+    nonce: `fixture-nonce-${String(batch).padStart(4, '0')}`,
+    status: 'posted',
+    posted_at: T1,
+    finished_at: null,
+    summary: null,
+    result_path: null,
+  }),
+  persist_chunks: (checkId: string, chunk: number): Row => ({
+    check_id: checkId,
+    collection: 'link_edges',
+    chunk,
+    rows: [],
+  }),
 } as const;
 
 /** A valid research.check_runs row (the ledger is not in `public`, so not in ROWS). */
@@ -432,11 +452,13 @@ export async function premakeTestMonths(db: Db): Promise<void> {
 export type NewTable = keyof typeof ROWS;
 /** The public tables 006b creates. */
 export const TABLES_006B: readonly NewTable[] = ['check_ledger_links', 'usage_events'];
+/** The public tables 008 creates. */
+export const TABLES_008: readonly NewTable[] = ['crawl_batches', 'persist_chunks'];
 /** The tables 003 creates. */
 export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
-  .filter((t) => !TABLES_006B.includes(t))
+  .filter((t) => !TABLES_006B.includes(t) && !TABLES_008.includes(t))
   .sort();
-/** Every public table 003 and 006b create. */
+/** Every public table 003, 006b and 008 create. */
 export const ALL_NEW_TABLES = (Object.keys(ROWS) as NewTable[]).sort();
 
 /** Where a seeded row belongs: one of the account's two sites, or the account as a whole. */
@@ -470,6 +492,18 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.usage_events')::text as t`,
   );
   const with006b = found[0]!.t !== null;
+  // Nor, migrated before 008, crawl_batches.
+  const { rows: batches } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.crawl_batches')::text as t`,
+  );
+  const with008 = batches[0]!.t !== null;
+  // A database migrated before 006d (the revert tests of 003 to 006c) has no identity columns.
+  const { rows: identity } = await db.query<{ n: number }>(
+    `select count(*)::int as n from pg_attribute
+      where attrelid = 'public.access_tests'::regclass and attname in ('identity_role', 'tagged')
+        and not attisdropped`,
+  );
+  const with006d = identity[0]!.n === 2;
   const ownerId = await signUp(db, `owner-${tag}-${n}@example.com`);
   const { accountId, seatId: ownerSeatId } = await personalAccount(db, ownerId);
   const scopedUserId = await signUp(db, `dev-${tag}-${n}@example.com`);
@@ -530,12 +564,12 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       scope,
     });
     const at = randomUUID();
-    await put(
-      'access_tests',
-      { ...ROWS.access_tests(at, checkId), lineage_id: lineage },
-      { id: at, ...month },
-      scope,
-    );
+    const access: Row = { ...ROWS.access_tests(at, checkId), lineage_id: lineage };
+    if (!with006d) {
+      delete access.identity_role;
+      delete access.tagged;
+    }
+    await put('access_tests', access, { id: at, ...month }, scope);
     if (with006b) {
       const run = randomUUID();
       await insertLedgerRow(db, 'check_runs', ledgerRun(run, SHA(++k), lineage));
@@ -547,6 +581,20 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       );
       const usage = randomUUID();
       await put('usage_events', ROWS.usage_events(usage, accountId, checkId), { id: usage }, scope);
+    }
+    if (with008) {
+      await put(
+        'crawl_batches',
+        ROWS.crawl_batches(checkId, 0),
+        { check_id: checkId, batch: 0 },
+        scope,
+      );
+      await put(
+        'persist_chunks',
+        ROWS.persist_chunks(checkId, 0),
+        { check_id: checkId, collection: 'link_edges', chunk: 0 },
+        scope,
+      );
     }
     const fixId = randomUUID();
     await put('site_fixes', ROWS.site_fixes(fixId, siteId, checkId, ++k), { id: fixId }, scope);

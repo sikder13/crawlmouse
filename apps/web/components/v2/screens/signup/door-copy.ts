@@ -31,9 +31,9 @@ export function signupLead(): string {
   );
 }
 
-/** D6: the first audit is promised only when the pipeline that starts it is on. */
-export function siteHelper(pipeline: boolean): string {
-  return pipeline
+/** D6: the first audit is promised only when checks are public (V2_CHECKS_PUBLIC). */
+export function siteHelper(checksPublic: boolean): string {
+  return checksPublic
     ? `If you name one, its first audit starts the moment you open the sign-in link, about ${numberWord(FIRST_AUDIT_MINUTES)} minutes, if the account has room for another site.`
     : 'If you name one, it is added to your account when you open the sign-in link, if the account has room for another site.';
 }

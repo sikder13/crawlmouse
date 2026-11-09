@@ -76,9 +76,10 @@ would leave the machine stopped after a crash loop until the next deploy.
 
 ## Check the page facts after a deploy
 
-After a deploy that changes what a crawl row records, send one signed crawl batch to staging and read
-its result. What each field means is in SPEC 12, "The page facts on a crawl row". Choose URLs that
-show each fact, and check the result for:
+After a deploy that changes what a crawl row records, send one signed crawl batch to staging with
+`scripts/worker-batch.ts` ("Send one signed batch (operators)", below) and read its result. What each
+field means is in SPEC 12, "The page facts on a crawl row". Choose URLs that show each fact, and
+check the result for:
 
 - a URL that redirects twice: `redirect.hops` lists both hops with their statuses, `loop: false`, and
   `final_url` is the last Location;
@@ -115,6 +116,56 @@ show each fact, and check the result for:
 
 Each row is parsed by its schema before it leaves the worker (`pageRow` in
 `packages/worker/src/batch/crawl.ts`), so the checks above are about the values, not the shape.
+
+### Send one signed batch (operators)
+
+`scripts/worker-batch.ts` sends one crawl or access batch to the worker, polls it every 5 s until it
+finishes or its time budget plus 60 s has passed, samples `GET /metrics` once, and writes
+`{ "result": …, "metrics": … }` to the file `--out` names. It signs and mints with the functions the
+pipeline uses (`apps/web/lib/worker-client/`). From the repository root:
+
+```bash
+pnpm --filter @crawlmouse/scripts exec tsx worker-batch.ts --kind crawl --url https://crawlmouse.com/ --url https://crawlmouse.com/pricing --out "$PWD/crawl-result.json"
+```
+
+- `--kind access` tests each URL with its own path as its template key.
+- `--budget-seconds` is the batch's time budget: 120 by default, at most 1800, the worker's ceiling.
+  Requests and bytes are capped at 1,000 and 64 MiB.
+- It prints how many pages (or access tests) and requests the batch made, and its partial reasons. A
+  failure prints the refusal's kind, HTTP status and the worker's code. The test that drives each
+  failure with planted values fails if a value or the JWT appears in what the script prints or
+  throws: `pnpm --filter @crawlmouse/scripts exec vitest run worker-batch.test.ts`.
+- It exits 0 when the result is written, 1 when the batch did not finish or was refused, and 2 when
+  an argument or a value cannot be used.
+
+**Where the three values live.** `CRAWL_WORKER_URL` (the worker's base URL), `WORKER_SIGNING_SECRET`
+(the secret the worker holds too) and `WORKER_JWT_PRIVATE_KEY_PKCS8_B64` (the private half of
+`WORKER_JWT_PUBLIC_KEY`):
+
+- for the pipeline, the app's secret store, read by `workerClientFromEnv`
+  (`apps/web/lib/worker-client/client.ts`);
+- for operators, `scripts/.env.local`, which git ignores, readable by its owner alone
+  (`chmod 600 scripts/.env.local`).
+
+The private key's value is base64 of its PKCS8 DER bytes, on one line: the body of the PEM that
+"First deploy" prints, without its header, footer and line breaks.
+
+**The JWT.** EdDSA over Ed25519, header `{"alg":"EdDSA","typ":"JWT"}`. Claims: `aud`
+`crawlmouse-worker`, `role` `crawl_worker`, `check_id`, `site_id`, `site_host`, `batch`, `nonce`,
+`iat`, and `exp` 15 minutes after `iat` (the worker refuses a token that lives longer than an hour).
+`check_id`, `site_id`, `batch` and `nonce` are the body's; the script makes new ids and a new nonce
+for each run, so a run can be repeated as it is.
+
+**One host per JWT.** `site_host` is the first URL's host: lower case, no port. The worker refuses a
+batch with a URL on another host (`jwt_scope`), counting `www.` and the bare host as one, and a URL
+on a port that is not its scheme's default. The script refuses both before sending, and is stricter:
+a URL whose host differs from the first's, `www.` against the bare host included. Smoke several
+hosts with one run per host.
+
+**A redirect to another site is recorded, not followed.** A redirect to another registrable domain
+is recorded on the page's row (`redirect.hops`) and its target is not requested (SPEC 12,
+"Politeness"); an access batch reports it as `redirected_away`. To check the target, send a batch to
+its host.
 
 ## Roll back
 

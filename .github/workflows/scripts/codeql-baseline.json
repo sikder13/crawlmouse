@@ -83,8 +83,8 @@
     {
       "rule": "js/incomplete-url-scheme-check",
       "file": "packages/engine/src/extract.ts",
-      "fingerprint": "52a3a31abe2ab219:1",
-      "line": 152,
+      "fingerprint": "7fdae392710e939:1",
+      "line": 222,
       "verdict": "Real hardening, CC-SEC-2 (due 2026-12-08): a deny-list of link schemes. data: and vbscript: links are dropped later by the same-host filter, so the crawler fetches none; to become an http/https allow-list."
     },
     {
@@ -92,14 +92,14 @@
       "file": "packages/engine/src/v2/layout/force-layout.ts",
       "fingerprint": "ab1205daaf58a4aa:1",
       "line": 300,
-      "verdict": "Real hardening, CC-SEC-2 (due 2026-12-08): plain objects keyed by crawled node ids. The ids are canonical page URLs, so none can be __proto__ today; to become a Map or Object.create(null)."
+      "verdict": "D10 tried null-prototype objects and reverted them: React cannot pass them to client components and CodeQL did not model them. The keys are canonical page URLs, so none can be `__proto__` today. CC-SEC-2 moves these to a `Map` and converts it to a plain object only at the client boundary."
     },
     {
       "rule": "js/remote-property-injection",
       "file": "packages/engine/src/v2/layout/force-layout.ts",
       "fingerprint": "8eabf3ded00f1884:1",
       "line": 426,
-      "verdict": "Real hardening, CC-SEC-2 (due 2026-12-08): plain objects keyed by crawled node ids. The ids are canonical page URLs, so none can be __proto__ today; to become a Map or Object.create(null)."
+      "verdict": "D10 tried null-prototype objects and reverted them: React cannot pass them to client components and CodeQL did not model them. The keys are canonical page URLs, so none can be `__proto__` today. CC-SEC-2 moves these to a `Map` and converts it to a plain object only at the client boundary."
     },
     {
       "rule": "js/incomplete-sanitization",
