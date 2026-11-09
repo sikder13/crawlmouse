@@ -18,3 +18,7 @@ f62128e5b7b5e65c023247edc1a41ca39a73f7ca:apps/web/__tests__/v2/account-door-sent
 beaf30fbee32eecef329da720dd42139040ff6e3:apps/web/__tests__/v2/account-door-token.test.tsx:generic-api-key:13
 # test canary, not a credential (CC-25, owner-approved 2026-11-06); renamed to CANARY in 5ca3d9de
 beaf30fbee32eecef329da720dd42139040ff6e3:apps/web/app/login/verify/route.test.ts:generic-api-key:33
+# malformed-key test value, not a credential: base64 for "not a key" (CC-20b, approved 2026-11-09)
+b93abad6bd1f3b1b8cd21cbf1582198ad366d40d:apps/web/lib/v2/pipeline/functions.test.ts:generic-api-key:328
+# known-answer HMAC test secret, not a credential (CC-20b, approved 2026-11-09)
+0fac16ea9d08e415f8faa0175bbd53403d319a73:apps/web/lib/worker-client/sign.test.ts:generic-api-key:10
