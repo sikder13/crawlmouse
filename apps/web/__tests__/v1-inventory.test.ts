@@ -28,7 +28,16 @@ import {
   v1Routes,
   v1Tables,
 } from './v1-inventory-source';
-import { BLOCKS, readBlock, renderCounts, renderCutover, writeBlocks } from './v1-inventory-report';
+import {
+  BLOCKS,
+  CHECK_KEYS,
+  type Inventory,
+  readBlock,
+  renderCounts,
+  renderCutover,
+  verdictOf,
+  writeBlocks,
+} from './v1-inventory-report';
 
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({}) }));
 vi.mock('@/lib/sitemap-reports', () => ({
@@ -48,11 +57,13 @@ type Entry = {
   evidence: string;
   replacedBy?: string;
   redirect?: string;
+  checks?: Record<string, string>;
+  e2e?: Record<string, unknown>;
 };
 
 const WEB = join(REPO_ROOT, 'apps/web');
 const INVENTORY = join(REPO_ROOT, 'docs/ops/v1-inventory.json');
-const inventory = JSON.parse(readFileSync(INVENTORY, 'utf8')) as { items: Entry[] };
+const inventory = JSON.parse(readFileSync(INVENTORY, 'utf8')) as Inventory & { items: Entry[] };
 const items = inventory.items;
 const live = items.filter((e) => e.ruling !== 'delete');
 const pathsOf = (kind: Kind) =>
@@ -247,18 +258,64 @@ describe('every ruling is one of three and carries its consequence (D2, D3)', ()
     const tracked = new Set(
       execFileSync('git', ['ls-files'], { cwd: REPO_ROOT, encoding: 'utf8' }).split('\n'),
     );
-    const ref = /\b((?:apps|packages|inngest|infra|docs|scripts)\/[\w./()[\]-]+):(\d+)\b/g;
+    const ref =
+      /(?<![\w/.])((?:apps|packages|inngest|infra|docs|scripts|app|lib|components)\/[\w./()[\]-]+):(\d+)\b/g;
+    const texts = [
+      ...items.flatMap((e) => [e.evidence, ...Object.values(e.checks ?? {})]),
+      ...inventory.findings.map((f) => f.evidence),
+    ];
     const bad: string[] = [];
-    for (const e of items) {
-      for (const m of e.evidence.matchAll(ref)) {
-        const file = m[1]!;
+    for (const text of texts) {
+      for (const m of text.matchAll(ref)) {
+        const file = /^(app|lib|components)\//.test(m[1]!) ? `apps/web/${m[1]}` : m[1]!;
         const lines = tracked.has(file)
           ? readFileSync(join(REPO_ROOT, file), 'utf8').split('\n').length
           : 0;
-        if (Number(m[2]) > lines) bad.push(`${e.path}: ${m[0]}`);
+        if (Number(m[2]) > lines) bad.push(m[0]);
       }
     }
     expect(bad).toEqual([]);
+  });
+});
+
+describe('each live page and route carries its D4 row, and each keep page its D7 block', () => {
+  const rowed = items.filter(
+    (e) => (e.kind === 'page' || e.kind === 'route') && e.ruling !== 'delete',
+  );
+
+  it.each(rowed.map((e) => [e.path, e] as const))('%s', (_path, e) => {
+    expect(Object.keys(e.checks ?? {}).sort()).toEqual([...CHECK_KEYS].sort());
+    for (const k of CHECK_KEYS) expect(e.checks![k], k).toMatch(/^(pass|n\/a|finding) — \S/);
+    if (e.kind === 'page' && e.ruling === 'keep') expect(e.e2e, 'e2e block').toBeDefined();
+  });
+
+  it('a finding verdict is named by a finding (anti-vacuity: some verdicts are findings)', () => {
+    const named = new Set(inventory.findings.flatMap((f) => f.items));
+    const flagged = items.filter((e) =>
+      Object.values(e.checks ?? {}).some((t) => verdictOf(t) === 'finding'),
+    );
+    expect(flagged.length).toBeGreaterThan(0);
+    expect(flagged.map((e) => e.path).filter((p) => !named.has(p))).toEqual([]);
+  });
+});
+
+describe('the findings (D8, D12)', () => {
+  const paths = new Set(items.map((e) => e.path));
+
+  it.each(inventory.findings.map((f) => [f.id, f] as const))('%s', (_id, f) => {
+    expect(['blocker', 'major', 'minor']).toContain(f.severity);
+    expect(f.items.length).toBeGreaterThan(0);
+    expect(f.items.filter((i) => !paths.has(i))).toEqual([]);
+    expect(f.evidence.trim()).not.toBe('');
+    expect(f.what.trim()).not.toBe('');
+    expect([f.owner, f.fixedIn].filter((x) => x !== undefined).length, 'owner xor fixedIn').toBe(1);
+    if (f.fixedIn !== undefined) expect(f.fixedIn).toMatch(/^[0-9a-f]{8}$/);
+  });
+
+  it('ids are unique, and no blocker is left open', () => {
+    const ids = inventory.findings.map((f) => f.id);
+    expect(ids.length).toBe(new Set(ids).size);
+    expect(inventory.findings.filter((f) => f.severity === 'blocker' && !f.fixedIn)).toEqual([]);
   });
 });
 
@@ -295,9 +352,9 @@ describe('the report renders its inventory sections from the JSON (D12, §10)', 
   it.each(Object.keys(BLOCKS))('block %s equals what the generator renders', (name) => {
     let report = readFileSync(REPORT, 'utf8');
     if (process.env.V1_INVENTORY_WRITE === '1') {
-      report = writeBlocks(report, items);
+      report = writeBlocks(report, inventory);
       writeFileSync(REPORT, report);
     }
-    expect(readBlock(report, name)).toBe(BLOCKS[name]!(items));
+    expect(readBlock(report, name)).toBe(BLOCKS[name]!(inventory));
   });
 });

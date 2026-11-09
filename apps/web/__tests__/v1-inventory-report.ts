@@ -92,11 +92,40 @@ export function renderChecks(items: readonly InventoryEntry[]): string {
   ].join('\n');
 }
 
-export const BLOCKS: Record<string, (items: readonly InventoryEntry[]) => string> = {
-  counts: renderCounts,
-  cutover: renderCutover,
-  rulings: renderRulings,
-  checks: renderChecks,
+export type Finding = {
+  id: string;
+  severity: 'blocker' | 'major' | 'minor';
+  items: string[];
+  evidence: string;
+  what: string;
+  owner?: string;
+  fixedIn?: string;
+};
+
+const SEVERITY_ORDER = ['blocker', 'major', 'minor'];
+
+export function renderFindings(findings: readonly Finding[]): string {
+  const sorted = [...findings].sort(
+    (a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity),
+  );
+  return [
+    '| id | severity | item | evidence | what happens | fixed in / owner |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...sorted.map(
+      (f) =>
+        `| ${f.id} | ${f.severity} | ${cell(f.items.map((i) => `\`${i}\``).join(', '))} | ${cell(f.evidence)} | ${cell(f.what)} | ${cell(f.fixedIn ? `fixed in \`${f.fixedIn}\`` : (f.owner ?? ''))} |`,
+    ),
+  ].join('\n');
+}
+
+export type Inventory = { items: InventoryEntry[]; findings: Finding[] };
+
+export const BLOCKS: Record<string, (inv: Inventory) => string> = {
+  findings: (inv) => renderFindings(inv.findings),
+  counts: (inv) => renderCounts(inv.items),
+  cutover: (inv) => renderCutover(inv.items),
+  rulings: (inv) => renderRulings(inv.items),
+  checks: (inv) => renderChecks(inv.items),
 };
 
 const blockPattern = (name: string) =>
@@ -107,12 +136,12 @@ export function readBlock(report: string, name: string): string | null {
   return blockPattern(name).exec(report)?.[2] ?? null;
 }
 
-export function writeBlocks(report: string, items: readonly InventoryEntry[]): string {
+export function writeBlocks(report: string, inv: Inventory): string {
   let out = report;
   for (const [name, render] of Object.entries(BLOCKS)) {
     out = out.replace(
       blockPattern(name),
-      (_m, open, _body, close) => `${open}\n${render(items)}\n${close}`,
+      (_m, open, _body, close) => `${open}\n${render(inv)}\n${close}`,
     );
   }
   return out;

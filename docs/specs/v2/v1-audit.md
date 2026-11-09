@@ -201,12 +201,104 @@ is the verdict word; the full verdict with its evidence is the entry's `checks` 
 <!-- v1-inventory:checks -->
 | item | ruling | input | output | cache | redirect | errors | escaping | abuse |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `/` (`app/page.tsx`) | retire | n/a | pass | pass | n/a | n/a | pass | pass |
+| `/ai-readiness-checker` (`app/ai-readiness-checker/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | pass |
+| `/audit/[id]` (`app/audit/[id]/page.tsx`) | retire | pass | pass | pass | n/a | pass | pass | pass |
+| `/aup` (`app/aup/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | n/a |
+| `/authors/[slug]` (`app/authors/[slug]/page.tsx`) | keep | pass | pass | pass | n/a | n/a | pass | n/a |
+| `/blog` (`app/blog/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | n/a |
+| `/blog/[slug]` (`app/blog/[slug]/page.tsx`) | keep | pass | pass | pass | n/a | n/a | pass | n/a |
+| `/blog/research` (`app/blog/research/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | n/a |
+| `/bot` (`app/bot/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | n/a |
+| `/compare` (`app/compare/page.tsx`) | retire | n/a | pass | pass | n/a | n/a | pass | pass |
+| `/compare/[a]/[b]` (`app/compare/[a]/[b]/page.tsx`) | retire | pass | pass | pass | n/a | pass | pass | n/a |
+| `/dashboard` (`app/dashboard/page.tsx`) | retire | pass | pass | pass | pass | pass | pass | n/a |
+| `/developers` (`app/developers/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | pass |
+| `/guides` (`app/guides/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | n/a |
+| `/login` (`app/login/page.tsx`) | keep | pass | pass | pass | pass | n/a | pass | pass |
+| `/pricing` (`app/pricing/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | pass |
+| `/privacy` (`app/privacy/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | n/a |
+| `/r/[slug]` (`app/r/[slug]/page.tsx`) | keep | pass | pass | pass | n/a | pass | pass | n/a |
+| `/status` (`app/status/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | n/a |
+| `/subprocessors` (`app/subprocessors/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | n/a |
+| `/takedown` (`app/takedown/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | pass |
+| `/terms` (`app/terms/page.tsx`) | keep | n/a | pass | pass | n/a | n/a | pass | n/a |
+| `/top/[platform]` (`app/top/[platform]/page.tsx`) | retire | pass | pass | pass | n/a | pass | pass | n/a |
+| `/verify/[id]` (`app/verify/[id]/page.tsx`) | keep | pass | pass | pass | pass | pass | pass | pass |
+| `app/layout.tsx` | keep | n/a | pass | pass | n/a | n/a | pass | n/a |
+| `app/blog/[slug]/opengraph-image.tsx` | keep | pass | pass | pass | n/a | n/a | pass | n/a |
+| `app/r/[slug]/opengraph-image.tsx` | keep | pass | pass | pass | n/a | n/a | pass | n/a |
+| `app/global-error.tsx` | keep | n/a | pass | n/a | n/a | pass | n/a | n/a |
+| `app/api/admin/takedown/process/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |
+| `app/api/audits/[id]/cancel/route.ts` | retire | pass | pass | pass | n/a | pass | n/a | pass |
+| `app/api/audits/[id]/export/route.ts` | retire | pass | pass | finding | n/a | pass | pass | n/a |
+| `app/api/audits/[id]/llms-txt/route.ts` | retire | pass | pass | finding | n/a | pass | n/a | n/a |
+| `app/api/audits/[id]/notify/route.ts` | retire | pass | pass | pass | n/a | pass | n/a | pass |
+| `app/api/audits/[id]/reaudit/route.ts` | retire | pass | pass | pass | n/a | pass | n/a | pass |
+| `app/api/audits/[id]/stream/route.ts` | retire | finding | pass | finding | n/a | pass | n/a | finding |
+| `app/api/audits/start/route.ts` | retire | pass | pass | pass | n/a | finding | n/a | pass |
+| `app/api/auth/logout/route.ts` | keep | n/a | pass | pass | pass | pass | n/a | n/a |
+| `app/api/auth/magic-link/route.ts` | keep | finding | pass | pass | pass | pass | n/a | pass |
+| `app/api/billing/checkout/route.ts` | keep | pass | pass | pass | pass | pass | n/a | finding |
+| `app/api/billing/portal/route.ts` | keep | n/a | pass | pass | pass | pass | n/a | finding |
+| `app/api/billing/status/route.ts` | keep | n/a | pass | pass | n/a | n/a | n/a | n/a |
+| `app/api/developers/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |
+| `app/api/health/route.ts` | keep | n/a | pass | pass | n/a | n/a | n/a | n/a |
+| `app/api/reports/hide/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |
+| `app/api/reports/mint/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |
+| `app/api/reports/[slug]/claim/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |
+| `app/api/reports/[slug]/logo/route.ts` | keep | pass | pass | pass | n/a | pass | pass | pass |
+| `app/api/reports/[slug]/mine/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | n/a |
+| `app/api/reports/[slug]/visibility/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |
+| `app/api/reports/[slug]/white-label/route.ts` | keep | pass | pass | pass | n/a | pass | pass | pass |
+| `app/api/takedown/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | finding |
+| `app/api/trpc/[trpc]/route.ts` | retire | pass | pass | pass | n/a | pass | n/a | n/a |
+| `app/api/verify/check/[id]/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |
+| `app/api/verify/start/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |
+| `app/api/webhooks/inngest/route.ts` | keep | pass | n/a | n/a | n/a | n/a | n/a | n/a |
+| `app/api/webhooks/resend/route.ts` | keep | pass | n/a | n/a | n/a | pass | n/a | n/a |
+| `app/api/webhooks/stripe/route.ts` | keep | pass | n/a | n/a | n/a | pass | n/a | n/a |
+| `app/billing/route.ts` | retire | n/a | pass | pass | pass | n/a | n/a | finding |
+| `app/embed/[domain]/route.ts` | keep | pass | pass | pass | n/a | pass | pass | n/a |
+| `app/llms.txt/route.ts` | keep | n/a | pass | pass | n/a | n/a | n/a | n/a |
+| `app/login/verify/route.ts` | keep | pass | pass | pass | pass | pass | n/a | pass |
+| `app/robots.txt/route.ts` | keep | n/a | pass | pass | n/a | n/a | n/a | n/a |
 <!-- /v1-inventory:checks -->
 <!-- prettier-ignore-end -->
 
 ## Findings
 
-_Filled at integration._
+Every finding of the three workstreams, most severe first. "Owner" findings could not be fixed here:
+the engine (D8), CC-03's or CC-20b's files, or a change D11 rules out (a migration, a cron, legal
+text).
+
+<!-- prettier-ignore-start -->
+<!-- v1-inventory:findings -->
+| id | severity | item | evidence | what happens | fixed in / owner |
+| --- | --- | --- | --- | --- | --- |
+| C-1 | major | `inngest/audit.ts#auditFn` | node_modules got-scraping@4.2.1 dist/index.js:543-552,577-585; packages/engine/src/crawler.ts:575 | got-scraping's header generator opens a TLS connection (ALPN probe) to each new https host:port with system DNS, ignoring the pinned dnsLookup; with a rebinding hostname a blind TLS handshake reaches an internal ip:port (reproduced: a 1,604-byte ClientHello reached 127.0.0.1; with useHeaderGenerator:false nothing arrived). No HTTP request is sent and nothing is read back. | CC-SEC-2 (engine; crawl-path change needs the deployed-function smoke) |
+| B-F1 | major | `public.rate_limits`, `app/privacy/page.tsx` | apps/web/app/privacy/page.tsx:158 | /privacy calls rate-limit records short-lived; production holds 1,138 rows, 1,027 older than 30 days, oldest 157 days, 468 keys embedding a raw IP and 52 a raw email; nothing deletes the table (measured 2026-11-09). | owner follow-up: a daily delete (Inngest cron or pg_cron migration), both outside this step (D11) |
+| B-F2 | major | `public.users`, `app/privacy/page.tsx`, `app/terms/page.tsx` | apps/web/app/privacy/page.tsx:152; apps/web/app/terms/page.tsx:205 | /privacy and /terms promise erasure on request; no code deletes public.users, public.users has no FK to auth.users, and the email also sits unlinked in rate_limits keys, email_events, audits.notify_email, waitlist and takedown_requests. | owner follow-up: an erasure runbook and an auth.users cascade migration (owner-applied) |
+| A-1 | minor | `app/api/audits/[id]/stream/route.ts` | apps/web/app/api/audits/[id]/stream/route.ts:253; apps/web/app/api/audits/[id]/stream/route.ts:309 | the id is not validated and the stream has no rate limit: a garbage id polls the database every 2.5 s until the 250 s self-close; its no-cache header lacks private. | lead follow-up (retired at cutover) |
+| A-2 | minor | `app/api/audits/[id]/export/route.ts`, `app/api/audits/[id]/llms-txt/route.ts` | apps/web/app/api/audits/[id]/export/route.ts:85; apps/web/app/api/audits/[id]/llms-txt/route.ts:43 | owner-only bodies with no Cache-Control; dynamic, not CDN-cached, so hardening. | lead follow-up (retired at cutover) |
+| A-3 | minor | `app/api/audits/start/route.ts` | apps/web/app/api/audits/start/route.ts:45; packages/engine/src/ssrf-guard.ts:164 | the engine's validation message is returned verbatim, including the private address a name resolved to. | CC-SEC-2 (the message is the engine's) |
+| A-4 | minor | `app/api/auth/magic-link/route.ts` | apps/web/app/api/auth/magic-link/route.ts:32 | email has no maximum length. | lead follow-up |
+| A-5 | minor | `app/api/takedown/route.ts` | apps/web/app/api/takedown/route.ts:39 | the per-domain bucket (3 a day) is spent before the report lookup, so three junk posts block a domain's takedown form for a day; Turnstile runs only when a token is sent. No mail is sent. | lead follow-up |
+| A-6 | minor | `app/api/billing/checkout/route.ts`, `app/api/billing/portal/route.ts`, `app/billing/route.ts` | apps/web/app/api/billing/checkout/route.ts:23; apps/web/app/api/billing/portal/route.ts:15; apps/web/app/billing/route.ts:20 | a Stripe API call per request with no per-user rate limit (signed-in only). | CC-03 |
+| A-7 | minor | `app/r/[slug]/page.tsx` | apps/web/middleware.ts:62 | the initial HTML of a missing report carries two robots metas (noindex and index, follow); the middleware's X-Robots-Tag noindex covers /r/, so nothing is indexed. | lead follow-up |
+| B-F3 | minor | `app/privacy/page.tsx` | apps/web/app/privacy/page.tsx:34 | "We do not store passwords" while 11 of 12 auth.users rows hold a hash (most likely GoTrue's random password for magic-link sign-ups; not checked against GoTrue source). | owner (legal text) |
+| B-F4 | minor | `public.email_events`, `app/privacy/page.tsx` | apps/web/app/privacy/page.tsx:97 | email delivery events are not named on /privacy and are never cleaned up (109 rows, 91 older than 30 days, 33 to non-account addresses). | owner (legal text) and lead follow-up (cleanup) |
+| B-F5 | minor | `public.public_reports`, `app/terms/page.tsx` | apps/web/app/terms/page.tsx:210 | public reports outlive their audits and are never deleted (78 of 96 have a null audit_id); /privacy is silent and Terms §18 says reports are deleted after termination, with no code path. | owner (legal text) |
+| B-F6 | minor | `app/privacy/page.tsx` | apps/web/lib/anon-session.ts:5 | the crawlmouse_anon cookie (httpOnly, one year) is missing from the cookie list. | owner (legal text) |
+| B-F7 | minor | `app/privacy/page.tsx`, `public.waitlist`, `public.takedown_requests` | apps/web/app/privacy/page.tsx:97 | email addresses of people without an account (waitlist, takedown requests, audits.notify_email) are not listed. | owner (legal text) |
+| C-2 | minor | `inngest/audit.ts#auditFn` | packages/engine/src/ssrf-guard.ts:46 | the blocklist misses 192.0.0.0/24, 198.18.0.0/15, 224.0.0.0/4, 240.0.0.0/4 and IPv6 fec0::/10, 100::/64. | CC-SEC-2 |
+| C-3 | minor | `inngest/audit.ts#auditFn` | inngest/audit.ts:126 | INNGEST_AUDIT_CONCURRENCY from 6 to 100 passes the clamp; above the Free cap the whole app sync is rejected. | CC-20b (its PLAN_CONCURRENCY_CAP closes it) |
+| C-4 | minor | `inngest/billing.ts#cleanupExpiredAuditsFn` | inngest/billing-helpers.ts:228 | the TTL cleanup does not exempt an audit behind a minted report; the report keeps its snapshot (FK on delete set null). One 2026-06-14 report has neither snapshot nor audit and renders through the legacy fallback (apps/web/app/r/[slug]/page.tsx:68). | lead follow-up |
+| C-5 | minor | `app/api/webhooks/inngest/route.ts` | apps/web/app/api/webhooks/inngest/route.ts:31 | with INNGEST_DEV set in production the SDK accepts unsigned invocations; nothing in the repo sets it, production env could not be read. | owner: confirm INNGEST_DEV is absent with vercel env ls production |
+| C-6 | minor | `inngest/audit.ts#auditFn` | packages/engine/src/crawler.ts:550 | the Crawlee path passes extraHeaders without safeFetch's forbidden-header filter; no web route sets it today. | CC-SEC-2 |
+| D9-1 | minor | `app/blog/[slug]/page.tsx` | apps/web/lib/seo/jsonld.tsx:118 | JSON-LD was serialised with bare JSON.stringify into a script tag; every caller passes our own constants today, so this was hardening. | fixed in `fed2923e` |
+<!-- /v1-inventory:findings -->
+<!-- prettier-ignore-end -->
 
 ## What was not checked, and why
 
