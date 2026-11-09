@@ -5,11 +5,11 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * V2_PIPELINE registers the pipeline's functions; V2_CHECKS_PUBLIC switches what the account door
- * promises about checks (CC-20b split them). Outside lib/auth/flags.ts, no source file under apps/web
- * or inngest reads either by name: a property access (`env.V2_PIPELINE`, `process.env?.V2_PIPELINE`),
- * an element access with the literal name (`process.env['V2_PIPELINE']`), or a destructuring
- * (`const { V2_PIPELINE } = process.env`), found in the TypeScript AST. A name assembled at run time is
- * not seen. And the two account pages that render the promises read the copy flag, never the pipeline
+ * promises about checks (CC-20b split them). Outside lib/auth/flags.ts, no TypeScript or JavaScript
+ * source file under apps/web or inngest reads either by name: a property access (`env.V2_PIPELINE`,
+ * `process.env?.V2_PIPELINE`), an element access with the literal name (`process.env['V2_PIPELINE']`),
+ * or a destructuring (`const { V2_PIPELINE } = process.env`), found in the TypeScript AST. A name held
+ * in a variable (`const k = 'V2_PIPELINE'; process.env[k]`) or assembled at run time is not seen. And the two account pages that render the promises read the copy flag, never the pipeline
  * one.
  */
 
@@ -22,7 +22,9 @@ function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) return SKIP.has(name) ? [] : sources(path);
-    return /\.(ts|tsx)$/.test(name) && !/\.(test|spec)\.tsx?$/.test(name) && !name.endsWith('.d.ts')
+    return /\.([cm]?js|tsx?)$/.test(name) &&
+      !/\.(test|spec)\.[cm]?[jt]sx?$/.test(name) &&
+      !name.endsWith('.d.ts')
       ? [path]
       : [];
   });
@@ -53,7 +55,11 @@ function flagRead(n: ts.Node): string | null {
 
 /** `file:line flag` for each read of a flag by name in `text`. */
 function flagReads(file: string, text: string): string[] {
-  const kind = file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const kind = file.endsWith('.tsx')
+    ? ts.ScriptKind.TSX
+    : /\.[cm]?js$/.test(file)
+      ? ts.ScriptKind.JS
+      : ts.ScriptKind.TS;
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, kind);
   const found: string[] = [];
   const visit = (n: ts.Node) => {
@@ -101,6 +107,7 @@ describe('the v2 pipeline and copy flags', () => {
     const rel = FILES.map((f) => relative(REPO, f));
     expect(rel).toContain('apps/web/lib/auth/flags.ts');
     expect(rel).toContain('apps/web/app/(account)/signup/page.tsx');
+    expect(rel).toContain('apps/web/next.config.mjs');
     expect(rel.some((f) => f.startsWith('inngest/'))).toBe(true);
   });
 
