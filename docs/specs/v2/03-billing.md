@@ -25,7 +25,7 @@ Nahl Technologies account — is untouched and keeps serving its customer until 
 
 ## Questions put to the owner
 
-Each is built as recommended, in a commit of its own, so a different ruling is a revert. Rulings pending.
+Each is built as recommended, in a commit of its own. All approved as recommended on 2026-11-09; the upgrade route (Q3), the card-required Pro trial and its 50/50 flag (Q9) and creating the Agency account (Q15) go to CC-29, and Q10 stays a founder alert and a manual refund.
 
 | Q   | What the build does                                                                                                                                                                                   | Departs from                       |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
