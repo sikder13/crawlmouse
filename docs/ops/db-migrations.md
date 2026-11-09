@@ -71,7 +71,7 @@ The scripts behind them are in `scripts/db`. Their tests:
 
 Migration files are append-only. The `migrations-append-only` job in `ci.yml` runs on every push
 to every branch and fails on any change under `infra/supabase/migrations` other than an added
-file (a modification, deletion, rename or a file swapped for a symlink); it is a required check. On a pull request that touches the database, the dry run also refuses an edit to
+file (a modification, deletion, rename or a file swapped for a symlink); `protect-main` requires it. On a pull request that touches the database, the dry run also refuses an edit to
 an applied migration.
 
 To apply files whose pull request was merged earlier, give `dry_run_pr` the number of a merged
@@ -395,11 +395,12 @@ so two databases can be compared section by section.
 
 ## 7. Secrets and environments
 
-| Where                           | Name                    | Used by                                                        |
-| ------------------------------- | ----------------------- | -------------------------------------------------------------- |
-| GitHub environment `db-dry-run` | `SUPABASE_ACCESS_TOKEN` | the dry run, the branch clean-up, and the read-only `plan` job |
-| GitHub environment `production` | `SUPABASE_ACCESS_TOKEN` | the `apply` and `rollback` jobs (pooler lookup, read-only)     |
-| GitHub environment `production` | `SUPABASE_DB_PASSWORD`  | the `apply` and `rollback` jobs                                |
+| Where                           | Name                        | Used by                                                               |
+| ------------------------------- | --------------------------- | --------------------------------------------------------------------- |
+| GitHub environment `db-dry-run` | `SUPABASE_ACCESS_TOKEN`     | the dry run, the branch clean-up, and the read-only `plan` job        |
+| GitHub environment `production` | `SUPABASE_ACCESS_TOKEN`     | the `apply` and `rollback` jobs (pooler lookup, read-only)            |
+| GitHub environment `production` | `SUPABASE_DB_PASSWORD`      | the `apply` and `rollback` jobs                                       |
+| GitHub environment `production` | `SUPABASE_SERVICE_ROLE_KEY` | no workflow; the owner removes it before the repository turns private |
 
 A branch's database password comes from the Management API at run time and is masked in the log
 before use. `production` accepts deployments from `main` only; it has no required reviewer, because

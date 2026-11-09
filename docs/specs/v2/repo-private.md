@@ -57,6 +57,18 @@ dry runs use it, so a workflow on any pushed branch can read it. The owner check
 cannot. The flip does not change this, because that environment never had a reviewer. It is the
 accepted risk in `docs/ops/db-migrations.md` §7. The follow-up is a narrower credential for the dry run.
 
+**Another environment the flip changes: `spike`.** It is used by no workflow
+(`grep -rn "environment: spike" .github/workflows` prints nothing) and holds `FLY_API_TOKEN`,
+`SPIKE_INTERNAL_SIGNING_SECRET` and `SPIKE_WORKER_JWT_SECRET`. Its only protection is a required
+reviewer, with no branch policy, so after the flip a workflow on any pushed branch could read them. The
+owner deletes it before the flip (checklist, item 0). Until then the D2 test fails any workflow that
+binds it.
+
+**Runs created before this change.** A re-run executes the workflow file of the run it repeats. The
+push-triggered runs of `db-apply-prod.yml` from before this change carry no owner check, and after the
+flip their `production` reviewer no longer applies. Never re-run a production run created before
+CC-REPO merged; the checklist has the owner confirm none is waiting.
+
 ## D2 — the test that pins D1
 
 ```bash
@@ -133,7 +145,8 @@ file written and passed it without (`~/crawlmouse-plan/notes/cc-repo/semgrep-tri
 with no entries.
 
 **What Semgrep does not replace.** CodeQL's run on `main` on 2026-11-08 reported 21 high-severity
-results outside tests, all listed in its baseline. Semgrep reports none: its community rules are pattern rules with no cross-file data flow. The
+results outside tests, all listed in its baseline (the entries' counts sum to 21:
+`node -e "const b=require('./.github/workflows/scripts/codeql-baseline.json'); console.log(b.entries.reduce((n,e)=>n+(e.count??1),0))"`). Semgrep reports none: its community rules are pattern rules with no cross-file data flow. The
 three CodeQL results that are real hardening are tracked as CC-SEC-2 in `sec-baseline.md`'s follow-ups,
 not by either scanner. The registry packs are fetched at run time and are not pinned, so a rule added
 upstream can fail a branch that changed nothing. The baseline takes it in, and the job is not required.
@@ -200,6 +213,10 @@ The required `visual` job passes in two cases:
 - every shard passed;
 - the shards were skipped and `changes` passed with `visual=false`.
 
+A pass on a skipped branch says nothing about `main`'s own visual state: the branch is compared with
+`main`, so if `main`'s own run failed its shards, a docs-only branch still passes `visual`. `main`'s
+red run is where that shows.
+
 It fails in every other case. Among them is the one a "skipped means passed" rule gets wrong: shards
 skipped because `changes` itself failed. The test runs the job's script for every combination of
 results:
@@ -235,6 +252,13 @@ Out of this step:
 
 ## The owner's checklist
 
+0. **Before the flip:**
+   - Settings → Environments → `spike` → Delete environment (no workflow uses it; it would lose its
+     only protection).
+   - Settings → Environments → `production` → remove `SUPABASE_SERVICE_ROLE_KEY`, which no workflow
+     reads (`grep -rn SUPABASE_SERVICE_ROLE_KEY .github` prints nothing).
+   - Actions → **DB apply to production** and **DB rollback on production**: no run is waiting. Never
+     re-run a run created before CC-REPO merged.
 1. **After merging:** Settings → General → Danger Zone → Change repository visibility → Private.
 2. **Check, after the flip:**
    - CI runs on the next push, `codeql` shows as skipped and `semgrep` passes;
