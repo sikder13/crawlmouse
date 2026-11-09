@@ -348,9 +348,9 @@ describe('no secret leaves the script', () => {
 /**
  * A server shaped like the worker, scripted onto the paths the worker in process cannot be made to
  * take: a batch that failed inside it, a batch it lost, metrics it refused, a batch that never ends.
- * Every answer echoes the signatures and the JWT it was sent; the client drops the echo on these
- * paths, so what catches a leak is the planted values and `sent` (both signatures and the JWT), each
- * checked against everything the script printed.
+ * Every answer but the POST's 202 echoes the signatures and the JWT it was sent; the client drops the
+ * echo on these paths, so what catches a leak is the planted values and `sent` (the signatures and
+ * the JWT), each checked against everything the script printed.
  */
 async function scripted(mode: 'failed' | 'lost' | 'metrics_refused' | 'never_done') {
   const sent: string[] = [];
@@ -425,6 +425,7 @@ describe('no secret leaves the script when the worker fails it', () => {
     expect(all).toMatch(says);
     // The JWT and a signature reached the server: the leak this test looks for was there to make.
     expect(server.sent.filter((v) => v.split('.').length === 3)).not.toHaveLength(0);
+    expect(server.sent.filter((v) => /^[0-9a-f]{64}$/.test(v))).not.toHaveLength(0);
     const planted = [
       secret,
       Buffer.from(secret).toString('base64'),
