@@ -60,13 +60,13 @@ interface Script {
   stage2?: boolean;
   claims?: ('claimed' | 'site_busy' | 'gone' | 'paused')[];
   poll?: (at: BatchAt, n: number) => PollOutput['status'] | PollOutput;
-  post?: (at: BatchAt, repost: boolean, n: number) => PostOutput | undefined;
+  post?: (at: BatchAt, n: number) => PostOutput | undefined;
   read?: (at: BatchAt) => ReadOutput | undefined;
 }
 
 /** Fake step bodies; each returns the clock's time where the real one returns its own. */
 function fakeSteps(clock: { now: number }, script: Script = {}) {
-  const posts: { at: BatchAt; repost: boolean }[] = [];
+  const posts: { at: BatchAt }[] = [];
   const failed: string[] = [];
   let claimN = 0;
   let pollN = 0;
@@ -75,11 +75,12 @@ function fakeSteps(clock: { now: number }, script: Script = {}) {
   const steps: CheckSteps = {
     claim: async () => ({ outcome: script.claims?.[claimN++] ?? 'claimed', at: clock.now }),
     discover: async () => ({ seeds: 3, sitemap_urls: 2, at: clock.now }),
-    post: async (_e, at, _so, repost) => {
-      posts.push({ at, repost });
-      const scripted = script.post?.(at, repost, postN++);
+    post: async (_e, at) => {
+      posts.push({ at });
+      const scripted = script.post?.(at, postN++);
       if (scripted) return scripted;
-      const crawlPosted = posts.filter((p) => p.at.kind === 'crawl' && !p.repost).length;
+      const crawlPosted = new Set(posts.filter((p) => p.at.kind === 'crawl').map((p) => p.at.batch))
+        .size;
       if (at.kind === 'crawl' && crawlPosted > crawlBatches) return { status: 'none', why: 'done' };
       if (at.stage === 2 && !script.stage2) return { status: 'none', why: 'not_needed' };
       return { status: 'posted', urls: 50, at: clock.now, max_seconds: 240 };
@@ -291,7 +292,7 @@ describe('runCheck: polling (D1)', () => {
 
   it('re-posts once when the worker lost the batch', async () => {
     let lost = 0;
-    const { ids, posts } = await drive({
+    const { ids } = await drive({
       crawlBatches: 1,
       poll: (at) => (at.kind === 'crawl' && lost++ === 0 ? 'not_found' : 'done'),
     });
@@ -304,7 +305,7 @@ describe('runCheck: polling (D1)', () => {
       'crawl-1-poll-2',
     ]);
     expect(ids).toContain('crawl-1-read-2');
-    expect(posts.filter((p) => p.repost)).toHaveLength(1);
+    expect(ids.filter((id) => id.includes('repost'))).toEqual(['crawl-1-repost']);
   });
 
   it('fails the batch on a second loss', async () => {

@@ -120,7 +120,8 @@ export interface CheckSteps {
     run: { runId: string; startedAt: number | null },
   ): Promise<ClaimOutput>;
   discover(event: CheckRequested, so: RunSoFar): Promise<DiscoverOutput>;
-  post(event: CheckRequested, at: BatchAt, so: RunSoFar, repost: boolean): Promise<PostOutput>;
+  /** Also a re-post: a batch whose row exists is asked for first, then posted with a fresh nonce. */
+  post(event: CheckRequested, at: BatchAt, so: RunSoFar): Promise<PostOutput>;
   poll(event: CheckRequested, at: BatchAt, so: RunSoFar): Promise<PollOutput>;
   read(event: CheckRequested, at: BatchAt, so: RunSoFar): Promise<ReadOutput>;
   failBatch(event: CheckRequested, at: BatchAt): Promise<Empty>;
@@ -210,10 +211,10 @@ export async function runCheck(
   so.crawlFrom = (await run('discover', () => steps.discover(data, soFar()))).at;
 
   // ── one batch: post, poll to its deadline, read; one re-post when the worker lost it ──
-  const post = async (prefix: string, at: BatchAt, repost: boolean): Promise<PostOutput> => {
+  const post = async (prefix: string, at: BatchAt): Promise<PostOutput> => {
     for (let k = 0; ; k++) {
       const out = await run(k === 0 ? prefix : `${prefix}-${k}`, () =>
-        steps.post(data, at, soFar(), repost),
+        steps.post(data, at, soFar()),
       );
       if (out.status !== 'busy') return out;
       if (k === PACE.busyRetries) return { status: 'none', why: 'no_time' };
@@ -227,7 +228,7 @@ export async function runCheck(
   };
 
   const runBatch = async (p: string, at: BatchAt): Promise<BatchEnd> => {
-    let posted = await post(`${p}-post`, at, false);
+    let posted = await post(`${p}-post`, at);
     let reposted = false;
     let polls = 0;
     for (;;) {
@@ -252,7 +253,7 @@ export async function runCheck(
       const lost = poll.status === 'not_found' || poll.status === 'done';
       if (!lost || reposted) return fail(p, at);
       reposted = true;
-      posted = await post(`${p}-repost`, at, true);
+      posted = await post(`${p}-repost`, at);
     }
   };
   /** A read batch adds to the run; a batch from another release than the first fails the check. */
