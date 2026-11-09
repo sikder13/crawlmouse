@@ -17,10 +17,15 @@ const WEB = resolve(__dirname, '..');
 const MODULE = /(^|\/)rate-limit(\.(js|ts|mjs))?$/;
 
 function callerFiles(): string[] {
-  const out = execFileSync('git', ['grep', '-l', '-E', 'rate-limit[\'"]', '--', '.'], {
-    cwd: WEB,
-    encoding: 'utf8',
-  });
+  // The same paths MODULE accepts: with or without a .js, .ts or .mjs suffix.
+  const out = execFileSync(
+    'git',
+    ['grep', '-l', '-E', 'rate-limit(\\.(js|ts|mjs))?[\'"]', '--', '.'],
+    {
+      cwd: WEB,
+      encoding: 'utf8',
+    },
+  );
   return out
     .split('\n')
     .filter((f) => /\.(ts|tsx|mts|js|mjs)$/.test(f))
