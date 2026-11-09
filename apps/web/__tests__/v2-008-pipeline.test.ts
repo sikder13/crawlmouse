@@ -20,12 +20,12 @@ import {
 import { before, through } from './helpers/v2-check-tables';
 
 /**
- * Migration 008 (CC-20b, D6 and Q13): crawl_batches, the pipeline's columns on checks and sites, the
- * one-running-check-per-site index, the state functions claim_check, fail_check and
- * reap_stalled_checks, and persist_built_check. What persist_built_check writes, and that it writes a
- * check once and whole, is tested through its one caller (apps/web/lib/v2/pipeline/persist.test.ts,
- * round-trip.test.ts) on a check the engine built; this file holds the catalog, the grants and the
- * three state functions.
+ * Migration 008 (CC-20b, D6, Q11 and Q13): crawl_batches and persist_chunks, the pipeline's columns
+ * on checks and sites, the one-running-check-per-site index, the state functions claim_check,
+ * fail_check and reap_stalled_checks, and stage_check_rows and persist_built_check. What the last two
+ * write, and that a check is written once and whole, is tested through their one caller
+ * (apps/web/lib/v2/pipeline/persist.test.ts, round-trip.test.ts) on a check the engine built; this
+ * file holds the catalog, the grants and the three state functions.
  *
  * PGlite has one backend, so two transactions never overlap here: "two claims at once" below runs
  * them in turn, which is the order a real race resolves in once the first commits.
@@ -108,6 +108,17 @@ async function aBatch(check: string, batch: number, status = 'posted'): Promise<
     [check, batch, `nonce-${randomUUID().replaceAll('-', '')}`, status],
   );
 }
+/** One staged chunk of link edges for a running check. */
+async function stage(check: string): Promise<void> {
+  await db.query(`select public.stage_check_rows($1, 'link_edges', 0, '[]'::jsonb)`, [check]);
+}
+const stagedChunks = async (check: string) =>
+  (
+    await db.query<{ n: number }>(
+      `select count(*)::int as n from public.persist_chunks where check_id = $1`,
+      [check],
+    )
+  ).rows[0]!.n;
 const batchStatuses = async (check: string) =>
   (
     await db.query<{ status: string }>(
@@ -135,28 +146,32 @@ describe('the columns 008 adds are the ones columns.ts names', () => {
 });
 
 describe('access', () => {
-  it('crawl_batches: RLS on; anon, authenticated and crawl_worker hold nothing; service_role reads and writes', async () => {
-    const { rows } = await db.query<{ rls: boolean }>(
-      `select relrowsecurity as rls from pg_class where oid = 'public.crawl_batches'::regclass`,
-    );
-    expect(rows[0]!.rls).toBe(true);
-    const held = async (role: string) =>
-      (
-        await db.query<{ p: string }>(
-          `select p from unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES',
+  it.each(['crawl_batches', 'persist_chunks'])(
+    '%s: RLS on; anon, authenticated and crawl_worker hold nothing; service_role reads and writes',
+    async (table) => {
+      const { rows } = await db.query<{ rls: boolean }>(
+        `select relrowsecurity as rls from pg_class where oid = ('public.' || $1)::regclass`,
+        [table],
+      );
+      expect(rows[0]!.rls).toBe(true);
+      const held = async (role: string) =>
+        (
+          await db.query<{ p: string }>(
+            `select p from unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES',
                                       'TRIGGER']) with ordinality as t (p, n)
-            where has_table_privilege($1, 'public.crawl_batches', p)
+            where has_table_privilege($1, ('public.' || $2)::regclass, p)
                or case when p in ('SELECT', 'INSERT', 'UPDATE', 'REFERENCES')
-                       then has_any_column_privilege($1, 'public.crawl_batches', p) else false end
+                       then has_any_column_privilege($1, ('public.' || $2)::regclass, p) else false end
             order by n`,
-          [role],
-        )
-      ).rows.map((r) => r.p);
-    expect(await held('anon')).toEqual([]);
-    expect(await held('authenticated')).toEqual([]);
-    expect(await held('crawl_worker')).toEqual([]);
-    expect(await held('service_role')).toEqual(['SELECT', 'INSERT', 'UPDATE', 'DELETE']);
-  });
+            [role, table],
+          )
+        ).rows.map((r) => r.p);
+      expect(await held('anon')).toEqual([]);
+      expect(await held('authenticated')).toEqual([]);
+      expect(await held('crawl_worker')).toEqual([]);
+      expect(await held('service_role')).toEqual(['SELECT', 'INSERT', 'UPDATE', 'DELETE']);
+    },
+  );
 
   it('no client role reads the pipeline columns of checks or the schedule columns of sites', async () => {
     const { rows } = await db.query<{ col: string; role: string }>(
@@ -170,7 +185,7 @@ describe('access', () => {
     expect(rows).toEqual([]);
   });
 
-  it('the four functions: service_role alone may execute them', async () => {
+  it('the five functions: service_role alone may execute them', async () => {
     const { rows } = await db.query<{
       name: string;
       definer: boolean;
@@ -190,7 +205,7 @@ describe('access', () => {
               has_function_privilege('service_role', p.oid, 'EXECUTE') as sr
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public'
-          and p.proname in ('claim_check', 'fail_check', 'reap_stalled_checks', $1)
+          and p.proname in ('claim_check', 'fail_check', 'reap_stalled_checks', 'stage_check_rows', $1)
         order by 1`,
       [PERSIST_RPC],
     );
@@ -213,6 +228,7 @@ describe('access', () => {
         config: ['search_path=pg_catalog, pg_temp'],
       },
       { name: 'reap_stalled_checks', ...invoker },
+      { name: 'stage_check_rows', ...invoker },
     ]);
   });
 
@@ -321,11 +337,12 @@ describe('claim_check', () => {
 });
 
 describe('fail_check', () => {
-  it('fails a running check: finished, progress cleared, its posted batches released', async () => {
+  it('fails a running check: finished, progress cleared, its posted batches released, its staging deleted', async () => {
     const check = await aQueuedCheck(await aSite());
     await claim(check, 'run-1');
     await aBatch(check, 0, 'done');
     await aBatch(check, 1, 'posted');
+    await stage(check);
     expect(await fail(check, 'worker_unavailable')).toBe(true);
     const s = await stateOf(check);
     expect(s).toMatchObject({
@@ -335,6 +352,7 @@ describe('fail_check', () => {
     });
     expect(s.finished_at).not.toBeNull();
     expect(await batchStatuses(check)).toEqual(['done', 'released']);
+    expect(await stagedChunks(check)).toBe(0);
   });
 
   it('fails a queued check, which then has a start time as the contract requires', async () => {
@@ -383,8 +401,10 @@ describe('reap_stalled_checks', () => {
       [running],
     );
     await aBatch(running, 0, 'posted');
+    await stage(running);
     const runningFresh = await aQueuedCheck(await aSite());
     await claim(runningFresh, 'run-alive');
+    await stage(runningFresh);
     const reaped = await reap(`now() - interval '30 minutes'`);
     const mine = reaped.filter((r) =>
       [neverStarted, queuedFresh, running, runningFresh].includes(r.check_id),
@@ -396,8 +416,10 @@ describe('reap_stalled_checks', () => {
     expect((await stateOf(neverStarted)).started_at).not.toBeNull();
     expect((await stateOf(running)).status).toBe('failed');
     expect(await batchStatuses(running)).toEqual(['released']);
+    expect(await stagedChunks(running)).toBe(0);
     expect((await stateOf(queuedFresh)).status).toBe('queued');
     expect((await stateOf(runningFresh)).status).toBe('running');
+    expect(await stagedChunks(runningFresh)).toBe(1);
   });
 
   it('a heartbeat exactly at the cutoff is not stalled', async () => {

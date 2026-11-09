@@ -36,6 +36,7 @@ type ReadScope = 'site' | 'site_or_account' | 'account_managers' | 'account' | '
 const READ_SCOPE: Record<string, ReadScope> = {
   measurement_lineages: 'signed_in',
   crawl_batches: 'none',
+  persist_chunks: 'none',
   sites: 'site',
   checks: 'site',
   page_results: 'site',

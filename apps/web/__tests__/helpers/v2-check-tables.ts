@@ -384,6 +384,12 @@ export const ROWS = {
     summary: null,
     result_path: null,
   }),
+  persist_chunks: (checkId: string, chunk: number): Row => ({
+    check_id: checkId,
+    collection: 'link_edges',
+    chunk,
+    rows: [],
+  }),
 } as const;
 
 /** A valid research.check_runs row (the ledger is not in `public`, so not in ROWS). */
@@ -446,8 +452,8 @@ export async function premakeTestMonths(db: Db): Promise<void> {
 export type NewTable = keyof typeof ROWS;
 /** The public tables 006b creates. */
 export const TABLES_006B: readonly NewTable[] = ['check_ledger_links', 'usage_events'];
-/** The public table 008 creates. */
-export const TABLES_008: readonly NewTable[] = ['crawl_batches'];
+/** The public tables 008 creates. */
+export const TABLES_008: readonly NewTable[] = ['crawl_batches', 'persist_chunks'];
 /** The tables 003 creates. */
 export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
   .filter((t) => !TABLES_006B.includes(t) && !TABLES_008.includes(t))
@@ -581,6 +587,12 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
         'crawl_batches',
         ROWS.crawl_batches(checkId, 0),
         { check_id: checkId, batch: 0 },
+        scope,
+      );
+      await put(
+        'persist_chunks',
+        ROWS.persist_chunks(checkId, 0),
+        { check_id: checkId, collection: 'link_edges', chunk: 0 },
         scope,
       );
     }

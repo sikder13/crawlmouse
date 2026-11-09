@@ -188,6 +188,9 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
     case 'crawl_batches':
       await needCheck();
       return ROWS.crawl_batches(check, 0);
+    case 'persist_chunks':
+      await needCheck();
+      return ROWS.persist_chunks(check, 0);
   }
 }
 
@@ -273,6 +276,7 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   check_ledger_links: null,
   usage_events: null,
   crawl_batches: null,
+  persist_chunks: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -327,7 +331,7 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   if (table === 'alert_rules') expectedTable.authenticated = 'd';
   if (table === 'page_results') expectedTable.crawl_worker = 'a';
   // 008 grants service_role the four statements the pipeline runs, not every privilege.
-  if (table === 'crawl_batches') expectedTable.service_role = 'arwd';
+  if (table === 'crawl_batches' || table === 'persist_chunks') expectedTable.service_role = 'arwd';
   const actualTable = Object.fromEntries(tableAcl.map((a) => [a.grantee, sorted(a.privileges)]));
   for (const g of new Set([...Object.keys(expectedTable), ...Object.keys(actualTable)])) {
     if ((actualTable[g] ?? '') !== sorted(expectedTable[g] ?? ''))

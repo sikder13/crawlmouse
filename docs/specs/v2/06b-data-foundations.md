@@ -49,7 +49,7 @@ Policies:
 
 Table-level client privileges (INSERT, DELETE, TRUNCATE): none.
 
-Which tables name it. The measurement tables carry a required `lineage_id`: `access_tests`, `link_edges`, `page_results`, and `research.check_runs`. `checks.lineage_id` names the lineage of the grading and is set exactly when the check has results (`checks_lineage`). `research.crawler_observations` reach theirs through their run. Every other table with a `check_id` is declared derived: `alert_events`, `changes`, `check_ledger_links`, `crawl_batches`, `evidence_blobs`, `fix_events`, `frontier`, `frontier_politeness`, `public_reports`, `usage_events`. A table with a `check_id` in neither list fails `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "lineage"`.
+Which tables name it. The measurement tables carry a required `lineage_id`: `access_tests`, `link_edges`, `page_results`, and `research.check_runs`. `checks.lineage_id` names the lineage of the grading and is set exactly when the check has results (`checks_lineage`). `research.crawler_observations` reach theirs through their run. Every other table with a `check_id` is declared derived: `alert_events`, `changes`, `check_ledger_links`, `crawl_batches`, `persist_chunks`, `evidence_blobs`, `fix_events`, `frontier`, `frontier_politeness`, `public_reports`, `usage_events`. A table with a `check_id` in neither list fails `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006b-data-foundations.test.ts -t "lineage"`.
 
 Where the values come from. The schema requires them now; producing them is a follow-up, because nothing in the engine or the worker carries a version today:
 

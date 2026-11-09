@@ -1,22 +1,25 @@
 -- v2 migration 008 (CC-20b, ARCH-2 §6.1 row 008): what the check pipeline stores beside a check.
 --
--- Additive. It creates public.crawl_batches; adds checks.inngest_run_id, heartbeat_at, diff_inputs
--- and map_path, and sites.next_check_at and schedule_offset_min; adds the unique partial index
--- checks_one_running_per_site and the reaper's index; and creates four functions:
+-- Additive. It creates public.crawl_batches and public.persist_chunks; adds checks.inngest_run_id,
+-- heartbeat_at, diff_inputs and map_path, and sites.next_check_at and schedule_offset_min; adds the
+-- unique partial index checks_one_running_per_site and the reaper's index; and creates five functions:
 --   claim_check, fail_check, reap_stalled_checks: a check's state moves, each one statement the
 --     pipeline (inngest/check.ts, through apps/web/lib/v2/pipeline) calls as service_role;
---   persist_built_check: a built check written whole, in one transaction.
+--   stage_check_rows: one chunk of a built check's bulk rows, staged while the check runs;
+--   persist_built_check: the built check written whole, staged rows included, in one transaction.
+-- A built check at the 500-page cap measured 5.00 MiB as a single request body, over the 2 MB bound
+-- the owner set (Q11), so its page results, link edges and access tests travel in chunks.
 -- No existing column, policy or grant is dropped or renamed. v1 reads none of the new objects.
 --
--- Access. RLS is on for crawl_batches, which no client role or crawl_worker may touch; service_role
--- reads and writes it. The new checks and sites columns are not granted to any client role: 003 grants
--- authenticated SELECT on checks and sites column by column, so a column added later stays hidden.
--- Only service_role may execute the four functions.
+-- Access. RLS is on for crawl_batches and persist_chunks, which no client role or crawl_worker may
+-- touch; service_role reads and writes them. The new checks and sites columns are not granted to any
+-- client role: 003 grants authenticated SELECT on checks and sites column by column, so a column added
+-- later stays hidden. Only service_role may execute the five functions.
 --
 -- search_path. persist_built_check is SECURITY DEFINER (it creates a month's partitions, which
 -- service_role may not), with search_path pg_catalog, pg_temp and every other name schema-qualified;
--- the three state functions are SECURITY INVOKER with search_path pg_catalog, public, pg_temp (owner
--- ruling, 2026-11-08).
+-- the other four are SECURITY INVOKER with search_path pg_catalog, public, pg_temp (owner ruling,
+-- 2026-11-08).
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261109000001_v2_008_pipeline.revert.sql.
@@ -53,6 +56,31 @@ do $$
 begin
   if exists (select 1 from pg_catalog.pg_roles where rolname = 'crawl_worker') then
     revoke all on table public.crawl_batches from crawl_worker;
+  end if;
+end;
+$$;
+
+-- ─── persist_chunks: a built check's bulk rows, staged until persist_built_check moves them ────────
+
+create table if not exists public.persist_chunks (
+  check_id uuid not null references public.checks (id) on delete cascade,
+  collection text not null check (collection in ('page_results', 'link_edges', 'access_tests')),
+  chunk integer not null,
+  -- The chunk's rows, as the contract writes them (page results with their vantage columns).
+  rows jsonb not null,
+  primary key (check_id, collection, chunk),
+  constraint persist_chunks_chunk check (chunk between 0 and 100000),
+  constraint persist_chunks_rows check (jsonb_typeof(rows) = 'array')
+);
+
+alter table public.persist_chunks enable row level security;
+revoke all on table public.persist_chunks from public, anon, authenticated, service_role;
+grant select, insert, update, delete on table public.persist_chunks to service_role;
+
+do $$
+begin
+  if exists (select 1 from pg_catalog.pg_roles where rolname = 'crawl_worker') then
+    revoke all on table public.persist_chunks from crawl_worker;
   end if;
 end;
 $$;
@@ -128,7 +156,8 @@ $$;
 -- ─── fail_check ───────────────────────────────────────────────────────────────────────────────────
 -- Moves a queued or running check to failed with p_reason, found by p_check, or by its run when
 -- p_check is null: finished now, started now if it never started (the contract gives a failed check a
--- start), progress cleared, and its posted batches released. True only when it made that move.
+-- start), progress cleared, its posted batches released and its staged chunks deleted. True only when
+-- it made that move.
 
 create or replace function public.fail_check(p_check uuid, p_reason text, p_run text default null)
 returns boolean
@@ -150,6 +179,8 @@ as $$
     update public.crawl_batches b
        set status = 'released'
      where b.check_id in (select f.id from failed f) and b.status = 'posted'
+  ), unstaged as (
+    delete from public.persist_chunks s where s.check_id in (select f.id from failed f)
   )
   select exists (select 1 from failed)
 $$;
@@ -157,7 +188,8 @@ $$;
 -- ─── reap_stalled_checks ──────────────────────────────────────────────────────────────────────────
 -- In one statement: every queued or running check whose heartbeat (its queue time when it has none)
 -- is before p_cutoff fails as fail_check fails one, with reason not_started when no run claimed it and
--- stalled when one did, and its posted batches are released. Returns the checks it failed.
+-- stalled when one did; its posted batches are released and its staged chunks deleted. Returns the
+-- checks it failed.
 
 create or replace function public.reap_stalled_checks(p_cutoff timestamptz)
 returns table (check_id uuid, site_id uuid, reason text)
@@ -179,26 +211,76 @@ as $$
     update public.crawl_batches b
        set status = 'released'
      where b.check_id in (select r.id from reaped r) and b.status = 'posted'
+  ), unstaged as (
+    delete from public.persist_chunks s where s.check_id in (select r.id from reaped r)
   )
   select r.id, r.site_id, r.failure_reason from reaped r
 $$;
 
+-- ─── stage_check_rows ─────────────────────────────────────────────────────────────────────────────
+-- Stages chunk p_chunk of a running check's p_collection, replacing a chunk of that number staged
+-- before, so a retried call writes it once. Chunk 0 also deletes the collection's other chunks, so an
+-- attempt that stages from 0 starts clean. Returns false, writing nothing, when the check has finished
+-- or ended partial (its rows are written already); raises for any other status, an unknown collection,
+-- or rows that are not an array. The rows are persist_built_check's to read and check.
+
+create or replace function public.stage_check_rows(p_check uuid, p_collection text, p_chunk integer,
+                                                   p_rows jsonb)
+returns boolean
+language plpgsql
+volatile
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v_status text;
+begin
+  if p_collection is null or p_collection not in ('page_results', 'link_edges', 'access_tests')
+     or p_chunk is null or jsonb_typeof(p_rows) is distinct from 'array' then
+    raise exception 'stage_check_rows: a collection, a chunk number and an array of rows are required'
+      using errcode = '22023';
+  end if;
+  select status into v_status from public.checks where id = p_check for share;
+  if not found then
+    raise exception 'stage_check_rows: check % not found', p_check using errcode = 'P0002';
+  end if;
+  if v_status in ('finished', 'partial') then
+    return false;
+  end if;
+  if v_status <> 'running' then
+    raise exception 'stage_check_rows: check % is %, not running', p_check, v_status
+      using errcode = '55000';
+  end if;
+  if p_chunk = 0 then
+    delete from public.persist_chunks where check_id = p_check and collection = p_collection;
+  end if;
+  insert into public.persist_chunks (check_id, collection, chunk, rows)
+  values (p_check, p_collection, p_chunk, p_rows)
+  on conflict (check_id, collection, chunk) do update set rows = excluded.rows;
+  return true;
+end;
+$$;
+
 -- ─── persist_built_check ──────────────────────────────────────────────────────────────────────────
 -- Writes a built check (the engine's BuiltCheck, as apps/web/lib/v2/pipeline/persist.ts sends it after
--- parsing every row with the contract's schemas) in one transaction:
+-- parsing every row with the contract's schemas) in one transaction. Its page results, link edges and
+-- access tests arrive staged in persist_chunks; p carries the rest and, under `staged`, how many
+-- chunks and rows of each collection were staged.
 --   1. locks the check; finished or partial already → {"written": false} and no write; any status
---      but running → raises. The built check's id, site, trigger, queue time, start time and grade
---      version must equal the row's, and its status be finished or partial.
+--      but running → raises. The built check's site, trigger, queue time, start time and grade
+--      version must equal the row's, and its status be finished or partial. Each collection's staged
+--      chunks must be exactly 0 to n−1 and hold the stated number of rows; otherwise it raises.
 --   2. creates the check month's partitions if they are missing.
 --   3. records the grading and fetching lineages, each found by its five values when it exists.
---   4. inserts the page results (with the vantage the crawl row carried), link edges and access
---      tests, each naming this check, its month and the fetching lineage.
+--   4. moves the staged page results (with the vantage the crawl row carried), link edges and access
+--      tests into their tables, each naming this check, its month and the fetching lineage, and
+--      deletes the staging.
 --   5. upserts the site's fixes by id (a fix of another site is refused), inserts their events and
 --      the check's changes, and the usage event while the site still belongs to the event's account
 --      (otherwise the event is skipped and counted as skipped).
 --   6. updates the check's pipeline-owned columns last, so every checks_* CHECK holds as it ends.
--- Every insert's row count must equal the payload's; a difference raises. It never writes expires_at,
--- result_email, deferred_until or failure_reason. Returns {"written": true, "counts": {…}}.
+-- Each insert's row count must equal the expected count, checked as it is made; a difference raises.
+-- It never writes expires_at, result_email, deferred_until or failure_reason. Returns
+-- {"written": true, "counts": {…}}.
 
 create or replace function public.persist_built_check(p jsonb)
 returns jsonb
@@ -216,6 +298,7 @@ declare
   v_account uuid;
   v_key text;
   v_n bigint;
+  v_expected bigint;
   v_counts jsonb := '{}'::jsonb;
   v_usage_skipped integer := 0;
 begin
@@ -228,10 +311,16 @@ begin
      or jsonb_typeof(p -> 'map_path') not in ('string', 'null') then
     raise exception 'persist_built_check: p is not a built check' using errcode = '22023';
   end if;
-  foreach v_key in array array['page_results', 'link_edges', 'access_tests', 'fixes', 'fix_events',
-                               'changes'] loop
+  foreach v_key in array array['fixes', 'fix_events', 'changes'] loop
     if jsonb_typeof(p -> v_key) is distinct from 'array' then
       raise exception 'persist_built_check: % is not an array', v_key using errcode = '22023';
+    end if;
+  end loop;
+  foreach v_key in array array['page_results', 'link_edges', 'access_tests'] loop
+    if jsonb_typeof(p -> 'staged' -> v_key -> 'chunks') is distinct from 'number'
+       or jsonb_typeof(p -> 'staged' -> v_key -> 'rows') is distinct from 'number' then
+      raise exception 'persist_built_check: staged.% is not {chunks, rows}', v_key
+        using errcode = '22023';
     end if;
   end loop;
 
@@ -265,10 +354,25 @@ begin
     raise exception 'persist_built_check: a built check is finished or partial, not %', v_new.status
       using errcode = '22023';
   end if;
+  -- The staged chunks: exactly 0 to n−1 of each collection, holding the stated rows.
+  foreach v_key in array array['page_results', 'link_edges', 'access_tests'] loop
+    if (select count(*) filter (where c.chunk < (p -> 'staged' -> v_key ->> 'chunks')::integer)
+                 is distinct from (p -> 'staged' -> v_key ->> 'chunks')::bigint
+               or count(*) filter (where c.chunk >= (p -> 'staged' -> v_key ->> 'chunks')::integer) > 0
+          from public.persist_chunks c where c.check_id = v_id and c.collection = v_key) then
+      raise exception 'persist_built_check: the staged % are not chunks 0 to %', v_key,
+        (p -> 'staged' -> v_key ->> 'chunks')::integer - 1 using errcode = '22023';
+    end if;
+    select coalesce(sum(jsonb_array_length(c.rows)), 0) into v_n
+      from public.persist_chunks c where c.check_id = v_id and c.collection = v_key;
+    if v_n <> (p -> 'staged' -> v_key ->> 'rows')::bigint then
+      raise exception 'persist_built_check: % staged rows of %, not %', v_n, v_key,
+        p -> 'staged' -> v_key ->> 'rows' using errcode = '22023';
+    end if;
+  end loop;
   -- Every row names this check, and every fix and change this check's site.
-  if exists (select 1 from jsonb_array_elements(p -> 'page_results') e where (e ->> 'check_id')::uuid is distinct from v_id)
-     or exists (select 1 from jsonb_array_elements(p -> 'link_edges') e where (e ->> 'check_id')::uuid is distinct from v_id)
-     or exists (select 1 from jsonb_array_elements(p -> 'access_tests') e where (e ->> 'check_id')::uuid is distinct from v_id)
+  if exists (select 1 from public.persist_chunks c, jsonb_array_elements(c.rows) e
+              where c.check_id = v_id and (e ->> 'check_id')::uuid is distinct from v_id)
      or exists (select 1 from jsonb_array_elements(p -> 'changes') e
                  where (e ->> 'check_id')::uuid is distinct from v_id
                     or (e ->> 'site_id')::uuid is distinct from v_check.site_id)
@@ -309,7 +413,7 @@ begin
      and m.worker_release is not distinct from l ->> 'worker_release'
      and m.population_version is not distinct from l ->> 'population_version';
 
-  -- 4. The measurement rows.
+  -- 4. The measurement rows, from the staging, which is then deleted.
   insert into public.page_results (
     check_id, check_month, lineage_id, url, template_key, kind, status_code, depth, links_in,
     links_out, pagerank_share, is_orphan, js_only, found_via, sitemap_lastmod, suggested_parent_url,
@@ -323,7 +427,8 @@ begin
          r.canonical_declared, r.hreflang, r.content_simhash, r.is_html, r.links_read,
          r.robots_search, r.title, r.meta_description, r.identity_sent, r.source_ip_class,
          r.request_headers, r.headers
-    from jsonb_to_recordset(p -> 'page_results') as r (
+    from public.persist_chunks c
+   cross join lateral jsonb_to_recordset(c.rows) as r (
       url text, template_key text, kind text, status_code smallint, depth integer,
       links_in integer, links_out integer, pagerank_share double precision, is_orphan boolean,
       js_only boolean, found_via text, sitemap_lastmod date, suggested_parent_url text,
@@ -331,17 +436,30 @@ begin
       content_failures text[], final_url text, redirect jsonb, canonical_declared jsonb,
       hreflang jsonb, content_simhash text, is_html boolean, links_read boolean,
       robots_search jsonb, title jsonb, meta_description jsonb, identity_sent text,
-      source_ip_class text, request_headers jsonb, headers jsonb);
+      source_ip_class text, request_headers jsonb, headers jsonb)
+   where c.check_id = v_id and c.collection = 'page_results';
   get diagnostics v_n = row_count;
+  v_expected := (p -> 'staged' -> 'page_results' ->> 'rows')::bigint;
+  if v_n <> v_expected then
+    raise exception 'persist_built_check: wrote % of % page_results', v_n, v_expected
+      using errcode = 'P0001';
+  end if;
   v_counts := v_counts || jsonb_build_object('page_results', v_n);
 
   insert into public.link_edges (check_id, check_month, lineage_id, from_url, to_url, anchor_text,
                                  is_generic_anchor, js_only)
   select v_id, v_check.check_month, v_fetching, r.from_url, r.to_url, r.anchor_text,
          r.is_generic_anchor, r.js_only
-    from jsonb_to_recordset(p -> 'link_edges') as r (
-      from_url text, to_url text, anchor_text text, is_generic_anchor boolean, js_only boolean);
+    from public.persist_chunks c
+   cross join lateral jsonb_to_recordset(c.rows) as r (
+      from_url text, to_url text, anchor_text text, is_generic_anchor boolean, js_only boolean)
+   where c.check_id = v_id and c.collection = 'link_edges';
   get diagnostics v_n = row_count;
+  v_expected := (p -> 'staged' -> 'link_edges' ->> 'rows')::bigint;
+  if v_n <> v_expected then
+    raise exception 'persist_built_check: wrote % of % link_edges', v_n, v_expected
+      using errcode = 'P0001';
+  end if;
   v_counts := v_counts || jsonb_build_object('link_edges', v_n);
 
   insert into public.access_tests (
@@ -355,15 +473,24 @@ begin
          r.byte_count, r.word_count, r.body_excerpt, r.method, r.http_version, r.identity_role,
          r.tagged, r.witness, r.fly_region, r.request_signing, r.signature_verified,
          r.worker_release, r.timing
-    from jsonb_to_recordset(p -> 'access_tests') as r (
+    from public.persist_chunks c
+   cross join lateral jsonb_to_recordset(c.rows) as r (
       id uuid, ua text, page_url text, template_key text, tested_at timestamptz, verdict text,
       evidence_class text, identity_sent text, source_ip_class text, limitations text[],
       cause text, request_headers jsonb, raw_status smallint, final_url text, headers jsonb,
       byte_count bigint, word_count integer, body_excerpt text, method text, http_version text,
       identity_role text, tagged boolean, witness jsonb, fly_region text, request_signing text,
-      signature_verified text, worker_release text, timing jsonb);
+      signature_verified text, worker_release text, timing jsonb)
+   where c.check_id = v_id and c.collection = 'access_tests';
   get diagnostics v_n = row_count;
+  v_expected := (p -> 'staged' -> 'access_tests' ->> 'rows')::bigint;
+  if v_n <> v_expected then
+    raise exception 'persist_built_check: wrote % of % access_tests', v_n, v_expected
+      using errcode = 'P0001';
+  end if;
   v_counts := v_counts || jsonb_build_object('access_tests', v_n);
+
+  delete from public.persist_chunks where check_id = v_id;
 
   -- 5. Fixes, their events, the changes, the usage event.
   insert into public.site_fixes (
@@ -394,6 +521,10 @@ begin
    -- A fix id of another site is not updated, so the count below refuses it.
    where public.site_fixes.site_id = excluded.site_id;
   get diagnostics v_n = row_count;
+  if v_n <> jsonb_array_length(p -> 'fixes') then
+    raise exception 'persist_built_check: wrote % of % fixes', v_n, jsonb_array_length(p -> 'fixes')
+      using errcode = 'P0001';
+  end if;
   v_counts := v_counts || jsonb_build_object('fixes', v_n);
 
   if exists (select 1 from jsonb_array_elements(p -> 'fix_events') e
@@ -407,6 +538,10 @@ begin
     from jsonb_to_recordset(p -> 'fix_events') as r (
       id uuid, fix_id uuid, at timestamptz, kind text, by_seat_id uuid, check_id uuid);
   get diagnostics v_n = row_count;
+  if v_n <> jsonb_array_length(p -> 'fix_events') then
+    raise exception 'persist_built_check: wrote % of % fix_events', v_n,
+      jsonb_array_length(p -> 'fix_events') using errcode = 'P0001';
+  end if;
   v_counts := v_counts || jsonb_build_object('fix_events', v_n);
 
   insert into public.changes (id, site_id, check_id, previous_check_id, detected_at, kind, severity,
@@ -420,6 +555,10 @@ begin
       subject text, summary text, "where" text, pages_affected integer, ua text,
       grade_deltas jsonb, cause jsonb, fix_id uuid, notified jsonb);
   get diagnostics v_n = row_count;
+  if v_n <> jsonb_array_length(p -> 'changes') then
+    raise exception 'persist_built_check: wrote % of % changes', v_n, jsonb_array_length(p -> 'changes')
+      using errcode = 'P0001';
+  end if;
   v_counts := v_counts || jsonb_build_object('changes', v_n);
 
   v_n := 0;
@@ -439,14 +578,6 @@ begin
     end if;
   end if;
   v_counts := v_counts || jsonb_build_object('usage_events', v_n, 'usage_events_skipped', v_usage_skipped);
-
-  foreach v_key in array array['page_results', 'link_edges', 'access_tests', 'fixes', 'fix_events',
-                               'changes'] loop
-    if (v_counts ->> v_key)::bigint <> jsonb_array_length(p -> v_key) then
-      raise exception 'persist_built_check: wrote % of % %', v_counts ->> v_key,
-        jsonb_array_length(p -> v_key), v_key using errcode = 'P0001';
-    end if;
-  end loop;
 
   -- 6. The check, last. Contract nulls arrive as JSON null, which jsonb_to_record reads as SQL null.
   update public.checks
@@ -480,11 +611,14 @@ $$;
 alter function public.claim_check(uuid, text, jsonb) owner to postgres;
 alter function public.fail_check(uuid, text, text) owner to postgres;
 alter function public.reap_stalled_checks(timestamptz) owner to postgres;
+alter function public.stage_check_rows(uuid, text, integer, jsonb) owner to postgres;
 alter function public.persist_built_check(jsonb) owner to postgres;
 
 revoke all on function public.claim_check(uuid, text, jsonb), public.fail_check(uuid, text, text),
-  public.reap_stalled_checks(timestamptz), public.persist_built_check(jsonb)
+  public.reap_stalled_checks(timestamptz), public.stage_check_rows(uuid, text, integer, jsonb),
+  public.persist_built_check(jsonb)
   from public, anon, authenticated, service_role;
 grant execute on function public.claim_check(uuid, text, jsonb), public.fail_check(uuid, text, text),
-  public.reap_stalled_checks(timestamptz), public.persist_built_check(jsonb)
+  public.reap_stalled_checks(timestamptz), public.stage_check_rows(uuid, text, integer, jsonb),
+  public.persist_built_check(jsonb)
   to service_role;

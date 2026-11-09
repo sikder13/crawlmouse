@@ -13,11 +13,12 @@ v2_tables(rel) as (
   values
     ('public.access_tests'), ('public.accounts'), ('public.agency_brands'), ('public.alert_events'),
     ('public.alert_rules'), ('public.api_keys'), ('public.changes'), ('public.check_ledger_links'),
-    ('public.checks'), ('public.crawl_batches'), ('public.deploy_hooks'), ('public.evidence_blobs'), ('public.fix_events'),
-    ('public.link_edges'), ('public.measurement_lineages'), ('public.page_results'),
-    ('public.report_schedules'), ('public.reports'), ('public.seat_sites'), ('public.seats'),
-    ('public.share_links'), ('public.site_fixes'), ('public.sites'), ('public.subscriptions'),
-    ('public.trial_ledger'), ('public.usage_events')
+    ('public.checks'), ('public.crawl_batches'), ('public.deploy_hooks'), ('public.evidence_blobs'),
+    ('public.fix_events'), ('public.link_edges'), ('public.measurement_lineages'),
+    ('public.page_results'), ('public.persist_chunks'), ('public.report_schedules'),
+    ('public.reports'), ('public.seat_sites'), ('public.seats'), ('public.share_links'),
+    ('public.site_fixes'), ('public.sites'), ('public.subscriptions'), ('public.trial_ledger'),
+    ('public.usage_events')
 ),
 -- (relation, role, privilege, columns); null columns is a grant on the whole table.
 declared(rel, role, privilege, columns) as (
