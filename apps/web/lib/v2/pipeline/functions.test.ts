@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { NonRetriableError } from 'inngest';
 import { GRADE_VERSION, safeFetch } from '@crawlmouse/engine/v2/pipeline';
@@ -10,7 +12,7 @@ import {
   reconcileBillingFn,
   reconcileBillingManualFn,
 } from '../../../../../inngest/billing';
-import { CHECK_CANCELLED_FN_ID, CHECK_FN_ID } from '../../../../../inngest/check';
+import { CHECK_CANCELLED_FN_ID, CHECK_FN_ID, type RunSoFar } from '../../../../../inngest/check';
 import { CHECK_REAPER_FN_ID } from '../../../../../inngest/check-reaper';
 import { inngest } from '../../../../../inngest/client';
 import type { CheckRequested } from '../../../../../inngest/check-events';
@@ -18,7 +20,15 @@ import { PLAN_CONCURRENCY_CAP } from '../../../../../inngest/concurrency';
 import { recordedInput } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { workerClientFromEnv } from '../../worker-client/client';
 import { CRAWL_USER_AGENT } from './discover';
-import { inngestFunctions, stepDeps, type StepStores, type Wiring } from './functions';
+import { getJson } from './evidence';
+import {
+  checkStepsFromEnv,
+  inngestFunctions,
+  stepDeps,
+  type StepStores,
+  type Wiring,
+} from './functions';
+import { homepageOf } from './request';
 import { NO_DAILY_BUDGET } from './steps';
 import type { PipelineStore } from './store';
 import { memoryStore, queuedCheck } from './test-support/fakes';
@@ -314,6 +324,117 @@ describe('stepDeps: the step bodies’ dependencies as production wires them (qu
     expect(deps.store).toBe(stores.store);
     expect(deps.evidence).toBe(stores.evidence);
     expect(deps.persistDb).toBe(stores.persistDb);
+  });
+});
+
+/** An HTTP server on loopback that answers 404 and counts the connections and requests it sees. */
+async function loopbackSite() {
+  const seen = { connections: 0, requests: 0 };
+  const server = createServer((_, res) => {
+    seen.requests++;
+    res.writeHead(404).end();
+  });
+  server.on('connection', () => {
+    seen.connections++;
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  const close = () =>
+    new Promise<void>((resolve, reject) => {
+      server.closeAllConnections();
+      server.close((e) => (e ? reject(e) : resolve()));
+    });
+  return { seen, port, close };
+}
+
+describe('production discovery goes through the SSRF guard, which refuses loopback (quality 2)', () => {
+  let site: Awaited<ReturnType<typeof loopbackSite>>;
+  beforeEach(async () => {
+    site = await loopbackSite();
+  });
+  afterEach(async () => {
+    await site.close();
+  });
+
+  const SITE = recordedInput().site;
+  const CHECK_ID = 'c0000000-0000-4000-8000-0000000000e2';
+  const SO: RunSoFar = {
+    startedAt: Date.now(),
+    crawlFrom: null,
+    pagesCrawled: 0,
+    linksFound: 0,
+    release: null,
+  };
+  const seedsOf = (evidence: ReturnType<typeof memoryEvidenceStore>) =>
+    getJson(evidence, `anon/${SITE.id}/${CHECK_ID}/seeds.json.gz`);
+
+  it('the server counts what reaches it: a request made to it is seen', async () => {
+    await fetch(`http://127.0.0.1:${site.port}/robots.txt`);
+    expect(site.seen).toEqual({ connections: 1, requests: 1 });
+  });
+
+  it('checkStepsFromEnv’s discover sends the site nothing, and seeds the homepage', async () => {
+    const homepageUrl = `http://127.0.0.1:${site.port}/`;
+    const { store } = memoryStore(
+      SITE,
+      [queuedCheck(CHECK_ID, SITE.id, '2026-11-08T12:00:00.000Z', GRADE_VERSION)],
+      () => new Date().toISOString(),
+    );
+    const evidence = memoryEvidenceStore();
+    const steps = checkStepsFromEnv({}, { store, evidence, persistDb: UNUSED_DB });
+    const event: CheckRequested = {
+      checkId: CHECK_ID,
+      siteId: SITE.id,
+      accountId: null,
+      host: `127.0.0.1:${site.port}`,
+      homepageUrl,
+      trigger: 'manual',
+      pageCap: 500,
+    };
+    expect(await steps.discover(event, SO)).toMatchObject({ seeds: 1, sitemap_urls: 0 });
+    expect(site.seen).toEqual({ connections: 0, requests: 0 });
+    expect(await seedsOf(evidence)).toEqual([
+      { url: homepageUrl, source: 'homepage', lastmod: null },
+    ]);
+  });
+
+  it('the check inngestFunctions registers discovers the same way', async () => {
+    const host = `127.0.0.1:${site.port}`;
+    const memory = memoryStore(
+      { ...SITE, host },
+      [queuedCheck(CHECK_ID, SITE.id, '2026-11-08T12:00:00.000Z', GRADE_VERSION)],
+      () => new Date().toISOString(),
+    );
+    const evidence = memoryEvidenceStore();
+    const wiring: Wiring = {
+      store: () => memory.store,
+      stores: () => ({ store: memory.store, evidence, persistDb: UNUSED_DB }),
+    };
+    const checkFn = inngestFunctions({ V2_PIPELINE: '1' }, wiring).find(
+      (f) => configsOf([f])[0]!.id === `crawlmouse-${CHECK_FN_ID}`,
+    ) as unknown as { fn: (ctx: unknown) => Promise<unknown> };
+    const event: CheckRequested = {
+      checkId: CHECK_ID,
+      siteId: SITE.id,
+      accountId: null,
+      host,
+      homepageUrl: homepageOf(host),
+      trigger: 'manual',
+      pageCap: 500,
+    };
+    // With no worker variables the check fails at its first batch, after discovery.
+    const step = {
+      run: async (_id: string, fn: () => Promise<unknown>) => fn(),
+      sleep: async () => {},
+      sendEvent: async () => {},
+    };
+    await expect(checkFn.fn({ event: { data: event }, step, runId: 'run-1' })).rejects.toThrow(
+      'check failed: worker_unavailable',
+    );
+    expect(site.seen).toEqual({ connections: 0, requests: 0 });
+    expect(await seedsOf(evidence)).toEqual([
+      { url: homepageOf(host), source: 'homepage', lastmod: null },
+    ]);
   });
 });
 
