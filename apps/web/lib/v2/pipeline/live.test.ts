@@ -173,7 +173,7 @@ describe.skipIf(!configured)('the pipeline on the staging worker, against PGlite
         // could be orphaned or deep, whatever its sitemap listed, so it cannot exercise D8.
         d8:
           reach.pages <= 1 && reach.link_edges === 0
-            ? `not exercised: one page crawled, no links (${reach.sitemap_urls ?? 0} sitemap URLs, none seeded)`
+            ? `not exercised: one page crawled, no links (${reach.sitemap_urls ?? 0} sitemap URLs listed)`
             : null,
       };
       console.log(`live ${JSON.stringify(summary)}`);
