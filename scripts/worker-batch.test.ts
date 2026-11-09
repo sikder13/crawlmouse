@@ -345,6 +345,97 @@ describe('no secret leaves the script', () => {
   });
 });
 
+/**
+ * A server shaped like the worker, scripted onto the paths the worker in process cannot be made to
+ * take: a batch that failed inside it, a batch it lost, metrics it refused, a batch that never ends.
+ * Every answer echoes the signatures and the JWT it was sent, so a leak would reach the script's
+ * output through any of them. `sent` keeps both for the assertion.
+ */
+async function scripted(mode: 'failed' | 'lost' | 'metrics_refused' | 'never_done') {
+  const sent: string[] = [];
+  const server = http.createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => chunks.push(c));
+    req.on('end', () => {
+      sent.push(String(req.headers['x-crawlmouse-signature'] ?? ''));
+      const send = (status: number, body: unknown) => {
+        res.statusCode = status;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify(body));
+      };
+      if (req.method === 'POST' && req.url === '/batch') {
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+          check_id: string;
+          batch: number;
+          jwt: string;
+        };
+        sent.push(body.jwt);
+        return send(202, { batch_id: `${body.check_id}:${body.batch}` });
+      }
+      if (req.method === 'GET' && req.url === '/metrics') {
+        return mode === 'metrics_refused'
+          ? send(401, { error: 'bad_signature', echo: sent })
+          : send(200, { echo: sent });
+      }
+      const id = decodeURIComponent((req.url ?? '').replace(/^\/batch\//, ''));
+      if (mode === 'failed') return send(200, { batch_id: id, status: 'failed', echo: sent });
+      if (mode === 'lost') return send(404, { error: 'not_found', echo: sent });
+      if (mode === 'never_done') return send(200, { batch_id: id, status: 'running', echo: sent });
+      return send(200, {
+        batch_id: id,
+        status: 'done',
+        result: { kind: 'crawl', pages: [], requests: 0, partial: null, echo: sent },
+      });
+    });
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  return { url, sent, close: () => new Promise<void>((r) => server.close(() => r())) };
+}
+
+describe('no secret leaves the script when the worker fails it', () => {
+  it.each([
+    ['failed', /the batch failed inside the worker/],
+    ['lost', /the worker no longer holds the batch/],
+    ['metrics_refused', /metrics not sampled: worker request failed: unauthorized/],
+    ['never_done', /the batch did not finish within/],
+  ] as const)('%s: says so, and prints no value, signature or JWT', async (mode, says) => {
+    const server = await scripted(mode);
+    const secret = plantedSecret();
+    const key = generateKeyPairSync('ed25519')
+      .privateKey.export({ format: 'der', type: 'pkcs8' })
+      .toString('base64');
+    const env = {
+      CRAWL_WORKER_URL: server.url,
+      WORKER_SIGNING_SECRET: secret,
+      WORKER_JWT_PRIVATE_KEY_PKCS8_B64: key,
+    };
+    const run = ioFor(null);
+    try {
+      await main(
+        ['--kind', 'crawl', '--url', 'https://example.com/', '--out', outFile()],
+        env,
+        run.io,
+      );
+    } finally {
+      await server.close();
+    }
+    const all = [...run.out, ...run.err].join('\n');
+    expect(all).toMatch(says);
+    // The JWT and a signature reached the server: the leak this test looks for was there to make.
+    expect(server.sent.filter((v) => v.split('.').length === 3)).not.toHaveLength(0);
+    const planted = [
+      secret,
+      Buffer.from(secret).toString('base64'),
+      Buffer.from(secret).toString('base64url'),
+      key,
+      Buffer.from(key, 'base64').toString('base64url'),
+      ...server.sent.filter((v) => v.length > 0),
+    ];
+    for (const p of planted) expect(all).not.toContain(p);
+  });
+});
+
 describe('the runbook section', () => {
   const runbook = readFileSync(new URL('../docs/ops/worker-runbook.md', import.meta.url), 'utf8');
   const heading = '### Send one signed batch (operators)';
