@@ -63,6 +63,7 @@ export type CheckFailed = { checkId: string; siteId: string; reason: FailureReas
 export type CheckCancelRequested = { checkId: string };
 
 const FAILURE_PREFIX = 'check failed: ';
+const FAILURE_MESSAGE = /^check failed: ([a-z_]+)$/;
 
 /**
  * A failure whose reason is known where it is thrown. Non-retriable: the same input fails the same
@@ -85,9 +86,7 @@ export class CheckFailure extends NonRetriableError {
  */
 export function failureReasonOf(error: unknown): FailureReason {
   if (!(error instanceof Error)) return 'internal';
-  if (error.message.startsWith(FAILURE_PREFIX)) {
-    const reason = error.message.slice(FAILURE_PREFIX.length);
-    if (isFailureReason(reason)) return reason;
-  }
+  const reason = FAILURE_MESSAGE.exec(error.message)?.[1];
+  if (isFailureReason(reason)) return reason;
   return error.name === 'WorkerError' ? 'worker_unavailable' : 'internal';
 }
