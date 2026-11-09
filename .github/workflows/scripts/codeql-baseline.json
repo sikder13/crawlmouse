@@ -83,8 +83,8 @@
     {
       "rule": "js/incomplete-url-scheme-check",
       "file": "packages/engine/src/extract.ts",
-      "fingerprint": "52a3a31abe2ab219:1",
-      "line": 152,
+      "fingerprint": "7fdae392710e939:1",
+      "line": 222,
       "verdict": "Real hardening, CC-SEC-2 (due 2026-12-08): a deny-list of link schemes. data: and vbscript: links are dropped later by the same-host filter, so the crawler fetches none; to become an http/https allow-list."
     },
     {
