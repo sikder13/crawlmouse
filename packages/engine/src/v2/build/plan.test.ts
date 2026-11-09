@@ -358,6 +358,35 @@ describe('nextCrawlBatch', () => {
       [linkAt, linkPast],
     );
     expect(nextCrawlBatch(seeds, [batch], 500)).toEqual([seedAt, linkAt]);
+    // Coverage counts the two within the limit, and the homepage; the two past it are not discovered.
+    const a = assemble(
+      {
+        check: { id: CHECK, site_id: SITE, page_cap: 500 } as never,
+        homepage_url: HOME,
+        seeds,
+        render: null,
+      },
+      readBatches([batch], { id: CHECK, site_id: SITE }, 'unreleased'),
+    );
+    expect(a.coverage.pages_discovered).toBe(3);
+  });
+
+  it('measures a URL as the crawl spells it: a path short as written but past the limit once encoded', () => {
+    // Each 'é' is one character as written and six once percent-encoded (%C3%A9).
+    const raw = at(`/${'é'.repeat(400)}`);
+    expect(raw.length).toBeLessThanOrEqual(MAX_URL_LENGTH);
+    expect(canonicalizeUrl(raw).length).toBeGreaterThan(MAX_URL_LENGTH);
+    const seeds: Seed[] = [
+      { url: HOME, source: 'homepage', lastmod: null },
+      { url: raw, source: 'sitemap', lastmod: null },
+    ];
+    const batch = crawlBatch(
+      0,
+      [crawlRow({ url: HOME, outcome: 'fetched', status: 200 })],
+      [],
+      [raw],
+    );
+    expect(nextCrawlBatch(seeds, [batch], 500)).toBeNull();
   });
 
   it('crawls no sitemap seed on another port', () => {
