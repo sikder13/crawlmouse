@@ -200,11 +200,8 @@ describe('the event × state table, through the handler, on the real schema', ()
       [a.id],
     );
     expect(rows[0]).toEqual({ state: k.expect.state, tier: k.expect.tier });
-    if (k.expect.outcome === 'ignored') {
-      expect((outcome as { reason: string | null }).reason).toBe(k.expect.reason);
-    } else {
-      expect((outcome as { reason: string | null }).reason).toBeNull();
-    }
+    // The machine's reason for an ignored case, the webhook's for a recorded one, none if unstated.
+    expect((outcome as { reason: string | null }).reason).toBe(k.expect.reason ?? null);
     // What this delivery sent to Stripe: each cancellation by its subscription's role, each alert.
     const role = (id: string): CaseRole | string =>
       id === a.current ? 'current' : id === other ? 'other' : id;
