@@ -162,7 +162,8 @@ async function run(argv: readonly string[], env: Record<string, string | undefin
   }
   const batch = batchOf(args);
   await client.postBatch(batch);
-  io.out(`posted: ${batch.kind} batch, ${args.urls.length} URLs`);
+  const n = args.urls.length;
+  io.out(`posted: ${batch.kind} batch, ${n} ${n === 1 ? 'URL' : 'URLs'}`);
   const id = batchIdOf(batch.check_id, batch.batch);
   const deadline = io.now() + (args.budgetSeconds + POLL_GRACE_S) * 1000;
   let polled: PollResult;

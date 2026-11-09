@@ -183,6 +183,7 @@ describe('worker-batch against the worker, in process', () => {
     expect(new Set(written.result.access_tests.map((t) => t.template_key))).toEqual(
       new Set(['/products/a']),
     );
+    expect(run.out[0]).toBe('posted: access batch, 1 URL');
     expect(run.out[1]).toBe(
       `done: access tests ${written.result.access_tests.length}, requests ${written.result.requests}, partial none`,
     );
