@@ -1,4 +1,5 @@
 import {
+  MAX_TEMPLATE_KEY_LENGTH,
   MAX_URL_LENGTH,
   ROBOTS_PARSE_LIMIT_BYTES,
   toPersistableText,
@@ -51,8 +52,8 @@ export { MAX_URL_LENGTH };
 
 export const CAPS = {
   url: whole(MAX_URL_LENGTH),
-  /** As the request schema holds it. */
-  templateKey: whole(512),
+  /** As the request schema holds it (the engine's MAX_TEMPLATE_KEY_LENGTH). */
+  templateKey: whole(MAX_TEMPLATE_KEY_LENGTH),
   /**
    * A site key (a registrable domain or an address) and an origin come from URLs within the URL cap, so
    * neither is cut in practice; they are text caps so that a row never loses one.
