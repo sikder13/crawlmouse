@@ -69,6 +69,21 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'that guard does not run on them in the suite',
+    withdrawnIn:
+      'docs/specs/v2/27-account-screens.md (Known gaps), CC-27 review round 2 (accessibility and deploy safety)',
+    truth:
+      'account-control-names.test.tsx reads ACCOUNT_ELEMENTS and CC27_ELEMENTS and requires their ' +
+      'paths to equal the account previews the registry lists, so the guard runs on every CC-27 preview.',
+    allowedIn: [],
+  },
+  {
+    text: 'CC-27 does not edit that file',
+    withdrawnIn: 'apps/web/__tests__/v2/_lib/screens.tsx, CC-27 review round 2',
+    truth: 'CC-27 extended account-control-names.test.tsx with the owner’s approval.',
+    allowedIn: [],
+  },
+  {
     text: 'so it drops the crawler changes whose summaries describe the old ones',
     withdrawnIn:
       'docs/specs/v2/26-dashboard-site.md (Known gaps), CC-26 review round 2 (correctness and tests)',
@@ -297,6 +312,42 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     truth:
       'Within half a window the second call is always refused; up to a full window apart it may be; ' +
       'beyond that it is not, and the ledger lookup decides.',
+    allowedIn: [],
+  },
+  {
+    // CC-SEC review round 4: Vercel also serves a static route handler at its .rsc spellings.
+    text: 'the two static routes are served only as written',
+    withdrawnIn: 'docs/specs/v2/sec-baseline.md (D9), CC-SEC review round 4',
+    truth:
+      "A static route's own letters answer only as written, and Vercel also serves it with `.rsc` or " +
+      '`.rsc/` appended and with `/.rsc` appended; the edge rules count those spellings.',
+    allowedIn: [],
+  },
+  // CC-SEC, the search_path ruling: an empty search_path leaves pg_temp searched first, so check 09
+  // no longer allows it. Withdrawn in e302578d (check 09's header, rendered into db-migrations.md) and
+  // 642dea0f (sec-baseline.md D6); registered here in a later commit, after the review found the
+  // registry had not been updated.
+  {
+    text: 'must be exactly "", "pg_catalog, pg_temp"',
+    withdrawnIn:
+      'infra/supabase/checks/09-definer-search-path.sql and docs/ops/db-migrations.md (e302578d)',
+    truth:
+      'Check 09 allows exactly "pg_catalog, pg_temp" and "pg_catalog, public, pg_temp"; an empty ' +
+      'setting is a finding, because it leaves pg_temp searched first.',
+    allowedIn: [],
+  },
+  {
+    text: 'exactly `""`, `pg_catalog, pg_temp`',
+    withdrawnIn: 'docs/specs/v2/sec-baseline.md, D6 check 09 (642dea0f)',
+    truth: 'Check 09 allows exactly `pg_catalog, pg_temp` and `pg_catalog, public, pg_temp`.',
+    allowedIn: [],
+  },
+  {
+    text: "`start_trial_with_ledger` keeps `''`",
+    withdrawnIn: 'docs/specs/v2/sec-baseline.md, D6 (642dea0f)',
+    truth:
+      '20261108000002 sets start_trial_with_ledger to pg_catalog, pg_temp and keeps its lock_timeout; ' +
+      "its rollback restores ''.",
     allowedIn: [],
   },
 ];

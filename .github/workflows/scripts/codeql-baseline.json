@@ -1,0 +1,147 @@
+{
+  "$comment": "CodeQL results of high severity on main, reviewed 2026-11-08 (docs/specs/v2/sec-baseline.md, D7). Keyed by rule, file and CodeQL's primaryLocationLineHash, which follows the line's content; `line` is where it was, for reading only. Accepted through 2026-12-08; from 2026-12-09 every result fails the codeql job again. Remove an entry in the change that fixes it.",
+  "expires": "2026-12-08",
+  "entries": [
+    {
+      "rule": "js/incomplete-sanitization",
+      "file": "apps/web/lib/entitlement-spec.ts",
+      "fingerprint": "570bef24ab4b3a5:1",
+      "line": 348,
+      "verdict": "Markdown table-cell escaping in a spec renderer: it writes a docs file from our own data; no untrusted input reaches a browser."
+    },
+    {
+      "rule": "js/incomplete-sanitization",
+      "file": "apps/web/lib/v2/view/home.ts",
+      "fingerprint": "7cc7ef6bf772fb1:1",
+      "line": 203,
+      "verdict": "Builds a RegExp from a site's host and escapes only '.': the host is validated to letters, digits, '.' and '-', which hold no other regex metacharacter."
+    },
+    {
+      "rule": "js/regex/missing-regexp-anchor",
+      "file": "packages/engine/src/cms-detection/signatures.ts",
+      "fingerprint": "2787d013bc523fb9:1",
+      "line": 22,
+      "verdict": "A substring detector over page HTML that sets a CMS label; no access or security decision rests on it."
+    },
+    {
+      "rule": "js/regex/missing-regexp-anchor",
+      "file": "packages/engine/src/cms-detection/signatures.ts",
+      "fingerprint": "7f6dad6457fa448f:1",
+      "line": 23,
+      "verdict": "A substring detector over page HTML that sets a CMS label; no access or security decision rests on it."
+    },
+    {
+      "rule": "js/regex/missing-regexp-anchor",
+      "file": "packages/engine/src/cms-detection/signatures.ts",
+      "fingerprint": "19672e7e5049cb74:1",
+      "line": 49,
+      "verdict": "A substring detector over page HTML that sets a CMS label; no access or security decision rests on it."
+    },
+    {
+      "rule": "js/regex/missing-regexp-anchor",
+      "file": "packages/engine/src/cms-detection/signatures.ts",
+      "fingerprint": "35960c2be9f05822:1",
+      "line": 50,
+      "verdict": "A substring detector over page HTML that sets a CMS label; no access or security decision rests on it."
+    },
+    {
+      "rule": "js/regex/missing-regexp-anchor",
+      "file": "packages/engine/src/cms-detection/signatures.ts",
+      "fingerprint": "d8170816c6b14eb1:1",
+      "line": 51,
+      "verdict": "A substring detector over page HTML that sets a CMS label; no access or security decision rests on it."
+    },
+    {
+      "rule": "js/regex/missing-regexp-anchor",
+      "file": "packages/engine/src/cms-detection/signatures.ts",
+      "fingerprint": "e955ff0a27b40c00:1",
+      "count": 2,
+      "line": 57,
+      "verdict": "A substring detector over page HTML that sets a CMS label; no access or security decision rests on it."
+    },
+    {
+      "rule": "js/regex/missing-regexp-anchor",
+      "file": "packages/engine/src/cms-detection/signatures.ts",
+      "fingerprint": "c20a551777c27373:1",
+      "line": 66,
+      "verdict": "A substring detector over page HTML that sets a CMS label; no access or security decision rests on it."
+    },
+    {
+      "rule": "js/regex/missing-regexp-anchor",
+      "file": "packages/engine/src/cms-detection/signatures.ts",
+      "fingerprint": "fc68ebbb4b85e1c2:1",
+      "line": 67,
+      "verdict": "A substring detector over page HTML that sets a CMS label; no access or security decision rests on it."
+    },
+    {
+      "rule": "js/regex/missing-regexp-anchor",
+      "file": "packages/engine/src/cms-detection/signatures.ts",
+      "fingerprint": "a56f95510a7b8076:1",
+      "line": 75,
+      "verdict": "A substring detector over page HTML that sets a CMS label; no access or security decision rests on it."
+    },
+    {
+      "rule": "js/incomplete-url-scheme-check",
+      "file": "packages/engine/src/extract.ts",
+      "fingerprint": "52a3a31abe2ab219:1",
+      "line": 152,
+      "verdict": "Real hardening, CC-SEC-2 (due 2026-12-08): a deny-list of link schemes. data: and vbscript: links are dropped later by the same-host filter, so the crawler fetches none; to become an http/https allow-list."
+    },
+    {
+      "rule": "js/remote-property-injection",
+      "file": "packages/engine/src/v2/layout/force-layout.ts",
+      "fingerprint": "ab1205daaf58a4aa:1",
+      "line": 300,
+      "verdict": "Real hardening, CC-SEC-2 (due 2026-12-08): plain objects keyed by crawled node ids. The ids are canonical page URLs, so none can be __proto__ today; to become a Map or Object.create(null)."
+    },
+    {
+      "rule": "js/remote-property-injection",
+      "file": "packages/engine/src/v2/layout/force-layout.ts",
+      "fingerprint": "8eabf3ded00f1884:1",
+      "line": 426,
+      "verdict": "Real hardening, CC-SEC-2 (due 2026-12-08): plain objects keyed by crawled node ids. The ids are canonical page URLs, so none can be __proto__ today; to become a Map or Object.create(null)."
+    },
+    {
+      "rule": "js/incomplete-sanitization",
+      "file": "packages/worker/src/spec/render.ts",
+      "fingerprint": "3d2db658dfd6460b:1",
+      "line": 110,
+      "verdict": "Markdown table-cell escaping in a spec renderer: it writes a docs file from our own data; no untrusted input reaches a browser."
+    },
+    {
+      "rule": "js/insecure-temporary-file",
+      "file": "scripts/p5/driver.mjs",
+      "fingerprint": "8163fca11f68f6bf:1",
+      "line": 30,
+      "verdict": "A launch-verification script run by the operator writes its cookie jar under /tmp on their own machine; not shipped."
+    },
+    {
+      "rule": "js/insecure-temporary-file",
+      "file": "scripts/p5/l8-funnel.mjs",
+      "fingerprint": "1334075aa1c7d48e:1",
+      "line": 104,
+      "verdict": "A launch-verification script run by the operator writes its result under /tmp on their own machine; not shipped."
+    },
+    {
+      "rule": "js/insecure-temporary-file",
+      "file": "scripts/p5/l8-funnel2.mjs",
+      "fingerprint": "1334075aa1c7d48e:1",
+      "line": 72,
+      "verdict": "A launch-verification script run by the operator writes its result under /tmp on their own machine; not shipped."
+    },
+    {
+      "rule": "js/regex/missing-regexp-anchor",
+      "file": "scripts/research/cf-panel/robots-access.ts",
+      "fingerprint": "2f7a00f8d23d0d3:1",
+      "line": 77,
+      "verdict": "A research script matching robots.txt text; not shipped."
+    },
+    {
+      "rule": "js/file-system-race",
+      "file": "scripts/research/cf-panel/tranco.ts",
+      "fingerprint": "439b33ccb515527b:1",
+      "line": 49,
+      "verdict": "A research script's cache file on the operator's own machine; not shipped."
+    }
+  ]
+}

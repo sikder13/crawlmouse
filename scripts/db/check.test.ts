@@ -50,7 +50,7 @@ async function expectFinding(prefix: string, mutation: string, expected: string)
 }
 
 describe('the check files', () => {
-  it('are the six of the brief, the partition-trigger check and the v1 client-grant check, each with a title', () => {
+  it('are the six of the brief, the partition-trigger, v1 client-grant and definer search_path checks, each with a title', () => {
     expect(checks.map((c) => c.file)).toEqual([
       '01-client-table-privileges.sql',
       '02-partitions-rls-owner-only.sql',
@@ -60,6 +60,7 @@ describe('the check files', () => {
       '06-client-functions.sql',
       '07-partition-triggers.sql',
       '08-v1-client-grants.sql',
+      '09-definer-search-path.sql',
     ]);
     for (const c of checks) expect(c.title.length, c.file).toBeGreaterThan(10);
   });
@@ -70,15 +71,22 @@ describe('the check files', () => {
     expect(failed(results)).toBe(false);
   });
 
-  it('all but 08 pass on a database migrated through 001 only, and 08 fails there: it predates 20261106000002', async () => {
+  it('all but 08 and 09 pass on a database migrated through 001 only; both fail there, as they predate 20261106000002 and 20261108000002', async () => {
     const early = await migratedDb((f) => f <= '20261101000001_v2_001_entitlement_tables.sql');
     const results = await runChecks(pgliteDb(early));
-    const v1 = results.filter((r) => r.check.file === '08-v1-client-grants.sql');
-    expect(formatResults(results.filter((r) => !v1.includes(r)))).not.toContain('FAIL');
+    const later = results.filter((r) =>
+      ['08-v1-client-grants.sql', '09-definer-search-path.sql'].includes(r.check.file),
+    );
+    expect(later).toHaveLength(2);
+    expect(formatResults(results.filter((r) => !later.includes(r)))).not.toContain('FAIL');
     // The v1 tables existed long before 001, with the broad client grants P2 removed.
-    const lines = v1[0]!.findings.map((row) => Object.values(row).join(': '));
+    const lines = later[0]!.findings.map((row) => Object.values(row).join(': '));
     expect(lines).toContain('public.audits: anon holds TRUNCATE on the table');
     expect(lines).toContain('public.users: authenticated holds SELECT on the table');
+    // 001's definer functions search pg_temp first for relations and types.
+    const definers = later[1]!.findings.map((row) => String(row.object));
+    expect(definers).toContain('public.is_member(uuid)');
+    expect(definers).toContain('public.handle_new_user()');
   }, 180_000);
 });
 

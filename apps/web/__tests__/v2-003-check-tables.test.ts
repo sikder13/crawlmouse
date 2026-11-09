@@ -418,10 +418,11 @@ describe('migration 003 catalog posture', () => {
     const { rows } = await db.query<{
       name: string;
       config: string[] | null;
+      definer: boolean;
       anon: boolean;
       authed: boolean;
     }>(
-      `select p.proname as name, p.proconfig as config,
+      `select p.proname as name, p.proconfig as config, p.prosecdef as definer,
               has_function_privilege('anon', p.oid, 'EXECUTE') as anon,
               has_function_privilege('authenticated', p.oid, 'EXECUTE') as authed
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -431,10 +432,16 @@ describe('migration 003 catalog posture', () => {
     );
     expect(rows.map((r) => r.name)).toEqual(created);
     for (const r of rows) {
-      // The CHECK helpers (v2_*) read no table, so they resolve nothing through public.
-      expect(r.config, r.name).toEqual([
-        r.name.startsWith('v2_') ? 'search_path=pg_catalog' : 'search_path=public, pg_catalog',
-      ]);
+      // The CHECK helpers (v2_*) read no table, so they resolve nothing through public. 003 wrote
+      // public, pg_catalog on the rest; on its SECURITY DEFINER functions 20261108000002 (CC-SEC) then
+      // put pg_catalog first and pg_temp last, adding no schema to v2_premake_month_partitions.
+      const written = r.name.startsWith('v2_') ? ['pg_catalog'] : ['public', 'pg_catalog'];
+      const now = !r.definer
+        ? written
+        : r.name.startsWith('v2_')
+          ? ['pg_catalog', 'pg_temp']
+          : ['pg_catalog', 'public', 'pg_temp'];
+      expect(r.config, r.name).toEqual([`search_path=${now.join(', ')}`]);
       expect(r.anon, r.name).toBe(false);
       expect(r.authed, r.name).toBe(r.name === 'is_member_for_site');
     }

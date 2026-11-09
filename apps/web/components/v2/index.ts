@@ -25,6 +25,8 @@ export { CoverageLine, coverageText, type Coverage } from './CoverageLine';
 export { Card, type CardProps } from './Card';
 export { Table, type TableProps, type TableColumn, type TableRow } from './Table';
 export { Field, type FieldProps } from './Field';
+export { Select, type SelectProps, type SelectOption } from './Select';
+export { Switch, type SwitchProps } from './Switch';
 export { Heading, type HeadingProps } from './Heading';
 export { PageShell, type PageShellProps } from './PageShell';
 export { AccountShell, type AccountShellProps, type RailLink } from './AccountShell';

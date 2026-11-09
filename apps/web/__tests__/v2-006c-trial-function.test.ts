@@ -815,7 +815,7 @@ describe('grants: only service_role may start a trial, and no role may call the 
     }
   });
 
-  it('the function is SECURITY DEFINER with an empty search_path and a lock timeout; the helpers are not', async () => {
+  it('the function is SECURITY DEFINER with pg_temp last (20261108000002) and a lock timeout; the helpers are invoker with an empty search_path', async () => {
     const { rows } = await db.query<{
       name: string;
       definer: boolean;
@@ -833,7 +833,7 @@ describe('grants: only service_role may start a trial, and no role may call the 
       {
         name: 'start_trial_with_ledger',
         definer: true,
-        config: ['search_path=""', 'lock_timeout=3s'],
+        config: ['search_path=pg_catalog, pg_temp', 'lock_timeout=3s'],
         owner: 'postgres',
         volatility: 'v',
       },
@@ -864,12 +864,14 @@ describe('grants: only service_role may start a trial, and no role may call the 
 });
 
 describe("a caller's temporary objects cannot run as the owner through 006c's bodies (refused path)", () => {
-  // With pg_temp left out of search_path, Postgres searches it first for type names (never for
-  // functions or operators). A type named in a body without its schema would resolve to a temp
-  // domain the caller made, whose CHECK runs as postgres. The call takes the refused path: it runs
-  // the validation, the locks and the rule, and stops before apply_entitlement_transition (003),
-  // whose own search_path is outside this migration (docs/specs/v2/06c-trial-function.md, known
-  // gaps). Each case needs a session that has not compiled the functions yet: a fresh clone.
+  // With pg_temp left out of search_path, '' included, Postgres searches it first for type names
+  // (never for functions or operators). A type named in a body without its schema would resolve to
+  // a temp domain the caller made, whose CHECK runs as postgres. 20261108000002 names pg_temp last
+  // on start_trial_with_ledger; its two helpers are invoker functions that keep '', and they run as
+  // postgres when it calls them, so these cases pin the helpers' bodies. The call takes the refused
+  // path: it runs the validation, the locks and the rule, and stops before
+  // apply_entitlement_transition (003). Each case needs a session that has not compiled the
+  // functions yet: a fresh clone.
   it.each(['jsonb', 'text', 'timestamptz', 'int4', 'bit', 'numeric', 'interval', 'uuid'])(
     'a temp domain named %s is not used',
     async (type) => {

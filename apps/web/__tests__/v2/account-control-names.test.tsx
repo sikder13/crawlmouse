@@ -17,7 +17,8 @@
 import { describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ACCOUNT_ELEMENTS } from './_lib/screens';
+import { PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/registry';
+import { ACCOUNT_ELEMENTS, CC27_ELEMENTS } from './_lib/screens';
 
 const CONTROLS = [
   'a[href]',
@@ -160,12 +161,16 @@ describe('the checker itself', () => {
 });
 
 describe('Account previews: no two controls share a name a row header does not separate', () => {
-  const paths = Object.keys(ACCOUNT_ELEMENTS);
-  it('covers every account preview', () => {
-    expect(paths).toHaveLength(7);
+  const elements = { ...ACCOUNT_ELEMENTS, ...CC27_ELEMENTS };
+  const paths = Object.keys(elements);
+  it('covers every account preview in the registry', () => {
+    const account = PREVIEWS.map((p) => p.path).filter((p) =>
+      /\/screens\/(dashboard|site|changes-log|alerts|reports|settings|trial-end)(\/|$)/.test(p),
+    );
+    expect(paths.sort()).toEqual(account.sort());
   });
   it.each(paths)('%s', (path) => {
-    const html = renderToStaticMarkup(ACCOUNT_ELEMENTS[path]!());
+    const html = renderToStaticMarkup(elements[path]!());
     // It found the page's controls: the rail alone has seven links.
     expect(html.match(/<a [^>]*href=|<button/g)?.length ?? 0).toBeGreaterThan(7);
     expect(sharedNames(html)).toEqual([]);

@@ -284,6 +284,20 @@ The page frame: canvas colours, the header with the brand, and the footer.
 | `status`   | `ServiceStatus \| undefined`        | no       | What the footer's Status link shows (SiteFooter); the shell fetches nothing.                                                                           |
 | `children` | `ReactNode`                         | yes      |                                                                                                                                                        |
 
+### Select
+
+A labelled native select: the browser gives it its keyboard, its list and its form value.
+
+| Prop           | Type                      | Required | Note                                                            |
+| -------------- | ------------------------- | -------- | --------------------------------------------------------------- |
+| `id`           | `string`                  | yes      |                                                                 |
+| `label`        | `string`                  | yes      |                                                                 |
+| `hideLabel`    | `boolean \| undefined`    | no       | The label is hidden visually and stays for screen readers.      |
+| `name`         | `string`                  | yes      |                                                                 |
+| `options`      | `readonly SelectOption[]` | yes      |                                                                 |
+| `defaultValue` | `string \| undefined`     | no       |                                                                 |
+| `form`         | `string \| undefined`     | no       | The id of a form the select belongs to when it sits outside it. |
+
 ### SiteFooter
 
 The site footer: the brand block, and the four columns of links from footer-links.ts.
@@ -300,6 +314,24 @@ A tinted pill: a status glyph and a short label (rule 7).
 | ---------- | ----------- | -------- | ---- |
 | `state`    | `PillState` | yes      |      |
 | `children` | `ReactNode` | yes      |      |
+
+### Switch
+
+An on/off setting: a native button with role="switch" and aria-checked, inside a POST form. A
+native button is in the tab order and answers Enter and Space, so it needs no key handling of its
+own. The routes are not built yet (CC-27b), so the submit is stopped; the switch still flips.
+
+The form posts the state the switch moves to, `!checked`. The browser reads the form after the
+click's handlers and React's re-render, so the switch flips in a later task: flipped in the click
+handler, the field would already hold the next click's value when the form is read.
+
+| Prop     | Type                     | Required | Note                                                                        |
+| -------- | ------------------------ | -------- | --------------------------------------------------------------------------- |
+| `label`  | `string`                 | yes      | The setting's own row text, which names the switch (DESIGN-LOCK §7.6).      |
+| `name`   | `string`                 | yes      | The field the form posts: "true" or "false", the state the switch moves to. |
+| `on`     | `boolean`                | yes      |                                                                             |
+| `action` | `string`                 | yes      | Where the new state is posted.                                              |
+| `fields` | `Record<string, string>` | yes      | Other fields the post carries, the setting's id among them.                 |
 
 ### Table
 
@@ -443,6 +475,8 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Card                                         | `/v2-preview/card`                                       | primitive |                                      |
 | Table                                        | `/v2-preview/table`                                      | primitive |                                      |
 | Field                                        | `/v2-preview/field`                                      | primitive |                                      |
+| Select                                       | `/v2-preview/select`                                     | primitive |                                      |
+| Switch                                       | `/v2-preview/switch`                                     | primitive |                                      |
 | PageShell                                    | `/v2-preview/page-shell`                                 | primitive |                                      |
 | AccountShell                                 | `/v2-preview/account-shell`                              | primitive |                                      |
 | TrialCard                                    | `/v2-preview/trial-card`                                 | primitive |                                      |
@@ -493,6 +527,15 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Final-Site                                   | `/v2-preview/screens/site`                               | screen    |                                      |
 | Site, clean (stand-in Free account)          | `/v2-preview/screens/site/clean`                         | screen    |                                      |
 | Site, withheld                               | `/v2-preview/screens/site/withheld`                      | screen    |                                      |
+| Final-Alerts                                 | `/v2-preview/screens/alerts`                             | screen    |                                      |
+| Alerts, free                                 | `/v2-preview/screens/alerts/free`                        | screen    |                                      |
+| Final-Reports                                | `/v2-preview/screens/reports`                            | screen    |                                      |
+| Reports, Agency (Northwind, owner ruling 8)  | `/v2-preview/screens/reports/agency`                     | screen    |                                      |
+| Final-Settings                               | `/v2-preview/screens/settings`                           | screen    |                                      |
+| Settings, free                               | `/v2-preview/screens/settings/free`                      | screen    |                                      |
+| Settings, delete (owner ruling 12)           | `/v2-preview/screens/settings/delete`                    | screen    |                                      |
+| Final-TrialEnd                               | `/v2-preview/screens/trial-end`                          | screen    |                                      |
+| Changes log                                  | `/v2-preview/screens/changes-log`                        | screen    | ``, `?kind=opened`                   |
 | Final-LinkMap                                | `/v2-preview/screens/map`                                | screen    |                                      |
 | Link map, every page                         | `/v2-preview/screens/map/all`                            | screen    |                                      |
 | Link map, clean bill                         | `/v2-preview/screens/map/clean`                          | screen    |                                      |

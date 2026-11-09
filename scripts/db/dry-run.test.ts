@@ -17,10 +17,13 @@ const THROUGH_001 = (f: string) => f.slice(0, 14) <= '20261101000001';
 // cannot restore a database that lacked what P1 adds. The fixture of production before P1 and P2,
 // below, is the one where they and every later file are pending.
 const files = listMigrations().filter((f) => f.version <= '20261103000001');
-// Check 08 asserts the client grants as 20261106000002 (P2) left them, which this fixture predates:
-// its v1 tables carry the broad grants production had then. The fixture of production before P1 and
-// P2, below, runs every check.
-const V2_SET_CHECKS = listChecks().filter((c) => c.file !== '08-v1-client-grants.sql');
+// Check 08 asserts the client grants as 20261106000002 (P2) left them, and check 09 the definer
+// functions' search_path as 20261108000002 left it; this fixture predates both: its v1 tables carry
+// the broad grants production had then. The fixture of production before P1 and P2, below, runs
+// every check.
+const V2_SET_CHECKS = listChecks().filter(
+  (c) => c.file !== '08-v1-client-grants.sql' && c.file !== '09-definer-search-path.sql',
+);
 
 describe('the fixture of production before P1 and P2 holds what was measured there', () => {
   it('the bucket, the service_role sequence defaults and the client lines, read back by the fingerprint', async () => {
@@ -44,7 +47,7 @@ describe('the fixture of production before P1 and P2 holds what was measured the
 });
 
 describe('the v2-set fixture', () => {
-  it('runs checks 01 to 07, every check but 08', () => {
+  it('runs checks 01 to 07, every check but 08 and 09', () => {
     expect(V2_SET_CHECKS.map((c) => c.file)).toEqual([
       '01-client-table-privileges.sql',
       '02-partitions-rls-owner-only.sql',
@@ -524,6 +527,7 @@ describe('the dry run', () => {
     const checks = summary.steps.find((s) => s.step === 'Checks')!;
     expect(checks.result).toBe(`${listChecks().length} checks pass`);
     expect(listChecks().map((c) => c.file)).toContain('08-v1-client-grants.sql');
+    expect(listChecks().map((c) => c.file)).toContain('09-definer-search-path.sql');
   }, 300_000);
 });
 
