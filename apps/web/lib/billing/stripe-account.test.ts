@@ -36,6 +36,16 @@ describe('stripeAccount', () => {
     ],
     // The sandbox's key and mode, set on the production deployment: test cards would buy plans.
     [{ STRIPE_ACCOUNT_SECRET_KEY: 'sk_test_x', VERCEL_ENV: 'production' }, 'live mode only'],
+    // A preview holds the production database's service-role key (docs/ops/incident-plan.md): a test
+    // card there would grant a plan in the production database.
+    [
+      {
+        STRIPE_ACCOUNT_SECRET_KEY: 'sk_test_x',
+        VERCEL_ENV: 'preview',
+        NEXT_PUBLIC_SUPABASE_URL: 'https://ezspnfeyzwsisymytssm.supabase.co',
+      },
+      'live mode only',
+    ],
   ])('refuses %j, naming no key', async (env, message) => {
     const { stripeAccount } = await load();
     expect(() => stripeAccount(env)).toThrow(message);
@@ -46,10 +56,14 @@ describe('stripeAccount', () => {
     }
   });
 
-  it('allows test mode on a preview deployment', async () => {
+  it('allows test mode on a preview deployment over another database', async () => {
     const { stripeAccount } = await load();
     expect(
-      stripeAccount({ STRIPE_ACCOUNT_SECRET_KEY: 'sk_test_x', VERCEL_ENV: 'preview' }),
+      stripeAccount({
+        STRIPE_ACCOUNT_SECRET_KEY: 'sk_test_x',
+        VERCEL_ENV: 'preview',
+        NEXT_PUBLIC_SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co',
+      }),
     ).toBeDefined();
   });
 });

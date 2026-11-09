@@ -16,7 +16,8 @@ let client: Stripe | null = null;
 
 /**
  * Refuses a key whose mode is not the one `STRIPE_ACCOUNT_LIVEMODE` names, and a test key on the
- * production deployment (`VERCEL_ENV=production`): there, test cards would buy real plans. The v2
+ * production deployment (`VERCEL_ENV=production`) or over the production database (a preview holds
+ * its service-role key too): there, test cards would grant real plans. The v2
  * routes, the webhook and the reconcile take their client from here, so a refusal stops each with a
  * 500 and no write. The other client outside tests is v1's (`grep -rln "new Stripe(" apps/web/lib
  * apps/web/app` lists lib/stripe.ts and this file, beside test files).
@@ -32,11 +33,22 @@ export function stripeAccount(env: Env = process.env): Stripe {
   if (live !== expectedLivemode(env)) {
     throw new Error('STRIPE_ACCOUNT_SECRET_KEY is not the mode STRIPE_ACCOUNT_LIVEMODE names');
   }
-  if (!live && env.VERCEL_ENV === 'production') {
-    throw new Error('the production deployment bills in live mode only');
+  if (!live && (env.VERCEL_ENV === 'production' || onProductionDatabase(env))) {
+    throw new Error('the production deployment and database bill in live mode only');
   }
   client = new Stripe(key);
   return client;
+}
+
+/** The production Supabase project (PROJECT_OVERVIEW §9). Previews hold its service-role key too. */
+const PRODUCTION_SUPABASE_HOST = 'ezspnfeyzwsisymytssm.supabase.co';
+
+function onProductionDatabase(env: Env): boolean {
+  try {
+    return new URL(env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname === PRODUCTION_SUPABASE_HOST;
+  } catch {
+    return false;
+  }
 }
 
 /** Whether the account's events must be live ones: `STRIPE_ACCOUNT_LIVEMODE=true`, anything else test. */
