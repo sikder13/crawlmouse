@@ -61,7 +61,7 @@ const DYNAMIC = new Set(['/api/checks/6f1c2a8e-0000-4000-8000-000000000000/claim
 // included; a static route's own letters only as written. The rules accept `.rsc` in any case at each
 // of these places, a few spellings more than Vercel serves, which a rate limit can count at no cost.
 const SUFFIXES = ['', '/', '.rsc', '.rsc/', '/.rsc'];
-/** Spellings no rule may count: other paths, and suffixes Vercel does not serve. */
+/** Spellings no rule may count: other paths, and some suffixes Vercel does not serve. */
 const NOT_THE_ROUTE = (path: string) => [
   `${path}x`,
   `/x${path}`,

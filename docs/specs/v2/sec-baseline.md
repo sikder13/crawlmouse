@@ -229,7 +229,7 @@ function's setting as production held it, `''` included; both lists are in the t
 for relations and types. A type written without its schema can then resolve to a caller's temp domain.
 A grammar keyword, such as `integer`, `numeric`, `bit` or `interval`, is not looked up on the path: the
 parser names its `pg_catalog` type itself. 006c's helpers keep `''`, and its temp-domain cases plant
-`int4`, `bit`, `numeric` and `interval` domains that their bodies' keywords do not reach
+`int4`, `bit` and `interval` domains that the helpers' `integer`, `bit(32)` and `interval` do not reach
 (`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-006c-trial-function.test.ts -t "temporary objects"`).
 When the domain is checked, as it is on assignment to a variable, its CHECK runs as `postgres`.
 The probe below is a definer function with `search_path = ''` and one `uuid` variable: the caller's
