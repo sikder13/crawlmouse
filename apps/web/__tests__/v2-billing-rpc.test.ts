@@ -27,7 +27,7 @@ import { accountOf, doorDb, signUp } from './v2/_lib/door-pglite';
  * Migration 20261110000001 (CC-03 D4, D5, D13): the stripe_events decision columns and
  * `apply_stripe_event(p)`, against PGlite with every migration applied in order.
  *
- * PGlite has one backend, so two calls never overlap here: each case shows a call's sequential
+ * PGlite has one backend, so two calls run one after the other here: each case shows a call's sequential
  * outcome. The races, with two real transactions, are scripts/db/stripe-event-race.test.ts.
  */
 
@@ -745,8 +745,8 @@ describe('the customer binding', () => {
 });
 
 describe("a caller's temporary objects are not used by the function", () => {
-  // pg_temp is searched last, so a temp domain cannot stand in for a pg_catalog type, and a temp
-  // table cannot stand in for public's (every table is written with its schema). Each case needs a
+  // pg_temp is searched last, so a temp domain does not stand in for a pg_catalog type, and the
+  // body writes public.stripe_events, so a temp table of that name is not read. Each case needs a
   // session that has not compiled the function yet: a fresh clone.
   it.each(['jsonb', 'text', 'timestamptz', 'int4', 'bool', 'uuid'])(
     'a temp domain named %s',

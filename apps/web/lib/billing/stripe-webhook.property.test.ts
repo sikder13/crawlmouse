@@ -11,11 +11,11 @@ vi.mock('server-only', () => ({}));
  * subscription's statuses, and a subscription read returns the status at the moment of the read.
  * Each event is delivered at or after the step that created it, some more than once, and some
  * while another delivery is between its read and its write (two deliveries at once: one reads,
- * the timeline moves on and a newer event is processed, then the first writes). Whatever the
- * schedule, once every event has been processed the account is what the final status implies.
+ * the timeline moves on and a newer event is processed, then the first writes). For each generated
+ * schedule, once its events have been processed, the account is what the final status implies.
  *
- * The timeline ends settled (active, unpaid or canceled): past_due is dunning, which Stripe always
- * ends one way or the other. The implied state is written out below, not computed by the code
+ * The timeline ends settled (active, unpaid or canceled): past_due is dunning, which Stripe ends by
+ * a payment or by giving up. The implied state is written out below, not computed by the code
  * under test.
  */
 
