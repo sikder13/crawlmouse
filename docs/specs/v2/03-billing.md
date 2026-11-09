@@ -202,6 +202,12 @@ With the flag unset, checkout, portal and status are pinned to main's behaviour:
 `pnpm --filter @crawlmouse/web exec vitest run app/api/billing/checkout/route.v1-pin.test.ts app/api/billing/portal/route.v1-pin.test.ts app/api/billing/status/route.v1-pin.test.ts`.
 The v1 webhook (`app/api/webhooks/stripe/`) is not edited.
 
+**Registry (D11).** `lib/security/route-policy.ts` lists the agency trial and cancel as `member` routes with
+the strict origin rule, and the v2 webhook as a `webhook` with `verifier: 'constructEvent'`. A POST from
+another site, or with neither `Origin` nor `Sec-Fetch-Site: same-origin`, to any of the four billing routes is
+refused 403 by the middleware before the route runs:
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/security/billing-cross-site.test.ts`.
+
 ## Our clock
 
 - `trialLifecycleFn` (`crawlmouse.trial.lifecycle`, on `trial.started`, idempotent per account, cancelled by
@@ -235,5 +241,9 @@ The v1 webhook (`app/api/webhooks/stripe/`) is not edited.
   replace them.
 - An applied checkout that replaces an `unpaid` or `paused` subscription does not cancel it (it is not
   "live"); the checkout route refuses while the account follows one (Q3), so only a race reaches it.
+- Two of CC-SEC's tests built their "after" database from every migration, so any later migration broke
+  them; they now compare their own migration alone (`__tests__/v2-definer-search-path.test.ts`,
+  `scripts/db/definer-search-path.test.ts`), and `__tests__/v2-billing-rpc.test.ts` runs check 09 with this
+  step's function in place.
 - Upgrades Pro → Agency are a subscription change, not a checkout: CC-29 or CC-31. Seat and site quantities:
   CC-31. The card-required Pro trial: Q9.
