@@ -142,7 +142,21 @@ describe.skipIf(!configured)('the pipeline on the staging worker, against PGlite
         technical_seo: check.technical_seo
           ? { grade: check.technical_seo.grade, score: check.technical_seo.score }
           : null,
-        ai_readability_withheld: check.ai_readability?.withheld ?? null,
+        ai_readability: check.ai_readability
+          ? {
+              withheld: check.ai_readability.withheld,
+              withheld_reasons: check.ai_readability.withheld_reasons,
+              grade: check.ai_readability.grade,
+            }
+          : null,
+        crawlers: check.crawlers.map((c) => `${c.ua}:${c.verdict}`),
+        diff_inputs: await db
+          .query<{
+            d: { detectors: string[]; indeterminate: string[] } | null;
+          }>(`select diff_inputs as d from public.checks where id = $1`, [checkId])
+          .then(({ rows: [r] }) =>
+            r?.d ? { detectors: r.d.detectors, indeterminate: r.d.indeterminate.length } : null,
+          ),
         fixes,
         changes: dataset.changes.length,
         emitted,
