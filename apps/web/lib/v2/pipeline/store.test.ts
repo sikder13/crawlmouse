@@ -136,6 +136,19 @@ describe('supabasePipelineStore: one statement per method', () => {
     ]);
   });
 
+  it('reads a site with its report schedule embedded, as siteFromRow needs', async () => {
+    const { sb, calls } = recorder(ok({ id: S, report_schedules: [] }));
+    await supabasePipelineStore(sb).site(S);
+    expect(calls[0]).toEqual({
+      root: ['from', 'sites'],
+      chain: [
+        ['select', ['*, report_schedules(*)']],
+        ['eq', ['id', S]],
+        ['single', []],
+      ],
+    });
+  });
+
   it('finds the check a run claimed by its run id', async () => {
     const { sb, calls } = recorder(ok({ id: C, site_id: S }));
     expect(await supabasePipelineStore(sb).checkOfRun('run-9')).toEqual({ checkId: C, siteId: S });

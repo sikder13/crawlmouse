@@ -179,8 +179,12 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
     },
 
     async site(siteId) {
+      // siteFromRow reads the site's report schedule from the row, under `report_schedules`.
       return siteFromRow(
-        must('site', await sb.from('sites').select('*').eq('id', siteId).single()),
+        must(
+          'site',
+          await sb.from('sites').select('*, report_schedules(*)').eq('id', siteId).single(),
+        ),
       );
     },
 
