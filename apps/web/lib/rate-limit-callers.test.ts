@@ -14,7 +14,7 @@ import { MAX_RATE_LIMIT_WINDOW_MS } from './rate-limit-window';
 // cannot evaluate, or a caller file with no call in it.
 
 const WEB = resolve(__dirname, '..');
-const MODULE = /(^|\/)rate-limit$/;
+const MODULE = /(^|\/)rate-limit(\.(js|ts|mjs))?$/;
 
 function callerFiles(): string[] {
   const out = execFileSync('git', ['grep', '-l', '-E', 'rate-limit[\'"]', '--', '.'], {
@@ -68,6 +68,15 @@ function windowsOf(file: string, text: string): Array<{ where: string; ms: numbe
   const namespaces = new Set<string>();
   let imports = false;
   for (const st of sf.statements) {
+    // A re-export hands checkRateLimit to other modules under names this file does not see.
+    if (
+      ts.isExportDeclaration(st) &&
+      st.moduleSpecifier &&
+      ts.isStringLiteral(st.moduleSpecifier) &&
+      MODULE.test(st.moduleSpecifier.text)
+    ) {
+      throw new Error(`${at(st)}: a re-export of the rate-limit module`);
+    }
     if (!ts.isImportDeclaration(st) || !ts.isStringLiteral(st.moduleSpecifier)) continue;
     if (!MODULE.test(st.moduleSpecifier.text)) continue;
     imports = true;
@@ -171,6 +180,12 @@ describe('every checkRateLimit caller (B-F1)', () => {
     expect(
       windowsOf('b.ts', `import * as RL from '../rate-limit'; ${H} RL.checkRateLimit('k', 1, H);`),
     ).toEqual([{ where: 'b.ts:1', ms: 3_600_000 }]);
+    expect(
+      windowsOf(
+        'e.ts',
+        `import { checkRateLimit } from '../rate-limit.js'; ${H} checkRateLimit('k', 1, 2 * H);`,
+      ),
+    ).toEqual([{ where: 'e.ts:1', ms: 2 * 3_600_000 }]);
     // The window constant's module is not the rate-limit module.
     expect(windowsOf('c.ts', `import { MAX } from './rate-limit-window'; MAX;`)).toEqual([]);
     for (const [src, why] of [
@@ -181,6 +196,9 @@ describe('every checkRateLimit caller (B-F1)', () => {
       ],
       [`import * as RL from '@/lib/rate-limit'; const { checkRateLimit } = RL;`, /namespace used/],
       [`import { checkRateLimit } from '@/lib/rate-limit'; export {};`, /calls it nowhere/],
+      [`export { checkRateLimit as limitBy } from './rate-limit';`, /re-export/],
+      [`export * from './rate-limit';`, /re-export/],
+      [`export * as RL from '../lib/rate-limit.js';`, /re-export/],
     ] as const) {
       expect(() => windowsOf('d.ts', src), src).toThrow(why);
     }
