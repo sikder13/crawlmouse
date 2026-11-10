@@ -42,6 +42,9 @@ owner approved Q1–Q7 as recommended and ruled Q8 and Q9 into a follow-up step,
 | Q8  | login CSRF moves anonymous audits (A-8)                      | CC-V1FIX, with sign-off for the §5 change: `cm_auth_for` on every magic-link request; claim only when it matches |
 | Q9  | every `/r/` page is noindexed by header (A-7)                | CC-V1FIX: stop sending `X-Robots-Tag` on `/r/` and let each page's robots meta decide; keep it on `/embed/`      |
 
+At CC-V1FIX's hand-back the owner narrowed Q9: each report's share image, `/r/<slug>/opengraph-image`,
+keeps the header, since it has no robots meta of its own (A-7).
+
 The two redirects are recorded in the inventory (`redirect` on `app/compare/page.tsx` and
 `app/compare/[a]/[b]/page.tsx`) and appear in the cutover list below. B-F1 and B-F2 also go to
 CC-V1FIX; their rows under Findings name it.

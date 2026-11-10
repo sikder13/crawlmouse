@@ -43,7 +43,7 @@ export function guardApi(req: NextRequest, report: (r: Refusal) => void): NextRe
   return NextResponse.next();
 }
 
-const REPORT_IMAGE = /^\/r\/[^/]+\/opengraph-image$/;
+const REPORT_IMAGE = /^\/r\/[^/]+\/opengraph-image\/?$/;
 
 /**
  * Edge request handler. API paths go to guardApi only. For pages, order matters: refresh the

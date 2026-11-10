@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicReportRow } from '@/lib/reports';
 
-// A-7: with the middleware no longer sending X-Robots-Tag on /r/, this metadata is the only robots
-// signal a report page gives. Pinned here for the three states the brief names.
+// A-7: with the middleware no longer sending X-Robots-Tag on /r/ report pages (it still does on each
+// report's opengraph-image), this metadata is the only robots signal a report page gives. Pinned
+// here for the three states the brief names.
 const store = vi.hoisted(() => ({ report: null as unknown }));
 vi.mock('@/lib/reports', () => ({ getPublicReport: async () => store.report }));
 
