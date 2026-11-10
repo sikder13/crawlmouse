@@ -50,7 +50,9 @@ afterEach(() => {
   clients.made = [];
 });
 
-describe('billingFunctions and the nightly reconcile (CC-03 D10)', () => {
+// Each block's first import loads the Inngest functions, the pipeline and the engine. Under the full
+// suite's parallel load that has outlasted vitest's default 5 s test timeout.
+describe('billingFunctions and the nightly reconcile (CC-03 D10)', { timeout: 60_000 }, () => {
   /** Runs the nightly handler with a fake `step` and answers the step ids it ran. */
   async function nightlySteps(): Promise<string[]> {
     const { reconcileBillingHandler } = await import('../../../../inngest/billing');
@@ -80,7 +82,7 @@ describe('billingFunctions and the nightly reconcile (CC-03 D10)', () => {
   });
 });
 
-describe('billingFunctions (CC-03 D9)', () => {
+describe('billingFunctions (CC-03 D9)', { timeout: 60_000 }, () => {
   it('is empty unless V2_BILLING is 1', async () => {
     const { billingFunctions } = await import('./inngest-functions');
     for (const env of [{}, { V2_BILLING: '0' }, { V2_BILLING: 'true' }, { V2_BILLING: '' }]) {
@@ -142,7 +144,7 @@ describe('billingFunctions (CC-03 D9)', () => {
   });
 });
 
-describe('the Inngest serve route’s function list', () => {
+describe('the Inngest serve route’s function list', { timeout: 60_000 }, () => {
   // The route registers CC-20b's inngestFunctions(process.env), which holds v1's four as the same
   // objects (lib/v2/pipeline/functions.test.ts); here, which functions in which order.
   async function routeIds(flag: string | undefined): Promise<string[]> {
