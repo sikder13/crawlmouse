@@ -272,8 +272,11 @@ Out of this step:
 ## The owner's checklist
 
 0. **Before the flip:**
-   - Settings → Environments → `spike` → Delete environment (no workflow uses it; it would lose its
-     only protection).
+   - **Delete the unused `spike` environment:** Settings → Environments → `spike` → Delete
+     environment. No workflow uses it, and it would lose its only protection on the flip.
+   - **Merge order:** CC-REPO merges last, after CC-V1FIX and CC-03, so their migrations apply through
+     the current reviewer-approved flow. Merge `main` into this branch after they land and let CI pass
+     on the merge.
    - Settings → Environments → `production` → remove `SUPABASE_SERVICE_ROLE_KEY`, which no workflow
      reads (`grep -rn SUPABASE_SERVICE_ROLE_KEY .github` prints nothing).
    - Actions → **DB apply to production** and **DB rollback on production**: no run is waiting. Never
@@ -288,8 +291,12 @@ Out of this step:
      If it lists nothing, `main` has lost its required checks: say so before anything else merges;
    - the owner check refuses a run that is not the owner's own dispatch from `main`. That is
      shown by the D2 test; do not dispatch production to check it.
-3. **Budget:** Settings → Billing and licensing → Budgets and alerts → an Actions budget, starting at
-   $50 a month with "stop usage" on, sized from D7's numbers.
+3. **Budget:** Settings → Billing and licensing → Budgets and alerts → an Actions budget of **$300 a
+   month for November**, with "stop usage" on at the limit and alerts at 50, 75 and 90%. The owner
+   re-sets it after the step that cuts the visual cost. From D7's projection (about 75,700 minutes a month,
+   about 2,500 a day), $300 at $0.006 a minute plus the 3,000 included minutes is about 53,000 minutes,
+   about 21 days of private-repo CI. November reaches the stop only if the flip is before about the
+   10th.
 4. **Actions defaults:** Settings → Actions → General → Workflow permissions → **Read repository
    contents**, and untick **Allow GitHub Actions to create and approve pull requests**. Every workflow
    here declares its own permissions, so this changes nothing today. It sets the default for a
