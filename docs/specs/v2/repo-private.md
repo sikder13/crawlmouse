@@ -292,11 +292,11 @@ Out of this step:
    - the owner check refuses a run that is not the owner's own dispatch from `main`. That is
      shown by the D2 test; do not dispatch production to check it.
 3. **Budget:** Settings → Billing and licensing → Budgets and alerts → an Actions budget of **$300 a
-   month for November**, with "stop usage" on at the limit and alerts at 50, 75 and 90%. The owner
+   month, set for November**, with "stop usage" on at the limit and alerts at 50, 75 and 90%. The owner
    re-sets it after the step that cuts the visual cost. From D7's projection (about 75,700 minutes a month,
    about 2,500 a day), $300 at $0.006 a minute plus the 3,000 included minutes is about 53,000 minutes,
    about 21 days of private-repo CI. November reaches the stop only if the flip is before about the
-   10th. A budget repeats each month, so it stays at $300 until the owner re-sets it; a full month at
+   10th. GitHub budgets are monthly, so it stays at $300 until the owner re-sets it; a full month at
    D7's rate reaches the stop around day 21.
 4. **Actions defaults:** Settings → Actions → General → Workflow permissions → **Read repository
    contents**, and untick **Allow GitHub Actions to create and approve pull requests**. Every workflow
