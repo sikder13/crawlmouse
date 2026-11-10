@@ -71,6 +71,8 @@ const DUAL_WRITE =
 const RECONCILE =
   'CC-03 extends reconcile to `accounts.state` (ARCH-2 §3.3); the `pro_until` repair is deleted in 009.';
 const DROP_009 = 'Deleted in 009, with `users.pro_until`.';
+const ERASURE =
+  'Its `pro_until` refusal is deleted in 009; its refusal on a live `subscriptions` row already covers v2 (CC-V1FIX B-F2).';
 
 /**
  * The plan for every file that reads or writes v1 entitlement. The spec test fails when the scan
@@ -100,6 +102,7 @@ export const V1_READER_PLAN: Readonly<Record<string, string>> = Object.freeze({
   'packages/types/src/audit.ts': DROP_009,
   'packages/types/src/billing.ts': DROP_009,
   'scripts/p5/reconcile-dryrun.ts': RECONCILE,
+  'scripts/ops/erase-account.ts': ERASURE,
 });
 
 // ─── Gates ────────────────────────────────────────────────────────────────────────────────────────

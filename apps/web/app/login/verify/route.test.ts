@@ -68,6 +68,9 @@ function post(
   });
 }
 
+// The binding this browser holds when it asked for the link it is now opening (A-8).
+const OWN = emailBinding(USER.email);
+
 const otp = (value = CANARY) => JSON.stringify({ kind: 'token_hash', value, type: 'magiclink' });
 
 function setCookies(res: Response): string[] {
@@ -213,9 +216,9 @@ describe('POST /login/verify verifies', () => {
     }
   });
 
-  it('still claims the anonymous v1 audits of this browser', async () => {
+  it('claims the anonymous v1 audits of a browser that asked for this address (A-8)', async () => {
     anon.id = 'anon-1';
-    await POST(post({ cm_auth_otp: otp() }));
+    await POST(post({ cm_auth_otp: otp(), cm_auth_for: OWN }));
     expect(anonUpdate).toHaveBeenCalledTimes(1);
     expect(anonUpdate.mock.calls[0]![0]).toMatchObject({
       table: 'audits',
@@ -226,7 +229,7 @@ describe('POST /login/verify verifies', () => {
 
   it('claims only audits no account owns yet: the update is filtered on user_id is null', async () => {
     anon.id = 'anon-1';
-    await POST(post({ cm_auth_otp: otp() }));
+    await POST(post({ cm_auth_otp: otp(), cm_auth_for: OWN }));
     expect(anonUpdate.mock.calls[0]![0].is).toEqual(['user_id', null]);
   });
 
@@ -258,16 +261,33 @@ describe('POST /login/verify verifies', () => {
       ).toMatch(/Max-Age=0/);
   });
 
-  it('claims as before when the binding is the verified address, or there is none', async () => {
+  it('A-8: with no cm_auth_for the browser asked for no link, so nothing is claimed', async () => {
     anon.id = 'anon-1';
-    await POST(post({ cm_auth_otp: otp(), cm_auth_for: emailBinding(USER.email) }));
-    await POST(post({ cm_auth_otp: otp() }));
-    expect(anonUpdate).toHaveBeenCalledTimes(2);
+    const res = await POST(post({ cm_auth_otp: otp() }));
+    expect(anonUpdate).not.toHaveBeenCalled();
+    expect(clearAnonSession).not.toHaveBeenCalled();
+    // The sign-in itself still happens.
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/dashboard`);
+  });
+
+  it('A-8: a matching cm_auth_for claims, and is cleared after the claim', async () => {
+    anon.id = 'anon-1';
+    const res = await POST(post({ cm_auth_otp: otp(), cm_auth_for: OWN }));
+    expect(anonUpdate).toHaveBeenCalledTimes(1);
+    expect(setCookies(res).find((c) => c.startsWith('cm_auth_for='))).toMatch(/Max-Age=0/);
+  });
+
+  it('A-8: a cm_auth_for that is not a binding of the verified address claims nothing', async () => {
+    anon.id = 'anon-1';
+    for (const bound of ['', 'not-a-hash', emailBinding('ADA@example.com ').toUpperCase()]) {
+      await POST(post({ cm_auth_otp: otp(), cm_auth_for: bound }));
+    }
+    expect(anonUpdate).not.toHaveBeenCalled();
   });
 
   it('ends the anonymous session after claiming it, and not before a sign-in', async () => {
     anon.id = 'anon-1';
-    await POST(post({ cm_auth_otp: otp() }));
+    await POST(post({ cm_auth_otp: otp(), cm_auth_for: OWN }));
     expect(clearAnonSession).toHaveBeenCalledTimes(1);
     clearAnonSession.mockClear();
     verifyOtp.mockResolvedValue({
@@ -293,7 +313,10 @@ describe('POST /login/verify verifies', () => {
       arm();
       for (const accept of [undefined, 'application/json']) {
         const res = await POST(
-          post({ cm_auth_otp: otp() }, accept ? { origin: ORIGIN, accept } : { origin: ORIGIN }),
+          post(
+            { cm_auth_otp: otp(), cm_auth_for: OWN },
+            accept ? { origin: ORIGIN, accept } : { origin: ORIGIN },
+          ),
         );
         expect(res.status, `${stage}, ${accept ?? 'form'}`).toBe(accept ? 200 : 303);
         const dest = accept
@@ -377,6 +400,7 @@ describe('POST /login/verify verifies', () => {
     expect(body).toEqual({
       next: '/dashboard',
       events: [{ name: 'trial_started', props: { kind: 'pro', variant: 'no_card' } }],
+      email: USER.email,
     });
     expect(JSON.stringify(body)).not.toContain(CANARY);
     expect(res.headers.get('Cache-Control')).toContain('no-store');
@@ -385,5 +409,45 @@ describe('POST /login/verify verifies', () => {
   it('answers JSON on the expired state too, so the page can show it', async () => {
     const res = await POST(post({}, { origin: ORIGIN, accept: 'application/json' }));
     expect(await res.json()).toEqual({ next: '/login/verify/continue?state=expired', events: [] });
+  });
+
+  // Q3(b): the Continue page names the account the link signed in, so a person handed someone
+  // else's link sees it before working inside that account.
+  it.each([
+    ['off', undefined],
+    ['on', '1'],
+  ])('with the door %s, names the signed-in address in the JSON answer only', async (_, flag) => {
+    if (flag) process.env.V2_ACCOUNT_DOOR = flag;
+    else delete process.env.V2_ACCOUNT_DOOR;
+    const json = await POST(
+      post({ cm_auth_otp: otp() }, { origin: ORIGIN, accept: 'application/json' }),
+    );
+    expect(await json.json()).toMatchObject({ next: '/dashboard', email: USER.email });
+    // The no-script post is a redirect: the address is in no header and no body.
+    const plain = await POST(post({ cm_auth_otp: otp() }));
+    expect(plain.status).toBe(303);
+    expect(plain.headers.get('location')).toBe(`${ORIGIN}/dashboard`);
+    for (const [name, value] of plain.headers)
+      expect(`${name}: ${value}`).not.toContain(USER.email);
+    expect(await plain.text()).not.toContain(USER.email);
+  });
+
+  it('names no address when the link is refused or the landing throws', async () => {
+    verifyOtp.mockResolvedValueOnce({ data: { user: null }, error: { status: 403 } });
+    const refused = await POST(
+      post({ cm_auth_otp: otp() }, { origin: ORIGIN, accept: 'application/json' }),
+    );
+    expect(await refused.json()).not.toHaveProperty('email');
+    anon.throws = true;
+    const threw = await POST(
+      post(
+        { cm_auth_otp: otp(), cm_auth_for: OWN },
+        { origin: ORIGIN, accept: 'application/json' },
+      ),
+    );
+    expect(await threw.json()).toEqual({
+      next: '/login/verify/continue?state=expired',
+      events: [],
+    });
   });
 });

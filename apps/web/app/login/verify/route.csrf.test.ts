@@ -110,12 +110,12 @@ afterEach(async () => {
 });
 
 /** The Continue page's POST from the victim's browser, carrying the attacker's link token. */
-function openInVictimBrowser(boundTo: string) {
+function openInVictimBrowser(boundTo: string | null) {
   const jar: Record<string, string> = {
     cm_auth_otp: JSON.stringify({ kind: 'token_hash', value: 'attacker-token', type: 'magiclink' }),
-    cm_auth_for: boundTo,
     cm_auth_device: VICTIM_DEVICE,
   };
+  if (boundTo !== null) jar.cm_auth_for = boundTo;
   return POST(
     new Request(`${ORIGIN}/login/verify`, {
       method: 'POST',
@@ -152,6 +152,14 @@ describe("a sign-in link for another address, opened in a browser bound to the v
       await count(h.db!, `select 1 from public.trial_ledger where account_id = $1`, [account.id]),
     ).toBe(2);
     expect(await deviceRows()).toBe(0);
+    expect(await auditOwner()).toBeNull();
+    expect(cleared).not.toHaveBeenCalled();
+  });
+
+  // A-8: the v1 victim never asked for a link, so the browser holds no binding at all. Before, that
+  // read as "nothing known" and the audit moved into the attacker's account.
+  it('a browser that asked for no link claims none of its audits', async () => {
+    await openInVictimBrowser(null);
     expect(await auditOwner()).toBeNull();
     expect(cleared).not.toHaveBeenCalled();
   });

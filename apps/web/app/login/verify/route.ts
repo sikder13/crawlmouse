@@ -11,6 +11,7 @@ import { isSameOrigin } from '@/lib/security/same-origin';
 import { accountDoorEnabled } from '@/lib/auth/flags';
 import { AUTH_LINK_SECONDS, COOKIES } from '@/lib/auth/constants';
 import {
+  bindingMatches,
   bindingMismatch,
   claimFromNext,
   decodeOtp,
@@ -86,10 +87,15 @@ export async function POST(request: Request) {
   const wantsJson = (request.headers.get('accept') ?? '').includes('application/json');
   const carry = decodeOtp(req.cookies.get(COOKIES.otp)?.value);
 
-  const respond = (dest: string, events: DoorEvent[] = []) => {
+  // `email` is the address the link signed in, for the Continue page to show before it goes on
+  // (Q3 of CC-V1FIX): someone handed another person's link sees whose account it is. JSON only; the
+  // no-script post is redirected and names nothing.
+  const respond = (dest: string, events: DoorEvent[] = [], email?: string) => {
     const res = applyNoStore(
       wantsJson
-        ? NextResponse.json({ next: dest, events })
+        ? NextResponse.json(
+            email === undefined ? { next: dest, events } : { next: dest, events, email },
+          )
         : NextResponse.redirect(new URL(dest, url.origin), 303),
     );
     // The token is spent or refused either way; nothing reads it twice.
@@ -114,14 +120,16 @@ export async function POST(request: Request) {
     }
     const user: User | null = data.user ?? (await sb.auth.getUser()).data.user;
 
-    // Claim the audits this browser ran anonymously before signing in (v1). The
-    // anon-session id is an httpOnly capability cookie, so a browser only claims its own unclaimed
-    // audits. Not when the link signed in an address other than the one this browser's door request
-    // was for: that is someone else's link opened here, and the audits are not theirs (CC-06c D9).
+    // Claim the audits this browser ran anonymously before signing in (v1). The anon-session id is
+    // an httpOnly capability cookie, so a browser only claims its own unclaimed audits, and only when
+    // this browser asked for a link to the address the link signed in (A-8): with no binding, or
+    // another address's, the link may be someone else's opened here (login CSRF), and the audits are
+    // not theirs (CC-06c D9).
     stage = 'anon-claim';
     const anonId = await readAnonSessionId();
-    const foreign = bindingMismatch(req.cookies.get(COOKIES.binding)?.value, user?.email);
-    if (user && anonId && !foreign) {
+    const boundTo = req.cookies.get(COOKIES.binding)?.value;
+    const foreign = bindingMismatch(boundTo, user?.email);
+    if (user && anonId && bindingMatches(boundTo, user.email)) {
       const admin = supabaseAdmin();
       await admin
         .from('audits')
@@ -163,7 +171,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const res = respond(dest, events);
+    const res = respond(dest, events, user?.email ?? undefined);
     // Someone else's link leaves this browser's own door request in place until it expires, so the
     // owner's link still finds it and a second foreign link is still recognised as one.
     if (!foreign) {

@@ -69,6 +69,31 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'the changed and cascaded rows read 0',
+    withdrawnIn: 'docs/ops/erasure.md §5, CC-V1FIX review round 1',
+    truth:
+      'executeErasure reads every count again with the erased user id, addresses and accounts ' +
+      '(after.counts), and each is 0 only when the erasure is complete.',
+    allowedIn: [],
+  },
+  {
+    text: 'which only the v2 door sets, so on v1 it never fires',
+    // The guard reads Markdown: this is the finding's text in the report rendered from
+    // docs/ops/v1-inventory.json, which v1-inventory.test.ts holds equal to the inventory.
+    withdrawnIn:
+      'docs/specs/v2/v1-audit.md finding A-8 (from docs/ops/v1-inventory.json), CC-V1FIX review round 1',
+    truth: 'Since A-8 every magic-link request sets cm_auth_for, door or v1.',
+    allowedIn: [],
+  },
+  {
+    text: 'carries no binding, and then its anonymous v1 audits are claimed',
+    withdrawnIn: 'docs/specs/v2/25-account-door.md (Known risks), CC-V1FIX A-8',
+    truth:
+      'Every magic-link request sets cm_auth_for, and /login/verify claims anonymous v1 audits ' +
+      'only when it is the binding of the address the link signed in (bindingMatches).',
+    allowedIn: [],
+  },
+  {
     text: 'that guard does not run on them in the suite',
     withdrawnIn:
       'docs/specs/v2/27-account-screens.md (Known gaps), CC-27 review round 2 (accessibility and deploy safety)',

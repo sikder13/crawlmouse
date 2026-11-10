@@ -450,30 +450,31 @@ The contract (`packages/types/src/v2`) wins where it and a document disagree.
 Tracked non-test files matching `pro_until|proUntil|isProActive|userIsPro|deriveTier|from '[./@/a-z-]*lib/pro'|from '\./pro'|from '\.\./pro'`, found by `git grep`. The spec
 test fails when this list and `V1_READER_PLAN` in `apps/web/lib/entitlement-spec.ts` disagree.
 
-| File                                                        | Plan                                                                                                  |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `apps/web/app/api/audits/[id]/export/route.ts`              | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/app/api/audits/[id]/llms-txt/route.ts`            | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/app/api/audits/[id]/reaudit/route.ts`             | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/app/api/audits/[id]/stream/route.ts`              | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/app/api/audits/start/route.ts`                    | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/app/api/billing/status/route.ts`                  | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/app/api/reports/[slug]/logo/route.ts`             | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/app/api/reports/[slug]/mine/route.ts`             | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/app/api/reports/[slug]/white-label/route.ts`      | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/app/dashboard/page.tsx`                           | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/components/audit/__fixtures__/client-audit-v2.ts` | Deleted in 009, with `users.pro_until`.                                                               |
-| `apps/web/components/billing/PlanStatusCard.tsx`            | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/lib/billing/apply-stripe-event.ts`                | CC-03 adds the v2 write beside it (dual-write, ARCH-2 §6.1); the `pro_until` write is deleted in 009. |
-| `apps/web/lib/billing/plan-card.ts`                         | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/lib/billing/pro-until.ts`                         | CC-03 adds the v2 write beside it (dual-write, ARCH-2 §6.1); the `pro_until` write is deleted in 009. |
-| `apps/web/lib/entitlement.ts`                               | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `apps/web/lib/pro.ts`                                       | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.      |
-| `inngest/billing-helpers.ts`                                | CC-03 extends reconcile to `accounts.state` (ARCH-2 §3.3); the `pro_until` repair is deleted in 009.  |
-| `inngest/billing.ts`                                        | CC-03 extends reconcile to `accounts.state` (ARCH-2 §3.3); the `pro_until` repair is deleted in 009.  |
-| `packages/types/src/audit.ts`                               | Deleted in 009, with `users.pro_until`.                                                               |
-| `packages/types/src/billing.ts`                             | Deleted in 009, with `users.pro_until`.                                                               |
-| `scripts/p5/reconcile-dryrun.ts`                            | CC-03 extends reconcile to `accounts.state` (ARCH-2 §3.3); the `pro_until` repair is deleted in 009.  |
+| File                                                        | Plan                                                                                                                    |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/app/api/audits/[id]/export/route.ts`              | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/app/api/audits/[id]/llms-txt/route.ts`            | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/app/api/audits/[id]/reaudit/route.ts`             | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/app/api/audits/[id]/stream/route.ts`              | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/app/api/audits/start/route.ts`                    | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/app/api/billing/status/route.ts`                  | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/app/api/reports/[slug]/logo/route.ts`             | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/app/api/reports/[slug]/mine/route.ts`             | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/app/api/reports/[slug]/white-label/route.ts`      | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/app/dashboard/page.tsx`                           | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/components/audit/__fixtures__/client-audit-v2.ts` | Deleted in 009, with `users.pro_until`.                                                                                 |
+| `apps/web/components/billing/PlanStatusCard.tsx`            | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/lib/billing/apply-stripe-event.ts`                | CC-03 adds the v2 write beside it (dual-write, ARCH-2 §6.1); the `pro_until` write is deleted in 009.                   |
+| `apps/web/lib/billing/plan-card.ts`                         | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/lib/billing/pro-until.ts`                         | CC-03 adds the v2 write beside it (dual-write, ARCH-2 §6.1); the `pro_until` write is deleted in 009.                   |
+| `apps/web/lib/entitlement.ts`                               | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `apps/web/lib/pro.ts`                                       | Reads move to `gatesFor()` at the switch-over (ARCH-2 §6.1 row 008, `V2_READS`); deleted in 009.                        |
+| `inngest/billing-helpers.ts`                                | CC-03 extends reconcile to `accounts.state` (ARCH-2 §3.3); the `pro_until` repair is deleted in 009.                    |
+| `inngest/billing.ts`                                        | CC-03 extends reconcile to `accounts.state` (ARCH-2 §3.3); the `pro_until` repair is deleted in 009.                    |
+| `packages/types/src/audit.ts`                               | Deleted in 009, with `users.pro_until`.                                                                                 |
+| `packages/types/src/billing.ts`                             | Deleted in 009, with `users.pro_until`.                                                                                 |
+| `scripts/ops/erase-account.ts`                              | Its `pro_until` refusal is deleted in 009; its refusal on a live `subscriptions` row already covers v2 (CC-V1FIX B-F2). |
+| `scripts/p5/reconcile-dryrun.ts`                            | CC-03 extends reconcile to `accounts.state` (ARCH-2 §3.3); the `pro_until` repair is deleted in 009.                    |
 
 ## Runbook (owner-applied, OPERATING-RULES §7)
 

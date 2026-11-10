@@ -37,8 +37,9 @@ export const COOKIES = {
   /** A random per-browser id, one of the trial ledger's signals. */
   device: 'cm_auth_device',
   /**
-   * Which address a door request was made for: a hash (continue-intent.ts `emailBinding`), not the
-   * address. The landing uses the named site and a Keep's claim only when it matches the email the
+   * Which address this browser's last magic-link request was for, door or v1: a hash
+   * (continue-intent.ts `emailBinding`), not the address. The landing uses the named site and a
+   * Keep's claim, and /login/verify the anonymous-audit claim, only when it matches the email the
    * link verified, so a link to someone else's account cannot carry them into it.
    */
   binding: 'cm_auth_for',
