@@ -50,8 +50,8 @@ afterEach(() => {
   clients.made = [];
 });
 
-// Each block's first import loads the Inngest functions, the pipeline and the engine. Under the full
-// suite's parallel load that has outlasted vitest's default 5 s test timeout.
+// These tests import the billing functions, or reset modules and import the Inngest route, inside the
+// test. Run alongside other files, two of them outlasted vitest's default 5 s test timeout.
 describe('billingFunctions and the nightly reconcile (CC-03 D10)', { timeout: 60_000 }, () => {
   /** Runs the nightly handler with a fake `step` and answers the step ids it ran. */
   async function nightlySteps(): Promise<string[]> {
