@@ -177,7 +177,7 @@ interface Lock {
   granted: boolean;
 }
 
-/** The lock modes B held on a table while it waited. */
+/** The table-level lock modes B held on a table while it waited (row locks are not recorded). */
 const heldOn = (locks: Lock[], table: string) =>
   locks.filter((l) => l.granted && l.relname === table).map((l) => l.mode);
 
@@ -210,7 +210,7 @@ async function race(sql: Sql, a: P, b: P) {
       if (waited) {
         locks = (await sql`select c.relname, l.mode, l.granted from pg_locks l
                              left join pg_class c on c.oid = l.relation
-                            where l.pid = ${pid}`) as unknown as Lock[];
+                            where l.pid = ${pid} and l.locktype = 'relation'`) as unknown as Lock[];
       }
       if (!waited) await new Promise((r) => setTimeout(r, 25));
     }
@@ -447,8 +447,10 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
     };
   }
 
-  // Where B waits in a new-row race: inside the insert, which holds RowExclusiveLock on subscriptions.
-  // It has not reached the locking read (RowShareLock on subscriptions) or the account (any lock).
+  // Where B waits in a new-row race: inside the insert, on the conflicting key, which holds
+  // RowExclusiveLock on subscriptions. It has not reached the locking read (RowShareLock on
+  // subscriptions). No lock on accounts separates that wait from one in the insert's foreign-key check,
+  // which takes RowShareLock on accounts, and from one at the account lock further on.
   const waitedInTheInsert = (locks: Lock[]) => {
     expect(heldOn(locks, 'subscriptions')).toContain('RowExclusiveLock');
     expect(heldOn(locks, 'subscriptions')).not.toContain('RowShareLock');
