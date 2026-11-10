@@ -125,6 +125,43 @@ describe('the changes job and the jobs it gates', () => {
   });
 });
 
+describe('the build artifact security-browser and zap-baseline start', () => {
+  // "Re-run failed jobs" re-runs those two without the build that passed, so their download must
+  // name what the build of an earlier attempt uploaded: a name keyed on the run, not the attempt
+  // (run 42671166085, attempt 2, failed on "Artifact not found" when it was keyed on the attempt).
+  // A full re-run builds again under the same name, which the upload must be allowed to replace.
+  function artifactSteps(jobName: string, action: 'upload-artifact' | 'download-artifact') {
+    return (job(jobName).steps ?? []).filter(
+      (s) =>
+        s.uses?.startsWith(`actions/${action}@`) && String(s.with?.name).startsWith('next-build-'),
+    );
+  }
+  const uploads = artifactSteps('build', 'upload-artifact');
+  const consumers = ['security-browser', 'zap-baseline'] as const;
+
+  it('is uploaded once by build, named by the run id alone, and may be replaced', () => {
+    expect(uploads).toHaveLength(1);
+    expect(uploads[0]!.with?.name).toBe('next-build-${{ github.run_id }}');
+    expect(uploads[0]!.with?.overwrite).toBe(true);
+  });
+
+  it.each(consumers)('%s downloads exactly the name build uploads', (consumer) => {
+    const downloads = artifactSteps(consumer, 'download-artifact');
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0]!.with?.name).toBe(uploads[0]!.with?.name);
+  });
+
+  it('no job downloads an artifact whose name reads the attempt', () => {
+    const offenders = Object.entries(ci.jobs).flatMap(([name, j]) =>
+      (j.steps ?? [])
+        .filter((s) => s.uses?.startsWith('actions/download-artifact@'))
+        .filter((s) => /run_attempt/i.test(String(s.with?.name ?? '')))
+        .map(() => name),
+    );
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe('the rule the required visual check applies', () => {
   const [step] = job('visual').steps ?? [];
 

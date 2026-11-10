@@ -162,10 +162,14 @@ jobs:
           . ./.env.ci
           set +a
           pnpm build
+      # Named by the run, not the attempt: "Re-run failed jobs" re-runs the two jobs that download it
+      # without re-running a build that passed, so they must find the earlier attempt's upload. A
+      # full re-run builds again under the same name, hence overwrite.
       - name: Keep the build for security-browser and zap-baseline
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: next-build-${{ github.run_id }}-${{ github.run_attempt }}
+          name: next-build-${{ github.run_id }}
+          overwrite: true
           path: |
             apps/web/.next
             !apps/web/.next/cache
@@ -192,7 +196,7 @@ jobs:
       - uses: ./.github/actions/setup
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: next-build-${{ github.run_id }}-${{ github.run_attempt }}
+          name: next-build-${{ github.run_id }}
           path: apps/web/.next
       - name: Install Chromium
         working-directory: apps/web
@@ -225,7 +229,7 @@ jobs:
       - uses: ./.github/actions/setup
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: next-build-${{ github.run_id }}-${{ github.run_attempt }}
+          name: next-build-${{ github.run_id }}
           path: apps/web/.next
       - name: Pull the ZAP image
         run: docker pull "$ZAP_IMAGE"
