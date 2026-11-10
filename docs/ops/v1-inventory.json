@@ -1,0 +1,1623 @@
+{
+  "base": "ee11796d",
+  "measuredAt": "2026-11-09",
+  "v2Rule": "Not listed: app files under a (v2-preview) or (account) route group at any depth; an app file with no entry that imports a ...Enabled reader from a .../flags module; Inngest functions built inside a factory rather than as a top-level export; tables created by a migration whose file name contains _v2_. The finders are apps/web/__tests__/v1-inventory-source.ts.",
+  "items": [
+    {
+      "kind": "page",
+      "path": "app/page.tsx",
+      "url": "/",
+      "ruling": "retire",
+      "reason": "v2 serves a new Home at the same URL; the v1 component goes at cutover",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "v2 Home (CC-21 screens/home), same URL",
+      "redirect": "same",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/page.tsx:1)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/page.tsx:1)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/page.tsx:1)",
+        "redirect": "n/a — no redirect or next param (app/page.tsx:1)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — JSON-LD from constants (app/page.tsx:15, lib/seo/faq.ts) through JsonLd, lib/seo/jsonld.tsx:118-125 now escapes < > & U+2028 U+2029 (fixed in fed2923e); the audit form posts to /api/audits/start",
+        "abuse": "pass — the form's action (/api/audits/start) carries Turnstile and per-IP/domain/global limits (app/api/audits/start/route.ts:58-117)"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/ai-readiness-checker/page.tsx",
+      "url": "/ai-readiness-checker",
+      "ruling": "keep",
+      "reason": "SEO landing in the sitemap; ARCH-2 keeps it as a landing page that posts to /api/checks",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/ai-readiness-checker/page.tsx:46)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/ai-readiness-checker/page.tsx:46)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/ai-readiness-checker/page.tsx:46)",
+        "redirect": "n/a — no redirect or next param (app/ai-readiness-checker/page.tsx:46)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — JSON-LD from constants (app/ai-readiness-checker/page.tsx:58), lib/seo/jsonld.tsx:118-125 now escapes < > & U+2028 U+2029 (fixed in fed2923e)",
+        "abuse": "pass — its form posts to /api/audits/start (Turnstile + limits, app/api/audits/start/route.ts:58-117)"
+      },
+      "e2e": {
+        "url": "/ai-readiness-checker",
+        "status": 200,
+        "title": "Free AI Readiness Checker — Whole-Site Test · Crawlmouse",
+        "canonical": "http://localhost:3000/ai-readiness-checker",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/audit/[id]/page.tsx",
+      "url": "/audit/[id]",
+      "ruling": "retire",
+      "reason": "capability URL kept; V2_READS switches it to read checks",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "v2 result and segment pages under /audit/[id] (CC-22), same ids",
+      "redirect": "same",
+      "checks": {
+        "input": "pass — id is an .eq filter on the admin client (app/audit/[id]/page.tsx:33); non-uuid makes Postgres reject the cast, data is null → notFound(); measured 404 for /audit/garbage; ?view accepts only 'ai' (:27-28)",
+        "output": "pass — capability read selects id, url only (app/audit/[id]/page.tsx:33); the rest arrives through the SSE projection chokepoint, which emits no user_id or session id (lib/audit-stream-projection.ts:249-275)",
+        "cache": "pass — dynamic; measured Cache-Control: private, no-cache, no-store",
+        "redirect": "n/a — no redirect param",
+        "errors": "pass — notFound() only",
+        "escaping": "pass — the audit URL is display text, never an href (components/audit/AuditUrlHeader.tsx:7); crawled titles/URLs are JSX text (components/audit/NodeDetail.tsx:7, components/audit/FreeFixCard.tsx:26-44); the graph tooltip is innerHTML (react-force-graph nodeLabel) and gets nodeTooltipLabel, which decodes then escapes (components/audit/LinkGraph.tsx:96, components/audit/graph-logic.ts:146)",
+        "abuse": "pass — re-audit/start actions are rate-limited (app/api/audits/[id]/reaudit/route.ts:67-93)"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/aup/page.tsx",
+      "url": "/aup",
+      "ruling": "keep",
+      "reason": "legal page, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/aup/page.tsx:3)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/aup/page.tsx:3)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/aup/page.tsx:3)",
+        "redirect": "n/a — no redirect or next param (app/aup/page.tsx:3)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/aup/page.tsx:3)",
+        "abuse": "n/a — no action that costs money or sends mail (app/aup/page.tsx:3)"
+      },
+      "e2e": {
+        "url": "/aup",
+        "status": 200,
+        "title": "Acceptable Use · Crawlmouse",
+        "canonical": "http://localhost:3000/aup",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/authors/[slug]/page.tsx",
+      "url": "/authors/[slug]",
+      "ruling": "keep",
+      "reason": "blog author pages, kept with the blog",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — dynamicParams=false and generateStaticParams (app/authors/[slug]/page.tsx:14-18); getAuthor uses Object.hasOwn so __proto__ is not an author (lib/blog/authors.ts:37)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/authors/[slug]/page.tsx:14)",
+        "cache": "pass — SSG, no cookies read",
+        "redirect": "n/a — no redirect or next param (app/authors/[slug]/page.tsx:14)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — Person JSON-LD from the AUTHORS constant (app/authors/[slug]/page.tsx:52), lib/seo/jsonld.tsx:118-125 now escapes < > & U+2028 U+2029 (fixed in fed2923e); author.linkedin href is a constant (app/authors/[slug]/page.tsx:62)",
+        "abuse": "n/a — no action that costs money or sends mail (app/authors/[slug]/page.tsx:14)"
+      },
+      "e2e": {
+        "url": "/authors/udaay-sikder",
+        "status": 200,
+        "title": "Udaay Sikder · Crawlmouse",
+        "canonical": "http://localhost:3000/authors/udaay-sikder",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/blog/page.tsx",
+      "url": "/blog",
+      "ruling": "keep",
+      "reason": "organic traffic, kept with the same slugs",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/blog/page.tsx:12)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/blog/page.tsx:12)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/blog/page.tsx:12)",
+        "redirect": "n/a — no redirect or next param (app/blog/page.tsx:12)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/blog/page.tsx:12)",
+        "abuse": "n/a — no action that costs money or sends mail (app/blog/page.tsx:12)"
+      },
+      "e2e": {
+        "url": "/blog",
+        "status": 200,
+        "title": "Internal Linking & Site Structure — The Crawlmouse Blog",
+        "canonical": "http://localhost:3000/blog",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/blog/[slug]/page.tsx",
+      "url": "/blog/[slug]",
+      "ruling": "keep",
+      "reason": "organic traffic, kept with the same slugs",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — slug resolved against the static POSTS list (lib/blog/posts.ts), SSG (● in the build table); an unknown slug is notFound()",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/blog/[slug]/page.tsx:61)",
+        "cache": "pass — SSG from generateStaticParams, no cookies read",
+        "redirect": "n/a — no redirect or next param (app/blog/[slug]/page.tsx:61)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — Article/Breadcrumb/FAQ JSON-LD from post constants (app/blog/[slug]/page.tsx:61, lib/blog/content/*.tsx), lib/seo/jsonld.tsx:118-125 now escapes < > & U+2028 U+2029 (fixed in fed2923e)",
+        "abuse": "n/a — no action that costs money or sends mail (app/blog/[slug]/page.tsx:61)"
+      },
+      "e2e": {
+        "url": "/blog/ai-crawler-access-test-2026",
+        "status": 200,
+        "title": "We fetched 96 websites as AI crawlers. The answer depended on who was asking.",
+        "canonical": "http://localhost:3000/blog/ai-crawler-access-test-2026",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/blog/research/page.tsx",
+      "url": "/blog/research",
+      "ruling": "keep",
+      "reason": "blog tag page, kept with the blog",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/blog/research/page.tsx:18)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/blog/research/page.tsx:18)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/blog/research/page.tsx:18)",
+        "redirect": "n/a — no redirect or next param (app/blog/research/page.tsx:18)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — breadcrumb JSON-LD from constants (app/blog/research/page.tsx:34), lib/seo/jsonld.tsx:118-125 now escapes < > & U+2028 U+2029 (fixed in fed2923e)",
+        "abuse": "n/a — no action that costs money or sends mail (app/blog/research/page.tsx:18)"
+      },
+      "e2e": {
+        "url": "/blog/research",
+        "status": 200,
+        "title": "Research · Crawlmouse",
+        "canonical": "http://localhost:3000/blog/research",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/bot/page.tsx",
+      "url": "/bot",
+      "ruling": "keep",
+      "reason": "crawler UA page referenced in the UA string, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/bot/page.tsx:5)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/bot/page.tsx:5)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/bot/page.tsx:5)",
+        "redirect": "n/a — no redirect or next param (app/bot/page.tsx:5)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/bot/page.tsx:5)",
+        "abuse": "n/a — no action that costs money or sends mail (app/bot/page.tsx:5)"
+      },
+      "e2e": {
+        "url": "/bot",
+        "status": 200,
+        "title": "CrawlmouseBot — about our crawler · Crawlmouse",
+        "canonical": "http://localhost:3000/bot",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/compare/page.tsx",
+      "url": "/compare",
+      "ruling": "retire",
+      "reason": "head-to-head leaves with v1; not in the sitemap; ARCH-2 names no target for the index, and the owner ruled 308 to / (Q2)",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "v2 competitor feature inside the account",
+      "redirect": "/",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/compare/page.tsx:7)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/compare/page.tsx:7)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/compare/page.tsx:7)",
+        "redirect": "n/a — no redirect or next param (app/compare/page.tsx:7)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/compare/page.tsx:7)",
+        "abuse": "pass — the form starts two audits through /api/audits/start (Turnstile + limits)"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/compare/[a]/[b]/page.tsx",
+      "url": "/compare/[a]/[b]",
+      "ruling": "retire",
+      "reason": "kept 90 days with noindex; ARCH-2 says 301 to /r/[a], but [a] is an audit id and /r/ takes a minted slug, so the owner ruled 308 to /audit/[a], the first audit's capability URL (Q5); not in the sitemap",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "v2 competitor feature inside the account",
+      "redirect": "/audit/[a]",
+      "checks": {
+        "input": "pass — both ids checked with isUuid and a≠b before any read (app/compare/[a]/[b]/page.tsx:27)",
+        "output": "pass — selects id, url only (app/compare/[a]/[b]/page.tsx:32); client gets the ids already in the URL plus domains (:46-49)",
+        "cache": "pass — force-dynamic (app/compare/[a]/[b]/page.tsx:11); measured private, no-store",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — notFound() only",
+        "escaping": "pass — domains are JSX text in CompareView",
+        "abuse": "n/a — read only"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/dashboard/page.tsx",
+      "url": "/dashboard",
+      "ruling": "retire",
+      "reason": "v2 serves the dashboard at the same URL",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "v2 Dashboard home (CC-26), same URL",
+      "redirect": "same",
+      "checks": {
+        "input": "pass — only ?upgraded, compared to '1' (app/dashboard/page.tsx:35)",
+        "output": "pass — reads the signed-in user's own rows (app/dashboard/page.tsx:30-43); nothing of another user",
+        "cache": "pass — dynamic, reads cookies; measured private, no-cache, no-store on the signed-out 307",
+        "redirect": "pass — signed-out → fixed '/login' (app/dashboard/page.tsx:28); post-upgrade return goes through safeReturnTo, /audit/<id> only (components/billing/post-upgrade-return.ts:9-12)",
+        "errors": "pass — no error body",
+        "escaping": "pass — site URLs are JSX text; links are /audit/${id} and /r/${slug} built from ids (components/dashboard/SiteCard.tsx:47, components/dashboard/ReportBrandingSettings.tsx:30)",
+        "abuse": "n/a — read only"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/developers/page.tsx",
+      "url": "/developers",
+      "ruling": "keep",
+      "reason": "OG holding page and waitlist, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/developers/page.tsx:6)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/developers/page.tsx:6)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/developers/page.tsx:6)",
+        "redirect": "n/a — no redirect or next param (app/developers/page.tsx:6)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/developers/page.tsx:6)",
+        "abuse": "pass — the waitlist form posts to /api/developers: per-IP 5/day and Turnstile when enforced (app/api/developers/route.ts:26-39)"
+      },
+      "e2e": {
+        "url": "/developers",
+        "status": 200,
+        "title": "Crawlmouse for developers — CLI, GitHub Action & webhooks · Crawlmouse",
+        "canonical": "http://localhost:3000/developers",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/guides/page.tsx",
+      "url": "/guides",
+      "ruling": "keep",
+      "reason": "organic traffic, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/guides/page.tsx:8)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/guides/page.tsx:8)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/guides/page.tsx:8)",
+        "redirect": "n/a — no redirect or next param (app/guides/page.tsx:8)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/guides/page.tsx:8)",
+        "abuse": "n/a — no action that costs money or sends mail (app/guides/page.tsx:8)"
+      },
+      "e2e": {
+        "url": "/guides",
+        "status": 200,
+        "title": "Guides — Internal Linking, Crawl Depth & Getting Found · Crawlmouse",
+        "canonical": "http://localhost:3000/guides",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/login/page.tsx",
+      "url": "/login",
+      "ruling": "keep",
+      "reason": "magic-link sign-in, kept; /signup is added beside it",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — `next` is read client-side (app/login/LoginForm.tsx:32) and validated server-side by safeNextPath (app/api/auth/magic-link/route.ts:163)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/login/page.tsx:7)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/login/page.tsx:7)",
+        "redirect": "pass — safeNextPath rejects //evil.com, /\\evil.com, https:evil.com, %2F%2Fevil.com, /.//evil.com, /foo/../..//evil.com, javascript:, tab (probed with tsx against lib/safe-next-path.ts:5-24); /%2F%2Fevil.com stays the same-origin path /%2F%2Fevil.com",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/login/page.tsx:7)",
+        "abuse": "pass — magic-link: per-email 3/h, per-IP 5/h, Turnstile enforced in production (app/api/auth/magic-link/route.ts:86-117)"
+      },
+      "e2e": {
+        "url": "/login",
+        "status": 200,
+        "title": "Crawlmouse — Grade your site's internal linking",
+        "canonical": "http://localhost:3000/login",
+        "robots": "noindex, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/pricing/page.tsx",
+      "url": "/pricing",
+      "ruling": "keep",
+      "reason": "kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/pricing/page.tsx:5)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/pricing/page.tsx:5)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/pricing/page.tsx:5)",
+        "redirect": "n/a — no redirect or next param (app/pricing/page.tsx:5)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/pricing/page.tsx:5)",
+        "abuse": "pass — checkout is a POST to /api/billing/checkout, signed-in only (app/api/billing/checkout/route.ts:12); no per-user rate limit there (CC-03 file, reported only)"
+      },
+      "e2e": {
+        "url": "/pricing",
+        "status": 200,
+        "title": "Pricing · Crawlmouse",
+        "canonical": "http://localhost:3000/pricing",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/privacy/page.tsx",
+      "url": "/privacy",
+      "ruling": "keep",
+      "reason": "legal page, kept (gains the evidence-retention statement)",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/privacy/page.tsx:3)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/privacy/page.tsx:3)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/privacy/page.tsx:3)",
+        "redirect": "n/a — no redirect or next param (app/privacy/page.tsx:3)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/privacy/page.tsx:3)",
+        "abuse": "n/a — no action that costs money or sends mail (app/privacy/page.tsx:3)"
+      },
+      "e2e": {
+        "url": "/privacy",
+        "status": 200,
+        "title": "Privacy Policy · Crawlmouse",
+        "canonical": "http://localhost:3000/privacy",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/r/[slug]/page.tsx",
+      "url": "/r/[slug]",
+      "ruling": "keep",
+      "reason": "public reports; old snapshots keep rendering with the v1 component until re-minted",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — slug is only an .eq('slug') filter in readReportRow (lib/reports.ts:44); unknown or garbage slug → null → notFound() (app/r/[slug]/page.tsx:40), measured 404 on next start",
+        "output": "pass — selects only render columns, never minted_by or audit_id (lib/reports.ts:29-30); the client island gets slug, domain and claimed only (app/r/[slug]/page.tsx:65); ownership state comes from /api/reports/[slug]/mine after hydration",
+        "cache": "pass — revalidate=300 (app/r/[slug]/page.tsx:17) is safe because the page reads no cookies or session; owner state is fetched client-side with no-store (app/api/reports/[slug]/mine/route.ts:23)",
+        "redirect": "n/a — no redirect or next param",
+        "errors": "pass — a read error returns null (lib/reports.ts:43-50) and renders the 404 page, no upstream text",
+        "escaping": "pass — crawled domain, titles and URLs are JSX text in server components (crawled titles and URLs render as JSX text at components/report/sections.tsx:81 and components/report/AiReadinessReportSection.tsx:125); no crawled href; the white-label logo src is built from our storage base plus a logoPath constrained to `${slug}/[A-Za-z0-9._-]+` (lib/report-brand.ts:23-27, app/api/reports/[slug]/white-label/route.ts:54-60); brandName is JSX text (components/report/ReportBrandHeader.tsx:26)",
+        "abuse": "n/a — read only"
+      },
+      "e2e": {
+        "url": "/r/no-such-report",
+        "status": 404,
+        "title": "Crawlmouse Report · Crawlmouse",
+        "canonical": "http://localhost:3000/r/no-such-report",
+        "robots": "noindex, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/status/page.tsx",
+      "url": "/status",
+      "ruling": "keep",
+      "reason": "kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/status/page.tsx:5 (constants at :12))",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/status/page.tsx:5 (constants at :12))",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/status/page.tsx:5 (constants at :12))",
+        "redirect": "n/a — no redirect or next param (app/status/page.tsx:5 (constants at :12))",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/status/page.tsx:5 (constants at :12))",
+        "abuse": "n/a — no action that costs money or sends mail (app/status/page.tsx:5 (constants at :12))"
+      },
+      "e2e": {
+        "url": "/status",
+        "status": 200,
+        "title": "Status · Crawlmouse",
+        "canonical": "http://localhost:3000/status",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/subprocessors/page.tsx",
+      "url": "/subprocessors",
+      "ruling": "keep",
+      "reason": "legal page, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/subprocessors/page.tsx:4)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/subprocessors/page.tsx:4)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/subprocessors/page.tsx:4)",
+        "redirect": "n/a — no redirect or next param (app/subprocessors/page.tsx:4)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/subprocessors/page.tsx:4)",
+        "abuse": "n/a — no action that costs money or sends mail (app/subprocessors/page.tsx:4)"
+      },
+      "e2e": {
+        "url": "/subprocessors",
+        "status": 200,
+        "title": "Subprocessors · Crawlmouse",
+        "canonical": "http://localhost:3000/subprocessors",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/takedown/page.tsx",
+      "url": "/takedown",
+      "ruling": "keep",
+      "reason": "legal page and form, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/takedown/page.tsx:1-12; the form is the client component app/takedown/TakedownForm.tsx, which posts to /api/takedown)",
+        "output": "pass — renders build-time copy and a client form; no DB read, no user or internal id in the HTML or RSC payload (app/takedown/page.tsx:1-12; the form is the client component app/takedown/TakedownForm.tsx, which posts to /api/takedown)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/takedown/page.tsx:1-12; the form is the client component app/takedown/TakedownForm.tsx, which posts to /api/takedown)",
+        "redirect": "n/a — no redirect or next param (app/takedown/page.tsx:1-12; the form is the client component app/takedown/TakedownForm.tsx, which posts to /api/takedown)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — server error codes are mapped to fixed copy before display (app/takedown/TakedownForm.tsx:47)",
+        "abuse": "pass — the form posts to /api/takedown (per-IP 5 and per-domain 3 per day, app/api/takedown/route.ts:35-40); no mail is sent"
+      },
+      "e2e": {
+        "url": "/takedown",
+        "status": 200,
+        "title": "Takedown request · Crawlmouse",
+        "canonical": "http://localhost:3000/takedown",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/terms/page.tsx",
+      "url": "/terms",
+      "ruling": "keep",
+      "reason": "legal page, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — static page, reads no params, query or body (app/terms/page.tsx:3)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/terms/page.tsx:3)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/terms/page.tsx:3)",
+        "redirect": "n/a — no redirect or next param (app/terms/page.tsx:3)",
+        "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/terms/page.tsx:3)",
+        "abuse": "n/a — no action that costs money or sends mail (app/terms/page.tsx:3)"
+      },
+      "e2e": {
+        "url": "/terms",
+        "status": 200,
+        "title": "Terms of Service · Crawlmouse",
+        "canonical": "http://localhost:3000/terms",
+        "robots": "index, follow"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/top/[platform]/page.tsx",
+      "url": "/top/[platform]",
+      "ruling": "retire",
+      "reason": "removed at cutover (410 Gone); not in the sitemap and noindex while thin",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "nothing; leaderboards are removed at cutover",
+      "redirect": "410",
+      "checks": {
+        "input": "pass — platform checked by isPlatform before any read (app/top/[platform]/page.tsx:35,55)",
+        "output": "pass — public leaderboard of slug, domain, grade; no user data",
+        "cache": "pass — ISR revalidate=300, reads no cookies; measured s-maxage=300",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — notFound() for an unknown platform",
+        "escaping": "pass — domains are JSX text; hrefs are /r/${slug} (app/top/[platform]/page.tsx:82)",
+        "abuse": "n/a — read only"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/verify/[id]/page.tsx",
+      "url": "/verify/[id]",
+      "ruling": "keep",
+      "reason": "domain verification for claims, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — id is an .eq filter on the user's own RLS client with .eq('user_id') (app/verify/[id]/page.tsx:33-38); garbage → no row → notFound()",
+        "output": "pass — the verification token is rendered only to the row's owner (user_id-scoped read, app/verify/[id]/page.tsx:37); anonymous → redirect('/login') before any read (:31)",
+        "cache": "pass — dynamic (ƒ), reads cookies; measured Cache-Control: private, no-cache, no-store on the 307",
+        "redirect": "pass — ?next= goes through safeNextPath (app/verify/[id]/page.tsx:27) before it becomes the VerifyClient link (app/verify/[id]/VerifyClient.tsx:56); vectors as for /login",
+        "errors": "pass — no error body; missing row is notFound()",
+        "escaping": "pass — domain and token are JSX text (app/verify/[id]/page.tsx:47-53)",
+        "abuse": "pass — the check button calls /api/verify/check/[id], 10/h per user (app/api/verify/check/[id]/route.ts:30)"
+      },
+      "e2e": {
+        "url": "/verify/00000000-0000-0000-0000-000000000000",
+        "status": 200,
+        "title": "Crawlmouse — Grade your site's internal linking",
+        "canonical": "http://localhost:3000/login",
+        "robots": "noindex, follow",
+        "finalPath": "/login"
+      }
+    },
+    {
+      "kind": "metadata",
+      "path": "app/layout.tsx",
+      "ruling": "keep",
+      "reason": "root layout of every v1 page and of the v2 route groups",
+      "evidence": "apps/web/app/layout.tsx:1",
+      "checks": {
+        "input": "n/a — reads no param, query or body",
+        "output": "pass — reads no cookies (every child page is static in the build table)",
+        "cache": "pass — static",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "n/a — no error path of its own",
+        "escaping": "pass — Organization JSON-LD from constants (app/layout.tsx:52), lib/seo/jsonld.tsx:118-125 now escapes < > & U+2028 U+2029 (fixed in fed2923e)",
+        "abuse": "n/a — no action that costs money or sends mail"
+      }
+    },
+    {
+      "kind": "metadata",
+      "path": "app/opengraph-image.tsx",
+      "ruling": "keep",
+      "reason": "site OG card",
+      "evidence": "apps/web/app/opengraph-image.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/blog/[slug]/opengraph-image.tsx",
+      "ruling": "keep",
+      "reason": "blog post OG cards; the blog is kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — SSG from allPostSlugs (:10); unknown slug draws the generic title (:15)",
+        "output": "pass — post title only",
+        "cache": "pass — SSG",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "n/a — no error path of its own",
+        "escaping": "pass — constant titles as satori text",
+        "abuse": "n/a — no action that costs money or sends mail"
+      }
+    },
+    {
+      "kind": "metadata",
+      "path": "app/r/[slug]/opengraph-image.tsx",
+      "ruling": "keep",
+      "reason": "public report OG cards; /r/ is kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — slug through getPublicReport (cached .eq read)",
+        "output": "pass — buildOgReportModel decides what is drawn; a gone report draws the placeholder (app/r/[slug]/opengraph-image.tsx:30-33)",
+        "cache": "pass — revalidate=3600, purged on hide/takedown/claim (lib/reports.ts:72-80); no cookies",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "n/a — no error path of its own",
+        "escaping": "pass — domain, grade and white-label brand are satori text nodes, not HTML (:51,54,57); no image is fetched",
+        "abuse": "n/a — no action that costs money or sends mail"
+      }
+    },
+    {
+      "kind": "metadata",
+      "path": "app/icon.tsx",
+      "ruling": "keep",
+      "reason": "favicon",
+      "evidence": "apps/web/app/icon.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/apple-icon.tsx",
+      "ruling": "keep",
+      "reason": "touch icon",
+      "evidence": "apps/web/app/apple-icon.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/not-found.tsx",
+      "ruling": "keep",
+      "reason": "site 404 page",
+      "evidence": "apps/web/app/not-found.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/global-error.tsx",
+      "ruling": "keep",
+      "reason": "root error boundary (reports to Sentry)",
+      "evidence": "apps/web/app/global-error.tsx:1",
+      "checks": {
+        "input": "n/a — reads no param, query or body",
+        "output": "pass — the error is sent to Sentry, not rendered (app/global-error.tsx:14)",
+        "cache": "n/a — machine-to-machine POST, never cached",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — no message, stack or digest in the markup",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "n/a — no action that costs money or sends mail"
+      }
+    },
+    {
+      "kind": "metadata",
+      "path": "app/sitemap.ts",
+      "ruling": "keep",
+      "reason": "sitemap; outside this step's allowed paths (§13)",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")"
+    },
+    {
+      "kind": "route",
+      "path": "app/api/admin/takedown/process/route.ts",
+      "ruling": "keep",
+      "reason": "takedown processing; legal obligation",
+      "evidence": "apps/web/lib/security/route-policy.ts:37",
+      "checks": {
+        "input": "pass — zod slug 1–64 (:13)",
+        "output": "pass — {ok}",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — 'could not process' (:46)",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "finding — minor (A-10): closed without ADMIN_SECRET, timing-safe compare (app/api/admin/takedown/process/route.ts:15), but the per-IP 30/h limit runs only after authorized() succeeds (app/api/admin/takedown/process/route.ts:34), so wrong-secret guesses are never throttled"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/cancel/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "alias",
+      "checks": {
+        "input": "pass — id is an .eq filter; garbage → no row → 404 (:14-19); no body read",
+        "output": "pass — {status:'canceled'} only",
+        "cache": "pass — POST, force-dynamic",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed codes (:19,38,39)",
+        "escaping": "n/a — JSON",
+        "abuse": "pass — owner or matching anon cookie only (lib/audit-cancel.ts:20-28; route :25); no cost"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/export/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "alias",
+      "checks": {
+        "input": "pass — id is an .eq filter; not-owned or missing → identical 404 (:36)",
+        "output": "pass — auth + Pro + owner before any read (:28-36)",
+        "cache": "finding — minor (A-2): the zip response sets no Cache-Control (:85-86); dynamic (reads cookies), not CDN-cached without s-maxage, but private, no-store is the stated bar",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed codes",
+        "escaping": "pass — CSV escaping lives in lib/billing/csv (CC-03 file, not reviewed here)",
+        "abuse": "n/a — no outbound call; Pro-gated"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/llms-txt/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "alias",
+      "checks": {
+        "input": "pass — id is an .eq filter; not-owned → 404 (:34)",
+        "output": "pass — auth + Pro + owner first (:24-34)",
+        "cache": "finding — minor (A-2): text/plain attachment with no Cache-Control (:43-47); same reasoning as export",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed codes",
+        "escaping": "n/a — plain-text attachment",
+        "abuse": "n/a — no outbound call"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/notify/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "alias",
+      "checks": {
+        "input": "pass — uuid check (:19) and zod email ≤254 (:14)",
+        "output": "pass — {ok:true}; the address is never returned",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed codes",
+        "escaping": "n/a — JSON",
+        "abuse": "finding — minor (A-11): per-IP 10/day and per-email 5/day before the write (app/api/audits/[id]/notify/route.ts:27, lib/limits.ts:53), but anyone holding the audit id can replace notify_email on a running audit, so the owner's address is overwritten and an arbitrary address gets mail carrying the /audit/<id> link (app/api/audits/[id]/notify/route.ts:36, inngest/notify.ts:43); IPs rotate"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/reaudit/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "alias",
+      "checks": {
+        "input": "pass — zod body (:22); id is an .eq filter, missing → authorizeReaudit 404",
+        "output": "pass — new and previous ids only (:120-125)",
+        "cache": "pass — force-dynamic POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed strings",
+        "escaping": "n/a — JSON",
+        "abuse": "pass — Pro + owner, global ceiling fail-closed, per-IP + Turnstile (:50-93), CRAWL_PAUSED first (:27)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/[id]/stream/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit API, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
+      "redirect": "alias",
+      "checks": {
+        "input": "finding — minor (A-1): id is not validated; a garbage or unknown id gets no snapshot and the function polls the DB every 2.5 s until the 250 s self-close (app/api/audits/[id]/stream/route.ts:253-293, lib/limits.ts:65,71), so open connections to random ids hold functions open; retire item, lead follow-up (validate uuid and close on a missing row)",
+        "output": "pass — every event goes through projectAuditForClient (lib/audit-stream-projection.ts:245-275), no user_id or anonymous_session_id; Pro-only fields are owner-scoped (:82-88)",
+        "cache": "finding — minor (A-1): 'no-cache, no-transform' (:309) without 'private' on an owner-dependent body; Vercel does not cache it (no s-maxage), so hardening only",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — 'Could not load results.' (:229)",
+        "escaping": "n/a — JSON over SSE (JSON.stringify per event, :202)",
+        "abuse": "finding — minor (A-1): no rate limit (see input)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/audits/start/route.ts",
+      "ruling": "retire",
+      "reason": "v1 audit start, replaced by the checks API",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/api/checks (CC-22), behind a 90-day alias",
+      "redirect": "alias",
+      "checks": {
+        "input": "pass — zod url + optional token (app/api/audits/start/route.ts:23-26); bad JSON → {} → 400; SSRF pre-check validateUrlOrThrow (:43)",
+        "output": "pass — returns auditId only (:148)",
+        "cache": "pass — POST, not cached",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "finding — minor (A-3): the engine's validation message is returned verbatim (:45-47), including the resolved private address, e.g. 'URL resolves to private or reserved IP (10.0.0.5): …' (packages/engine/src/ssrf-guard.ts:164-169); owner CC-SEC-2",
+        "escaping": "n/a — JSON",
+        "abuse": "pass — global ceiling fails closed, per-IP + Turnstile on exhaustion, per-domain (:58-117)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/auth/logout/route.ts",
+      "ruling": "keep",
+      "reason": "auth routes are kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — no input",
+        "output": "pass — redirect only",
+        "cache": "pass — applyNoStore (:38, lib/supabase/no-store.ts:11-15)",
+        "redirect": "pass — fixed '/' on the request origin (:37-38)",
+        "errors": "pass — revoke failure logged without detail (:30)",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "n/a — no cost"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/auth/magic-link/route.ts",
+      "ruling": "keep",
+      "reason": "auth routes are kept (v2 door fields behind V2_ACCOUNT_DOOR)",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "finding — minor (A-4): email is z.string().email() with no max length (:32); next ≤2048 (:36); the v2 fields are checked only behind the door flag (:73-81)",
+        "output": "pass — {ok:true}; no account existence signal",
+        "cache": "pass — POST",
+        "redirect": "pass — next stored only after safeNextPath (:163); vectors listed under app/login/page.tsx",
+        "errors": "pass — 'Could not send magic link' (:147-150), no Supabase text",
+        "escaping": "n/a — JSON",
+        "abuse": "pass — per-email 3/h, per-IP 5/h, Turnstile enforced in production (:86-117, lib/limits.ts:27-28)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/billing/checkout/route.ts",
+      "ruling": "keep",
+      "reason": "kept with new bodies; CC-03 owns these files",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — zod priceId, then an allowlist of the two env prices (:7,17-18)",
+        "output": "pass — Stripe URL only",
+        "cache": "pass — POST",
+        "redirect": "pass — success/cancel URLs built from resolveOrigin (:22,31-32) (lib/origin, not reviewed)",
+        "errors": "pass — fixed codes; a Stripe throw is an unhandled 500 with Next's generic body",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "finding — minor (A-6): no per-user rate limit on a Stripe API call (:23); signed-in only. CC-03 file, reported only"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/billing/portal/route.ts",
+      "ruling": "keep",
+      "reason": "kept with new bodies; CC-03 owns these files",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — no body",
+        "output": "pass — portal URL for the caller's own customer (:11-19)",
+        "cache": "pass — POST",
+        "redirect": "pass — return_url fixed to origin/dashboard (:17)",
+        "errors": "pass — fixed codes",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "finding — minor (A-6): Stripe call with no rate limit (:15); signed-in with a customer. CC-03, reported only"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/billing/status/route.ts",
+      "ruling": "keep",
+      "reason": "kept with new bodies; CC-03 owns these files",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — reads no param, query or body",
+        "output": "pass — {pro} for self (:15)",
+        "cache": "pass — force-dynamic (:6); no explicit header, dynamic responses are not CDN-cached",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "n/a — no error path of its owns",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "n/a — read only"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/developers/route.ts",
+      "ruling": "keep",
+      "reason": "waitlist form behind /developers, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — zod email ≤320 (:13-16)",
+        "output": "pass — same {ok:true} for new and duplicate (:46-53), no enumeration",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — 'could not submit'",
+        "escaping": "n/a — JSON",
+        "abuse": "pass — per-IP 5/day, Turnstile when enforced (:26-39)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/health/route.ts",
+      "ruling": "keep",
+      "reason": "liveness probe",
+      "evidence": "apps/web/app/api/health/route.ts:1",
+      "checks": {
+        "input": "n/a — no input",
+        "output": "pass — ok, version, commit only (app/api/health/route.ts:10-11)",
+        "cache": "pass — no-store (:12)",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "n/a — no error path",
+        "escaping": "n/a — JSON",
+        "abuse": "n/a — no DB or upstream call"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/hide/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — zod uuid (:14)",
+        "output": "pass — {ok} only",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed codes (:40-41)",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "pass — per-IP 30/day (:22-26); capability is the audit UUID, which /r/ never exposes (lib/reports.ts:29-30 select no audit_id)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/mint/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — zod uuid auditId (:15)",
+        "output": "pass — slug only; minted_by stored, never returned (:102-107)",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed strings (:104)",
+        "escaping": "n/a — JSON; snapshot is built from persisted data (lib/mint-snapshot.ts)",
+        "abuse": "pass — per-user 20/day or per-IP 10/day, Turnstile on exhaustion, Turnstile required with no IP (:64-77)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/[slug]/claim/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — slug is an .eq filter via readReportRow; no body",
+        "output": "pass — {ok, slug, alreadyClaimed}",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed codes",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "pass — per-user 20/h (:31, lib/limits.ts:40) and verified-domain ownership (:42)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/[slug]/logo/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — multipart 'logo' Blob, declared size ≤ MAX_LOGO_BYTES then byte validation (:63-70, lib/logo-validation.ts); storage path is `${slug}/<sha256-16>.<ext>` of an existing slug (:72-73)",
+        "output": "pass — logoPath and dimensions only",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — storage message logged, not returned (:86-87)",
+        "escaping": "pass — our detected content type, never the client's (:76)",
+        "abuse": "pass — auth, Pro, ownership, 10 uploads/h per user (:43, lib/limits.ts:49)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/[slug]/mine/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — slug is an .eq filter",
+        "output": "pass — anonymous and non-owners get {owned:false} only (:31,43)",
+        "cache": "pass — force-dynamic + no-store (:21,23); measured cache-control: no-store",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "n/a — read only"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/[slug]/visibility/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — zod booleans with a refine (:21-23)",
+        "output": "pass — {ok, listed, indexable}",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed codes (:62-65)",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "pass — per-user 60/h (:36, lib/limits.ts:43) and ownership (:44)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/reports/[slug]/white-label/route.ts",
+      "ruling": "keep",
+      "reason": "/api/reports/* kept as is",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — zod discriminated union, brandName trimmed 1–60, logoPath ≤300 and charset/prefix/.. check (:28-60)",
+        "output": "pass — own white_label only",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed codes",
+        "escaping": "pass — brandName rendered as JSX text (components/report/ReportBrandHeader.tsx:26) and satori text (app/r/[slug]/opengraph-image.tsx:51)",
+        "abuse": "pass — per-user 30/h (:62, lib/limits.ts:46), Pro, ownership"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/takedown/route.ts",
+      "ruling": "keep",
+      "reason": "public takedown form, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — zod with lengths (:10-16), normalizeDomain (:27)",
+        "output": "pass — {ok}",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed codes",
+        "escaping": "n/a — stored for the ops queue",
+        "abuse": "finding — minor (A-5): Turnstile only when a token is sent (:44); the per-domain bucket (3/day, lib/limits.ts:56) is spent before the report check (:39-61), so anyone can use a domain's three daily submissions and the owner's form gets 429 until the next day (email takedown@ still works). No mail is sent. Lead follow-up"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/trpc/[trpc]/route.ts",
+      "ruling": "retire",
+      "reason": "ARCH-2: removed unless something still calls it; not deletable now, app/layout.tsx imports its provider",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "nothing; removed at cutover",
+      "redirect": "none",
+      "checks": {
+        "input": "pass — zod uuid on getById (lib/trpc/router.ts:14); measured 400 for a non-uuid",
+        "output": "pass — getById reads through the caller's RLS client with an explicit column list, no user_id (lib/trpc/router.ts:18-20); anonymous audits are invisible to it",
+        "cache": "pass — dynamic (reads cookies in createContext, lib/trpc/server.ts:6-9); no Cache-Control set (tRPC default)",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — DB errors become 'query_failed' (lib/trpc/router.ts:24); the zod issue list is echoed on 400 (lib/trpc/server.ts:17), which is input detail, not internals",
+        "escaping": "n/a — JSON",
+        "abuse": "n/a — reads only"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/verify/check/[id]/route.ts",
+      "ruling": "keep",
+      "reason": "/api/verify/* kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — id is an .eq filter with .eq('user_id') (:17-22); garbage → 404",
+        "output": "pass — {verified}",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "pass — 10/h per user on the outbound path (:30); the meta-tag fetch uses the engine's safeFetch (lib/verification.ts:3,19)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/verify/start/route.ts",
+      "ruling": "keep",
+      "reason": "/api/verify/* kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — zod domain ≥3 + method enum (:10), normalizeDomain (:27)",
+        "output": "pass — returns the caller's own token (user_id-scoped, :33-37)",
+        "cache": "pass — POST",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — fixed",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "pass — 10/h per user (:18)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/webhooks/inngest/route.ts",
+      "ruling": "keep",
+      "reason": "Inngest serve route; v2 functions register through it too",
+      "evidence": "apps/web/app/api/webhooks/inngest/route.ts:31",
+      "checks": {
+        "input": "pass — Inngest serve() verifies the signing key (inngest/next)",
+        "output": "n/a — returns no data of its own",
+        "cache": "n/a — machine callers",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "n/a — library responses",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "n/a — signed"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/webhooks/resend/route.ts",
+      "ruling": "keep",
+      "reason": "email events webhook, kept",
+      "evidence": "apps/web/lib/security/route-policy.ts:163",
+      "checks": {
+        "input": "pass — svix signature verified (:24) before parse; email shape check (:32)",
+        "output": "n/a — returns no data of its owns",
+        "cache": "n/a — machine-to-machine POST, never cached",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — 'db error' (:42), the DB message only in logs",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "n/a — signed"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/webhooks/stripe/route.ts",
+      "ruling": "keep",
+      "reason": "Stripe webhook, kept (dual-write until 009)",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — constructEvent signature check (:21) (CC-03 file, reported only)",
+        "output": "n/a — returns no data of its owns",
+        "cache": "n/a — machine-to-machine POST, never cached",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — 'invalid signature' / 'handler error' (:30,38)",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "n/a — signed"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/billing/route.ts",
+      "ruling": "retire",
+      "reason": "v1 redirect to the Stripe portal",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "replacedBy": "/settings/plan (v2 settings)",
+      "redirect": "/settings/plan",
+      "checks": {
+        "input": "n/a — reads no param, query or body",
+        "output": "pass — redirect to the caller's own portal",
+        "cache": "pass — force-dynamic; signed-out 307 measured without a Cache-Control header, a redirect to /login carries no user data",
+        "redirect": "pass — /login, /pricing on req.url, or Stripe's portal.url (:14-24)",
+        "errors": "n/a — no error path of its owns",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "finding — minor (A-6): GET creates a Stripe portal session on every visit with no rate limit (:20). Retire item; CC-03 owns billing"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/embed/[domain]/route.ts",
+      "ruling": "keep",
+      "reason": "badge image; kept forever",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — decodeURIComponent+normalizeDomain in try, length ≤253 (app/embed/[domain]/route.ts:41-48); malformed → 400 badge",
+        "output": "pass — grade, score, slug link only",
+        "cache": "pass — public s-maxage=300 (:21) on a body that depends on the domain only, no cookies",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — the 'no report' badge",
+        "escaping": "pass — every interpolation goes through htmlEscape, which escapes & < > \" ' (lib/html-escape.ts:12-18; :33-34,64,67); score is toFixed(0)",
+        "abuse": "n/a — read; the view counter is best-effort in after() (:73-79)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/llms.txt/route.ts",
+      "ruling": "keep",
+      "reason": "kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — reads no param, query or body",
+        "output": "pass — constants and post metadata",
+        "cache": "pass — force-static, public max-age=3600 (:8,70)",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "n/a — no error path of its own",
+        "escaping": "n/a — plain text from constants",
+        "abuse": "n/a — no action that costs money or sends mail"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/login/verify/route.ts",
+      "ruling": "keep",
+      "reason": "magic-link verify, kept",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "pass — OTP type allowlisted (:48,57-60); token only moves into an httpOnly cookie on GET (:69-75)",
+        "output": "pass — token never in a URL after GET; Sentry gets the stage, not the error (:176-180)",
+        "cache": "pass — applyNoStore on the continue redirect and every POST response (app/login/verify/route.ts:67, app/login/verify/route.ts:90); the missing-token redirect (app/login/verify/route.ts:65) is not wrapped, and carries no session or token",
+        "redirect": "pass — dest is safeNextPath(cookie) or DASHBOARD (:139) or the door's computed target (lib/auth/landing.ts:77-83), always new URL(dest, url.origin)",
+        "errors": "pass — any failure → the 'expired' state (:113,181)",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "finding — major (A-8): POST same-origin only (:82), and the anon claim is bound to this browser's httpOnly anon cookie, but bindingMismatch refuses a foreign link only when a cm_auth_for cookie exists (lib/auth/continue-intent.ts:29); that cookie is set only with V2_ACCOUNT_DOOR on (app/api/auth/magic-link/route.ts:174), so on v1 an attacker's own link opened here signs the browser in as the attacker and claims its anonymous audits (app/login/verify/route.ts:122)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/robots.txt/route.ts",
+      "ruling": "keep",
+      "reason": "kept; outside this step's allowed paths (§12, §13)",
+      "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
+      "checks": {
+        "input": "n/a — reads no param, query or body",
+        "output": "pass — constants (lib/robots-txt.ts)",
+        "cache": "pass — force-static",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "n/a — no error path of its own",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "n/a — no action that costs money or sends mail"
+      }
+    },
+    {
+      "kind": "inngest",
+      "path": "inngest/audit.ts#auditFn",
+      "id": "crawlmouse.audit",
+      "ruling": "retire",
+      "reason": "ARCH-2 Appendix: crawlmouse.audit is retired",
+      "evidence": "ARCH-2 Appendix \"Inngest function ids\" (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "crawlmouse.check.run (CC-20b checkFn)",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "inngest",
+      "path": "inngest/billing.ts#reconcileBillingFn",
+      "id": "crawlmouse.stripe-reconcile",
+      "ruling": "keep",
+      "reason": "crawlmouse.stripe-reconcile is kept in v2",
+      "evidence": "ARCH-2 Appendix \"Inngest function ids\""
+    },
+    {
+      "kind": "inngest",
+      "path": "inngest/billing.ts#reconcileBillingManualFn",
+      "id": "crawlmouse.stripe-reconcile-manual",
+      "ruling": "keep",
+      "reason": "crawlmouse.stripe-reconcile-manual is kept in v2",
+      "evidence": "ARCH-2 Appendix \"Inngest function ids\""
+    },
+    {
+      "kind": "inngest",
+      "path": "inngest/billing.ts#cleanupExpiredAuditsFn",
+      "id": "crawlmouse.audits-ttl-cleanup",
+      "ruling": "retire",
+      "reason": "ARCH-2 Appendix: crawlmouse.audits-ttl-cleanup is retired",
+      "evidence": "ARCH-2 Appendix \"Inngest function ids\"",
+      "replacedBy": "crawlmouse.cleanup.daily (v2)",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "cron",
+      "path": "inngest/billing.ts#reconcileBillingFn",
+      "schedule": "0 3 * * *",
+      "ruling": "keep",
+      "reason": "its function is kept",
+      "evidence": "inngest/billing.ts:49"
+    },
+    {
+      "kind": "cron",
+      "path": "inngest/billing.ts#cleanupExpiredAuditsFn",
+      "schedule": "0 4 * * *",
+      "ruling": "retire",
+      "reason": "its function is retired",
+      "evidence": "inngest/billing.ts:88",
+      "replacedBy": "the crawlmouse.cleanup.daily schedule (v2)",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.audits",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "checks",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.pages",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "page_results",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.links",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "link_edges",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.findings",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "fixes and page_results columns",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.fixes",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "site_fixes",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.sessions",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "Supabase Auth (never used)",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.benchmark_cohorts",
+      "ruling": "retire",
+      "reason": "dropped in migration 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)",
+      "replacedBy": "nothing (leaderboards leave)",
+      "redirect": "n/a"
+    },
+    {
+      "kind": "table",
+      "path": "public.users",
+      "ruling": "keep",
+      "reason": "kept; pro_until and stripe_customer_id dropped in 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.rate_limits",
+      "ruling": "keep",
+      "reason": "kept unchanged",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.domain_verifications",
+      "ruling": "keep",
+      "reason": "kept; user_id dropped in 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.public_reports",
+      "ruling": "keep",
+      "reason": "kept; v1 columns dropped in 009, snapshots never mutated",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.embed_badges",
+      "ruling": "keep",
+      "reason": "kept; user_id dropped in 009",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.takedown_requests",
+      "ruling": "keep",
+      "reason": "kept unchanged",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.stripe_events",
+      "ruling": "keep",
+      "reason": "kept; gains account_id",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.email_events",
+      "ruling": "keep",
+      "reason": "kept; gains account_id, kind",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.waitlist",
+      "ruling": "keep",
+      "reason": "kept unchanged",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.frontier",
+      "ruling": "keep",
+      "reason": "kept; audit_id becomes check_id",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "table",
+      "path": "public.frontier_politeness",
+      "ruling": "keep",
+      "reason": "kept; audit_id becomes check_id",
+      "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    }
+  ],
+  "findings": [
+    {
+      "id": "C-1",
+      "severity": "major",
+      "items": ["inngest/audit.ts#auditFn"],
+      "evidence": "got-scraping 4.2.1, dist/index.js lines 543-552 and 577-585 (a dependency); packages/engine/src/crawler.ts:575",
+      "what": "got-scraping's header generator opens a TLS connection (ALPN probe) to each new https host:port with system DNS, ignoring the pinned dnsLookup. With a rebinding hostname (needs only a DNS server the attacker runs) the probe handshakes with an internal ip:port; reproduced: a 1,604-byte ClientHello reached 127.0.0.1, and with useHeaderGenerator:false nothing arrived. No HTTP request is sent on the probe and no body is read, but a failed probe fails the request and the page is stored with status 0, so one audit of https://rebind.example:PORT/ URLs (no port check; same-host strategy matches the hostname only) reads one bit per URL: a blind internal TLS port scan. The request itself still goes over the pinned connection. The port-scan oracle is read from the code, not reproduced; CC-SEC-2 confirms it when fixing.",
+      "owner": "CC-SEC-2 (engine; crawl-path change needs the deployed-function smoke)"
+    },
+    {
+      "id": "B-F1",
+      "severity": "major",
+      "items": ["public.rate_limits", "app/privacy/page.tsx"],
+      "evidence": "apps/web/app/privacy/page.tsx:158",
+      "what": "/privacy calls rate-limit records short-lived; production holds 1,138 rows, 1,027 older than 30 days, oldest 157 days, 468 keys embedding a raw IP and 52 a raw email; nothing deletes the table (measured 2026-11-09).",
+      "owner": "CC-V1FIX (owner ruled: a bounded daily delete of rows past their window, in the existing cleanup cron); hashing the keys is a follow-up"
+    },
+    {
+      "id": "B-F2",
+      "severity": "major",
+      "items": ["public.users", "app/privacy/page.tsx", "app/terms/page.tsx"],
+      "evidence": "apps/web/app/privacy/page.tsx:151; apps/web/app/privacy/page.tsx:219; apps/web/app/terms/page.tsx:205",
+      "what": "/privacy and /terms promise erasure on request; no code deletes public.users, public.users has no FK to auth.users, and the email also sits unlinked in rate_limits keys, email_events, audits.notify_email, waitlist and takedown_requests. Erasure is possible by hand in SQL; what is missing is the process and the cascade.",
+      "owner": "CC-V1FIX (owner ruled: scripts/ops/erase-account.ts and docs/ops/erasure.md; a cascade migration if a table lacks one)"
+    },
+    {
+      "id": "A-1",
+      "severity": "minor",
+      "items": ["app/api/audits/[id]/stream/route.ts"],
+      "evidence": "apps/web/app/api/audits/[id]/stream/route.ts:253; apps/web/app/api/audits/[id]/stream/route.ts:309",
+      "what": "the id is not validated and the stream has no rate limit: a garbage id polls the database every 2.5 s until the 250 s self-close; its no-cache header lacks private.",
+      "owner": "lead follow-up (retired at cutover)"
+    },
+    {
+      "id": "A-2",
+      "severity": "minor",
+      "items": ["app/api/audits/[id]/export/route.ts", "app/api/audits/[id]/llms-txt/route.ts"],
+      "evidence": "apps/web/app/api/audits/[id]/export/route.ts:85; apps/web/app/api/audits/[id]/llms-txt/route.ts:43",
+      "what": "owner-only bodies with no Cache-Control; dynamic, not CDN-cached, so hardening.",
+      "owner": "lead follow-up (retired at cutover)"
+    },
+    {
+      "id": "A-3",
+      "severity": "minor",
+      "items": ["app/api/audits/start/route.ts"],
+      "evidence": "apps/web/app/api/audits/start/route.ts:45; packages/engine/src/ssrf-guard.ts:164",
+      "what": "the engine's validation message is returned verbatim, including the private address a name resolved to.",
+      "owner": "CC-SEC-2 (the message is the engine's)"
+    },
+    {
+      "id": "A-4",
+      "severity": "minor",
+      "items": ["app/api/auth/magic-link/route.ts"],
+      "evidence": "apps/web/app/api/auth/magic-link/route.ts:32",
+      "what": "email has no maximum length.",
+      "owner": "lead follow-up"
+    },
+    {
+      "id": "A-5",
+      "severity": "minor",
+      "items": ["app/api/takedown/route.ts"],
+      "evidence": "apps/web/app/api/takedown/route.ts:39",
+      "what": "the per-domain bucket (3 a day) is spent before the report lookup, so three junk posts block a domain's takedown form for a day; Turnstile runs only when a token is sent. No mail is sent. Rated minor because the takedown address (email) remains open when the form is blocked.",
+      "owner": "lead follow-up"
+    },
+    {
+      "id": "A-6",
+      "severity": "minor",
+      "items": [
+        "app/api/billing/checkout/route.ts",
+        "app/api/billing/portal/route.ts",
+        "app/billing/route.ts"
+      ],
+      "evidence": "apps/web/app/api/billing/checkout/route.ts:23; apps/web/app/api/billing/portal/route.ts:15; apps/web/app/billing/route.ts:20",
+      "what": "a Stripe API call per request with no per-user rate limit (signed-in only).",
+      "owner": "CC-03"
+    },
+    {
+      "id": "A-7",
+      "severity": "major",
+      "items": ["app/r/[slug]/page.tsx"],
+      "evidence": "apps/web/middleware.ts:62; apps/web/app/r/[slug]/page.tsx:23",
+      "what": "the middleware sends X-Robots-Tag: noindex, nofollow, noarchive on every /r/ page, including the claimed, indexable reports the page marks index and the sitemap lists, so no report can be indexed (since 0478f107, before SPEC 04 made claimed reports indexable). A missing report's HTML also carries two robots metas. Changing the header changes what search engines index (§13).",
+      "owner": "CC-V1FIX (owner ruled Q9: drop X-Robots-Tag on /r/, keep it on /embed/)"
+    },
+    {
+      "id": "B-F3",
+      "severity": "minor",
+      "items": ["app/privacy/page.tsx"],
+      "evidence": "apps/web/app/privacy/page.tsx:34",
+      "what": "\"We do not store passwords\" while 11 of 12 auth.users rows hold a hash (most likely GoTrue's random password for magic-link sign-ups; not checked against GoTrue source).",
+      "owner": "owner (legal text)"
+    },
+    {
+      "id": "B-F4",
+      "severity": "minor",
+      "items": ["public.email_events", "app/privacy/page.tsx"],
+      "evidence": "apps/web/app/privacy/page.tsx:97",
+      "what": "email delivery events are not named on /privacy and are never cleaned up (109 rows, 91 older than 30 days, 33 to non-account addresses).",
+      "owner": "owner (legal text) and lead follow-up (cleanup)"
+    },
+    {
+      "id": "B-F5",
+      "severity": "minor",
+      "items": ["public.public_reports", "app/terms/page.tsx"],
+      "evidence": "apps/web/app/terms/page.tsx:210",
+      "what": "public reports outlive their audits and are never deleted (78 of 96 have a null audit_id); /privacy is silent and Terms §18 says reports are deleted after termination, with no code path.",
+      "owner": "owner (legal text)"
+    },
+    {
+      "id": "B-F6",
+      "severity": "minor",
+      "items": ["app/privacy/page.tsx"],
+      "evidence": "apps/web/lib/anon-session.ts:5",
+      "what": "the crawlmouse_anon cookie (httpOnly, one year) is missing from the cookie list.",
+      "owner": "owner (legal text)"
+    },
+    {
+      "id": "B-F7",
+      "severity": "minor",
+      "items": ["app/privacy/page.tsx", "public.waitlist", "public.takedown_requests"],
+      "evidence": "apps/web/app/privacy/page.tsx:97",
+      "what": "email addresses of people without an account (waitlist, takedown requests, audits.notify_email) are not listed.",
+      "owner": "owner (legal text)"
+    },
+    {
+      "id": "C-2",
+      "severity": "minor",
+      "items": ["inngest/audit.ts#auditFn"],
+      "evidence": "packages/engine/src/ssrf-guard.ts:46",
+      "what": "the blocklist misses 192.0.0.0/24, 198.18.0.0/15, 224.0.0.0/4, 240.0.0.0/4 and IPv6 fec0::/10, 100::/64.",
+      "owner": "CC-SEC-2"
+    },
+    {
+      "id": "C-3",
+      "severity": "minor",
+      "items": ["inngest/audit.ts#auditFn"],
+      "evidence": "inngest/audit.ts:123-127",
+      "what": "INNGEST_AUDIT_CONCURRENCY from 6 to 100 passed the old clamp of 100; above the Free cap the whole app sync is rejected. CC-20b clamps it to PLAN_CONCURRENCY_CAP = 5 (inngest/concurrency.ts:13).",
+      "fixedIn": "a9bd2008"
+    },
+    {
+      "id": "C-4",
+      "severity": "minor",
+      "items": ["inngest/billing.ts#cleanupExpiredAuditsFn"],
+      "evidence": "inngest/billing-helpers.ts:228",
+      "what": "the TTL cleanup does not exempt an audit behind a minted report; the report keeps its snapshot (FK on delete set null). One 2026-06-14 report has neither snapshot nor audit and renders through the legacy fallback (apps/web/app/r/[slug]/page.tsx:68).",
+      "owner": "lead follow-up"
+    },
+    {
+      "id": "C-5",
+      "severity": "minor",
+      "items": ["app/api/webhooks/inngest/route.ts"],
+      "evidence": "apps/web/app/api/webhooks/inngest/route.ts:31",
+      "what": "with INNGEST_DEV set in production the SDK accepts unsigned invocations; nothing in the repo sets it, production env could not be read.",
+      "owner": "owner: confirm INNGEST_DEV is absent with vercel env ls production"
+    },
+    {
+      "id": "C-6",
+      "severity": "minor",
+      "items": ["inngest/audit.ts#auditFn"],
+      "evidence": "packages/engine/src/crawler.ts:550",
+      "what": "the Crawlee path passes extraHeaders without safeFetch's forbidden-header filter; no web route sets it today.",
+      "owner": "CC-SEC-2"
+    },
+    {
+      "id": "D9-1",
+      "severity": "minor",
+      "items": ["app/blog/[slug]/page.tsx"],
+      "evidence": "apps/web/lib/seo/jsonld.tsx:118",
+      "what": "JSON-LD was serialised with bare JSON.stringify into a script tag; every caller passes our own constants today, so this was hardening.",
+      "fixedIn": "fed2923e"
+    },
+    {
+      "id": "A-8",
+      "severity": "major",
+      "items": ["app/login/verify/route.ts"],
+      "evidence": "apps/web/lib/auth/continue-intent.ts:29; apps/web/app/api/auth/magic-link/route.ts:174; apps/web/app/login/verify/route.ts:122",
+      "what": "login CSRF with data capture: an attacker requests a magic link for their own address and gets a victim to open it and press Continue; the victim is signed in as the attacker and the victim browser's anonymous audits move into the attacker's account. The foreign-link refusal needs the cm_auth_for cookie, which only the v2 door sets, so on v1 it never fires. Disclosed for v2 in docs/specs/v2/25-account-door.md. Not fixed here: refusing without the cookie switches off the anonymous-audit claim for every v1 sign-in, a §5 flow.",
+      "owner": "CC-V1FIX (owner ruled Q8, with §5 sign-off: cm_auth_for on every magic-link request; claim only on a matching cookie)"
+    },
+    {
+      "id": "A-10",
+      "severity": "minor",
+      "items": ["app/api/admin/takedown/process/route.ts"],
+      "evidence": "apps/web/app/api/admin/takedown/process/route.ts:34",
+      "what": "the per-IP throttle runs after the secret check, so wrong-secret guesses are not throttled; it matters only if ADMIN_SECRET is short. The code comment above it (app/api/admin/takedown/process/route.ts:35) says the throttle caps a brute force; the follow-up corrects it too.",
+      "owner": "lead follow-up"
+    },
+    {
+      "id": "A-11",
+      "severity": "minor",
+      "items": ["app/api/audits/[id]/notify/route.ts"],
+      "evidence": "apps/web/app/api/audits/[id]/notify/route.ts:36; inngest/notify.ts:43",
+      "what": "anyone holding an audit id can replace notify_email on a running audit: the owner's address is overwritten and an arbitrary address gets a mail with the /audit/<id> link. Capped at 10 per IP and 5 per address a day.",
+      "owner": "lead follow-up (retired at cutover)"
+    },
+    {
+      "id": "C-7",
+      "severity": "minor",
+      "items": ["inngest/billing.ts#reconcileBillingManualFn"],
+      "evidence": "inngest/billing-helpers.ts:127",
+      "what": "with STRIPE_RECONCILE_LIVEMODE unset the livemode guard does not run, including on a manual full (writing) run; D6 asks for a livemode guard.",
+      "owner": "owner: set STRIPE_RECONCILE_LIVEMODE=true in production (CC-03 owns inngest/billing.ts)"
+    },
+    {
+      "id": "B-F8",
+      "severity": "minor",
+      "items": ["app/api/reports/[slug]/logo/route.ts", "app/privacy/page.tsx"],
+      "evidence": "apps/web/lib/report-brand.ts:7",
+      "what": "customer logo uploads sit in the public report-logos storage bucket with no retention and are not named on /privacy.",
+      "owner": "owner (legal text) and lead follow-up"
+    }
+  ]
+}
