@@ -77,7 +77,7 @@ an applied migration.
 To apply files whose pull request was merged earlier, give `dry_run_pr` the number of a merged
 pull request whose passed dry run applied those files.
 
-Until 2026-11-09 a merge that changed a migration started this workflow and the `apply` job waited
+Until CC-REPO merged, a merge that changed a migration started this workflow and the `apply` job waited
 for the owner's approval on the `production` environment. Required reviewers are not available to a
 private repository on GitHub Pro, so after the repository went private that wait would have
 vanished and a merge would have applied with no approval. The approval is now the owner's own run.

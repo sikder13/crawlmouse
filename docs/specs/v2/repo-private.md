@@ -296,7 +296,8 @@ Out of this step:
    re-sets it after the step that cuts the visual cost. From D7's projection (about 75,700 minutes a month,
    about 2,500 a day), $300 at $0.006 a minute plus the 3,000 included minutes is about 53,000 minutes,
    about 21 days of private-repo CI. November reaches the stop only if the flip is before about the
-   10th.
+   10th. A budget repeats each month, so it stays at $300 until the owner re-sets it; a full month at
+   D7's rate reaches the stop around day 21.
 4. **Actions defaults:** Settings → Actions → General → Workflow permissions → **Read repository
    contents**, and untick **Allow GitHub Actions to create and approve pull requests**. Every workflow
    here declares its own permissions, so this changes nothing today. It sets the default for a
