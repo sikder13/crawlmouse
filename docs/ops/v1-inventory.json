@@ -1419,7 +1419,7 @@
       "id": "B-F1",
       "severity": "major",
       "items": ["public.rate_limits", "app/privacy/page.tsx"],
-      "evidence": "infra/supabase/migrations/20261110000002_rate_limits_prune.sql:15; inngest/billing.ts:96",
+      "evidence": "infra/supabase/migrations/20261109000002_rate_limits_prune.sql:15; inngest/billing.ts:96",
       "what": "/privacy calls rate-limit records short-lived; production holds 1,138 rows, 1,027 older than 30 days, oldest 157 days, 468 keys embedding a raw IP and 52 a raw email; nothing deletes the table (measured 2026-11-09). Fixed by a daily prune of rows past their window (the migration adds public.prune_rate_limits; the cleanup cron calls it). Hashing the keys is a follow-up.",
       "fixedIn": "0f08e323"
     },
@@ -1427,7 +1427,7 @@
       "id": "B-F2",
       "severity": "major",
       "items": ["public.users", "app/privacy/page.tsx", "app/terms/page.tsx"],
-      "evidence": "infra/supabase/migrations/20261110000003_users_auth_cascade.sql:14; scripts/ops/erase-account.ts:331",
+      "evidence": "infra/supabase/migrations/20261109000003_users_auth_cascade.sql:14; scripts/ops/erase-account.ts:331",
       "what": "/privacy and /terms promise erasure on request; no code deletes public.users, public.users has no FK to auth.users, and the email also sits unlinked in rate_limits keys, email_events, audits.notify_email, waitlist and takedown_requests. Erasure is possible by hand in SQL; what is missing is the process and the cascade. Fixed by the users_id_auth_fkey cascade, scripts/ops/erase-account.ts and docs/ops/erasure.md.",
       "fixedIn": "66f8d04e"
     },

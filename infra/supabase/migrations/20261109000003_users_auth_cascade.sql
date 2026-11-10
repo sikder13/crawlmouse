@@ -9,7 +9,7 @@
 -- Added `not valid`, then validated; at this size the two steps gain nothing over one, and they keep
 -- the lock short if the table grows. Running this file twice changes nothing: the constraint is
 -- dropped if present and added again (apps/web/__tests__/users-auth-cascade.test.ts).
--- Rollback: infra/supabase/rollbacks/20261110000003_users_auth_cascade.revert.sql.
+-- Rollback: infra/supabase/rollbacks/20261109000003_users_auth_cascade.revert.sql.
 
 alter table public.users drop constraint if exists users_id_auth_fkey;
 alter table public.users

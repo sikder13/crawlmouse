@@ -10,7 +10,7 @@
 -- Security invoker: it deletes with the caller's rights, and only service_role may execute it.
 -- search_path names pg_catalog first and pg_temp last; the body qualifies every relation.
 -- Running this file twice changes nothing (create or replace keeps the grants; revoke and grant are
--- idempotent; apps/web/__tests__/rate-limits-prune.test.ts). Rollback: infra/supabase/rollbacks/20261110000002_rate_limits_prune.revert.sql.
+-- idempotent; apps/web/__tests__/rate-limits-prune.test.ts). Rollback: infra/supabase/rollbacks/20261109000002_rate_limits_prune.revert.sql.
 
 create or replace function public.prune_rate_limits(p_limit integer)
 returns integer
