@@ -2,6 +2,7 @@ import type { GetFunctionInput } from 'inngest';
 import { inngest } from './client';
 import { supabaseAdmin } from './supabase';
 import { runReconcile, buildReconcileOpts, deleteExpiredAudits } from './billing-helpers';
+import { pruneRateLimits } from './rate-limit-retention';
 import Stripe from 'stripe';
 
 function stripeClient() {
@@ -106,13 +107,19 @@ export const reconcileBillingManualFn = inngest.createFunction(
     }),
 );
 
-// Daily TTL cleanup — bounded/batched delete of expired free audits (cascades to pages/links/findings).
+// Daily TTL cleanup — bounded/batched delete of expired free audits (cascades to pages/links/findings),
+// then the rate_limits rows whose window has ended (B-F1, rate-limit-retention.ts), each its own step.
 export const cleanupExpiredAuditsFn = inngest.createFunction(
   { id: 'crawlmouse.audits-ttl-cleanup' },
   { cron: '0 4 * * *' },
-  async ({ step }) =>
-    step.run('delete-expired', async () => {
+  async ({ step }) => {
+    const audits = await step.run('delete-expired', async () => {
       const sb = supabaseAdmin();
       return deleteExpiredAudits(sb, new Date().toISOString());
-    }),
+    });
+    const rateLimits = await step.run('prune-rate-limits', async () =>
+      pruneRateLimits(supabaseAdmin()),
+    );
+    return { audits, rateLimits };
+  },
 );

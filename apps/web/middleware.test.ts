@@ -34,10 +34,39 @@ describe('handleEdge', () => {
     expect(res.cookies.get(CONSENT_REQUIRED_COOKIE)).toBeDefined();
   });
 
-  it('adds X-Robots-Tag noindex on /r/ report pages', async () => {
-    const req = new NextRequest(new Request('https://crawlmouse.com/r/abc'));
+  // A-7: each report page's robots meta decides whether it is indexed (app/r/[slug]/page.tsx), so the
+  // middleware sends no header that would override a claimed, indexable report. A report whose slug
+  // is "opengraph-image" is a page, not the image.
+  it.each([
+    '/r/abc',
+    '/r/abc?ref=x',
+    '/r/opengraph-image',
+    '/r/abc/opengraph-imagex',
+    '/r/a/b/opengraph-image',
+  ])('sends no X-Robots-Tag on the report path %s', async (path) => {
+    const req = new NextRequest(new Request(`https://crawlmouse.com${path}`));
     const res = await handleEdge(req, refreshWithAuthCookie);
-    expect(res.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(res.headers.get('X-Robots-Tag')).toBeNull();
+  });
+
+  // Owner ruling: a report's share image stays out of image search. Social previews do not read the
+  // header, and the image of an unclaimed report has no robots meta of its own.
+  it.each([
+    '/r/abc/opengraph-image',
+    '/r/abc/opengraph-image?1a2b3c',
+    '/r/opengraph-image/opengraph-image',
+    // skipTrailingSlashRedirect (next.config.mjs) serves the image at the slash path too.
+    '/r/abc/opengraph-image/',
+  ])('keeps X-Robots-Tag noindex on the report image %s', async (path) => {
+    const req = new NextRequest(new Request(`https://crawlmouse.com${path}`));
+    const res = await handleEdge(req, refreshWithAuthCookie);
+    expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow, noarchive');
+  });
+
+  it('keeps X-Robots-Tag noindex on /embed/ badges', async () => {
+    const req = new NextRequest(new Request('https://crawlmouse.com/embed/example.com'));
+    const res = await handleEdge(req, refreshWithAuthCookie);
+    expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow, noarchive');
   });
 
   it('does not add X-Robots-Tag on app pages', async () => {

@@ -764,8 +764,13 @@ describe('handle_new_user: user → account → seat → default account', () =>
 
   it('gives a users row that predates the account model an account, and never a second one', async () => {
     const id = randomUUID();
-    await db.query(`insert into public.users (id, email) values ($1, 'legacy@example.com')`, [id]);
-    await db.query(`insert into auth.users (id, email) values ($1, 'legacy@example.com')`, [id]);
+    // public.users references auth.users (B-F2), so the legacy row is written in the same statement
+    // as its auth row: the sign-up trigger fires at the statement's end and finds it already there.
+    await db.query(
+      `with a as (insert into auth.users (id, email) values ($1, 'legacy@example.com') returning id)
+       insert into public.users (id, email) select id, 'legacy@example.com' from a`,
+      [id],
+    );
     const count = async () =>
       (
         await db.query<{ n: number }>(
@@ -776,7 +781,10 @@ describe('handle_new_user: user → account → seat → default account', () =>
     expect(await count()).toBe(1);
     // A second platform insert for the same id cannot happen (auth.users PK), so re-run the trigger
     // body directly through a fresh auth row and check the guard on default_account_id holds.
+    // Replica mode skips the users_id_auth_fkey cascade, so public.users and its account stay.
+    await db.exec(`set session_replication_role = replica`);
     await db.query(`delete from auth.users where id = $1`, [id]);
+    await db.exec(`set session_replication_role = origin`);
     await db.query(`insert into auth.users (id, email) values ($1, 'legacy@example.com')`, [id]);
     expect(await count()).toBe(1);
   });

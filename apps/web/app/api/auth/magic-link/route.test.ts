@@ -42,13 +42,16 @@ describe('POST /api/auth/magic-link — post-login return cookie', () => {
     for (const evil of ['https://evil.com', '//evil.com', '/\\evil.com', '/.//evil.com']) {
       const res = await call({ email: 'a@b.com', next: evil });
       expect(res.status).toBe(200);
-      expect(setCookie(res)).not.toContain('post_login_next');
+      // Never stored; an earlier target is cleared instead (A-8).
+      const next = res.headers.getSetCookie().filter((c) => c.startsWith('post_login_next='));
+      expect(next).toEqual([expect.stringMatching(/^post_login_next=;.*Max-Age=0/)]);
     }
   });
 
-  it('sets no cookie when next is absent (unchanged behavior)', async () => {
+  it('sets no return target when next is absent, and clears an earlier one (A-8)', async () => {
     const res = await call({ email: 'a@b.com' });
     expect(res.status).toBe(200);
-    expect(setCookie(res)).not.toContain('post_login_next');
+    const next = res.headers.getSetCookie().filter((c) => c.startsWith('post_login_next='));
+    expect(next).toEqual([expect.stringMatching(/^post_login_next=;.*Max-Age=0/)]);
   });
 });

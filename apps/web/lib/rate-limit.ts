@@ -1,7 +1,12 @@
 import 'server-only';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { MAX_RATE_LIMIT_WINDOW_MS } from './rate-limit-window';
 
-interface CheckResult { allowed: boolean; remaining: number; resetAt: Date }
+interface CheckResult {
+  allowed: boolean;
+  remaining: number;
+  resetAt: Date;
+}
 
 /**
  * Per-bucket options. The RPC-error behaviour is the only knob:
@@ -10,7 +15,9 @@ interface CheckResult { allowed: boolean; remaining: number; resetAt: Date }
  *    is worse than a brief outage — the 18%-MRR GLOBAL audit ceiling, where failing open would
  *    silently uncap platform-wide spend during a Supabase blip. Per-IP/domain buckets stay OPEN.
  */
-interface CheckOpts { failClosed?: boolean }
+interface CheckOpts {
+  failClosed?: boolean;
+}
 
 export async function checkRateLimit(
   bucketKey: string,
@@ -18,6 +25,13 @@ export async function checkRateLimit(
   windowMs: number,
   opts?: CheckOpts,
 ): Promise<CheckResult> {
+  // prune_rate_limits deletes a row 25 hours after its window starts, so a longer window would lose
+  // its count mid-window (B-F1). A caller error, refused before anything is counted.
+  if (!(windowMs > 0 && windowMs <= MAX_RATE_LIMIT_WINDOW_MS)) {
+    throw new Error(
+      `rate-limit window of ${windowMs} ms is outside (0, ${MAX_RATE_LIMIT_WINDOW_MS}]`,
+    );
+  }
   const sb = supabaseAdmin();
   const windowStart = new Date(Math.floor(Date.now() / windowMs) * windowMs);
   const resetAt = new Date(windowStart.getTime() + windowMs);
@@ -34,7 +48,9 @@ export async function checkRateLimit(
       // The caller has declared that an uncapped fallback is unacceptable for this bucket (the
       // global cost ceiling). Deny rather than risk blowing the cost envelope, and log loudly so
       // the deny-on-outage is unmistakable in the logs rather than read as organic capacity.
-      console.error(`rate-limit RPC failed for bucket "${bucketKey}" — failing CLOSED (deny): ${error.message}`);
+      console.error(
+        `rate-limit RPC failed for bucket "${bucketKey}" — failing CLOSED (deny): ${error.message}`,
+      );
       return { allowed: false, remaining: 0, resetAt };
     }
     // Otherwise fail OPEN on a transient RPC error rather than blocking legitimate traffic, but log

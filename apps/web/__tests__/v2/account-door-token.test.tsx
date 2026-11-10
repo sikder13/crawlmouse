@@ -123,6 +123,12 @@ describe('the sign-in token', () => {
         .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       await new Promise((r) => setTimeout(r, 0));
     });
+    // The page names the account the link signed in (Q3 of CC-V1FIX), then goes on when asked.
+    seen.push(host.innerHTML);
+    expect(host.textContent).toContain('Signed in as ada@example.com.');
+    act(() =>
+      [...host.querySelectorAll('button')].find((b) => b.textContent === 'Continue')!.click(),
+    );
 
     // The walk reached the end: the events fired and the browser was sent on.
     expect(assigned).toEqual(['/dashboard']);
