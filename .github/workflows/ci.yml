@@ -1,9 +1,9 @@
 name: CI
 
+# Pushes only: a pull request's checks are the ones its head commit's push ran. protect-main requires
+# the branch to be up to date with main before merging, so the tested head carries main's tree.
 on:
   push:
-    branches: ['**']
-  pull_request:
     branches: ['**']
 
 permissions:
@@ -13,7 +13,7 @@ permissions:
 # run is cancelled or replaced: GitHub also drops a PENDING run when a newer one joins its group, and the
 # Prettier job on main checks only what that push added.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: true
 
 env:
@@ -21,6 +21,43 @@ env:
   TURBO_TELEMETRY_DISABLED: '1'
 
 jobs:
+  # Whether the visual shards, security-browser and zap-baseline run: they do unless every file the
+  # branch changed is on the reviewed skip list in .github/workflows/scripts/changes.mjs. On main they
+  # always run. On a branch the whole branch is compared with its merge-base on main, not the last
+  # push: the required `visual` check attaches to the head commit, so a docs-only commit on top of a
+  # rendering change still runs the visuals. The runner's own node runs the script; nothing is
+  # installed.
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      visual: ${{ steps.decide.outputs.visual }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Did anything that can affect rendering change
+        id: decide
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$REF" = "refs/heads/main" ]; then
+            echo "main: everything runs"
+            echo "visual=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! base="$(git merge-base origin/main HEAD)"; then
+            echo "::warning::no merge-base with origin/main, so everything runs"
+            echo "visual=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Comparing against ${base}"
+          # --no-renames: a file moved out of a rendering path is listed under its old path as well.
+          git -c core.quotePath=false diff --name-only --no-renames -z "$base" HEAD > "$RUNNER_TEMP/changed"
+          node .github/workflows/scripts/changes.mjs < "$RUNNER_TEMP/changed" >> "$GITHUB_OUTPUT"
+
   lint:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -54,15 +91,11 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Check changed files
         env:
-          EVENT_NAME: ${{ github.event_name }}
           PUSH_BEFORE: ${{ github.event.before }}
           REF: ${{ github.ref }}
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            # The checkout is GitHub's merge commit; its first parent is the base it merged against.
-            base="$(git rev-parse HEAD^1)"
-          elif [ "$REF" = "refs/heads/main" ]; then
+          if [ "$REF" = "refs/heads/main" ]; then
             base="$PUSH_BEFORE"
           else
             base="$(git merge-base origin/main HEAD)"
@@ -129,10 +162,14 @@ jobs:
           . ./.env.ci
           set +a
           pnpm build
+      # Named by the run, not the attempt: "Re-run failed jobs" re-runs the two jobs that download it
+      # without re-running a build that passed, so they must find the earlier attempt's upload. A
+      # full re-run builds again under the same name, hence overwrite.
       - name: Keep the build for security-browser and zap-baseline
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: next-build-${{ github.run_id }}-${{ github.run_attempt }}
+          name: next-build-${{ github.run_id }}
+          overwrite: true
           path: |
             apps/web/.next
             !apps/web/.next/cache
@@ -144,7 +181,8 @@ jobs:
   # the build above (docs/specs/v2/sec-baseline.md). Same runner image and checkout path as build, so
   # the downloaded .next starts as it was built.
   security-browser:
-    needs: build
+    needs: [build, changes]
+    if: needs.changes.outputs.visual == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -158,7 +196,7 @@ jobs:
       - uses: ./.github/actions/setup
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: next-build-${{ github.run_id }}-${{ github.run_attempt }}
+          name: next-build-${{ github.run_id }}
           path: apps/web/.next
       - name: Install Chromium
         working-directory: apps/web
@@ -176,7 +214,8 @@ jobs:
   # triaged (docs/specs/v2/sec-baseline.md), within six minutes, its reports kept as an artifact.
   # /r/ci-fixture has no database behind it in CI, so ZAP sees the not-found page there.
   zap-baseline:
-    needs: build
+    needs: [build, changes]
+    if: needs.changes.outputs.visual == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 6
     continue-on-error: true
@@ -190,7 +229,7 @@ jobs:
       - uses: ./.github/actions/setup
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: next-build-${{ github.run_id }}-${{ github.run_attempt }}
+          name: next-build-${{ github.run_id }}
           path: apps/web/.next
       - name: Pull the ZAP image
         run: docker pull "$ZAP_IMAGE"
@@ -253,10 +292,12 @@ jobs:
   # security-severity 7.0 or more (high or critical) fails the job unless the reviewed baseline
   # (.github/workflows/scripts/codeql-baseline.json, by fingerprint, expiring 2026-12-08) lists it; read
   # from the SARIF by .github/workflows/scripts/sarif-gate.mjs, which also fails a scan that extracted
-  # no file. Results
-  # upload to code scanning from this repository's own pushes and pull requests: a fork's token cannot
-  # write them, and the gate still runs on its SARIF.
+  # no file. Results upload to code scanning from every run (CI runs on pushes only).
+  #
+  # Code scanning is not available on a private repository without GitHub Advanced Security, so the
+  # job runs only while the repository is public; once it is private the job is skipped, not failed.
   codeql:
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -283,9 +324,62 @@ jobs:
         with:
           category: /language:javascript-typescript
           output: ${{ runner.temp }}/codeql
-          upload: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && 'always' || 'never' }}
+          upload: always
       - name: Fail on a high or critical result
         run: node .github/workflows/scripts/sarif-gate.mjs "$RUNNER_TEMP/codeql" .github/workflows/scripts/codeql-baseline.json
+
+  # Semgrep CE with four registry packs, in CI only: nothing is uploaded to code scanning. The image
+  # is pinned by digest; the packs are fetched at run time and are not pinned, so the log's rule
+  # count shows when one changes. Test code is excluded as in the codeql job. Semgrep's built-in
+  # ignore list (used when the repository has no .semgrepignore) skips every `build/` directory,
+  # which holds engine source (packages/engine/src/v2/build), so the job writes a .semgrepignore
+  # with no pattern first. Without --error Semgrep exits 0 on findings, so the gate treats any
+  # other exit as a failed scan; it also fails on an ERROR result the reviewed baseline does not
+  # accept, and on a scan that read no file or ran too few rules (--time lists them).
+  semgrep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      # renovate: datasource=docker depName=semgrep/semgrep
+      SEMGREP_IMAGE: semgrep/semgrep:1.182.1@sha256:451b3d875c00dac7ed5db5293e584a07de11449a409c10b3c2d2652f429630b6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: semgrep
+        id: scan
+        run: |
+          set -uo pipefail
+          echo "# No pattern: replaces Semgrep's built-in list; the exclusions are the --exclude flags." > .semgrepignore
+          mkdir -p "$RUNNER_TEMP/semgrep"
+          status=0
+          # safe.directory, as in the gitleaks job: without it git refuses the mounted checkout
+          # (another owner), and Semgrep's git-based target listing needs git.
+          docker run --rm -v "$PWD:/src" -w /src -v "$RUNNER_TEMP/semgrep:/out" \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
+            -e SEMGREP_ENABLE_VERSION_CHECK=0 "$SEMGREP_IMAGE" \
+            semgrep scan --metrics=off --time \
+            --config p/typescript --config p/javascript --config p/nodejs --config p/react \
+            --exclude '*.test.ts' --exclude '*.test.tsx' --exclude __tests__ --exclude tests \
+            --text --json-output=/out/semgrep.json || status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+      - name: Upload the Semgrep JSON
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: semgrep-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/semgrep/semgrep.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Fail on an ERROR result or a scan that cannot be trusted
+        if: ${{ !cancelled() }}
+        env:
+          SCAN_EXIT: ${{ steps.scan.outputs.status }}
+        run: |
+          node .github/workflows/scripts/semgrep-gate.mjs "$RUNNER_TEMP/semgrep/semgrep.json" \
+            .github/workflows/scripts/semgrep-baseline.json --repo-root . --scan-exit "${SCAN_EXIT:-missing}"
 
   # The v2 design-system harness (tests/visual): screenshots of the preview pages at 1280 and
   # 390 px, light and dark, failing on a diff above 0.2%, plus layout, axe, focus and motion checks.
@@ -295,9 +389,13 @@ jobs:
   # --update-snapshots and uploads them as proposed baselines, next to the diffs; nothing is
   # committed from CI. tests/visual/README.md says how to accept them.
   #
-  # Four shards, each under its own 45 minutes: one runner ran past that limit once the segment
+  # Six shards, each under its own 45 minutes: one runner ran past that limit once the segment
   # previews were added (owner ruling, CC-23).
+  #
+  # Skipped when the `changes` job finds nothing on the branch that can affect rendering.
   visual-shard:
+    needs: changes
+    if: needs.changes.outputs.visual == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -427,21 +525,37 @@ jobs:
           if-no-files-found: warn
 
   # The check named `visual`, as before the shards, for branch protection and for a reader of the
-  # PR: it passes only when every shard passed, and fails on a shard that failed, was cancelled or
-  # was skipped.
+  # PR. It passes when every shard passed, or when the shards were skipped because the `changes` job
+  # passed and found nothing that can affect rendering. Everything else fails: a shard that failed or
+  # was cancelled, and shards skipped because `changes` itself failed or was cancelled.
   visual:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: visual-shard
+    needs: [changes, visual-shard]
     if: ${{ always() }}
     permissions: {}
     steps:
-      - name: Every shard passed
+      - name: Every shard passed, or nothing that can affect rendering changed
         env:
           SHARDS: ${{ needs.visual-shard.result }}
+          CHANGES: ${{ needs.changes.result }}
+          VISUAL: ${{ needs.changes.outputs.visual }}
         run: |
-          echo "visual-shard: $SHARDS"
-          test "$SHARDS" = success
+          set -euo pipefail
+          echo "changes: $CHANGES (visual=${VISUAL}); visual-shard: $SHARDS"
+          if [ "$SHARDS" = success ]; then
+            exit 0
+          fi
+          if [ "$SHARDS" = skipped ] && [ "$CHANGES" = success ] && [ "$VISUAL" = false ]; then
+            echo "nothing that can affect rendering changed, so the shards were skipped"
+            exit 0
+          fi
+          if [ "$CHANGES" != success ]; then
+            echo "::error::the changes job is '$CHANGES', so whether the visuals were needed is unknown"
+          else
+            echo "::error::visual-shard is '$SHARDS' with visual=${VISUAL}"
+          fi
+          exit 1
 
   # gitleaks over the FULL history of every ref (gitleaks' default git log is
   # `--full-history --all`), hence fetch-depth: 0. Pinned by image digest.
@@ -499,8 +613,8 @@ jobs:
 
   # Migration files are append-only: once on main, a migration file is applied or about to be, and
   # an edit would never reach production (scripts/db/dry-run.ts refuses it too, but the dry run runs
-  # only on pull requests that touch the database). This job runs on every push and pull request,
-  # so it can be a required check.
+  # only on pull requests that touch the database). This job runs on every push, so it can be a
+  # required check.
   migrations-append-only:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -511,14 +625,11 @@ jobs:
           persist-credentials: false
       - name: Migration files are only ever added
         env:
-          EVENT_NAME: ${{ github.event_name }}
           PUSH_BEFORE: ${{ github.event.before }}
           REF: ${{ github.ref }}
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            base="$(git rev-parse HEAD^1)"
-          elif [ "$REF" = "refs/heads/main" ]; then
+          if [ "$REF" = "refs/heads/main" ]; then
             base="$PUSH_BEFORE"
           else
             base="$(git merge-base origin/main HEAD)"

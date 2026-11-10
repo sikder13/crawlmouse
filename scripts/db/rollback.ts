@@ -86,7 +86,7 @@ export const LOCK_WAIT = "set local lock_timeout = '2min'";
 /**
  * For `revert` on production: inside the rollback's transaction, waits for the apply's advisory lock
  * (DB_OPS_LOCK_KEY), locks the history table, and requires the migration to be the
- * newest one recorded. The plan checked this before the approval; this checks it again at the
+ * newest one recorded. The plan checked this before the rollback job; this checks it again at the
  * moment the rollback runs.
  */
 export async function newestFirstGuard(tx: Db, migration: MigrationFile): Promise<void> {

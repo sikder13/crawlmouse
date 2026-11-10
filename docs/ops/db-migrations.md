@@ -1,16 +1,18 @@
 # Database migrations: from pull request to production
 
-A migration reaches production through three GitHub Actions workflows. The owner approves each
-production change in GitHub after seeing the exact files and their sha256. The bytes that run are
+A migration reaches production through three GitHub Actions workflows. Only the owner starts a
+production change, by running the workflow by hand from `main` after reading the pull request's dry
+run, which lists the exact files and their sha256. Nothing reaches production on a merge
+(`docs/specs/v2/repo-private.md`, D1). The bytes that run are
 the tracked files: `supabase db push` reads `infra/supabase/migrations` in place
 (`--workdir infra`), and a rollback runs a file from `infra/supabase/rollbacks`. Nothing is pasted
 into the SQL editor.
 
-| Workflow               | Runs when                                                           | Touches                         |
-| ---------------------- | ------------------------------------------------------------------- | ------------------------------- |
-| `db-dry-run.yml`       | a pull request changes `infra/supabase/**` or the tooling           | a Supabase branch of production |
-| `db-apply-prod.yml`    | a push to `main` changes `infra/supabase/migrations/**`, or by hand | production, after approval      |
-| `db-rollback-prod.yml` | by hand only, with a rollback file name                             | production, after approval      |
+| Workflow               | Runs when                                                          | Touches                         |
+| ---------------------- | ------------------------------------------------------------------ | ------------------------------- |
+| `db-dry-run.yml`       | a pull request changes `infra/supabase/**` or the tooling          | a Supabase branch of production |
+| `db-apply-prod.yml`    | by hand only: the owner, from `main`, with the merged pull request | production                      |
+| `db-rollback-prod.yml` | by hand only: the owner, from `main`, with a rollback file name    | production                      |
 
 The scripts behind them are in `scripts/db`. Their tests:
 `pnpm --filter @crawlmouse/scripts exec vitest run db`.
@@ -49,36 +51,44 @@ The scripts behind them are in `scripts/db`. Their tests:
    rollback run, is posted on the pull request and kept as the `db-dry-run-summary` artifact for
    90 days. A pull request opened by Renovate gets no dry run (§7).
 
-3. **Merge.** The push to `main` starts `db-apply-prod.yml`. Its `plan` job needs no approval and
-   reads production through the Management API's read-only endpoint. It finds the merged pull
-   request and its newest completed dry run, which must have passed, downloads that run's
-   summary, and lists production's pending files. It refuses when a pending file is not in that
-   dry run, when its sha256 differs from the bytes the dry run applied, or when production's
+3. **Merge.** The merge applies nothing. Read the dry run's comment on the pull request: the
+   files and their sha256 are the ones the apply will accept.
+4. **Run the apply (the owner).** GitHub → **Actions** → **DB apply to production** → **Run
+   workflow** → **Use workflow from:** `main` → **dry_run_pr:** the merged pull request's number →
+   **Run workflow**. Its `authorize` job refuses unless the run was started, and any re-run is
+   started, by the repository owner, from `main`, by hand; each job that holds a secret repeats
+   that check as its first step. The `plan` job reads production through the Management API's
+   read-only endpoint. It checks the pull request is merged, finds its newest completed dry run,
+   which must have passed, downloads that run's summary, and lists production's pending files.
+   It refuses when a pending file is not in that dry run, when its sha256 differs from the bytes the dry run applied, or when production's
    fingerprint differs from the one the dry run read
    (`pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts`).
-4. **Approve.** The `apply` job waits on the `production` environment. Once approved, it checks
+5. **Apply.** The `apply` job starts as soon as `plan` passes; there is no second click. It checks
    that production's pending files still equal the manifest the `plan` job printed and that
    production's fingerprint still equals the one the `plan` job read, runs
    `supabase db push`, runs the checks, and writes the fingerprint to the job summary. A failure
    opens an issue. The workflow does not retry, and it does not run a rollback.
 
 Migration files are append-only. The `migrations-append-only` job in `ci.yml` runs on every push
-and pull request and fails on any change under `infra/supabase/migrations` other than an added
-file (a modification, deletion, rename or a file swapped for a symlink), so it can be made a
-required check. On a pull request that touches the database, the dry run also refuses an edit to
+to every branch and fails on any change under `infra/supabase/migrations` other than an added
+file (a modification, deletion, rename or a file swapped for a symlink); `protect-main` requires it. On a pull request that touches the database, the dry run also refuses an edit to
 an applied migration.
 
-A merge that changes no migration file does not start `db-apply-prod.yml`. To apply files whose
-pull request was merged earlier, run the workflow by hand from `main` and give `dry_run_pr` the
-number of a merged pull request whose passed dry run applied those files.
+To apply files whose pull request was merged earlier, give `dry_run_pr` the number of a merged
+pull request whose passed dry run applied those files.
 
-## 2. What the owner sees before approving
+Until CC-REPO merged, a merge that changed a migration started this workflow and the `apply` job waited
+for the owner's approval on the `production` environment. Required reviewers are not available to a
+private repository on GitHub Pro, so after the repository went private that wait would have
+vanished and a merge would have applied with no approval. The approval is now the owner's own run.
 
-In the run of `db-apply-prod.yml`, before the **Review deployments** button:
+## 2. What the owner reads before running the apply
 
-- the `plan` job's summary: a table of the pending files with the sha256 of each, then the dry
-  run's own summary: its steps, its commit, and the sha256 of each file it applied. Matching
-  hashes in both tables are what the gate already checked.
+- the dry run's comment on the pull request: its steps, its commit, and the sha256 of each file
+  it applied;
+- after the run, the `plan` job's summary: a table of the pending files with the sha256 of each,
+  next to the dry run's. Matching hashes in both tables are what the gate already checked; a
+  mismatch stops the run before `apply`.
 - the link to the dry run, in the `plan` job's log (`pull request #N, dry run <url>`).
 
 To check a hash against the repository yourself:
@@ -119,11 +129,12 @@ access token.
 
 ## 4. Rolling back on production
 
-Run **DB rollback on production** (`db-rollback-prod.yml`) from `main`, with the rollback's file
-name, for example `20261102000003_v2_007_storage.revert.sql`. Its `plan` job, before the
-approval, shows the rollback file's sha256 and its migration's, and refuses a rollback that is not
-of the newest migration production records. The `rollback` job waits on the same `production`
-approval, requires the planned sha256, runs the file's bytes and deletes the migration's history
+The owner runs it: GitHub → **Actions** → **DB rollback on production** → **Run workflow** →
+**Use workflow from:** `main` → **file:** the rollback's file name, for example
+`20261102000003_v2_007_storage.revert.sql` → **Run workflow**. The same owner check as the apply
+runs first. Its `plan` job shows the rollback file's sha256 and its migration's, and refuses a
+rollback that is not of the newest migration production records. The `rollback` job starts when
+`plan` passes, requires the planned sha256, runs the file's bytes and deletes the migration's history
 row in one transaction, then runs the checks and writes the fingerprint to the job summary.
 Reverting `20261106000002_v1_client_grant_hardening.sql`, which comes first for anything older,
 gives the client roles back the broad v1 privileges, so check 08 then fails: the rollback has
@@ -132,7 +143,7 @@ committed by then, and the failure says what the revert restored.
 - It refuses a name that is not a file in `infra/supabase/rollbacks` with a matching migration,
   a migration the history does not record as applied, and any but the newest recorded migration,
   so rollbacks run newest first, one per run. The order is checked by the plan and again inside the
-  rollback's transaction, after it locks the history table, so an apply approved in between is
+  rollback's transaction, after it locks the history table, so an apply run in between is
   seen (`pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts db/rollback.test.ts`).
 - A rollback changed in a pull request is run on the branch by the dry run's step 9 before it
   merges. Check its comment before dispatching. Step 9 reverts every migration from the changed
@@ -384,15 +395,24 @@ so two databases can be compared section by section.
 
 ## 7. Secrets and environments
 
-| Where                           | Name                    | Used by                                                        |
-| ------------------------------- | ----------------------- | -------------------------------------------------------------- |
-| GitHub environment `db-dry-run` | `SUPABASE_ACCESS_TOKEN` | the dry run, the branch clean-up, and the read-only `plan` job |
-| GitHub environment `production` | `SUPABASE_ACCESS_TOKEN` | the `apply` and `rollback` jobs (pooler lookup, read-only)     |
-| GitHub environment `production` | `SUPABASE_DB_PASSWORD`  | the `apply` and `rollback` jobs                                |
+| Where                           | Name                        | Used by                                                               |
+| ------------------------------- | --------------------------- | --------------------------------------------------------------------- |
+| GitHub environment `db-dry-run` | `SUPABASE_ACCESS_TOKEN`     | the dry run, the branch clean-up, and the read-only `plan` job        |
+| GitHub environment `production` | `SUPABASE_ACCESS_TOKEN`     | the `apply` and `rollback` jobs (pooler lookup, read-only)            |
+| GitHub environment `production` | `SUPABASE_DB_PASSWORD`      | the `apply` and `rollback` jobs                                       |
+| GitHub environment `production` | `SUPABASE_SERVICE_ROLE_KEY` | no workflow; the owner removes it before the repository turns private |
 
 A branch's database password comes from the Management API at run time and is masked in the log
-before use. `production` has a required reviewer (the owner) and accepts deployments from `main`
-only.
+before use. `production` accepts deployments from `main` only; it has no required reviewer, because
+a private repository on GitHub Pro cannot have one. What stands in for it is that only the owner can
+start the two workflows that use it: both are `workflow_dispatch` only and refuse any other actor or
+ref (`pnpm --filter @crawlmouse/scripts exec vitest run db/production-workflows.test.ts`). That check
+tells accounts apart, not tools: a token that acts as the owner with Actions write passes it, which is
+why coding sessions get a token without Actions write (`docs/specs/v2/repo-private.md`).
+
+The `db-dry-run` environment has no branch policy, because pull-request dry runs use it, so a
+workflow on any pushed branch can read its `SUPABASE_ACCESS_TOKEN`. The owner check above does not
+cover it and cannot.
 
 **What the access token can do.** A Supabase access token acts for the whole account, including
 writing to production through the Management API. The dry run needs one to create branches, so a
@@ -403,8 +423,8 @@ code with the token before review.
 
 **What the dry-run summary proves.** It is written by the pull request's own workflow and scripts,
 so a pull request that changes them can write any summary. The gate in `db-apply-prod.yml` checks
-the bytes against that summary; review of the pull request and the `production` approval are what
-stand behind the summary itself.
+the bytes against that summary; review of the pull request and the owner's own run of the apply are
+what stand behind the summary itself.
 
 ## 8. What this replaced
 

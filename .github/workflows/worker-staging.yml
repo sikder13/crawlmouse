@@ -4,8 +4,9 @@
 # worker's own secrets (WORKER_SIGNING_SECRET, WORKER_JWT_PUBLIC_KEY) are set on Fly by the owner and
 # never pass through here: docs/ops/worker-runbook.md, "First deploy".
 #
-# The repository is public, and so are these logs. The egress address is masked and never printed.
-# flyctl's first deploy prints the app's ingress addresses, which public DNS already shows.
+# The repository has been public, and so have these logs and its history; after it is made private
+# they are still written as if anyone can read them. The egress address is masked and never
+# printed. flyctl's first deploy prints the app's ingress addresses, which public DNS already shows.
 name: worker-staging
 
 on:
