@@ -34,6 +34,9 @@ import type { PipelineStore } from './store';
 import { memoryStore, queuedCheck } from './test-support/fakes';
 import { memoryEvidenceStore } from './test-support/memory-evidence';
 
+// The billing functions (CC-03) load modules that import 'server-only', which throws outside Next.
+vi.mock('server-only', () => ({}));
+
 type Config = { id: string; concurrency?: number | { limit: number } | { limit: number }[] };
 const configsOf = (fns: readonly unknown[]): Config[] =>
   fns.flatMap((fn) =>
@@ -250,30 +253,41 @@ describe('no registered function can declare a concurrency limit above the plan 
 
   // auditFn reads INNGEST_AUDIT_CONCURRENCY when its module loads, so each case loads the modules
   // afresh, as a new deployment does.
-  for (const flag of [undefined, '1'] as const) {
-    for (const audit of SWEEP) {
-      it(`V2_PIPELINE=${String(flag)}, INNGEST_AUDIT_CONCURRENCY=${String(audit)}, every INNGEST_CHECK_CONCURRENCY`, async () => {
-        vi.stubEnv('V2_PIPELINE', flag);
-        vi.stubEnv('INNGEST_AUDIT_CONCURRENCY', audit);
-        vi.resetModules();
-        const fresh = await import('./functions');
-        for (const check of SWEEP) {
-          vi.stubEnv('INNGEST_CHECK_CONCURRENCY', check);
-          const configs = configsOf(fresh.inngestFunctions(process.env));
-          expect(configs.length).toBe(flag === '1' ? 9 : 5);
-          const limits = limitsOf(configs);
-          expect(limits.length).toBeGreaterThan(0);
-          for (const limit of limits) {
-            expect(
-              limit,
-              `${configs.map((c) => c.id).join(', ')}: ${limits.join(', ')}`,
-            ).toBeLessThanOrEqual(PLAN_CONCURRENCY_CAP);
-            expect(limit).toBeGreaterThanOrEqual(1);
+  // V2_BILLING adds CC-03's trial and past-due functions, which the cap covers as well.
+  for (const billing of [undefined, '1'] as const)
+    for (const flag of [undefined, '1'] as const) {
+      for (const audit of SWEEP) {
+        it(`V2_BILLING=${String(billing)}, V2_PIPELINE=${String(flag)}, INNGEST_AUDIT_CONCURRENCY=${String(audit)}, every INNGEST_CHECK_CONCURRENCY`, async () => {
+          vi.stubEnv('V2_BILLING', billing);
+          vi.stubEnv('V2_PIPELINE', flag);
+          vi.stubEnv('INNGEST_AUDIT_CONCURRENCY', audit);
+          vi.resetModules();
+          const fresh = await import('./functions');
+          for (const check of SWEEP) {
+            vi.stubEnv('INNGEST_CHECK_CONCURRENCY', check);
+            const configs = configsOf(fresh.inngestFunctions(process.env));
+            expect(configs.length).toBe((flag === '1' ? 9 : 5) + (billing === '1' ? 2 : 0));
+            if (billing === '1') {
+              expect(configs.map((c) => c.id)).toEqual(
+                expect.arrayContaining([
+                  'crawlmouse-crawlmouse.trial.lifecycle',
+                  'crawlmouse-crawlmouse.billing.past-due-sweep',
+                ]),
+              );
+            }
+            const limits = limitsOf(configs);
+            expect(limits.length).toBeGreaterThan(0);
+            for (const limit of limits) {
+              expect(
+                limit,
+                `${configs.map((c) => c.id).join(', ')}: ${limits.join(', ')}`,
+              ).toBeLessThanOrEqual(PLAN_CONCURRENCY_CAP);
+              expect(limit).toBeGreaterThanOrEqual(1);
+            }
           }
-        }
-      });
+        });
+      }
     }
-  }
 
   it('the sweep reaches the values it sets: a limit of 2 from each variable', async () => {
     vi.stubEnv('V2_PIPELINE', '1');

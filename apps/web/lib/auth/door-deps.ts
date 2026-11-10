@@ -2,6 +2,7 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { supabaseAdmin } from '../supabase/admin';
 import { supabaseEntitlementStore } from '../billing/state-machine-apply';
+import { billingDispatcher } from '../billing/effect-sinks';
 import type { ClaimDeps } from './claim';
 import type { FirstLoginDeps } from './first-login';
 import { pepperFrom } from './ledger';
@@ -21,6 +22,7 @@ export function doorDeps(): { firstLogin: FirstLoginDeps; claim: ClaimDeps } {
       report: sentryReport((m, ctx) => Sentry.captureMessage(m, ctx)),
       pepper: pepperFrom(process.env),
       now,
+      dispatch: billingDispatcher(process.env),
     },
     claim: { store, now },
   };

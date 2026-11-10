@@ -34,10 +34,39 @@ describe('handleEdge', () => {
     expect(res.cookies.get(CONSENT_REQUIRED_COOKIE)).toBeDefined();
   });
 
-  it('adds X-Robots-Tag noindex on /r/ report pages', async () => {
-    const req = new NextRequest(new Request('https://crawlmouse.com/r/abc'));
+  // A-7: each report page's robots meta decides whether it is indexed (app/r/[slug]/page.tsx), so the
+  // middleware sends no header that would override a claimed, indexable report. A report whose slug
+  // is "opengraph-image" is a page, not the image.
+  it.each([
+    '/r/abc',
+    '/r/abc?ref=x',
+    '/r/opengraph-image',
+    '/r/abc/opengraph-imagex',
+    '/r/a/b/opengraph-image',
+  ])('sends no X-Robots-Tag on the report path %s', async (path) => {
+    const req = new NextRequest(new Request(`https://crawlmouse.com${path}`));
     const res = await handleEdge(req, refreshWithAuthCookie);
-    expect(res.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(res.headers.get('X-Robots-Tag')).toBeNull();
+  });
+
+  // Owner ruling: a report's share image stays out of image search. Social previews do not read the
+  // header, and the image of an unclaimed report has no robots meta of its own.
+  it.each([
+    '/r/abc/opengraph-image',
+    '/r/abc/opengraph-image?1a2b3c',
+    '/r/opengraph-image/opengraph-image',
+    // skipTrailingSlashRedirect (next.config.mjs) serves the image at the slash path too.
+    '/r/abc/opengraph-image/',
+  ])('keeps X-Robots-Tag noindex on the report image %s', async (path) => {
+    const req = new NextRequest(new Request(`https://crawlmouse.com${path}`));
+    const res = await handleEdge(req, refreshWithAuthCookie);
+    expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow, noarchive');
+  });
+
+  it('keeps X-Robots-Tag noindex on /embed/ badges', async () => {
+    const req = new NextRequest(new Request('https://crawlmouse.com/embed/example.com'));
+    const res = await handleEdge(req, refreshWithAuthCookie);
+    expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow, noarchive');
   });
 
   it('does not add X-Robots-Tag on app pages', async () => {
@@ -78,7 +107,7 @@ describe('middleware (exported entrypoint)', () => {
       {
         reason: 'cross_site',
         route: 'api/billing/portal',
-        class: 'user',
+        class: 'member',
         method: 'POST',
         status: 403,
       },
@@ -112,11 +141,13 @@ const lenient = ROUTE_POLICIES.filter((p) => p.origin === 'lenient');
 const passes = (res: NextResponse) => res.headers.get('x-middleware-next') === '1';
 
 describe('a state-changing API request from another site is refused before the route runs', () => {
-  it('guards exactly the twelve strict routes, named here', () => {
+  it('guards exactly the fourteen strict routes, named here', () => {
     expect(guarded.map((p) => p.route).sort()).toEqual([
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
       'api/auth/logout',
+      'api/billing/agency-trial',
+      'api/billing/cancel',
       'api/billing/checkout',
       'api/billing/portal',
       'api/checks/[id]/claim',

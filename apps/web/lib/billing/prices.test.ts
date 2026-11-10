@@ -10,6 +10,8 @@ describe('prices', () => {
       AGENCY_YEARLY: prices.AGENCY_YEARLY,
       EXTRA_SEAT: prices.EXTRA_SEAT,
       EXTRA_SITE: prices.EXTRA_SITE,
+      EXTRA_SEAT_YEARLY: prices.EXTRA_SEAT_YEARLY,
+      EXTRA_SITE_YEARLY: prices.EXTRA_SITE_YEARLY,
     }).toEqual({
       PRO_MONTHLY: 19,
       PRO_YEARLY: 190,
@@ -17,6 +19,8 @@ describe('prices', () => {
       AGENCY_YEARLY: 990,
       EXTRA_SEAT: 12,
       EXTRA_SITE: 3,
+      EXTRA_SEAT_YEARLY: 120,
+      EXTRA_SITE_YEARLY: 30,
     });
   });
 

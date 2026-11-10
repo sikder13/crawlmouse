@@ -63,7 +63,8 @@ describe('with V2_ACCOUNT_DOOR off, the route is exactly v1', () => {
       next: '/r/abc',
     });
     expect(res.status).toBe(200);
-    expect(cookieNamed(res, 'cm_auth_signup')).toBeUndefined();
+    // Cleared, never written: v1 carries no named site (A-8 clears an earlier request's).
+    expect(cookieNamed(res, 'cm_auth_signup')).toMatch(/^cm_auth_signup=;.*Max-Age=0/);
     expect(cookieNamed(res, 'cm_auth_device')).toBeUndefined();
     expect(valueOf(res, 'post_login_next')).toBe('/r/abc');
     expect(cookieNamed(res, 'post_login_next')).toMatch(/Max-Age=600/);
@@ -171,7 +172,8 @@ describe('with V2_ACCOUNT_DOOR=1', () => {
   it('sets cm_auth_device on a sign-in without the door fields too (v1 /login, a bare resend)', async () => {
     const res = await call({ email: 'a@b.com' });
     expect(valueOf(res, 'cm_auth_device')).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(cookieNamed(res, 'cm_auth_signup')).toBeUndefined();
+    // No named site is written; an earlier one is cleared (A-8).
+    expect(cookieNamed(res, 'cm_auth_signup')).toMatch(/^cm_auth_signup=;.*Max-Age=0/);
   });
 
   it('refuses a cross-site browser post, so another site cannot plant the door cookies', async () => {

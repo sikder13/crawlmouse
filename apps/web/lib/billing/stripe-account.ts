@@ -1,0 +1,62 @@
+import 'server-only';
+import Stripe from 'stripe';
+
+/**
+ * The Crawlmouse Stripe account (CC-03 D2), which v2 bills through. v1 bills the Nahl Technologies
+ * account through `lib/stripe.ts`; the two share no key, secret or client.
+ *
+ * Built on first use, not at import: `STRIPE_ACCOUNT_SECRET_KEY` is unset wherever `V2_BILLING` is, and
+ * the Stripe constructor throws without a key, so a module-level client would break every route that
+ * imports this. Signature checks need no key and use the static `Stripe.webhooks`.
+ */
+
+type Env = Readonly<Record<string, string | undefined>>;
+
+let client: Stripe | null = null;
+
+/**
+ * Refuses a key whose mode is not the one `STRIPE_ACCOUNT_LIVEMODE` names, and a test key on the
+ * production deployment (`VERCEL_ENV=production`) or over the production database (a preview holds
+ * its service-role key too): there, test cards would grant real plans. The v2
+ * routes, the webhook and the reconcile take their client from here, so a refusal stops each with a
+ * 500 and no write. The other client outside tests is v1's (`grep -rln "new Stripe(" apps/web/lib
+ * apps/web/app` lists lib/stripe.ts and this file, beside test files).
+ */
+export function stripeAccount(env: Env = process.env): Stripe {
+  if (client) return client;
+  const key = env.STRIPE_ACCOUNT_SECRET_KEY;
+  if (!key) throw new Error('STRIPE_ACCOUNT_SECRET_KEY is not set');
+  const live = /^(sk|rk)_live_/.test(key);
+  if (!live && !/^(sk|rk)_test_/.test(key)) {
+    throw new Error('STRIPE_ACCOUNT_SECRET_KEY is neither a live nor a test secret key');
+  }
+  if (live !== expectedLivemode(env)) {
+    throw new Error('STRIPE_ACCOUNT_SECRET_KEY is not the mode STRIPE_ACCOUNT_LIVEMODE names');
+  }
+  if (!live && (env.VERCEL_ENV === 'production' || onProductionDatabase(env))) {
+    throw new Error('the production deployment and database bill in live mode only');
+  }
+  client = new Stripe(key);
+  return client;
+}
+
+/**
+ * The production Supabase project's default host (PROJECT_OVERVIEW §9). Previews hold its service-role
+ * key too. A custom domain for the project would reach it under another name: add it here first.
+ */
+const PRODUCTION_SUPABASE_HOST = 'ezspnfeyzwsisymytssm.supabase.co';
+
+/** Whether the URL names that host: case, port, path and a trailing root dot do not change it. */
+function onProductionDatabase(env: Env): boolean {
+  try {
+    const host = new URL(env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname.replace(/\.$/, '');
+    return host === PRODUCTION_SUPABASE_HOST;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether the account's events must be live ones: `STRIPE_ACCOUNT_LIVEMODE=true`, anything else test. */
+export function expectedLivemode(env: Env = process.env): boolean {
+  return env.STRIPE_ACCOUNT_LIVEMODE === 'true';
+}

@@ -3,7 +3,8 @@
  * the `apply_entitlement_transition` RPC (migration 001), which does it in one transaction and
  * refuses the write when the account changed since it was read.
  *
- * Not imported by any live route. CC-03's webhook handler is its first caller.
+ * Its callers are CC-03's v2 Stripe webhook and our clock (the trial and past-due functions), both
+ * behind V2_BILLING, and the first-login hook, which reads through `load` only.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AccountState } from '@crawlmouse/types/v2';
@@ -67,12 +68,17 @@ export interface StoredSnapshot {
   snapshot: EntitlementSnapshot;
 }
 
+/**
+ * Where a transition is read and written. `applyEntitlementTransition` passes `commit` and `confirm`
+ * the transition they record, so a store that writes more than the account in the same transaction
+ * (the v2 Stripe webhook's ledger row and its effects) has it; the Supabase store below ignores it.
+ */
 export interface EntitlementStore {
   load(accountId: string): Promise<StoredSnapshot | null>;
   /** Returns the new version; throws EntitlementConflictError when the expected version is stale. */
-  commit(params: TransitionParams): Promise<number>;
+  commit(params: TransitionParams, transition?: Transition): Promise<number>;
   /** Throws EntitlementConflictError when the account is no longer at `version`. */
-  confirm(accountId: string, version: number): Promise<void>;
+  confirm(accountId: string, version: number, transition?: Transition): Promise<void>;
 }
 
 export class EntitlementConflictError extends Error {
@@ -151,12 +157,14 @@ export function toTransitionParams(
 }
 
 export interface AppliedTransition {
+  /** The snapshot the transition was decided on. */
+  before: EntitlementSnapshot;
   transition: Transition;
   /** The account's version after this call: unchanged when the event was ignored. */
   version: number;
   /**
-   * Site effects the RPC does not apply yet, because the `sites` table arrives in migration 003.
-   * Until then the caller owns them; `planSites` computes them.
+   * The site effects of a written transition. Since migration 003 `apply_entitlement_transition`
+   * applies them in the same transaction, so this says what was done, not what is left to do.
    */
   siteEffects: SiteEffect[];
 }
@@ -177,16 +185,17 @@ export async function applyEntitlementTransition(
   if (transition.outcome === 'ignored' || unchanged) {
     // Nothing to write, but the decision was made on this read: it stands only if the account has
     // not changed since.
-    await store.confirm(accountId, stored.version);
-    return { transition, version: stored.version, siteEffects: [] };
+    await store.confirm(accountId, stored.version, transition);
+    return { before: stored.snapshot, transition, version: stored.version, siteEffects: [] };
   }
   const version = await store.commit(
     toTransitionParams(accountId, stored.version, transition.state, event.at),
+    transition,
   );
   const siteEffects = transition.effects
     .map((e) => e.kind)
     .filter((kind): kind is SiteEffect => SITE_EFFECTS.includes(kind));
-  return { transition, version, siteEffects };
+  return { before: stored.snapshot, transition, version, siteEffects };
 }
 
 /** The store for route handlers and Inngest functions; `sb` must be the service-role client. */

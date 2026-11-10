@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
+import { reconcileBillingHandler, setAccountReconcile } from './billing';
 import {
   deriveProUntil,
   reconcileCustomerChunk,
@@ -15,7 +16,10 @@ const iso = (unix: number) => new Date(unix * 1000).toISOString();
 const sub = (status: string, periodEnd: number | null): Stripe.Subscription =>
   ({ status, current_period_end: periodEnd }) as unknown as Stripe.Subscription;
 const subItems = (status: string, periodEnd: number): Stripe.Subscription =>
-  ({ status, items: { data: [{ current_period_end: periodEnd }] } }) as unknown as Stripe.Subscription;
+  ({
+    status,
+    items: { data: [{ current_period_end: periodEnd }] },
+  }) as unknown as Stripe.Subscription;
 
 describe('sameInstant', () => {
   it('treats two strings for the SAME wall time as equal despite differing ISO formats', () => {
@@ -44,16 +48,25 @@ describe('sameInstant', () => {
 
 describe('deriveProUntil', () => {
   it('picks the latest period-end across multiple active subs', () => {
-    expect(deriveProUntil([sub('active', 1_000), sub('trialing', 2_000)])).toEqual({ skip: false, proUntil: iso(2_000) });
+    expect(deriveProUntil([sub('active', 1_000), sub('trialing', 2_000)])).toEqual({
+      skip: false,
+      proUntil: iso(2_000),
+    });
   });
   it('reads the period-end off the subscription item when the top-level field is absent', () => {
-    expect(deriveProUntil([subItems('active', 2_000)])).toEqual({ skip: false, proUntil: iso(2_000) });
+    expect(deriveProUntil([subItems('active', 2_000)])).toEqual({
+      skip: false,
+      proUntil: iso(2_000),
+    });
   });
   it('skips (no downgrade) when an active sub has no resolvable period-end', () => {
     expect(deriveProUntil([sub('active', null)])).toEqual({ skip: true });
   });
   it('returns null pro_until (clears Pro) when no subs are active', () => {
-    expect(deriveProUntil([sub('canceled', 2_000), sub('incomplete_expired', 3_000)])).toEqual({ skip: false, proUntil: null });
+    expect(deriveProUntil([sub('canceled', 2_000), sub('incomplete_expired', 3_000)])).toEqual({
+      skip: false,
+      proUntil: null,
+    });
   });
 });
 
@@ -83,7 +96,9 @@ function makeSb(
       }),
     }),
   };
-  return sb as unknown as Parameters<typeof reconcileCustomerChunk>[0] & { updates: typeof updates };
+  return sb as unknown as Parameters<typeof reconcileCustomerChunk>[0] & {
+    updates: typeof updates;
+  };
 }
 
 function makeStripe(byCustomer: Record<string, Stripe.Subscription[] | Error>) {
@@ -147,22 +162,30 @@ describe('reconcileCustomerChunk', () => {
 
   it('re-throws a non-resource_missing Stripe error so step.run can retry the chunk', async () => {
     const sb = makeSb({ uX: null });
-    const stripe = makeStripe({ cus_X: Object.assign(new Error('Too many requests'), { code: 'rate_limit' }) });
-    await expect(reconcileCustomerChunk(sb, stripe, [cust('uX', 'cus_X')])).rejects.toThrow(/Too many requests/);
+    const stripe = makeStripe({
+      cus_X: Object.assign(new Error('Too many requests'), { code: 'rate_limit' }),
+    });
+    await expect(reconcileCustomerChunk(sb, stripe, [cust('uX', 'cus_X')])).rejects.toThrow(
+      /Too many requests/,
+    );
     expect(sb.updates).toEqual([]); // nothing written on a propagated failure
   });
 
   it('throws (→ chunk retry) when the Supabase read fails, instead of silently skipping', async () => {
     const sb = makeSb({ u1: null }, { readError: new Error('db read down') });
     const stripe = makeStripe({ cus_1: [sub('active', 5_000)] });
-    await expect(reconcileCustomerChunk(sb, stripe, [cust('u1', 'cus_1')])).rejects.toThrow(/db read down/);
+    await expect(reconcileCustomerChunk(sb, stripe, [cust('u1', 'cus_1')])).rejects.toThrow(
+      /db read down/,
+    );
     expect(sb.updates).toEqual([]);
   });
 
   it('throws (→ chunk retry) when the Supabase write fails', async () => {
     const sb = makeSb({ u1: null }, { writeError: new Error('db write down') });
     const stripe = makeStripe({ cus_1: [sub('active', 5_000)] });
-    await expect(reconcileCustomerChunk(sb, stripe, [cust('u1', 'cus_1')])).rejects.toThrow(/db write down/);
+    await expect(reconcileCustomerChunk(sb, stripe, [cust('u1', 'cus_1')])).rejects.toThrow(
+      /db write down/,
+    );
   });
 });
 
@@ -197,10 +220,11 @@ describe('runReconcile', () => {
   it('single-customer mode only touches the named customer', async () => {
     const sb = makeSb({ u1: null, u2: null });
     const stripe = makeStripe({ cus_1: [sub('active', 5_000)], cus_2: [sub('active', 6_000)] });
-    const res = await runReconcile(
-      sb, stripe, [cust('u1', 'cus_1'), cust('u2', 'cus_2')],
-      { mode: 'single-customer', customerId: 'cus_1', keyLivemode: false },
-    );
+    const res = await runReconcile(sb, stripe, [cust('u1', 'cus_1'), cust('u2', 'cus_2')], {
+      mode: 'single-customer',
+      customerId: 'cus_1',
+      keyLivemode: false,
+    });
     expect(res.repaired).toBe(1);
     expect(sb.updates).toEqual([{ id: 'u1', pro_until: iso(5_000) }]); // u2 untouched
   });
@@ -209,7 +233,11 @@ describe('runReconcile', () => {
     const sb = makeSb({ u1: null });
     const stripe = makeStripe({ cus_1: [sub('active', 5_000)] });
     await expect(
-      runReconcile(sb, stripe, customers, { mode: 'full', keyLivemode: false, expectLivemode: true }),
+      runReconcile(sb, stripe, customers, {
+        mode: 'full',
+        keyLivemode: false,
+        expectLivemode: true,
+      }),
     ).rejects.toBeInstanceOf(LivemodeMismatchError);
     expect(sb.updates).toEqual([]);
   });
@@ -220,10 +248,19 @@ describe('runReconcile', () => {
     let stripeListed = false;
     const sb = makeSb({ u1: null });
     const stripe = {
-      subscriptions: { list: async () => { stripeListed = true; return { data: [] }; } },
+      subscriptions: {
+        list: async () => {
+          stripeListed = true;
+          return { data: [] };
+        },
+      },
     } as unknown as Stripe;
     await expect(
-      runReconcile(sb, stripe, customers, { mode: 'dry-run', keyLivemode: true, expectLivemode: false }),
+      runReconcile(sb, stripe, customers, {
+        mode: 'dry-run',
+        keyLivemode: true,
+        expectLivemode: false,
+      }),
     ).rejects.toBeInstanceOf(LivemodeMismatchError);
     expect(stripeListed).toBe(false); // no Stripe read happened
     expect(sb.updates).toEqual([]); // no write happened
@@ -255,7 +292,10 @@ function makeTtlSb(expiredIds: string[], opts: { selectError?: Error } = {}) {
       }),
       delete: () => ({
         in: (_col: string, ids: string[]) => {
-          ids.forEach((id) => { store.delete(id); deleted.push(id); });
+          ids.forEach((id) => {
+            store.delete(id);
+            deleted.push(id);
+          });
           return Promise.resolve({ error: null });
         },
       }),
@@ -268,7 +308,10 @@ describe('deleteExpiredAudits', () => {
   it('deletes the entire expired set in <= batchSize chunks and terminates', async () => {
     const ids = Array.from({ length: 23 }, (_, i) => `a${i}`);
     const sb = makeTtlSb(ids);
-    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 100 });
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', {
+      batchSize: 10,
+      maxIterations: 100,
+    });
     // 23 ids / batch 10 → two full batches then a partial (3) batch that exits via the
     // `ids.length < batchSize` branch with iterations incremented to 3.
     expect(res).toMatchObject({ deleted: 23, drained: true, iterations: 3 });
@@ -281,14 +324,20 @@ describe('deleteExpiredAudits', () => {
     // broken impl that returned drained=false or looped to maxIterations would be caught here.
     const ids = Array.from({ length: 20 }, (_, i) => `a${i}`);
     const sb = makeTtlSb(ids);
-    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 100 });
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', {
+      batchSize: 10,
+      maxIterations: 100,
+    });
     expect(res).toMatchObject({ deleted: 20, drained: true, iterations: 2 });
     expect(sb.deleted.length).toBe(20); // the trailing empty select adds nothing
   });
 
   it('an already-empty expired set returns deleted=0, drained=true, iterations=0', async () => {
     const sb = makeTtlSb([]);
-    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 5 });
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', {
+      batchSize: 10,
+      maxIterations: 5,
+    });
     expect(res).toEqual({ deleted: 0, drained: true, iterations: 0 });
     expect(sb.deleted).toEqual([]);
   });
@@ -296,14 +345,20 @@ describe('deleteExpiredAudits', () => {
   it('stops at maxIterations even if rows remain (no infinite loop)', async () => {
     const ids = Array.from({ length: 100 }, (_, i) => `a${i}`);
     const sb = makeTtlSb(ids);
-    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 3 });
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', {
+      batchSize: 10,
+      maxIterations: 3,
+    });
     expect(res.deleted).toBe(30); // 3 * 10
     expect(res.drained).toBe(false);
   });
 
   it('reports drained=true when the set empties before the cap', async () => {
     const sb = makeTtlSb(['a', 'b']);
-    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 5 });
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', {
+      batchSize: 10,
+      maxIterations: 5,
+    });
     expect(res).toMatchObject({ deleted: 2, drained: true });
   });
 
@@ -326,7 +381,12 @@ describe('buildReconcileOpts', () => {
       livemodeEnv: 'true',
       defaultMode: 'dry-run', // the scheduled cron's fixed default
     });
-    expect(opts).toEqual({ mode: 'dry-run', keyLivemode: true, expectLivemode: true, customerId: undefined });
+    expect(opts).toEqual({
+      mode: 'dry-run',
+      keyLivemode: true,
+      expectLivemode: true,
+      customerId: undefined,
+    });
   });
 
   it('MANUAL path defaults to a real full run when the event omits a mode', () => {
@@ -336,7 +396,12 @@ describe('buildReconcileOpts', () => {
       defaultMode: 'full',
       event: { data: {} },
     });
-    expect(opts).toEqual({ mode: 'full', keyLivemode: false, expectLivemode: false, customerId: undefined });
+    expect(opts).toEqual({
+      mode: 'full',
+      keyLivemode: false,
+      expectLivemode: false,
+      customerId: undefined,
+    });
   });
 
   it('MANUAL path forwards the event mode + customerId verbatim', () => {
@@ -346,14 +411,25 @@ describe('buildReconcileOpts', () => {
       defaultMode: 'full',
       event: { data: { mode: 'single-customer', customerId: 'cus_42' } },
     });
-    expect(opts).toEqual({ mode: 'single-customer', keyLivemode: false, expectLivemode: undefined, customerId: 'cus_42' });
+    expect(opts).toEqual({
+      mode: 'single-customer',
+      keyLivemode: false,
+      expectLivemode: undefined,
+      customerId: 'cus_42',
+    });
   });
 
   it('keyLivemode is true only for an sk_live_ key; expectLivemode is undefined when the env is unset', () => {
-    expect(buildReconcileOpts({ secretKey: 'sk_live_x', livemodeEnv: undefined, defaultMode: 'dry-run' }))
-      .toMatchObject({ keyLivemode: true, expectLivemode: undefined });
-    expect(buildReconcileOpts({ secretKey: undefined, livemodeEnv: 'false', defaultMode: 'dry-run' }))
-      .toMatchObject({ keyLivemode: false, expectLivemode: false });
+    expect(
+      buildReconcileOpts({
+        secretKey: 'sk_live_x',
+        livemodeEnv: undefined,
+        defaultMode: 'dry-run',
+      }),
+    ).toMatchObject({ keyLivemode: true, expectLivemode: undefined });
+    expect(
+      buildReconcileOpts({ secretKey: undefined, livemodeEnv: 'false', defaultMode: 'dry-run' }),
+    ).toMatchObject({ keyLivemode: false, expectLivemode: false });
   });
 });
 
@@ -364,10 +440,10 @@ describe('runReconcile dry-run resource_missing', () => {
       cus_1: Object.assign(new Error('No such customer: cus_1'), { code: 'resource_missing' }),
       cus_2: [sub('active', 5_000)],
     });
-    const res = await runReconcile(
-      sb, stripe, [cust('u1', 'cus_1'), cust('u2', 'cus_2')],
-      { mode: 'dry-run', keyLivemode: false },
-    );
+    const res = await runReconcile(sb, stripe, [cust('u1', 'cus_1'), cust('u2', 'cus_2')], {
+      mode: 'dry-run',
+      keyLivemode: false,
+    });
     // The deleted customer is skipped (not a wouldRepair) but still counted in `checked`;
     // the healthy customer is the only intended repair. Nothing is written in dry-run.
     expect(res).toMatchObject({ mode: 'dry-run', checked: 2, wouldRepair: 1, repaired: 0 });
@@ -376,10 +452,67 @@ describe('runReconcile dry-run resource_missing', () => {
 
   it('re-throws a non-resource_missing Stripe error in dry-run (→ step retry), writing nothing', async () => {
     const sb = makeSb({ u1: null });
-    const stripe = makeStripe({ cus_1: Object.assign(new Error('Too many requests'), { code: 'rate_limit' }) });
+    const stripe = makeStripe({
+      cus_1: Object.assign(new Error('Too many requests'), { code: 'rate_limit' }),
+    });
     await expect(
       runReconcile(sb, stripe, [cust('u1', 'cus_1')], { mode: 'dry-run', keyLivemode: false }),
     ).rejects.toThrow(/Too many requests/);
     expect(sb.updates).toEqual([]);
+  });
+});
+
+// ─── The v2 reconcile seam (CC-03 D10) ───────────────────────────────────────────────────────────
+
+describe('reconcileBillingFn and the v2 reconcile seam', () => {
+  /** A fake `step` that records step ids and runs each body, except the canned ones. */
+  function fakeStep(canned: Record<string, unknown>) {
+    const ran: string[] = [];
+    const step = {
+      run: async (id: string, fn: () => unknown) => {
+        ran.push(id);
+        return id in canned ? canned[id] : fn();
+      },
+    };
+    return { step, ran };
+  }
+  const v1Summary = { mode: 'dry-run', checked: 4, wouldRepair: 1, repaired: 0 };
+  type Input = Parameters<typeof reconcileBillingHandler>[0];
+
+  afterEach(() => setAccountReconcile(null));
+
+  it('unset: v1’s step alone, and its summary is the answer', async () => {
+    const { step, ran } = fakeStep({ 'reconcile-dry-run': v1Summary });
+    expect(await reconcileBillingHandler({ step } as unknown as Input)).toEqual(v1Summary);
+    expect(ran).toEqual(['reconcile-dry-run']);
+  });
+
+  it('set: v1’s step, then reconcile-accounts runs it; the answer is still v1’s summary', async () => {
+    const calls: string[] = [];
+    setAccountReconcile(async () => {
+      calls.push('v2');
+      return { checked: 2, drifted: 1 };
+    });
+    const { step, ran } = fakeStep({ 'reconcile-dry-run': v1Summary });
+    expect(await reconcileBillingHandler({ step } as unknown as Input)).toEqual(v1Summary);
+    expect(ran).toEqual(['reconcile-dry-run', 'reconcile-accounts']);
+    expect(calls).toEqual(['v2']);
+  });
+
+  it('a v2 failure fails the run after v1’s step, so Inngest retries only the second step', async () => {
+    setAccountReconcile(async () => Promise.reject(new Error('the key’s mode is wrong')));
+    const { step, ran } = fakeStep({ 'reconcile-dry-run': v1Summary });
+    await expect(reconcileBillingHandler({ step } as unknown as Input)).rejects.toThrow(
+      'the key’s mode is wrong',
+    );
+    expect(ran).toEqual(['reconcile-dry-run', 'reconcile-accounts']);
+  });
+
+  it('set back to null: v1’s step alone again', async () => {
+    setAccountReconcile(async () => ({}));
+    setAccountReconcile(null);
+    const { step, ran } = fakeStep({ 'reconcile-dry-run': v1Summary });
+    await reconcileBillingHandler({ step } as unknown as Input);
+    expect(ran).toEqual(['reconcile-dry-run']);
   });
 });
