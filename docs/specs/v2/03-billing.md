@@ -125,8 +125,9 @@ CI's Postgres (each mechanism is removed in a mutated database there):
   writer's uncommitted row, so the guard then reads that writer's `last_event_created`. This is what
   protects the path, a brand-new subscription included; keep it. The `for update` that follows can lock only
   a row that already exists: on such a row it serialises the two events by itself, and on a new one it locks
-  nothing. A call without a mirror row (a superseded event, record-only) runs no insert and applies no
-  transition.
+  nothing. A call without a mirror row (a superseded event, record-only) runs no insert. When the
+  webhook's call names a subscription and carries a transition, it carries a mirror row too
+  (`apps/web/lib/billing/stripe-normalise.ts`); the function does not check that itself.
 - **A confirm and a commit on one account:** the account row's `for update`, taken before the version is
   read. Without it, the confirm still waits later, on the `FOR KEY SHARE` lock that writing its ledger row's
   `account_id` takes, but only after deciding on the old version.
