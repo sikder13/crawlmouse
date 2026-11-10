@@ -30,8 +30,10 @@ const MIGRATION = '20261110000001_v2_billing_rpc.sql';
 /**
  * How a mutated database differs from the migration. Each `for update` names a lock it leaves out;
  * `insert` leaves out the subscription row's `insert … on conflict do nothing`, the only statement
- * that creates the row; `insertLate` keeps both but runs the insert after the locking read, so the
- * read finds no row to lock when the row is new.
+ * that creates the row; `guardEarly` keeps both but runs the locking read and the guard before the
+ * insert, then locks the row again so a call that creates it still writes its mark. Run one call
+ * after the other it decides as the migration does (the serial control below); only a call racing
+ * a concurrent creator of the row reads no row and skips the guard.
  */
 const EDITS = {
   ledger: { find: '     for update of e;\n', with: ';\n' },
@@ -41,9 +43,9 @@ const EDITS = {
     find: /^      insert into public\.subscriptions \(id, account_id,[\s\S]*?on conflict \(id\) do nothing;\n/m,
     with: '',
   },
-  insertLate: {
-    find: /^(    if v_m is not null then\n      insert into public\.subscriptions [\s\S]*?on conflict \(id\) do nothing;\n    end if;\n)(    select s\.account_id, s\.last_event_created, s\.status\n[\s\S]*?       for update of s;\n    v_sub_found := found;\n)/m,
-    with: '$2$1',
+  guardEarly: {
+    find: /^(    if v_m is not null then\n      insert into public\.subscriptions [\s\S]*?on conflict \(id\) do nothing;\n    end if;\n)([\s\S]*?v_m_prices := null;\n    end if;\n)/m,
+    with: '$2$1    perform 1 from public.subscriptions s where s.id = v_sub_id for update of s;\n    v_sub_found := found;\n',
   },
 } as const;
 /** How long to watch for B waiting. Below the function's 5 s lock_timeout, so B never times out. */
@@ -169,7 +171,20 @@ const call = (t: postgres.ReservedSql | Sql, p: P) =>
   // sql.json sends the value as jsonb; a JSON.stringify'd string would be sent as a jsonb string.
   t`select public.apply_stripe_event(${t.json(p as never)}) as r`;
 
-/** A's call commits only after B's call has been seen waiting on a lock (or the watch ran out). */
+interface Lock {
+  relname: string | null;
+  mode: string;
+  granted: boolean;
+}
+
+/** The lock modes B held on a table while it waited. */
+const heldOn = (locks: Lock[], table: string) =>
+  locks.filter((l) => l.granted && l.relname === table).map((l) => l.mode);
+
+/**
+ * A's call commits only after B's call has been seen waiting on a lock (or the watch ran out).
+ * `locks` is what B held at that moment, which says where in the function it was waiting.
+ */
 async function race(sql: Sql, a: P, b: P) {
   const ta = await sql.reserve();
   const tb = await sql.reserve();
@@ -187,16 +202,22 @@ async function race(sql: Sql, a: P, b: P) {
       (error: unknown) => ({ error: error as { code?: string } }),
     );
     let waited = false;
+    let locks: Lock[] = [];
     for (const until = Date.now() + WAIT_WATCH_MS; Date.now() < until && !waited; ) {
       const [w] =
         await sql`select exists (select 1 from pg_locks where pid = ${pid} and not granted) as w`;
       waited = w!.w as boolean;
+      if (waited) {
+        locks = (await sql`select c.relname, l.mode, l.granted from pg_locks l
+                             left join pg_class c on c.oid = l.relation
+                            where l.pid = ${pid}`) as unknown as Lock[];
+      }
       if (!waited) await new Promise((r) => setTimeout(r, 25));
     }
     await ta`commit`;
     const settled = await pending;
     await tb`commit`.catch(() => {});
-    return { a: ra!.r as Answer, b: settled, waited };
+    return { a: ra!.r as Answer, b: settled, waited, locks };
   } finally {
     // A failed race leaves a transaction open; end it before the connection goes back to the pool.
     for (const t of [ta, tb]) {
@@ -286,7 +307,7 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
     insert: `stripe_race_insert_${suffix}`,
     unguarded: `stripe_race_unguarded_${suffix}`,
     account: `stripe_race_account_${suffix}`,
-    insertLate: `stripe_race_insert_late_${suffix}`,
+    guardEarly: `stripe_race_guard_early_${suffix}`,
   };
   let admin: Sql;
   const dbs = {} as Record<keyof typeof names, Sql>;
@@ -299,7 +320,7 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
     dbs.insert = await migrated(admin, names.insert, ['insert']);
     dbs.unguarded = await migrated(admin, names.unguarded, ['subscription', 'insert']);
     dbs.account = await migrated(admin, names.account, ['account']);
-    dbs.insertLate = await migrated(admin, names.insertLate, ['insertLate']);
+    dbs.guardEarly = await migrated(admin, names.guardEarly, ['guardEarly']);
   }, 240_000);
 
   afterAll(async () => {
@@ -307,7 +328,7 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
     for (const n of Object.values(names))
       await admin?.unsafe(`drop database if exists ${n} with (force)`);
     await admin?.end({ timeout: 5 });
-    // Its own timeout: on a local Postgres 17 the first drop alone reached vitest's default.
+    // Its own timeout: on a local Postgres 17 the first drop took most of vitest's default 10 s.
   }, 120_000);
 
   // ── 1. two deliveries of one event ──
@@ -397,7 +418,7 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
    * - 'existing': written and committed before the race, by the setup's checkout, or, in the
    *   databases without the insert (where no call creates a row), by the statement below.
    */
-  async function olderAfterNewer(sql: Sql, row: 'new' | 'existing') {
+  async function olderAfterNewer(sql: Sql, row: 'new' | 'existing', serial = false) {
     const { accountId, sub } = await onPro(sql, row === 'existing');
     if (row === 'existing') {
       await sql`insert into public.subscriptions (id, account_id, status, plan, interval, price_ids,
@@ -411,8 +432,28 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
       throw new Error(`the ${row} set-up left the row ${before ? 'present' : 'absent'}`);
     const newer = await newerUnchanged(sql, accountId, sub);
     const older = await olderPastDue(sql, accountId, sub);
-    return { accountId, sub, r: await race(sql, newer, older) };
+    if (!serial) return { accountId, sub, r: await race(sql, newer, older) };
+    // The control: the newer commits before the older starts.
+    const one = async (p: P) =>
+      sql.begin(async (t) => {
+        await t`set local role service_role`;
+        return (await call(t as never, p))[0]!.r as Answer;
+      });
+    const a = await one(newer);
+    return {
+      accountId,
+      sub,
+      r: { a, b: { ok: await one(older) }, waited: false, locks: [] as Lock[] },
+    };
   }
+
+  // Where B waits in a new-row race: inside the insert, which holds RowExclusiveLock on subscriptions.
+  // It has not reached the locking read (RowShareLock on subscriptions) or the account (any lock).
+  const waitedInTheInsert = (locks: Lock[]) => {
+    expect(heldOn(locks, 'subscriptions')).toContain('RowExclusiveLock');
+    expect(heldOn(locks, 'subscriptions')).not.toContain('RowShareLock');
+    expect(heldOn(locks, 'accounts')).toEqual([]);
+  };
 
   async function subscriptionRow(sql: Sql, sub: string) {
     return (await sql`select status from public.subscriptions where id = ${sub}`)[0] ?? null;
@@ -421,9 +462,10 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
   // What serialises this path (spec 03, "Concurrency"): the insert … on conflict, the only statement
   // that creates a subscription row, which waits for a concurrent writer of that row; and the row
   // lock, which can lock only a row that exists.
-  it('on a brand-new subscription the newer creates the row; the older waits on it, then is refused', async () => {
+  it('on a brand-new subscription the newer creates the row; the older waits in its insert, then is refused', async () => {
     const { accountId, sub, r } = await olderAfterNewer(dbs.real, 'new');
     expect(r.waited).toBe(true);
+    waitedInTheInsert(r.locks);
     expect(r.a).toMatchObject({ decided: false, handled: false, reason: 'no entitlement change' });
     expect(r.b).toMatchObject({ ok: { decided: false, handled: false, reason: OLDER } });
     expect(await accountOf(dbs.real, accountId)).toEqual({ state: 'pro', version: 1 });
@@ -435,18 +477,24 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
     // sees A's row and its mark.
     const { accountId, sub, r } = await olderAfterNewer(dbs.subscription, 'new');
     expect(r.waited).toBe(true);
+    waitedInTheInsert(r.locks);
     expect(r.b).toMatchObject({ ok: { decided: false, handled: false, reason: OLDER } });
     expect(await accountOf(dbs.subscription, accountId)).toEqual({ state: 'pro', version: 1 });
     expect(await subscriptionRow(dbs.subscription, sub)).toMatchObject({ status: 'active' });
   });
 
-  it('mutation check: with the insert after the lock, on a brand-new subscription, the older writes past_due after the newer', async () => {
-    // B's locking read finds no committed row and locks nothing; its insert then waits for A's row,
-    // but the guard has already been skipped.
-    const { accountId, r } = await olderAfterNewer(dbs.insertLate, 'new');
+  it('control: with the guard before the insert, one call after the other, the older is refused', async () => {
+    const { accountId, r } = await olderAfterNewer(dbs.guardEarly, 'new', true);
+    expect(r.b).toMatchObject({ ok: { decided: false, handled: false, reason: OLDER } });
+    expect(await accountOf(dbs.guardEarly, accountId)).toEqual({ state: 'pro', version: 1 });
+  });
+
+  it('mutation check: with the guard before the insert, on a brand-new subscription, the older writes past_due after the newer', async () => {
+    // B's guard reads no committed row and passes; its insert then waits for A's row, too late.
+    const { accountId, r } = await olderAfterNewer(dbs.guardEarly, 'new');
     expect(r.waited).toBe(true);
     expect(r.b).toMatchObject({ ok: { decided: false, handled: true } });
-    expect(await accountOf(dbs.insertLate, accountId)).toEqual({ state: 'past_due', version: 2 });
+    expect(await accountOf(dbs.guardEarly, accountId)).toEqual({ state: 'past_due', version: 2 });
   });
 
   it('without the lock, on a row that exists, the insert waits on the newer’s update of it and the older is refused', async () => {
@@ -515,7 +563,10 @@ describe.skipIf(!URL_ENV)('apply_stripe_event under two real transactions', () =
     // writing its ledger row's account_id takes FOR KEY SHARE on the account, which A's FOR UPDATE
     // blocks. That wait comes after the decision, so it protects nothing (spec 03, "Concurrency").
     const { r } = await commitThenConfirm(dbs.account);
-    expect(r.waited, 'B waited, on the FOR KEY SHARE lock').toBe(true);
+    expect(r.waited).toBe(true);
+    // B waits while writing its ledger row (RowExclusiveLock on stripe_events), after deciding. With
+    // the account lock in place it waits before writing anything.
+    expect(heldOn(r.locks, 'stripe_events')).toContain('RowExclusiveLock');
     expect(r.a).toMatchObject({ decided: false, handled: true, version: 1 });
     expect(r.b).toMatchObject({ ok: { decided: false, handled: false } });
   });
