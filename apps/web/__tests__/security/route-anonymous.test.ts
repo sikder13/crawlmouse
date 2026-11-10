@@ -71,6 +71,8 @@ const ANONYMOUS: Record<
     status: 401,
     reads: ['admin.from(audits)', 'admin.select', 'admin.eq', 'admin.maybeSingle'],
   },
+  'api/billing/agency-trial': { status: 401, body: { error: 'auth_required' } },
+  'api/billing/cancel': { status: 401, body: { error: 'auth_required' } },
   'api/billing/checkout': { status: 401, body: { error: 'auth_required' } },
   'api/billing/portal': { status: 401, body: { error: 'auth_required' } },
   'api/billing/status': { status: 401, body: { pro: false } },

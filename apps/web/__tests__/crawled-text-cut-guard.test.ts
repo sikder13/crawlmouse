@@ -227,6 +227,10 @@ const INVENTORY: [entry: string, why: string][] = [
     'array slice \u2014 cannot split a surrogate pair',
   ],
   [
+    'apps/web/lib/billing/clock.ts :: return due.slice(0, limit).map(({ accountId, kind }) => ({ accountId, kind }));',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
     'apps/web/lib/billing/csv.ts :: return raw.length > max ? `${raw.slice(0, max)}\u2026` : raw;',
     'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
   ],

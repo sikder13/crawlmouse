@@ -1,4 +1,5 @@
 import { Inngest, EventSchemas } from 'inngest';
+import type { AccountState } from '@crawlmouse/types/v2';
 import type {
   CheckCancelRequested,
   CheckFailed,
@@ -33,6 +34,15 @@ type Events = {
   'billing.reconcile.requested': {
     data: { mode?: 'dry-run' | 'single-customer' | 'full'; customerId?: string };
   };
+  // v2 billing (CC-03): the entitlement machine's `event` and `email` effects, sent by
+  // apps/web/lib/billing/effects.ts. Data shapes as ARCH-2 §4.1 lists them.
+  'trial.started': {
+    data: { accountId: string; trialEndsAt: string; variant: 'no_card' | 'card_required' };
+  };
+  'trial.converted': { data: { accountId: string } };
+  'entitlement.changed': { data: { accountId: string; from: AccountState; to: AccountState } };
+  // CC-28's mailer handles it; nothing in CC-03 does.
+  'email.requested': { data: { accountId: string; template: 'trial_reminder' } };
   // The v2 check pipeline (CC-20b, check.ts). Registered only when V2_PIPELINE=1.
   'check.requested': { data: CheckRequested };
   'check.finished': { data: CheckFinished };

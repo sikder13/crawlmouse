@@ -26,7 +26,7 @@ import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { runCheck, type CheckStepTools, type DiscoverOutput } from '../../../../../inngest/check';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
@@ -37,6 +37,9 @@ import { checkSteps } from './steps';
 import { memoryEvidenceStore } from './test-support/memory-evidence';
 import { pgliteCheckReader, pglitePersistDb } from './test-support/pglite';
 import { sqlPipelineStore } from './test-support/sql-store';
+
+// The billing functions (CC-03) load modules that import 'server-only', which throws outside Next.
+vi.mock('server-only', () => ({}));
 
 const env = process.env;
 const configured = ['CRAWL_WORKER_URL', 'WORKER_SIGNING_SECRET', 'WORKER_JWT_PRIVATE_KEY_PKCS8_B64']

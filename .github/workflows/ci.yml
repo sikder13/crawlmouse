@@ -597,3 +597,9 @@ jobs:
           TRIAL_RACE_REQUIRED: '1'
         # A renamed or missing file must fail the step, not pass it with no tests.
         run: pnpm exec vitest run db/trial-race.test.ts --passWithNoTests=false
+      - name: Two transactions race in apply_stripe_event (CC-03)
+        working-directory: scripts
+        env:
+          TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          TRIAL_RACE_REQUIRED: '1'
+        run: pnpm exec vitest run db/stripe-event-race.test.ts --passWithNoTests=false

@@ -269,7 +269,7 @@ describe('cross-site refusal covers every state change a session or a visitor ca
     expect(open.map((p) => p.route)).toEqual([]);
   });
 
-  it('the strict rule is on exactly these twelve routes', () => {
+  it('the strict rule is on exactly these fourteen routes', () => {
     expect(
       ROUTE_POLICIES.filter((p) => p.origin === 'strict')
         .map((p) => p.route)
@@ -278,6 +278,8 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
       'api/auth/logout',
+      'api/billing/agency-trial',
+      'api/billing/cancel',
       'api/billing/checkout',
       'api/billing/portal',
       'api/checks/[id]/claim',

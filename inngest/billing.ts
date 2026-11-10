@@ -1,3 +1,4 @@
+import type { GetFunctionInput } from 'inngest';
 import { inngest } from './client';
 import { supabaseAdmin } from './supabase';
 import { runReconcile, buildReconcileOpts, deleteExpiredAudits } from './billing-helpers';
@@ -43,23 +44,46 @@ async function loadCustomers(sb: ReturnType<typeof supabaseAdmin>, customerId?: 
   return loadAllCustomers(sb);
 }
 
+let accountReconcile: (() => Promise<unknown>) | null = null;
+
+/**
+ * The v2 reconcile (CC-03 D10). The app sets it when V2_BILLING is on
+ * (apps/web/lib/billing/reconcile-v2.ts, accountReconcileFromEnv); the nightly run then runs it as a
+ * second step after v1's. Null, the default, leaves the nightly run as v1's step alone.
+ */
+export function setAccountReconcile(run: (() => Promise<unknown>) | null): void {
+  accountReconcile = run;
+}
+
+type ReconcileInput = Pick<GetFunctionInput<typeof inngest>, 'step'>;
+
+/**
+ * The nightly body, exported so a test can drive it with a fake `step`. v1's dry run first, then the
+ * v2 reconcile when it is set; the run answers v1's summary either way.
+ */
+export async function reconcileBillingHandler({ step }: ReconcileInput) {
+  const v1 = await step.run('reconcile-dry-run', async () => {
+    const sb = supabaseAdmin();
+    const stripe = stripeClient();
+    const opts = buildReconcileOpts({
+      secretKey: process.env.STRIPE_SECRET_KEY,
+      livemodeEnv: process.env.STRIPE_RECONCILE_LIVEMODE,
+      defaultMode: 'dry-run', // scheduled cron is dry-run ONLY — never writes
+    });
+    const customers = await loadCustomers(sb, opts.customerId);
+    return runReconcile(sb, stripe, customers, opts);
+  });
+  const v2 = accountReconcile;
+  if (v2 !== null) await step.run('reconcile-accounts', () => v2());
+  return v1;
+}
+
 // SCHEDULED daily run — DRY-RUN ONLY. Logs intended pro_until repairs; writes nothing.
 // A real repair is triggered explicitly via the manual function below.
 export const reconcileBillingFn = inngest.createFunction(
   { id: 'crawlmouse.stripe-reconcile' },
   { cron: '0 3 * * *' },
-  async ({ step }) =>
-    step.run('reconcile-dry-run', async () => {
-      const sb = supabaseAdmin();
-      const stripe = stripeClient();
-      const opts = buildReconcileOpts({
-        secretKey: process.env.STRIPE_SECRET_KEY,
-        livemodeEnv: process.env.STRIPE_RECONCILE_LIVEMODE,
-        defaultMode: 'dry-run', // scheduled cron is dry-run ONLY — never writes
-      });
-      const customers = await loadCustomers(sb, opts.customerId);
-      return runReconcile(sb, stripe, customers, opts);
-    }),
+  ({ step }) => reconcileBillingHandler({ step }),
 );
 
 // MANUAL reconcile — explicit `inngest.send({ name: 'billing.reconcile.requested', data: { mode, customerId } })`.

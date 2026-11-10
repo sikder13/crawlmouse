@@ -42,6 +42,10 @@ import {
   writeBlocks,
 } from './v1-inventory-report';
 
+// The serve route's list reaches CC-03's billing functions, which import 'server-only'; vitest has
+// no such module, so it is mocked, as lib/billing/inngest-functions.test.ts does.
+vi.mock('server-only', () => ({}));
+
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({}) }));
 vi.mock('@/lib/sitemap-reports', () => ({
   fetchIndexableReportSlugs: () =>
@@ -166,7 +170,12 @@ describe('the finders see what they claim to see', () => {
     const hidden = [...v1Pages(), ...v1MetadataFiles(), ...v1Routes()].filter((p) =>
       isFlagGated(join(WEB, p)),
     );
-    expect(hidden).toEqual(['app/api/checks/[id]/claim/route.ts']);
+    expect(hidden).toEqual([
+      'app/api/billing/agency-trial/route.ts',
+      'app/api/billing/cancel/route.ts',
+      'app/api/checks/[id]/claim/route.ts',
+      'app/api/webhooks/stripe-account/route.ts',
+    ]);
   });
 
   it('top-level exported Inngest functions with their cron, and not a factory-built one', () =>

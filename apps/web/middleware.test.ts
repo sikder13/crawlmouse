@@ -107,7 +107,7 @@ describe('middleware (exported entrypoint)', () => {
       {
         reason: 'cross_site',
         route: 'api/billing/portal',
-        class: 'user',
+        class: 'member',
         method: 'POST',
         status: 403,
       },
@@ -141,11 +141,13 @@ const lenient = ROUTE_POLICIES.filter((p) => p.origin === 'lenient');
 const passes = (res: NextResponse) => res.headers.get('x-middleware-next') === '1';
 
 describe('a state-changing API request from another site is refused before the route runs', () => {
-  it('guards exactly the twelve strict routes, named here', () => {
+  it('guards exactly the fourteen strict routes, named here', () => {
     expect(guarded.map((p) => p.route).sort()).toEqual([
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
       'api/auth/logout',
+      'api/billing/agency-trial',
+      'api/billing/cancel',
       'api/billing/checkout',
       'api/billing/portal',
       'api/checks/[id]/claim',
