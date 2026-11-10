@@ -1487,8 +1487,8 @@
       "id": "A-7",
       "severity": "major",
       "items": ["app/r/[slug]/page.tsx"],
-      "evidence": "apps/web/middleware.ts:64; apps/web/app/r/[slug]/page.tsx:23",
-      "what": "the middleware sends X-Robots-Tag: noindex, nofollow, noarchive on every /r/ page, including the claimed, indexable reports the page marks index and the sitemap lists, so no report can be indexed (since 0478f107, before SPEC 04 made claimed reports indexable). A missing report's HTML also carries two robots metas. Changing the header changes what search engines index (§13). Fixed: the header is gone from /r/ and stays on /embed/. The missing report's two robots metas (Next's noindex for the 404 and the root layout's) are unchanged; the 404 status and the noindex keep it out of the index.",
+      "evidence": "apps/web/middleware.ts:69; apps/web/app/r/[slug]/page.tsx:23",
+      "what": "the middleware sends X-Robots-Tag: noindex, nofollow, noarchive on every /r/ page, including the claimed, indexable reports the page marks index and the sitemap lists, so no report can be indexed (since 0478f107, before SPEC 04 made claimed reports indexable). A missing report's HTML also carries two robots metas. Changing the header changes what search engines index (§13). Fixed: the header is gone from /r/ report pages and stays on /embed/ and on each report's share image, /r/<slug>/opengraph-image, which has no robots meta of its own (owner ruling, 2026-11-09). The missing report's two robots metas (Next's noindex for the 404 and the root layout's) are unchanged; the 404 status and the noindex keep it out of the index.",
       "fixedIn": "268cc2ec"
     },
     {
