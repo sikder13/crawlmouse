@@ -185,6 +185,19 @@ describe('middleware (exported entrypoint)', () => {
     expect(res.cookies.get(CONSENT_REQUIRED_COOKIE)).toBeDefined();
   });
 
+  it('through the real session refresh, a marker a client sent does not reach the page', async () => {
+    const event = { waitUntil: vi.fn() } as unknown as NextFetchEvent;
+    const spoofed = new NextRequest(
+      new Request('https://crawlmouse.com/pricing', { headers: { [REWRITE_HEADER]: '1' } }),
+    );
+    const res = await middleware(spoofed, event);
+    // The page sees the request as forwarded: the override list and the headers it names.
+    const forwarded = (res.headers.get('x-middleware-override-headers') ?? '').split(',');
+    expect(forwarded.length).toBeGreaterThan(0);
+    expect(forwarded).not.toContain(REWRITE_HEADER);
+    expect(res.headers.get(`x-middleware-request-${REWRITE_HEADER}`)).toBeNull();
+  });
+
   it('hands each refusal report to waitUntil, so it is sent after the response', async () => {
     const waitUntil = vi.fn();
     const res = await middleware(
