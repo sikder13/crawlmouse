@@ -301,7 +301,25 @@ describe('/audit/[id]/fix/[fixId]', () => {
     expect(first.fixes.map((f) => f.packet)).toEqual(first.fixes.map(() => null));
     const found = fixOf(one, live()[0]!.id)!;
     expect(found.view).toMatchObject({ kind: 'open', packet: null });
-    expect(dead(html(<FixBody read={one} found={found} />))).toEqual([]);
+    const markup = html(<FixBody read={one} found={found} />);
+    expect(dead(markup)).toEqual([]);
+    // The page says so, in one line, and shows what the audit does hold of the fix.
+    expect(markup.split(NO_PACKET)).toHaveLength(2);
+    expect(markup).toContain(escaped(live()[0]!.title));
+  });
+
+  it('the no-steps line is absent when the fix has a packet, and on a locked fix', () => {
+    const read = withPackets();
+    const open = fixOf(read, live()[0]!.id)!;
+    expect(open.view).toMatchObject({ kind: 'open' });
+    expect(html(<FixBody read={read} found={open} />)).not.toContain(NO_PACKET);
+    // Locked, with no packet stored: the wall stands where the line would be.
+    const locked = fixOf(one, live()[FREE_FIXES]!.id)!;
+    expect(locked.view.kind).toBe('locked');
+    expect(html(<FixBody read={one} found={locked} />)).not.toContain(NO_PACKET);
+    // Opened by a paid plan, still with no packet: the line is there.
+    const paid = fixOf({ ...one, plan: 'pro' }, live()[FREE_FIXES]!.id)!;
+    expect(html(<FixBody read={{ ...one, plan: 'pro' }} found={paid} />)).toContain(NO_PACKET);
   });
 
   it('a Free fix opens in full, with its packet', () => {
@@ -469,7 +487,7 @@ describe('nothing internal goes on the wire for a kept check (D3)', () => {
   });
 });
 
-import { FixScreen } from '../../../../components/v2/screens/fix/FixScreen';
+import { FixScreen, NO_PACKET } from '../../../../components/v2/screens/fix/FixScreen';
 import type { FixView } from '../../../../lib/v2/view/fix';
 
 const fixScreen = (view: FixView) => <FixScreen data={view} />;

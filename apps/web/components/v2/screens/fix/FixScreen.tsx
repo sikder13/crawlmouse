@@ -13,6 +13,10 @@ import layout from '../../layout.module.css';
 import segment from '../segment/SegmentScreen.module.css';
 import styles from './FixScreen.module.css';
 
+/** Said in the packet card of a fix the reader may open whose steps the audit did not write. */
+export const NO_PACKET =
+  'The steps for this fix are not written yet. What the audit found, and its estimated effect, are above.';
+
 /** The packet card of an open fix: the stack it is written for, the packet, and what to do with it. */
 function PacketCard({ data }: { data: Extract<FixView, { kind: 'open' }> }) {
   const p = data.packet;
@@ -22,11 +26,7 @@ function PacketCard({ data }: { data: Extract<FixView, { kind: 'open' }> }) {
         <Heading level={2} size="s">
           The packet
         </Heading>
-        <div className={styles.hdSub}>
-          {p
-            ? p.stack
-            : 'No packet was written for this fix. The audit names it, and its effect, above.'}
-        </div>
+        <div className={styles.hdSub}>{p ? p.stack : NO_PACKET}</div>
       </div>
       {p ? (
         <>
