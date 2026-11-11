@@ -5,18 +5,23 @@
  * `expireUnkept` deletes the sites no account keeps once they are past keeping
  * (`unkept_site_expired`, migration 022b): for each, its checks' evidence objects are removed, then
  * the site's row is deleted and its checks, their measurement rows and its fixes go by the foreign
- * keys' cascades. The objects go first, so a run that stops between the two is finished by the
- * next, which lists the site again. A site an account keeps is not listed, and the delete statement
- * asks `account_id is null` itself.
+ * keys' cascades. The objects removed are those under `anon/` and, for each account in a check's
+ * `copied_for`, the same names in that account's directory of the check: what a Keep copied and did
+ * not commit. The objects go first, so a run that stops between the two is finished by the
+ * next, which lists the site again. Each site is deleted by a statement of its own
+ * (`delete_expired_unkept_sites` with one id), so a statement holds one site's cascade and a site
+ * whose delete fails is counted and left for the next run while the others go. A site an account
+ * keeps is not listed, and the delete statement asks `account_id is null` itself.
  *
  * `settleKept` moves what the ended checks of kept sites still hold under `anon/`
  * (`settleKeptCheck`, keep.ts): a check kept while it ran, one whose copy failed or ran out of
- * budget inside the claim, and one whose `anon/` objects a failed removal left.
+ * budget inside the claim, and one whose `anon/` objects a failed removal left. For a check claimed
+ * inside the sweep window it also removes the copies a refused Keep left under another account.
  *
  * Both work in bounded batches inside a time budget and return counts, with what is left for the
  * next run.
  */
-import { objectNames, settleKeptCheck, type KeepDeps } from './keep';
+import { copyPaths, objectNames, settleKeptCheck, type KeepDeps } from './keep';
 import type { ExpireStore } from './expire-store';
 import { ANONYMOUS_EXPIRY_HOURS } from './limits';
 import { evidencePath, type EvidenceStore } from './types';
@@ -28,7 +33,10 @@ import { evidencePath, type EvidenceStore } from './types';
  * the claim's own expiry test to commit.
  */
 export const EXPIRY_GRACE_MS = 10 * 60 * 1000;
-/** Sites listed and deleted per batch: one Storage removal per check, one delete per batch. */
+/**
+ * Sites listed per batch. For each: one Storage removal per check (and one more for each account
+ * in its `copied_for`), then one delete statement.
+ */
 export const EXPIRY_BATCH_SITES = 50;
 /** Batches per run, so 1,000 sites a run at most. */
 export const EXPIRY_MAX_BATCHES = 20;
@@ -59,7 +67,7 @@ export interface ExpireOutput {
   sites: number;
   /** Their checks. */
   checks: number;
-  /** Sites left in place because their objects could not be removed. */
+  /** Sites left in place: their objects could not be removed, or their delete failed. */
   skipped: number;
   /** Sites past keeping that this run did not reach. */
   left: number;
@@ -84,7 +92,6 @@ export async function expireUnkept(deps: ExpireDeps): Promise<ExpireOutput> {
       out.left = 0;
       break;
     }
-    const cleared = new Map<string, number>();
     for (const site of page.rows) {
       try {
         for (const check of site.checks) {
@@ -92,15 +99,20 @@ export async function expireUnkept(deps: ExpireDeps): Promise<ExpireOutput> {
           await deps.evidence.remove(
             objectNames(check.batches).map((name) => evidencePath(owner, name)),
           );
+          for (const accountId of check.copiedFor) {
+            await deps.evidence.remove(copyPaths({ ...owner, batches: check.batches }, accountId));
+          }
         }
-        cleared.set(site.siteId, site.checks.length);
+        // Empty when the site was kept, or stopped being past keeping, since it was listed.
+        const deleted = await deps.store.deleteExpiredUnkept([site.siteId], cutoff, bareBefore);
+        if (deleted.includes(site.siteId)) {
+          out.sites++;
+          out.checks += site.checks.length;
+        }
       } catch {
         out.skipped++;
       }
     }
-    const deleted = await deps.store.deleteExpiredUnkept([...cleared.keys()], cutoff, bareBefore);
-    out.sites += deleted.length;
-    for (const siteId of deleted) out.checks += cleared.get(siteId) ?? 0;
     after = page.rows.at(-1)!.siteId;
     out.left = page.remaining - page.rows.length;
   }

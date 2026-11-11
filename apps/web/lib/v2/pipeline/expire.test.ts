@@ -188,22 +188,56 @@ describe('expireUnkept', () => {
     expect(await exists('sites', fresh)).toBe(1);
   });
 
-  it('a run stopped after the objects were removed is finished by the next; a third changes nothing', async () => {
+  it('a site whose delete fails after its objects were removed is counted and finished by the next run; a third changes nothing', async () => {
     const check = await storedCheck(db, memory, { host: host(), expiresAt: EXPIRED });
     const real = sqlExpireStore(asService(db));
     const stopped: ExpireStore = {
       ...real,
       deleteExpiredUnkept: async () => {
-        throw new Error('the step was stopped');
+        throw new Error('canceling statement due to statement timeout');
       },
     };
-    await expect(expireUnkept(depsOf({ store: stopped }))).rejects.toThrow('the step was stopped');
+    expect(await expireUnkept(depsOf({ store: stopped }))).toEqual({
+      sites: 0,
+      checks: 0,
+      skipped: 1,
+      left: 0,
+    });
     expect([...memory.objects.keys()]).toEqual([]);
     expect(await exists('checks', check.checkId)).toBe(1);
 
     expect(await expireUnkept(depsOf())).toEqual({ sites: 1, checks: 1, skipped: 0, left: 0 });
     expect(await exists('sites', check.siteId)).toBe(0);
     expect(await expireUnkept(depsOf())).toEqual({ sites: 0, checks: 0, skipped: 0, left: 0 });
+  });
+
+  it('deletes each site in a statement of its own: one whose delete fails stays, and the others go', async () => {
+    const checks: StoredCheck[] = [];
+    for (let i = 0; i < 3; i++) {
+      checks.push(await storedCheck(db, memory, { host: host(), expiresAt: EXPIRED, batches: 0 }));
+    }
+    const stuck = checks[1]!;
+    const real = sqlExpireStore(asService(db));
+    const asked: string[][] = [];
+    const store: ExpireStore = {
+      ...real,
+      deleteExpiredUnkept: async (siteIds, cutoff, bareBefore) => {
+        asked.push([...siteIds]);
+        if (siteIds.includes(stuck.siteId))
+          throw new Error('canceling statement due to statement timeout');
+        return real.deleteExpiredUnkept(siteIds, cutoff, bareBefore);
+      },
+    };
+    expect(await expireUnkept(depsOf({ store }))).toEqual({
+      sites: 2,
+      checks: 2,
+      skipped: 1,
+      left: 0,
+    });
+    expect(asked.map((ids) => ids.length)).toEqual([1, 1, 1]);
+    expect(asked.flat().sort()).toEqual(checks.map((c) => c.siteId).sort());
+    const left = await db.query<{ id: string }>(`select id from public.sites`);
+    expect(left.rows.map((r) => r.id)).toEqual([stuck.siteId]);
   });
 
   it('a site whose objects cannot be removed is skipped with its rows, and the others go', async () => {
@@ -226,6 +260,76 @@ describe('expireUnkept', () => {
     expect(await exists('checks', stuck.checkId)).toBe(1);
     expect(anonKeys(stuck)).toHaveLength(5);
     expect(await exists('sites', gone.siteId)).toBe(0);
+  });
+
+  it('removes the copies a Keep that did not commit left under its account, with the site’s own objects', async () => {
+    // Two accounts' Keeps of one check, each refused (the check has expired on the database's
+    // clock) and each unable to remove its copies; a third account's objects of another check stay.
+    const check = await storedCheck(db, memory, { host: host(), expiresAt: EXPIRED, built: true });
+    const kept = await storedCheck(db, memory, { host: host(), expiresAt: LATER });
+    const [first, second, third] = [await keeper(), await keeper(), await keeper()];
+    const noRemove: Evidence = {
+      ...memory,
+      remove: async () => {
+        throw new Error('storage: remove refused');
+      },
+    };
+    const reported: Record<string, string>[] = [];
+    const refused = claimKeep({
+      store: sqlKeepStore(asService(db)),
+      evidence: noRemove,
+      report: (_signal, extra) => reported.push(extra),
+    });
+    for (const who of [first, second]) {
+      expect(
+        await refused.keep({
+          checkId: check.checkId,
+          siteId: check.siteId,
+          ...who,
+          schedule: null,
+        }),
+      ).toBe('expired');
+    }
+    expect(reported.map((r) => r.accountId)).toEqual([first.accountId, second.accountId]);
+    expect(
+      await claimKeep({
+        store: sqlKeepStore(asService(db)),
+        evidence: memory,
+        report: () => {},
+      }).keep({ checkId: kept.checkId, siteId: kept.siteId, ...third, schedule: null }),
+    ).toBe('taken');
+    const ofCheck = () => [...memory.objects.keys()].filter((k) => k.includes(check.checkId));
+    // Six objects (two batches, seeds, render, map, built) under anon/ and under each account.
+    expect(ofCheck()).toHaveLength(18);
+    const others = [...memory.objects.keys()].filter((k) => !k.includes(check.checkId)).sort();
+    expect(others).toHaveLength(5);
+
+    expect(await expireUnkept(depsOf())).toEqual({ sites: 1, checks: 1, skipped: 0, left: 0 });
+    expect(ofCheck()).toEqual([]);
+    expect([...memory.objects.keys()].sort()).toEqual(others);
+  });
+
+  it('a site whose copies under an account cannot be removed is skipped with its rows', async () => {
+    const check = await storedCheck(db, memory, { host: host(), expiresAt: EXPIRED });
+    const who = await keeper();
+    await asService(db)((tx) =>
+      tx.query(`select public.note_check_copy($1::uuid, $2::uuid)`, [check.checkId, who.accountId]),
+    );
+    const evidence: Evidence = {
+      ...memory,
+      remove: async (paths) => {
+        if (paths.some((p) => p.startsWith(`${who.accountId}/`)))
+          throw new Error('storage: remove refused');
+        return memory.remove(paths);
+      },
+    };
+    expect(await expireUnkept(depsOf({ evidence }))).toEqual({
+      sites: 0,
+      checks: 0,
+      skipped: 1,
+      left: 0,
+    });
+    expect(await exists('checks', check.checkId)).toBe(1);
   });
 
   it('works in bounded batches and reports what is left', async () => {
@@ -314,7 +418,7 @@ describe('a claim against the expiry, at each point', () => {
     expect(await exists('sites', check.siteId)).toBe(0);
   });
 
-  it('a site an account took after it was listed is not deleted: the delete statement tests the site again', async () => {
+  it('a site an account took after it was listed is not deleted: unkept_site_expired is asked again when the delete runs', async () => {
     const check = await storedCheck(db, memory, { host: host(), expiresAt: EXPIRED });
     const who = await keeper();
     const real = sqlExpireStore(asService(db));
@@ -481,6 +585,66 @@ describe('settleKept', () => {
       failed: 0,
       left: 0,
     });
+  });
+
+  it('removes the copies a refused Keep left under another account, for a check claimed inside the sweep window, whatever its trigger', async () => {
+    const check = await storedCheck(db, memory, { host: host(), expiresAt: LATER });
+    // Not a first audit: the sweep's other arm does not list it.
+    await db.query(`update public.checks set trigger = 'manual' where id = $1`, [check.checkId]);
+    const winner = await keeper();
+    const loser = await keeper();
+    const keepStore = sqlKeepStore(asService(db));
+    // The loser's Keep copied and then lost the site to the winner; its discard failed.
+    let won = 'not run';
+    let readBack = 0;
+    const racing: Evidence = {
+      ...memory,
+      remove: async () => {
+        throw new Error('storage: remove refused');
+      },
+      get: async (path) => {
+        const bytes = await memory.get(path);
+        // The winner's claim runs whole once the loser's last copy has been written and read back.
+        if (path.startsWith(`${loser.accountId}/`) && ++readBack === NAMES(check).length) {
+          won = await claimKeep({ store: keepStore, evidence: memory, report: () => {} }).keep({
+            checkId: check.checkId,
+            siteId: check.siteId,
+            ...winner,
+            schedule: null,
+          });
+        }
+        return bytes;
+      },
+    };
+    expect(
+      await claimKeep({ store: keepStore, evidence: racing, report: () => {} }).keep({
+        checkId: check.checkId,
+        siteId: check.siteId,
+        ...loser,
+        schedule: null,
+      }),
+    ).toBe('not_unowned');
+    expect(won).toBe('taken');
+    const leftBy = (accountId: string) =>
+      [...memory.objects.keys()].filter((k) => k.startsWith(`${accountId}/`)).sort();
+    expect(leftBy(loser.accountId)).toEqual(under(check, loser.accountId));
+
+    // Past the window the check is not listed, and the copies stay.
+    const later = () => NOW + SETTLE_SWEEP_MS + HOUR;
+    expect(await settleKept(depsOf({ now: later }))).toEqual({
+      moved: 0,
+      nothing: 0,
+      failed: 0,
+      left: 0,
+    });
+    expect(leftBy(loser.accountId)).toEqual(under(check, loser.accountId));
+
+    expect(await settleKept(depsOf())).toEqual({ moved: 0, nothing: 1, failed: 0, left: 0 });
+    expect(leftBy(loser.accountId)).toEqual([]);
+    expect([...memory.objects.keys()].sort()).toEqual(under(check, winner.accountId));
+    for (const path of await storedPaths(db, check.checkId)) {
+      expect(memory.objects.has(path), path).toBe(true);
+    }
   });
 
   it('does not list a kept check that is still running, or any check of an unkept site', async () => {

@@ -94,5 +94,5 @@ export type FirstAudit = (input: {
   userId: string;
 }) => Promise<FirstAuditOutcome>;
 
-/** A Sentry signal: a name, and ids only (never an email or a ledger value). */
+/** A Sentry signal: a name, with ids and counts (never an email or a ledger value). */
 export type Report = (signal: string, extra: Record<string, string>) => void;

@@ -1,8 +1,12 @@
 /**
  * What the daily expiry reads and deletes in Postgres (CC-22b D8): migration 022b section D's
  * `expired_unkept_sites`, `delete_expired_unkept_sites` and `unsettled_kept_checks`. This is the
- * service-role supabase-js implementation; `test-support/sql-expire-store.ts` calls the same three
- * functions over PGlite.
+ * service-role supabase-js implementation; `test-support/sql-expire-store.ts` is the same interface
+ * in SQL for PGlite. expire-store.test.ts runs one set of cases against both, this one through a
+ * PostgREST stand-in that takes each function's argument names and return shape from the migrated
+ * catalog (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/expire-store.test.ts`).
+ * PostgREST's row cap (`max_rows`, 1000 in infra/supabase/config.toml) is not modelled there: the
+ * expiry's read answers one row per check of at most EXPIRY_BATCH_SITES sites.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { KeptCheck } from './keep';
@@ -11,6 +15,8 @@ import type { KeptCheck } from './keep';
 export interface ExpiredCheck {
   checkId: string;
   batches: number[];
+  /** The accounts a Keep that did not commit copied the check's objects for (`checks.copied_for`). */
+  copiedFor: string[];
 }
 
 /** A site no account keeps that is past keeping, with its checks (none for a site that has none). */
@@ -48,6 +54,7 @@ export interface ExpiredRow {
   site_id: string;
   check_id: string | null;
   batches: number[];
+  copied_for: string[];
   remaining: number | string;
 }
 
@@ -57,6 +64,7 @@ export interface UnsettledRow {
   site_id: string;
   account_id: string;
   batches: number[];
+  strays: string[];
   remaining: number | string;
 }
 
@@ -72,7 +80,13 @@ export function expiredPage(rows: readonly ExpiredRow[]): Page<ExpiredSite> {
       site = { siteId: row.site_id, checks: [] };
       sites.push(site);
     }
-    if (row.check_id !== null) site.checks.push({ checkId: row.check_id, batches: row.batches });
+    if (row.check_id !== null) {
+      site.checks.push({
+        checkId: row.check_id,
+        batches: row.batches,
+        copiedFor: row.copied_for,
+      });
+    }
   }
   return { rows: sites, remaining: remainingOf(rows) };
 }
@@ -84,6 +98,7 @@ export function unsettledPage(rows: readonly UnsettledRow[]): Page<KeptCheck> {
       siteId: r.site_id,
       accountId: r.account_id,
       batches: r.batches,
+      strays: r.strays,
     })),
     remaining: remainingOf(rows),
   };

@@ -1,9 +1,11 @@
 /**
  * What keeping an audit reads and writes in Postgres (CC-22b D7), beside the door's own store: the
  * check's status and batch numbers, the commit (`keep_check`, migration 022b section D), the later
- * path rewrite (`move_check_paths`), and two reads the claim decides by. This is the service-role
- * supabase-js implementation; `test-support/sql-keep-store.ts` is the same interface over PGlite,
- * with the same statements in SQL.
+ * path rewrite (`move_check_paths`), the note of a copy (`note_check_copy`), and two reads the claim
+ * decides by. This is the service-role supabase-js implementation; `test-support/sql-keep-store.ts`
+ * is the same interface in SQL for PGlite. keep-store.test.ts runs one set of cases against both,
+ * this one through a PostgREST stand-in that takes each function's argument names from the migrated
+ * catalog (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/keep-store.test.ts`).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Check } from '@crawlmouse/types/v2';
@@ -51,6 +53,11 @@ export interface KeepStore {
   hostKept(accountId: string, host: string): Promise<boolean>;
   /** Null when there is no such check. */
   evidenceOf(checkId: string): Promise<CheckEvidence | null>;
+  /**
+   * `note_check_copy`: records, on the check's row, that its objects are about to be copied for the
+   * account. False when there is no such check.
+   */
+  noteCopy(checkId: string, accountId: string): Promise<boolean>;
   /** `keep_check`: ownership, the expiry and the path pairs in one transaction. */
   keep(commit: KeepCommit): Promise<KeepOutcome>;
   /** `move_check_paths`: how many stored paths it rewrote. */
@@ -123,6 +130,14 @@ export function supabaseKeepStore(sb: SupabaseClient): KeepStore {
         accountId: site.account_id,
         batches: batches.map((b) => b.batch),
       };
+    },
+
+    async noteCopy(checkId, accountId) {
+      const noted = must(
+        'note_check_copy',
+        await sb.rpc('note_check_copy', { p_check: checkId, p_account: accountId }),
+      );
+      return noted === true;
     },
 
     async keep(commit) {

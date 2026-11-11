@@ -17,6 +17,14 @@
  * or passes its budget does not refuse the Keep: the commit then carries no pair, the check reads at
  * its `anon/` paths as before, and `settleKeptCheck` (the daily function, expire.ts) moves it later.
  * So does a check kept while it is queued or running, whose objects are still being written.
+ *
+ * Before the claim copies anything it records the account on the check's row (`note_check_copy`,
+ * `checks.copied_for`), and copies nothing when that write fails. `keep_check` takes the account
+ * out again when it commits. A Keep that is refused or throws removes its copies (`discardCopies`);
+ * where that removal fails, a request is still in flight when the budget passes, or the process
+ * stops first, the account stays on the row and the daily function removes the copies by name:
+ * with the site's own objects when the site expires unkept (`expireUnkept`), and from
+ * `settleKeptCheck` when another account kept it.
  */
 import type { ClaimKeep } from '../../auth/claim';
 import type { Report } from '../../auth/door-store';
@@ -36,7 +44,7 @@ export const MOVE_CONCURRENCY = 4;
 export interface KeepDeps {
   store: KeepStore;
   evidence: EvidenceStore & EvidenceDirectory;
-  /** A Sentry signal with ids only. */
+  /** A Sentry signal with ids and counts. */
   report: Report;
   /** KEEP_MOVE_BUDGET_MS unless a test sets another. */
   budgetMs?: number;
@@ -49,6 +57,11 @@ export interface KeptCheck {
   accountId: string;
   /** The numbers of its `crawl_batches` rows. */
   batches: readonly number[];
+  /**
+   * What is left in the check's `copied_for`: accounts other than the keeper that a Keep copied its
+   * objects for. The settle step's read gives it; the claim has none to give.
+   */
+  strays?: readonly string[];
 }
 
 /**
@@ -147,16 +160,24 @@ export function claimKeep(deps: KeepDeps): ClaimKeep {
       const held = await store.evidenceOf(input.checkId);
       if (held === null) return 'not_unowned';
       const ended = ENDED.includes(held.status);
-      const copy = ended
+      // No copy without the account on the check's row: the row is what a later removal goes by.
+      const noted =
+        ended && (await store.noteCopy(input.checkId, input.accountId).catch(() => false));
+      const copy = noted
         ? await copyEvidence(evidence, { ...input, batches: held.batches }, budgetMs)
         : NOT_COPIED;
-      const outcome = await store.keep({
-        checkId: input.checkId,
-        accountId: input.accountId,
-        ownerSeatId: input.ownerSeatId,
-        schedule: input.schedule,
-        pairs: copy.pairs,
-      });
+      const outcome = await store
+        .keep({
+          checkId: input.checkId,
+          accountId: input.accountId,
+          ownerSeatId: input.ownerSeatId,
+          schedule: input.schedule,
+          pairs: copy.pairs,
+        })
+        .catch(async (error: unknown) => {
+          await discardCopies(deps, input, copy.written);
+          throw error;
+        });
       if (outcome !== 'taken') {
         await discardCopies(deps, input, copy.written);
         return outcome;
@@ -174,8 +195,11 @@ export function claimKeep(deps: KeepDeps): ClaimKeep {
 }
 
 /**
- * Removes what a refused claim copied, unless the caller's account turns out to keep the site:
- * then another call of the same claim won, and its stored paths may name these objects.
+ * Removes what a claim copied when its commit was refused or threw, unless the caller's account
+ * turns out to keep the site: then the commit happened (another call of the same claim won, or the
+ * commit's answer was lost), and its stored paths may name these objects. A removal that fails, or
+ * an owner that cannot be read, is reported with the account and the number of objects left; it
+ * does not throw. The account stays in the check's `copied_for` either way.
  */
 async function discardCopies(
   deps: KeepDeps,
@@ -188,8 +212,21 @@ async function discardCopies(
     if (held?.accountId === input.accountId) return;
     await deps.evidence.remove(written);
   } catch {
-    deps.report('keep-evidence-discard-failed', { checkId: input.checkId });
+    deps.report('keep-evidence-discard-failed', {
+      checkId: input.checkId,
+      accountId: input.accountId,
+      objects: String(written.length),
+    });
   }
+}
+
+/** The names a check's objects can have, as paths in `accountId`'s directory of the check. */
+export function copyPaths(
+  check: Pick<KeptCheck, 'siteId' | 'checkId' | 'batches'>,
+  accountId: string,
+): string[] {
+  const owner: EvidenceOwner = { accountId, siteId: check.siteId, checkId: check.checkId };
+  return objectNames(check.batches).map((name) => evidencePath(owner, name));
 }
 
 /**
@@ -197,11 +234,17 @@ async function discardCopies(
  * the removal. 'nothing' when its `anon/` directory lists none of its objects; 'failed', with no
  * row and no `anon/` object changed, when the copy did not complete. A commit or a removal that
  * throws is the caller's to count; the next call starts again from the listing.
+ *
+ * First it removes, by name, the check's objects in the directory of each of `check.strays` other
+ * than the keeper: the copies of a Keep that did not commit.
  */
 export async function settleKeptCheck(
   deps: KeepDeps,
   check: KeptCheck,
 ): Promise<'moved' | 'nothing' | 'failed'> {
+  for (const stray of check.strays ?? []) {
+    if (stray !== check.accountId) await deps.evidence.remove(copyPaths(check, stray));
+  }
   const copy = await copyEvidence(deps.evidence, check, deps.budgetMs ?? KEEP_MOVE_BUDGET_MS);
   if (!copy.complete) return 'failed';
   if (copy.pairs.length === 0) return 'nothing';
