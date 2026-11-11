@@ -289,17 +289,16 @@ describe('who may open the stream', () => {
   });
 
   it('closes when the check expires or its site is removed mid-stream', async () => {
+    // Both instants are the harness clock's: the stream reads `expires_at` against `deps.now()`.
+    const at = new Date(NOW).toISOString();
     for (const [host, change] of [
-      [
-        'expires-mid.example',
-        `update public.checks set expires_at = now() - interval '1 day' where site_id = $1`,
-      ],
-      ['removed-mid.example', `update public.sites set removed_at = now() where id = $1`],
+      ['expires-mid.example', `update public.checks set expires_at = $2 where site_id = $1`],
+      ['removed-mid.example', `update public.sites set removed_at = $2 where id = $1`],
     ] as const) {
       const h = harness(db);
       const ids = await running(db, h, host);
       h.betweenPolls.push(async () => {
-        await db.query(change, [ids.siteId]);
+        await db.query(change, [ids.siteId, at]);
         await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
       });
       const { groups } = groupsOf(await (await open(h, ids)).text());
