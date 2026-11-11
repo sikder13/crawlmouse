@@ -5,21 +5,22 @@
  */
 import type { PGlite } from '@electric-sql/pglite';
 import type { CrawlBatchResult } from '@crawlmouse/types/v2';
-import { asRole } from '../../../../../__tests__/helpers/pglite-migrations';
-import { accountOf, anonymousCheck } from '../../../../../__tests__/v2/_lib/door-pglite';
-import { gzipJson } from '../../../../../lib/v2/pipeline/evidence';
-import { progressOf, type Phase } from '../../../../../lib/v2/pipeline/steps/progress';
-import { STARTED } from '../../../../../lib/v2/pipeline/stream.fixtures';
-import { sqlStreamStore } from '../../../../../lib/v2/pipeline/stream-store';
-import { memoryEvidenceStore } from '../../../../../lib/v2/pipeline/test-support/memory-evidence';
-import { pgliteCheckReader } from '../../../../../lib/v2/pipeline/test-support/pglite';
-import { sqlPipelineStore } from '../../../../../lib/v2/pipeline/test-support/sql-store';
-import { ProgressEventSchema, type ProgressEvent } from '../../../../../lib/v2/progress';
-import type { CaptureBody } from '../../../../../lib/analytics-server';
-import { capturePublicEvent } from '../../_lib/events';
-import type { CancelDeps } from '../cancel/cancel';
-import type { NotifyDeps } from '../notify/notify';
-import type { StreamDeps } from '../stream/serve';
+import { asRole } from '../../helpers/pglite-migrations';
+import { accountOf, anonymousCheck } from './door-pglite';
+import { gzipJson } from '../../../lib/v2/pipeline/evidence';
+import { progressOf, type Phase } from '../../../lib/v2/pipeline/steps/progress';
+import { STARTED } from '../../../lib/v2/pipeline/stream.fixtures';
+import { sqlStreamStore } from '../../../lib/v2/pipeline/stream-store';
+import { memoryEvidenceStore } from '../../../lib/v2/pipeline/test-support/memory-evidence';
+import { pgliteCheckReader } from '../../../lib/v2/pipeline/test-support/pglite';
+import { sqlPipelineStore } from '../../../lib/v2/pipeline/test-support/sql-store';
+import { ProgressEventSchema, type ProgressEvent } from '../../../lib/v2/progress';
+import type { CaptureBody } from '../../../lib/analytics-server';
+import { capturePublicEvent } from '../../../app/api/checks/_lib/events';
+import { LIMITS, type CheckRouteLimits } from '../../../app/api/checks/[id]/_lib/limit-keys';
+import type { CancelDeps } from '../../../app/api/checks/[id]/cancel/cancel';
+import type { NotifyDeps } from '../../../app/api/checks/[id]/notify/notify';
+import type { StreamDeps } from '../../../app/api/checks/[id]/stream/serve';
 
 export interface Ids {
   siteId: string;
@@ -52,7 +53,7 @@ export function harness(db: PGlite) {
   const clock = { now: NOW };
   /** Run, one per sleep, before the stream's next poll. */
   const betweenPolls: (() => Promise<unknown>)[] = [];
-  const limits: string[] = [];
+  const keysCounted: string[] = [];
   const denied = new Set<string>();
   const counted = new Map<string, number>();
   const captured: CaptureBody[] = [];
@@ -60,6 +61,21 @@ export function harness(db: PGlite) {
   const pipeline = sqlPipelineStore(db);
   const stream = sqlStreamStore(db);
   let snapshots = 0;
+  /** Counts each bucket as `checkRateLimit` does within one window: its first `limit` calls pass. */
+  const bucket = (name: keyof typeof LIMITS) => async (subject: string) => {
+    const key = LIMITS[name].key(subject);
+    keysCounted.push(key);
+    if ([...denied].some((prefix) => key.startsWith(prefix))) return false;
+    const n = (counted.get(key) ?? 0) + 1;
+    counted.set(key, n);
+    return n <= LIMITS[name].limit;
+  };
+  const limits: CheckRouteLimits = {
+    streamOpens: bucket('streamOpens'),
+    finishedOnce: bucket('finishedOnce'),
+    notifyIp: bucket('notifyIp'),
+    notifyAddress: bucket('notifyAddress'),
+  };
 
   const deps: StreamDeps & NotifyDeps & CancelDeps = {
     read: pgliteCheckReader(db),
@@ -85,14 +101,7 @@ export function harness(db: PGlite) {
         }
       },
     },
-    /** Counts as `checkRateLimit` does: the first `limit` calls for a key are allowed. */
-    async limit(key, limit) {
-      limits.push(key);
-      if ([...denied].some((prefix) => key.startsWith(prefix))) return { allowed: false };
-      const n = (counted.get(key) ?? 0) + 1;
-      counted.set(key, n);
-      return { allowed: n <= limit };
-    },
+    limits,
     captureFinished: (req, checkId, properties) =>
       capturePublicEvent(req, 'check_finished', checkId, properties, async (body) => {
         captured.push(body);
@@ -114,7 +123,7 @@ export function harness(db: PGlite) {
     clock,
     betweenPolls,
     denied,
-    limits,
+    limits: keysCounted,
     captured,
     sent,
     gets,

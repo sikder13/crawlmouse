@@ -12,14 +12,9 @@
  *
  * Limits. A poll every POLL_MS; the stream closes itself STREAM_CLOSE_MS after it opened, before
  * the route's `maxDuration`, and the browser reconnects; STREAM_OPENS_PER_IP_PER_HOUR opens an hour
- * for one address; one batch result in memory at a time (`readBatch`'s bounds).
+ * for one address (../_lib/limit-keys.ts); one batch result in memory at a time (`readBatch`'s bounds).
  */
-import {
-  checkRef,
-  isExpired,
-  readableCheck,
-  type Viewer,
-} from '../../../../../lib/v2/pipeline/public';
+import { isExpired, readableCheck, type Viewer } from '../../../../../lib/v2/pipeline/public';
 import {
   START,
   batchEvents,
@@ -36,17 +31,11 @@ import type { StreamSnapshot, StreamStore } from '../../../../../lib/v2/pipeline
 import type { CheckReader, EvidenceStore } from '../../../../../lib/v2/pipeline/types';
 import type { ProgressEvent } from '../../../../../lib/v2/progress';
 import type { PublicServerEvents } from '../../_lib/events';
+import type { CheckRouteLimits } from '../_lib/limit-keys';
 
 export const POLL_MS = 1500;
 /** The stream closes itself this long after it opened; the route's `maxDuration` is 300 s. */
 export const STREAM_CLOSE_MS = 240_000;
-/**
- * Stream opens an address may make in an hour. One tab reconnects every STREAM_CLOSE_MS, 15 times
- * an hour; this leaves room for eight tabs, or four on a connection that drops as often again.
- */
-export const STREAM_OPENS_PER_IP_PER_HOUR = 120;
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
 /** How long a browser waits before it reconnects. */
 const RETRY_MS = 2000;
 
@@ -55,8 +44,7 @@ export interface StreamDeps {
   isMember(siteId: string, userId: string): Promise<boolean>;
   store: Pick<StreamStore, 'snapshot' | 'scores'>;
   evidence: Pick<EvidenceStore, 'get'>;
-  /** `checkRateLimit`: whether `key` is under `limit` in the current window. */
-  limit(key: string, limit: number, windowMs: number): Promise<{ allowed: boolean }>;
+  limits: Pick<CheckRouteLimits, 'streamOpens' | 'finishedOnce'>;
   /** Sends `check_finished` (app/api/checks/_lib/events.ts, `capturePublicEvent`). */
   captureFinished(
     req: Request,
@@ -91,12 +79,7 @@ export async function serveStream(
   const resumed = lastId === null ? START : parseCursor(lastId);
   if (resumed === null) return refuse(400, 'invalid_cursor');
 
-  const opens = await deps.limit(
-    `stream:ip:${deps.clientIp(req)}`,
-    STREAM_OPENS_PER_IP_PER_HOUR,
-    HOUR_MS,
-  );
-  if (!opens.allowed) return refuse(429, 'rate_limited');
+  if (!(await deps.limits.streamOpens(deps.clientIp(req)))) return refuse(429, 'rate_limited');
 
   const access = await readableCheck(deps, checkId, viewer);
   if (access === null || isExpired(access, deps.now())) return refuse(404, 'not_found');
@@ -200,8 +183,8 @@ export async function serveStream(
 }
 
 /**
- * `check_finished`, once for a check: the limiter's bucket for the check's ref admits one capture
- * in its 24-hour window. The scores are read for a finished or partial check.
+ * `check_finished`, once for a check: `finishedOnce` admits one capture for the check in its
+ * bucket's 24-hour window. The scores are read for a finished or partial check.
  */
 async function finished(
   req: Request,
@@ -212,8 +195,7 @@ async function finished(
   deps: StreamDeps,
 ): Promise<void> {
   const status = facts.status as PublicServerEvents['check_finished']['status'];
-  const once = await deps.limit(`event:check_finished:${checkRef(checkId)}`, 1, DAY_MS);
-  if (!once.allowed) return;
+  if (!(await deps.limits.finishedOnce(checkId))) return;
   const scores = status === 'failed' ? {} : await deps.store.scores(checkId);
   await deps.captureFinished(req, checkId, {
     trigger,

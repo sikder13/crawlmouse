@@ -25,8 +25,9 @@ import {
   storeBatch,
   type Harness,
   type Ids,
-} from '../_lib/test-harness';
-import { POLL_MS, STREAM_CLOSE_MS, STREAM_OPENS_PER_IP_PER_HOUR, serveStream } from './serve';
+} from '../../../../../__tests__/v2/_lib/check-routes-harness';
+import { STREAM_OPENS_PER_IP_PER_HOUR } from '../_lib/limit-keys';
+import { POLL_MS, STREAM_CLOSE_MS, serveStream } from './serve';
 
 const anonymous: Viewer = { userId: null };
 const one = crawlResult(
