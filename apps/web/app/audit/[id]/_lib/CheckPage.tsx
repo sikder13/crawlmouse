@@ -12,7 +12,7 @@ import { auditPage, viewOptions, type ReadyCheck } from './page-data';
 /** Where a reader of an audit that cannot be read any more starts another. */
 const NEW_AUDIT = { label: 'Start a new audit', href: '/' };
 
-/** The result of a ready check, as `/audit/[id]` shows it. */
+/** The result of a ready check, as its overview shows it. */
 export function resultOf(read: ReadyCheck) {
   const { hrefs, plan } = viewOptions(read);
   return resultView(read.dataset, read.checkId, {
@@ -48,9 +48,8 @@ export function noticeOf(read: Extract<CheckRead, { state: 'failed' | 'expired' 
 }
 
 /**
- * `/audit/[id]` for a v2 check (CC-22b D4): the crawl while it waits or runs, the result once it
- * is graded, and a notice for one that failed or expired. Loaded by the route only under the flag,
- * so the v1 page carries none of this module's stylesheets.
+ * A v2 check's overview (CC-22b D4), at `/audit/[id]/overview`: the crawl while it waits or runs,
+ * the result once it is graded, and a notice for one that failed or expired.
  */
 export function CheckPage({ read }: { read: CheckRead }) {
   if (read.state === 'waiting') return <LiveCrawl checkId={read.checkId} host={read.host} />;

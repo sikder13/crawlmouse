@@ -36,6 +36,8 @@ function pages(dir: string): string[] {
 }
 const ALL = pages(HERE).sort();
 const SUB = ALL.filter((p) => p !== 'page.tsx');
+/** The sub-pages that show a graded check only. */
+const GRADED = SUB.filter((p) => p !== 'overview/page.tsx');
 const params = (file: string) =>
   Promise.resolve(file.startsWith('fix/') ? { id: ID, fixId: FIX } : { id: ID });
 /** The path a route file serves for `ID`. */
@@ -66,6 +68,7 @@ const waiting: CheckRead = {
 // The first import of a route loads the screens behind it, which takes longer than one test's time.
 beforeAll(async () => {
   await import('./access/page');
+  await import('./overview/page');
   await import('./page');
 }, 120_000);
 
@@ -77,7 +80,7 @@ afterEach(() => {
 });
 
 describe('the route files', () => {
-  it('are the overview, six segments, the fix page and the map', () => {
+  it('are the v1 page, the v2 overview, six segments, the fix page and the map', () => {
     expect(ALL).toEqual([
       'access/page.tsx',
       'changes/page.tsx',
@@ -85,6 +88,7 @@ describe('the route files', () => {
       'fix/[fixId]/page.tsx',
       'map/page.tsx',
       'nojs/page.tsx',
+      'overview/page.tsx',
       'page.tsx',
       'signals/page.tsx',
       'structure/page.tsx',
@@ -127,7 +131,8 @@ describe('with V2_CHECKS_PUBLIC off', () => {
     })) as ReactElement;
     expect(readAudit).not.toHaveBeenCalled();
     expect(v1Audit).toHaveBeenCalledTimes(1);
-    expect(node.type).not.toBe((await import('./_lib/CheckPage')).CheckPage);
+    // The v1 page's own markup (a fragment), not a v2 component.
+    expect(typeof node.type).not.toBe('function');
   });
 
   it('the 404 page is the site’s own', async () => {
@@ -139,17 +144,31 @@ describe('with V2_CHECKS_PUBLIC off', () => {
 });
 
 describe('with V2_CHECKS_PUBLIC on', () => {
-  it('the overview shows a v2 check the viewer may read, without a v1 lookup', async () => {
+  it('/audit/[id] sends a v2 check the viewer may read to its overview, without a v1 lookup', async () => {
     flag(true);
     readAudit.mockResolvedValue(waiting);
     const route = await import('./page');
-    const node = (await route.default({
-      params: params('page.tsx'),
-      searchParams: Promise.resolve({}),
-    })) as ReactElement<{ read: CheckRead }>;
+    const digest = await digestOf(() =>
+      route.default({ params: params('page.tsx'), searchParams: Promise.resolve({}) }),
+    );
+    expect(digest).toContain('NEXT_REDIRECT');
+    expect(digest).toContain(`/audit/${ID}/overview;`);
+    expect(v1Audit).not.toHaveBeenCalled();
+  });
+
+  it('the overview shows the check in whatever state it is, and is a 404 for an id that reads none', async () => {
+    flag(true);
+    readAudit.mockResolvedValue(waiting);
+    const route = await import('./overview/page');
+    const node = (await route.default({ params: params('overview/page.tsx') })) as ReactElement<{
+      read: CheckRead;
+    }>;
     expect(node.type).toBe((await import('./_lib/CheckPage')).CheckPage);
     expect(node.props.read).toBe(waiting);
-    expect(v1Audit).not.toHaveBeenCalled();
+    readAudit.mockResolvedValue(null);
+    expect(await digestOf(() => route.default({ params: params('overview/page.tsx') }))).toContain(
+      '404',
+    );
   });
 
   it('an id that reads no v2 check is looked up as a v1 audit, and is a 404 when it is neither', async () => {
@@ -164,7 +183,7 @@ describe('with V2_CHECKS_PUBLIC on', () => {
     expect(await digestOf(run)).toBe('returned');
   });
 
-  it.each(SUB)('%s is a 404 for an id that reads no check', async (file) => {
+  it.each(GRADED)('%s is a 404 for an id that reads no check', async (file) => {
     flag(true);
     readAudit.mockResolvedValue(null);
     const route = (await import(`./${file}`)) as { default(p: object): Promise<ReactElement> };
@@ -177,7 +196,7 @@ describe('with V2_CHECKS_PUBLIC on', () => {
     expect(readAudit).toHaveBeenCalledWith(ID);
   });
 
-  it.each(SUB)(
+  it.each(GRADED)(
     '%s sends a check that is not graded to the overview, which shows its state',
     async (file) => {
       flag(true);
@@ -191,7 +210,7 @@ describe('with V2_CHECKS_PUBLIC on', () => {
         await (node.type as (p: object) => Promise<unknown>)(node.props as object);
       });
       expect(digest).toContain('NEXT_REDIRECT');
-      expect(digest).toContain(`/audit/${ID};`);
+      expect(digest).toContain(`/audit/${ID}/overview;`);
     },
   );
 
@@ -213,14 +232,32 @@ describe('what the v1 page and its 404 import', () => {
     );
   const V2 = /_lib\/|_crawl\/|components\/v2|styles\/v2|lib\/v2/;
 
+  /** A v2 module that holds no screen, and so no stylesheet: the reader of a check. */
+  const NO_SCREEN = ['./_lib/access'];
+  /** Each module a file reaches: `import … from`, and `import()`. */
+  const reached = (file: string) => [
+    ...staticImports(file),
+    ...[...readFileSync(join(HERE, file), 'utf8').matchAll(/import\(\s*'([^']+)'/g)].map(
+      (m) => m[1]!,
+    ),
+  ];
+
   it.each(['page.tsx', 'not-found.tsx'])(
-    '%s imports no v2 module statically, so the flag-off page links no v2 stylesheet',
+    '%s reaches no v2 screen, by import or by import(), so the v1 page links no v2 stylesheet',
     (file) => {
-      const imports = staticImports(file);
-      expect(imports.length).toBeGreaterThan(3);
-      expect(imports.filter((m) => V2.test(m))).toEqual([]);
+      const modules = reached(file);
+      expect(modules.length).toBeGreaterThan(3);
+      expect(modules.filter((m) => V2.test(m) && !NO_SCREEN.includes(m))).toEqual([]);
     },
   );
+
+  it('the reader of a check, which the v1 page loads under the flag, imports no screen and no stylesheet', () => {
+    const imports = staticImports('_lib/access.ts');
+    expect(imports.length).toBeGreaterThan(2);
+    expect(imports.filter((m) => /components\/|\.css$|\.tsx$|CheckPage|ReadyPage/.test(m))).toEqual(
+      [],
+    );
+  });
 
   it('the scan sees a static v2 import where there is one', () => {
     expect(staticImports('access/page.tsx').filter((m) => V2.test(m))).not.toEqual([]);

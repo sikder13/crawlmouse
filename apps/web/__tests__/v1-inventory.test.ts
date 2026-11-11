@@ -178,6 +178,7 @@ describe('the finders see what they claim to see', () => {
       'app/audit/[id]/fix/[fixId]/page.tsx',
       'app/audit/[id]/map/page.tsx',
       'app/audit/[id]/nojs/page.tsx',
+      'app/audit/[id]/overview/page.tsx',
       'app/audit/[id]/signals/page.tsx',
       'app/audit/[id]/structure/page.tsx',
       'app/api/billing/agency-trial/route.ts',

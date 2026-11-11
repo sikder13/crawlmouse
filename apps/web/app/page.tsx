@@ -8,25 +8,8 @@ import { ReferralCapture } from '@/components/analytics/ReferralCapture';
 import { JsonLd, websiteLd, softwareApplicationLd, faqLd } from '@/lib/seo/jsonld';
 import { HOMEPAGE_FAQ } from '@/lib/seo/faq';
 import { FeatureCards } from '@/components/home/FeatureCards';
-import { checksPublicEnabled } from '@/lib/auth/flags';
 
-// CC-22b: read once, when this module is evaluated. The page is prerendered at build, so the flag
-// is the build's: changing it takes a new deployment, as CRAWL_PAUSED does (PROJECT_OVERVIEW §6).
-const V2_HOME = checksPublicEnabled();
-
-export default async function Home() {
-  if (V2_HOME) {
-    // Loaded here, not imported above, so the v1 page links none of the v2 stylesheets.
-    const { LiveHome } = await import('@/components/v2/screens/home/LiveHome');
-    return (
-      <>
-        <JsonLd data={[websiteLd(), softwareApplicationLd()]} />
-        <TrackView event="home_viewed" />
-        <ReferralCapture />
-        <LiveHome />
-      </>
-    );
-  }
+export default function Home() {
   return (
     <>
       <JsonLd data={[websiteLd(), softwareApplicationLd(), faqLd(HOMEPAGE_FAQ)]} />
@@ -36,21 +19,15 @@ export default async function Home() {
         <ReferralCapture />
         <section className="text-center max-w-3xl mx-auto">
           <h1 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-tight text-ink">
-            Grade your site&rsquo;s internal linking{' '}
-            <span className="text-accent-text">in under 2 minutes.</span>
+            Grade your site&rsquo;s internal linking <span className="text-accent-text">in under 2 minutes.</span>
           </h1>
           <p className="mt-4 sm:mt-5 text-lg text-ink/70">
-            Free. No install. Works on any site &mdash; Shopify, WordPress, Webflow, Wix,
-            Squarespace, Framer, Ghost, or custom.
+            Free. No install. Works on any site &mdash; Shopify, WordPress, Webflow, Wix, Squarespace, Framer, Ghost, or custom.
           </p>
           <p className="mt-4 text-base text-ink/60">
-            See your site the way AI crawlers do. ChatGPT, Claude, and Perplexity don&rsquo;t run
-            JavaScript &mdash; they read the same raw HTML Crawlmouse grades, the view Google crawls
-            first. Links that need JavaScript are invisible to them.
+            See your site the way AI crawlers do. ChatGPT, Claude, and Perplexity don&rsquo;t run JavaScript &mdash; they read the same raw HTML Crawlmouse grades, the view Google crawls first. Links that need JavaScript are invisible to them.
           </p>
-          <div className="mt-8 sm:mt-10 flex justify-center">
-            <UrlForm />
-          </div>
+          <div className="mt-8 sm:mt-10 flex justify-center"><UrlForm /></div>
         </section>
 
         <FeatureCards />
@@ -60,55 +37,27 @@ export default async function Home() {
             Learn the craft
           </h2>
           <p className="mt-4 text-center text-ink/70">
-            Practical guides to internal linking, orphan pages, crawl depth, and getting your pages
-            found.
+            Practical guides to internal linking, orphan pages, crawl depth, and getting your pages found.
           </p>
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
-            <Link
-              href={'/blog/how-deep-is-too-deep-crawl-depth' as Route}
-              className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors"
-            >
-              <span className="font-display font-semibold text-ink">
-                How deep is too deep? Crawl depth explained
-              </span>
+            <Link href={'/blog/how-deep-is-too-deep-crawl-depth' as Route} className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors">
+              <span className="font-display font-semibold text-ink">How deep is too deep? Crawl depth explained</span>
             </Link>
-            <Link
-              href={'/blog/orphan-pages' as Route}
-              className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors"
-            >
-              <span className="font-display font-semibold text-ink">
-                How to find orphan pages (free)
-              </span>
+            <Link href={'/blog/orphan-pages' as Route} className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors">
+              <span className="font-display font-semibold text-ink">How to find orphan pages (free)</span>
             </Link>
-            <Link
-              href={'/blog/screaming-frog-alternative' as Route}
-              className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors"
-            >
-              <span className="font-display font-semibold text-ink">
-                A free Screaming Frog alternative
-              </span>
+            <Link href={'/blog/screaming-frog-alternative' as Route} className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors">
+              <span className="font-display font-semibold text-ink">A free Screaming Frog alternative</span>
             </Link>
-            <Link
-              href={'/blog/discovered-currently-not-indexed' as Route}
-              className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors"
-            >
-              <span className="font-display font-semibold text-ink">
-                Fix &ldquo;Discovered &ndash; currently not indexed&rdquo;
-              </span>
+            <Link href={'/blog/discovered-currently-not-indexed' as Route} className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors">
+              <span className="font-display font-semibold text-ink">Fix &ldquo;Discovered &ndash; currently not indexed&rdquo;</span>
             </Link>
-            <Link
-              href={'/blog/sitebulb-alternative' as Route}
-              className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors"
-            >
-              <span className="font-display font-semibold text-ink">
-                A free Sitebulb alternative
-              </span>
+            <Link href={'/blog/sitebulb-alternative' as Route} className="rounded-card border border-oat bg-white p-4 hover:border-peach transition-colors">
+              <span className="font-display font-semibold text-ink">A free Sitebulb alternative</span>
             </Link>
           </div>
           <div className="mt-6 text-center">
-            <Link href="/guides" className="text-peach font-medium hover:underline">
-              Browse all guides &rarr;
-            </Link>
+            <Link href="/guides" className="text-peach font-medium hover:underline">Browse all guides &rarr;</Link>
           </div>
         </section>
 

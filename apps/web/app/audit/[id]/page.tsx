@@ -3,8 +3,8 @@ import { Footer } from '@/components/layout/Footer';
 import { AuditView } from './AuditView';
 import { AuditUrlHeader } from '@/components/audit/AuditUrlHeader';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { notFound } from 'next/navigation';
-import type { Metadata } from 'next';
+import { notFound, redirect } from 'next/navigation';
+import type { Metadata, Route } from 'next';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 
 // Capability URL: the unguessable audit UUID is the only thing guarding this page, so it must
@@ -26,16 +26,13 @@ export default async function AuditPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { id } = await params;
-  // CC-22b: under V2_CHECKS_PUBLIC an id that names a v2 check the viewer may read shows that check.
-  // The v2 modules are loaded here, not imported above, so this page links none of their
-  // stylesheets while the flag is off. Any other id is a v1 audit, served below as before.
+  // CC-22b: under V2_CHECKS_PUBLIC an id that names a v2 check the viewer may read is sent to that
+  // check's own page. This page imports no v2 screen, here or through `import()`: a production
+  // build links a screen's stylesheets on each page whose module can reach it, flag on or off.
+  // Any other id is a v1 audit, served below as before.
   if (checksPublicEnabled()) {
     const { readAudit } = await import('./_lib/access');
-    const read = await readAudit(id);
-    if (read) {
-      const { CheckPage } = await import('./_lib/CheckPage');
-      return <CheckPage read={read} />;
-    }
+    if (await readAudit(id)) redirect(`/audit/${id}/overview` as Route);
   }
   // Entry-point hint from /ai-readiness-checker. Anything other than the one known value is treated
   // as absent, so a hand-edited URL can only ever produce today's ordering.
