@@ -28,7 +28,7 @@ export default async function Page({
 }: {
   searchParams: Promise<{ done?: string | string[]; error?: string | string[] }>;
 }) {
-  if (!checksPublicEnabled()) notFound();
+  if (!checksPublicEnabled()) return notFound();
   const query = await searchParams;
   const raw = (await cookies()).get(LINK_FLOWS.emailChange.cookie)?.value;
   const view = await emailLinkPage(
