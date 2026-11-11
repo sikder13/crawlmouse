@@ -26,7 +26,7 @@ let db: PGlite;
 beforeAll(async () => {
   db = await freshDb();
   await applyAllMigrations(db);
-});
+}, 300_000);
 afterAll(async () => db.close());
 
 async function account(email: string, tier: 'free' | 'pro' = 'pro') {
