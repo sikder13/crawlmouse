@@ -176,6 +176,7 @@ describe('the finders see what they claim to see', () => {
       'app/api/billing/cancel/route.ts',
       'app/api/billing/pro-trial/start/route.ts',
       'app/api/checks/[id]/claim/route.ts',
+      'app/api/fixes/[id]/done/route.ts',
       'app/api/fixes/[id]/email-developer/route.ts',
       'app/api/fixes/[id]/packet/route.ts',
       'app/api/me/route.ts',

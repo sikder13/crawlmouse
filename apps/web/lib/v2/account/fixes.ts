@@ -17,7 +17,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Check, Fix, FixtureDataset } from '@crawlmouse/types/v2';
 import { z } from 'zod';
-import type { Capture } from './events';
+import { checkStarted, type Capture } from './events';
 import type { FixesStore, SiteFixes } from './fixes-store';
 import type { RecheckOutcome, RequestRecheck } from './recheck';
 import { notFound, paywall, refuse, type RequestBody } from './route';
@@ -40,7 +40,7 @@ export interface FixCaller {
 
 interface Reached {
   fix: Fix;
-  site: { id: string; account_id: string };
+  site: { id: string; account_id: string; paused_reason: string | null };
   entitlement: Entitlement;
   seatId: string;
 }
@@ -49,6 +49,7 @@ const SiteRow = z.object({
   id: z.string(),
   account_id: z.string(),
   removed_at: z.string().nullable(),
+  paused_reason: z.string().nullable(),
 });
 
 function failed(what: string, error: { message: string }): never {
@@ -61,7 +62,7 @@ async function reach(deps: FixDeps, caller: FixCaller): Promise<Reached | null> 
   if (fix === null) return null;
   const site = await deps.session
     .from('sites')
-    .select('id, account_id, removed_at')
+    .select('id, account_id, removed_at, paused_reason')
     .eq('id', fix.site_id)
     .maybeSingle();
   if (site.error) failed('sites read', site.error);
@@ -133,8 +134,10 @@ export interface MarkDoneDeps extends FixDeps {
  * POST /api/fixes/[id]/done once membership is established: 402 `fixesVisible` for a fix the tier
  * does not see; 409 `not_markable` for a verified fix; otherwise the mark (or the mark already
  * there) and a `fix_recheck` of the site, which shares the site's daily re-check cap (Q3). The mark
- * stands whatever the re-check answers. A form is sent to the site's page, JSON gets
- * `{status: 'marked_done', recheck}`. `fix_marked_done` is sent once, for the call that marked it.
+ * stands whatever the re-check answers (capped, check_running, capacity, paused: a paused site's
+ * answer carries its `pausedReason`, read with the caller's session). A form is sent to the site's
+ * page, JSON gets `{status: 'marked_done', recheck}`. `fix_marked_done` is sent once, for the call
+ * that marked it, and `check_started` when the re-check created a check.
  */
 export async function markDone(
   deps: MarkDoneDeps,
@@ -150,12 +153,23 @@ export async function markDone(
   if (marked.outcome === 'marked') {
     await deps.capture('fix_marked_done', r.site.account_id, { type: r.fix.type });
   }
-  const recheck: RecheckOutcome = await deps.requestRecheck({
+  const outcome: RecheckOutcome = await deps.requestRecheck({
     siteId: r.site.id,
     trigger: 'fix_recheck',
     cap: r.entitlement.gates.manualChecksPerSiteDay,
     requestedByUserId: caller.userId,
   });
+  if (outcome.queued && outcome.created) {
+    await deps.capture(
+      'check_started',
+      r.site.account_id,
+      checkStarted('fix_recheck', outcome.checkId),
+    );
+  }
+  const recheck =
+    !outcome.queued && outcome.reason === 'paused'
+      ? { ...outcome, pausedReason: r.site.paused_reason }
+      : outcome;
   if (kind === 'form') {
     return new Response(null, { status: 303, headers: { location: `/sites/${r.site.id}` } });
   }

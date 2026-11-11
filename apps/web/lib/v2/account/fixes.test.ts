@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { GATES } from '../../entitlement-v2';
-import type { Capture } from './events';
+import { checkStarted, type Capture } from './events';
 import { markDone, type MarkDoneDeps } from './fixes';
 import { supabaseFixesStore } from './fixes-store';
 import type { RecheckOutcome, RecheckRequest } from './recheck';
@@ -79,7 +79,14 @@ describe('markDone', () => {
       status: 'marked_done',
       events: [{ kind: 'marked_done', by_seat_id: fw.w.scopedSeatId }],
     });
-    expect(captured).toEqual([['fix_marked_done', fw.w.accountId, { type: 'orphan_pages' }]]);
+    expect(captured).toEqual([
+      ['fix_marked_done', fw.w.accountId, { type: 'orphan_pages' }],
+      [
+        'check_started',
+        fw.w.accountId,
+        checkStarted('fix_recheck', recheck.queued ? recheck.checkId : ''),
+      ],
+    ]);
     expect(asked).toEqual([
       {
         siteId: fw.w.site1,
@@ -98,9 +105,11 @@ describe('markDone', () => {
   it('marking again writes no second event and sends no second fix_marked_done, and asks for the re-check again', async () => {
     const fix = fw.ranked[0]!;
     await mark(fw.w.ownerId, fix);
+    recheck = { ...recheck, created: false } as RecheckOutcome;
     expect((await mark(fw.w.ownerId, fix)).status).toBe(200);
     expect((await state(fix)).events).toHaveLength(1);
-    expect(captured).toHaveLength(1);
+    // The first call's fix_marked_done and check_started; the second's re-check found that check.
+    expect(captured.map(([event]) => event)).toEqual(['fix_marked_done', 'check_started']);
     expect(asked).toHaveLength(2);
   });
 
@@ -141,7 +150,7 @@ describe('markDone', () => {
     for (const outcome of [
       { queued: false, reason: 'capped', nextAllowedAt: '2026-11-11T09:00:00.000Z' },
       { queued: false, reason: 'check_running', checkId: randomUUID() },
-      { queued: false, reason: 'paused' },
+      { queued: false, reason: 'capacity' },
     ] as RecheckOutcome[]) {
       recheck = outcome;
       const fix = await freshOpenFix();
@@ -151,6 +160,19 @@ describe('markDone', () => {
       ]);
       expect((await state(fix)).status).toBe('marked_done');
     }
+    expect(captured.map(([event]) => event)).not.toContain('check_started');
+  });
+
+  it('a paused site: the mark stands, and the re-check answer carries why the site is paused', async () => {
+    await db.query(`update public.sites set paused_reason = 'user' where id = $1`, [fw.w.site1]);
+    recheck = { queued: false, reason: 'paused' };
+    expect(await answer(await mark(fw.w.ownerId, fw.ranked[0]!))).toEqual([
+      200,
+      {
+        status: 'marked_done',
+        recheck: { queued: false, reason: 'paused', pausedReason: 'user' },
+      },
+    ]);
   });
 
   it('404 for a fix of a removed site, and for a caller with no seat on the fix’s account', async () => {

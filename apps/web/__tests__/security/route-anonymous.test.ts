@@ -78,6 +78,7 @@ const ANONYMOUS: Record<
   'api/billing/pro-trial/start': { status: 401, body: { code: 'auth_required' } },
   'api/billing/status': { status: 401, body: { pro: false } },
   'api/checks/[id]/claim': { status: 401, body: { code: 'auth_required' } },
+  'api/fixes/[id]/done': { status: 401, body: { code: 'auth_required' } },
   'api/fixes/[id]/email-developer': { status: 401, body: { code: 'auth_required' } },
   'api/fixes/[id]/packet': { status: 401, body: { code: 'auth_required' } },
   'api/me': { status: 401, body: { code: 'auth_required' } },
