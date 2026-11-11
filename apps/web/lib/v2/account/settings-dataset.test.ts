@@ -30,7 +30,7 @@ import {
 } from '../pipeline/test-support/pglite';
 import { deleteStepView, settingsView } from '../view/settings';
 import { trialEndView, trialEndViewer } from '../view/trial-end';
-import { loadSettingsDataset } from './settings-dataset';
+import { loadSettingsDataset, viewInput } from './settings-dataset';
 
 let db: PGlite;
 let built: BuiltCheck;
@@ -57,7 +57,6 @@ beforeAll(async () => {
     built,
     vantage: pageVantage(crawlRows(input.batches)),
     map_path: null,
-    read: [],
   });
   await db.query(
     `insert into public.alert_rules (account_id, site_id, kind, enabled) values ($1, null, 'crawler_blocked', true)`,
@@ -95,9 +94,9 @@ describe('loadSettingsDataset as the owner', () => {
   it('Settings and the delete step render from it', async () => {
     const { d } = await load(owner.userId);
     const viewer = { accountId: owner.accountId, now: NOW.toISOString() };
-    const v = settingsView(d, viewer);
+    const v = settingsView(viewInput(d), viewer);
     expect(v.plan.usage[0]).toEqual(['Sites', '1 of 1']);
-    expect(deleteStepView(d, viewer).field.expected).toBe(d.sites[0]!.host);
+    expect(deleteStepView(viewInput(d), viewer).field.expected).toBe(d.sites[0]!.host);
   });
 
   it('reads another account as nothing: row security hides it', async () => {
@@ -112,7 +111,7 @@ describe('an account with no site', () => {
     const { accountId } = await personalAccount(db, userId);
     const { d } = await load(userId, accountId);
     expect(d.sites).toEqual([]);
-    const v = settingsView(d, { accountId, now: NOW.toISOString() });
+    const v = settingsView(viewInput(d), { accountId, now: NOW.toISOString() });
     expect(v.plan.usage[0]).toEqual(['Sites', '0 of 1']);
   });
 });

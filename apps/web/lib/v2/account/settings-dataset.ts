@@ -46,8 +46,18 @@ export interface SettingsDatasetDeps {
   records: CheckReader;
 }
 
+/**
+ * The account's records in the contract's shape, marked as measured. The views on this branch's base
+ * take a FixtureDataset, whose provenance can only be "fixture"; CC-26b's `AccountDataset` widens it
+ * to "measured". Until the merge, `viewInput` hands these records to the views.
+ */
+export type AccountRecords = Omit<FixtureDataset, 'provenance'> & { provenance: 'measured' };
+
+/** The records as the views on this base type their input (see AccountRecords); goes at the merge. */
+export const viewInput = (d: AccountRecords): FixtureDataset => d as unknown as FixtureDataset;
+
 export interface SettingsDataset {
-  d: FixtureDataset;
+  d: AccountRecords;
   /**
    * When the paid plan ends, for a subscription set to cancel at its period's end: the plan is shown
    * until then (spec 27 "Cancel"). Null otherwise. The contract's Account has no field for it.
@@ -201,7 +211,7 @@ export async function loadSettingsDataset(
   const sitesOf = (seatId: unknown) =>
     scopeRows.filter((r) => r.seat_id === seatId).map((r) => r.site_id as string);
   const asOf = now.toISOString();
-  const d: FixtureDataset = {
+  const d: AccountRecords = {
     provenance: 'measured',
     as_of: asOf,
     description: `Account ${accountId}: ${siteIds.length} live sites, read at ${asOf} for Settings and Trial ending.`,
