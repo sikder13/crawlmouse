@@ -5,11 +5,11 @@
  * page's query (ARCH-2 §5: `GET /changes?site=&kind=&since=`). A site the account does not hold, a
  * kind the contract does not name or an unknown since is ignored, as if that filter were not set.
  */
-import { instant, type Change, type FixtureDataset } from '@crawlmouse/types/v2';
+import { instant, type Change } from '@crawlmouse/types/v2';
 import { CHANGES_LOG_COPY as COPY } from '../copy/changes-log';
 import { findCheck } from '../fixtures';
 import { dayDate, hourMinute } from '../format';
-import { viewAt, type AccountView, type Viewer } from './account';
+import { viewAt, type AccountDataset, type AccountView, type Viewer } from './account';
 import { accountShellView, newChanges, type ShellView } from './account-shell';
 import { rowOf, type ChangeRowView } from './segment/changes';
 
@@ -74,7 +74,7 @@ export function accountChanges(v: AccountView): Change[] {
 }
 
 export function changesLogView(
-  d: FixtureDataset,
+  d: AccountDataset,
   viewer: Viewer,
   query: ChangesLogQuery,
   /** The page the filter links point at: `/changes`, or a preview's path. */

@@ -7,6 +7,7 @@ import type { ShellView } from '../../../../lib/v2/view/account-shell';
 import type { GradeCardView, SiteView } from '../../../../lib/v2/view/site';
 import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
+import { MarkDone } from './MarkDone';
 import { CardHead } from '../account/parts';
 import { verdictCell } from '../account/verdict-cells';
 import { CopyText } from '../segment/CopyText';
@@ -159,7 +160,10 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
                   <span key="s" className={shared.muted}>
                     {f.status}
                   </span>,
-                  <ActionControl key="p" action={f.packet} variant="quiet" />,
+                  <span key="p">
+                    {f.markDone ? <MarkDone action={f.markDone} /> : null}
+                    <ActionControl action={f.packet} variant="quiet" />
+                  </span>,
                 ],
               })),
               ...(fixes.rest

@@ -75,8 +75,10 @@ const ANONYMOUS: Record<
   'api/billing/cancel': { status: 401, body: { error: 'auth_required' } },
   'api/billing/checkout': { status: 401, body: { error: 'auth_required' } },
   'api/billing/portal': { status: 401, body: { error: 'auth_required' } },
+  'api/billing/pro-trial/start': { status: 401, body: { code: 'auth_required' } },
   'api/billing/status': { status: 401, body: { pro: false } },
   'api/checks/[id]/claim': { status: 401, body: { code: 'auth_required' } },
+  'api/me': { status: 401, body: { code: 'auth_required' } },
   'api/reports/[slug]/claim': { status: 401, body: { error: 'auth_required' } },
   'api/reports/[slug]/logo': { status: 401, body: { error: 'auth_required' } },
   // The owner island's probe: a caller with no session gets the deny answer before any read.
@@ -94,6 +96,7 @@ const ID = '6f1c2a8e-0000-4000-8000-000000000000';
 beforeEach(() => {
   calls.length = 0;
   vi.stubEnv('V2_ACCOUNT_DOOR', '1');
+  vi.stubEnv('V2_CHECKS_PUBLIC', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
 

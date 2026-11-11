@@ -6,7 +6,7 @@
  * offers the plans instead. The site the card makes reports for is the page's `?site=`, by default
  * the primary site.
  */
-import { instant, type Check, type FixtureDataset, type Report } from '@crawlmouse/types/v2';
+import { instant, type Check, type Report } from '@crawlmouse/types/v2';
 import { GATES, type Tier } from '../../entitlement-v2';
 import {
   RAW_FORMATS,
@@ -23,6 +23,7 @@ import {
   primarySites,
   resultChecks,
   viewAt,
+  type AccountDataset,
   type Viewer,
 } from './account';
 import { action, type ActionView } from './account-actions';
@@ -97,7 +98,7 @@ const firstPlanWith = (gate: 'exports' | 'agencyBranding'): string =>
   ];
 
 export function reportsView(
-  d: FixtureDataset,
+  d: AccountDataset,
   viewer: Viewer,
   query: { site?: string },
   /** The page the site picker reloads: `/reports`, or a preview's path. */
