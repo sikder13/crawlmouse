@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   isConsentRequiredCountry,
+  consentDecisionCookie,
+  consentDecisionFromCookie,
   consentRequiredFromCookie,
+  serverCaptureAllowed,
   shouldShowConsentBanner,
   CONSENT_REQUIRED_COOKIE,
   CONSENT_DECISION_STORAGE_KEY,
@@ -80,5 +83,44 @@ describe('shouldShowConsentBanner', () => {
   it('does not show in a non-consent region regardless of decision', () => {
     expect(shouldShowConsentBanner('cm_consent_required=0', null)).toBe(false);
     expect(shouldShowConsentBanner('', null)).toBe(false);
+  });
+});
+
+describe('the consent decision cookie', () => {
+  it('is written for one year, for the whole site, SameSite=Lax, readable by script', () => {
+    expect(consentDecisionCookie('granted')).toBe(
+      'cm_consent=granted; Max-Age=31536000; Path=/; SameSite=Lax',
+    );
+    expect(consentDecisionCookie('denied')).toBe(
+      'cm_consent=denied; Max-Age=31536000; Path=/; SameSite=Lax',
+    );
+  });
+
+  it('is read back from a cookie string, by exact name and value', () => {
+    expect(consentDecisionFromCookie('a=1; cm_consent=granted')).toBe('granted');
+    expect(consentDecisionFromCookie('cm_consent=denied; b=2')).toBe('denied');
+    expect(consentDecisionFromCookie('cm_consent=yes')).toBeNull();
+    expect(consentDecisionFromCookie('cm_consent_required=1')).toBeNull();
+    expect(consentDecisionFromCookie('xcm_consent=granted')).toBeNull();
+    expect(consentDecisionFromCookie(null)).toBeNull();
+  });
+});
+
+describe('serverCaptureAllowed', () => {
+  // The four combinations of region and decision, and the two with no decision.
+  it.each([
+    ['cm_consent_required=1; cm_consent=granted', true],
+    ['cm_consent_required=1; cm_consent=denied', false],
+    ['cm_consent_required=0; cm_consent=granted', true],
+    ['cm_consent_required=0; cm_consent=denied', false],
+    ['cm_consent_required=1', false],
+    ['cm_consent_required=0', true],
+  ])('%s → %s', (cookie, allowed) => {
+    expect(serverCaptureAllowed(cookie)).toBe(allowed);
+  });
+
+  it('allows a request with no cookie header, as the region default does', () => {
+    expect(serverCaptureAllowed(null)).toBe(true);
+    expect(serverCaptureAllowed('')).toBe(true);
   });
 });
