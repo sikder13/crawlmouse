@@ -1335,6 +1335,18 @@ begin
 end;
 $$;
 
+-- Whether the person is waiting for erasure: the source of truth for their Auth ban. A route that
+-- bans or unbans reads it after its own change, so the last writer's ban follows the database.
+create or replace function public.erasure_pending(p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select exists (select 1 from public.pending_erasures q where q.user_id = p_user);
+$$;
+
 -- The purge's work: the people whose window has ended by p_now and by the database's clock, the
 -- longest waiting first. A restore refuses once either clock has passed the window's end
 -- (restore_account), and a person is due only once both have, so a restore cannot succeed for someone
@@ -1394,6 +1406,7 @@ revoke all on function public.read_deletion_link(text, text, timestamptz) from p
 revoke all on function public.confirm_account_deletion(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.restore_account(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.record_deletion_cancel(uuid, uuid, text, boolean) from public, anon, authenticated;
+revoke all on function public.erasure_pending(uuid) from public, anon, authenticated;
 revoke all on function public.due_erasures(timestamptz, integer) from public, anon, authenticated;
 revoke all on function public.record_erasure_attempt(uuid) from public, anon, authenticated;
 revoke all on function public.finish_erasure(uuid) from public, anon, authenticated;
@@ -1404,6 +1417,7 @@ grant execute on function public.read_deletion_link(text, text, timestamptz) to 
 grant execute on function public.confirm_account_deletion(text, timestamptz) to service_role;
 grant execute on function public.restore_account(text, timestamptz) to service_role;
 grant execute on function public.record_deletion_cancel(uuid, uuid, text, boolean) to service_role;
+grant execute on function public.erasure_pending(uuid) to service_role;
 grant execute on function public.due_erasures(timestamptz, integer) to service_role;
 grant execute on function public.record_erasure_attempt(uuid) to service_role;
 grant execute on function public.finish_erasure(uuid) to service_role;

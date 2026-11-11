@@ -23,6 +23,7 @@ drop function if exists public.account_slack_destinations_drop_secret();
 drop function if exists public.finish_erasure(uuid);
 drop function if exists public.record_erasure_attempt(uuid);
 drop function if exists public.due_erasures(timestamptz, integer);
+drop function if exists public.erasure_pending(uuid);
 drop function if exists public.record_deletion_cancel(uuid, uuid, text, boolean);
 drop function if exists public.restore_account(text, timestamptz);
 drop function if exists public.confirm_account_deletion(text, timestamptz);

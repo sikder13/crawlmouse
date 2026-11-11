@@ -455,6 +455,7 @@ describe('the catalogue', () => {
       'confirm_account_deletion',
       'restore_account',
       'record_deletion_cancel',
+      'erasure_pending',
       'due_erasures',
       'record_erasure_attempt',
       'finish_erasure',
