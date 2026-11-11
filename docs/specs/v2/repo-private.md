@@ -188,7 +188,8 @@ the flip, and after the flip it is skipped rather than failed. `codeql-baseline.
 > still holds for every push.
 
 `ci.yml` triggers on `push` to every branch (and, since CC-COST, `workflow_dispatch` and a nightly
-`schedule`; it has no `pull_request` trigger). A pull request's required checks are the ones its
+`schedule`, and `pull_request` for `opened`, `reopened` and `ready_for_review` only:
+`docs/specs/v2/ci-cost.md`, D1). A pull request's required checks are the ones its
 head commit's runs reported: status checks attach to a commit, not to an event. The ruleset
 requires a branch to be up to date with `main`, so the head that was tested carries `main`'s tree.
 

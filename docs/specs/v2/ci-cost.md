@@ -17,8 +17,10 @@ pnpm --filter @crawlmouse/web exec vitest run __tests__/security/ci-workflow.tes
 merge…"). It is `open` when:
 
 - (a) the ref is `main`, whatever the event;
-- (b) the event is a push and GitHub lists an open pull request whose head is the branch
-  (`GET /repos/{repo}/pulls?state=open&head={owner}:{branch}`; the job has `pull-requests: read`);
+- (b) the event is a push, or a dispatch without `visual: true`, and GitHub lists an open pull
+  request whose head is the branch (`GET /repos/{repo}/pulls?state=open&head={owner}:{branch}`;
+  the job has `pull-requests: read`). A draft is an open pull request, so pushes to a draft run the
+  visual set;
 - (c) the event is `pull_request`, which `ci.yml` receives only for `opened`, `reopened` and
   `ready_for_review`;
 - (d) the event is a `workflow_dispatch` with the input `visual: true`.
@@ -89,7 +91,7 @@ with nothing changed:
 | the map rendered and animated twice (a hidden twin) | 2.93 ms                    | 7.5 ms           | 33.4 ms            | red      | **red**  |
 
 The twin map (a second `MapSvg` with its own `useFlip`, invisible) is the mutation for "the map does
-twice the work per frame": the page's work rises about 40%, because the map is part of it, and the
+twice the work per frame": the page's work rises by about a third (2.195 to 2.93 ms), because the map is part of it, and the
 mean crosses its limit. The 95th percentile moves less, which is why the mean is the budget held
 closely. Held callbacks model the CI symptom (frame intervals of two vsyncs or more); they slow the
 page's own callbacks, not the browser's compositor.
@@ -97,7 +99,8 @@ page's own callbacks, not the browser's compositor.
 **The limits are absolute milliseconds**, so a slower CPU reads more work. That is what the runner
 probe and the one retry in `packages/timing/scripts/perf-retry.sh` already handle
 (`docs/ops/ci-timing.md`): a budget-only failure that repeats on a runner the probe rates slow passes
-as inconclusive. The limit is set from the CI run of this branch (see the PR); the nightly trend
+as inconclusive. The limit was set on one workstation; the PR records the CI run's readings of all
+three windows against it, and the nightly trend
 shows how close each night runs to it.
 
 ## D4 — superseded runs are cancelled
@@ -175,10 +178,10 @@ branch pushes came with a pull request already open.
    largest single lever.
 2. **The visual set once per pull request and again on its merge to `main`** (3,600 + 3,414 a week).
    A `main` push re-tests the tree its up-to-date pull request head already passed. Skipping the
-   visual set there, with the nightly run as the daily full check, saves 2,752 a week: about 50,100
-   a month.
-3. The nightly run skipping the visual set on a day `main` already ran it: 889 a week, about 58,100
-   a month. It overlaps 2.
+   visual set there, with the nightly run as the daily full check, saves 2,752 a week, about 11,800
+   a month, leaving about 50,100.
+3. The nightly run skipping the visual set on a day `main` already ran it saves 889 a week, about
+   3,800 a month, leaving about 58,100. It overlaps 2.
 
 Even with 1 and 2, eighteen pull requests a week at about 200 minutes for one visual run each is
 about 15,000 a month: under 10,000 needs fewer, cheaper visual runs (fewer shards, or the screenshots
@@ -189,8 +192,8 @@ only where the change can reach), not only fewer triggers.
 - Production: the owner dispatches the workflow from `main`, then approves the `production`
   environment, whose required reviewer is the owner while the repository is public
   (`docs/specs/v2/repo-private.md`, D1, with the command that reads it back). Updated here:
-  `repo-private.md`, the comments in `db-apply-prod.yml` and `db-rollback-prod.yml`.
-  `docs/ops/incident-plan.md:51` already said so. `docs/ops/db-migrations.md` (§1, and the secrets
+  `repo-private.md`, the comments in `db-apply-prod.yml` and `db-rollback-prod.yml`, and
+  `docs/ops/incident-plan.md`, which already said "then approve" and now says when that applies. `docs/ops/db-migrations.md` (§1, and the secrets
   table in §7) still says there is no reviewer; it is outside this step and is listed for a
   follow-up.
 - `PROJECT_OVERVIEW.md` §9 and `docs/specs/v2/repo-private.md` (D5, D6) point here for the triggers.
