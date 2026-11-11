@@ -84,7 +84,7 @@ export interface CheckFacts {
   elapsedMs: number;
 }
 
-/** A crawl batch whose result is stored. `result` is null when it was not read (see `readBatch`). */
+/** A crawl batch whose result is stored. `result` is null when it is passed over (see `readBatch`). */
 export interface StoredBatch {
   batch: number;
   result: Pick<CrawlBatchResult, 'pages' | 'link_edges'> | null;
@@ -285,16 +285,23 @@ export const BATCH_GZIP_BYTES = 4 * 1024 * 1024;
 export const BATCH_RAW_BYTES = 16 * 1024 * 1024;
 
 /**
- * A stored crawl batch result, read for the stream: null when the object is missing, over a bound
- * above, not gzipped JSON, not a contract `BatchResult`, or not a crawl batch's.
+ * A stored crawl batch result, read for the stream. Null, which the stream passes over, when the
+ * object was read and is over a bound above, not gzipped JSON, not a contract `BatchResult`, or not
+ * a crawl batch's.
+ *
+ * A `get` that fails is thrown, not passed over: the cursor moves past a batch that was passed
+ * over, so its pages would not be sent on this connection or a later one. The store throws the
+ * same way for a missing object and for a request that failed (evidence.ts, `get`). The stream's
+ * loop ends the connection on the throw and the browser reconnects at the cursor before the batch
+ * (app/api/checks/[id]/stream/serve.test.ts, "a batch read that fails closes the connection…").
  */
 export async function readBatch(
   evidence: Pick<EvidenceStore, 'get'>,
   path: string,
 ): Promise<StoredBatch['result']> {
+  const gzipped = await evidence.get(path);
+  if (gzipped.byteLength > BATCH_GZIP_BYTES) return null;
   try {
-    const gzipped = await evidence.get(path);
-    if (gzipped.byteLength > BATCH_GZIP_BYTES) return null;
     const raw = gunzipSync(gzipped, { maxOutputLength: BATCH_RAW_BYTES });
     const parsed = BatchResultSchema.safeParse(JSON.parse(raw.toString('utf8')));
     if (!parsed.success || parsed.data.kind !== 'crawl') return null;

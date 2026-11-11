@@ -159,7 +159,8 @@ export async function serveStream(
           snapshot = await deps.store.snapshot(checkId);
         }
       } catch {
-        // A read that failed ends this connection; the browser reconnects from its last id.
+        // A read that failed (the snapshot, or a batch's object) ends this connection; the browser
+        // reconnects from its last id, which is before a batch whose read failed.
       } finally {
         open = false;
         try {
