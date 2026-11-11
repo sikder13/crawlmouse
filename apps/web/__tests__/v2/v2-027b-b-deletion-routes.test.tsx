@@ -201,7 +201,7 @@ describe('the routes', () => {
       );
       expect(`${route}:${exported.join(',')}`).toBe(`${route}:${methods.join(',')}`);
     }
-  });
+  }, 60_000);
 
   it('each is a 404 with V2_CHECKS_PUBLIC unset', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '');

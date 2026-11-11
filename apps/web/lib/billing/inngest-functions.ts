@@ -11,7 +11,7 @@ import type { InngestFunction } from 'inngest';
 import { setAccountReconcile } from '../../../../inngest/billing';
 import { createPastDueSweepFn } from '../../../../inngest/past-due-sweep';
 import { createTrialLifecycleFn } from '../../../../inngest/trial-lifecycle';
-import { billingClock, supabaseSweepReads, type ClockDeps } from './clock';
+import { billingClock, supabaseDeletionState, supabaseSweepReads, type ClockDeps } from './clock';
 import { productionSinks } from './effect-sinks';
 import { billingV2Enabled } from './flags';
 import { accountReconcileFromEnv } from './reconcile-v2';
@@ -36,6 +36,7 @@ function clockDeps(env: Env): ClockDeps {
   return {
     store: supabaseEntitlementStore(sb),
     reads: supabaseSweepReads(sb),
+    deletion: supabaseDeletionState(sb),
     sinks: productionSinks(),
     now: Date.now,
   };

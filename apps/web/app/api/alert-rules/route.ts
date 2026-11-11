@@ -21,7 +21,8 @@ const BACK = '/alerts';
  * replacing or clearing the Slack webhook URL (a paid tier to set one: 402). The membership is read
  * through the caller's own session (`member_role`) before the service-role client is made, and the
  * writes name that account only, so another account's rule is a 404. The answer carries whether a
- * URL is set and its last four characters, never the URL; a form is sent back to Alerts.
+ * URL is set and its last four characters, never the URL. A form is sent back to Alerts, a refused
+ * one with `?error=<code>`.
  */
 async function update(req: Request, method: 'PUT' | null): Promise<Response> {
   const sb = await supabaseServer();
@@ -30,25 +31,31 @@ async function update(req: Request, method: 'PUT' | null): Promise<Response> {
   } = await sb.auth.getUser();
   if (!user) return refuse(401, 'auth_required');
 
+  const body = await readBody(req);
+  if (body === null) return refuse(400, 'invalid');
+  // A form is sent back to Alerts with the refusal's code to show; JSON gets JSON.
+  const no = (status: number, code: string, detail: Record<string, unknown> = {}): Response =>
+    body.kind === 'form'
+      ? respond('form', `${BACK}?error=${encodeURIComponent(code)}`)
+      : refuse(status, code, detail);
+
   const viewer = await loadViewer();
-  if (viewer.kind === 'signed_out') return refuse(401, 'auth_required');
-  if (viewer.kind === 'no_account') return refuse(409, 'no_account');
-  if (viewer.kind === 'ambiguous') return refuse(409, 'account_ambiguous');
+  if (viewer.kind === 'signed_out') return no(401, 'auth_required');
+  if (viewer.kind === 'no_account') return no(409, 'no_account');
+  if (viewer.kind === 'ambiguous') return no(409, 'account_ambiguous');
   const { account, gates } = viewer.viewer;
 
   const { data: role, error: roleError } = await sb.rpc('member_role', { p_account: account.id });
   if (roleError) throw new Error(`member_role failed: ${roleError.message}`);
-  if (typeof role !== 'string') return notFound();
+  if (typeof role !== 'string') return no(404, 'not_found');
 
-  const body = await readBody(req);
-  if (body === null) return refuse(400, 'invalid');
   const meant = meantMethod(req, body);
-  if ((method ?? meant.method) !== 'PUT') return refuse(405, 'method_not_allowed');
+  if ((method ?? meant.method) !== 'PUT') return no(405, 'method_not_allowed');
   const decision = decideAlertRules({ kind: body.kind, fields: meant.fields }, gates);
   if (!decision.ok) {
     return decision.status === 402
-      ? refuse(402, decision.code, { gate: decision.gate })
-      : refuse(400, decision.code);
+      ? no(402, decision.code, { gate: decision.gate })
+      : no(400, decision.code);
   }
 
   const outcome = await applyAlertRules(
@@ -56,7 +63,7 @@ async function update(req: Request, method: 'PUT' | null): Promise<Response> {
     account.id,
     decision.plan,
   );
-  if (!outcome.ok) return notFound();
+  if (!outcome.ok) return no(404, 'not_found');
   return body.kind === 'form' ? respond('form', BACK) : Response.json({ slack: outcome.slack });
 }
 

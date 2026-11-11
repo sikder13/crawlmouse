@@ -21,7 +21,7 @@ describe('the delete step, as data', () => {
       expected: 'example-outfitter.com',
     });
     expect(v.steps).toBe(
-      'Type the hostname below and we send a confirmation link to you@company.com. The link opens a page where you confirm the deletion; sign-in then stops at once, and for seven days a sign-in link from that address restores the account.',
+      'Type the hostname below and we send a confirmation link to you@company.com. The link opens a page where you confirm the deletion; sign-in then stops at once, and for seven days the restore link in the same email restores the account.',
     );
     expect(v.text).toMatch(/^Removes all five sites, their history and reports\. /);
   });

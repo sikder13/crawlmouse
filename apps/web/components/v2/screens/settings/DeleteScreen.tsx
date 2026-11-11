@@ -6,7 +6,9 @@ import { ActionControl } from '../account/ActionControl';
 import { CardHead } from '../account/parts';
 import field from '../../Field.module.css';
 import shared from '../account/AccountScreen.module.css';
+import { NoticeLine } from './NoticeLine';
 import { StoppedForm } from './StoppedForm';
+import type { Notice } from '../../../../lib/v2/copy/settings-notices';
 import styles from './SettingsScreen.module.css';
 
 /**
@@ -14,8 +16,15 @@ import styles from './SettingsScreen.module.css';
  * and the request for a confirmation link. No orange element: the page's one action is deleting,
  * which the Settings artboard draws as a quiet control, never as the screen's best action.
  */
-export function DeleteScreen({ data }: { data: DeleteStepView }) {
-  const { header, field: f } = data;
+export function DeleteScreen({
+  data,
+  notice = null,
+}: {
+  data: DeleteStepView;
+  /** What the form's last post did, on a live page (`settingsNotice`). */
+  notice?: Notice | null;
+}) {
+  const { header, field: f, submit } = data;
   const hint = `${f.id}-hint`;
   return (
     <AccountFrame shell={data.shell} currentIs="location">
@@ -25,37 +34,47 @@ export function DeleteScreen({ data }: { data: DeleteStepView }) {
           <div className={shared.line}>{header.line}</div>
         </div>
       </header>
+      <NoticeLine notice={notice} />
       <Card as="section" className={shared.panel}>
         <CardHead title={data.cardTitle} sub={data.text} />
-        <StoppedForm action={data.submit.href} className={styles.form}>
-          {Object.entries(data.submit.fields).map(([name, value]) => (
-            <input key={name} type="hidden" name={name} value={value} />
-          ))}
-          {data.removes ? <p className={styles.hint}>{data.removes}</p> : null}
-          <p className={styles.hint}>{data.steps}</p>
-          <div className={field.stack}>
-            <label htmlFor={f.id} className={field.label}>
-              {f.label}
-            </label>
-            <input
-              id={f.id}
-              name={f.name}
-              type="text"
-              required
-              autoComplete="off"
-              spellCheck={false}
-              aria-describedby={hint}
-              className={`${field.input} ${styles.input}`}
-            />
-            <div id={hint} className={styles.hint}>
-              {f.hint}
+        {submit === null ? (
+          <div className={styles.form}>
+            {data.blocked ? <p className={styles.hint}>{data.blocked}</p> : null}
+            <div className={shared.actions}>
+              <ActionControl action={data.back} variant="quiet" size="md" />
             </div>
           </div>
-          <div className={shared.actions}>
-            <Button type="submit">{data.submit.label}</Button>
-            <ActionControl action={data.back} variant="quiet" size="md" />
-          </div>
-        </StoppedForm>
+        ) : (
+          <StoppedForm action={submit.href} className={styles.form}>
+            {Object.entries(submit.fields).map(([name, value]) => (
+              <input key={name} type="hidden" name={name} value={value} />
+            ))}
+            {data.removes ? <p className={styles.hint}>{data.removes}</p> : null}
+            <p className={styles.hint}>{data.steps}</p>
+            <div className={field.stack}>
+              <label htmlFor={f.id} className={field.label}>
+                {f.label}
+              </label>
+              <input
+                id={f.id}
+                name={f.name}
+                type="text"
+                required
+                autoComplete="off"
+                spellCheck={false}
+                aria-describedby={hint}
+                className={`${field.input} ${styles.input}`}
+              />
+              <div id={hint} className={styles.hint}>
+                {f.hint}
+              </div>
+            </div>
+            <div className={shared.actions}>
+              <Button type="submit">{submit.label}</Button>
+              <ActionControl action={data.back} variant="quiet" size="md" />
+            </div>
+          </StoppedForm>
+        )}
       </Card>
     </AccountFrame>
   );

@@ -240,18 +240,28 @@ describe('the purge', () => {
     }
   });
 
-  it('a run whose queue row outlived the erasure finishes it, and one whose accounts are still there refuses to', async () => {
+  it('an Auth user deleted outside the erasure: the purge still erases the accounts and finishes', async () => {
     const d = await deleted();
+    // Deleted by hand, say in the dashboard: public.users and the seats cascade, the accounts stay.
     await db.query(`delete from auth.users where id = $1`, [d.userId]);
+    expect(await n(`select count(*) from public.accounts where id = $1`, [d.accountId])).toBe(1);
     const log: string[] = [];
     const { steps } = purgeOver(log);
-    const person = { userId: d.userId, accounts: [d.accountId] };
-    await expect(steps.purgeOne(person)).rejects.toThrow(/an account it marked is still there/);
-    expect(await queued(d.userId)).toBe(1);
-    await db.query(`delete from public.accounts where id = $1`, [d.accountId]);
-    expect((await steps.purgeOne(person)).outcome).toBe('purged');
-    expect(log).toEqual([]);
+    const out = await steps.purgeOne({ userId: d.userId, accounts: [d.accountId] });
+    expect(out.outcome).toBe('purged');
+    expect(out.counts).toMatchObject({ 'accounts deleted': 1 });
+    expect(log).toEqual(['remove:report-logos:1', 'deleteUser']);
+    expect(await n(`select count(*) from public.accounts where id = $1`, [d.accountId])).toBe(0);
     expect(await queued(d.userId)).toBe(0);
+  });
+
+  it('finish_erasure refuses while an account it marked is still there', async () => {
+    const d = await deleted();
+    await db.query(`delete from auth.users where id = $1`, [d.userId]);
+    await expect(db.query(`select public.finish_erasure($1)`, [d.userId])).rejects.toThrow(
+      /an account it marked is still there/,
+    );
+    expect(await queued(d.userId)).toBe(1);
   });
 
   it('ends a live subscription at once with no proration, refuses until Stripe’s webhook lands, and reports nothing that day', async () => {
@@ -277,6 +287,37 @@ describe('the purge', () => {
     // The webhook writes the cancellation; the next run erases.
     await db.query(`update public.subscriptions set status = 'canceled' where id = $1`, [sub]);
     expect((await steps.purgeOne(person)).outcome).toBe('purged');
+  });
+
+  it('refuses, and reports, when the accounts to erase are not those the confirm marked', async () => {
+    const d = await deleted();
+    // An account the person alone holds that the confirm did not mark.
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+       values ('agency', 'free', 'free', 1, 1, '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]')
+       returning id`,
+    );
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'x@example.com', 'owner', 'active', now())`,
+      [rows[0]!.id, d.userId],
+    );
+    const { captureMessage } = await import('@sentry/nextjs');
+    vi.mocked(captureMessage).mockClear();
+    const log: string[] = [];
+    const { steps } = purgeOver(log);
+    const out = await steps.purgeOne({ userId: d.userId, accounts: [d.accountId] });
+    expect(out.outcome).toBe('refused');
+    expect(out.refusals![0]).toMatch(/not the accounts the confirm marked/);
+    expect(log).toEqual(['ban:876000h']);
+    expect(vi.mocked(captureMessage).mock.calls).toEqual([
+      ['account.purge_refused', { level: 'error', user: { id: d.userId } }],
+    ]);
+    expect(
+      await n(`select count(*) from public.accounts where id = any($1)`, [
+        [d.accountId, rows[0]!.id],
+      ]),
+    ).toBe(2);
   });
 
   it('any other refusal is counted and reported with the user id only', async () => {
@@ -367,6 +408,24 @@ describe('the deletion’s billing steps', () => {
       cancel: { accounts: followedFrom(null), stripe, now: () => new Date() },
     });
     expect(await none.cancel(d.userId, d.accountId)).toBe('no_subscription');
+  });
+
+  it('leaves a past-due, unpaid or paused plan to the purge, so a restore never finds one we ended', async () => {
+    for (const status of ['past_due', 'unpaid', 'paused'] as const) {
+      const d = await deleted({ due: false });
+      const stripe = stripeRecorder({ sub_late: { status } });
+      const steps = deletionBilling({
+        rpc: async (fn, args) => (await rpc(fn, args)).data as never,
+        cancel: { accounts: followedFrom('sub_late'), stripe, now: () => new Date() },
+      });
+      expect(await steps.cancel(d.userId, d.accountId)).toBe(`left:${status}`);
+      expect(stripe.calls).toEqual([['retrieve', 'sub_late']]);
+      expect(
+        await n(`select count(*) from public.deletion_cancellations where user_id = $1`, [
+          d.userId,
+        ]),
+      ).toBe(0);
+    }
   });
 
   it('resumes only a plan still set to end', async () => {

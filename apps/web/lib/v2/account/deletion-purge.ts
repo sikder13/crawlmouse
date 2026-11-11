@@ -37,7 +37,11 @@ export function deletionBilling(ports: BillingPorts): DeletionBilling {
       const followed = await ports.cancel.accounts.followed(accountId);
       if (followed === null) return 'no_subscription';
       const sub = await stripe.retrieve(followed.id);
-      const weSetCancel = RESUMABLE.has(sub.status) && !sub.cancel_at_period_end;
+      // Only a plan a restore can continue is ended at confirm (set to end at its period's end). A
+      // past-due, unpaid or paused one CC-03 would cancel at once; it is left to the purge's at-once
+      // cancel, so a restore never finds a plan this deletion killed.
+      if (!RESUMABLE.has(sub.status)) return `left:${sub.status}`;
+      const weSetCancel = !sub.cancel_at_period_end;
       const recorded = await ports.rpc<boolean>('record_deletion_cancel', {
         p_user: userId,
         p_account: accountId,
@@ -104,19 +108,15 @@ export function purge(ports: PurgePorts): Purge {
 
 async function purgeOne(ports: PurgePorts, person: DuePerson): Promise<PurgeOutcome> {
   const { userId, accounts } = person;
-  if (!(await ports.auth.exists(userId))) {
-    // An earlier run deleted the Auth user and stopped before the queue row went: finish that.
-    await ports.rpc('erase_auth_audit_log', { p_user: userId, p_emails: [] });
-    await ports.rpc('finish_erasure', { p_user: userId });
-    return { outcome: 'purged', counts: {} };
-  }
-  await ports.auth.ban(userId);
+  // An Auth user already gone (an earlier run, or a delete outside the erasure) cannot be banned;
+  // the erasure still runs, by the queue row (erase_person_plan), and its Auth delete answers 404.
+  if (await ports.auth.exists(userId)) await ports.auth.ban(userId);
   const live = await ports.liveSubscriptions(accounts);
   for (const id of live) {
     await ports.stripe.cancel(id, { prorate: false }, { idempotencyKey: `purge:${id}` });
   }
 
-  const result = await erasePerson(ports.erasure, { userId });
+  const result = await erasePerson(marked(ports.erasure, accounts), { userId });
   if (!result.ok) {
     await ports.rpc('record_erasure_attempt', { p_user: userId });
     if (live.length === 0) ports.report('account.purge_refused', userId);
@@ -125,4 +125,29 @@ async function purgeOne(ports: PurgePorts, person: DuePerson): Promise<PurgeOutc
   await ports.rpc('finish_erasure', { p_user: userId });
   await ports.capture('account_purged', accounts[0]!, { counts: result.before.counts });
   return { outcome: 'purged', counts: result.before.counts };
+}
+
+/**
+ * The erasure's ports with one more refusal: every account the plan would delete must be one the
+ * confirm marked (`pending_erasures.accounts`), so the purge never erases an account it was not asked
+ * to (S5). A marked account missing from the plan is one an earlier run already deleted (after which
+ * the Auth delete failed), so the rule is "a subset", not "the same set". The refusal goes first,
+ * ahead of the plan's own.
+ */
+function marked(erasure: ErasurePorts, accounts: readonly string[]): ErasurePorts {
+  return {
+    ...erasure,
+    async plan(target) {
+      const plan = await erasure.plan(target);
+      if (plan.accounts.every((a) => accounts.includes(a))) return plan;
+      return {
+        ...plan,
+        refusals: [
+          `the accounts to erase (${plan.accounts.join(', ')}) are not the accounts the confirm marked (${accounts.join(', ')})`,
+          ...plan.refusals,
+        ],
+        refusalCodes: ['accounts_changed', ...plan.refusalCodes],
+      };
+    },
+  };
 }

@@ -11,6 +11,7 @@ function plan(over: Partial<ErasurePlan> = {}): ErasurePlan {
     emails: ['a@example.com'],
     accounts: ['acc1'],
     refusals: [],
+    refusalCodes: [],
     counts: { 'accounts deleted': 1 },
     kept: {},
     storage: [],
@@ -51,7 +52,11 @@ function ports(first: ErasurePlan, overrides: Partial<ErasurePorts> = {}) {
 
 describe('erasePerson', () => {
   it('runs plan, storage, apply, the Auth delete, the sweep and the read-back, in that order', async () => {
-    const first = plan({ storage: objects, refusals: [`1 ${STORAGE_REFUSAL}`] });
+    const first = plan({
+      storage: objects,
+      refusals: [`1 ${STORAGE_REFUSAL}`],
+      refusalCodes: ['storage'],
+    });
     const { p, calls } = ports(first);
     const result = await erasePerson(p, { userId: 'u1' });
     expect(calls).toEqual([
@@ -73,6 +78,7 @@ describe('erasePerson', () => {
     const first = plan({
       storage: objects,
       refusals: ['subscription sub_1 is live; cancel it in Stripe first', `1 ${STORAGE_REFUSAL}`],
+      refusalCodes: ['live_subscription', 'storage'],
     });
     const { p, calls } = ports(first);
     expect(await erasePerson(p, { userId: 'u1' })).toEqual({
@@ -82,8 +88,36 @@ describe('erasePerson', () => {
     expect(calls).toEqual(['plan']);
   });
 
+  it('tells the Storage refusal by its code, wherever it sits in the list (T3)', async () => {
+    const storageFirst = plan({
+      storage: objects,
+      refusals: [`1 ${STORAGE_REFUSAL}`, 'account a1: other people are seated on it'],
+      refusalCodes: ['storage', 'others_seated'],
+    });
+    const blocked = ports(storageFirst);
+    expect((await erasePerson(blocked.p, { userId: 'u1' })).ok).toBe(false);
+    expect(blocked.calls).toEqual(['plan']);
+    // Storage objects listed, and a refusal that is not about them: it stops the erasure.
+    const otherOnly = ports(
+      plan({
+        storage: objects,
+        refusals: ['account a1: other people are seated on it'],
+        refusalCodes: ['others_seated'],
+      }),
+    );
+    expect((await erasePerson(otherOnly.p, { userId: 'u1' })).ok).toBe(false);
+    expect(otherOnly.calls).toEqual(['plan']);
+    const onlyStorage = ports(
+      plan({ storage: objects, refusals: [`1 ${STORAGE_REFUSAL}`], refusalCodes: ['storage'] }),
+    );
+    expect((await erasePerson(onlyStorage.p, { userId: 'u1' })).ok).toBe(true);
+    expect(onlyStorage.calls).toContain('removeStorage:1');
+  });
+
   it('a refusal with no storage listed stops it too', async () => {
-    const { p, calls } = ports(plan({ refusals: ['users.pro_until is in the future'] }));
+    const { p, calls } = ports(
+      plan({ refusals: ['users.pro_until is in the future'], refusalCodes: ['v1_subscription'] }),
+    );
     expect((await erasePerson(p, { userId: 'u1' })).ok).toBe(false);
     expect(calls).toEqual(['plan']);
   });

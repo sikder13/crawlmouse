@@ -3,10 +3,15 @@
  * its period's end, and the accounts a deletion removes. Values worked out by hand on the
  * challenged-site fixture's Northwind account (Agency, America/Indiana/Indianapolis) and bad-site.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ACCOUNT_VIEWERS } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
 import { fixture } from '../fixtures';
+import { REFUSAL_SENTENCES } from '../copy/settings-notices';
 import { deleteStepView, settingsView } from './settings';
+
+const WEB = join(__dirname, '../../..');
 
 describe('Settings, a paid plan set to end at its period’s end', () => {
   const ch = fixture('challenged-site');
@@ -63,16 +68,28 @@ describe('the delete step, with the accounts the deletion removes', () => {
 });
 
 describe('deleting an account with a paid plan: the money (owner ruling Q7)', () => {
-  // The published policy is Terms §8 (app/terms/page.tsx): "We don’t refund partial periods except
-  // where the law requires it." The copy says that and no more.
+  // The period-end sentence is the deletion page's (lib/v2/copy/deletion.ts); the refund sentence is
+  // the Terms page's own, read from app/terms/page.tsx below, so a change there turns this red.
   const ch = fixture('challenged-site');
   const viewer = { accountId: ACCOUNT_VIEWERS.withheld().accountId, now: '2026-10-31T12:00:00Z' };
   const MONEY =
-    'A paid plan stops renewing when you confirm and ends when the account is deleted. We don’t refund partial periods except where the law requires it (Terms, section 8).';
+    'A paid plan is set to end at the end of the period you have paid for. If that comes after the seven days, the plan is cancelled when the account is erased. We don’t refund partial periods except where the law requires it.';
+  const terms = readFileSync(join(WEB, 'app/terms/page.tsx'), 'utf8')
+    .replace(/&rsquo;/g, '’')
+    .replace(/\s+/g, ' ');
+  /** The text's last sentence. */
+  const last = (text: string) => text.slice(text.lastIndexOf('. ', text.length - 2) + 2);
 
   it('the danger zone and the delete step say it on a paid plan', () => {
     expect(settingsView(ch, viewer).danger.text.endsWith(` ${MONEY}`)).toBe(true);
     expect(deleteStepView(ch, viewer).text.endsWith(` ${MONEY}`)).toBe(true);
+  });
+
+  it('its refund sentence is the one the Terms page publishes, and nothing is added to it', () => {
+    for (const text of [settingsView(ch, viewer).danger.text, deleteStepView(ch, viewer).text]) {
+      expect(last(text)).toMatch(/refund/);
+      expect(terms).toContain(last(text));
+    }
   });
 
   it('a trial with no card and Free say nothing about money', () => {
@@ -83,5 +100,62 @@ describe('deleting an account with a paid plan: the money (owner ruling Q7)', ()
       expect(settingsView(d, v).danger.text).not.toContain('refund');
       expect(deleteStepView(d, v).text).not.toContain('refund');
     }
+  });
+});
+
+describe('what each role is offered (CC-27b review, item 5)', () => {
+  const home = fixture('bad-site');
+  const paid = fixture('challenged-site');
+  const onAgency = { accountId: ACCOUNT_VIEWERS.withheld().accountId, now: '2026-10-31T12:00:00Z' };
+
+  it('the owner: the address to change, Delete…, Keep, and on a paid plan Cancel and the portal', () => {
+    const v = settingsView(home, ACCOUNT_VIEWERS.home(), { role: 'owner' });
+    expect(v.account.email.readOnly).toBe(false);
+    expect(v.danger.action).toMatchObject({ href: '/settings/delete' });
+    expect(v.plan.keep).not.toBeNull();
+    const p = settingsView(paid, onAgency, { role: 'owner' }).plan;
+    expect(p.terms.map((t) => t.action?.href ?? null)).toEqual([
+      '/api/billing/cancel',
+      '/api/billing/portal',
+    ]);
+  });
+
+  it('an account manager: the address read-only, and no Delete…, Keep, Cancel or portal', () => {
+    const v = settingsView(home, ACCOUNT_VIEWERS.home(), { role: 'account_manager' });
+    expect(v.account.email.readOnly).toBe(true);
+    expect(v.danger.action).toBeNull();
+    expect(v.plan.keep).toBeNull();
+    const p = settingsView(paid, onAgency, { role: 'account_manager' }).plan;
+    expect(p.terms.map((t) => t.action)).toEqual([null, null]);
+    // The name and the email kinds stay theirs to change.
+    expect(v.account.save.href).toBe('/api/account');
+  });
+
+  it('a preview is read as the owner’s', () => {
+    expect(settingsView(home, ACCOUNT_VIEWERS.home())).toEqual(
+      settingsView(home, ACCOUNT_VIEWERS.home(), { role: 'owner' }),
+    );
+  });
+
+  it('the delete step’s request is the owner’s alone', () => {
+    expect(deleteStepView(home, ACCOUNT_VIEWERS.home(), { role: 'owner' }).submit).not.toBeNull();
+    for (const role of ['account_manager', 'developer'] as const)
+      expect(deleteStepView(home, ACCOUNT_VIEWERS.home(), { role }).submit).toBeNull();
+  });
+});
+
+describe('the delete step when the request would be refused (CC-27b review, item 6)', () => {
+  const home = fixture('bad-site');
+
+  it('says why, from the refusal sentences, and offers no form', () => {
+    const v = deleteStepView(home, ACCOUNT_VIEWERS.home(), { blocked: 'others_seated' });
+    expect(v.blocked).toBe(REFUSAL_SENTENCES.others_seated);
+    expect(v.submit).toBeNull();
+  });
+
+  it('with nothing in the way, the form', () => {
+    const v = deleteStepView(home, ACCOUNT_VIEWERS.home(), { blocked: null });
+    expect(v.blocked).toBeNull();
+    expect(v.submit).not.toBeNull();
   });
 });

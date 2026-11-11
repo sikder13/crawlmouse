@@ -20,7 +20,7 @@ export default async function TrialEndedPage() {
   const page = await readSettingsPage();
   if (page.kind === 'signed_out') redirect('/login');
   if (page.kind === 'none') notFound();
-  const shown = trialPage(page.d, page.viewer);
+  const shown = trialPage(page.d, page.viewer, { billingEnd: page.billingEnd, role: page.role });
   if (shown === null) redirect(page.role === 'owner' ? '/settings/plan' : '/dashboard');
   return (
     <LiveActions>

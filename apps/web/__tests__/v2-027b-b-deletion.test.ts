@@ -86,6 +86,36 @@ const marked = (accountId: string) =>
     accountId,
   ]);
 
+/**
+ * One email change's two links, as request_email_change creates them (one transaction, so one
+ * created_at): `applied` marks the confirmation used; `abandoned` lets it expire unused.
+ */
+async function emailChange(
+  o: Owner,
+  state: 'pending' | 'applied' | 'abandoned',
+): Promise<{ change: string; undo: string }> {
+  const created = state === 'abandoned' ? `now() - interval '2 hours'` : 'now()';
+  const { rows } = await db.query<{ id: string; kind: string }>(
+    `insert into public.account_tokens
+       (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, created_at, expires_at, used_at)
+     values ($1, $2, 'email_change', $3, ${created}, 'new@example.com', $4, ${created},
+             ${created} + interval '1 hour', $6::timestamptz),
+            ($1, $2, 'email_change_undo', $5, ${created}, 'new@example.com', $4, ${created},
+             now() + interval '7 days', null)
+     returning id, kind`,
+    [
+      o.accountId,
+      o.userId,
+      hashToken(newToken()),
+      o.email,
+      hashToken(newToken()),
+      state === 'applied' ? new Date().toISOString() : null,
+    ],
+  );
+  const id = (kind: string) => rows.find((r) => r.kind === kind)!.id;
+  return { change: id('email_change'), undo: id('email_change_undo') };
+}
+
 describe('request_account_deletion', () => {
   it('takes the primary site’s host in any case, and the sign-in address when there is no site', async () => {
     const o = await owner();
@@ -125,11 +155,7 @@ describe('request_account_deletion', () => {
 
   it('refuses while an email change is in flight, with others seated, and with a v1 plan', async () => {
     const o = await owner();
-    await db.query(
-      `insert into public.account_tokens (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, expires_at)
-       values ($1, $2, 'email_change_undo', $3, now(), 'new@example.com', $4, now() + interval '7 days')`,
-      [o.accountId, o.userId, 'e'.repeat(60) + String(1000 + serial), o.email],
-    );
+    await emailChange(o, 'pending');
     expect((await request(o)).r.code).toBe('email_change_pending');
 
     const crowded = await owner();
@@ -151,6 +177,27 @@ describe('request_account_deletion', () => {
     ).toBe(0);
   });
 
+  it('raises for a seated manager alone on the account, its owner’s seat gone (T6)', async () => {
+    const o = await owner();
+    const manager = await signUp(db, `manager-${serial}@example.com`);
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'mgr@example.com', 'account_manager', 'active', now())`,
+      [o.accountId, manager],
+    );
+    await db.query(`delete from public.seats where account_id = $1 and user_id = $2`, [
+      o.accountId,
+      o.userId,
+    ]);
+    await expect(
+      db.query(`select public.request_account_deletion($1, $2, $3)`, [
+        o.accountId,
+        manager,
+        o.host,
+      ]),
+    ).rejects.toThrow(/not the owner/);
+  });
+
   it('raises for someone who is not the account’s active owner', async () => {
     const o = await owner();
     const stranger = await owner();
@@ -165,6 +212,53 @@ describe('request_account_deletion', () => {
 });
 
 describe('confirm_account_deletion', () => {
+  it('sends both links to the sign-in address at the request, even after an email change in between', async () => {
+    const o = await owner();
+    const r = await json<{ ok: boolean; confirmTokenId: string }>(
+      `select public.request_account_deletion($1, $2, $3) as r`,
+      [o.accountId, o.userId, o.host],
+    );
+    // An email change confirmed after the request, before the mailer sends.
+    await db.query(`update auth.users set email = 'moved@example.net' where id = $1`, [o.userId]);
+    await db.query(`update public.users set email = 'moved@example.net' where id = $1`, [o.userId]);
+    const { rows } = await issue(r.confirmTokenId);
+    expect(rows.map((x) => [x.kind, x.recipient])).toEqual([
+      ['delete_confirm', o.email],
+      ['delete_restore', o.email],
+    ]);
+  });
+
+  it('refuses while an applied change’s undo link is live, and leaves the change’s links alone', async () => {
+    const o = await owner();
+    const { confirm: raw } = await request(o);
+    const { undo } = await emailChange(o, 'applied');
+    expect((await confirm(raw)).code).toBe('email_change_pending');
+    expect(await marked(o.accountId)).toBe(0);
+    expect(
+      await n(`select count(*) from public.account_tokens where id = $1 and revoked_at is null`, [
+        undo,
+      ]),
+    ).toBe(1);
+    await db.query(`update public.account_tokens set used_at = now() where id = $1`, [undo]);
+    expect((await confirm(raw)).ok).toBe(true);
+  });
+
+  it('refuses when a change was started between the request and the confirm', async () => {
+    const o = await owner();
+    const { confirm: raw } = await request(o);
+    await emailChange(o, 'pending');
+    expect((await confirm(raw)).code).toBe('email_change_pending');
+    expect(await marked(o.accountId)).toBe(0);
+  });
+
+  it('an abandoned change (its confirmation expired unused) holds neither the request nor the confirm', async () => {
+    const o = await owner();
+    await emailChange(o, 'abandoned');
+    const { r, confirm: raw } = await request(o);
+    expect(r.ok).toBe(true);
+    expect((await confirm(raw)).ok).toBe(true);
+  });
+
   it('a row the mailer never issued holds nothing that confirms or restores, and cannot be consumed', async () => {
     const o = await owner();
     const r = await json<{ ok: boolean; confirmTokenId: string }>(
@@ -256,6 +350,26 @@ describe('confirm_account_deletion', () => {
     expect((await confirm(raw)).code).toBe('invalid_link');
   });
 
+  it('a second confirm for the same person (a link from each account they hold) is refused, not an error', async () => {
+    const o = await owner();
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+       values ('agency', 'free', 'free', 1, 1, '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]')
+       returning id`,
+    );
+    const second = rows[0]!.id;
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'x@example.com', 'owner', 'active', now())`,
+      [second, o.userId],
+    );
+    const first = await request(o);
+    const other = await request({ ...o, accountId: second }, o.email);
+    expect(other.r.ok).toBe(true);
+    expect((await confirm(first.confirm)).ok).toBe(true);
+    expect(await confirm(other.confirm)).toEqual({ ok: false, code: 'already_confirmed' });
+  });
+
   it('takes a confirmation token only: a restore token, an expired one and an unknown one change nothing', async () => {
     const o = await owner();
     const { confirm: raw, restore: restoreRaw } = await request(o);
@@ -337,12 +451,87 @@ describe('restore_account', () => {
     ).toBe(1);
   });
 
+  it('a live, unused confirmation token posted to restore is refused as a link of another kind (T7)', async () => {
+    const o = await owner();
+    const { confirm: confirmRaw } = await request(o);
+    expect((await restore(confirmRaw)).code).toBe('invalid_link');
+    expect((await confirm(confirmRaw)).ok).toBe(true);
+  });
+
   it('before the confirm, says so and leaves the link usable', async () => {
     const o = await owner();
     const { restore: raw, confirm: confirmRaw } = await request(o);
     expect((await restore(raw)).code).toBe('not_confirmed');
     expect((await confirm(confirmRaw)).ok).toBe(true);
     expect((await restore(raw)).ok).toBe(true);
+  });
+});
+
+describe('the window’s edge when the two clocks disagree (T1)', () => {
+  /** A confirmed deletion whose window ends `offset` from the database's now. */
+  async function windowEnding(offset: string) {
+    const o = await owner();
+    const links = await request(o);
+    await confirm(links.confirm);
+    await db.query(
+      `update public.pending_erasures set confirmed_at = now() ${offset} - interval '7 days',
+              purge_after = now() ${offset} where user_id = $1`,
+      [o.userId],
+    );
+    return { o, ...links };
+  }
+  const readRestore = (token: string, now: string) =>
+    json<{ ok: boolean; code?: string }>(
+      `select public.read_deletion_link('delete_restore', $1, ${now}) as r`,
+      [hashToken(token)],
+    );
+
+  it('restore and its page refuse once the database’s clock has passed the end, though the app’s is an hour behind', async () => {
+    const { o, restore: raw } = await windowEnding(`- interval '1 minute'`);
+    const behind = `now() - interval '1 hour'`;
+    expect((await readRestore(raw, behind)).code).toBe('window_closed');
+    expect((await restore(raw, behind)).code).toBe('window_closed');
+    expect(
+      await n(`select count(*) from public.pending_erasures where user_id = $1`, [o.userId]),
+    ).toBe(1);
+  });
+
+  it('restore and its page refuse once the app’s clock has passed the end, though the database’s has not', async () => {
+    const { o, restore: raw } = await windowEnding(`+ interval '1 hour'`);
+    const ahead = `now() + interval '2 hours'`;
+    expect((await readRestore(raw, ahead)).code).toBe('window_closed');
+    expect((await restore(raw, ahead)).code).toBe('window_closed');
+    expect(
+      await n(`select count(*) from public.pending_erasures where user_id = $1`, [o.userId]),
+    ).toBe(1);
+  });
+
+  it('at the exact end the window is closed: restore refuses with p_now equal to purge_after', async () => {
+    const { o, restore: raw } = await windowEnding(`+ interval '1 hour'`);
+    const end = (
+      await db.query<{ t: string }>(
+        `select purge_after::text as t from public.pending_erasures where user_id = $1`,
+        [o.userId],
+      )
+    ).rows[0]!.t;
+    expect((await restore(raw, `'${end}'::timestamptz`)).code).toBe('window_closed');
+    expect((await restore(raw, `'${end}'::timestamptz - interval '1 millisecond'`)).ok).toBe(true);
+  });
+
+  it('a person is due only once both clocks have passed the end', async () => {
+    const inside = await windowEnding(`+ interval '1 hour'`);
+    const passed = await windowEnding(`- interval '1 minute'`);
+    const due = async (now: string) =>
+      (
+        await db.query<{ user_id: string }>(
+          `select user_id from public.due_erasures(${now}, 10000)`,
+        )
+      ).rows.map((r) => r.user_id);
+    // The app's clock eight days ahead; the database's still inside the window.
+    expect(await due(`now() + interval '8 days'`)).not.toContain(inside.o.userId);
+    // The database's clock past the end; the app's an hour behind it.
+    expect(await due(`now() - interval '1 hour'`)).not.toContain(passed.o.userId);
+    expect(await due('now()')).toContain(passed.o.userId);
   });
 });
 
@@ -379,6 +568,30 @@ describe('read_deletion_link', () => {
 });
 
 describe('the purge’s queue', () => {
+  it('a person not yet attempted comes before 51 refused ones waiting longer', async () => {
+    const refused = Array.from({ length: 51 }, () => crypto.randomUUID());
+    for (const id of refused) {
+      await db.query(
+        `insert into public.pending_erasures (user_id, accounts, confirmed_at, purge_after, attempts, last_attempt_at)
+         values ($1, array[gen_random_uuid()], now() - interval '30 days', now() - interval '23 days', 3, now())`,
+        [id],
+      );
+    }
+    const fresh = crypto.randomUUID();
+    await db.query(
+      `insert into public.pending_erasures (user_id, accounts, confirmed_at, purge_after)
+       values ($1, array[gen_random_uuid()], now() - interval '8 days', now() - interval '1 day')`,
+      [fresh],
+    );
+    const { rows } = await db.query<{ user_id: string }>(
+      `select user_id from public.due_erasures(now(), 50)`,
+    );
+    expect(rows.map((r) => r.user_id)).toContain(fresh);
+    await db.query(`delete from public.pending_erasures where user_id = any($1)`, [
+      [...refused, fresh],
+    ]);
+  });
+
   it('erase_person_apply refuses inside the window, runs after it, and finish_erasure waits for the Auth user', async () => {
     const o = await owner();
     const { confirm: raw, restore: restoreRaw } = await request(o);
@@ -455,6 +668,7 @@ describe('the catalogue', () => {
       'confirm_account_deletion',
       'restore_account',
       'record_deletion_cancel',
+      'erasure_pending',
       'due_erasures',
       'record_erasure_attempt',
       'finish_erasure',

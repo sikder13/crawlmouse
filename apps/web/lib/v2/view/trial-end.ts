@@ -36,6 +36,7 @@ import { ACCOUNT_NAV, action, type ActionView } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { freeFixes } from './free-fixes';
 import { GRADES } from './segment/changes';
+import type { SeatRole } from '../account/profile';
 
 export interface TrialRowView {
   what: string;
@@ -56,9 +57,10 @@ export interface TrialEndView {
   /**
    * `keep`: on a trial with no card, the checkout that keeps the plan (the page's orange action);
    * null on a trial with a card, which becomes the plan at its end unless it is cancelled. `end`:
-   * leaving it to end (no card), or cancelling it (a card).
+   * leaving it to end (no card, or a card trial already set to cancel), or cancelling it (a card).
+   * Both are null for a seat that is not the owner's: the choice is the owner's to make.
    */
-  banner: { title: string; sub: string; keep: ActionView | null; end: ActionView };
+  banner: { title: string; sub: string; keep: ActionView | null; end: ActionView | null };
   staysTitle: string;
   stays: TrialRowView[];
   pausesTitle: string;
@@ -90,7 +92,19 @@ function numbersText(numbers: readonly number[]): string {
     : listOf(numbers.map(String));
 }
 
-export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
+/** What a live page knows beyond the dataset: the subscription set to end, and the reader's seat. */
+export interface TrialReading {
+  /** When a subscription set to cancel at its period's end ends; null when it is not set to. */
+  billingEnd?: string | null;
+  /** The reader's seat role: only the owner is offered the plan's checkout or its cancel. */
+  role?: SeatRole;
+}
+
+export function trialEndView(
+  d: FixtureDataset,
+  viewer: Viewer,
+  { billingEnd = null, role = 'owner' }: TrialReading = {},
+): TrialEndView {
   const v = viewAt(d, viewer);
   const a = v.account;
   if (a.state !== 'pro_trial' && a.state !== 'agency_trial') {
@@ -104,6 +118,9 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
   const price = v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY;
   const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
   const card = a.card_last4;
+  // A card trial set to cancel at its end is not charged: it ends as a trial with no card does.
+  const cancelled = card !== null && billingEnd !== null;
+  const owner = role === 'owner';
   const hostOf = new Map(v.d.sites.map((s) => [s.id, s.host]));
   const checkSite = new Map(v.d.checks.map((c) => [c.id, c.site_id]));
 
@@ -124,13 +141,18 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
 
   // ── the banner ──
   const reminder = daysBefore(end, TRIAL_REMINDER_DAYS_BEFORE_END, zone);
-  const sent =
+  const reminderLine =
     a.email_prefs.trial_reminder && at(reminder) <= at(v.now)
       ? sameDay(reminder, v.now, zone)
-        ? COPY.sentToday
-        : COPY.sentOn(dayDate(reminder, zone))
+        ? COPY.reminderToday
+        : COPY.reminderOn(dayDate(reminder, zone))
       : null;
-  const cardLine = card === null ? COPY.noCard : COPY.card(card, dayDate(end, zone));
+  const cardLine =
+    card === null
+      ? COPY.noCard
+      : cancelled
+        ? COPY.cardCancelled(card, dayDate(end, zone))
+        : COPY.card(card, dayDate(end, zone));
   const dashboard = ACCOUNT_NAV[0];
 
   const {
@@ -194,7 +216,7 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
 
   return {
     // Reached from the dashboard's banner: it sits under Sites, as Final-TrialEnd marks it.
-    shell: accountShellView(v, 'Sites', { plan: 'page' }),
+    shell: accountShellView(v, 'Sites', { plan: 'page', billingEnd }),
     header: {
       title: COPY.title(days, plan),
       line,
@@ -202,9 +224,9 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
     },
     banner: {
       title: COPY.bannerTitle(plan, dayDate(end, zone)),
-      sub: [sent, cardLine].filter(Boolean).join(' '),
+      sub: [reminderLine, cardLine].filter(Boolean).join(' '),
       keep:
-        card === null
+        owner && card === null
           ? action(
               'keepPlan',
               COPY.keepNoCard(plan, price),
@@ -215,8 +237,9 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
               },
             )
           : null,
-      end:
-        card === null
+      end: !owner
+        ? null
+        : card === null || cancelled
           ? {
               label: COPY.letItEnd(dayDate(end, zone)),
               route: dashboard.href,
@@ -291,17 +314,19 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
     keepText: [
       card === null
         ? COPY.keepNoCardText(price, yearly)
-        : COPY.keepCardText(
-            card,
-            a.billing_period_months === 12 ? yearly : price,
-            dayDate(end, zone),
-            a.billing_period_months === 12 ? 'year' : 'month',
-          ),
+        : cancelled
+          ? COPY.cancelledKeepText(card, dayDate(end, zone))
+          : COPY.keepCardText(
+              card,
+              a.billing_period_months === 12 ? yearly : price,
+              dayDate(end, zone),
+              a.billing_period_months === 12 ? 'year' : 'month',
+            ),
       COPY.terms(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
     ].join(' '),
-    endTitle: card === null ? COPY.endTitle : COPY.cancelTitle,
+    endTitle: card === null || cancelled ? COPY.endTitle : COPY.cancelTitle,
     endText: [
-      card === null
+      card === null || cancelled
         ? COPY.endNothing(dayDate(end, zone))
         : COPY.endCancel(dayDate(end, zone), CANCEL_CLICKS),
       COPY.endKeeps(site.host, free, freeThree.length, others.length, staging.length > 0, plan),
@@ -314,8 +339,8 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
 export interface TrialEndedView {
   shell: ShellView;
   header: { title: string; line: string };
-  /** `keep`: the checkout for the plan the trial was of, the page's orange action. */
-  banner: { title: string; sub: string; keep: ActionView };
+  /** `keep`: the checkout for the plan the trial was of, the page's orange action; the owner's only. */
+  banner: { title: string; sub: string; keep: ActionView | null };
   staysTitle: string;
   stays: TrialRowView[];
   pausesTitle: string;
@@ -331,7 +356,11 @@ const TRIAL_TIER = { pro_trial: 'pro', agency_trial: 'agency' } as const;
  * stays and what is paused are read as before the end, now on Free. Null for any other account, and
  * for one with no primary site.
  */
-export function trialEndedView(d: FixtureDataset, viewer: Viewer): TrialEndedView | null {
+export function trialEndedView(
+  d: FixtureDataset,
+  viewer: Viewer,
+  { role = 'owner' }: Pick<TrialReading, 'role'> = {},
+): TrialEndedView | null {
   const v = viewAt(d, viewer);
   const a = v.account;
   const before = a.state_history.at(-2)?.state;
@@ -350,12 +379,15 @@ export function trialEndedView(d: FixtureDataset, viewer: Viewer): TrialEndedVie
     banner: {
       title: COPY.ended.banner(plan, dayDate(a.state_history.at(-1)!.since, zone)),
       sub: COPY.ended.sub(plan),
-      keep: action(
-        'keepPlan',
-        COPY.ended.choose(plan, tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY),
-        {},
-        { primary: true, fields: { plan: tier, interval: 'month' } },
-      ),
+      keep:
+        role !== 'owner'
+          ? null
+          : action(
+              'keepPlan',
+              COPY.ended.choose(plan, tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY),
+              {},
+              { primary: true, fields: { plan: tier, interval: 'month' } },
+            ),
     },
     staysTitle: COPY.staysTitle,
     stays,
@@ -374,12 +406,13 @@ export function trialEndedView(d: FixtureDataset, viewer: Viewer): TrialEndedVie
 export function trialPage(
   d: FixtureDataset,
   viewer: Viewer,
+  reading: TrialReading = {},
 ): { kind: 'before'; view: TrialEndView } | { kind: 'after'; view: TrialEndedView } | null {
   const v = viewAt(d, viewer);
   if (primarySites(v).length === 0) return null;
   if (v.account.state === 'pro_trial' || v.account.state === 'agency_trial')
-    return { kind: 'before', view: trialEndView(d, viewer) };
-  const view = trialEndedView(d, viewer);
+    return { kind: 'before', view: trialEndView(d, viewer, reading) };
+  const view = trialEndedView(d, viewer, { role: reading.role });
   return view === null ? null : { kind: 'after', view };
 }
 

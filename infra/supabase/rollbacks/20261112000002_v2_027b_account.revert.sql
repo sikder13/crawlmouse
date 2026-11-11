@@ -5,6 +5,7 @@
 -- search_path 20261108000002 set.
 
 -- ─── C ────────────────────────────────────────────────────────────────────────────────────────────
+drop function if exists public.account_deletion_blocked(uuid, uuid);
 -- The stored Slack URLs are Vault secrets the table names; they go with it, so a revert leaves none
 -- behind and every account has to save its URL again after a re-apply.
 do $$ begin
@@ -23,12 +24,13 @@ drop function if exists public.account_slack_destinations_drop_secret();
 drop function if exists public.finish_erasure(uuid);
 drop function if exists public.record_erasure_attempt(uuid);
 drop function if exists public.due_erasures(timestamptz, integer);
+drop function if exists public.erasure_pending(uuid);
 drop function if exists public.record_deletion_cancel(uuid, uuid, text, boolean);
 drop function if exists public.restore_account(text, timestamptz);
 drop function if exists public.confirm_account_deletion(text, timestamptz);
 drop function if exists public.read_deletion_link(text, text, timestamptz);
 drop function if exists public.request_account_deletion(uuid, uuid, text);
-drop function if exists public.email_change_live(uuid);
+drop function if exists public.email_change_live(uuid, timestamptz);
 drop function if exists public.deletion_refusal(uuid, uuid);
 drop function if exists public.deletion_hostname(uuid, uuid);
 drop table if exists public.deletion_cancellations;
@@ -51,7 +53,7 @@ drop function if exists public.normalize_email(text);
 
 -- ─── Shared ───────────────────────────────────────────────────────────────────────────────────────
 drop function if exists public.issue_account_link(uuid);
-drop function if exists public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid);
+drop function if exists public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid, text);
 drop function if exists public.end_user_sessions(uuid, uuid);
 drop table if exists public.pending_erasures;
 alter table public.users drop column if exists previous_emails;
