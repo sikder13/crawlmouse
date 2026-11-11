@@ -28,11 +28,11 @@ describe('Trial ending, the header and banner', () => {
     ]);
   });
 
-  it('says what the reminder does, today, and what the missing card means', () => {
+  it('says when the reminder is due, and what the missing card means', () => {
     const b = view().banner;
     expect(b.title).toBe("Pro ends Sat 7 Nov. Here is exactly what changes, and what doesn't.");
     expect(b.sub).toBe(
-      'The reminder goes out once, today, unless you turned it off. No card is on file, so nothing is charged either way.',
+      'The reminder is due once, on Wed 4 Nov. No card is on file, so nothing is charged either way.',
     );
     expect(b.keep).toMatchObject({ label: 'Keep Pro, $19 a month · add a card', primary: true });
     expect(b.end).toMatchObject({
@@ -243,5 +243,36 @@ describe('Trial ending, a card trial billed yearly, and the counts when nothing 
     const t = trialEndView(ch, trialEndViewer(ch, K));
     expect(t.did.rows.find((r) => r.label === 'Fixes open with packets')!.detail).toBe('none');
     expect(t.stays[0]!.how).toBe('monthly checks');
+  });
+});
+
+describe('Trial ending, the reminder line around its date (fix round 2, item 4)', () => {
+  // The reminder is due Wed 4 Nov, 21:41 in Indiana; the trial ends Sat 7 Nov.
+  const at = (now: string) => trialEndView(bad, { accountId: BAD, now }).banner.sub;
+  const NO_CARD = 'No card is on file, so nothing is charged either way.';
+
+  it('before the day, and on it, says the day it is due', () => {
+    expect(at('2026-11-01T12:00:00.000Z')).toBe(
+      `The reminder is due once, on Wed 4 Nov. ${NO_CARD}`,
+    );
+    expect(at('2026-11-04T13:00:00.000Z')).toBe(
+      `The reminder is due once, on Wed 4 Nov. ${NO_CARD}`,
+    );
+  });
+
+  it('once the day has passed, says nothing of it', () => {
+    expect(at('2026-11-06T12:00:00.000Z')).toBe(NO_CARD);
+  });
+
+  it('with the reminder turned off, says nothing of it', () => {
+    const off = {
+      ...bad,
+      accounts: bad.accounts.map((a) =>
+        a.id === BAD ? { ...a, email_prefs: { ...a.email_prefs, trial_reminder: false } } : a,
+      ),
+    };
+    expect(trialEndView(off, { accountId: BAD, now: '2026-11-01T12:00:00.000Z' }).banner.sub).toBe(
+      NO_CARD,
+    );
   });
 });

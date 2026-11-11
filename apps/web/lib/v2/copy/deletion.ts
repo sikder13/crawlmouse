@@ -23,6 +23,12 @@ export const DELETE_COPY = {
     'A paid plan is set to end at the end of the period you have paid for. If that comes after the seven days, the plan is cancelled when the account is erased.',
     REFUND_POLICY,
   ],
+  /**
+   * In place of `money[0]` for a plan whose payment failed (past_due, unpaid, paused): the confirm does
+   * not set it to end, and the purge cancels it at once (C3b).
+   */
+  moneyPaymentFailed:
+    'A plan whose last payment failed is not set to end when you confirm. It is cancelled when the account is erased, after the seven days.',
   button: 'Delete these accounts',
   /** The account named by its sign-in address has no site. */
   noSite: 'no site yet',

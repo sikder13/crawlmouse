@@ -63,6 +63,8 @@ export interface SettingsDataset {
    * until then (spec 27 "Cancel"). Null otherwise. The contract's Account has no field for it.
    */
   billingEnd: string | null;
+  /** The subscription mirror's `status`, or null when the account names no subscription. */
+  subscriptionStatus: string | null;
 }
 
 type Row = Record<string, unknown>;
@@ -73,7 +75,7 @@ const ACCOUNT_COLUMNS =
 const SEAT_COLUMNS =
   'id, account_id, user_id, invited_email, name, role, status, alert_channels, theme, ' +
   'created_at, accepted_at, client_scope_all';
-const SUBSCRIPTION_COLUMNS = 'id, interval, current_period_end, cancel_at_period_end';
+const SUBSCRIPTION_COLUMNS = 'id, status, interval, current_period_end, cancel_at_period_end';
 const ALERT_COLUMNS =
   'id, account_id, site_id, kind, enabled, threshold_points, channels, last_fired_at, ' +
   'last_fired_check_id';
@@ -244,6 +246,7 @@ export async function loadSettingsDataset(
   };
   return {
     d,
+    subscriptionStatus: subscription === null ? null : (subscription.status as string),
     billingEnd:
       subscription !== null && subscription.cancel_at_period_end === true
         ? instantFromDb(subscription.current_period_end)

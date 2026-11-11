@@ -141,11 +141,11 @@ export function trialEndView(
 
   // ── the banner ──
   const reminder = daysBefore(end, TRIAL_REMINDER_DAYS_BEFORE_END, zone);
+  // Nothing records a send (CC-28 sends it): the line says when the reminder is due, from its day
+  // until that day is over in the account's zone, and nothing after.
   const reminderLine =
-    a.email_prefs.trial_reminder && at(reminder) <= at(v.now)
-      ? sameDay(reminder, v.now, zone)
-        ? COPY.reminderToday
-        : COPY.reminderOn(dayDate(reminder, zone))
+    a.email_prefs.trial_reminder && (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
+      ? COPY.reminderDue(dayDate(reminder, zone))
       : null;
   const cardLine =
     card === null
@@ -216,7 +216,7 @@ export function trialEndView(
 
   return {
     // Reached from the dashboard's banner: it sits under Sites, as Final-TrialEnd marks it.
-    shell: accountShellView(v, 'Sites', { plan: 'page', billingEnd }),
+    shell: accountShellView(v, 'Sites', { plan: 'page', billingEnd, role }),
     header: {
       title: COPY.title(days, plan),
       line,
@@ -371,7 +371,7 @@ export function trialEndedView(
   const zone = a.timezone;
   const { stays, pauses } = staysAndPauses(v, plan);
   return {
-    shell: accountShellView(v, 'Sites', { plan: 'page' }),
+    shell: accountShellView(v, 'Sites', { plan: 'page', role }),
     header: {
       title: COPY.ended.title(plan),
       line: [dayDate(v.now, zone), COPY.sites(v.d.sites.length)].join(' · '),

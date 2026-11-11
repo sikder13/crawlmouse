@@ -76,6 +76,12 @@ No page here shares a path with a v1 page, so `V2_REWRITES` gains no row.
 
 ## Known gaps
 
+- The rail's trial card offers Billing and Keep to the owner only when its page passes the reader's
+  role (`accountShellView(…, { role })`). This step's pages do: `/settings`, `/settings/plan`,
+  `/settings/delete`, `/trial-ended`. The others still read every member as the owner, and pass the
+  role when their steps wire them: `dashboard.ts` (CC-26b), `alerts.ts`, `changes-log.ts` and
+  `reports.ts` (CC-28 and the agency-workspace step). Callers:
+  `grep -rn "accountShellView(" apps/web/lib/v2/view --include=*.ts | grep -v test`.
 - Nothing is emailed until CC-28's mailer handles `email.requested` for the three account templates and calls
   `issue_account_link`. Until then a request creates its link rows and they expire unused.
 - The scheduler of v2 checks does not exist yet (CC-28): it must skip accounts with `deletion_confirmed_at` set.

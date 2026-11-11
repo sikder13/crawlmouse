@@ -65,7 +65,10 @@ export const SETTINGS_COPY = {
    * Owner ruling Q7: the deletion page's own money sentences (lib/v2/copy/deletion.ts), the second of
    * which is the Terms page's refund sentence, so Settings says no more than the confirmation does.
    */
-  deleteMoney: DELETE_COPY.money.join(' '),
+  deleteMoney: {
+    ends: DELETE_COPY.money.join(' '),
+    failed: `${DELETE_COPY.moneyPaymentFailed} ${DELETE_COPY.money[1]}`,
+  },
   /** The confirmation step (owner ruling 12). */
   deleteSteps: (what: string, email: string, grace: number) =>
     `Type the ${what} below and we send a confirmation link to ${email}. The link opens a page where you confirm the deletion; sign-in then stops at once, and for ${numberWord(grace)} days the restore link in the same email restores the account.`,

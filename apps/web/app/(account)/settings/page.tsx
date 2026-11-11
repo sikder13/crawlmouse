@@ -30,7 +30,11 @@ export default async function SettingsPage({
     <LiveActions>
       <SettingsScreen
         notice={settingsNotice(await searchParams, 'settings')}
-        data={settingsView(page.d, page.viewer, { billingEnd: page.billingEnd, role: page.role })}
+        data={settingsView(page.d, page.viewer, {
+          billingEnd: page.billingEnd,
+          role: page.role,
+          subscriptionStatus: page.subscriptionStatus,
+        })}
       />
     </LiveActions>
   );
