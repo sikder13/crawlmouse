@@ -9,9 +9,10 @@
  * Order within one poll: each new batch's events (`batchEvents`), then the row's (`checkEvents`),
  * so the map has its pages before a `grading` stage could close it (progress.ts, `reduce`).
  *
- * The two stages the stored progress cannot name as under way, `without_js` and `grading`, are
- * closed when the check's status is `finished` or `partial`: the status says those steps ran. The
- * stream does not observe them start.
+ * The pipeline writes four phases to the stored progress as under way (steps/progress.ts,
+ * `phaseOf`; steps/lifecycle.ts). The other two, `without_js` and `grading`, are closed here when
+ * the check's status is `finished` or `partial`: the status says those steps ran. The stream does
+ * not observe them start.
  */
 import { gunzipSync } from 'node:zlib';
 import { BatchResultSchema, type Check, type CrawlBatchResult } from '@crawlmouse/types/v2';
@@ -46,8 +47,8 @@ export const START: Cursor = Object.freeze({
 
 const ALL_DONE = 2 * PHASES.length;
 /**
- * As far as a check that has not ended is taken: `crawler_tests` done. The stored progress names
- * neither `without_js` nor `grading` as under way (steps/progress.ts, `phaseOf`).
+ * As far as a check that has not ended is taken: `crawler_tests` done, whatever its stored steps
+ * say (stream.test.ts, "a running check is not taken past the crawler tests").
  */
 const OBSERVED = 2 * PHASES.indexOf('without_js');
 const CURSOR = /^1\.(\d{1,7})\.(\d{1,2})\.(\d{1,9})\.(\d{1,9})\.(\d{1,12})\.([01])$/;
