@@ -20,16 +20,18 @@ import { personalAccount, signUp } from './helpers/v2-check-tables';
 const MIGRATION = '20261112000002_v2_027b_account.sql';
 const ROLLBACK = '20261112000002_v2_027b_account.revert.sql';
 
-/** Supabase's auth.users has created_at; the shared shim leaves it out, and the undo reads it. */
-const AUTH_CREATED_AT = `alter table auth.users add column created_at timestamptz not null default now();`;
+/** Supabase's auth.users has both columns; the shared shim leaves them out, and the undo reads them. */
+const AUTH_CREATED_AT = `alter table auth.users add column created_at timestamptz not null default now(),
+                                             add column banned_until timestamptz;`;
 
 let db: PGlite;
 
+// Applying every migration to a fresh PGlite takes several seconds, more under a parallel run.
 beforeAll(async () => {
   db = await freshDb();
   await db.exec(AUTH_CREATED_AT);
   await applyAllMigrations(db);
-});
+}, 120_000);
 afterAll(async () => db.close());
 
 let n = 0;
@@ -41,10 +43,15 @@ async function person(tag = 'p') {
   return { userId, accountId, seatId, email };
 }
 
-const link = () => {
-  const raw = newToken();
+/** The mailer's call (CC-28): mints the row's token and returns it with its hash. */
+async function issue(id: string) {
+  const { rows } = await db.query<{ token: string }>(
+    `select token from public.issue_account_link($1)`,
+    [id],
+  );
+  const raw = rows[0]!.token;
   return { raw, hash: hashToken(raw) };
-};
+}
 
 /** A database error's SQLSTATE, or 'none' when the call succeeded. */
 async function sqlstate(p: Promise<unknown>): Promise<string> {
@@ -59,13 +66,14 @@ async function sqlstate(p: Promise<unknown>): Promise<string> {
 const NOW = () => new Date();
 const minutes = (d: Date, m: number) => new Date(d.getTime() + m * 60_000);
 
+/** Asks for a change, then issues the confirmation link as the mailer would. */
 async function request(p: { accountId: string; userId: string }, to: string, now = NOW()) {
-  const l = link();
   const { rows } = await db.query<{ id: string }>(
-    `select public.request_email_change($1, $2, $3, $4, $5, $6) as id`,
-    [p.accountId, p.userId, to, l.hash, l.raw, now],
+    `select public.request_email_change($1, $2, $3, $4) as id`,
+    [p.accountId, p.userId, to, now],
   );
-  return { ...l, id: rows[0]!.id };
+  const id = rows[0]!.id;
+  return { id, ...(await issue(id)) };
 }
 
 interface Applied {
@@ -77,13 +85,14 @@ interface Applied {
   tier: string;
 }
 
+/** Confirms a change, then issues the undo link as the mailer would. */
 async function apply(hash: string, now = NOW()) {
-  const undo = link();
-  const { rows } = await db.query<{ r: Applied }>(
-    `select public.apply_email_change($1, $2, $3, $4) as r`,
-    [hash, now, undo.hash, undo.raw],
-  );
-  return { applied: rows[0]!.r, undo };
+  const { rows } = await db.query<{ r: Applied }>(`select public.apply_email_change($1, $2) as r`, [
+    hash,
+    now,
+  ]);
+  const applied = rows[0]!.r;
+  return { applied, undo: await issue(applied.undo_token_id) };
 }
 
 const prepare = async (hash: string, now = NOW()) =>
@@ -331,36 +340,132 @@ describe('the undo', () => {
     expect(await sqlstate(prepare(u.hash))).toBe('CMA05');
     expect(await sqlstate(undo(u.hash))).toBe('CMA05');
   });
+});
 
-  it('clears a sign-up of the old address made after the change that holds nothing, and names it', async () => {
+describe('a sign-up of the old address made after the change (owner ruling Q10)', () => {
+  /** A person whose address was changed, and a sign-up of their old address afterwards. */
+  async function squatted(tag: string) {
     const p = await person();
-    const r = await request(p, 'stolen@example.net');
-    const { undo: u } = await apply(r.hash);
-    const squatter = await signUp(db, p.email);
-    const { accountId: squatAccount } = await personalAccount(db, squatter);
-    expect((await prepare(u.hash)).squatter).toBe(squatter);
-    const { rows } = await db.query(`select 1 from public.accounts where id = $1`, [squatAccount]);
-    expect(rows).toEqual([]);
-  });
-
-  it('refuses a holder of the old address that holds something, or that predates the change (CMA04)', async () => {
-    const p = await person();
-    const r = await request(p, 'stolen2@example.net');
+    const r = await request(p, `${tag}@example.net`);
     const { undo: u } = await apply(r.hash);
     const squatter = await signUp(db, p.email);
     const { accountId } = await personalAccount(db, squatter);
-    await db.query(`insert into public.sites (account_id, host) values ($1, 'kept.example')`, [
-      accountId,
-    ]);
-    expect(await sqlstate(prepare(u.hash))).toBe('CMA04');
-    await db.query(`delete from public.sites where account_id = $1`, [accountId]);
+    return { p, u, squatter, accountId };
+  }
+
+  const accountLeft = async (id: string) =>
+    (await db.query(`select 1 from public.accounts where id = $1`, [id])).rows.length;
+
+  it('a sign-up has the seat and account handle_new_user gives it, and nothing else', async () => {
+    const { squatter, accountId } = await squatted('measure');
+    const { rows } = await db.query<{ seats: number; role: string; is_default: boolean }>(
+      `select count(*)::int seats, min(s.role) role, bool_and(s.account_id = u.default_account_id) is_default
+         from public.seats s join public.users u on u.id = s.user_id where s.user_id = $1`,
+      [squatter],
+    );
+    expect(rows[0]).toEqual({ seats: 1, role: 'owner', is_default: true });
+    expect(await accountLeft(accountId)).toBe(1);
+  });
+
+  it('is cleared out of the way when all four conditions hold, and named', async () => {
+    const { u, squatter, accountId } = await squatted('cleared');
+    expect((await prepare(u.hash)).squatter).toBe(squatter);
+    expect(await accountLeft(accountId)).toBe(0);
+  });
+
+  it('1: is refused when it was created before the change was applied', async () => {
+    const { u, squatter, accountId } = await squatted('older');
     await db.query(`update auth.users set created_at = now() - interval '1 day' where id = $1`, [
       squatter,
     ]);
     expect(await sqlstate(prepare(u.hash))).toBe('CMA04');
     expect(await sqlstate(undo(u.hash))).toBe('CMA04');
-    const { rows } = await db.query(`select 1 from public.accounts where id = $1`, [accountId]);
-    expect(rows).toHaveLength(1);
+    expect(await accountLeft(accountId)).toBe(1);
+  });
+
+  it('2: is refused when it has a seat beyond its own sign-up account', async () => {
+    const { u, squatter, accountId } = await squatted('seated');
+    const host = await person('host');
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'seated@example.org', 'developer', 'active', now())`,
+      [host.accountId, squatter],
+    );
+    expect(await sqlstate(prepare(u.hash))).toBe('CMA04');
+    expect(await accountLeft(accountId)).toBe(1);
+  });
+
+  it('3: is refused when it has an audit, a session, or an account that holds something', async () => {
+    const cases: [string, (s: { squatter: string; accountId: string }) => Promise<unknown>][] = [
+      [
+        'audit',
+        (s) =>
+          db.query(`insert into public.audits (user_id, url) values ($1, 'https://a.example')`, [
+            s.squatter,
+          ]),
+      ],
+      [
+        'session',
+        (s) =>
+          db.query(
+            `insert into public.sessions (user_id, expires_at) values ($1, now() + interval '1 day')`,
+            [s.squatter],
+          ),
+      ],
+      [
+        'site',
+        (s) =>
+          db.query(`insert into public.sites (account_id, host) values ($1, 'kept.example')`, [
+            s.accountId,
+          ]),
+      ],
+    ];
+    for (const [tag, add] of cases) {
+      const s = await squatted(`holds-${tag}`);
+      await add(s);
+      expect(await sqlstate(prepare(s.u.hash)), tag).toBe('CMA04');
+      expect(await accountLeft(s.accountId), tag).toBe(1);
+    }
+  });
+
+  it('4: is refused when it is banned', async () => {
+    const { u, squatter, accountId } = await squatted('banned');
+    await db.query(
+      `update auth.users set banned_until = now() + interval '100 years' where id = $1`,
+      [squatter],
+    );
+    expect(await sqlstate(prepare(u.hash))).toBe('CMA04');
+    expect(await accountLeft(accountId)).toBe(1);
+  });
+});
+
+describe('a link row before the mailer issues it', () => {
+  it('holds no token, and no token confirms it', async () => {
+    const p = await person();
+    const { rows } = await db.query<{ id: string }>(
+      `select public.request_email_change($1, $2, 'unissued@example.org', now()) as id`,
+      [p.accountId, p.userId],
+    );
+    const { rows: row } = await db.query(
+      `select token_hash, issued_at from public.account_tokens where id = $1`,
+      [rows[0]!.id],
+    );
+    expect(row).toEqual([{ token_hash: null, issued_at: null }]);
+    expect(await sqlstate(apply(hashToken(newToken())))).toBe('CMA05');
+    const { rows: after } = await db.query<{ used: boolean }>(
+      `select used_at is not null as used from public.account_tokens where id = $1`,
+      [rows[0]!.id],
+    );
+    expect(after).toEqual([{ used: false }]);
+  });
+
+  it('a retried send gives a new token, and the earlier one stops confirming', async () => {
+    const p = await person();
+    const r = await request(p, 'retried@example.org');
+    const again = await issue(r.id);
+    expect(again.raw).not.toBe(r.raw);
+    expect(await sqlstate(apply(r.hash))).toBe('CMA05');
+    expect((await apply(again.hash)).applied.new_email).toBe('retried@example.org');
   });
 });
 
@@ -455,5 +560,5 @@ describe('the file', () => {
     } finally {
       await twice.close();
     }
-  });
+  }, 120_000);
 });

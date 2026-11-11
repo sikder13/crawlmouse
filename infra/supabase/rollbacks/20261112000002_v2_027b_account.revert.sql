@@ -12,8 +12,8 @@
 drop function if exists public.undo_email_change(text, timestamptz);
 drop function if exists public.prepare_email_undo(text, timestamptz);
 drop function if exists public.revert_email_change(uuid);
-drop function if exists public.apply_email_change(text, timestamptz, text, text);
-drop function if exists public.request_email_change(uuid, uuid, text, text, text, timestamptz);
+drop function if exists public.apply_email_change(text, timestamptz);
+drop function if exists public.request_email_change(uuid, uuid, text, timestamptz);
 drop function if exists public.email_held_by_other(text, uuid);
 drop function if exists public.normalize_email(text);
 
