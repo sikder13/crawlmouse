@@ -30,7 +30,8 @@ Three things change with the flag unset:
   (`vitest lib/auth/sentry-scrub.test.ts`). A v1 audit id is a capability too.
 - The middleware answers a cross-site POST to a new route 403 and a non-JSON one 415 before the
   route's own 404, as it does for the claim route (`vitest __tests__/security/json-body.test.ts`).
-  This follows the plan review, not an owner ruling; it is listed for the owner in the pull request.
+  Approved (owner rulings, round 3): the routes are public in this repository, so a 404 would hide
+  nothing.
 
 ## Decisions
 
@@ -68,8 +69,8 @@ Three things change with the flag unset:
   and the pages affected, and one line saying its steps are not written yet (the engine writes no
   effort either). No packet text is made
   up in the web app. **"The primary action is Keep":** the result's orange button is the locked
-  design's "Open the fix"; Keep is the bar below it. Not ruled on; listed for the owner in the pull
-  request.
+  design's "Open the fix"; Keep is the bar below it. Approved (owner rulings,
+  round 3): the free fix is the taste, and Keep stays one click away.
 - **D7, "the claim calls `requestCheck`".** Only when the kept site has no queued, running,
   deferred, finished or partial check, which is when the claimed check failed.
 - **D7, "a failed move".** A copy that fails or passes its 8-second budget does not refuse the
@@ -159,6 +160,8 @@ lib/v2/pipeline/stream.budget.test.ts`, which prints the numbers): one batch res
   limit, and resumes from `Last-Event-ID`; a cursor that does not parse answers 400. 120 opens an
   hour per address.
 - The capability is checked when the stream opens and again when the site's account changes.
+- Once a client has gone, no further batch object is read for it and no `check_finished` is sent
+  (`vitest "app/api/checks/[id]/stream/serve.test.ts" -t "client that has gone"`).
 - A batch object that cannot be read is tried three times on a connection, a poll's wait apart,
   then passed over and logged; that batch's pages stay off the live map for that viewing, and
   the steps, counts and end still arrive (`vitest "app/api/checks/[id]/stream/serve.test.ts" -t
@@ -206,8 +209,9 @@ db/rollback.test.ts db/check.test.ts`).
 ## Home (D10)
 
 `middleware.ts` holds `V2_REWRITES`; with the flag set `/` is rewritten to `/v2-home`, a prerendered
-page that renders the v2 home and main's three JSON-LD blocks under the root layout's title,
-description, canonical and robots. The middleware sends a direct request for `/v2-home`, or a path under it, to a path no route serves, with the flag set or unset (`vitest middleware.test.ts`); on the production build named above each such request answered the site's 404, in upper case and percent-encoded too. `app/page.tsx` is main's file
+page that renders the v2 home under the root layout's title, description, canonical and robots,
+with the WebSite and SoftwareApplication structured data. Main's FAQPage block is not emitted: the
+v2 home shows no FAQ (`vitest app/v2-home/page.test.tsx`). The middleware sends a direct request for `/v2-home`, or a path under it, to a path no route serves, with the flag set or unset (`vitest middleware.test.ts`); on the production build named above each such request answered the site's 404, in upper case and percent-encoded too. `app/page.tsx` is main's file
 (`git diff origin/main -- apps/web/app/page.tsx` prints nothing).
 
 ## Events (D12)
@@ -253,10 +257,8 @@ values are in the environment.
 - The engine's private-address test answers false for some IPv6 spellings that embed an IPv4
   address with a zero 16-bit half (`packages/engine/src/ssrf-guard.ts`). The host rule here refuses
   an IP literal, so the way in is a DNS record, as on v1.
-- The v2 home emits the FAQ structured data and does not show the questions.
 - A batch object that stays unreadable for three tries is left off that viewing's live map, and
-  a read that hangs is not bounded by the stream. The stream stops reading for a client that has
-  gone, which no test covers.
+  a read that hangs is not bounded by the stream.
 - A run of the expiry deletes 1,000 sites at most; a day with more expired sites than that leaves
   the rest for the next run. A site with very many rows may pass the database's statement timeout
   and be skipped each day; it is reported by id.
@@ -277,6 +279,8 @@ values are in the environment.
 - Two visitors' checks of one host can overlap; a per-host run guard belongs to the worker step (Q16).
 - `templateNoun` names a template whose label is its key, which every measured check has
   (`lib/v2/format.ts`; rulings round 2, 0.3).
+- Under the flag the h1 and each h2 of `/` change, as D10's repositioning; the v2 home emits no
+  FAQPage structured data (round 3).
 - A challenge of one crawler is worded from that crawler's rows, with the control fetch beside it
   (`lib/v2/view/segment/access.ts`; 0.4).
 - The files outside the step's path list that workstream B changed were approved as it listed them:

@@ -227,6 +227,37 @@ describe('the stream of a check anyone with its id may read', () => {
     warned.mockRestore();
   });
 
+  it('for a client that has gone: no further batch object is read, and no `check_finished` is sent', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'client-gone.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await storeBatch(h, ids, 2, two, { pages: 3, links: 3 });
+    // The check has ended, so a poll that ran to its end would send the end and capture the event.
+    await h.pipeline.fail(ids.checkId, 'canceled', null);
+    const gone = new AbortController();
+    const get = h.deps.evidence.get;
+    const read: string[] = [];
+    h.deps.evidence = {
+      async get(path) {
+        read.push(path);
+        // The client drops the connection while the first batch's object is being read.
+        gone.abort();
+        return get(path);
+      },
+    };
+    const res = await serveStream(
+      request(`/api/checks/${ids.checkId}/stream`, { signal: gone.signal }),
+      ids.checkId,
+      anonymous,
+      h.deps,
+    );
+    await res.text().catch(() => undefined);
+    expect(read).toHaveLength(1);
+    expect(read[0]).toMatch(/batch-1\.json\.gz$/);
+    expect(h.captured).toEqual([]);
+    expect(h.limits.filter((key) => key.startsWith('event:check_finished:'))).toEqual([]);
+  });
+
   it('a queued check: nothing but the end when it is cancelled before it starts', async () => {
     const h = harness(db);
     const ids = await queued(db, 'queued.example');
