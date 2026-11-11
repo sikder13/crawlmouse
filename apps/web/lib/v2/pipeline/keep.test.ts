@@ -648,6 +648,7 @@ describe('settleKeptCheck', () => {
 
 describe('at any failure, the stored paths and the objects agree (property)', () => {
   it('each stored path names an object that exists, and they are all old or all new', async () => {
+    const failed = new Set<string>();
     await fc.assert(
       fc.asyncProperty(
         fc.record({
@@ -660,8 +661,18 @@ describe('at any failure, the stored paths and the objects agree (property)', ()
           const memory = memoryEvidenceStore();
           const check = await storedCheck(db, memory, { host: host(), expiresAt: LATER, batches });
           const who = await keeper();
+          // The fixture stores `batches` batch objects, seeds, render and map; a move lists once,
+          // reads each object twice, writes it once and removes once. `failAt` is folded into the
+          // calls the op has, so a drawn failure happens.
+          const objects = batches + 3;
+          const callsOf = { list: 1, get: 2 * objects, put: objects, remove: 1, none: 1 };
+          const at = 1 + ((failAt - 1) % callsOf[op]);
           let seen = 0;
-          const flaky = failing(memory, (o) => o === op && ++seen === failAt);
+          const flaky = failing(memory, (o) => {
+            if (o !== op || ++seen !== at) return false;
+            failed.add(op);
+            return true;
+          });
           const kept = { ...check, accountId: who.accountId };
           if (settle) {
             await db.query(`update public.sites set account_id = $2 where id = $1`, [
@@ -684,6 +695,8 @@ describe('at any failure, the stored paths and the objects agree (property)', ()
       ),
       { numRuns: 60 },
     );
+    // What the runs reached: a failure of each kind of storage call.
+    expect([...failed].sort()).toEqual(['get', 'list', 'put', 'remove']);
   }, 180_000);
 });
 
