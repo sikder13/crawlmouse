@@ -32,6 +32,7 @@ vi.mock('@/lib/v2/pipeline/load', () => ({
   supabaseCheckReader: () => pgliteCheckReader(h.db as PGlite),
 }));
 
+import { REFUSAL_SENTENCES, SETTINGS_NOTICES } from '@/lib/v2/copy/settings-notices';
 import { DeleteScreen } from '@/components/v2/screens/settings/DeleteScreen';
 import { PlanScreen } from '@/components/v2/screens/settings/PlanScreen';
 import { SettingsScreen } from '@/components/v2/screens/settings/SettingsScreen';
@@ -51,6 +52,9 @@ let owner: Person; // a Free account with one site
 let empty: Person; // a Free account with no site
 let trialing: Person; // a no-card Pro trial with one site
 let ended: Person; // back on Free after a Pro trial, one site
+let shared: Person; // a no-card Pro trial with a manager seated on it
+let sharedManager: { id: string; email: string };
+let cancelling: Person; // a Pro trial with a card, its subscription set to cancel at the trial's end
 let manager: { id: string; email: string };
 let developer: { id: string; email: string };
 
@@ -115,6 +119,37 @@ beforeAll(async () => {
       where id = $1`,
     [ended.accountId],
   );
+  cancelling = await person('cancelling');
+  await host(cancelling, 'cancelling-site.example');
+  await db.query(
+    `insert into public.subscriptions (id, account_id, status, plan, interval, current_period_end, trial_end,
+                                       cancel_at_period_end)
+     values ('sub_cancelling_trial', $1, 'trialing', 'pro', 'month', now() + interval '5 days',
+             now() + interval '5 days', true)`,
+    [cancelling.accountId],
+  );
+  await db.query(
+    `update public.accounts
+        set state = 'pro_trial', tier = 'pro', trial_variant = 'card_required', card_last4 = '4242',
+            current_subscription_id = 'sub_cancelling_trial',
+            trial_ends_at = now() + interval '5 days', trial_used_at = now(),
+            state_history = state_history || jsonb_build_array(jsonb_build_object('state', 'pro_trial',
+              'since', (state_history->0->>'since')::timestamptz + interval '1 millisecond'))
+      where id = $1`,
+    [cancelling.accountId],
+  );
+  shared = await person('shared');
+  await host(shared, 'shared-site.example');
+  await db.query(
+    `update public.accounts
+        set state = 'pro_trial', tier = 'pro', trial_variant = 'no_card',
+            trial_ends_at = now() + interval '5 days', trial_used_at = now(),
+            state_history = state_history || jsonb_build_array(jsonb_build_object('state', 'pro_trial',
+              'since', (state_history->0->>'since')::timestamptz + interval '1 millisecond'))
+      where id = $1`,
+    [shared.accountId],
+  );
+  sharedManager = await seat(shared.accountId, 'account_manager');
   manager = await seat(owner.accountId, 'account_manager');
   developer = await seat(owner.accountId, 'developer');
 }, 300_000);
@@ -127,6 +162,8 @@ const as = (u: { id: string; email: string } | null) => {
 };
 const notFoundError = { digest: expect.stringMatching(/404/) };
 const redirectTo = (path: string) => ({ digest: expect.stringContaining(`;${path};`) });
+/** A page's query, as Next hands it over. */
+const q = (query: Record<string, string> = {}) => ({ searchParams: Promise.resolve(query) });
 const screen = (el: unknown) => (el as ReactElement<{ children: ReactElement }>).props.children;
 
 const PAGES = [
@@ -140,14 +177,18 @@ describe('with V2_CHECKS_PUBLIC off', () => {
   it.each(PAGES)('%s is a 404, even for the owner', async (_path, Page) => {
     h.user = { id: owner.id, email: owner.email };
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
-    await expect(Page()).rejects.toMatchObject(notFoundError);
+    await expect((Page as (p: unknown) => Promise<unknown>)(q())).rejects.toMatchObject(
+      notFoundError,
+    );
   });
 });
 
 describe('signed out', () => {
   it.each(PAGES)('%s sends the caller to sign in', async (_path, Page) => {
     as(null);
-    await expect(Page()).rejects.toMatchObject(redirectTo('/login'));
+    await expect((Page as (p: unknown) => Promise<unknown>)(q())).rejects.toMatchObject(
+      redirectTo('/login'),
+    );
   });
 });
 
@@ -155,7 +196,7 @@ describe('/settings', () => {
   it('renders Settings for the owner and for an account manager, from the account’s records', async () => {
     for (const u of [owner, manager]) {
       as(u);
-      const el = screen(await SettingsPage());
+      const el = screen(await SettingsPage(q()));
       expect(el.type).toBe(SettingsScreen);
       const html = renderToStaticMarkup(el);
       expect(html).toContain(owner.email);
@@ -163,9 +204,35 @@ describe('/settings', () => {
     }
   });
 
+  it('offers the owner Delete… and the address to change, and a manager neither', async () => {
+    as(owner);
+    const mine = renderToStaticMarkup(screen(await SettingsPage(q())));
+    expect(mine).toContain('href="/settings/delete"');
+    expect(mine).not.toMatch(
+      /<input[^>]*name="newEmail"[^>]*readOnly|<input[^>]*readonly[^>]*name="newEmail"/i,
+    );
+    as(manager);
+    const theirs = renderToStaticMarkup(screen(await SettingsPage(q())));
+    expect(theirs).not.toContain('href="/settings/delete"');
+    expect(theirs).toMatch(/<input(?=[^>]*name="newEmail")(?=[^>]*readonly)[^>]*>/i);
+  });
+
+  it('says what the form did: saved, the link sent, or why it was refused', async () => {
+    as(owner);
+    const text = async (query: Record<string, string>) =>
+      renderToStaticMarkup(screen(await SettingsPage(q(query))));
+    expect(await text({ saved: '1' })).toContain(SETTINGS_NOTICES.saved);
+    expect(await text({ email: 'sent' })).toContain(SETTINGS_NOTICES.emailSent);
+    expect(await text({ error: 'deletion_pending' })).toContain(
+      renderToStaticMarkup(<>{REFUSAL_SENTENCES.deletion_pending}</>),
+    );
+    expect(await text({ error: 'nonsense' })).toContain(SETTINGS_NOTICES.unknown);
+    expect(await text({})).not.toContain(SETTINGS_NOTICES.saved);
+  });
+
   it('is a 404 for a developer', async () => {
     as(developer);
-    await expect(SettingsPage()).rejects.toMatchObject(notFoundError);
+    await expect(SettingsPage(q())).rejects.toMatchObject(notFoundError);
   });
 });
 
@@ -188,30 +255,41 @@ describe('/settings/plan', () => {
 describe('/settings/delete', () => {
   it('renders the step for an owner alone on the account, with the hostname and the account it removes', async () => {
     as(trialing);
-    const el = screen(await DeletePage());
+    const el = screen(await DeletePage(q()));
     expect(el.type).toBe(DeleteScreen);
     const html = renderToStaticMarkup(el);
     expect(html).toContain('Type trial-site.example to confirm');
     expect(html).toContain('Deleting removes 1 account you alone hold: trial-site.example.');
   });
 
-  it('an account others sit on is not one the person alone holds: the step names none', async () => {
+  it('an account others sit on: the step names no account, says why, and offers no form', async () => {
     as(owner);
-    const html = renderToStaticMarkup(screen(await DeletePage()));
-    expect(html).toContain('Type owner-site.example to confirm');
+    const html = renderToStaticMarkup(screen(await DeletePage(q())));
     expect(html).not.toContain('Deleting removes');
+    expect(html).toContain(renderToStaticMarkup(<>{REFUSAL_SENTENCES.others_seated}</>));
+    expect(html).not.toContain('action="/api/account"');
+  });
+
+  it('says the link was sent, and shows a refusal the route sent back', async () => {
+    as(trialing);
+    const sent = renderToStaticMarkup(screen(await DeletePage(q({ sent: '1' }))));
+    expect(sent).toContain(SETTINGS_NOTICES.deleteSent);
+    const refused = renderToStaticMarkup(
+      screen(await DeletePage(q({ error: 'hostname_mismatch' }))),
+    );
+    expect(refused).toContain(REFUSAL_SENTENCES.hostname_mismatch);
   });
 
   it('an account with no site is retyped by its sign-in address', async () => {
     as(empty);
-    const html = renderToStaticMarkup(screen(await DeletePage()));
+    const html = renderToStaticMarkup(screen(await DeletePage(q())));
     expect(html).toContain(`Type ${empty.email} to confirm`);
   });
 
   it('is a 404 for an account manager and a developer', async () => {
     for (const u of [manager, developer]) {
       as(u);
-      await expect(DeletePage()).rejects.toMatchObject(notFoundError);
+      await expect(DeletePage(q())).rejects.toMatchObject(notFoundError);
     }
   });
 });
@@ -236,5 +314,39 @@ describe('/trial-ended', () => {
     await expect(TrialEndedPage()).rejects.toMatchObject(redirectTo('/settings/plan'));
     as(manager);
     await expect(TrialEndedPage()).rejects.toMatchObject(redirectTo('/dashboard'));
+  });
+});
+
+describe('a trial with a card whose subscription is set to cancel at its end', () => {
+  const CHARGE = /charged (then|on)|unless you cancel|Cancel before/;
+
+  it('/settings says the card is not charged, and offers no cancel', async () => {
+    as(cancelling);
+    const html = renderToStaticMarkup(screen(await SettingsPage(q())));
+    expect(html).toContain('The card ending 4242 is not charged.');
+    expect(html).not.toMatch(CHARGE);
+    expect(html).not.toContain('action="/api/billing/cancel"');
+  });
+
+  it('/trial-ended says the trial is cancelled and the card not charged', async () => {
+    as(cancelling);
+    const html = renderToStaticMarkup(screen(await TrialEndedPage()));
+    expect(html).toContain('The trial is cancelled: it ends on');
+    expect(html).not.toMatch(CHARGE);
+    expect(html).not.toContain('href="/settings/plan"');
+  });
+});
+
+describe('/trial-ended for a seat that is not the owner’s', () => {
+  it('offers the owner the checkout, and the manager neither it nor a link to Settings › Plan', async () => {
+    as(shared);
+    expect(renderToStaticMarkup(screen(await TrialEndedPage()))).toContain(
+      'action="/api/billing/checkout"',
+    );
+    as(sharedManager);
+    const html = renderToStaticMarkup(screen(await TrialEndedPage()));
+    expect(html).toContain('of Pro left');
+    expect(html).not.toContain('action="/api/billing/checkout"');
+    expect(html).not.toContain('href="/settings/plan"');
   });
 });

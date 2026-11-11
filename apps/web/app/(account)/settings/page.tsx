@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { SettingsScreen } from '@/components/v2/screens/settings/SettingsScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { settingsNotice } from '@/lib/v2/copy/settings-notices';
 import { readSettingsPage } from '@/lib/v2/account/settings-pages';
 import { settingsView } from '@/lib/v2/view/settings';
 
@@ -15,7 +16,11 @@ export const metadata: Metadata = { title: 'Settings' };
  * plan card and the danger zone, for the owner or an account manager; a developer gets a 404, as
  * does everyone while V2_CHECKS_PUBLIC is off. A signed-out caller is sent to sign in.
  */
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   if (!checksPublicEnabled()) return notFound();
   const page = await readSettingsPage();
   if (page.kind === 'signed_out') redirect('/login');
@@ -23,7 +28,10 @@ export default async function SettingsPage() {
   if (page.role !== 'owner' && page.role !== 'account_manager') notFound();
   return (
     <LiveActions>
-      <SettingsScreen data={settingsView(page.d, page.viewer, { billingEnd: page.billingEnd })} />
+      <SettingsScreen
+        notice={settingsNotice(await searchParams, 'settings')}
+        data={settingsView(page.d, page.viewer, { billingEnd: page.billingEnd, role: page.role })}
+      />
     </LiveActions>
   );
 }

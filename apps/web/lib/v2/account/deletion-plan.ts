@@ -40,3 +40,21 @@ export async function deletionAccounts(
     return { accountId, host: primary?.host ?? null };
   });
 }
+
+/**
+ * The code the owner's deletion request would be refused with past the hostname check
+ * (`account_deletion_blocked`, migration 027b section C), or null. Read with the service role after
+ * the page has shown the caller is the owner.
+ */
+export async function deletionBlocked(
+  admin: SupabaseClient,
+  accountId: string,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await admin.rpc('account_deletion_blocked', {
+    p_account: accountId,
+    p_user: userId,
+  });
+  if (error) throw new Error(`deletion plan: account_deletion_blocked failed: ${error.message}`);
+  return z.string().nullable().parse(data);
+}

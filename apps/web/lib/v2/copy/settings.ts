@@ -3,6 +3,7 @@
  * lock corrections for the artboard follow.
  */
 import type { Addition, CopyChange } from '../copy-registry';
+import { DELETE_COPY } from './deletion';
 import { listOf } from '../format';
 import { capitalise, count, numberWord, plural } from '../words';
 
@@ -20,6 +21,8 @@ export const SETTINGS_COPY = {
   accountTitle: 'Account',
   emailLabel: 'Email',
   emailHint: 'Sign-in links and alerts go here. Changing it sends a link to the new address first.',
+  /** The sign-in address, read by anyone but the owner (ARCH-2 §5: the change is the owner's). */
+  emailOwnerOnly: 'Sign-in links and alerts go here. Only the account’s owner can change it.',
   nameLabel: 'Name',
   namePlaceholder: 'Optional',
   nameHint: (agency: boolean) =>
@@ -46,7 +49,7 @@ export const SETTINGS_COPY = {
     `Those are the ${numberWord(kinds)} kinds from us. If you pay, Stripe sends the receipts. There is no newsletter and no product-update mail to unsubscribe from.`,
   dangerTitle: 'Danger',
   deleteLabel: 'Delete this account',
-  /** FACTS E6: the seven-day undo. */
+  /** FACTS E6: the seven-day undo, by the restore link (questions.md Q16). */
   deleteText: (sites: number, grace: number) =>
     `${
       sites === 0
@@ -56,14 +59,16 @@ export const SETTINGS_COPY = {
           : sites === 2
             ? 'Removes both sites, their history and reports'
             : `Removes all ${numberWord(sites)} sites, their history and reports`
-    }. Takes effect after a confirmation link. For ${numberWord(grace)} days the sign-in email can undo it; after that nothing is kept.`,
+    }. Takes effect after a confirmation link. For ${numberWord(grace)} days the restore link in that email undoes it; after that the account is erased, apart from the few things the confirmation page lists.`,
   deleteAction: 'Delete…',
-  /** Owner ruling Q7, worded as the published policy is: Terms §8 (app/terms/page.tsx). */
-  deleteMoney:
-    'A paid plan stops renewing when you confirm and ends when the account is deleted. We don’t refund partial periods except where the law requires it (Terms, section 8).',
+  /**
+   * Owner ruling Q7: the deletion page's own money sentences (lib/v2/copy/deletion.ts), the second of
+   * which is the Terms page's refund sentence, so Settings says no more than the confirmation does.
+   */
+  deleteMoney: DELETE_COPY.money.join(' '),
   /** The confirmation step (owner ruling 12). */
   deleteSteps: (what: string, email: string, grace: number) =>
-    `Type the ${what} below and we send a confirmation link to ${email}. The link opens a page where you confirm the deletion; sign-in then stops at once, and for ${numberWord(grace)} days a sign-in link from that address restores the account.`,
+    `Type the ${what} below and we send a confirmation link to ${email}. The link opens a page where you confirm the deletion; sign-in then stops at once, and for ${numberWord(grace)} days the restore link in the same email restores the account.`,
   hostnameNoun: 'hostname',
   emailNoun: 'sign-in address',
   retype: (expected: string) => `Type ${expected} to confirm`,
@@ -116,6 +121,11 @@ export const SETTINGS_COPY = {
   /** A paid plan set to end at its period's end is shown until then (spec 27 "Cancel"). */
   cancelling: (plan: string, date: string) =>
     `${plan} until ${date}, then Free. Nothing more is charged.`,
+  /** A trial with a card set to cancel at its end: the card is not charged. */
+  trialCancelling: (plan: string, date: string, last4: string) =>
+    `${plan} trial until ${date}, then Free. The card ending ${last4} is not charged.`,
+  trialCancelled: (date: string) =>
+    `Cancelled; the trial ends ${date} and the card is not charged.`,
   cancelled: (date: string, days: number) =>
     `Cancelled; it takes effect ${date}. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
   cancelFree: 'Nothing to cancel on Free.',
@@ -216,8 +226,9 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     kind: 'facts',
     locked: 'Takes effect after a confirmation link; nothing is kept.',
     rendered:
-      'Takes effect after a confirmation link. For seven days the sign-in email can undo it; after that nothing is kept.',
-    source: 'FACTS E6',
+      'Takes effect after a confirmation link. For seven days the restore link in that email undoes it; after that the account is erased, apart from the few things the confirmation page lists.',
+    source:
+      'FACTS E6, as CC-27b built it (questions.md Q16): the restore link restores, a sign-in link cannot once sign-in is stopped, and the erasure keeps what the confirmation page lists',
   },
   {
     screen: 'settings',

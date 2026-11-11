@@ -9,7 +9,9 @@ import { CardHead } from '../account/parts';
 import field from '../../Field.module.css';
 import shared from '../account/AccountScreen.module.css';
 import { PlanCard } from './PlanCard';
+import { NoticeLine } from './NoticeLine';
 import { StoppedForm } from './StoppedForm';
+import type { Notice } from '../../../../lib/v2/copy/settings-notices';
 import settings from './SettingsTable.module.css';
 import styles from './SettingsScreen.module.css';
 
@@ -31,6 +33,7 @@ function Input({ f, type }: { f: FieldView; type: 'email' | 'text' }) {
         defaultValue={f.value}
         placeholder={f.placeholder ?? undefined}
         aria-describedby={hint}
+        readOnly={f.readOnly}
         className={`${field.input} ${styles.input} ${type === 'email' ? '' : styles.text}`}
       />
       <div id={hint} className={styles.hint}>
@@ -44,7 +47,14 @@ function Input({ f, type }: { f: FieldView; type: 'email' | 'text' }) {
  * Final-Settings: the account's address and name, its three kinds of email, deleting it, and its
  * plan. The one orange element is Save. Nothing posts in the preview (CC-27b builds the routes).
  */
-export function SettingsScreen({ data }: { data: SettingsView }) {
+export function SettingsScreen({
+  data,
+  notice = null,
+}: {
+  data: SettingsView;
+  /** What the form's last post did, on a live page (`settingsNotice`). */
+  notice?: Notice | null;
+}) {
   const { header, account, email, danger, plan, columns: C } = data;
   return (
     <AccountFrame shell={data.shell}>
@@ -54,6 +64,7 @@ export function SettingsScreen({ data }: { data: SettingsView }) {
           <div className={shared.line}>{header.line}</div>
         </div>
       </header>
+      <NoticeLine notice={notice} />
 
       <div className={styles.columns}>
         <div className={styles.column}>
@@ -136,7 +147,9 @@ export function SettingsScreen({ data }: { data: SettingsView }) {
                     <span key="t" className={shared.muted}>
                       {danger.text}
                     </span>,
-                    <ActionControl key="a" action={danger.action} variant="quiet" />,
+                    danger.action ? (
+                      <ActionControl key="a" action={danger.action} variant="quiet" />
+                    ) : null,
                   ],
                 },
               ]}

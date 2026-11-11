@@ -42,6 +42,24 @@ describe('deletionAccounts', () => {
     ]);
   });
 
+  it('a staging copy older than the primary site does not name the account', async () => {
+    const userId = await signUp(db, `staging-${randomUUID().slice(0, 8)}@example.com`);
+    const { accountId } = await personalAccount(db, userId);
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.sites (account_id, host, created_at) values ($1, 'primary.example', '2026-10-02T00:00:00Z')
+       returning id`,
+      [accountId],
+    );
+    await db.query(
+      `insert into public.sites (account_id, host, created_at, staging_of_site_id)
+       values ($1, 'staging.primary.example', '2026-10-01T00:00:00Z', $2)`,
+      [accountId, rows[0]!.id],
+    );
+    expect(await deletionAccounts(postgrestOver(db), userId)).toEqual([
+      { accountId, host: 'primary.example' },
+    ]);
+  });
+
   it('an account with no site is named by none', async () => {
     const userId = await signUp(db, `nosite-${randomUUID().slice(0, 8)}@example.com`);
     const { accountId } = await personalAccount(db, userId);

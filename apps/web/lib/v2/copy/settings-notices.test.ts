@@ -1,0 +1,104 @@
+/**
+ * What /settings and /settings/delete say after a form comes back (CC-27b review, item 6): the
+ * success lines, and a sentence for each refusal code the routes behind them can answer. The codes
+ * are read from the routes' and modules' sources, so a code added there without a sentence here
+ * turns this red.
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { REFUSAL_SENTENCES, SETTINGS_NOTICES, settingsNotice } from './settings-notices';
+
+const WEB = join(__dirname, '../../..');
+const read = (p: string) => readFileSync(join(WEB, p), 'utf8');
+
+/** Every quoted code passed as a refusal in the sources a form on these pages reaches. */
+function codesIn(src: string): string[] {
+  const out = new Set<string>();
+  for (const re of [
+    /(?:refuse|refused|no)\(\s*\d{3},\s*'([a-z][a-z0-9_]*)'/g,
+    /code: '([a-z][a-z0-9_]*)'/g,
+    /^\s{2}([a-z][a-z0-9_]*): \d{3},$/gm,
+  ])
+    for (const m of src.matchAll(re)) out.add(m[1]!);
+  return [...out];
+}
+
+const SOURCES = [
+  'app/api/account/route.ts',
+  'lib/v2/account/profile.ts',
+  'lib/v2/account/email-change.ts',
+  'lib/v2/account/deletion.ts',
+  'app/api/alert-rules/route.ts',
+  'lib/v2/account/alert-rules.ts',
+];
+
+describe('the refusal sentences', () => {
+  const codes = [...new Set(SOURCES.flatMap((p) => codesIn(read(p))))].sort();
+
+  it('the sources answer the codes the coordinator listed, so the scan reads them', () => {
+    for (const c of [
+      'deletion_pending',
+      'rate_limited',
+      'email_change_pending',
+      'role_refused',
+      'email_change_owner_only',
+      'invalid',
+      'not_owner',
+      'hostname_mismatch',
+      'others_seated',
+      'v1_subscription',
+    ])
+      expect(codes).toContain(c);
+  });
+
+  it('each code the routes can answer has its own sentence, not the generic one', () => {
+    const missing = codes.filter((c) => !Object.hasOwn(REFUSAL_SENTENCES, c));
+    expect(missing).toEqual([]);
+    for (const c of codes) expect(REFUSAL_SENTENCES[c]).not.toBe(SETTINGS_NOTICES.unknown);
+  });
+});
+
+describe('settingsNotice', () => {
+  it('reads the success lines each page is sent back with', () => {
+    expect(settingsNotice({ saved: '1' }, 'settings')).toEqual({
+      tone: 'ok',
+      text: SETTINGS_NOTICES.saved,
+    });
+    expect(settingsNotice({ email: 'sent' }, 'settings')).toEqual({
+      tone: 'ok',
+      text: SETTINGS_NOTICES.emailSent,
+    });
+    expect(settingsNotice({ sent: '1' }, 'delete')).toEqual({
+      tone: 'ok',
+      text: SETTINGS_NOTICES.deleteSent,
+    });
+    // Each page reads its own success line only.
+    expect(settingsNotice({ sent: '1' }, 'settings')).toBeNull();
+    expect(settingsNotice({ saved: '1' }, 'delete')).toBeNull();
+  });
+
+  it('reads an error code on either page, ahead of a success line', () => {
+    expect(settingsNotice({ error: 'deletion_pending', saved: '1' }, 'settings')).toEqual({
+      tone: 'error',
+      text: REFUSAL_SENTENCES.deletion_pending,
+    });
+    expect(settingsNotice({ error: 'others_seated' }, 'delete')).toEqual({
+      tone: 'error',
+      text: REFUSAL_SENTENCES.others_seated,
+    });
+  });
+
+  it('an unknown code, a prototype key or a repeated one gets the generic sentence', () => {
+    for (const error of ['no_such_code', '__proto__', 'constructor', ['invalid', 'invalid']])
+      expect(settingsNotice({ error }, 'settings')).toEqual({
+        tone: 'error',
+        text: SETTINGS_NOTICES.unknown,
+      });
+  });
+
+  it('nothing in the query: no line', () => {
+    expect(settingsNotice({}, 'settings')).toBeNull();
+    expect(settingsNotice({ saved: '0', email: 'x' }, 'settings')).toBeNull();
+  });
+});

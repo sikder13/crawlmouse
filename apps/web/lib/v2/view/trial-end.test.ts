@@ -28,11 +28,11 @@ describe('Trial ending, the header and banner', () => {
     ]);
   });
 
-  it('says the reminder went out today and what the missing card means', () => {
+  it('says what the reminder does, today, and what the missing card means', () => {
     const b = view().banner;
     expect(b.title).toBe("Pro ends Sat 7 Nov. Here is exactly what changes, and what doesn't.");
     expect(b.sub).toBe(
-      'We sent this once, today, as promised. No card is on file, so nothing is charged either way.',
+      'The reminder goes out once, today, unless you turned it off. No card is on file, so nothing is charged either way.',
     );
     expect(b.keep).toMatchObject({ label: 'Keep Pro, $19 a month · add a card', primary: true });
     expect(b.end).toMatchObject({

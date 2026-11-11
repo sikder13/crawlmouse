@@ -1621,4 +1621,21 @@ grant execute on function public.clear_account_slack_webhook(uuid) to service_ro
 grant execute on function public.account_slack_last4(uuid) to service_role;
 
 
+-- What the delete step shows in place of a form its request would refuse (CC-27b review, item 6):
+-- the code request_account_deletion answers past the hostname check, in its order, or null. It reads
+-- section B's email_change_live and deletion_refusal, so the page and the request cannot disagree.
+-- Answers nothing about the hostname: the page asks for it.
+create or replace function public.account_deletion_blocked(p_account uuid, p_user uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select case when public.email_change_live(p_user) then 'email_change_pending'
+              else public.deletion_refusal(p_account, p_user) end;
+$$;
+revoke all on function public.account_deletion_blocked(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.account_deletion_blocked(uuid, uuid) to service_role;
+
 -- ═══ end C ════════════════════════════════════════════════════════════════════════════════════════

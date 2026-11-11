@@ -35,6 +35,8 @@ import {
 import { action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
+import { REFUSAL_SENTENCES, SETTINGS_NOTICES as NOTICES } from '../copy/settings-notices';
+import type { SeatRole } from '../account/profile';
 
 export const CC27B_ROUTES = {
   accountAlertRules: {
@@ -206,6 +208,8 @@ export interface FieldView {
   value: string;
   placeholder: string | null;
   hint: string;
+  /** Shown but not changeable by this reader: the sign-in address, for anyone but the owner. */
+  readOnly: boolean;
 }
 
 export interface EmailKindRowView {
@@ -228,7 +232,14 @@ export interface SettingsView {
     save: ActionView;
   };
   email: { title: string; tableLabel: string; rows: EmailKindRowView[]; foot: string };
-  danger: { title: string; tableLabel: string; label: string; text: string; action: ActionView };
+  /** `action` is null for anyone but the owner: deleting is the owner's alone. */
+  danger: {
+    title: string;
+    tableLabel: string;
+    label: string;
+    text: string;
+    action: ActionView | null;
+  };
   plan: {
     title: string;
     name: string;
@@ -259,13 +270,21 @@ export function settingsView(
   viewer: Viewer,
   {
     billingEnd = null,
+    role = 'owner',
   }: {
     /** When a paid plan set to cancel at its period's end ends (the subscription mirror's
      * current_period_end); null when it is not set to. The contract's Account has no field for it. */
     billingEnd?: string | null;
+    /**
+     * The reader's seat role. The owner alone changes the sign-in address, deletes the account, and
+     * reaches the checkout, the cancel and the billing portal (spec 27's guards); a manager keeps the
+     * name and the email kinds. A preview reads as the owner.
+     */
+    role?: SeatRole;
   } = {},
 ): SettingsView {
   const v = viewAt(d, viewer);
+  const owner = role === 'owner';
   const a = v.account;
   const zone = a.timezone;
   const trial = a.state === 'pro_trial' || a.state === 'agency_trial';
@@ -324,8 +343,9 @@ export function settingsView(
   const monthly = v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY;
   // A trial with a card becomes the plan at its end, and an account past due on Free gets back by
   // updating its card: neither has a Keep. A trial with no card keeps its plan; Free chooses Pro.
-  const keep =
-    trial && !cardTrial
+  const keep = !owner
+    ? null
+    : trial && !cardTrial
       ? action(
           'keepPlan',
           COPY.keep(plan, monthly),
@@ -343,12 +363,12 @@ export function settingsView(
           )
         : null;
   const keepShown = keep !== null;
-  const cancel = routeAction('cancelPlan', COPY.cancelAction);
-  const portal = routeAction('billingPortal', COPY.portalAction);
+  const cancel = owner ? routeAction('cancelPlan', COPY.cancelAction) : null;
+  const portal = owner ? routeAction('billingPortal', COPY.portalAction) : null;
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
-    shell: accountShellView(v, 'Settings', { plan: 'page' }),
+    shell: accountShellView(v, 'Settings', { plan: 'page', billingEnd }),
     header: {
       title: COPY.title,
       line: [a.email, trial ? COPY.trialLeft(plan, days!) : plan].join(' · '),
@@ -361,7 +381,8 @@ export function settingsView(
         name: 'newEmail',
         value: a.email,
         placeholder: null,
-        hint: COPY.emailHint,
+        hint: owner ? COPY.emailHint : COPY.emailOwnerOnly,
+        readOnly: !owner,
       },
       name: {
         id: 'account-name',
@@ -370,6 +391,7 @@ export function settingsView(
         value: a.name ?? '',
         placeholder: COPY.namePlaceholder,
         hint: COPY.nameHint(agency),
+        readOnly: false,
       },
       signIn: { title: COPY.signInTitle, text: COPY.signIn(AUTH_LINK_MINUTES) },
       save: routeAction('account', COPY.save, {}, { primary: true }),
@@ -385,25 +407,29 @@ export function settingsView(
       tableLabel: COPY.tables.danger,
       label: COPY.deleteLabel,
       text: deleteText(v),
-      action: routeAction('deleteConfirm', COPY.deleteAction),
+      action: owner ? routeAction('deleteConfirm', COPY.deleteAction) : null,
     },
     plan: {
       title: COPY.planTitle,
       name: trial ? COPY.trialName(plan) : plan,
       left: days === null ? null : COPY.daysLeft(days),
-      note: trial
-        ? `${COPY.ends(date(a.trial_ends_at!))} ${
-            card === null ? COPY.noCardTerms(plan) : COPY.cardTerms(card)
-          }`
-        : pastDue
-          ? v.tier === 'free'
-            ? COPY.pastDueEnded(date(pastDueSince), date(graceEnds))
-            : COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
-          : ending !== null
-            ? COPY.cancelling(plan, date(ending))
-            : paid
-              ? null
-              : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
+      // A plan set to end is said first: a card trial set to cancel is not charged.
+      note:
+        cardTrial && ending !== null
+          ? COPY.trialCancelling(plan, date(ending), card)
+          : trial
+            ? `${COPY.ends(date(a.trial_ends_at!))} ${
+                card === null ? COPY.noCardTerms(plan) : COPY.cardTerms(card)
+              }`
+            : pastDue
+              ? v.tier === 'free'
+                ? COPY.pastDueEnded(date(pastDueSince), date(graceEnds))
+                : COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
+              : ending !== null
+                ? COPY.cancelling(plan, date(ending))
+                : paid
+                  ? null
+                  : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
       usageLabel: COPY.tables.usage,
       usage: [
         [COPY.sitesUsed, COPY.of(primarySites(v).length, a.limits.sites)],
@@ -425,39 +451,41 @@ export function settingsView(
       compare: action('pricing', COPY.compare),
       termsLabel: COPY.tables.terms,
       terms: [
-        cardTrial
-          ? {
-              label: COPY.cancel,
-              text: COPY.cancelCardTrial(
-                date(a.trial_ends_at!),
-                CANCEL_CLICKS,
-                EVIDENCE_CONDENSED_AFTER_DAYS,
-              ),
-              action: cancel,
-            }
-          : trial
+        cardTrial && ending !== null
+          ? { label: COPY.cancel, text: COPY.trialCancelled(date(ending)), action: null }
+          : cardTrial
             ? {
                 label: COPY.cancel,
-                text: COPY.cancelTrial(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
-                action: null,
+                text: COPY.cancelCardTrial(
+                  date(a.trial_ends_at!),
+                  CANCEL_CLICKS,
+                  EVIDENCE_CONDENSED_AFTER_DAYS,
+                ),
+                action: cancel,
               }
-            : ending !== null
+            : trial
               ? {
                   label: COPY.cancel,
-                  text: COPY.cancelled(date(ending), EVIDENCE_CONDENSED_AFTER_DAYS),
+                  text: COPY.cancelTrial(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
                   action: null,
                 }
-              : paid
+              : ending !== null
                 ? {
                     label: COPY.cancel,
-                    text: COPY.cancelPaid(
-                      CANCEL_CLICKS,
-                      EVIDENCE_CONDENSED_AFTER_DAYS,
-                      a.billing_period_months === 12 ? 'year' : 'month',
-                    ),
-                    action: cancel,
+                    text: COPY.cancelled(date(ending), EVIDENCE_CONDENSED_AFTER_DAYS),
+                    action: null,
                   }
-                : { label: COPY.cancel, text: COPY.cancelFree, action: null },
+                : paid
+                  ? {
+                      label: COPY.cancel,
+                      text: COPY.cancelPaid(
+                        CANCEL_CLICKS,
+                        EVIDENCE_CONDENSED_AFTER_DAYS,
+                        a.billing_period_months === 12 ? 'year' : 'month',
+                      ),
+                      action: cancel,
+                    }
+                  : { label: COPY.cancel, text: COPY.cancelFree, action: null },
         // A card on file means a Stripe customer, whose receipts the portal lists.
         card === null
           ? { label: COPY.receipts, text: COPY.noReceipts, action: null }
@@ -485,7 +513,7 @@ export interface DeleteStepView {
   shell: ShellView;
   header: { title: string; line: string };
   cardTitle: string;
-  /** What deleting removes, and how long the sign-in email can undo it (FACTS E6). */
+  /** What deleting removes, and how long the restore link in the email can undo it (FACTS E6, Q16). */
   text: string;
   /** How it goes from here: the link to the sign-in address, sign-in stopping, the restore. */
   steps: string;
@@ -496,7 +524,10 @@ export interface DeleteStepView {
   removes: string | null;
   /** The in-page guard: the primary site's hostname, typed again. */
   field: { id: string; label: string; name: string; expected: string; hint: string };
-  submit: ActionView;
+  /** Why the request would be refused, when it would be; null otherwise. */
+  blocked: string | null;
+  /** The request for the link; null for anyone but the owner, and when it would be refused. */
+  submit: ActionView | null;
   /** Back to Settings, deleting nothing. */
   back: ActionView;
 }
@@ -511,9 +542,15 @@ export function deleteStepView(
   viewer: Viewer,
   {
     removes = null,
+    role = 'owner',
+    blocked = null,
   }: {
+    /** The code the request would be refused with (`account_deletion_blocked`), or null. */
+    blocked?: string | null;
     /** Each account the erasure plan names, by its primary site's host (null for none). */
     removes?: readonly { host: string | null }[] | null;
+    /** The reader's seat role: the request is the owner's alone. A preview reads as the owner. */
+    role?: SeatRole;
   } = {},
 ): DeleteStepView {
   const v = viewAt(d, viewer);
@@ -537,7 +574,16 @@ export function deleteStepView(
       expected,
       hint: COPY.retypeHint,
     },
-    submit: routeAction('deleteAccount', COPY.sendDeleteLink),
+    blocked:
+      blocked === null
+        ? null
+        : Object.hasOwn(REFUSAL_SENTENCES, blocked)
+          ? REFUSAL_SENTENCES[blocked]!
+          : NOTICES.unknown,
+    submit:
+      role === 'owner' && blocked === null
+        ? routeAction('deleteAccount', COPY.sendDeleteLink)
+        : null,
     back: action('emailSettings', COPY.keepAccount),
   };
 }
