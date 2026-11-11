@@ -88,12 +88,18 @@ async function handle(req: Request, verb: 'PATCH' | 'DELETE' | null): Promise<Re
       : Response.json({ sent: true }, { status: 202 });
   }
 
-  const outcome = await updateProfile(supabaseProfilePorts(admin), {
-    accountId,
-    accountEmail: await ownerEmail(admin, accountId),
-    role: role as SeatRole,
-    body: { kind: body.kind, fields: meant.fields },
-  });
+  // The profile's write waits until the email change, if any, is accepted, so a refused change
+  // (rate limited, in flight) saves nothing in the request.
+  const pending: { accountId: string; columns: Readonly<Record<string, unknown>> }[] = [];
+  const outcome = await updateProfile(
+    { updateAccount: async (id, columns) => void pending.push({ accountId: id, columns }) },
+    {
+      accountId,
+      accountEmail: await ownerEmail(admin, accountId),
+      role: role as SeatRole,
+      body: { kind: body.kind, fields: meant.fields },
+    },
+  );
   if (!outcome.ok) return refuse(outcome.status, outcome.code);
   if (outcome.forwardEmailChange !== null) {
     const change = await requestEmailChange(emailChangePorts(admin, req.headers.get('cookie')), {
@@ -105,6 +111,8 @@ async function handle(req: Request, verb: 'PATCH' | 'DELETE' | null): Promise<Re
     });
     if (!change.ok) return refuse(change.status, change.code);
   }
+  const write = supabaseProfilePorts(admin);
+  for (const p of pending) await write.updateAccount(p.accountId, p.columns);
   const sent = outcome.forwardEmailChange !== null;
   return body.kind === 'form'
     ? respond('form', sent ? `${SETTINGS}?email=sent` : `${SETTINGS}?saved=1`)

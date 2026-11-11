@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   deletions: [] as unknown[],
   changes: [] as unknown[],
   deletionAnswer: { ok: true } as { ok: true } | { ok: false; status: number; code: string },
+  changeAnswer: { ok: true } as { ok: true } | { ok: false; status: number; code: string },
 }));
 
 vi.mock('server-only', () => ({}));
@@ -66,7 +67,7 @@ vi.mock('@/lib/v2/account/email-change-ports', () => ({ emailChangePorts: () => 
 vi.mock('@/lib/v2/account/email-change', () => ({
   requestEmailChange: async (_ports: unknown, input: unknown) => {
     h.changes.push(input);
-    return { ok: true };
+    return h.changeAnswer;
   },
 }));
 
@@ -97,6 +98,7 @@ beforeEach(() => {
   h.deletions = [];
   h.changes = [];
   h.deletionAnswer = { ok: true };
+  h.changeAnswer = { ok: true };
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -176,6 +178,24 @@ describe('PATCH: the profile', () => {
         ip: '203.0.113.9',
       },
     ]);
+  });
+
+  it('saves nothing when the owner’s email change is refused', async () => {
+    h.changeAnswer = { ok: false, status: 429, code: 'rate_limited' };
+    const res = await (
+      await route()
+    ).PATCH(json('PATCH', { name: 'Studio', newEmail: 'new@example.com' }));
+    expect(res.status).toBe(429);
+    expect(h.changes).toHaveLength(1);
+    expect(h.saved).toEqual([]);
+  });
+
+  it('saves the name with an accepted email change', async () => {
+    const res = await (
+      await route()
+    ).PATCH(json('PATCH', { name: 'Studio', newEmail: 'new@example.com' }));
+    expect(res.status).toBe(200);
+    expect(h.saved).toEqual([{ accountId: ACCOUNT, columns: { name: 'Studio' } }]);
   });
 
   it('takes the address Settings posts back unchanged as no change', async () => {
