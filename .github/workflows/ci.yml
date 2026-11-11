@@ -174,13 +174,52 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [engine, web, inngest, types, scripts, worker, timing]
+        package: [engine, inngest, types, scripts, worker, timing]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - run: pnpm --filter @crawlmouse/${{ matrix.package }} test
+
+  # The web suite in three vitest shards: as one job it took 13.5 minutes (run 43056751031) and was
+  # cancelled at its 15-minute limit (run 43073710281). The required check `test (web)` is the job
+  # below, so the ruleset is unchanged.
+  test-web-shard:
+    name: test (web, shard ${{ matrix.shard }}/3)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @crawlmouse/web exec vitest run --shard=${{ matrix.shard }}/3
+
+  # `test (web)` passes only when every shard passed; a shard that failed, was cancelled or was
+  # skipped fails it.
+  test-web:
+    name: test (web)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: test-web-shard
+    if: ${{ always() }}
+    permissions: {}
+    steps:
+      - name: Every shard of the web suite passed
+        env:
+          SHARDS: ${{ needs.test-web-shard.result }}
+        run: |
+          if [ "$SHARDS" = success ]; then
+            echo "every shard passed"
+            exit 0
+          fi
+          echo "::error::test-web-shard is '${SHARDS}'"
+          exit 1
 
   test-templates:
     runs-on: ubuntu-24.04

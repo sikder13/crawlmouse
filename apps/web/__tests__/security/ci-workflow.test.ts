@@ -855,3 +855,95 @@ describe('migrations-append-only, the commit it compares with', () => {
     expect(against).toBe(want);
   });
 });
+
+// The ruleset protect-main requires these checks by name. Each must be reported by exactly one job of
+// ci.yml (a matrix job once per value), or a rename would leave a requirement no job can meet.
+describe('the required checks', () => {
+  const REQUIRED = [
+    'build',
+    'lint',
+    'typecheck',
+    'test (web)',
+    'test (engine)',
+    'test (inngest)',
+    'test (timing)',
+    'gitleaks',
+    'osv-scanner',
+    'visual',
+    'migrations-append-only',
+  ];
+
+  /**
+   * The check names a job reports: its name, or its id, once per matrix value it names. A name of
+   * the form `${{ cond && 'a' || 'b' }}` (the `visual` job's) is read as 'b', the name it reports
+   * when the condition is false: for `visual`, an open gate.
+   */
+  function checkNames(id: string, j: Job & { name?: string; strategy?: unknown }): string[] {
+    const conditional = /^\$\{\{ .+ && '[^']+' \|\| '([^']+)' \}\}$/.exec(j.name ?? '');
+    const name = conditional ? conditional[1]! : (j.name ?? id);
+    const matrix = (j.strategy as { matrix?: Record<string, unknown[]> } | undefined)?.matrix;
+    if (!matrix) return [name];
+    return Object.entries(matrix).reduce<string[]>(
+      (names, [key, values]) =>
+        names.flatMap((n) => values.map((v) => n.replaceAll(`\${{ matrix.${key} }}`, String(v)))),
+      [name],
+    );
+  }
+
+  const names = Object.entries(ci.jobs).flatMap(([id, j]) => checkNames(id, j));
+
+  it.each(REQUIRED)('%s is reported by exactly one job', (check) => {
+    expect(names.filter((n) => n === check)).toHaveLength(1);
+  });
+});
+
+// test (web) runs in three shards; one job named `test (web)` reports their verdict, so the
+// required check keeps its name. On 2026-11-11 the single job took 13.5 min (run 43056751031) and
+// was cancelled at its 15-minute limit (run 43073710281).
+describe('test (web), sharded', () => {
+  const shard = job('test-web-shard') as Job & {
+    name?: string;
+    strategy?: { 'fail-fast'?: boolean; matrix?: { shard?: number[] } };
+    'timeout-minutes'?: number;
+  };
+  const aggregate = job('test-web') as Job & { name?: string; permissions?: unknown };
+
+  it('leaves web out of the per-package matrix', () => {
+    const matrix = (job('test') as { strategy?: { matrix?: { package?: string[] } } }).strategy
+      ?.matrix?.package;
+    expect(matrix).toEqual(['engine', 'inngest', 'types', 'scripts', 'worker', 'timing']);
+  });
+
+  it('runs vitest in three shards, each within 25 minutes, none cancelling the others', () => {
+    expect(shard.name).toBe('test (web, shard ${{ matrix.shard }}/3)');
+    expect(shard.strategy).toEqual({ 'fail-fast': false, matrix: { shard: [1, 2, 3] } });
+    expect(shard['timeout-minutes']).toBe(25);
+    const run = (shard.steps ?? []).map((s) => s.run).filter(Boolean);
+    expect(run).toEqual([
+      'pnpm --filter @crawlmouse/web exec vitest run --shard=${{ matrix.shard }}/3',
+    ]);
+  });
+
+  it('reports the verdict as test (web), always, reading only the shards', () => {
+    expect(aggregate.name).toBe('test (web)');
+    expect(needs('test-web')).toEqual(['test-web-shard']);
+    expect(aggregate.if).toBe('${{ always() }}');
+    expect(aggregate.permissions).toEqual({});
+    expect(aggregate.steps?.[0]?.env).toEqual({ SHARDS: '${{ needs.test-web-shard.result }}' });
+  });
+
+  it.each([
+    ['success', 0],
+    ['failure', 1],
+    ['cancelled', 1],
+    ['skipped', 1],
+    ['', 1],
+  ])('passes only when every shard passed: shards=%j', (SHARDS, want) => {
+    const r = spawnSync('bash', ['-c', aggregate.steps?.[0]?.run ?? 'exit 99'], {
+      env: { NODE_ENV: 'test', PATH: process.env.PATH ?? '/usr/bin:/bin', SHARDS },
+      encoding: 'utf8',
+    });
+    expect(r.status, r.stdout + r.stderr).toBe(want);
+    if (want !== 0) expect(r.stdout).toMatch(/^::error::/m);
+  });
+});
