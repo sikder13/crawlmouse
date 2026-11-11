@@ -63,6 +63,8 @@ beforeAll(async () => {
     built: buildCheck(input),
     vantage: pageVantage(crawlRows(input.batches)),
     map_path: null,
+    // A site's first check: its build read no fixes.
+    read: [],
   });
   empty = randomUUID();
   removed = randomUUID();
