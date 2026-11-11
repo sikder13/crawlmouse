@@ -28,7 +28,7 @@ export function resultOf(read: ReadyCheck) {
 export function noticeOf(read: Extract<CheckRead, { state: 'failed' | 'expired' }>) {
   if (read.state === 'failed') {
     return {
-      title: 'This audit stopped before it could grade the site',
+      title: 'This audit did not finish',
       lines: [
         `What happened: ${FAILURE_COPY[read.reason]}.`,
         `It stopped on ${dateTimeUtc(read.failedAt)}.`,
@@ -36,8 +36,10 @@ export function noticeOf(read: Extract<CheckRead, { state: 'failed' | 'expired' 
     };
   }
   const until = dateTimeUtc(read.expiredAt);
+  // `finishedAt` is set for a check that was graded (load-for.ts); one that failed, was cancelled
+  // or never ran has no result and no crawl to name.
   return {
-    title: 'This result has expired',
+    title: read.finishedAt ? 'This result has expired' : 'This audit has expired',
     lines: [
       read.finishedAt
         ? `It was crawled on ${dateTimeUtc(read.finishedAt)} and nobody kept it, so it was visible until ${until}.`

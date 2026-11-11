@@ -244,6 +244,8 @@ describe('/audit/[id]: the states around a result', () => {
       kept: false,
     };
     const markup = html(<CheckPage read={read} />);
+    expect(markup).toContain('This audit did not finish');
+    expect(markup).not.toContain('before it could grade');
     expect(markup).toContain(`What happened: ${FAILURE_COPY[reason]}.`);
     expect(markup).toContain('6 Nov 2026');
     // The stored word is not shown: no reason word that is not also plain English appears.
@@ -261,12 +263,15 @@ describe('/audit/[id]: the states around a result', () => {
   it('an expired check says until when it was visible, and when it was crawled if it was', () => {
     const expired = { ...base, state: 'expired' as const, expiredAt: '2026-11-07T10:00:00Z' };
     const crawled = noticeOf({ ...expired, finishedAt: '2026-11-06T10:11:00Z' });
+    expect(crawled.title).toBe('This result has expired');
     expect(crawled.lines[0]).toMatch(/^It was crawled on 6 Nov 2026.* visible until 7 Nov 2026/);
+    // No finish time: the check ended ungraded or never ran, so the page names no crawl and no result.
     const never = noticeOf({ ...expired, finishedAt: null });
+    expect(never.title).toBe('This audit has expired');
     expect(never.lines[0]).toMatch(/^Nobody kept this audit, so it was visible until 7 Nov 2026/);
-    expect(never.lines.join(' ')).not.toContain('crawled on');
+    expect([never.title, ...never.lines].join(' ')).not.toMatch(/crawled on|result/);
     const markup = html(<CheckPage read={{ ...expired, finishedAt: null }} />);
-    expect(markup).toContain('This result has expired');
+    expect(markup).toContain('This audit has expired');
     expect(dead(markup)).toEqual([]);
   });
 });
