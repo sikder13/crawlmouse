@@ -14,8 +14,14 @@ const h = vi.hoisted(() => ({
   getUser: 0,
   built: 0,
   deps: null as unknown,
+  /** What the route handed to Next's `after`, to run once its response has gone. */
+  afterTasks: [] as Array<() => unknown>,
 }));
 vi.mock('server-only', () => ({}));
+vi.mock('next/server', async (original) => ({
+  ...(await original<typeof import('next/server')>()),
+  after: (task: () => unknown) => void h.afterTasks.push(task),
+}));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => ({
     auth: {
@@ -33,7 +39,14 @@ vi.mock('./_lib/start-deps', () => ({
   },
 }));
 
-import { POST } from './route';
+import { POST as respond } from './route';
+
+/** The route's answer, then what it left for `after`, as the platform runs them. */
+async function POST(req: Request): Promise<Response> {
+  const res = await respond(req);
+  for (const task of h.afterTasks.splice(0)) await task();
+  return res;
+}
 
 const REQUEST = '0b9d3c52-7c1e-4f0a-9a44-1f2e3d4c5b6a';
 // stableId('public_check', REQUEST, 'example.com'), computed outside this codebase (start.test.ts).
@@ -92,6 +105,7 @@ beforeEach(async () => {
   h.user = null;
   h.getUser = 0;
   h.built = 0;
+  h.afterTasks.length = 0;
   h.deps = deps();
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
   vi.stubEnv('V2_PIPELINE', '1');
@@ -104,7 +118,8 @@ beforeEach(async () => {
   for (const level of ['log', 'info', 'warn', 'error'] as const) {
     vi.spyOn(console, level).mockImplementation((...args) => void logged.push(args.join(' ')));
   }
-});
+  // The first call applies each migration to the template database; later calls clone it.
+}, 120_000);
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -328,6 +343,22 @@ describe('POST /api/checks, `check_started`', () => {
   it('is sent for a visitor who agreed, in a region that needs prior consent', async () => {
     await POST(post(VALID, { cookie: 'cm_consent_required=1; cm_consent=granted' }));
     expect(captured.map((c) => c.body.event)).toEqual(['check_started']);
+  });
+
+  it('the answer does not wait on the capture: it is left for `after`', async () => {
+    // PostHog accepts the connection and never answers.
+    vi.stubGlobal('fetch', () => new Promise(() => undefined));
+    expect(await read(await respond(post(VALID)))).toEqual({
+      status: 200,
+      body: { checkId: CHECK },
+    });
+    expect(h.afterTasks).toHaveLength(1);
+  });
+
+  it('nothing is left for `after` when the request is answered with a check already there', async () => {
+    await POST(post(VALID));
+    await respond(post(VALID));
+    expect(h.afterTasks).toEqual([]);
   });
 
   it('a capture that fails does not fail the start', async () => {

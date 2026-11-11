@@ -1,4 +1,5 @@
 import 'server-only';
+import { after } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { inngest } from '../../../../../../../inngest/client';
 import { getClientIp } from '@/lib/client-ip';
@@ -29,11 +30,24 @@ export function checkRouteDeps(caller: SupabaseClient): StreamDeps & NotifyDeps 
     store: { ...supabasePipelineStore(admin), ...supabaseStreamStore(admin) },
     evidence: supabaseEvidenceStore(admin),
     limits: checkRouteLimits,
-    captureFinished: (req, checkId, properties) =>
-      capturePublicEvent(req, 'check_finished', checkId, properties),
+    captureFinished: captureAfterResponse,
     send: (event) => inngest.send(event),
     clientIp: getClientIp,
     now: () => Date.now(),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   };
 }
+
+/**
+ * `check_finished`, handed to Next's `after` so the stream closes without waiting on PostHog; the
+ * capture runs once the response has ended. `after` throws when Next gives it no request scope or
+ * no `waitUntil`; the capture is then awaited here, for at most the sender's CAPTURE_TIMEOUT_MS.
+ */
+const captureAfterResponse: StreamDeps['captureFinished'] = async (req, checkId, properties) => {
+  const capture = () => capturePublicEvent(req, 'check_finished', checkId, properties);
+  try {
+    after(capture);
+  } catch {
+    await capture();
+  }
+};
