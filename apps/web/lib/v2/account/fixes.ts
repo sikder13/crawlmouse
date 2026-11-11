@@ -30,6 +30,7 @@ import {
   type RequestBody,
 } from './route';
 import { readEntitlement, type Entitlement } from './viewer-read';
+import { packetPrompt } from '../view/segment/fixes';
 import { isFreeFix } from '../view/free-fixes';
 import type { CheckDataset } from '../pipeline/types';
 
@@ -216,7 +217,7 @@ export async function packet(deps: FixDeps, caller: FixCaller): Promise<Response
     return paywall('packets');
   }
   if (r.fix.packet === null) return refuse(404, 'no_packet');
-  return Response.json({ packet: r.fix.packet });
+  return Response.json({ packet: r.fix.packet, prompt: packetPrompt(r.fix, r.fix.packet) });
 }
 
 // ─── Email a developer ──────────────────────────────────────────────────────────────────────────

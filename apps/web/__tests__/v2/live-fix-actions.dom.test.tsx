@@ -11,12 +11,12 @@ import { ActionControl } from '../../components/v2/screens/account/ActionControl
 import { LiveActions } from '../../components/v2/screens/account/LiveActions';
 import { fixture } from '../../lib/v2/fixtures';
 import { action } from '../../lib/v2/view/account-actions';
-import { packetPrompt } from '../../lib/v2/view/packet-prompt';
+import { packetPrompt } from '../../lib/v2/view/segment/fixes';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const fix = fixture('bad-site').fixes.find((f) => f.packet !== null)!;
-const copyFix = action('copyFix', 'Copy fix', { id: fix.id }, { copy: { title: fix.title } });
+const copyFix = action('copyFix', 'Copy fix', { id: fix.id }, { copy: true });
 const email = action(
   'emailDeveloper',
   'Email to my developer',
@@ -68,7 +68,7 @@ afterEach(() => {
 
 describe('Copy fix on a live page', () => {
   it('fetches the packet and copies it as the fix page’s prompt', async () => {
-    const fetchMock = answer(200, { packet: fix.packet });
+    const fetchMock = answer(200, { packet: fix.packet, prompt: packetPrompt(fix, fix.packet!) });
     vi.stubGlobal('fetch', fetchMock);
     render(
       <LiveActions>
@@ -119,7 +119,10 @@ describe('Copy fix on a live page', () => {
   });
 
   it('a browser that refuses the clipboard is told so', async () => {
-    vi.stubGlobal('fetch', answer(200, { packet: fix.packet }));
+    vi.stubGlobal(
+      'fetch',
+      answer(200, { packet: fix.packet, prompt: packetPrompt(fix, fix.packet!) }),
+    );
     writeText.mockRejectedValueOnce(new Error('denied'));
     render(
       <LiveActions>
