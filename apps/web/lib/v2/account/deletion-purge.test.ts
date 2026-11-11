@@ -369,6 +369,24 @@ describe('the deletion’s billing steps', () => {
     expect(await none.cancel(d.userId, d.accountId)).toBe('no_subscription');
   });
 
+  it('leaves a past-due, unpaid or paused plan to the purge, so a restore never finds one we ended', async () => {
+    for (const status of ['past_due', 'unpaid', 'paused'] as const) {
+      const d = await deleted({ due: false });
+      const stripe = stripeRecorder({ sub_late: { status } });
+      const steps = deletionBilling({
+        rpc: async (fn, args) => (await rpc(fn, args)).data as never,
+        cancel: { accounts: followedFrom('sub_late'), stripe, now: () => new Date() },
+      });
+      expect(await steps.cancel(d.userId, d.accountId)).toBe(`left:${status}`);
+      expect(stripe.calls).toEqual([['retrieve', 'sub_late']]);
+      expect(
+        await n(`select count(*) from public.deletion_cancellations where user_id = $1`, [
+          d.userId,
+        ]),
+      ).toBe(0);
+    }
+  });
+
   it('resumes only a plan still set to end', async () => {
     const stripe = stripeRecorder({
       sub_r: { status: 'active', cancel_at_period_end: true },

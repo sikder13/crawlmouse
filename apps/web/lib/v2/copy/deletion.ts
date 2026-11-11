@@ -33,7 +33,7 @@ export const RESTORE_COPY = {
   lead: 'Pressing the button undoes the deletion of these accounts:',
   until: (date: string) => `The restore link works until ${date}.`,
   money:
-    'A plan the deletion set to end carries on as before. A plan that had already ended, or was ended at once after a failed payment, is not started again; you can choose one in Settings › Plan.',
+    'A plan the deletion set to end carries on as before. A plan that had already ended is not started again; you can choose one in Settings › Plan.',
   button: 'Restore these accounts',
 } as const;
 

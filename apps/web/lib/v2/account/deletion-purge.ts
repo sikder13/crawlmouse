@@ -37,7 +37,11 @@ export function deletionBilling(ports: BillingPorts): DeletionBilling {
       const followed = await ports.cancel.accounts.followed(accountId);
       if (followed === null) return 'no_subscription';
       const sub = await stripe.retrieve(followed.id);
-      const weSetCancel = RESUMABLE.has(sub.status) && !sub.cancel_at_period_end;
+      // Only a plan a restore can continue is ended at confirm (set to end at its period's end). A
+      // past-due, unpaid or paused one CC-03 would cancel at once; it is left to the purge's at-once
+      // cancel, so a restore never finds a plan this deletion killed.
+      if (!RESUMABLE.has(sub.status)) return `left:${sub.status}`;
+      const weSetCancel = !sub.cancel_at_period_end;
       const recorded = await ports.rpc<boolean>('record_deletion_cancel', {
         p_user: userId,
         p_account: accountId,

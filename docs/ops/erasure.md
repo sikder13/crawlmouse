@@ -119,8 +119,10 @@ An owner can delete their account from Settings without this runbook. What happe
 2. **Confirm** (the link's page, then `POST /api/account/delete/confirm`, `confirm_account_deletion`):
    every account the person alone holds is marked (`accounts.deletion_confirmed_at`, `purge_after`
    seven days on), the person is queued in `pending_erasures`, their sessions end and the Auth user is
-   banned. Nothing is deleted. `deletionCancelFn` sets a paid plan to end at its period's end
-   (CC-03's cancel) and records in `deletion_cancellations` whether it did.
+   banned. Nothing is deleted. `deletionCancelFn` sets an `active` or `trialing` plan to end at its
+   period's end (CC-03's cancel) and records in `deletion_cancellations` whether it did; a past-due,
+   unpaid or paused plan is left for the purge to cancel at once, so a restore never finds a plan the
+   deletion ended.
 3. **Restore** (`POST /api/account/restore`, `restore_account`), inside the seven days: the marks and
    the queue row are cleared, the ban is lifted, and `deletionResumeFn` continues a plan the deletion
    set to end (not one the person had already set to end, or one Stripe ended at once).
