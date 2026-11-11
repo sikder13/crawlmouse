@@ -23,7 +23,11 @@ export default async function PlanPage() {
   return (
     <LiveActions>
       <PlanScreen
-        data={settingsView(page.d, page.viewer, { billingEnd: page.billingEnd, role: page.role })}
+        data={settingsView(page.d, page.viewer, {
+          billingEnd: page.billingEnd,
+          role: page.role,
+          subscriptionStatus: page.subscriptionStatus,
+        })}
       />
     </LiveActions>
   );

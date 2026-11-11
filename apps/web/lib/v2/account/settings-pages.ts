@@ -24,6 +24,7 @@ export type SettingsPageRead =
       d: FixtureDataset;
       viewer: Viewer;
       billingEnd: string | null;
+      subscriptionStatus: string | null;
     };
 
 export async function readSettingsPage(now = new Date()): Promise<SettingsPageRead> {
@@ -43,7 +44,7 @@ export async function readSettingsPage(now = new Date()): Promise<SettingsPageRe
   if (error) throw new Error(`settings page: member_role failed: ${error.message}`);
   if (role !== 'owner' && role !== 'account_manager' && role !== 'developer')
     return { kind: 'none' };
-  const { d, billingEnd } = await loadSettingsDataset(
+  const { d, billingEnd, subscriptionStatus } = await loadSettingsDataset(
     { session, admin, records: supabaseCheckReader(admin) },
     accountId,
     now,
@@ -55,5 +56,6 @@ export async function readSettingsPage(now = new Date()): Promise<SettingsPageRe
     d: viewInput(d),
     viewer: { accountId, now: now.toISOString() },
     billingEnd,
+    subscriptionStatus,
   };
 }

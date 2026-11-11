@@ -271,7 +271,10 @@ export function settingsView(
   {
     billingEnd = null,
     role = 'owner',
+    subscriptionStatus,
   }: {
+    /** The subscription mirror's `status`, or null for none; left out in a preview (`deleteText`). */
+    subscriptionStatus?: string | null;
     /** When a paid plan set to cancel at its period's end ends (the subscription mirror's
      * current_period_end); null when it is not set to. The contract's Account has no field for it. */
     billingEnd?: string | null;
@@ -406,7 +409,7 @@ export function settingsView(
       title: COPY.dangerTitle,
       tableLabel: COPY.tables.danger,
       label: COPY.deleteLabel,
-      text: deleteText(v),
+      text: deleteText(v, subscriptionStatus),
       action: owner ? routeAction('deleteConfirm', COPY.deleteAction) : null,
     },
     plan: {
@@ -497,15 +500,32 @@ export function settingsView(
 }
 
 /**
- * What deleting removes, and, on a paid plan (a subscription the account is billed by), what happens
- * to the money: the plan stops renewing at the confirm and ends at the purge, with what the published
- * refund policy (Terms §8) says and nothing more (owner ruling Q7).
+ * What deleting removes, and what happens to the money, by the state of the subscription mirror
+ * (owner ruling Q7, fix round 2): `active` or `trialing` is set to end at the end of the paid period
+ * at the confirm; `past_due`, `unpaid` or `paused` is not, and the purge cancels it at once; any other
+ * state, or none, has nothing to say. Each with what the published refund policy (Terms §8) says.
+ * `undefined` is a preview, which has no mirror: it is read from the tier and the billing period.
  */
-function deleteText(v: ReturnType<typeof viewAt>): string {
-  const billed = v.tier !== 'free' && v.account.billing_period_months !== null;
+function deleteText(v: ReturnType<typeof viewAt>, status: string | null | undefined): string {
   const text = COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS);
-  return billed ? `${text} ${COPY.deleteMoney}` : text;
+  const billed: 'ends' | 'failed' | null =
+    status === undefined
+      ? v.tier !== 'free' && v.account.billing_period_months !== null
+        ? 'ends'
+        : null
+      : status !== null && Object.hasOwn(SUBSCRIPTION_MONEY, status)
+        ? SUBSCRIPTION_MONEY[status]!
+        : null;
+  return billed === null ? text : `${text} ${COPY.deleteMoney[billed]}`;
 }
+
+const SUBSCRIPTION_MONEY: Readonly<Record<string, 'ends' | 'failed'>> = {
+  active: 'ends',
+  trialing: 'ends',
+  past_due: 'failed',
+  unpaid: 'failed',
+  paused: 'failed',
+};
 
 // ── Deleting the account: the confirmation step ─────────────────────────────────────────────
 
@@ -544,7 +564,10 @@ export function deleteStepView(
     removes = null,
     role = 'owner',
     blocked = null,
+    subscriptionStatus,
   }: {
+    /** The subscription mirror's `status`, or null for none; left out in a preview (`deleteText`). */
+    subscriptionStatus?: string | null;
     /** The code the request would be refused with (`account_deletion_blocked`), or null. */
     blocked?: string | null;
     /** Each account the erasure plan names, by its primary site's host (null for none). */
@@ -561,7 +584,7 @@ export function deleteStepView(
     shell: accountShellView(v, 'Settings', { role }),
     header: { title: COPY.deleteLabel, line: a.email },
     cardTitle: COPY.deleteCardTitle,
-    text: deleteText(v),
+    text: deleteText(v, subscriptionStatus),
     steps: COPY.deleteSteps(site ? COPY.hostnameNoun : COPY.emailNoun, a.email, DELETE_GRACE_DAYS),
     removes:
       removes === null || removes.length === 0

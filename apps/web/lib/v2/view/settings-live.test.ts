@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ACCOUNT_VIEWERS } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
 import { fixture } from '../fixtures';
+import { DELETE_COPY, REFUND_POLICY } from '../copy/deletion';
 import { REFUSAL_SENTENCES } from '../copy/settings-notices';
 import { deleteStepView, settingsView } from './settings';
 
@@ -181,5 +182,35 @@ describe('the rail’s trial card for each role (fix round 2, item 2)', () => {
       href: '/settings/plan',
     });
     expect(deleteStepView(home, day0, { role: 'account_manager' }).shell.trial?.billing).toBeNull();
+  });
+});
+
+describe('the money sentence by the subscription’s state (fix round 2, item 5)', () => {
+  // Northwind on 31 Oct, on Agency, billed by its subscription.
+  const ch = fixture('challenged-site');
+  const viewer = { accountId: ACCOUNT_VIEWERS.withheld().accountId, now: '2026-10-31T12:00:00Z' };
+  const text = (subscriptionStatus: string | null) =>
+    [
+      settingsView(ch, viewer, { subscriptionStatus }).danger.text,
+      deleteStepView(ch, viewer, { subscriptionStatus }).text,
+    ] as const;
+
+  it('active or trialing: the plan is set to end at the end of the paid period', () => {
+    for (const status of ['active', 'trialing'])
+      for (const t of text(status))
+        expect(t.endsWith(` ${DELETE_COPY.money.join(' ')}`)).toBe(true);
+  });
+
+  it('past due, unpaid or paused: not set to end, cancelled at once when the account is erased', () => {
+    for (const status of ['past_due', 'unpaid', 'paused'])
+      for (const t of text(status)) {
+        expect(t.endsWith(` ${DELETE_COPY.moneyPaymentFailed} ${REFUND_POLICY}`)).toBe(true);
+        expect(t).not.toContain(DELETE_COPY.money[0]);
+      }
+  });
+
+  it('a subscription already over, or none: nothing about money', () => {
+    for (const status of ['canceled', 'incomplete_expired', null])
+      for (const t of text(status)) expect(t).not.toContain('refund');
   });
 });
