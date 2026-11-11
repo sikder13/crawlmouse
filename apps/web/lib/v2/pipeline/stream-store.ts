@@ -3,8 +3,12 @@
  * the service role: one narrow read of a check per poll, the guarded write of `checks.notify_email`,
  * and an ended check's two scores for the `check_finished` event.
  *
- * `supabaseStreamStore` is production's; `sqlStreamStore` is the same statements in SQL, for PGlite.
- * `notify_email` is written here and read nowhere in this file.
+ * `supabaseStreamStore` is production's. `sqlStreamStore` is its twin in SQL for PGlite, which the
+ * route tests run; the two are not the same statements (the snapshot is two PostgREST requests
+ * with an embed in one and a single joined statement in the other) and no test runs them against
+ * one database. stream-store.test.ts runs the twin on the migrations and pins production's
+ * requests call by call.
+ * `notify_email` is written here; that test fails if production's requests name it in a select.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Check } from '@crawlmouse/types/v2';

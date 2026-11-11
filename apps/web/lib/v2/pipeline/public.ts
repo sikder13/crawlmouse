@@ -150,7 +150,9 @@ export const publicSiteId = (requestId: string, host: string): string =>
   stableId('public_site', requestId, host);
 
 /**
- * How a product event names a check. The check id is the capability to read the check, so events
- * carry this hash of it instead.
+ * How a product event names a check. The check id is the capability to read the check, so the
+ * server's events carry this hash of it as `check_ref` and not the id (app/api/checks/_lib/events.ts).
+ * The audit pages' browser events (`result_viewed`, `fix_opened`, `keep_clicked`) carry `check_ref`
+ * too, beside the page's URL, which holds the id.
  */
 export const checkRef = (checkId: string): string => stableId('check_ref', checkId);

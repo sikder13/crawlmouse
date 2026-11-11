@@ -2,9 +2,10 @@
  * The four buckets the stream and notify routes count against: each one's key and its number.
  * `limits.ts` counts them with `checkRateLimit`; the route tests count the same keys in memory.
  *
- * No key holds a check's id or a visitor's address: the limiter stores its key and prints it when
- * its database call fails (lib/rate-limit.ts), so the check is named by `checkRef` and the address
- * by a hash.
+ * The limiter stores its key and prints it when its database call fails (lib/rate-limit.ts). The
+ * `finishedOnce` key names the check by `checkRef`, not by its id, and the `notifyAddress` key
+ * holds a hash of the email address. The two `ip:` keys hold the caller's IP address as it is, as
+ * v1's keys do.
  */
 import { stableId } from '@crawlmouse/engine/v2/pipeline';
 import { NOTIFY_PER_EMAIL_PER_DAY, NOTIFY_PER_IP_PER_DAY } from '../../../../../lib/limits';

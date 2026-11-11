@@ -1,6 +1,7 @@
 /**
- * The server's one sender of product events to PostHog. Routes call `captureServerEvent`; none
- * builds a capture request of its own.
+ * The server's sender of product events to PostHog (`check_started`, `check_finished` and the
+ * other funnel events): the check routes send through `captureServerEvent`. The security refusal
+ * event has a sender of its own (lib/security/refusal-event.ts), which posts to the same endpoint.
  *
  * What it sends: the event name, the caller's distinct id and properties, with
  * `$process_person_profile: false` (no person profile) and `$geoip_disable: true` (PostHog would
