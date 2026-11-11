@@ -3,7 +3,7 @@
  * figures from the check, the crawl's own map drawing, and the orphan pages the record lists.
  * Every sentence is built from those figures (OPERATING-RULES §10).
  */
-import type { Check, FixtureDataset, PageResult } from '@crawlmouse/types/v2';
+import type { Check, PageResult } from '@crawlmouse/types/v2';
 import { findCheck } from '../../fixtures';
 import { listOf, percent, templateNoun } from '../../format';
 import { RECORDING_NAMES, recordingSpec } from '../../recordings';
@@ -13,6 +13,7 @@ import { mapDrawing, type MapDrawing } from '../map';
 import type { CoverageView, DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
+import type { ViewDataset } from '../dataset';
 
 export interface OrphanRow {
   page: string;
@@ -217,7 +218,7 @@ function mapView(
 }
 
 export function structureView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   options: SegmentOptions = {},
   drawing: MapDrawing | null = drawingOf(checkId),

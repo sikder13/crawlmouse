@@ -3,13 +3,7 @@
  * the HTML the server sends, template by template, and the two responses behind each page the
  * check kept (the untagged control fetch, and the rendering browser's).
  */
-import type {
-  AccessTest,
-  Check,
-  FixSection,
-  FixtureDataset,
-  PageResult,
-} from '@crawlmouse/types/v2';
+import type { AccessTest, Check, FixSection, PageResult } from '@crawlmouse/types/v2';
 import { findCheck } from '../../fixtures';
 import { listOf, percent, templateNoun, testedAt, timeOfDay } from '../../format';
 import {
@@ -23,6 +17,7 @@ import { capitalise, count, numberWord, plural } from '../../words';
 import type { CoverageView, DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { SEGMENTS, segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
+import type { ViewDataset } from '../dataset';
 
 export interface NoJsEvidence {
   title: string;
@@ -202,11 +197,7 @@ function fixesNote(fixes: SectionFixesView): string | null {
   }.`;
 }
 
-export function nojsView(
-  d: FixtureDataset,
-  checkId: string,
-  options: SegmentOptions = {},
-): NoJsView {
+export function nojsView(d: ViewDataset, checkId: string, options: SegmentOptions = {}): NoJsView {
   const check = findCheck(d, checkId);
   const coverage = check.coverage;
   if (!coverage || !check.without_js) {

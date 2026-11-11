@@ -3,11 +3,12 @@
  * long an unkept audit stays. The next link carries the next section's own figure, read from the
  * check, so it cannot disagree with that section's headline.
  */
-import type { Check, FixSection, FixtureDataset } from '@crawlmouse/types/v2';
+import type { Check, FixSection } from '@crawlmouse/types/v2';
 import { SCREEN_SIGNALS, screenSignals } from '../screen-signals';
 import { findCheck, siteOf } from '../../fixtures';
 import { dayTimeUtc, percent } from '../../format';
 import { keptUntilOf } from '../result';
+import type { ViewDataset } from '../dataset';
 
 export const SEGMENT_KEYS = [
   'access',
@@ -124,7 +125,7 @@ function figureOf(check: Check, key: SegmentKey): string | null {
 }
 
 export function segmentFrame(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   key: SegmentKey,
   { asFirstSeen = false, hrefs = NO_HREFS }: SegmentOptions = {},

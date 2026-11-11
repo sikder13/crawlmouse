@@ -22,6 +22,7 @@ import { keptUntilOf } from './result';
 import { sectionFixes } from './segment/fixes';
 import { NO_HREFS, SEGMENT_KEYS, SEGMENTS, type SegmentLink } from './segment/frame';
 import { drawingOf } from './segment/structure';
+import type { ViewDataset } from './dataset';
 
 /** The most nodes drawn as SVG; a larger map is drawn on a canvas (CC-24 brief, scope 2). */
 export const EXPLORER_SVG_MAX = 500;
@@ -153,7 +154,7 @@ const TEXT_STATE: Record<NonNullable<PageResult['without_js']>['state'], PillVie
 };
 
 function detailsOf(
-  d: FixtureDataset,
+  d: ViewDataset,
   check: Check,
   page: PageResult,
   fixLink: (p: PageResult) => SegmentLink | null,
@@ -274,7 +275,7 @@ const ORDER = (a: MapNodeView, b: MapNodeView) =>
   (a.depth ?? Infinity) - (b.depth ?? Infinity) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 
 export function linkMapView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   { scope, asFirstSeen = false, hrefs = NO_HREFS, generated }: LinkMapOptions,
 ): LinkMapView {

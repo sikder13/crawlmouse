@@ -11,6 +11,21 @@ export const CONSENT_REQUIRED_COOKIE = 'cm_consent_required';
 export const CONSENT_DECISION_STORAGE_KEY = 'cm_consent';
 
 /**
+ * First-party cookie holding the same decision, so the server can read it: the banner writes it
+ * beside localStorage. Readable by script, like the region cookie.
+ */
+export const CONSENT_DECISION_COOKIE = 'cm_consent';
+
+export type ConsentDecision = 'granted' | 'denied';
+
+const ONE_YEAR_S = 365 * 24 * 60 * 60;
+
+/** The `document.cookie` assignment that records `decision` for one year. */
+export function consentDecisionCookie(decision: ConsentDecision): string {
+  return `${CONSENT_DECISION_COOKIE}=${decision}; Max-Age=${ONE_YEAR_S}; Path=/; SameSite=Lax`;
+}
+
+/**
  * Window event that re-opens the consent banner so a visitor can change or withdraw a prior
  * decision (GDPR Art. 7(3): withdrawal as easy as giving). Dispatched by the footer "Cookie
  * settings" control; listened for by the CookieConsent banner.
@@ -21,10 +36,37 @@ export const CONSENT_OPEN_EVENT = 'cm:open-consent';
 // what Vercel's `x-vercel-ip-country` header returns. (Greece is GR in ISO, not the EU's "EL".)
 const CONSENT_REQUIRED_COUNTRIES: ReadonlySet<string> = new Set([
   // EU-27
-  'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV',
-  'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
+  'AT',
+  'BE',
+  'BG',
+  'HR',
+  'CY',
+  'CZ',
+  'DK',
+  'EE',
+  'FI',
+  'FR',
+  'DE',
+  'GR',
+  'HU',
+  'IE',
+  'IT',
+  'LV',
+  'LT',
+  'LU',
+  'MT',
+  'NL',
+  'PL',
+  'PT',
+  'RO',
+  'SK',
+  'SI',
+  'ES',
+  'SE',
   // EEA (non-EU)
-  'IS', 'LI', 'NO',
+  'IS',
+  'LI',
+  'NO',
   // United Kingdom
   'GB',
 ]);
@@ -54,4 +96,26 @@ export function shouldShowConsentBanner(
   decision?: string | null,
 ): boolean {
   return consentRequiredFromCookie(cookieString) && decision !== 'granted' && decision !== 'denied';
+}
+
+/** The decision the `cm_consent` cookie holds in a `Cookie` header or `document.cookie` string. */
+export function consentDecisionFromCookie(cookieString?: string | null): ConsentDecision | null {
+  if (!cookieString) return null;
+  for (const part of cookieString.split(';')) {
+    const pair = part.trim();
+    if (pair === `${CONSENT_DECISION_COOKIE}=granted`) return 'granted';
+    if (pair === `${CONSENT_DECISION_COOKIE}=denied`) return 'denied';
+  }
+  return null;
+}
+
+/**
+ * Whether the server may send a product event for the request with this `Cookie` header: yes when
+ * the visitor granted consent; no when they denied it; with no decision, yes unless their region
+ * needs prior consent.
+ */
+export function serverCaptureAllowed(cookieHeader?: string | null): boolean {
+  const decision = consentDecisionFromCookie(cookieHeader);
+  if (decision !== null) return decision === 'granted';
+  return !consentRequiredFromCookie(cookieHeader);
 }

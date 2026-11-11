@@ -27,7 +27,7 @@ import {
 import {
   ACCESS_BATCH_BUDGET,
   ACCESS_SLICE_S,
-  ANONYMOUS_EXPIRY_DAYS,
+  ANONYMOUS_EXPIRY_HOURS,
   CRAWL_BATCH_BUDGET,
   CRAWL_CEILING_S,
   DEFAULT_PAGE_CAP,
@@ -303,7 +303,7 @@ export function buildSpec20b(): string {
       ],
     ),
     '',
-    `A bucketed key’s check id is the engine’s \`stableId\` of the key, so two requests in one bucket insert one row and send events of one id, which Inngest keeps once (\`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/request.test.ts\`). A site no account keeps gets \`expires_at\` ${ANONYMOUS_EXPIRY_DAYS} days out. No caps are enforced here (CC-26b).`,
+    `A bucketed key’s check id is the engine’s \`stableId\` of the key, so two requests in one bucket insert one row and send events of one id, which Inngest keeps once (\`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/request.test.ts\`). A site no account keeps gets \`expires_at\` ${ANONYMOUS_EXPIRY_HOURS} hours out. No caps are enforced here (CC-26b).`,
     '',
     '## Migrations',
     '',

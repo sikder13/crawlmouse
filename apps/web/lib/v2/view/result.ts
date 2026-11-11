@@ -11,7 +11,6 @@ import {
   type CrawlerResult,
   type Fix,
   type FixSection,
-  type FixtureDataset,
 } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { AI_WAITING, effectHeadline } from './effect-headline';
@@ -37,6 +36,7 @@ import {
   verbFor,
 } from '../sentences';
 import { capitalise, count, numberWord, plural } from '../words';
+import type { ViewDataset } from './dataset';
 
 export interface GradeView {
   label: string;
@@ -786,7 +786,7 @@ const DOOR_SEGMENTS: readonly SegmentKey[] = [
  * Until when an audit nobody has kept stays visible, as a timestamp; null once an account keeps
  * it. `asFirstSeen` shows a since-kept check as it was at its finish (see ResultOptions).
  */
-export function keptUntilOf(d: FixtureDataset, check: Check, asFirstSeen = false): string | null {
+export function keptUntilOf(d: ViewDataset, check: Check, asFirstSeen = false): string | null {
   if (siteOf(d, check).account_id !== null && !asFirstSeen) return null;
   return (
     check.expires_at ?? new Date(instant(check.finished_at!) + ANONYMOUS_VISIBLE_MS).toISOString()
@@ -800,7 +800,7 @@ const CADENCE: Record<string, string> = {
 };
 
 export function resultView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   { map, asFirstSeen = false, segmentHref, fixHref = () => '#', mapHref = '#' }: ResultOptions,
 ): ResultView {
@@ -876,7 +876,7 @@ export function resultView(
 }
 
 /** The states around a result: a check that has not run, one that failed, one that expired. */
-export function resultStateView(d: FixtureDataset, checkId: string, now?: string): ResultPageView {
+export function resultStateView(d: ViewDataset, checkId: string, now?: string): ResultPageView {
   const check = findCheck(d, checkId);
   const domain = siteOf(d, check).host;
   if (check.status === 'queued' || check.status === 'deferred') {
