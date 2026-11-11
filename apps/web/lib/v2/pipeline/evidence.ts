@@ -5,7 +5,20 @@
  */
 import { gunzipSync, gzipSync } from 'node:zlib';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { EVIDENCE_BUCKET, type EvidenceStore } from './types';
+import { EVIDENCE_BUCKET, type EvidenceOwner, type EvidenceStore } from './types';
+
+/** The directory one check's objects live in: `evidencePath` without the object's name. */
+export const evidenceDir = (owner: EvidenceOwner): string =>
+  `${owner.accountId ?? 'anon'}/${owner.siteId}/${owner.checkId}`;
+
+/** What the evidence move needs beyond put, get and remove: which objects a check's directory holds. */
+export interface EvidenceDirectory {
+  /** The paths of the objects directly in `dir` (one check's directory); empty when it holds none. */
+  list(dir: string): Promise<string[]>;
+}
+
+/** Objects asked for per page of a listing. */
+const LIST_PAGE = 1000;
 
 export const gzipJson = (value: unknown): Uint8Array =>
   gzipSync(Buffer.from(JSON.stringify(value), 'utf8'));
@@ -22,7 +35,7 @@ export async function getJson(store: EvidenceStore, path: string): Promise<unkno
 }
 
 /** The bucket through the service-role client. A put replaces an object at the same path. */
-export function supabaseEvidenceStore(sb: SupabaseClient): EvidenceStore {
+export function supabaseEvidenceStore(sb: SupabaseClient): EvidenceStore & EvidenceDirectory {
   const bucket = () => sb.storage.from(EVIDENCE_BUCKET);
   return {
     async put(path, gzipped) {
@@ -41,6 +54,21 @@ export function supabaseEvidenceStore(sb: SupabaseClient): EvidenceStore {
       if (paths.length === 0) return;
       const { error } = await bucket().remove([...paths]);
       if (error) throw new Error(`evidence: remove: ${error.message}`);
+    },
+    async list(dir) {
+      const paths: string[] = [];
+      for (;;) {
+        const { data, error } = await bucket().list(dir, {
+          limit: LIST_PAGE,
+          offset: paths.length,
+          sortBy: { column: 'name', order: 'asc' },
+        });
+        if (error || !data) {
+          throw new Error(`evidence: list ${dir}: ${error?.message ?? 'no data'}`);
+        }
+        paths.push(...data.map((o) => `${dir}/${o.name}`));
+        if (data.length < LIST_PAGE) return paths;
+      }
     },
   };
 }

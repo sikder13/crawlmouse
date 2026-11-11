@@ -1,11 +1,12 @@
 /**
  * The functions the Inngest serve route registers (D3): v1's four, in today's order; and checkFn, its
- * cancel handler and the reaper only when V2_PIPELINE=1 in the environment the route module loads
- * with. CC-03's two billing functions follow, only when V2_BILLING=1. With both flags unset the list is
+ * cancel handler, the reaper and the daily expiry (CC-22b D8) only when V2_PIPELINE=1 in the
+ * environment the route module loads with. CC-03's two billing functions follow, only when V2_BILLING=1. With both flags unset the list is
  * v1's four objects, unchanged (functions.test.ts).
  *
  * What each function is built from (correctness 1): the reaper, the cancel handler and checkFn's
- * onFailure take the pipeline store and nothing else; a check's steps are `checkStepsFromEnv`'s, over
+ * onFailure take the pipeline store and nothing else; the expiry takes its own stores and the
+ * evidence bucket (`wiring.expiry`); a check's steps are `checkStepsFromEnv`'s, over
  * `stepDeps`, whose worker client is built when a batch step asks for it. A worker variable that does
  * not make a client fails the checks that reach a batch step (`worker_unavailable`); the store-only
  * handlers never build one.
@@ -30,12 +31,16 @@ import {
   createCheckFn,
   type CheckSteps,
 } from '../../../../../inngest/check';
+import { createExpireAnonymousChecksFn } from '../../../../../inngest/check-expiry';
 import { createCheckReaperFn } from '../../../../../inngest/check-reaper';
 import { pipelineEnabled } from '../../auth/flags';
 import { billingFunctions } from '../../billing/inngest-functions';
 import { workerClientFromEnv } from '../../worker-client/client';
 import { CRAWL_USER_AGENT } from './discover';
 import { supabaseEvidenceStore } from './evidence';
+import { expireUnkept, settleKept, type ExpireDeps } from './expire';
+import { supabaseExpireStore } from './expire-store';
+import { supabaseKeepStore } from './keep-store';
 import { supabasePersistDb } from './persist';
 import {
   checkSteps,
@@ -58,6 +63,8 @@ export interface Wiring {
   store(env: Env): PipelineStore;
   /** The three stores a check's steps use. */
   stores(env: Env): StepStores;
+  /** What the daily expiry reads, deletes and moves with. */
+  expiry(env: Env): ExpireDeps;
 }
 
 const serviceClient = (env: Env): SupabaseClient =>
@@ -73,6 +80,21 @@ export const SERVICE_WIRING: Wiring = {
       store: supabasePipelineStore(sb),
       evidence: supabaseEvidenceStore(sb),
       persistDb: supabasePersistDb(sb),
+    };
+  },
+  expiry: (env) => {
+    const sb = serviceClient(env);
+    const evidence = supabaseEvidenceStore(sb);
+    return {
+      store: supabaseExpireStore(sb),
+      evidence,
+      keep: {
+        store: supabaseKeepStore(sb),
+        evidence,
+        report: (signal, extra) =>
+          console.warn(JSON.stringify({ event: `expiry.${signal}`, ...extra })),
+      },
+      now: Date.now,
     };
   },
 };
@@ -97,6 +119,10 @@ export function inngestFunctions(
     ),
     createCheckCancelledFn((run) => failCancelled(wiring.store(env), run)),
     createCheckReaperFn(() => reapStalled(wiring.store(env), Date.now)),
+    createExpireAnonymousChecksFn({
+      expireUnkept: () => expireUnkept(wiring.expiry(env)),
+      settleKept: () => settleKept(wiring.expiry(env)),
+    }),
     ...billing,
   ];
 }

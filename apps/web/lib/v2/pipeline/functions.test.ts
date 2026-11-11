@@ -13,6 +13,7 @@ import {
   reconcileBillingManualFn,
 } from '../../../../../inngest/billing';
 import { CHECK_CANCELLED_FN_ID, CHECK_FN_ID, type RunSoFar } from '../../../../../inngest/check';
+import { CHECK_EXPIRY_FN_ID } from '../../../../../inngest/check-expiry';
 import { CHECK_REAPER_FN_ID } from '../../../../../inngest/check-reaper';
 import { inngest } from '../../../../../inngest/client';
 import type { CheckRequested } from '../../../../../inngest/check-events';
@@ -21,6 +22,7 @@ import { recordedInput } from '../../../../../packages/engine/fixtures/v2/build/
 import { workerClientFromEnv } from '../../worker-client/client';
 import { CRAWL_USER_AGENT } from './discover';
 import { getJson } from './evidence';
+import type { ExpireDeps } from './expire';
 import {
   checkStepsFromEnv,
   inngestFunctions,
@@ -28,6 +30,7 @@ import {
   type StepStores,
   type Wiring,
 } from './functions';
+import type { KeepStore } from './keep-store';
 import { homepageOf } from './request';
 import { NO_DAILY_BUDGET } from './steps';
 import type { PipelineStore } from './store';
@@ -36,6 +39,16 @@ import { memoryEvidenceStore } from './test-support/memory-evidence';
 
 // The billing functions (CC-03) load modules that import 'server-only', which throws outside Next.
 vi.mock('server-only', () => ({}));
+
+const unused = (what: string) => (): never => {
+  throw new Error(`${what} is not called in this test`);
+};
+/** A wiring whose members throw: a test replaces the ones it reaches. */
+const UNUSED_WIRING: Wiring = {
+  store: unused('wiring.store'),
+  stores: unused('wiring.stores'),
+  expiry: unused('wiring.expiry'),
+};
 
 type Config = { id: string; concurrency?: number | { limit: number } | { limit: number }[] };
 const configsOf = (fns: readonly unknown[]): Config[] =>
@@ -215,7 +228,7 @@ describe('registration with V2_PIPELINE unset (D3)', () => {
 });
 
 describe('registration with V2_PIPELINE=1 (D3)', () => {
-  it('adds checkFn, its cancel handler and the reaper after v1’s four', () => {
+  it('adds checkFn, its cancel handler, the reaper and the expiry after v1’s four', () => {
     const fns = inngestFunctions({ V2_PIPELINE: '1' });
     expect(fns.slice(0, 4)).toEqual([
       auditFn,
@@ -231,7 +244,47 @@ describe('registration with V2_PIPELINE=1 (D3)', () => {
       `crawlmouse-${CHECK_FN_ID}`,
       `crawlmouse-${CHECK_CANCELLED_FN_ID}`,
       `crawlmouse-${CHECK_REAPER_FN_ID}`,
+      `crawlmouse-${CHECK_EXPIRY_FN_ID}`,
     ]);
+  });
+
+  it('registers no expiry with V2_PIPELINE unset', () => {
+    expect(configsOf(inngestFunctions({})).map((c) => c.id)).not.toContain(
+      `crawlmouse-${CHECK_EXPIRY_FN_ID}`,
+    );
+  });
+
+  it('the registered expiry runs expireUnkept, then settleKept, over the wiring’s stores', async () => {
+    const calls: string[] = [];
+    const evidence = memoryEvidenceStore();
+    const expiry: ExpireDeps = {
+      store: {
+        expiredUnkept: async () => {
+          calls.push('expiredUnkept');
+          return { rows: [], remaining: 0 };
+        },
+        deleteExpiredUnkept: async () => [],
+        unsettledKept: async () => {
+          calls.push('unsettledKept');
+          return { rows: [], remaining: 0 };
+        },
+      },
+      evidence,
+      keep: { store: {} as KeepStore, evidence, report: () => {} },
+      now: () => 0,
+    };
+    const wiring: Wiring = { ...UNUSED_WIRING, expiry: () => expiry };
+    const fn = inngestFunctions({ V2_PIPELINE: '1' }, wiring).find(
+      (f) => configsOf([f])[0]!.id === `crawlmouse-${CHECK_EXPIRY_FN_ID}`,
+    ) as unknown as { fn: (ctx: unknown) => Promise<unknown> };
+    const out = await fn.fn({
+      step: { run: async (_id: string, body: () => Promise<unknown>) => body() },
+    });
+    expect(calls).toEqual(['expiredUnkept', 'unsettledKept']);
+    expect(out).toEqual({
+      expired: { sites: 0, checks: 0, skipped: 0, left: 0 },
+      settled: { moved: 0, nothing: 0, failed: 0, left: 0 },
+    });
   });
 });
 
@@ -266,7 +319,7 @@ describe('no registered function can declare a concurrency limit above the plan 
           for (const check of SWEEP) {
             vi.stubEnv('INNGEST_CHECK_CONCURRENCY', check);
             const configs = configsOf(fresh.inngestFunctions(process.env));
-            expect(configs.length).toBe((flag === '1' ? 9 : 5) + (billing === '1' ? 2 : 0));
+            expect(configs.length).toBe((flag === '1' ? 10 : 5) + (billing === '1' ? 2 : 0));
             if (billing === '1') {
               expect(configs.map((c) => c.id)).toEqual(
                 expect.arrayContaining([
@@ -421,6 +474,7 @@ describe('production discovery sends a loopback site nothing (quality 2)', () =>
     );
     const evidence = memoryEvidenceStore();
     const wiring: Wiring = {
+      ...UNUSED_WIRING,
       store: () => memory.store,
       stores: () => ({ store: memory.store, evidence, persistDb: UNUSED_DB }),
     };
@@ -500,6 +554,7 @@ describe('a worker variable that makes no client (correctness 1)', () => {
     ]);
     const store: PipelineStore = { ...memory.store, reap };
     const wiring: Wiring = {
+      ...UNUSED_WIRING,
       store: () => store,
       stores: () => ({ store, evidence: memoryEvidenceStore(), persistDb: UNUSED_DB }),
     };

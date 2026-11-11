@@ -74,7 +74,7 @@ A site named on Sign-up is attached at any sign-in with room (a first login or a
 | `no_account`      | 409    | the caller has no v2 account (a user from before migration 001)                               |
 | `expired`         | 410    | the check expired before anyone kept it                                                       |
 
-The Storage move of the check’s evidence objects is CC-20b’s; no evidence object exists yet.
+With `V2_CHECKS_PUBLIC=1` (CC-22b D7) the two writes are one transaction, `keep_check` (migration 022b), which also refuses a check that has expired on the database’s clock, and the check’s evidence objects move from `anon/` to the account (`apps/web/lib/v2/pipeline/keep.ts`). A claim whose check failed, and a site named on Sign-up, get a first audit when `V2_PIPELINE=1` as well (`apps/web/lib/v2/pipeline/first-audit.ts`).
 
 ## Constants
 
