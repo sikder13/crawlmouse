@@ -173,27 +173,52 @@ describe('LiveCrawl', () => {
     expect(notices()).toEqual(['The map shows 1 of the 3 pages fetched so far.']);
   });
 
+  const LOST =
+    'The live view lost its connection, and is trying again. The audit keeps running; the counts here are the last received.';
+
   it('says so when the server refuses the stream, keeps the last counts, and tries again later', () => {
     act(() => source().send(crawling.events, crawling.cursor));
     act(() => source().refuse());
-    expect(notices()[0]).toBe(
-      'The live view lost its connection, and is trying again. The audit keeps running; the counts here are the last received.',
-    );
+    expect(notices()[0]).toBe(LOST);
     expect(text()).toContain('3 pages');
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(FakeEventSource.made).toHaveLength(1);
     act(() => void vi.advanceTimersByTime(retryDelayMs(1)));
     expect(FakeEventSource.made).toHaveLength(2);
-    // The new connection has no last event id: the screen starts over and is sent the run again.
-    expect(text()).toContain('Starting');
-    act(() => {
-      source().onopen?.();
-      source().send(crawling.events, crawling.cursor);
-    });
-    expect(notices()).toEqual(['The map shows 1 of the 3 pages fetched so far.']);
     expect([1, 2, 3, 4, 5, 9].map(retryDelayMs)).toEqual([
       5000, 10_000, 20_000, 40_000, 60_000, 60_000,
     ]);
+  });
+
+  it('a retry the server refuses again leaves the last counts on the screen', () => {
+    act(() => source().send(crawling.events, crawling.cursor));
+    act(() => source().refuse());
+    act(() => void vi.advanceTimersByTime(retryDelayMs(1)));
+    // The retry is under way, and then refused: nothing was sent, so nothing is taken away.
+    expect(text()).toContain('3 pages');
+    act(() => source().refuse());
+    expect(FakeEventSource.made).toHaveLength(2);
+    expect(text()).toContain('3 pages');
+    expect(text()).not.toContain('Starting');
+    expect(notices()[0]).toBe(LOST);
+  });
+
+  it('starts over when a retry opens, and not when the browser reconnects by itself', () => {
+    act(() => source().send(crawling.events, crawling.cursor));
+    act(() => source().refuse());
+    act(() => void vi.advanceTimersByTime(retryDelayMs(1)));
+    // The new connection sent no last event id: once it opens, the server sends the run again.
+    act(() => source().onopen?.());
+    expect(text()).toContain('Starting');
+    expect(text()).not.toContain('3 pages');
+    expect(notices()).toEqual([]);
+    act(() => source().send(crawling.events, crawling.cursor));
+    expect(notices()).toEqual(['The map shows 1 of the 3 pages fetched so far.']);
+    // The browser's own reconnect sends the last id, so what is drawn stays.
+    act(() => source().drop());
+    act(() => source().onopen?.());
+    expect(text()).toContain('3 pages');
+    expect(FakeEventSource.made).toHaveLength(2);
   });
 
   it('Cancel posts to the cancel route and asks the page again', async () => {
