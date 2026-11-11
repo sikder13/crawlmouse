@@ -61,14 +61,14 @@ async function sqlstate(p: Promise<unknown>): Promise<string> {
 const NOW = () => new Date();
 const minutes = (d: Date, m: number) => new Date(d.getTime() + m * 60_000);
 
-/** Asks for a change, then issues the confirmation link as the mailer would. */
+/** Asks for a change, then issues both of its links as the mailer would. */
 async function request(p: { accountId: string; userId: string }, to: string, now = NOW()) {
-  const { rows } = await db.query<{ id: string }>(
-    `select public.request_email_change($1, $2, $3, $4) as id`,
+  const { rows } = await db.query<{ r: { change_token_id: string; undo_token_id: string } }>(
+    `select public.request_email_change($1, $2, $3, $4) as r`,
     [p.accountId, p.userId, to, now],
   );
-  const id = rows[0]!.id;
-  return { id, ...(await issue(id)) };
+  const { change_token_id: id, undo_token_id: undoId } = rows[0]!.r;
+  return { id, ...(await issue(id)), undoId, undo: await issue(undoId) };
 }
 
 interface Applied {
@@ -98,12 +98,13 @@ const prepare = async (hash: string, now = NOW()) =>
     )
   ).rows[0]!.r;
 
-const undo = async (hash: string, now = NOW()) =>
+/** `applied` is what prepare_email_undo said; most cases here undo an applied change. */
+const undo = async (hash: string, now = NOW(), applied = true) =>
   (
-    await db.query<{ r: Record<string, unknown> }>(`select public.undo_email_change($1, $2) as r`, [
-      hash,
-      now,
-    ])
+    await db.query<{ r: Record<string, unknown> }>(
+      `select public.undo_email_change($1, $2, $3) as r`,
+      [hash, now, applied],
+    )
   ).rows[0]!.r;
 
 async function userRow(id: string) {
@@ -148,10 +149,22 @@ async function token(id: string) {
 }
 
 describe('request_email_change', () => {
-  it('issues a sixty-minute email_change link to the new address and records the request', async () => {
+  it('creates the sixty-minute confirmation link and the old address’s undo link, and records the request', async () => {
     const p = await person();
     const now = NOW();
     const r = await request(p, 'moved@example.org', now);
+    const u = await token(r.undoId);
+    expect(u).toMatchObject({
+      kind: 'email_change_undo',
+      new_email: 'moved@example.org',
+      old_email: p.email,
+      used: false,
+      revoked: false,
+    });
+    // The undo link outlives the confirmation link, so it can stop the change until the end.
+    expect(u.expires_at.getTime()).toBe(
+      minutes(now, EMAIL_CHANGE_LINK_MINUTES + EMAIL_UNDO_DAYS * 24 * 60).getTime(),
+    );
     const t = await token(r.id);
     expect(t).toMatchObject({
       kind: 'email_change',
@@ -176,14 +189,56 @@ describe('request_email_change', () => {
     expect(await sqlstate(request(p, 'Moved@example.org'))).toBe('22023');
   });
 
-  it('replaces an unconfirmed request, and refuses one while an undo link is live (CMA02)', async () => {
+  it('refuses a second request while the first one’s confirmation link is live (CMA02)', async () => {
     const p = await person();
     const first = await request(p, 'first@example.org');
-    const second = await request(p, 'second@example.org');
+    expect(await sqlstate(request(p, 'second@example.org'))).toBe('CMA02');
+    expect((await token(first.id)).revoked).toBe(false);
+  });
+
+  it('refuses a second request while an applied change’s undo link is live (CMA02)', async () => {
+    const p = await person();
+    const first = await request(p, 'first@example.org');
+    await apply(first.hash);
+    expect(await sqlstate(request(p, 'second@example.org'))).toBe('CMA02');
+  });
+
+  it('lets a request through once the first was never confirmed and its link expired, ending both old links', async () => {
+    const p = await person();
+    const first = await request(p, 'abandoned@example.org');
+    const later = minutes(NOW(), EMAIL_CHANGE_LINK_MINUTES + 1);
+    const { rows } = await db.query<{ r: { change_token_id: string } }>(
+      `select public.request_email_change($1, $2, 'next@example.org', $3) as r`,
+      [p.accountId, p.userId, later],
+    );
+    expect(rows[0]!.r.change_token_id).toBeTruthy();
     expect((await token(first.id)).revoked).toBe(true);
-    expect((await token(second.id)).revoked).toBe(false);
-    await apply(second.hash);
-    expect(await sqlstate(request(p, 'third@example.org'))).toBe('CMA02');
+    expect((await token(first.undoId)).revoked).toBe(true);
+  });
+
+  it('turns a race past the check into CMA02 through the index', async () => {
+    const p = await person();
+    await request(p, 'first@example.org');
+    // The check is skipped by a sweep that ages the first link, as a second transaction that read
+    // before it committed would; the index still holds the account to one live link per kind.
+    await db.query(
+      `update public.account_tokens set expires_at = created_at + interval '1 millisecond'
+        where account_id = $1 and kind = 'email_change'`,
+      [p.accountId],
+    );
+    await db.query(
+      `create function pg_temp.no_revoke() returns trigger language plpgsql as $f$
+         begin if new.revoked_at is not null and old.revoked_at is null then return old; end if; return new; end $f$`,
+    );
+    await db.query(
+      `create trigger keep_live before update on public.account_tokens
+         for each row execute function pg_temp.no_revoke()`,
+    );
+    try {
+      expect(await sqlstate(request(p, 'second@example.org'))).toBe('CMA02');
+    } finally {
+      await db.query(`drop trigger keep_live on public.account_tokens`);
+    }
   });
 
   it('refuses an account marked for deletion (CMA03)', async () => {
@@ -216,6 +271,7 @@ describe('apply_email_change', () => {
       previous_emails: [p.email],
     });
     expect(await seatEmail(p.seatId)).toBe('new.name+work@googlemail.com');
+    expect(applied.undo_token_id).toBe(r.undoId);
     const u = await token(applied.undo_token_id);
     expect(u).toMatchObject({
       kind: 'email_change_undo',
@@ -235,16 +291,15 @@ describe('apply_email_change', () => {
     expect(await sqlstate(apply(r.hash))).toBe('CMA05');
   });
 
-  it('refuses an expired link, a revoked one, and an undo link (CMA05)', async () => {
+  it('refuses an expired link, and an undo link (CMA05)', async () => {
     const p = await person();
-    const expired = await request(p, 'late@example.org');
-    expect(await sqlstate(apply(expired.hash, minutes(NOW(), 61)))).toBe('CMA05');
-    const replaced = await request(p, 'late2@example.org');
-    expect((await token(expired.id)).revoked).toBe(true);
-    expect(await sqlstate(apply(expired.hash))).toBe('CMA05');
-    const { applied, undo: u } = await apply(replaced.hash);
-    expect(applied.new_email).toBe('late2@example.org');
-    expect(await sqlstate(apply(u.hash))).toBe('CMA05');
+    const r = await request(p, 'late@example.org');
+    expect(await sqlstate(apply(r.hash, minutes(NOW(), EMAIL_CHANGE_LINK_MINUTES + 1)))).toBe(
+      'CMA05',
+    );
+    expect(await sqlstate(apply(r.undo.hash))).toBe('CMA05');
+    const { applied } = await apply(r.hash);
+    expect(applied.new_email).toBe('late@example.org');
   });
 
   it('refuses an address another sign-in user or profile holds, in any case, and leaves the link usable (CMA04)', async () => {
@@ -307,9 +362,14 @@ describe('the undo', () => {
       user_id: p.userId,
       account_id: p.accountId,
       old_email: p.email,
+      applied: true,
       squatter: null,
     });
-    expect(await undo(u.hash)).toEqual({ user_id: p.userId, account_id: p.accountId });
+    expect(await undo(u.hash)).toEqual({
+      user_id: p.userId,
+      account_id: p.accountId,
+      applied: true,
+    });
     expect(await userRow(p.userId)).toEqual({
       email: p.email,
       email_normalized: normalizeEmail(p.email),
@@ -321,6 +381,34 @@ describe('the undo', () => {
       'email_changed',
       'email_change_undone',
     ]);
+  });
+
+  it('before the confirm, stops the change: the confirmation link no longer applies, and no row moves', async () => {
+    const p = await person();
+    const r = await request(p, 'pending@example.net');
+    const before = await userRow(p.userId);
+    expect(await prepare(r.undo.hash)).toMatchObject({ applied: false, squatter: null });
+    expect(await undo(r.undo.hash, NOW(), false)).toEqual({
+      user_id: p.userId,
+      account_id: p.accountId,
+      applied: false,
+    });
+    expect(await sqlstate(apply(r.hash))).toBe('CMA05');
+    expect((await token(r.id)).revoked).toBe(true);
+    expect(await userRow(p.userId)).toEqual(before);
+    expect(await seatEmail(p.seatId)).toBe(p.email);
+    expect(await events(p.accountId)).toEqual(['email_change_requested', 'email_change_undone']);
+    // Both links are spent, so the person may ask again.
+    await request(p, 'mine-after-all@example.net');
+  });
+
+  it('refuses to finish an undo prepared before the confirm once the change has applied (CMA06)', async () => {
+    const p = await person();
+    const r = await request(p, 'raced@example.net');
+    expect(await prepare(r.undo.hash)).toMatchObject({ applied: false });
+    await db.query(`select public.apply_email_change($1, $2)`, [r.hash, NOW()]);
+    expect(await sqlstate(undo(r.undo.hash, NOW(), false))).toBe('CMA06');
+    expect((await userRow(p.userId)).email).toBe('raced@example.net');
   });
 
   it('accepts its link once, before it expires, and not a confirmation link (CMA05)', async () => {
@@ -438,7 +526,7 @@ describe('a link row before the mailer issues it', () => {
   it('holds no token, and no token confirms it', async () => {
     const p = await person();
     const { rows } = await db.query<{ id: string }>(
-      `select public.request_email_change($1, $2, 'unissued@example.org', now()) as id`,
+      `select public.request_email_change($1, $2, 'unissued@example.org', now()) ->> 'change_token_id' as id`,
       [p.accountId, p.userId],
     );
     const { rows: row } = await db.query(

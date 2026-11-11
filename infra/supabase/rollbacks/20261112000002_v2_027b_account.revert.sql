@@ -9,7 +9,7 @@
 -- ─── B ────────────────────────────────────────────────────────────────────────────────────────────
 
 -- ─── A ────────────────────────────────────────────────────────────────────────────────────────────
-drop function if exists public.undo_email_change(text, timestamptz);
+drop function if exists public.undo_email_change(text, timestamptz, boolean);
 drop function if exists public.prepare_email_undo(text, timestamptz);
 drop function if exists public.revert_email_change(uuid);
 drop function if exists public.apply_email_change(text, timestamptz);

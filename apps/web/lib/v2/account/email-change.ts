@@ -6,16 +6,18 @@
  * Neither link is minted here: each is a row with no token, which CC-28's mailer issues at send time
  * (`issue_account_link`, owner ruling Q5), so no token is held anywhere at rest.
  *
- * - Request: the new address gets a sixty-minute confirmation link. The answer does not depend on
- *   whether the address is in use, so the form cannot be used to find out who has an account; the
- *   confirm is where a taken address shows.
+ * - Request: the new address gets a sixty-minute confirmation link, and the old address is told at
+ *   once, with the "this wasn't me" link, so a change asked for from a stolen session can be stopped
+ *   before it applies (D3). The answer does not depend on whether the address is in use, so the form
+ *   cannot be used to find out who has an account; the confirm is where a taken address shows.
  * - Confirm: our rows move first (`apply_email_change`), then Supabase Auth's, with the address
  *   marked confirmed, since the confirmation link proved it. If Auth refuses, our rows go back.
  *   Then every session of the person ends except the confirming browser's own, when that browser
- *   is signed in as the person; the old address is told, with a seven-day undo link.
- * - Undo: Auth goes back to the old address before our rows do (`undo_email_change` consumes the
- *   link last), so a failure on the way leaves the link usable and the page can be posted again.
- *   Every session ends.
+ *   is signed in as the person. The undo link the old address already holds now lasts seven days.
+ * - Undo before the confirm: the confirmation link is revoked; nothing else changes, Auth included.
+ *   Undo after it: Auth goes back to the old address before our rows do (`undo_email_change`
+ *   consumes the link last), so a failure on the way leaves the link usable and the page can be
+ *   posted again. Either way every session of the person ends.
  */
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -65,11 +67,13 @@ const REFUSALS: Readonly<Record<string, EmailChangeOutcome>> = {
   CMA03: refused(409, 'account_deleting'),
   CMA04: refused(409, 'address_taken'),
   CMA05: refused(410, 'link_unusable'),
+  CMA06: refused(409, 'try_again'),
 };
 
 const LINK_UNUSABLE = REFUSALS.CMA05!;
 const ADDRESS_TAKEN = REFUSALS.CMA04!;
 const AUTH_FAILED = refused(502, 'auth_failed');
+const CHANGED_MEANWHILE = REFUSALS.CMA06!;
 
 type Called<T> =
   | { ok: true; value: T }
@@ -134,10 +138,13 @@ export async function requestEmailChange(
       p_new_email: newEmail,
       p_now: ports.now().toISOString(),
     },
-    z.string().uuid(),
+    z.object({ change_token_id: z.string(), undo_token_id: z.string() }),
   );
   if (!created.ok) return created.outcome;
-  await ports.sendEmails([accountEmail(input.accountId, 'email_change_confirm', created.value)]);
+  await ports.sendEmails([
+    accountEmail(input.accountId, 'email_change_confirm', created.value.change_token_id),
+    accountEmail(input.accountId, 'email_change_notice', created.value.undo_token_id),
+  ]);
   return { ok: true };
 }
 
@@ -188,7 +195,6 @@ export async function confirmEmailChange(
   const keep = input.caller?.userId === a.user_id ? input.caller.sessionId : null;
   await endSessions(ports, a.user_id, keep);
   await ports.capture('account_email_changed', a.account_id, { tier: a.tier });
-  await ports.sendEmails([accountEmail(a.account_id, 'email_change_notice', a.undo_token_id)]);
   return { ok: true };
 }
 
@@ -213,12 +219,14 @@ function holderIds(details: string | null): Record<string, string> {
 const Prepared = z.object({
   user_id: z.string(),
   old_email: z.string(),
+  applied: z.boolean(),
   squatter: z.string().nullable(),
 });
 
 export async function undoEmailChange(
   ports: EmailChangePorts,
   input: { token: string },
+  retried = false,
 ): Promise<EmailChangeOutcome> {
   if (!isToken(input.token)) return LINK_UNUSABLE;
   const hash = hashToken(input.token);
@@ -235,6 +243,8 @@ export async function undoEmailChange(
     return prepared.outcome;
   }
   const p = prepared.value;
+
+  if (!p.applied) return finishUndo(ports, input.token, hash, false, retried);
 
   if (p.squatter !== null) {
     // prepare_email_undo returns a holder only when it was created after the change and holds
@@ -260,13 +270,31 @@ export async function undoEmailChange(
     return auth === 'failed' ? AUTH_FAILED : ADDRESS_TAKEN;
   }
 
+  return finishUndo(ports, input.token, hash, true, retried);
+}
+
+/**
+ * The undo's last step: consumes the link, then ends every session of the person. When the change
+ * applied between the two steps (CMA06), the undo starts again once, now taking the applied path.
+ */
+async function finishUndo(
+  ports: EmailChangePorts,
+  token: string,
+  hash: string,
+  applied: boolean,
+  retried: boolean,
+): Promise<EmailChangeOutcome> {
   const undone = await call(
     ports,
     'undo_email_change',
-    { p_hash: hash, p_now: ports.now().toISOString() },
+    { p_hash: hash, p_now: ports.now().toISOString(), p_applied: applied },
     z.object({ user_id: z.string() }),
   );
-  if (!undone.ok) return undone.outcome;
+  if (!undone.ok) {
+    if (undone.outcome === CHANGED_MEANWHILE && !retried)
+      return undoEmailChange(ports, { token }, true);
+    return undone.outcome;
+  }
   await endSessions(ports, undone.value.user_id, null);
   return { ok: true };
 }

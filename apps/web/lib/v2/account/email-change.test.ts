@@ -24,9 +24,6 @@ let db: PGlite;
 // Applying every migration to a fresh PGlite takes several seconds, more under a parallel run.
 beforeAll(async () => {
   db = await freshDb();
-  await db.exec(
-    `alter table auth.users add column created_at timestamptz not null default now(), add column banned_until timestamptz;`,
-  );
   await applyAllMigrations(db);
 }, 120_000);
 afterAll(async () => db.close());
@@ -124,13 +121,15 @@ async function changed(p: Awaited<ReturnType<typeof person>>, to: string) {
     }),
   ).toEqual({ ok: true });
   const confirm = await rawOf(a.rec.emails[0]!.data.tokenId);
-  const b = ports();
-  expect(await confirmEmailChange(b.ports, { token: confirm, caller: null })).toEqual({ ok: true });
-  return { confirm, undo: await rawOf(b.rec.emails[0]!.data.tokenId) };
+  const undo = await rawOf(a.rec.emails[1]!.data.tokenId);
+  expect(await confirmEmailChange(ports().ports, { token: confirm, caller: null })).toEqual({
+    ok: true,
+  });
+  return { confirm, undo };
 }
 
 describe('requestEmailChange', () => {
-  it('counts the request per person and per hashed address, and emails the confirmation link', async () => {
+  it('counts the request per person and per hashed address, and emails both addresses at once', async () => {
     const p = await person();
     const { ports: pp, rec } = ports();
     const out = await requestEmailChange(pp, {
@@ -143,29 +142,36 @@ describe('requestEmailChange', () => {
     expect(out).toEqual({ ok: true });
     const ipHash = createHash('sha256').update('203.0.113.9').digest('hex');
     expect(rec.buckets).toEqual([`account-email:user:${p.userId}`, `account-email:ip:${ipHash}`]);
-    expect(rec.emails).toHaveLength(1);
-    const [event] = rec.emails;
-    expect(event!.data.template).toBe('email_change_confirm');
-    expect(event!.data.accountId).toBe(p.accountId);
-    const { rows } = await db.query<{ new_email: string; kind: string }>(
-      `select new_email, kind from public.account_tokens where id = $1`,
-      [event!.data.tokenId],
+    expect(rec.emails.map((e) => [e.data.template, e.data.accountId])).toEqual([
+      ['email_change_confirm', p.accountId],
+      ['email_change_notice', p.accountId],
+    ]);
+    const { rows } = await db.query<{ kind: string; new_email: string; old_email: string }>(
+      `select kind, new_email, old_email from public.account_tokens where id = any($1) order by kind`,
+      [rec.emails.map((e) => e.data.tokenId)],
     );
-    expect(rows[0]).toEqual({ new_email: 'new.address@example.org', kind: 'email_change' });
+    expect(rows).toEqual([
+      { kind: 'email_change', new_email: 'new.address@example.org', old_email: p.email },
+      { kind: 'email_change_undo', new_email: 'new.address@example.org', old_email: p.email },
+    ]);
     expect(JSON.stringify(rec.emails)).not.toContain('example.org');
   });
 
   it('answers the same whether or not the new address is in use', async () => {
-    const p = await person();
     const holder = await person();
-    const ask = (newEmail: string) =>
-      requestEmailChange(ports().ports, {
+    // Two people, one request each: a person has one change in flight at a time.
+    const ask = async (newEmail: string) => {
+      const p = await person();
+      const { ports: pp, rec } = ports();
+      const out = await requestEmailChange(pp, {
         accountId: p.accountId,
         userId: p.userId,
         currentEmail: p.email,
         newEmail,
         ip: '203.0.113.9',
       });
+      return [out, rec.emails.map((e) => e.data.template)];
+    };
     const free = await ask('nobody-has-this@example.org');
     const taken = await ask(holder.email);
     expect(taken).toEqual(free);
@@ -238,7 +244,7 @@ describe('requestEmailChange', () => {
 });
 
 describe('confirmEmailChange', () => {
-  it('moves Auth and the rows, ends the other sessions but the confirming one, and tells the old address', async () => {
+  it('moves Auth and the rows, and ends the other sessions but the confirming one', async () => {
     const p = await person();
     const a = ports();
     await requestEmailChange(a.ports, {
@@ -264,12 +270,8 @@ describe('confirmEmailChange', () => {
     expect(await emailOf(p.userId)).toBe('confirmed@example.org');
     expect(await sessions(p.userId)).toEqual([mine]);
     expect(rec.captured).toEqual([['account_email_changed', p.accountId, { tier: 'free' }]]);
-    expect(rec.emails.map((e) => e.data.template)).toEqual(['email_change_notice']);
-    const { rows } = await db.query<{ kind: string; old_email: string }>(
-      `select kind, old_email from public.account_tokens where id = $1`,
-      [rec.emails[0]!.data.tokenId],
-    );
-    expect(rows[0]).toEqual({ kind: 'email_change_undo', old_email: p.email });
+    // The old address was told at the request; a second notice would re-issue its link.
+    expect(rec.emails).toEqual([]);
   });
 
   it('ends every session when the confirming browser is not signed in as the person', async () => {
@@ -413,6 +415,31 @@ describe('confirmEmailChange', () => {
 });
 
 describe('undoEmailChange', () => {
+  it('before the confirm, stops the change without touching Auth, and ends every session', async () => {
+    const p = await person();
+    const a = ports();
+    await requestEmailChange(a.ports, {
+      accountId: p.accountId,
+      userId: p.userId,
+      currentEmail: p.email,
+      newEmail: 'from-a-stolen-session@example.net',
+      ip: '203.0.113.9',
+    });
+    const confirm = await rawOf(a.rec.emails[0]!.data.tokenId);
+    const undo = await rawOf(a.rec.emails[1]!.data.tokenId);
+    await addSessions(p.userId, ['00000000-0000-4000-8000-0000000000e9']);
+    const { ports: pp, rec } = ports();
+    expect(await undoEmailChange(pp, { token: undo })).toEqual({ ok: true });
+    expect(rec.auth).toEqual([]);
+    expect(await sessions(p.userId)).toEqual([]);
+    expect(await confirmEmailChange(ports().ports, { token: confirm, caller: null })).toEqual({
+      ok: false,
+      status: 410,
+      code: 'link_unusable',
+    });
+    expect(await emailOf(p.userId)).toBe(p.email);
+  });
+
   it('sets Auth and the rows back to the old address and ends every session', async () => {
     const p = await person();
     const { undo } = await changed(p, 'stolen@example.net');

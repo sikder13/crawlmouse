@@ -8,7 +8,10 @@ import { maskEmail } from '../../auth/mask-email';
 import type { LinkFlow } from './link-cookie';
 import { hashToken } from './tokens';
 
-/** The confirmation link's life and the undo link's (section A: 60 minutes, 7 days). */
+/**
+ * The confirmation link's life, and the undo link's from the confirm (section A: 60 minutes, 7 days;
+ * before the confirm the undo link lasts both together).
+ */
 export const EMAIL_CHANGE_LINK_MINUTES = 60;
 export const EMAIL_UNDO_DAYS = 7;
 

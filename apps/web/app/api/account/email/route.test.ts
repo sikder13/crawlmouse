@@ -82,9 +82,6 @@ const accountOf = new Map<string, string>();
 // Applying every migration to a fresh PGlite takes several seconds, more under a parallel run.
 beforeAll(async () => {
   h.db = await freshDb();
-  await h.db.exec(
-    `alter table auth.users add column created_at timestamptz not null default now(), add column banned_until timestamptz;`,
-  );
   await applyAllMigrations(h.db);
 }, 120_000);
 afterAll(async () => h.db.close());
@@ -114,8 +111,8 @@ const load = async () => ({
   request: await import('./route'),
   confirm: await import('./confirm/route'),
   undo: await import('./undo/route'),
-  landEmail: await import('../../../account/email/[token]/route'),
-  landUndo: await import('../../../account/email-undo/[token]/route'),
+  landEmail: await import('../../../(account)/account/email/[token]/route'),
+  landUndo: await import('../../../(account)/account/email-undo/[token]/route'),
 });
 
 const post = (path: string, body: string, type: string, cookie?: string) =>
@@ -151,7 +148,7 @@ async function asked(p: { id: string; email: string }, to: string) {
     post('/api/account/email', JSON.stringify({ newEmail: to }), 'application/json'),
   );
   expect(res.status).toBe(202);
-  const raw = await rawOf(h.emails.at(-1)!.data.tokenId);
+  const raw = await rawOf(h.emails.at(-2)!.data.tokenId);
   h.user = null;
   return raw;
 }
@@ -185,7 +182,10 @@ describe('POST /api/account/email', () => {
       'session.rpc member_role',
       'supabaseAdmin',
     ]);
-    expect(h.emails.map((e) => e.data.template)).toEqual(['email_change_confirm']);
+    expect(h.emails.map((e) => e.data.template)).toEqual([
+      'email_change_confirm',
+      'email_change_notice',
+    ]);
   });
 
   it('refuses a manager with 403 not_owner, before the service role', async () => {
@@ -222,11 +222,12 @@ describe('POST /api/account/email', () => {
   });
 
   it('answers a taken address exactly as a free one', async () => {
-    const p = await person();
     const holder = await person();
-    h.user = { id: p.id, email: p.email };
     const { request } = await load();
+    // Two people, one request each: a person has one change in flight at a time.
     const ask = async (to: string) => {
+      const p = await person();
+      h.user = { id: p.id, email: p.email };
       const res = await request.POST(
         post(
           '/api/account/email',
@@ -341,6 +342,7 @@ describe('the undo link and its page’s POST', () => {
     await confirm.POST(
       post('/api/account/email/confirm', '{}', 'application/json', `cm_link_email=${raw}`),
     );
+    // The notice went out with the request; the mailer issues its link.
     const undoRaw = await rawOf(h.emails.at(-1)!.data.tokenId);
 
     const crossed = await confirm.POST(
