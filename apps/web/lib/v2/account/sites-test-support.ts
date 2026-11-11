@@ -2,11 +2,15 @@
  * Test support for the site routes and store: supabase-js clients over a migrated PGlite, through the
  * PostgREST stand-in (`__tests__/helpers/postgrest-pglite.ts`), plus the two calls it does not model
  * that these paths make: `.single()` (the pipeline store's site read) and `auth.getUser()` (the
- * session client). `single()` answers as supabase-js does: the one row, or PGRST116 for none.
+ * session client). `single()` answers as supabase-js does: the one row, or PGRST116 for none. And
+ * the rows the route tests start from, written as postgres.
  */
+import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { postgrestOver, type Call } from '../../../__tests__/helpers/postgrest-pglite';
+import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
+import { GATES } from '../../entitlement-v2';
 
 type Answer = { data: unknown; error: unknown };
 
@@ -78,4 +82,80 @@ export function sessionOver(
       return client.rpc(fn, args);
     },
   } as unknown as SupabaseClient;
+}
+
+export interface Person {
+  id: string;
+  email: string;
+  accountId: string;
+  seatId: string;
+}
+
+/** A signed-up user with their personal (Free) account and its owner seat. */
+export async function person(db: PGlite, tag: string): Promise<Person> {
+  const email = `${tag}-${randomUUID().slice(0, 8)}@example.com`;
+  const id = await signUp(db, email);
+  return { id, email, ...(await personalAccount(db, id)) };
+}
+
+/** An active seat for `p` on `accountId`; scoped to `sites` when given. */
+export async function addSeat(
+  db: PGlite,
+  accountId: string,
+  p: Pick<Person, 'id' | 'email'>,
+  role: 'account_manager' | 'developer',
+  sites?: string[],
+): Promise<string> {
+  const id = randomUUID();
+  await db.query(
+    `insert into public.seats (id, account_id, user_id, invited_email, role, status, accepted_at, client_scope_all)
+     values ($1, $2, $3, $4, $5, 'active', now(), $6)`,
+    [id, accountId, p.id, p.email, role, sites === undefined],
+  );
+  for (const site of sites ?? []) {
+    await db.query(
+      `insert into public.seat_sites (seat_id, site_id, account_id) values ($1, $2, $3)`,
+      [id, site, accountId],
+    );
+  }
+  return id;
+}
+
+/** Moves an account onto a paid plan, with the plan's limits stored as billing writes them. */
+export async function makePaid(
+  db: PGlite,
+  accountId: string,
+  tier: 'pro' | 'agency',
+): Promise<void> {
+  const g = GATES[tier];
+  await db.query(
+    `update public.accounts set state = $2, tier = $2, site_limit = $3, seat_limit = $4,
+       competitor_limit = $5, current_subscription_id = $6,
+       state_history = state_history || jsonb_build_array(jsonb_build_object('state', $2::text, 'since', now()::text))
+     where id = $1`,
+    [accountId, tier, g.sites, g.seats, g.competitorsPerSite, `sub_${randomUUID().slice(0, 8)}`],
+  );
+}
+
+/** A kept site of the account, written as postgres. */
+export async function keptSite(
+  db: PGlite,
+  accountId: string,
+  columns: Partial<Record<'staging_of_site_id' | 'paused_reason' | 'removed_at', string>> = {},
+): Promise<{ id: string; host: string }> {
+  const id = randomUUID();
+  const host = `${id.slice(0, 8)}.example`;
+  await db.query(
+    `insert into public.sites (id, account_id, host, staging_of_site_id, paused_reason, removed_at)
+     values ($1, $2, $3, $4, $5, $6)`,
+    [
+      id,
+      accountId,
+      host,
+      columns.staging_of_site_id ?? null,
+      columns.paused_reason ?? null,
+      columns.removed_at ?? null,
+    ],
+  );
+  return { id, host };
 }

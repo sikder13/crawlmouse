@@ -5,6 +5,7 @@
  * is decided with the gates and limits of the site's own account, read by the route
  * (`readEntitlement`).
  */
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { admitSiteHost } from '../../auth/admit-site';
 import { hostFromSiteInput } from '../../auth/site-host';
@@ -149,4 +150,39 @@ export async function decideEdit(
     }
   }
   return { ok: true, patch };
+}
+
+/** What a site route reads of the site through the caller's session (`sites_member_read`). */
+const SiteRow = z.object({
+  id: z.string(),
+  account_id: z.string(),
+  host: z.string(),
+  staging_of_site_id: z.string().nullable(),
+  removed_at: z.string().nullable(),
+  paused_reason: z.string().nullable(),
+});
+
+export type SiteRow = z.infer<typeof SiteRow>;
+
+/**
+ * The site as the caller may read it, or null: row security (`is_member_for_site`) returns no row
+ * for a site outside the caller's seats, and none for a site no account keeps.
+ */
+export async function readSite(session: SupabaseClient, siteId: string): Promise<SiteRow | null> {
+  const { data, error } = await session
+    .from('sites')
+    .select('id, account_id, host, staging_of_site_id, removed_at, paused_reason')
+    .eq('id', siteId)
+    .maybeSingle();
+  if (error) throw new Error(`sites read failed: ${error.message}`);
+  return data === null ? null : SiteRow.parse(data);
+}
+
+/** A 429 for a request over a per-day bound, with when the next one is allowed. */
+export function tooSoon(error: string, nextAllowedAt: string, now = Date.now()): Response {
+  const seconds = Math.max(1, Math.ceil((Date.parse(nextAllowedAt) - now) / 1000));
+  return Response.json(
+    { error, nextAllowedAt },
+    { status: 429, headers: { 'retry-after': String(seconds) } },
+  );
 }

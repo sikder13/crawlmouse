@@ -5,7 +5,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
 import { checkIdOfKey } from '../pipeline/ids';
@@ -22,6 +22,18 @@ beforeAll(async () => {
 }, 300_000);
 afterAll(async () => {
   await db?.close();
+});
+
+/** Holds Date.now inside one 2-minute bucket, so two requests cannot fall either side of its edge. */
+let pinned: { mockRestore(): void } | null = null;
+const pinBucket = () => {
+  pinned = vi
+    .spyOn(Date, 'now')
+    .mockReturnValue(Math.floor(Date.now() / 120_000) * 120_000 + 1_000);
+};
+afterEach(() => {
+  pinned?.mockRestore();
+  pinned = null;
 });
 
 async function account() {
@@ -50,6 +62,7 @@ const statuses = async (siteId: string) =>
 
 describe('supabaseRequestRecheck', () => {
   it('queues the bucket’s check and sends its event; a repeat in the bucket sends the same id again', async () => {
+    pinBucket();
     const a = await account();
     const s = await site(a.accountId);
     const send = vi.fn(async () => undefined);
@@ -124,6 +137,7 @@ describe('supabaseRequestRecheck', () => {
   });
 
   it('a bucket check that has started is check_running, with nothing sent', async () => {
+    pinBucket();
     const a = await account();
     const s = await site(a.accountId);
     const send = vi.fn(async () => undefined);
@@ -162,6 +176,7 @@ describe('supabaseRequestRecheck', () => {
   });
 
   it('a send that fails leaves the queued row, and the retry sends the same event', async () => {
+    pinBucket();
     const a = await account();
     const s = await site(a.accountId);
     const send = vi.fn(async () => undefined).mockRejectedValueOnce(new Error('inngest down'));
