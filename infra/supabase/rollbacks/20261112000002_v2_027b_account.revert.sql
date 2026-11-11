@@ -24,22 +24,13 @@ drop function if exists public.account_slack_destinations_drop_secret();
 -- ─── A ────────────────────────────────────────────────────────────────────────────────────────────
 
 -- ─── Shared ───────────────────────────────────────────────────────────────────────────────────────
--- Unsent links' raw tokens are in Vault; remove them before the table that names them goes.
-do $$ begin
-  if to_regclass('public.account_tokens') is not null then
-    delete from vault.secrets s using public.account_tokens t where s.id = t.link_secret_id;
-  end if;
-end $$;
-drop function if exists public.sweep_account_links();
-drop function if exists public.take_account_link(uuid);
-drop function if exists public.issue_account_token(uuid, uuid, text, text, text, timestamptz, text, text);
+drop function if exists public.issue_account_link(uuid);
+drop function if exists public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid);
 drop function if exists public.end_user_sessions(uuid, uuid);
 drop table if exists public.pending_erasures;
 alter table public.users drop column if exists previous_emails;
 drop table if exists public.account_events;
 drop table if exists public.account_tokens;
--- Its trigger went with the table.
-drop function if exists public.account_tokens_drop_secret();
 
 create or replace function public.is_member(p_account uuid)
 returns boolean
