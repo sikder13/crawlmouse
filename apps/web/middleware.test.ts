@@ -1,10 +1,9 @@
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { NextRequest, NextResponse, type NextFetchEvent } from 'next/server';
 import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
-import { NO_SUCH_PAGE, V2_REWRITES, config, handleEdge, middleware } from './middleware';
+import { config, handleEdge, middleware } from './middleware';
 import { CONSENT_REQUIRED_COOKIE } from '@/lib/consent';
+import { REWRITE_HEADER, V2_REWRITES } from '@/lib/v2/rewrites';
 import { ROUTE_POLICIES, isStateChanging, type RoutePolicy } from '@/lib/security/route-policy';
 import type { Refusal } from '@/lib/security/refusal-event';
 
@@ -85,12 +84,121 @@ describe('handleEdge', () => {
   });
 });
 
+describe('the v2 rewrites (owner ruling Q17)', () => {
+  const at = (path: string) => new NextRequest(new Request(`https://crawlmouse.com${path}`));
+  const rewriteOf = (res: NextResponse) => res.headers.get('x-middleware-rewrite');
+
+  /** A refresh that rotated the session: a cookie on the response, no-store headers beside it. */
+  function rotated(req: NextRequest) {
+    req.cookies.set(AUTH_COOKIE, 'fresh-token');
+    const res = NextResponse.next({ request: req });
+    res.cookies.set(AUTH_COOKIE, 'fresh-token', { path: '/' });
+    res.headers.set('cache-control', 'private, no-cache, no-store, must-revalidate, max-age=0');
+    return Promise.resolve(res);
+  }
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each(['/dashboard', '/dashboard/'])(
+    'with V2_CHECKS_PUBLIC=1, %s is served by /dashboard/v2',
+    async (path) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+      const res = await handleEdge(at(path), rotated);
+      expect(rewriteOf(res)).toBe('https://crawlmouse.com/dashboard/v2');
+    },
+  );
+
+  it('keeps the query string (v1 reads ?upgraded=1)', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const res = await handleEdge(at('/dashboard?upgraded=1'), rotated);
+    expect(rewriteOf(res)).toBe('https://crawlmouse.com/dashboard/v2?upgraded=1');
+  });
+
+  it('the rewrite keeps the rotated session: its cookie, its no-store header and the updated request', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const res = await handleEdge(at('/dashboard'), rotated);
+    expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
+    expect(res.headers.get('cache-control')).toContain('no-store');
+    expect(res.headers.get('x-middleware-request-cookie')).toContain('fresh-token');
+    expect(res.cookies.get(CONSENT_REQUIRED_COOKIE)).toBeDefined();
+  });
+
+  it.each([
+    ['the flag unset', '', '/dashboard'],
+    ['the flag not 1', 'true', '/dashboard'],
+    ['another page', '1', '/dashboards'],
+    ['the pricing page', '1', '/pricing'],
+  ])('no rewrite with %s', async (_name, flag, path) => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+    const res = await handleEdge(at(path), rotated);
+    expect(rewriteOf(res)).toBeNull();
+    expect(res.status).toBe(200);
+    expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
+  });
+
+  it('marks its own rewrite, and removes a marker a client sent with any other request', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const spoofed = (path: string) =>
+      new NextRequest(
+        new Request(`https://crawlmouse.com${path}`, {
+          headers: { [REWRITE_HEADER]: '1' },
+        }),
+      );
+    const rewritten = await handleEdge(spoofed('/dashboard'), rotated);
+    expect(rewritten.headers.get(`x-middleware-request-${REWRITE_HEADER}`)).toBe('1');
+    for (const path of ['/pricing', '/sites/x']) {
+      const passed = await handleEdge(spoofed(path), rotated);
+      expect(passed.headers.get(`x-middleware-request-${REWRITE_HEADER}`)).toBeNull();
+      expect(passed.headers.get('x-middleware-override-headers') ?? '').not.toContain(
+        REWRITE_HEADER,
+      );
+    }
+  });
+
+  it.each([
+    ['1', '/dashboard/v2.rsc'],
+    ['1', '/dashboard/%76%32'],
+    ['1', '/dashboard%2Fv2'],
+    ['1', '/dashboard/v2'],
+    ['1', '/dashboard/v2/'],
+    ['1', '/dashboard/v2/anything'],
+    ['', '/dashboard/v2'],
+    ['', '/dashboard/v2?upgraded=1'],
+  ])(
+    'with V2_CHECKS_PUBLIC=%j, a direct request for %s is a 404 and is not refreshed',
+    async (flag, path) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+      const refresh = vi.fn(rotated);
+      const res = await handleEdge(at(path), refresh);
+      expect(res.status).toBe(404);
+      expect(rewriteOf(res)).toBeNull();
+      expect(refresh).not.toHaveBeenCalled();
+    },
+  );
+});
+
 describe('middleware (exported entrypoint)', () => {
   it('wires handleEdge → updateSession end-to-end and returns a response with the consent cookie for an anonymous request', async () => {
     const event = { waitUntil: vi.fn() } as unknown as NextFetchEvent;
     const res = await middleware(new NextRequest(new Request('https://crawlmouse.com/')), event);
     expect(res).toBeDefined();
     expect(res.cookies.get(CONSENT_REQUIRED_COOKIE)).toBeDefined();
+  });
+
+  it('through the real session refresh, a marker a client sent does not reach the page', async () => {
+    const event = { waitUntil: vi.fn() } as unknown as NextFetchEvent;
+    const spoofed = new NextRequest(
+      new Request('https://crawlmouse.com/pricing', { headers: { [REWRITE_HEADER]: '1' } }),
+    );
+    const res = await middleware(spoofed, event);
+    // The page sees the request as forwarded: the override list and the headers it names.
+    // Without an override list Next forwards the client's own headers, marker included, so the list
+    // must be there.
+    const list = res.headers.get('x-middleware-override-headers');
+    expect(list).not.toBeNull();
+    const forwarded = list!.split(',');
+    expect(forwarded).not.toContain(REWRITE_HEADER);
+    expect(res.headers.get(`x-middleware-request-${REWRITE_HEADER}`)).toBeNull();
   });
 
   it('hands each refusal report to waitUntil, so it is sent after the response', async () => {
@@ -143,7 +251,7 @@ const lenient = ROUTE_POLICIES.filter((p) => p.origin === 'lenient');
 const passes = (res: NextResponse) => res.headers.get('x-middleware-next') === '1';
 
 describe('a state-changing API request from another site is refused before the route runs', () => {
-  it('guards exactly the fifteen strict routes, named here', () => {
+  it('guards exactly the twenty-two strict routes, named here', () => {
     expect(guarded.map((p) => p.route).sort()).toEqual([
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
@@ -152,12 +260,19 @@ describe('a state-changing API request from another site is refused before the r
       'api/billing/cancel',
       'api/billing/checkout',
       'api/billing/portal',
+      'api/billing/pro-trial/start',
       'api/checks/[id]/cancel',
       'api/checks/[id]/claim',
+      'api/fixes/[id]/done',
+      'api/fixes/[id]/email-developer',
+      'api/me',
       'api/reports/[slug]/claim',
       'api/reports/[slug]/logo',
       'api/reports/[slug]/visibility',
       'api/reports/[slug]/white-label',
+      'api/sites',
+      'api/sites/[id]',
+      'api/sites/[id]/checks',
       'api/verify/check/[id]',
       'api/verify/start',
     ]);
@@ -373,7 +488,7 @@ describe('the matcher sends every guarded route through the middleware', () => {
   });
 });
 
-describe('the v2 rewrite table (CC-22b)', () => {
+describe('the / row of the v2 rewrite table (CC-22b, carried onto lib/v2/rewrites.ts)', () => {
   const HOME = V2_REWRITES.find((r) => r.from === '/')!;
   const at = (path: string) => new NextRequest(new Request(`https://crawlmouse.com${path}`));
   /** The path a response is rewritten to, with its query string; null for no rewrite. */
@@ -438,7 +553,7 @@ describe('the v2 rewrite table (CC-22b)', () => {
     expect(res.headers.get('x-middleware-request-x-from-test')).toBe('kept');
   });
 
-  it.each(['/pricing', '/blog', '/dashboard', '/audit/abc', '//', '/index'])(
+  it.each(['/pricing', '/blog', '/dashboards', '/audit/abc', '//', '/index'])(
     'with the flag on, %s is not rewritten: a row matches its own path only',
     async (path) => {
       flag(true);
@@ -451,13 +566,11 @@ describe('the v2 rewrite table (CC-22b)', () => {
       'a direct request for %s is answered as not found, never as the page',
       async (path) => {
         flag(on);
-        const res = await handleEdge(at(path), refreshNoStore);
-        const to = rewrittenTo(res);
-        expect(to).not.toBeNull();
-        expect(V2_REWRITES.some((r) => to === r.to || to!.startsWith(`${r.to}/`))).toBe(false);
-        expect(to).not.toBe('/');
-        // What the refresh did still rides on the answer.
-        expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
+        const refresh = vi.fn(refreshNoStore);
+        const res = await handleEdge(at(path), refresh);
+        expect(res.status).toBe(404);
+        expect(rewrittenTo(res)).toBeNull();
+        expect(refresh).not.toHaveBeenCalled();
       },
     );
 
@@ -465,7 +578,9 @@ describe('the v2 rewrite table (CC-22b)', () => {
       '%s, which only resembles the target, is left alone',
       async (path) => {
         flag(on);
-        expect(rewrittenTo(await handleEdge(at(path), refreshNoStore))).toBeNull();
+        const res = await handleEdge(at(path), refreshNoStore);
+        expect(rewrittenTo(res)).toBeNull();
+        expect(res.status).toBe(200);
       },
     );
   });
@@ -477,9 +592,5 @@ describe('the v2 rewrite table (CC-22b)', () => {
       expect(matches(row.to), row.to).toBe(true);
       expect(matches(`${row.to}/`), row.to).toBe(true);
     }
-  });
-
-  it('the path a direct request is sent to has no page', () => {
-    expect(existsSync(join(__dirname, 'app', NO_SUCH_PAGE.slice(1)))).toBe(false);
   });
 });

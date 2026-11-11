@@ -11,6 +11,12 @@
  * staging answers false and persist_built_check {written: false}, so a retried persist step changes
  * nothing.
  *
+ * The watermark (CC-26b D5, migration 20261112000001): the build reads the site's fixes and their
+ * events minutes before persist runs, and a member can mark a fix done in between. The payload's
+ * `read` names, per fix the build read, the last event it read (`readOfFixes`), and
+ * persist_built_check withholds every row of this check about a fix whose last event is now another.
+ * The RPC answers the verifications it wrote, and each is captured as `fix_closed` (questions.md Q6).
+ *
  * The one-writer guard in persist.test.ts fails when a non-test file under apps/web, inngest, scripts,
  * packages or infra, other than this one and migration 008, writes these tables or calls either
  * function, as the guard's header defines a write: read from the TypeScript AST, a `from(…)` of one of
@@ -31,12 +37,22 @@ import {
   MeasurementLineageSchema,
   PageResultSchema,
   UsageEventSchema,
+  instant,
   type CrawlPage,
+  type Fix,
+  type FixEvent,
 } from '@crawlmouse/types/v2';
 import { z } from 'zod';
+import {
+  SERVER_EVENTS,
+  sendWithoutRequest,
+  type Sender,
+  type ServerEvents,
+} from '../account/events';
 import { PERSIST_RPC } from './columns';
 import { DiffInputsSchema } from './rows';
 import type {
+  FixRead,
   PageVantage,
   PersistDb,
   PersistInput,
@@ -58,10 +74,43 @@ const VantageSchema = z.strictObject({
   headers: CrawlPageSchema.shape.headers,
 });
 
+const VerifiedSchema = z.strictObject({
+  fix_id: z.uuid(),
+  type: z.string().min(1),
+  checks_to_close: z.int().min(1),
+});
+
 const OutcomeSchema = z.strictObject({
   written: z.boolean(),
   counts: z.record(z.string(), z.int().min(0)),
+  // Migration 008's body, which the 026b revert restores, answers no `verified`.
+  verified: z.array(VerifiedSchema).default([]),
 });
+
+const ReadSchema = z.array(
+  z.strictObject({ fix_id: z.uuid(), last_event_id: z.uuid().nullable() }),
+);
+
+/**
+ * What a build read of the site's fixes: each fix, with the id of its last event as the engine orders
+ * a fix's events (by time, then by id; packages/engine/src/v2/diff/diff.ts), or null for none. The
+ * database orders by (at, id) as well, and a uuid compares there as its lowercase text does here.
+ */
+export function readOfFixes(
+  fixes: readonly Pick<Fix, 'id'>[],
+  events: readonly Pick<FixEvent, 'id' | 'fix_id' | 'at'>[],
+): FixRead[] {
+  const last = new Map<string, Pick<FixEvent, 'id' | 'at'>>();
+  for (const e of events) {
+    const seen = last.get(e.fix_id);
+    const later =
+      !seen ||
+      instant(e.at) > instant(seen.at) ||
+      (instant(e.at) === instant(seen.at) && e.id > seen.id);
+    if (later) last.set(e.fix_id, e);
+  }
+  return fixes.map((f) => ({ fix_id: f.id, last_event_id: last.get(f.id)?.id ?? null }));
+}
 
 export interface StageCall {
   collection: StagedCollection;
@@ -138,6 +187,7 @@ export function persistCalls(input: PersistInput): PersistCalls {
       usage_event: built.usage_event === null ? null : UsageEventSchema.parse(built.usage_event),
       diff_inputs: DiffInputsSchema.parse(built.diff_inputs),
       map_path: z.string().min(1).nullable().parse(input.map_path),
+      read: ReadSchema.parse(input.read),
       staged: Object.fromEntries(
         STAGED.map((collection) => [
           collection,
@@ -151,9 +201,19 @@ export function persistCalls(input: PersistInput): PersistCalls {
   };
 }
 
+/** The event a verification sends (owner rulings Q6, Q7), one of the catalogue's server events. */
+const FIX_CLOSED = 'fix_closed' satisfies (typeof SERVER_EVENTS)[number];
+
+/**
+ * Persists the built check, then sends `fix_closed` for each verification the call wrote, as
+ * `account:<id>` of the usage event's account (a site no account keeps has none, and sends nothing),
+ * through the product's server sender. A repeated call answers no verifications, so a retried step
+ * does not send them twice. No request reaches this step, so no consent cookie can be read here.
+ */
 export async function persistBuiltCheck(
   db: PersistDb,
   input: PersistInput,
+  send: Sender = sendWithoutRequest,
 ): Promise<PersistOutcome> {
   const calls = persistCalls(input);
   for (const s of calls.stages) {
@@ -163,7 +223,18 @@ export async function persistBuiltCheck(
     // False: the check is written already, and persist_built_check will say so.
     if (!staged) break;
   }
-  return OutcomeSchema.parse(await db.persistBuiltCheck(calls.payload));
+  const outcome = OutcomeSchema.parse(await db.persistBuiltCheck(calls.payload));
+  const accountId = input.built.usage_event?.account_id ?? null;
+  if (accountId !== null) {
+    for (const v of outcome.verified) {
+      const properties: ServerEvents[typeof FIX_CLOSED] = {
+        type: v.type,
+        checksToClose: v.checks_to_close,
+      };
+      await send(FIX_CLOSED, `account:${accountId}`, properties).catch(() => undefined);
+    }
+  }
+  return outcome;
 }
 
 /**

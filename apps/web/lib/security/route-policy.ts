@@ -102,6 +102,12 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { route: 'api/billing/cancel', methods: ['POST'], class: 'member', origin: 'strict' },
   { route: 'api/billing/checkout', methods: ['POST'], class: 'member', origin: 'strict' },
   { route: 'api/billing/portal', methods: ['POST'], class: 'member', origin: 'strict' },
+  {
+    route: 'api/billing/pro-trial/start',
+    methods: ['POST'],
+    class: 'member',
+    origin: 'strict',
+  },
   { route: 'api/billing/status', methods: ['GET'], class: 'user', origin: 'any' },
   {
     route: 'api/checks/[id]/cancel',
@@ -112,6 +118,15 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     origin: 'strict',
   },
   { route: 'api/checks/[id]/claim', methods: ['POST'], class: 'user', origin: 'strict' },
+  { route: 'api/me', methods: ['PATCH', 'POST'], class: 'user', origin: 'strict' },
+  { route: 'api/fixes/[id]/done', methods: ['POST'], class: 'member', origin: 'strict' },
+  {
+    route: 'api/fixes/[id]/email-developer',
+    methods: ['POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  { route: 'api/fixes/[id]/packet', methods: ['GET'], class: 'member', origin: 'any' },
   {
     route: 'api/checks/[id]/notify',
     methods: ['POST'],
@@ -177,6 +192,14 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { route: 'api/reports/[slug]/mine', methods: ['GET'], class: 'user', origin: 'any' },
   { route: 'api/reports/[slug]/visibility', methods: ['POST'], class: 'user', origin: 'strict' },
   { route: 'api/reports/[slug]/white-label', methods: ['POST'], class: 'user', origin: 'strict' },
+  { route: 'api/sites', methods: ['POST'], class: 'member', origin: 'strict' },
+  {
+    route: 'api/sites/[id]',
+    methods: ['DELETE', 'PATCH', 'POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  { route: 'api/sites/[id]/checks', methods: ['POST'], class: 'member', origin: 'strict' },
   {
     route: 'api/takedown',
     methods: ['POST'],

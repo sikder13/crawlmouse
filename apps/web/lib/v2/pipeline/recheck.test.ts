@@ -1,13 +1,14 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { PGlite } from '@electric-sql/pglite';
-import { buildCheck, type BuildInput, type BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
+import { buildCheck, type BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
 import { FixSchema, type BatchResult, type Fix, type FixEvent } from '@crawlmouse/types/v2';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { loadCheck } from './load';
-import { pageVantage, persistBuiltCheck } from './persist';
+import { pageVantage, persistBuiltCheck, readOfFixes } from './persist';
 import { pgliteCheckReader, pglitePersistDb, seedRunning, seedSite } from './test-support/pglite';
+import { FIRST, ROBOTS_ADDED, SECOND, secondCrawl, secondInput } from './test-support/second-check';
 import type { CheckDataset, PersistOutcome } from './types';
 
 /**
@@ -35,87 +36,6 @@ import type { CheckDataset, PersistOutcome } from './types';
  * database whose fix rows hold, in each column but id and site_id, a value the second build does not
  * hold, and reads every column back.
  */
-
-const FIRST = recordedBuild().check.id;
-const SECOND = 'b0000000-0000-4000-8000-0000000000c2';
-const HOME = 'https://built-site.test';
-const ORPHAN = `${HOME}/products/forgotten-lantern`;
-/** The recorded edge flagged js_only on the second check. */
-const JS_ONLY_TO = `${HOME}/collections/camp-lighting`;
-/** The lines robots.txt gains on the second check. */
-const ROBOTS_ADDED = ['User-agent: ExampleBot', 'Disallow: /'];
-/**
- * The pages whose title is empty on the second check. A 200 HTML page with an empty title is a
- * crawlability defect (`lacksTitle`, packages/engine/src/v2/grade/technical-seo.ts).
- */
-const UNTITLED = [1, 2, 3, 4].map((n) => `${HOME}/products/sleeping-bags-item-${n}`);
-
-/**
- * The recorded crawl renamed to the second check, with the homepage's new link, robots.txt's new
- * lines and the empty titles.
- */
-function secondCrawl(): BatchResult[] {
-  const renamed = JSON.parse(
-    JSON.stringify(recordedBuild().batches).replaceAll(FIRST, SECOND),
-  ) as BatchResult[];
-  return renamed.flatMap((b): BatchResult[] => {
-    if (b.kind !== 'crawl') return [];
-    const robots = b.robots.map((r) => {
-      if (r.body === null) return r;
-      const body = `${r.body}${ROBOTS_ADDED.join('\n')}\n`;
-      return { ...r, body, body_excerpt: body };
-    });
-    const pages = b.pages.map((p) => {
-      if (p.url === HOME) return { ...p, links_out: (p.links_out ?? 0) + 1 };
-      if (UNTITLED.includes(p.url)) return { ...p, title: { text: '', chars: 0, cut: false } };
-      return p;
-    });
-    if (!b.pages.some((p) => p.url === HOME)) return [{ ...b, robots, pages }];
-    return [
-      {
-        ...b,
-        robots,
-        pages,
-        link_edges: [
-          ...b.link_edges.map((e) =>
-            e.from_url === HOME && e.to_url === JS_ONLY_TO ? { ...e, js_only: true } : e,
-          ),
-          {
-            check_id: SECOND,
-            from_url: HOME,
-            to_url: ORPHAN,
-            anchor_text: 'click here',
-            is_generic_anchor: true,
-            js_only: false,
-          },
-        ],
-      },
-    ];
-  });
-}
-
-function secondInput(first: BuiltCheck): BuildInput {
-  const input = recordedBuild();
-  return {
-    ...input,
-    check: {
-      ...input.check,
-      id: SECOND,
-      previous_check_id: FIRST,
-      trigger: 'fix_recheck',
-      queued_at: '2026-11-06T10:00:00Z',
-      started_at: '2026-11-06T10:00:02Z',
-      finished_at: '2026-11-06T10:11:00Z',
-      expires_at: '2026-12-06T10:00:00Z',
-    },
-    previous: { check: first.check, ...first.diff_inputs },
-    fixes: first.fixes,
-    events: first.fix_events,
-    batches: secondCrawl(),
-    render: null,
-    now: '2026-11-06T10:11:00Z',
-  };
-}
 
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 /** Timestamps as instants (the database writes them in its own spelling); everything else as it is. */
@@ -155,6 +75,7 @@ beforeAll(async () => {
       built: first,
       vantage: vantageOf(recorded.batches),
       map_path: null,
+      read: [],
     });
     afterFirst = (await db.clone()) as PGlite;
     await seedRunning(db, secondInput(first).check);
@@ -162,6 +83,7 @@ beforeAll(async () => {
       built: second,
       vantage: vantageOf(secondCrawl()),
       map_path: null,
+      read: readOfFixes(first.fixes, first.fix_events),
     });
     loaded = await loadCheck(pgliteCheckReader(db), SECOND);
   } catch (error) {
@@ -391,6 +313,7 @@ describe('the second check, persisted over fix rows holding none of its values',
         built: second,
         vantage: vantageOf(secondCrawl()),
         map_path: null,
+        read: readOfFixes(first.fixes, first.fix_events),
       });
       rewritten = await fixRows(copy);
     } catch (error) {

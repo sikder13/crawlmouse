@@ -170,7 +170,7 @@ function validZone(zone: string | undefined): string | null {
   return typeof zone === 'string' && TimeZoneSchema.safeParse(zone).success ? zone : null;
 }
 
-async function decideTrial(
+export async function decideTrial(
   deps: FirstLoginDeps,
   input: FirstLoginInput,
   account: MemberAccount,

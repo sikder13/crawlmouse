@@ -191,6 +191,12 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
     case 'persist_chunks':
       await needCheck();
       return ROWS.persist_chunks(check, 0);
+    case 'fix_email_requests': {
+      await needCheck();
+      const fix = randomUUID();
+      await insertRow(db, 'site_fixes', ROWS.site_fixes(fix, site, check, 7));
+      return ROWS.fix_email_requests(randomUUID(), fix, world.accountId, world.ownerSeatId);
+    }
   }
 }
 
@@ -279,6 +285,7 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   usage_events: null,
   crawl_batches: null,
   persist_chunks: null,
+  fix_email_requests: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -332,8 +339,9 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   };
   if (table === 'alert_rules') expectedTable.authenticated = 'd';
   if (table === 'page_results') expectedTable.crawl_worker = 'a';
-  // 008 grants service_role the four statements the pipeline runs, not every privilege.
-  if (table === 'crawl_batches' || table === 'persist_chunks') expectedTable.service_role = 'arwd';
+  // 008 grants service_role the four statements the pipeline runs, and 026b the same on its table.
+  if (['crawl_batches', 'persist_chunks', 'fix_email_requests'].includes(table))
+    expectedTable.service_role = 'arwd';
   const actualTable = Object.fromEntries(tableAcl.map((a) => [a.grantee, sorted(a.privileges)]));
   for (const g of new Set([...Object.keys(expectedTable), ...Object.keys(actualTable)])) {
     if ((actualTable[g] ?? '') !== sorted(expectedTable[g] ?? ''))

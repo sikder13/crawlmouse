@@ -9,7 +9,8 @@ import { fixture } from '../../../../lib/v2/fixtures';
 import { firstRunNow, viewAt, type Viewer } from '../../../../lib/v2/view/account';
 import { accountShellView } from '../../../../lib/v2/view/account-shell';
 import { dashboardView } from '../../../../lib/v2/view/dashboard';
-import { siteView } from '../../../../lib/v2/view/site';
+import { sitePage, siteView, type FirstCheckView } from '../../../../lib/v2/view/site';
+import type { FixtureDataset } from '@crawlmouse/types/v2';
 
 /** example-outfitter.com's owner, on day 9 of the Pro trial (bad-site). */
 export const BAD_ACCOUNT_ID = 'a0000000-0000-4000-8000-000000000001';
@@ -111,3 +112,43 @@ export const ACCOUNT_PREVIEWS = {
   string,
   { screen: 'dashboard' | 'site'; viewer: keyof typeof ACCOUNT_VIEWERS }
 >;
+
+// ── States a live account reaches that the fixtures hold no moment of (CC-26b D8, R22) ─────────
+
+/** bad-site's account with every site record taken out: day 0 before a site is added. */
+export function noSiteDataset(): FixtureDataset {
+  const d = fixture('bad-site');
+  return {
+    ...d,
+    sites: [],
+    checks: [],
+    page_results: [],
+    link_edges: [],
+    access_tests: [],
+    fixes: [],
+    fix_events: [],
+    changes: [],
+    alert_rules: d.alert_rules.filter((r) => r.site_id === null),
+    reports: [],
+    usage_events: [],
+    withheld: [],
+  };
+}
+
+/** The dashboard of an account with no site, at bad-site's as_of. */
+export const noSitePreview = () => dashboardView(noSiteDataset(), ACCOUNT_VIEWERS.home());
+
+/** nahltech.com, bad-site's second site, halfway through its first check. */
+export const FIRST_CHECK_SITE = '50000000-0000-4000-8000-000000000002';
+
+export function firstCheckPreview(): FirstCheckView {
+  const d = fixture('bad-site');
+  const first = d.checks
+    .filter((c) => c.site_id === FIRST_CHECK_SITE)
+    .sort((a, b) => Date.parse(a.queued_at) - Date.parse(b.queued_at))[0]!;
+  const now = new Date((Date.parse(first.started_at!) + Date.parse(first.finished_at!)) / 2);
+  const p = sitePage(d, { accountId: BAD_ACCOUNT_ID, now: now.toISOString() }, FIRST_CHECK_SITE);
+  if (p.kind !== 'first_check')
+    throw new Error('nahltech.com has a result mid-way through its first check');
+  return p.first;
+}

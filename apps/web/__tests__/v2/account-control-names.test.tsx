@@ -169,10 +169,17 @@ describe('Account previews: no two controls share a name a row header does not s
     );
     expect(paths.sort()).toEqual(account.sort());
   });
+  // A sign-in the viewer cannot place on one account has no rail: its controls are the app
+  // header's brand.
+  const NO_RAIL = new Set([
+    '/v2-preview/screens/dashboard/no-account',
+    '/v2-preview/screens/dashboard/ambiguous',
+  ]);
   it.each(paths)('%s', (path) => {
     const html = renderToStaticMarkup(elements[path]!());
-    // It found the page's controls: the rail alone has seven links.
-    expect(html.match(/<a [^>]*href=|<button/g)?.length ?? 0).toBeGreaterThan(7);
+    const controls = html.match(/<a [^>]*href=|<button/g)?.length ?? 0;
+    // It found the page's controls: the rail alone has seven links; the brand, one.
+    expect(controls).toBeGreaterThan(NO_RAIL.has(path) ? 0 : 7);
     expect(sharedNames(html)).toEqual([]);
     expect(bareRepeats(html)).toEqual([]);
   });
