@@ -2,7 +2,16 @@ import { readFileSync } from 'node:fs';
 import { busyPerSlice, quantile } from '../../packages/timing/src/busy';
 import { recordSample } from '../../packages/timing/src/samples';
 import { fmt, median } from '../../packages/timing/src/stats';
-import { ADVISORY, BUDGET, EXPLORER, MEAN_WORK_MS, RUNS, WINDOW_MS } from './budgets';
+import {
+  ADVISORY,
+  BUDGET,
+  EXPLORER,
+  MAP_WRITES_PER_FRAME,
+  MEAN_WORK_ADVISORY,
+  MEAN_WORK_MS,
+  RUNS,
+  WINDOW_MS,
+} from './budgets';
 import { test, expect, type Browser, type Page, type TestInfo } from './pw';
 
 /**
@@ -113,6 +122,21 @@ const INVALID = 'MEASUREMENT INVALID';
  * dropped to 30 fps failed as invalid with the page unchanged.)
  */
 const MIN_FPS = 20;
+
+/**
+ * The runner probe's reading (packages/timing/src/probe.ts), from the file PERF_PROBE names: CI and
+ * the nightly write it before this spec runs. Locally:
+ * `pnpm --silent --filter @crawlmouse/timing exec tsx src/probe-cli.ts > /tmp/probe.json` and
+ * `PERF_PROBE=/tmp/probe.json`. Without it the crawl windows' runs are invalid, not passed.
+ */
+const PROBE: { medianMs: number; referenceMs: number } | null = (() => {
+  const path = process.env.PERF_PROBE;
+  if (!path) return null;
+  const p = JSON.parse(readFileSync(path, 'utf8')) as { medianMs?: unknown; referenceMs?: unknown };
+  return typeof p.medianMs === 'number' && p.medianMs > 0 && typeof p.referenceMs === 'number'
+    ? { medianMs: p.medianMs, referenceMs: p.referenceMs }
+    : null;
+})();
 
 /** What the trace records: `toplevel` holds `RunTask`, `loading` holds `LayoutShift`. */
 const CATEGORIES = [
@@ -237,7 +261,12 @@ test.describe('crawl screen performance', () => {
           { metric: 'longestTaskMs', unit: 'ms', limit: BUDGET.stallMs },
           { metric: 'longTasks', unit: 'tasks', limit: w.longTasks },
           { metric: 'layoutShift', unit: 'score', limit: BUDGET.layoutShift },
-          { metric: 'meanWorkMs', unit: 'ms', limit: meanWorkLimit(w.name) },
+          {
+            metric: 'meanWorkRefMs',
+            unit: 'ms',
+            limit: meanWorkLimit(w.name),
+            advisory: MEAN_WORK_ADVISORY,
+          },
           { metric: 'p95WorkMs', unit: 'ms', limit: BUDGET.p95WorkMs },
           { metric: 'maxFrameMs', unit: 'ms', limit: BUDGET.maxFrameMs },
           { metric: 'p95FrameMs', unit: 'ms', limit: ADVISORY.p95FrameMs, advisory: true },
@@ -286,6 +315,99 @@ test.describe('crawl screen performance', () => {
       INVALID,
     ).toEqual([]);
     expect(missed, `medians of ${RUNS} runs`).toEqual([]);
+  });
+});
+
+/**
+ * The crawl map's work, counted: the gate for "the map does twice the work per frame"
+ * (docs/specs/v2/ci-cost.md, D3). Milliseconds move with the machine; this count does not.
+ *
+ * The window is replayed on Playwright's fake clock, stepped one frame at a time, with the layout
+ * Worker switched off so each layout runs on the main thread at a fixed point in replay time (a
+ * real Worker's result lands whenever its thread finishes, which no clock controls). What is
+ * counted is every DOM change inside a map (`svg[data-v2-map]`: attributes, nodes added or removed,
+ * text) and every animation started on a map element, divided by the window's length in 60 Hz
+ * frames. A second map doubles it exactly. Stepping at 30 fps replays the same events in half as
+ * many frames: React may then batch two events into one commit, so the count can only stay or
+ * fall. The same window counted twice must read the same number, or the run measured nothing.
+ */
+async function countMapWrites(browser: Browser, w: (typeof WINDOWS)[number], frameMs: number) {
+  const context = await browser.newContext({ viewport: { width: w.width, height: w.height } });
+  await context.addInitScript(() => {
+    Object.defineProperty(window, 'Worker', { value: undefined, configurable: true });
+  });
+  const page = await context.newPage();
+  // Paused from the start: only the steps below move time, never the page's load or a round trip.
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
+  await page.goto(`/v2-preview/screens/crawl?at=${w.at}&play`, { waitUntil: 'load' });
+  await expect(page.locator('[data-v2-replay]')).toHaveAttribute('data-v2-replay', 'playing');
+  await page.evaluate(() => {
+    const inMap = (n: Node | null) =>
+      (n instanceof Element ? n : (n?.parentElement ?? null))?.closest('svg[data-v2-map]') != null;
+    const counts = { mutations: 0, animations: 0 };
+    (window as unknown as { __mapWrites: typeof counts }).__mapWrites = counts;
+    new MutationObserver((records) => {
+      for (const r of records) if (inMap(r.target)) counts.mutations++;
+    }).observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (this: Element, ...args: Parameters<Element['animate']>) {
+      if (inMap(this)) counts.animations++;
+      return animate.apply(this, args);
+    };
+  });
+  let steps = 0;
+  for (let t = 0; t < WINDOW_MS; t += frameMs) {
+    await page.clock.runFor(frameMs);
+    steps++;
+  }
+  // MutationObserver delivers in a microtask; a round trip after the last step flushes it.
+  const counts = await page.evaluate(
+    () =>
+      (window as unknown as { __mapWrites: { mutations: number; animations: number } }).__mapWrites,
+  );
+  await context.close();
+  const writes = counts.mutations + counts.animations;
+  return {
+    ...counts,
+    writes,
+    steps,
+    perFrame: Number((writes / (WINDOW_MS / (1000 / 60))).toFixed(3)),
+  };
+}
+
+test.describe('the crawl map, counted', () => {
+  test.describe.configure({ timeout: 240_000 });
+  const crawl = WINDOWS[0]!;
+
+  test(`${crawl.name}: map writes per frame within MAP_WRITES_PER_FRAME, at 60 and 30 fps`, async ({
+    browser,
+  }) => {
+    const first = await countMapWrites(browser, crawl, 1000 / 60);
+    const again = await countMapWrites(browser, crawl, 1000 / 60);
+    const slow = await countMapWrites(browser, crawl, 1000 / 30);
+    console.log(`[perf] ${crawl.name}, map writes: ${JSON.stringify({ first, again, slow })}`);
+    recordSample(process.env.PERF_SAMPLES_DIR, {
+      metric: `${crawl.name}: mapWritesPerFrame`,
+      unit: 'writes',
+      median: first.perFrame,
+      limit: MAP_WRITES_PER_FRAME,
+      pass: first.perFrame <= MAP_WRITES_PER_FRAME && slow.perFrame <= MAP_WRITES_PER_FRAME,
+      samples: [first.perFrame, again.perFrame, slow.perFrame],
+    });
+    expect(first.writes, `${INVALID}: the window wrote nothing to the map`).toBeGreaterThan(0);
+    expect(again, `${INVALID}: the same window counted twice read two numbers`).toEqual(first);
+    expect(first.perFrame, 'map writes per frame, at 60 fps').toBeLessThanOrEqual(
+      MAP_WRITES_PER_FRAME,
+    );
+    expect(slow.perFrame, 'map writes per frame, at 30 fps').toBeLessThanOrEqual(
+      MAP_WRITES_PER_FRAME,
+    );
   });
 });
 
@@ -476,6 +598,17 @@ async function measure(
     meanWorkMs: trace.busy.length
       ? Number((trace.busy.reduce((a, b) => a + b, 0) / trace.busy.length).toFixed(3))
       : 0,
+    // The mean in a reference runner's milliseconds: divided by the runner probe's ratio to its
+    // reference, so a slower machine reads the same page as the same work. No probe, no reading.
+    meanWorkRefMs:
+      trace.busy.length && PROBE
+        ? Number(
+            (
+              (trace.busy.reduce((a, b) => a + b, 0) / trace.busy.length) *
+              (PROBE.referenceMs / PROBE.medianMs)
+            ).toFixed(3),
+          )
+        : 0,
     p95WorkMs: trace.busy.length ? Number(quantile(trace.busy, 0.95).toFixed(2)) : 0,
     longTasks: trace.long.length,
     longTasksMs: trace.long,
@@ -499,6 +632,7 @@ async function measure(
       ? null
       : `run ${run + 1}: the trace holds ${trace.mainThreads} renderer main threads, not 1`,
     trace.tasks > 0 ? null : `run ${run + 1}: the trace holds no main-thread task`,
+    PROBE ? null : `run ${run + 1}: no runner probe reading (PERF_PROBE)`,
     measured.frames > (WINDOW_MS / 1000) * MIN_FPS
       ? null
       : `run ${run + 1}: only ${measured.frames} frames`,

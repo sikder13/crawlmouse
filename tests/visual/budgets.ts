@@ -23,15 +23,25 @@ export const ADVISORY = {
 };
 
 /**
- * The main thread's mean busy time per 16.7 ms slice, per crawl-screen window: each window does its
- * own amount of work, as its long-task cap already says. Set from the readings in
+ * The main thread's mean busy time per 16.7 ms slice, per crawl-screen window, in a reference
+ * runner's milliseconds (divided by the runner probe's ratio to its reference). The coarse safety
+ * net beside MAP_WRITES_PER_FRAME: it catches a large regression, not a third more work. Set from
+ * the CI readings in docs/specs/v2/ci-cost.md, D3; advisory when they spread by more than 15%.
+ */
+export const MEAN_WORK_ADVISORY = false;
+
+export const MEAN_WORK_MS: Record<string, number> = {
+  'the crawl, the map growing': 2.75,
+  'the crawler tests, the log and verdicts landing': 0.65,
+  'on a phone, the crawler tests beginning': 2.45,
+};
+
+/**
+ * The crawl window's map writes per 60 Hz frame of replay time, counted on a fake clock
+ * (perf.spec.ts, "the crawl map, counted"): the gate for twice the map's work. Set from the count in
  * docs/specs/v2/ci-cost.md, D3.
  */
-export const MEAN_WORK_MS: Record<string, number> = {
-  'the crawl, the map growing': 2.5,
-  'the crawler tests, the log and verdicts landing': 0.9,
-  'on a phone, the crawler tests beginning': 3.2,
-};
+export const MAP_WRITES_PER_FRAME = 5.4;
 
 /** How long each crawl-screen window plays. */
 export const WINDOW_MS = 12_000;
