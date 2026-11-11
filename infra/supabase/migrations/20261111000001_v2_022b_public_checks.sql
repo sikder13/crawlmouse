@@ -262,8 +262,15 @@ $$;
 -- Deletes those of p_sites that no account keeps and for which unkept_site_expired is true when the
 -- statement runs, and returns their ids. Each site's checks, their measurement rows, batches and
 -- staged chunks, and the site's fixes and fix events go with it by the foreign keys' cascades.
--- `account_id is null` is a condition of the delete itself: a site an account took after it was
--- listed is not deleted.
+-- A site an account took after it was listed is not deleted: unkept_site_expired asks
+-- `account_id is null` when the delete runs (apps/web/lib/v2/pipeline/expire.test.ts, "a site an
+-- account took after it was listed"). The delete states `account_id is null` as its own condition
+-- too. That copy does work in one case: keep_check commits on another connection while this
+-- statement waits for the site's row lock, and READ COMMITTED then tests the statement's own
+-- conditions against the new row, where the stable function still reads the statement's snapshot.
+-- PGlite has one connection, so no test in this repository runs that case; with the copy removed
+-- the tests here stay green. The expiry calls this with an array of one site, so a statement holds
+-- one site's cascade.
 
 create or replace function public.delete_expired_unkept_sites(p_sites uuid[],
                                                               p_cutoff timestamptz,

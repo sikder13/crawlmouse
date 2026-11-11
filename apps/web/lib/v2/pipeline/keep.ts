@@ -44,7 +44,7 @@ export const MOVE_CONCURRENCY = 4;
 export interface KeepDeps {
   store: KeepStore;
   evidence: EvidenceStore & EvidenceDirectory;
-  /** A Sentry signal with ids only. */
+  /** A Sentry signal with ids and counts. */
   report: Report;
   /** KEEP_MOVE_BUDGET_MS unless a test sets another. */
   budgetMs?: number;
