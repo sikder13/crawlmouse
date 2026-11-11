@@ -705,9 +705,9 @@ grant execute on function public.undo_email_change(text, timestamptz, boolean) t
 -- The erasure's rules, the in-app deletion's three steps and the purge's queue reads. Functions are
 -- owned by postgres, revoked from every client role and granted to service_role (erase_rules,
 -- erase_person_refusals, deletion_refusal and email_change_live to no role: only the functions here
--- call them). Tests:
--- apps/web/__tests__/v2-027b-b-erasure.test.ts, apps/web/__tests__/v2-027b-b-deletion.test.ts and,
--- for the rules carried over from the script, scripts/ops/erase-account.test.ts.
+-- call them). Tests: apps/web/__tests__/v2-027b-b-deletion.test.ts (the deletion, the queue and the
+-- catalogue), apps/web/lib/v2/account/deletion-purge.test.ts (the purge over this SQL) and, for the
+-- erasure's rules, scripts/ops/erase-account.test.ts.
 
 -- ─── The erasure's rules (D5) ─────────────────────────────────────────────────────────────────────
 -- One row per rule. `kind`: `with_user` and `with_accounts` are counted only (they go with the Auth
