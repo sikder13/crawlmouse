@@ -18,9 +18,10 @@
 --   expired_unkept_sites, delete_expired_unkept_sites: the expiry's read and its delete;
 --   unsettled_kept_checks: the ended checks of kept sites whose evidence may still lie under anon/.
 -- The six are SECURITY INVOKER with search_path pg_catalog, public, pg_temp, as 008's invoker
--- functions are: service_role holds each privilege they use (select, insert, update and delete on
--- sites, checks and crawl_batches; the cascade from a deleted site runs as the tables' owner), so
--- none needs its definer's. Only service_role may execute them.
+-- functions are. They read and write sites, checks and crawl_batches, which service_role may; the
+-- rows a deleted site takes with it go by the foreign keys' cascades, which Postgres runs itself.
+-- The tests below call them as service_role. EXECUTE is revoked from public, anon and authenticated
+-- and granted to service_role (__tests__/v2-022b-keep-expiry.test.ts reads the catalog).
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261111000001_v2_022b_public_checks.revert.sql.
@@ -103,7 +104,8 @@ $$;
 -- 'not_unowned' when there is no such check or its site has an account already, 'expired' when the
 -- check's expires_at is at or before now(), 'host_kept' when the account keeps a site with that host
 -- (sites_account_host_uq). The site's row is locked before the expiry is read, in the order
--- delete_expired_unkept_sites takes its locks (site, then checks), so the two cannot both proceed.
+-- delete_expired_unkept_sites takes its locks (site, then checks). PGlite has one connection, so no
+-- test here runs the two at the same time; the tests place one between the other's statements.
 
 create or replace function public.keep_check(p_check uuid, p_account uuid, p_owner_seat uuid,
                                              p_cadence text, p_iso_weekday integer,
