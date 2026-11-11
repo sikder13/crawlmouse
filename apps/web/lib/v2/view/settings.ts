@@ -384,7 +384,7 @@ export function settingsView(
       title: COPY.dangerTitle,
       tableLabel: COPY.tables.danger,
       label: COPY.deleteLabel,
-      text: COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS),
+      text: deleteText(v),
       action: routeAction('deleteConfirm', COPY.deleteAction),
     },
     plan: {
@@ -468,6 +468,17 @@ export function settingsView(
   };
 }
 
+/**
+ * What deleting removes, and, on a paid plan (a subscription the account is billed by), what happens
+ * to the money: the plan stops renewing at the confirm and ends at the purge, with what the published
+ * refund policy (Terms §8) says and nothing more (owner ruling Q7).
+ */
+function deleteText(v: ReturnType<typeof viewAt>): string {
+  const billed = v.tier !== 'free' && v.account.billing_period_months !== null;
+  const text = COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS);
+  return billed ? `${text} ${COPY.deleteMoney}` : text;
+}
+
 // ── Deleting the account: the confirmation step ─────────────────────────────────────────────
 
 export interface DeleteStepView {
@@ -513,7 +524,7 @@ export function deleteStepView(
     shell: accountShellView(v, 'Settings'),
     header: { title: COPY.deleteLabel, line: a.email },
     cardTitle: COPY.deleteCardTitle,
-    text: COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS),
+    text: deleteText(v),
     steps: COPY.deleteSteps(site ? COPY.hostnameNoun : COPY.emailNoun, a.email, DELETE_GRACE_DAYS),
     removes:
       removes === null || removes.length === 0

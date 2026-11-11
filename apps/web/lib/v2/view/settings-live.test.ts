@@ -61,3 +61,27 @@ describe('the delete step, with the accounts the deletion removes', () => {
     expect(deleteStepView(bad, viewer).removes).toBeNull();
   });
 });
+
+describe('deleting an account with a paid plan: the money (owner ruling Q7)', () => {
+  // The published policy is Terms §8 (app/terms/page.tsx): "We don’t refund partial periods except
+  // where the law requires it." The copy says that and no more.
+  const ch = fixture('challenged-site');
+  const viewer = { accountId: ACCOUNT_VIEWERS.withheld().accountId, now: '2026-10-31T12:00:00Z' };
+  const MONEY =
+    'A paid plan stops renewing when you confirm and ends when the account is deleted. We don’t refund partial periods except where the law requires it (Terms, section 8).';
+
+  it('the danger zone and the delete step say it on a paid plan', () => {
+    expect(settingsView(ch, viewer).danger.text.endsWith(` ${MONEY}`)).toBe(true);
+    expect(deleteStepView(ch, viewer).text.endsWith(` ${MONEY}`)).toBe(true);
+  });
+
+  it('a trial with no card and Free say nothing about money', () => {
+    for (const [d, v] of [
+      [fixture('bad-site'), ACCOUNT_VIEWERS.home()],
+      [fixture('clean-site'), ACCOUNT_VIEWERS.clean()],
+    ] as const) {
+      expect(settingsView(d, v).danger.text).not.toContain('refund');
+      expect(deleteStepView(d, v).text).not.toContain('refund');
+    }
+  });
+});
