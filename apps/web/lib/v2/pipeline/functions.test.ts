@@ -253,41 +253,53 @@ describe('no registered function can declare a concurrency limit above the plan 
 
   // auditFn reads INNGEST_AUDIT_CONCURRENCY when its module loads, so each case loads the modules
   // afresh, as a new deployment does.
-  // V2_BILLING adds CC-03's trial and past-due functions, which the cap covers as well.
-  for (const billing of [undefined, '1'] as const)
-    for (const flag of [undefined, '1'] as const) {
-      for (const audit of SWEEP) {
-        it(`V2_BILLING=${String(billing)}, V2_PIPELINE=${String(flag)}, INNGEST_AUDIT_CONCURRENCY=${String(audit)}, every INNGEST_CHECK_CONCURRENCY`, async () => {
-          vi.stubEnv('V2_BILLING', billing);
-          vi.stubEnv('V2_PIPELINE', flag);
-          vi.stubEnv('INNGEST_AUDIT_CONCURRENCY', audit);
-          vi.resetModules();
-          const fresh = await import('./functions');
-          for (const check of SWEEP) {
-            vi.stubEnv('INNGEST_CHECK_CONCURRENCY', check);
-            const configs = configsOf(fresh.inngestFunctions(process.env));
-            expect(configs.length).toBe((flag === '1' ? 9 : 5) + (billing === '1' ? 2 : 0));
-            if (billing === '1') {
-              expect(configs.map((c) => c.id)).toEqual(
-                expect.arrayContaining([
-                  'crawlmouse-crawlmouse.trial.lifecycle',
-                  'crawlmouse-crawlmouse.billing.past-due-sweep',
-                ]),
+  // V2_BILLING adds CC-03's trial and past-due functions, and V2_CHECKS_PUBLIC CC-27b's three deletion
+  // functions, which the cap covers as well.
+  for (const pub of [undefined, '1'] as const)
+    for (const billing of [undefined, '1'] as const)
+      for (const flag of [undefined, '1'] as const) {
+        for (const audit of SWEEP) {
+          it(`V2_CHECKS_PUBLIC=${String(pub)}, V2_BILLING=${String(billing)}, V2_PIPELINE=${String(flag)}, INNGEST_AUDIT_CONCURRENCY=${String(audit)}, every INNGEST_CHECK_CONCURRENCY`, async () => {
+            vi.stubEnv('V2_CHECKS_PUBLIC', pub);
+            vi.stubEnv('V2_BILLING', billing);
+            vi.stubEnv('V2_PIPELINE', flag);
+            vi.stubEnv('INNGEST_AUDIT_CONCURRENCY', audit);
+            vi.resetModules();
+            const fresh = await import('./functions');
+            for (const check of SWEEP) {
+              vi.stubEnv('INNGEST_CHECK_CONCURRENCY', check);
+              const configs = configsOf(fresh.inngestFunctions(process.env));
+              expect(configs.length).toBe(
+                (flag === '1' ? 9 : 5) + (billing === '1' ? 2 : 0) + (pub === '1' ? 3 : 0),
               );
+              const deletionIds = [
+                'crawlmouse-crawlmouse.account.deletion-cancel',
+                'crawlmouse-crawlmouse.account.deletion-resume',
+                'crawlmouse-crawlmouse.account.purge-deleted',
+              ];
+              const ids = configs.map((c) => c.id);
+              for (const id of deletionIds) expect(ids.includes(id), id).toBe(pub === '1');
+              if (billing === '1') {
+                expect(configs.map((c) => c.id)).toEqual(
+                  expect.arrayContaining([
+                    'crawlmouse-crawlmouse.trial.lifecycle',
+                    'crawlmouse-crawlmouse.billing.past-due-sweep',
+                  ]),
+                );
+              }
+              const limits = limitsOf(configs);
+              expect(limits.length).toBeGreaterThan(0);
+              for (const limit of limits) {
+                expect(
+                  limit,
+                  `${configs.map((c) => c.id).join(', ')}: ${limits.join(', ')}`,
+                ).toBeLessThanOrEqual(PLAN_CONCURRENCY_CAP);
+                expect(limit).toBeGreaterThanOrEqual(1);
+              }
             }
-            const limits = limitsOf(configs);
-            expect(limits.length).toBeGreaterThan(0);
-            for (const limit of limits) {
-              expect(
-                limit,
-                `${configs.map((c) => c.id).join(', ')}: ${limits.join(', ')}`,
-              ).toBeLessThanOrEqual(PLAN_CONCURRENCY_CAP);
-              expect(limit).toBeGreaterThanOrEqual(1);
-            }
-          }
-        });
+          });
+        }
       }
-    }
 
   it('the sweep reaches the values it sets: a limit of 2 from each variable', async () => {
     vi.stubEnv('V2_PIPELINE', '1');

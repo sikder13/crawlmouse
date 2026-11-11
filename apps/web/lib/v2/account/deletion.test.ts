@@ -51,9 +51,11 @@ function recorder(over: Partial<DeletionPorts> = {}) {
     auth: {
       async ban(id) {
         log.push(`ban:${id}`);
+        banned.add(id);
       },
       async unban(id) {
         log.push(`unban:${id}`);
+        banned.delete(id);
       },
     },
     async send(e) {
@@ -84,6 +86,9 @@ function recorder(over: Partial<DeletionPorts> = {}) {
     },
   };
 }
+
+/** Who the fake Auth admin has banned, across every recorder in this file. */
+const banned = new Set<string>();
 
 let serial = 0;
 async function owner() {
@@ -186,7 +191,8 @@ describe('requestAccountDeletion', () => {
     expect(buckets).toEqual([
       `account:delete:user:${o.userId}#3`,
       `account:delete:user:${o.userId}#3`,
-      'account:delete:ip:198.51.100.4#10',
+      // The address as its sha256, computed here independently of ipHash (S4).
+      'account:delete:ip:14915055e8377734244f0890e1cf35857cc5059c83bf28422dad0d81a0112c89#10',
     ]);
   });
 });
@@ -204,13 +210,15 @@ describe('confirmDeletion', () => {
     return { o, ...(await links(rec.emails[0]!)) };
   }
 
-  it('confirms in SQL, then bans, then sends one deletion_confirmed per account', async () => {
+  it('confirms in SQL, then bans while the database says so, then sends one deletion_confirmed per account', async () => {
     const { o, delete_confirm } = await requested();
     const rec = recorder();
     expect(await confirmDeletion(rec.ports, delete_confirm)).toEqual({ ok: true });
     expect(rec.log).toEqual([
       'rpc:confirm_account_deletion',
+      'rpc:erasure_pending',
       `ban:${o.userId}`,
+      'rpc:erasure_pending',
       'send:account.deletion_confirmed',
     ]);
     expect(rec.events).toEqual([
@@ -258,6 +266,32 @@ describe('confirmDeletion', () => {
   });
 });
 
+describe('confirmDeletion’s Inngest send', () => {
+  it('is retried within the request, and reported with the user id only once three tries fail', async () => {
+    for (const failures of [2, 3]) {
+      const o = await owner();
+      const rec = recorder();
+      await requestAccountDeletion(rec.ports, {
+        userId: o.userId,
+        accountId: o.accountId,
+        hostname: o.host,
+        ip: null,
+      });
+      const l = await links(rec.emails[0]!);
+      let left = failures;
+      const flaky = recorder({
+        send: async (e) => {
+          if (left-- > 0) throw new Error('inngest 502');
+          flaky.events.push(...e);
+        },
+      });
+      expect(await confirmDeletion(flaky.ports, l.delete_confirm)).toEqual({ ok: true });
+      expect(flaky.events).toHaveLength(failures < 3 ? 1 : 0);
+      expect(flaky.reported).toEqual(failures < 3 ? [] : [['Error: inngest 502', o.userId]]);
+    }
+  });
+});
+
 describe('restoreAccount', () => {
   async function confirmed() {
     const o = await owner();
@@ -273,7 +307,7 @@ describe('restoreAccount', () => {
     return { o, ...l };
   }
 
-  it('reads the link, lifts the ban, then restores in SQL, and asks to resume only what the deletion stopped', async () => {
+  it('restores in SQL first, then lifts the ban, and asks to resume only what the deletion stopped', async () => {
     const { o, delete_restore } = await confirmed();
     await db.query(`select public.record_deletion_cancel($1, $2, 'sub_ours', true)`, [
       o.userId,
@@ -283,8 +317,9 @@ describe('restoreAccount', () => {
     expect(await restoreAccount(rec.ports, delete_restore)).toEqual({ ok: true });
     expect(rec.log).toEqual([
       'rpc:read_deletion_link',
-      `unban:${o.userId}`,
       'rpc:restore_account',
+      'rpc:erasure_pending',
+      `unban:${o.userId}`,
       'send:account.restored',
     ]);
     expect(rec.events).toEqual([
@@ -292,9 +327,10 @@ describe('restoreAccount', () => {
     ]);
     expect(rec.captured).toEqual([['account_restored', o.accountId, { tier: 'free' }]]);
     expect(await marked(o.accountId)).toBe(false);
+    expect(banned.has(o.userId)).toBe(false);
   });
 
-  it('after the window, unbans no one and restores nothing', async () => {
+  it('after the window, changes no ban and restores nothing', async () => {
     const { o, delete_restore } = await confirmed();
     const rec = recorder();
     rec.setNow(new Date(Date.now() + 7 * 86_400_000 + 60_000));
@@ -305,26 +341,70 @@ describe('restoreAccount', () => {
     });
     expect(rec.log).toEqual(['rpc:read_deletion_link']);
     expect(await marked(o.accountId)).toBe(true);
+    expect(banned.has(o.userId)).toBe(true);
   });
 
-  it('a failed SQL step bans again and leaves the token usable', async () => {
+  it('two restores at once: one restores, the other is refused, and the person ends unbanned', async () => {
+    const { o, delete_restore } = await confirmed();
+    expect(banned.has(o.userId)).toBe(true);
+    const answers = await Promise.all([
+      restoreAccount(recorder().ports, delete_restore),
+      restoreAccount(recorder().ports, delete_restore),
+    ]);
+    expect(answers.filter((a) => a.ok)).toHaveLength(1);
+    expect(await marked(o.accountId)).toBe(false);
+    expect(banned.has(o.userId)).toBe(false);
+  });
+
+  it('a restore whose answer is lost after it committed still unbans', async () => {
+    const { o, delete_restore } = await confirmed();
+    const lost = recorder({
+      rpc: async <T>(fn: string, args: Record<string, unknown>) => {
+        const r = await rpc<T>(fn, args);
+        if (fn === 'restore_account') throw new Error('connection reset');
+        return r;
+      },
+    });
+    expect(await restoreAccount(lost.ports, delete_restore)).toEqual({ ok: true });
+    expect(await marked(o.accountId)).toBe(false);
+    expect(banned.has(o.userId)).toBe(false);
+  });
+
+  it('a restore that failed before it committed leaves the ban and the token usable', async () => {
     const { o, delete_restore } = await confirmed();
     const failing = recorder({
       rpc: async (fn, args) => {
-        failing.log.push(`rpc:${fn}`);
         if (fn === 'restore_account') throw new Error('connection reset');
         return rpc(fn, args);
       },
     });
     await expect(restoreAccount(failing.ports, delete_restore)).rejects.toThrow(/connection reset/);
-    expect(failing.log).toEqual([
-      'rpc:read_deletion_link',
-      `unban:${o.userId}`,
-      'rpc:restore_account',
-      `ban:${o.userId}`,
-    ]);
     expect(await marked(o.accountId)).toBe(true);
+    expect(banned.has(o.userId)).toBe(true);
     expect(await restoreAccount(recorder().ports, delete_restore)).toEqual({ ok: true });
+    expect(banned.has(o.userId)).toBe(false);
+  });
+
+  it('a confirm whose ban lands after a fast restore leaves the person unbanned', async () => {
+    const o = await owner();
+    const rec = recorder();
+    await requestAccountDeletion(rec.ports, {
+      userId: o.userId,
+      accountId: o.accountId,
+      hostname: o.host,
+      ip: null,
+    });
+    const l = await links(rec.emails[0]!);
+    const slow = recorder();
+    const realBan = slow.ports.auth.ban;
+    slow.ports.auth.ban = async (id) => {
+      // The person restores between the confirm's SQL and its ban.
+      expect(await restoreAccount(recorder().ports, l.delete_restore)).toEqual({ ok: true });
+      await realBan(id);
+    };
+    expect(await confirmDeletion(slow.ports, l.delete_confirm)).toEqual({ ok: true });
+    expect(await marked(o.accountId)).toBe(false);
+    expect(banned.has(o.userId)).toBe(false);
   });
 
   it('a confirmation token posted to restore is refused', async () => {

@@ -49,7 +49,7 @@ export const DONE: Readonly<Record<DeletionFlow, string>> = {
 };
 
 /** Codes after which the link cannot be used again, so its cookie goes. */
-const SPENT = new Set(['invalid_link', 'window_closed']);
+const SPENT = new Set(['invalid_link', 'window_closed', 'already_confirmed']);
 
 /** The form carries no field: the token is in the cookie. */
 const NoFields = z.strictObject({});

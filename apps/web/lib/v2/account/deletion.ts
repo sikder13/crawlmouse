@@ -5,17 +5,18 @@
  * this module adds what SQL cannot do: the Auth ban, the emails, the events, and the Inngest event that
  * ends the subscription.
  *
- * Confirm, in this order (plan-revision R4): the SQL confirm (marks the accounts, queues the person,
- * ends their sessions); then the Auth ban, tried three times, and on failure reported with the user id
- * only while the answer is still "done", because the purge bans again before it erases; then one
- * `account.deletion_confirmed` per marked account. Restore: the link is read (valid, unused, inside its
- * window), the ban lifted, and then the SQL restore consumes the token; when the SQL step does not
- * restore, the person is banned again and the token is still unused, so the page can be posted again.
+ * The database decides the Auth ban: a person is banned while they have a pending_erasures row
+ * (`settleBan`). Confirm: the SQL confirm (marks the accounts, queues the person, ends their
+ * sessions); then the ban, which a failure only reports, because the purge bans again before it
+ * erases; then one `account.deletion_confirmed` per marked account. Restore: the link is read, the
+ * SQL restore consumes the token and clears the row, and then the ban is lifted; a restore whose
+ * answer is lost is judged by whether the row is still there.
  * A subscription the deletion set to end is resumed by `account.restored` (deletionResumeFn).
  */
 import type { Tier } from '../../entitlement-v2';
 import type { CaptureAccountEvent } from './account-events';
 import { accountEmail, type SendEmails } from './emails';
+import { ipHash } from './rate-keys';
 import { hashToken } from './tokens';
 
 /** A service-role RPC: the function's JSON answer, or a throw. */
@@ -54,6 +55,7 @@ const STATUS: Readonly<Record<string, number>> = {
   v1_subscription: 409,
   email_change_pending: 409,
   invalid_link: 410,
+  already_confirmed: 409,
   not_confirmed: 409,
   window_closed: 410,
 };
@@ -83,11 +85,13 @@ export async function requestAccountDeletion(
   ports: DeletionPorts,
   input: DeletionRequest,
 ): Promise<DeletionAnswer> {
-  // Bucket keys end with `:<user id>`, so the erasure's rate-limit rule removes them with the person.
+  // The person's bucket ends with `:<user id>`, so the erasure's rate-limit rule removes it with the
+  // person. The address's bucket ends with the address's sha256 (`ipHash`, as the email change's does):
+  // the erasure cannot tie it to anyone, and `prune_rate_limits` deletes it 25 hours after its window.
   const allowed =
     (await ports.rateLimit(`account:delete:user:${input.userId}`, DELETE_REQUESTS_PER_USER)) &&
     (input.ip === null ||
-      (await ports.rateLimit(`account:delete:ip:${input.ip}`, DELETE_REQUESTS_PER_IP)));
+      (await ports.rateLimit(`account:delete:ip:${ipHash(input.ip)}`, DELETE_REQUESTS_PER_IP)));
   if (!allowed) return { ok: false, status: 429, code: 'rate_limited' };
 
   // The links' rows hold no token until CC-28's mailer issues them (owner ruling Q5): the email names
@@ -112,18 +116,17 @@ export async function confirmDeletion(
   >('confirm_account_deletion', { p_hash: hashToken(token), p_now: ports.now().toISOString() });
   if (!r.ok) return refusal(r.code);
 
-  await banWithRetries(ports, r.userId);
-  try {
-    await ports.send(
+  await settleBan(ports, r.userId);
+  // Tried BAN_ATTEMPTS times, then reported: the deletion stands either way, and the purge cancels any
+  // subscription still live before it erases.
+  await withRetries(ports, r.userId, () =>
+    ports.send(
       r.accounts.map((accountId) => ({
         name: 'account.deletion_confirmed' as const,
         data: { userId: r.userId, accountId },
       })),
-    );
-  } catch (error) {
-    // The deletion stands; the purge cancels any subscription still live before it erases.
-    ports.report(error, r.userId);
-  }
+    ),
+  );
   await ports.capture('account_deletion_confirmed', r.accountId, {
     tier: r.tier,
     accounts: r.accounts.length,
@@ -131,15 +134,34 @@ export async function confirmDeletion(
   return { ok: true };
 }
 
-async function banWithRetries(ports: DeletionPorts, userId: string): Promise<void> {
+/**
+ * Brings the person's Auth ban in line with the database: banned while they have a pending_erasures
+ * row, not banned once it is gone. Each Auth call is tried BAN_ATTEMPTS times and a failure is
+ * reported with the user id only. After a ban the row is read again, so a restore that committed
+ * while the ban was on its way still ends unbanned (its own settle may have run first).
+ */
+async function settleBan(ports: DeletionPorts, userId: string): Promise<void> {
+  const pending = () => ports.rpc<boolean>('erasure_pending', { p_user: userId });
+  if (await pending()) {
+    if (!(await withRetries(ports, userId, () => ports.auth.ban(userId)))) return;
+    if (await pending()) return;
+  }
+  await withRetries(ports, userId, () => ports.auth.unban(userId));
+}
+
+async function withRetries(
+  ports: DeletionPorts,
+  userId: string,
+  call: () => Promise<void>,
+): Promise<boolean> {
   for (let attempt = 1; ; attempt++) {
     try {
-      await ports.auth.ban(userId);
-      return;
+      await call();
+      return true;
     } catch (error) {
       if (attempt >= BAN_ATTEMPTS) {
         ports.report(error, userId);
-        return;
+        return false;
       }
     }
   }
@@ -156,18 +178,17 @@ export async function restoreAccount(ports: DeletionPorts, token: string): Promi
   });
   if (!link.ok) return refusal(link.code);
 
-  await ports.auth.unban(link.userId);
   let r: Refused | { ok: true; accountId: string; tier: Tier; resume: string[] };
   try {
     r = await ports.rpc('restore_account', { p_hash: hash, p_now: now });
   } catch (error) {
-    await ports.auth.ban(link.userId);
-    throw error;
+    // The answer may be lost after the restore committed: the database says which.
+    if (await ports.rpc<boolean>('erasure_pending', { p_user: link.userId })) throw error;
+    await settleBan(ports, link.userId);
+    return { ok: true };
   }
-  if (!r.ok) {
-    await ports.auth.ban(link.userId);
-    return refusal(r.code);
-  }
+  if (!r.ok) return refusal(r.code);
+  await settleBan(ports, link.userId);
   if (r.resume.length > 0) {
     try {
       await ports.send([
