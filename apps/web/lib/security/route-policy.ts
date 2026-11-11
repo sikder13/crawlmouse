@@ -254,14 +254,14 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   // CC-27b workstream B: the deletion's links (D4). The token in the link, then in its cookie, is the
   // credential; the person may not be able to sign in (a confirmed deletion bans them).
   {
-    route: 'account/delete/[token]',
+    route: '(account)/account/delete/[token]',
     methods: ['GET'],
     class: 'public',
     reason: 'an emailed link: moves its token into a cookie and redirects; changes nothing',
     origin: 'any',
   },
   {
-    route: 'account/restore/[token]',
+    route: '(account)/account/restore/[token]',
     methods: ['GET'],
     class: 'public',
     reason: 'an emailed link: moves its token into a cookie and redirects; changes nothing',

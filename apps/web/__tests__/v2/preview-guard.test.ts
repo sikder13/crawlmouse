@@ -207,14 +207,18 @@ describe('v2 stays out of live pages', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('the account group holds exactly the account-door files and the email-change pages', () => {
+  it('the account group holds exactly the account-door files and the account’s link pages', () => {
     const inGroup = sources.filter((f) => f.startsWith(ACCOUNT_GROUP + '/'));
     expect(inGroup.map((f) => relative(WEB_ROOT, f)).sort()).toEqual([
+      'app/(account)/account/delete/[token]/route.ts',
+      'app/(account)/account/delete/page.tsx',
       'app/(account)/account/email-undo/[token]/route.ts',
       'app/(account)/account/email-undo/page.tsx',
       'app/(account)/account/email/[token]/route.ts',
       'app/(account)/account/email/page.test.tsx',
       'app/(account)/account/email/page.tsx',
+      'app/(account)/account/restore/[token]/route.ts',
+      'app/(account)/account/restore/page.tsx',
       'app/(account)/check-email/page.tsx',
       'app/(account)/layout.tsx',
       'app/(account)/login/verify/continue/page.tsx',

@@ -1,4 +1,3 @@
-import '../../../styles/v2/tokens.css';
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
@@ -10,13 +9,9 @@ import { serviceRpc } from '@/lib/v2/account/deletion-ports';
 import { LINK_FLOWS } from '@/lib/v2/account/link-cookie';
 import { LINK_STATES } from '@/lib/v2/copy/deletion';
 
-export const dynamic = 'force-dynamic';
-
-export const metadata: Metadata = {
-  title: 'Delete your account',
-  robots: { index: false, follow: false },
-  alternates: { canonical: null },
-};
+// Not indexed, not in the sitemap and rendered per request: the (account) layout says so for
+// every page in the group.
+export const metadata: Metadata = { title: 'Delete your account' };
 
 /**
  * Where the confirmation link lands (D4): the accounts its button acts on, read from the

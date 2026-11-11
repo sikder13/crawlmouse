@@ -143,9 +143,11 @@ const passes = (res: NextResponse) => res.headers.get('x-middleware-next') === '
 describe('a state-changing API request from another site is refused before the route runs', () => {
   it('guards exactly the strict routes named here', () => {
     expect(guarded.map((p) => p.route).sort()).toEqual([
+      'api/account/delete/confirm',
       'api/account/email',
       'api/account/email/confirm',
       'api/account/email/undo',
+      'api/account/restore',
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
       'api/auth/logout',

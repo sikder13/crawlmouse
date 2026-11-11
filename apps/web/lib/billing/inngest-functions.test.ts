@@ -97,7 +97,14 @@ describe('billingFunctions (CC-03 D9)', { timeout: 60_000 }, () => {
         id: 'crawlmouse-crawlmouse.trial.lifecycle',
         triggers: [{ event: 'trial.started' }],
         idempotency: 'event.data.accountId',
-        cancel: [{ event: 'trial.converted', if: 'event.data.accountId == async.data.accountId' }],
+        // CC-27b Q12: a deletion's confirm stops the trial's reminders too.
+        cancel: [
+          { event: 'trial.converted', if: 'event.data.accountId == async.data.accountId' },
+          {
+            event: 'account.deletion_confirmed',
+            if: 'event.data.accountId == async.data.accountId',
+          },
+        ],
         concurrency: { limit: 2 },
       }),
       expect.objectContaining({
