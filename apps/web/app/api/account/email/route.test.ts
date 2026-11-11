@@ -79,13 +79,14 @@ vi.mock('@/lib/v2/account/email-change-ports', () => ({
 
 const accountOf = new Map<string, string>();
 
+// Applying every migration to a fresh PGlite takes several seconds, more under a parallel run.
 beforeAll(async () => {
   h.db = await freshDb();
   await h.db.exec(
-    `alter table auth.users add column created_at timestamptz not null default now();`,
+    `alter table auth.users add column created_at timestamptz not null default now(), add column banned_until timestamptz;`,
   );
   await applyAllMigrations(h.db);
-});
+}, 120_000);
 afterAll(async () => h.db.close());
 beforeEach(() => {
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
@@ -136,7 +137,7 @@ const setCookie = (res: Response) => (res.headers.get('set-cookie') ?? '').split
 
 async function rawOf(tokenId: string) {
   const { rows } = await h.db.query<{ token: string }>(
-    `select token from public.take_account_link($1)`,
+    `select token from public.issue_account_link($1)`,
     [tokenId],
   );
   return rows[0]!.token;
@@ -150,7 +151,7 @@ async function asked(p: { id: string; email: string }, to: string) {
     post('/api/account/email', JSON.stringify({ newEmail: to }), 'application/json'),
   );
   expect(res.status).toBe(202);
-  const raw = await rawOf(h.emails.at(-1)!.data.tokenIds[0]!);
+  const raw = await rawOf(h.emails.at(-1)!.data.tokenId);
   h.user = null;
   return raw;
 }
@@ -340,7 +341,7 @@ describe('the undo link and its page’s POST', () => {
     await confirm.POST(
       post('/api/account/email/confirm', '{}', 'application/json', `cm_link_email=${raw}`),
     );
-    const undoRaw = await rawOf(h.emails.at(-1)!.data.tokenIds[0]!);
+    const undoRaw = await rawOf(h.emails.at(-1)!.data.tokenId);
 
     const crossed = await confirm.POST(
       post('/api/account/email/confirm', '{}', 'application/json', `cm_link_email=${undoRaw}`),

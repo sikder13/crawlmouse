@@ -21,11 +21,14 @@ import { hashToken, newToken } from './tokens';
 
 let db: PGlite;
 
+// Applying every migration to a fresh PGlite takes several seconds, more under a parallel run.
 beforeAll(async () => {
   db = await freshDb();
-  await db.exec(`alter table auth.users add column created_at timestamptz not null default now();`);
+  await db.exec(
+    `alter table auth.users add column created_at timestamptz not null default now(), add column banned_until timestamptz;`,
+  );
   await applyAllMigrations(db);
-});
+}, 120_000);
 afterAll(async () => db.close());
 
 let n = 0;
@@ -82,10 +85,10 @@ function ports(over: Partial<EmailChangePorts> = {}): { ports: EmailChangePorts;
   };
 }
 
-/** The raw token the mailer would take for a link row. */
+/** The raw token the mailer would issue for a link row (CC-28's `issue_account_link`). */
 async function rawOf(tokenId: string): Promise<string> {
   const { rows } = await db.query<{ token: string }>(
-    `select token from public.take_account_link($1)`,
+    `select token from public.issue_account_link($1)`,
     [tokenId],
   );
   return rows[0]!.token;
@@ -120,10 +123,10 @@ async function changed(p: Awaited<ReturnType<typeof person>>, to: string) {
       ip: '203.0.113.9',
     }),
   ).toEqual({ ok: true });
-  const confirm = await rawOf(a.rec.emails[0]!.data.tokenIds[0]!);
+  const confirm = await rawOf(a.rec.emails[0]!.data.tokenId);
   const b = ports();
   expect(await confirmEmailChange(b.ports, { token: confirm, caller: null })).toEqual({ ok: true });
-  return { confirm, undo: await rawOf(b.rec.emails[0]!.data.tokenIds[0]!) };
+  return { confirm, undo: await rawOf(b.rec.emails[0]!.data.tokenId) };
 }
 
 describe('requestEmailChange', () => {
@@ -146,7 +149,7 @@ describe('requestEmailChange', () => {
     expect(event!.data.accountId).toBe(p.accountId);
     const { rows } = await db.query<{ new_email: string; kind: string }>(
       `select new_email, kind from public.account_tokens where id = $1`,
-      [event!.data.tokenIds[0]],
+      [event!.data.tokenId],
     );
     expect(rows[0]).toEqual({ new_email: 'new.address@example.org', kind: 'email_change' });
     expect(JSON.stringify(rec.emails)).not.toContain('example.org');
@@ -245,7 +248,7 @@ describe('confirmEmailChange', () => {
       newEmail: 'confirmed@example.org',
       ip: '203.0.113.9',
     });
-    const raw = await rawOf(a.rec.emails[0]!.data.tokenIds[0]!);
+    const raw = await rawOf(a.rec.emails[0]!.data.tokenId);
     const mine = '00000000-0000-4000-8000-00000000000a';
     const other = '00000000-0000-4000-8000-00000000000b';
     await addSessions(p.userId, [mine, other]);
@@ -264,7 +267,7 @@ describe('confirmEmailChange', () => {
     expect(rec.emails.map((e) => e.data.template)).toEqual(['email_change_notice']);
     const { rows } = await db.query<{ kind: string; old_email: string }>(
       `select kind, old_email from public.account_tokens where id = $1`,
-      [rec.emails[0]!.data.tokenIds[0]],
+      [rec.emails[0]!.data.tokenId],
     );
     expect(rows[0]).toEqual({ kind: 'email_change_undo', old_email: p.email });
   });
@@ -280,7 +283,7 @@ describe('confirmEmailChange', () => {
       newEmail: 'elsewhere@example.org',
       ip: '203.0.113.9',
     });
-    const raw = await rawOf(a.rec.emails[0]!.data.tokenIds[0]!);
+    const raw = await rawOf(a.rec.emails[0]!.data.tokenId);
     const s1 = '00000000-0000-4000-8000-0000000000c1';
     await addSessions(p.userId, [s1]);
     expect(
@@ -310,7 +313,7 @@ describe('confirmEmailChange', () => {
       newEmail: 'late@example.org',
       ip: '203.0.113.9',
     });
-    const raw = await rawOf(a.rec.emails[0]!.data.tokenIds[0]!);
+    const raw = await rawOf(a.rec.emails[0]!.data.tokenId);
     const later = ports({ now: () => new Date(Date.now() + 61 * 60_000) });
     expect(await confirmEmailChange(later.ports, { token: raw, caller: null })).toEqual({
       ok: false,
@@ -343,7 +346,7 @@ describe('confirmEmailChange', () => {
       newEmail: holder.email,
       ip: '203.0.113.9',
     });
-    const raw = await rawOf(a.rec.emails[0]!.data.tokenIds[0]!);
+    const raw = await rawOf(a.rec.emails[0]!.data.tokenId);
     const { ports: pp, rec } = ports();
     expect(await confirmEmailChange(pp, { token: raw, caller: null })).toEqual({
       ok: false,
@@ -364,7 +367,7 @@ describe('confirmEmailChange', () => {
       newEmail: 'auth-down@example.org',
       ip: '203.0.113.9',
     });
-    const raw = await rawOf(a.rec.emails[0]!.data.tokenIds[0]!);
+    const raw = await rawOf(a.rec.emails[0]!.data.tokenId);
     const s1 = '00000000-0000-4000-8000-0000000000d1';
     await addSessions(p.userId, [s1]);
     const { ports: pp, rec } = ports({
@@ -396,7 +399,7 @@ describe('confirmEmailChange', () => {
       newEmail: 'raced@example.org',
       ip: '203.0.113.9',
     });
-    const raw = await rawOf(a.rec.emails[0]!.data.tokenIds[0]!);
+    const raw = await rawOf(a.rec.emails[0]!.data.tokenId);
     const { ports: pp } = ports({
       auth: { updateEmail: async () => 'address_taken', deleteUser: async () => {} },
     });
@@ -449,7 +452,9 @@ describe('undoEmailChange', () => {
       code: 'address_taken',
     });
     expect(rec.auth).toEqual([]);
-    expect(rec.reports.map(([s]) => s)).toEqual(['account.email_undo.address_taken']);
+    expect(rec.reports).toEqual([
+      ['account.email_undo.address_taken', { userId: p.userId, holder: squatter }],
+    ]);
   });
 
   it('leaves the link usable when Auth refuses, so the page can be posted again', async () => {

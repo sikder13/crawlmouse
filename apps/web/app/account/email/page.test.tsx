@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { applyAllMigrations, freshDb } from '@/__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '@/__tests__/helpers/postgrest-pglite';
 import { personalAccount, signUp } from '@/__tests__/helpers/v2-check-tables';
-import { hashToken, newToken } from '@/lib/v2/account/tokens';
+import { hashToken } from '@/lib/v2/account/tokens';
 
 // The two pages the email-change links land on, rendered from a real link row: what the button does,
 // with the address masked, and never the token.
@@ -23,10 +23,11 @@ vi.mock('next/headers', () => ({
 }));
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => postgrestOver(h.db) }));
 
+// Applying every migration to a fresh PGlite takes several seconds, more under a parallel run.
 beforeAll(async () => {
   h.db = await freshDb();
   await applyAllMigrations(h.db);
-});
+}, 120_000);
 afterAll(async () => h.db.close());
 beforeEach(() => {
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
@@ -40,12 +41,15 @@ async function link(kind: 'email_change' | 'email_change_undo', old: string, fre
   n += 1;
   const userId = await signUp(h.db, `page${n}@example.com`);
   const { accountId } = await personalAccount(h.db, userId);
-  const raw = newToken();
-  await h.db.query(
-    `select public.issue_account_token($1, $2, $3, $4, $5, now() + interval '1 hour', $6, $7)`,
-    [accountId, userId, kind, hashToken(raw), raw, fresh, old],
+  const { rows } = await h.db.query<{ id: string }>(
+    `select public.create_account_token($1, $2, $3, now() + interval '1 hour', $4, $5) as id`,
+    [accountId, userId, kind, fresh, old],
   );
-  return raw;
+  const issued = await h.db.query<{ token: string }>(
+    `select token from public.issue_account_link($1)`,
+    [rows[0]!.id],
+  );
+  return issued.rows[0]!.token;
 }
 
 const render = async (

@@ -3,6 +3,9 @@
  * tests pass recorders and the PostgREST stand-in. The SQL it calls is migration 027b's section A,
  * whose header lists the refusals mapped below.
  *
+ * Neither link is minted here: each is a row with no token, which CC-28's mailer issues at send time
+ * (`issue_account_link`, owner ruling Q5), so no token is held anywhere at rest.
+ *
  * - Request: the new address gets a sixty-minute confirmation link. The answer does not depend on
  *   whether the address is in use, so the form cannot be used to find out who has an account; the
  *   confirm is where a taken address shows.
@@ -19,11 +22,12 @@ import { z } from 'zod';
 import type { Tier } from '../../entitlement-v2';
 import type { CaptureAccountEvent } from './account-events';
 import { accountEmail, type SendEmails } from './emails';
-import { hashToken, isToken, newToken } from './tokens';
+import { hashToken, isToken } from './tokens';
 
 export interface RpcError {
   code: string;
   message: string;
+  details?: string | null;
 }
 
 /** A service-role `rpc`, as supabase-js answers it. */
@@ -67,7 +71,9 @@ const LINK_UNUSABLE = REFUSALS.CMA05!;
 const ADDRESS_TAKEN = REFUSALS.CMA04!;
 const AUTH_FAILED = refused(502, 'auth_failed');
 
-type Called<T> = { ok: true; value: T } | { ok: false; outcome: EmailChangeOutcome };
+type Called<T> =
+  | { ok: true; value: T }
+  | { ok: false; outcome: EmailChangeOutcome; details: string | null };
 
 /** Calls a section A function: its value parsed, or the answer for a refusal it raised. */
 async function call<T>(
@@ -79,7 +85,7 @@ async function call<T>(
   const { data, error } = await ports.rpc(fn, args);
   if (error) {
     const outcome = REFUSALS[error.code];
-    if (outcome) return { ok: false, outcome };
+    if (outcome) return { ok: false, outcome, details: error.details ?? null };
     throw new Error(`${fn}: ${error.code} ${error.message}`);
   }
   return { ok: true, value: schema.parse(data) };
@@ -119,22 +125,19 @@ export async function requestEmailChange(
   if (!(await ports.rateLimit(`account-email:ip:${ipHash}`, EMAIL_CHANGE_LIMITS.perIp)))
     return refused(429, 'rate_limited');
 
-  const token = newToken();
-  const issued = await call(
+  const created = await call(
     ports,
     'request_email_change',
     {
       p_account: input.accountId,
       p_user: input.userId,
       p_new_email: newEmail,
-      p_hash: hashToken(token),
-      p_raw: token,
       p_now: ports.now().toISOString(),
     },
     z.string().uuid(),
   );
-  if (!issued.ok) return issued.outcome;
-  await ports.sendEmails([accountEmail(input.accountId, 'email_change_confirm', [issued.value])]);
+  if (!created.ok) return created.outcome;
+  await ports.sendEmails([accountEmail(input.accountId, 'email_change_confirm', created.value)]);
   return { ok: true };
 }
 
@@ -158,16 +161,10 @@ export async function confirmEmailChange(
   input: EmailChangeConfirm,
 ): Promise<EmailChangeOutcome> {
   if (!isToken(input.token)) return LINK_UNUSABLE;
-  const undo = newToken();
   const applied = await call(
     ports,
     'apply_email_change',
-    {
-      p_hash: hashToken(input.token),
-      p_now: ports.now().toISOString(),
-      p_undo_hash: hashToken(undo),
-      p_undo_raw: undo,
-    },
+    { p_hash: hashToken(input.token), p_now: ports.now().toISOString() },
     Applied,
   );
   if (!applied.ok) return applied.outcome;
@@ -191,8 +188,26 @@ export async function confirmEmailChange(
   const keep = input.caller?.userId === a.user_id ? input.caller.sessionId : null;
   await endSessions(ports, a.user_id, keep);
   await ports.capture('account_email_changed', a.account_id, { tier: a.tier });
-  await ports.sendEmails([accountEmail(a.account_id, 'email_change_notice', [a.undo_token_id])]);
+  await ports.sendEmails([accountEmail(a.account_id, 'email_change_notice', a.undo_token_id)]);
   return { ok: true };
+}
+
+/** The ids prepare_email_undo puts in a CMA04's detail: the person and the address's holder. */
+const HolderIds = z
+  .object({ user_id: z.string().optional(), holder: z.string().optional() })
+  .transform(
+    (d): Record<string, string> => ({
+      ...(d.user_id ? { userId: d.user_id } : {}),
+      ...(d.holder ? { holder: d.holder } : {}),
+    }),
+  );
+
+function holderIds(details: string | null): Record<string, string> {
+  try {
+    return HolderIds.parse(JSON.parse(details ?? '{}'));
+  } catch {
+    return {};
+  }
 }
 
 const Prepared = z.object({
@@ -214,7 +229,9 @@ export async function undoEmailChange(
     Prepared,
   );
   if (!prepared.ok) {
-    if (prepared.outcome === ADDRESS_TAKEN) ports.report('account.email_undo.address_taken', {});
+    if (prepared.outcome === ADDRESS_TAKEN) {
+      ports.report('account.email_undo.address_taken', holderIds(prepared.details));
+    }
     return prepared.outcome;
   }
   const p = prepared.value;
