@@ -188,7 +188,7 @@ export async function markDone(
       : noticeTo(
           back,
           UNQUEUED[outcome.reason],
-          outcome.reason === 'capped' ? outcome.nextAllowedAt : null,
+          'nextAllowedAt' in outcome ? outcome.nextAllowedAt : null,
         );
   }
   return Response.json({ status: 'marked_done', recheck });
@@ -198,6 +198,7 @@ export async function markDone(
 const UNQUEUED: Record<Extract<RecheckOutcome, { queued: false }>['reason'], NoticeCode> = {
   capped: 'marked_done_capped',
   check_running: 'marked_done_check_running',
+  recently_checked: 'marked_done_recently_checked',
   capacity: 'marked_done_capacity',
   paused: 'marked_done_site_paused',
   removed: 'marked_done_not_checked',

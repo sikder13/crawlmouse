@@ -117,6 +117,10 @@ describe('markDone', () => {
         'notice=marked_done_check_running',
       ],
       [{ queued: false, reason: 'capacity' }, 'notice=marked_done_capacity'],
+      [
+        { queued: false, reason: 'recently_checked', nextAllowedAt: next },
+        `notice=marked_done_recently_checked&next=${encodeURIComponent(next)}`,
+      ],
       [{ queued: false, reason: 'paused' }, 'notice=marked_done_site_paused'],
       [{ queued: false, reason: 'removed' }, 'notice=marked_done_not_checked'],
     ] as [RecheckOutcome, string][]) {

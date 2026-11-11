@@ -170,6 +170,39 @@ describe('supabaseRequestRecheck', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('a bucket check that has already ended is recently_checked until the bucket ends, with nothing sent', async () => {
+    pinBucket();
+    const a = await account();
+    const s = await site(a.accountId);
+    const send = vi.fn(async () => undefined);
+    const recheck = supabaseRequestRecheck(adminOver(db), send);
+    const req = { siteId: s.id, trigger: 'manual' as const, cap: 10, requestedByUserId: a.userId };
+    for (const ended of ['failed', 'deferred']) {
+      const first = (await recheck(req)) as { checkId: string };
+      if (ended === 'failed') {
+        await db.query(`select public.claim_check($1, 'run-1', '{"phase":"crawl"}'::jsonb)`, [
+          first.checkId,
+        ]);
+        await db.query(`select public.fail_check($1, 'internal')`, [first.checkId]);
+      } else {
+        await db.query(
+          `update public.checks set status = 'deferred', deferred_until = now() + interval '1 day'
+            where id = $1`,
+          [first.checkId],
+        );
+      }
+      send.mockClear();
+      const bucketEnd = new Date((Math.floor(Date.now() / 120_000) + 1) * 120_000).toISOString();
+      expect(await recheck(req), ended).toEqual({
+        queued: false,
+        reason: 'recently_checked',
+        nextAllowedAt: bucketEnd,
+      });
+      expect(send).not.toHaveBeenCalled();
+      await db.query(`delete from public.checks where id = $1`, [first.checkId]);
+    }
+  });
+
   it('a removed site and a paused one are refused, with nothing sent', async () => {
     const a = await account();
     const removed = await site(a.accountId);

@@ -50,7 +50,7 @@ export const FUNNEL_EVENTS = [
   'trial_started',
   'site_added',
   // CC-26b — the signed-in product (ARCH-2 §8). Sent from the server (lib/v2/account/events.ts):
-  // `check_started {trigger}` when a re-check or a first check is queued, `fix_marked_done {type}`,
+  // `check_started {trigger, check_ref}` when a re-check or a first check is queued, `fix_marked_done {type}`,
   // and `fix_closed {type, checksToClose}` when a check verifies a fix.
   'check_started',
   'fix_marked_done',

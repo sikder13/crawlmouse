@@ -27,10 +27,12 @@ export function serverCaptureAllowed(cookieHeader?: string | null): boolean {
 export const checkRef = (checkId: string): string => stableId('check_ref', checkId);
 
 const POSTHOG_CAPTURE_URL = 'https://us.i.posthog.com/i/v0/e/';
+/** How long a send may hold the action it records. */
+const SEND_TIMEOUT_MS = 2000;
 
 /**
- * Sends one event with no person profile and no IP or GeoIP; a failure is logged without the
- * payload and swallowed.
+ * Sends one event with no person profile and no IP or GeoIP, giving up after SEND_TIMEOUT_MS; a
+ * failure is logged without the payload and swallowed.
  */
 export async function captureServerEvent(
   event: string,
@@ -42,6 +44,7 @@ export async function captureServerEvent(
   try {
     const res = await fetch(POSTHOG_CAPTURE_URL, {
       method: 'POST',
+      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         api_key: apiKey,

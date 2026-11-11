@@ -9,9 +9,19 @@
 
 -- ═══ A: sites and re-checks (D4, D6) ══════════════════════════════════════════════════════════════
 -- Four functions granted to service_role only, and their helper take_rate_slot, which no client
--- role may execute; all five are security definer. Each of the four locks its row in a statement of
--- its own and reads what it decides on in later statements: under READ COMMITTED a later statement
--- takes a fresh snapshot, so a call that waited on the lock sees what the holder committed. The races are tested on a real Postgres by scripts/db/sites-race.test.ts; the rest by
+-- role may execute; all five are security definer. Each of the four, once its arguments are
+-- checked, first locks one row with SELECT … FOR UPDATE, in a statement of its own:
+--   request_capped_check locks the site row and reads its removed_at and paused_reason in that same
+--     statement; it reads the site's checks in later statements;
+--   add_site locks the account row with PERFORM, reading no column of it (its WHERE requires
+--     deleted_at null), and reads the account's sites and checks in later statements;
+--   edit_site locks the site row and reads its account_id, staging_of_site_id, removed_at and
+--     owner_seat_id in that same statement; it reads the staging site and the account's hosts in
+--     later statements;
+--   remove_site locks the site row and reads its removed_at in that same statement.
+-- Under READ COMMITTED both kinds of read see what a call holding the lock committed: a FOR UPDATE
+-- that waited returns the locked row as that call left it, and each later statement takes a fresh
+-- snapshot. The races are tested on a real Postgres by scripts/db/sites-race.test.ts; the rest by
 -- apps/web/__tests__/v2-026b-sites.test.ts.
 
 -- ─── take_rate_slot ───────────────────────────────────────────────────────────────────────────────

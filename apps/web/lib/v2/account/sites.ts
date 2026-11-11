@@ -40,6 +40,14 @@ export function parseAddBody(fields: unknown): z.infer<typeof AddBody> | null {
   return r.success ? r.data : null;
 }
 
+const RemoveBody = z.strictObject({ confirm: z.literal('remove') });
+
+/**
+ * DELETE /api/sites/[id] (or its form's POST): exactly `{confirm: 'remove'}`, the box the page asks
+ * to be ticked, so a removal is never one click.
+ */
+export const isRemoveConfirmed = (fields: unknown): boolean => RemoveBody.safeParse(fields).success;
+
 /** A form posts every field as a string; JSON sends the value itself. */
 const formInt = (v: unknown) => (typeof v === 'string' && /^\d{1,2}$/.test(v) ? Number(v) : v);
 const formList = (v: unknown) =>
