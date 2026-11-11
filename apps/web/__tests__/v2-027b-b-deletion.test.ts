@@ -177,6 +177,27 @@ describe('request_account_deletion', () => {
     ).toBe(0);
   });
 
+  it('raises for a seated manager alone on the account, its owner’s seat gone (T6)', async () => {
+    const o = await owner();
+    const manager = await signUp(db, `manager-${serial}@example.com`);
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'mgr@example.com', 'account_manager', 'active', now())`,
+      [o.accountId, manager],
+    );
+    await db.query(`delete from public.seats where account_id = $1 and user_id = $2`, [
+      o.accountId,
+      o.userId,
+    ]);
+    await expect(
+      db.query(`select public.request_account_deletion($1, $2, $3)`, [
+        o.accountId,
+        manager,
+        o.host,
+      ]),
+    ).rejects.toThrow(/not the owner/);
+  });
+
   it('raises for someone who is not the account’s active owner', async () => {
     const o = await owner();
     const stranger = await owner();
@@ -430,12 +451,87 @@ describe('restore_account', () => {
     ).toBe(1);
   });
 
+  it('a live, unused confirmation token posted to restore is refused as a link of another kind (T7)', async () => {
+    const o = await owner();
+    const { confirm: confirmRaw } = await request(o);
+    expect((await restore(confirmRaw)).code).toBe('invalid_link');
+    expect((await confirm(confirmRaw)).ok).toBe(true);
+  });
+
   it('before the confirm, says so and leaves the link usable', async () => {
     const o = await owner();
     const { restore: raw, confirm: confirmRaw } = await request(o);
     expect((await restore(raw)).code).toBe('not_confirmed');
     expect((await confirm(confirmRaw)).ok).toBe(true);
     expect((await restore(raw)).ok).toBe(true);
+  });
+});
+
+describe('the window’s edge when the two clocks disagree (T1)', () => {
+  /** A confirmed deletion whose window ends `offset` from the database's now. */
+  async function windowEnding(offset: string) {
+    const o = await owner();
+    const links = await request(o);
+    await confirm(links.confirm);
+    await db.query(
+      `update public.pending_erasures set confirmed_at = now() ${offset} - interval '7 days',
+              purge_after = now() ${offset} where user_id = $1`,
+      [o.userId],
+    );
+    return { o, ...links };
+  }
+  const readRestore = (token: string, now: string) =>
+    json<{ ok: boolean; code?: string }>(
+      `select public.read_deletion_link('delete_restore', $1, ${now}) as r`,
+      [hashToken(token)],
+    );
+
+  it('restore and its page refuse once the database’s clock has passed the end, though the app’s is an hour behind', async () => {
+    const { o, restore: raw } = await windowEnding(`- interval '1 minute'`);
+    const behind = `now() - interval '1 hour'`;
+    expect((await readRestore(raw, behind)).code).toBe('window_closed');
+    expect((await restore(raw, behind)).code).toBe('window_closed');
+    expect(
+      await n(`select count(*) from public.pending_erasures where user_id = $1`, [o.userId]),
+    ).toBe(1);
+  });
+
+  it('restore and its page refuse once the app’s clock has passed the end, though the database’s has not', async () => {
+    const { o, restore: raw } = await windowEnding(`+ interval '1 hour'`);
+    const ahead = `now() + interval '2 hours'`;
+    expect((await readRestore(raw, ahead)).code).toBe('window_closed');
+    expect((await restore(raw, ahead)).code).toBe('window_closed');
+    expect(
+      await n(`select count(*) from public.pending_erasures where user_id = $1`, [o.userId]),
+    ).toBe(1);
+  });
+
+  it('at the exact end the window is closed: restore refuses with p_now equal to purge_after', async () => {
+    const { o, restore: raw } = await windowEnding(`+ interval '1 hour'`);
+    const end = (
+      await db.query<{ t: string }>(
+        `select purge_after::text as t from public.pending_erasures where user_id = $1`,
+        [o.userId],
+      )
+    ).rows[0]!.t;
+    expect((await restore(raw, `'${end}'::timestamptz`)).code).toBe('window_closed');
+    expect((await restore(raw, `'${end}'::timestamptz - interval '1 millisecond'`)).ok).toBe(true);
+  });
+
+  it('a person is due only once both clocks have passed the end', async () => {
+    const inside = await windowEnding(`+ interval '1 hour'`);
+    const passed = await windowEnding(`- interval '1 minute'`);
+    const due = async (now: string) =>
+      (
+        await db.query<{ user_id: string }>(
+          `select user_id from public.due_erasures(${now}, 10000)`,
+        )
+      ).rows.map((r) => r.user_id);
+    // The app's clock eight days ahead; the database's still inside the window.
+    expect(await due(`now() + interval '8 days'`)).not.toContain(inside.o.userId);
+    // The database's clock past the end; the app's an hour behind it.
+    expect(await due(`now() - interval '1 hour'`)).not.toContain(passed.o.userId);
+    expect(await due('now()')).toContain(passed.o.userId);
   });
 });
 
