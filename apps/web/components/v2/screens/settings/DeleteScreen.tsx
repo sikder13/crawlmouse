@@ -31,6 +31,7 @@ export function DeleteScreen({ data }: { data: DeleteStepView }) {
           {Object.entries(data.submit.fields).map(([name, value]) => (
             <input key={name} type="hidden" name={name} value={value} />
           ))}
+          {data.removes ? <p className={styles.hint}>{data.removes}</p> : null}
           <p className={styles.hint}>{data.steps}</p>
           <div className={field.stack}>
             <label htmlFor={f.id} className={field.label}>
