@@ -43,6 +43,14 @@ export const LINK_STATES: Readonly<Record<string, { title: string; body: string 
     title: 'This link no longer works',
     body: 'It has been used, it has expired, or a newer email replaced it. Use the link in the latest email.',
   },
+  already_confirmed: {
+    title: 'Your account is already deleted',
+    body: 'An earlier link deleted every account you hold, this one with it. The restore link in that email undoes it.',
+  },
+  email_change_pending: {
+    title: 'An email change is in progress',
+    body: 'Finish or cancel the change of your sign-in address first, then press this link again.',
+  },
   not_confirmed: {
     title: 'Nothing to restore yet',
     body: 'The deletion has not been confirmed, so the account is still there. You can ignore the email.',

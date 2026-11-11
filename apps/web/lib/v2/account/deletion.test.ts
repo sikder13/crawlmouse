@@ -265,6 +265,32 @@ describe('confirmDeletion', () => {
   });
 });
 
+describe('confirmDeletion’s Inngest send', () => {
+  it('is retried within the request, and reported with the user id only once three tries fail', async () => {
+    for (const failures of [2, 3]) {
+      const o = await owner();
+      const rec = recorder();
+      await requestAccountDeletion(rec.ports, {
+        userId: o.userId,
+        accountId: o.accountId,
+        hostname: o.host,
+        ip: null,
+      });
+      const l = await links(rec.emails[0]!);
+      let left = failures;
+      const flaky = recorder({
+        send: async (e) => {
+          if (left-- > 0) throw new Error('inngest 502');
+          flaky.events.push(...e);
+        },
+      });
+      expect(await confirmDeletion(flaky.ports, l.delete_confirm)).toEqual({ ok: true });
+      expect(flaky.events).toHaveLength(failures < 3 ? 1 : 0);
+      expect(flaky.reported).toEqual(failures < 3 ? [] : [['Error: inngest 502', o.userId]]);
+    }
+  });
+});
+
 describe('restoreAccount', () => {
   async function confirmed() {
     const o = await owner();

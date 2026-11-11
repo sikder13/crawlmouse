@@ -240,18 +240,28 @@ describe('the purge', () => {
     }
   });
 
-  it('a run whose queue row outlived the erasure finishes it, and one whose accounts are still there refuses to', async () => {
+  it('an Auth user deleted outside the erasure: the purge still erases the accounts and finishes', async () => {
     const d = await deleted();
+    // Deleted by hand, say in the dashboard: public.users and the seats cascade, the accounts stay.
     await db.query(`delete from auth.users where id = $1`, [d.userId]);
+    expect(await n(`select count(*) from public.accounts where id = $1`, [d.accountId])).toBe(1);
     const log: string[] = [];
     const { steps } = purgeOver(log);
-    const person = { userId: d.userId, accounts: [d.accountId] };
-    await expect(steps.purgeOne(person)).rejects.toThrow(/an account it marked is still there/);
-    expect(await queued(d.userId)).toBe(1);
-    await db.query(`delete from public.accounts where id = $1`, [d.accountId]);
-    expect((await steps.purgeOne(person)).outcome).toBe('purged');
-    expect(log).toEqual([]);
+    const out = await steps.purgeOne({ userId: d.userId, accounts: [d.accountId] });
+    expect(out.outcome).toBe('purged');
+    expect(out.counts).toMatchObject({ 'accounts deleted': 1 });
+    expect(log).toEqual(['remove:report-logos:1', 'deleteUser']);
+    expect(await n(`select count(*) from public.accounts where id = $1`, [d.accountId])).toBe(0);
     expect(await queued(d.userId)).toBe(0);
+  });
+
+  it('finish_erasure refuses while an account it marked is still there', async () => {
+    const d = await deleted();
+    await db.query(`delete from auth.users where id = $1`, [d.userId]);
+    await expect(db.query(`select public.finish_erasure($1)`, [d.userId])).rejects.toThrow(
+      /an account it marked is still there/,
+    );
+    expect(await queued(d.userId)).toBe(1);
   });
 
   it('ends a live subscription at once with no proration, refuses until Stripe’s webhook lands, and reports nothing that day', async () => {

@@ -108,13 +108,9 @@ export function purge(ports: PurgePorts): Purge {
 
 async function purgeOne(ports: PurgePorts, person: DuePerson): Promise<PurgeOutcome> {
   const { userId, accounts } = person;
-  if (!(await ports.auth.exists(userId))) {
-    // An earlier run deleted the Auth user and stopped before the queue row went: finish that.
-    await ports.rpc('erase_auth_audit_log', { p_user: userId, p_emails: [] });
-    await ports.rpc('finish_erasure', { p_user: userId });
-    return { outcome: 'purged', counts: {} };
-  }
-  await ports.auth.ban(userId);
+  // An Auth user already gone (an earlier run, or a delete outside the erasure) cannot be banned;
+  // the erasure still runs, by the queue row (erase_person_plan), and its Auth delete answers 404.
+  if (await ports.auth.exists(userId)) await ports.auth.ban(userId);
   const live = await ports.liveSubscriptions(accounts);
   for (const id of live) {
     await ports.stripe.cancel(id, { prorate: false }, { idempotencyKey: `purge:${id}` });

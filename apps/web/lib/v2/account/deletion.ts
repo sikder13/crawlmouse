@@ -54,6 +54,7 @@ const STATUS: Readonly<Record<string, number>> = {
   v1_subscription: 409,
   email_change_pending: 409,
   invalid_link: 410,
+  already_confirmed: 409,
   not_confirmed: 409,
   window_closed: 410,
 };
@@ -113,17 +114,16 @@ export async function confirmDeletion(
   if (!r.ok) return refusal(r.code);
 
   await settleBan(ports, r.userId);
-  try {
-    await ports.send(
+  // Tried BAN_ATTEMPTS times, then reported: the deletion stands either way, and the purge cancels any
+  // subscription still live before it erases.
+  await withRetries(ports, r.userId, () =>
+    ports.send(
       r.accounts.map((accountId) => ({
         name: 'account.deletion_confirmed' as const,
         data: { userId: r.userId, accountId },
       })),
-    );
-  } catch (error) {
-    // The deletion stands; the purge cancels any subscription still live before it erases.
-    ports.report(error, r.userId);
-  }
+    ),
+  );
   await ports.capture('account_deletion_confirmed', r.accountId, {
     tier: r.tier,
     accounts: r.accounts.length,

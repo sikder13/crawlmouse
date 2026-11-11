@@ -80,3 +80,6 @@ No page here shares a path with a v1 page, so `V2_REWRITES` gains no row.
   whose policies read `auth.uid()` alone; v2 tables refuse it through the membership functions.
 - Before the first apply, on the dry-run branch: `postgres` may delete `auth.sessions` and `auth.refresh_tokens`, and
   no client role holds a privilege on `vault.secrets` or `vault.decrypted_secrets` (`docs/ops/erasure.md` §8).
+- If Inngest refuses `account.deletion_confirmed` three times in the confirm's request, the deletion still stands
+  and Sentry is told (user id only), but no `deletionCancelFn` runs: an `active` plan is not set to end during the
+  window, and can renew in it. The purge cancels it at once, with no proration, before it erases.

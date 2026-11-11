@@ -921,6 +921,7 @@ declare
   v_refusals text[] := '{}';
   v_counts json;
   v_held bigint := 0;
+  v_orphan boolean := false;
 begin
   if (p_user is null) = (v_given is null) then
     raise exception 'erase_person_plan: name exactly one of a user id and an address' using errcode = '22023';
@@ -933,7 +934,14 @@ begin
     raise exception 'the address names % users; erase by user id', cardinality(v_ids) using errcode = '22023';
   end if;
   v_user := v_ids[1];
-  if p_user is not null and v_user is null then
+  -- An Auth user deleted outside the erasure (the dashboard) whose deletion was confirmed in the app:
+  -- public.users and its seats are gone with it, the accounts it marked are not. The erasure goes on
+  -- by the queue row: the user id, and the marked accounts that still exist with no active member.
+  if p_user is not null and v_user is null
+     and exists (select 1 from public.pending_erasures q where q.user_id = p_user) then
+    v_user := p_user;
+    v_orphan := true;
+  elsif p_user is not null and v_user is null then
     raise exception 'no user has that id' using errcode = '22023';
   end if;
 
@@ -948,7 +956,15 @@ begin
            where e is not null and e <> ''
            group by e) s;
 
-  if v_user is not null then
+  if v_orphan then
+    v_accounts := array(select a.id from public.pending_erasures q
+                          join public.accounts a on a.id = any(q.accounts)
+                         where q.user_id = p_user
+                           and not exists (select 1 from public.seats s
+                                            where s.account_id = a.id and s.status = 'active')
+                         order by a.id::text);
+    v_refusals := array(select f.message from public.erase_person_refusals(v_user, v_accounts) f);
+  elsif v_user is not null then
     v_accounts := public.erase_person_accounts(v_user);
     v_refusals := array(select f.message from public.erase_person_refusals(v_user, v_accounts) f);
   end if;
@@ -1256,8 +1272,8 @@ $$;
 -- press again once that is resolved; marks every account the person alone holds, queues the person in
 -- pending_erasures with the window's end, ends every session, and records `delete_confirmed` on each
 -- account. Returns {ok: true, userId, accountId, tier, accounts, purgeAfter} (accountId and tier: the
--- account the link was issued for) or {ok: false, code} (`invalid_link`, `email_change_pending`,
--- `others_seated`, `v1_subscription`). Signing-in is stopped by the caller's Auth ban; the
+-- account the link was issued for) or {ok: false, code} (`invalid_link`, `already_confirmed`,
+-- `email_change_pending`, `others_seated`, `v1_subscription`). Signing-in is stopped by the caller's Auth ban; the
 -- subscription is ended by deletionCancelFn.
 create or replace function public.confirm_account_deletion(p_hash text, p_now timestamptz)
 returns jsonb
@@ -1276,8 +1292,12 @@ begin
   if not found or v.used_at is not null or v.revoked_at is not null or v.expires_at <= p_now then
     return jsonb_build_object('ok', false, 'code', 'invalid_link');
   end if;
-  v_refusal := case when public.email_change_live(v.user_id) then 'email_change_pending'
-                    else public.deletion_refusal(v.account_id, v.user_id) end;
+  v_refusal := case
+    -- A link from another account the person holds, after the first confirm marked them all.
+    when exists (select 1 from public.pending_erasures q where q.user_id = v.user_id)
+      then 'already_confirmed'
+    when public.email_change_live(v.user_id) then 'email_change_pending'
+    else public.deletion_refusal(v.account_id, v.user_id) end;
   if v_refusal is not null then
     return jsonb_build_object('ok', false, 'code', v_refusal);
   end if;

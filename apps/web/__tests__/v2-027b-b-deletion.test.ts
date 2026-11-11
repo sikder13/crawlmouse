@@ -293,6 +293,26 @@ describe('confirm_account_deletion', () => {
     expect((await confirm(raw)).code).toBe('invalid_link');
   });
 
+  it('a second confirm for the same person (a link from each account they hold) is refused, not an error', async () => {
+    const o = await owner();
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+       values ('agency', 'free', 'free', 1, 1, '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]')
+       returning id`,
+    );
+    const second = rows[0]!.id;
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'x@example.com', 'owner', 'active', now())`,
+      [second, o.userId],
+    );
+    const first = await request(o);
+    const other = await request({ ...o, accountId: second }, o.email);
+    expect(other.r.ok).toBe(true);
+    expect((await confirm(first.confirm)).ok).toBe(true);
+    expect(await confirm(other.confirm)).toEqual({ ok: false, code: 'already_confirmed' });
+  });
+
   it('takes a confirmation token only: a restore token, an expired one and an unknown one change nothing', async () => {
     const o = await owner();
     const { confirm: raw, restore: restoreRaw } = await request(o);
