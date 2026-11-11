@@ -7,9 +7,11 @@
  *
  * This is the one table of v2 rewrites: a session that needs one adds its row here.
  *
- * A target has no address of its own. A rewrite made by the middleware does not pass through the
- * middleware again, so a request the middleware sees for a target was asked for directly, and it
- * answers 404, flag on or off (`middleware.test.ts`).
+ * A target has no address of its own, by two checks. The middleware answers 404 to a request it
+ * sees for a target in any spelling it can read (a rewrite it makes does not pass through it again).
+ * And it removes `REWRITE_HEADER` from the requests it forwards and sets it only on its own rewrite,
+ * so a target page that answers 404 without the header (`reachedByRewrite`) is not served by a
+ * spelling the first check missed. Both are pinned in `middleware.test.ts`.
  */
 
 export interface V2Rewrite {
@@ -21,13 +23,17 @@ export interface V2Rewrite {
 
 export const V2_REWRITES: readonly V2Rewrite[] = [{ from: '/dashboard', to: '/dashboard/v2' }];
 
+/** Set by the middleware on its own rewrite; removed from every request it forwards otherwise. */
+export const REWRITE_HEADER = 'x-crawlmouse-v2-rewrite';
+
 const withoutSlash = (path: string): string =>
   path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
 
 /**
  * The spellings a request path can reach a page by: as sent, and percent-decoded, which is how
  * Next's production router reads a path before it matches a page (`/dashboard/%76%32` is
- * `/dashboard/v2` there). Null when the path does not decode.
+ * `/dashboard/v2` there), each also without the `.rsc` suffix of a React Server Components request.
+ * Null when the path does not decode.
  */
 function spellings(pathname: string): string[] | null {
   let decoded: string;
@@ -36,7 +42,10 @@ function spellings(pathname: string): string[] | null {
   } catch {
     return null;
   }
-  return [withoutSlash(pathname), withoutSlash(decoded)];
+  return [pathname, decoded].flatMap((p) => {
+    const path = withoutSlash(p);
+    return path.endsWith('.rsc') ? [path, withoutSlash(path.slice(0, -'.rsc'.length))] : [path];
+  });
 }
 
 /** The rewrite for a request path (a trailing slash allowed, either spelling), or null. */

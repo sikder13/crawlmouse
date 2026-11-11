@@ -27,6 +27,8 @@ describe('V2_REWRITES', () => {
       '/%64ashboard/v2',
       '/dashboard%2Fv2',
       '/dashboard/v2/x',
+      '/dashboard/v2.rsc',
+      '/dashboard/%76%32.rsc',
     ])
       expect(isRewriteTarget(p)).toBe(true);
     for (const p of ['/dashboard', '/dashboard/x', '/', '/dashboards/v2'])
