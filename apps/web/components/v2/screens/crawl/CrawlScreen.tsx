@@ -1,6 +1,13 @@
 'use client';
 
-import { memo, useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import {
+  memo,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Grade } from '../../Grade';
@@ -15,13 +22,14 @@ import { LiveMap } from '../../map/LiveMap';
 import type { Point } from '../../../../lib/v2/map-layout';
 import { MOTION } from '../../../../lib/v2/motion';
 import type { Playable } from '../../../../lib/v2/player';
+import type { CrawlState } from '../../../../lib/v2/progress';
 import {
   LOG_LINES,
   crawlFrame,
   type CrawlContext,
   type CrawlFrame,
 } from '../../../../lib/v2/view/crawl';
-import { EmailAsk } from './EmailAsk';
+import { EmailAsk, type SendEmail } from './EmailAsk';
 import { Enter, MotionGateProvider } from './motion-context';
 import { usePlayback } from './usePlayback';
 import layout from '../../layout.module.css';
@@ -53,17 +61,77 @@ export function CrawlScreen(props: CrawlScreenProps) {
   );
 }
 
-function Crawl({
-  recording,
+function Crawl({ recording, startAt, autoplay, ...rest }: CrawlScreenProps) {
+  const { state, playing } = usePlayback(recording, startAt, autoplay);
+  return <CrawlBody state={state} playing={playing} {...rest} />;
+}
+
+/** A real check's stream as the screen reads it: the state so far, and a way to hear it change. */
+export interface LiveSource {
+  subscribe(listener: () => void): () => void;
+  getState(): CrawlState;
+}
+
+/** What the screen of a real check can do and say that a replay cannot. */
+export interface LiveControls {
+  onCancel(): void;
+  cancelling: boolean;
+  sendEmail: SendEmail;
+  /** What the email ask says the address is used for. */
+  emailDoes: string;
+  /** Sentences about the stream and the map (view/crawl.ts, `liveNotices`); none when all is well. */
+  notices: readonly string[];
+}
+
+export interface LiveCrawlScreenProps {
+  source: LiveSource;
+  context: CrawlContext;
+  /** Where the page shows the check once it has ended. */
+  resultHref: string;
+  live: LiveControls;
+}
+
+/**
+ * The crawl screen of a real check: the same elements as the replay, driven by the stream's state.
+ * It has no recording, no map laid out ahead and no grade sentences: the stream carries none.
+ */
+export function LiveCrawlScreen({ source, context, resultHref, live }: LiveCrawlScreenProps) {
+  const state = useSyncExternalStore(source.subscribe, source.getState, source.getState);
+  return (
+    <MotionGateProvider>
+      <CrawlBody
+        state={state}
+        playing={state.ended === null}
+        context={context}
+        initialMap={NO_MAP}
+        gradeSummaries={NO_SUMMARIES}
+        resultHref={resultHref}
+        live={live}
+      />
+    </MotionGateProvider>
+  );
+}
+
+const NO_MAP: Record<string, Point> = {};
+const NO_SUMMARIES: [string, string] = ['', ''];
+
+type CrawlBodyProps = Pick<
+  CrawlScreenProps,
+  'context' | 'initialMap' | 'gradeSummaries' | 'resultHref'
+> & { state: CrawlState; playing: boolean; live?: LiveControls };
+
+function CrawlBody({
+  state,
+  playing,
   context,
-  startAt,
-  autoplay,
   initialMap,
   gradeSummaries,
   resultHref,
-}: CrawlScreenProps) {
-  const { state, playing } = usePlayback(recording, startAt, autoplay);
+  live,
+}: CrawlBodyProps) {
   const frame = crawlFrame(state, context);
+  // A real check lists the crawlers only when it was given them: the stream carries no verdict.
+  const showVerdicts = context.crawlers.length > 0;
   // Whether focus was in the email ask: if the reveal replaces it, focus moves to the reveal.
   const askHadFocus = useRef(false);
   // The grades are in: the reveal replaces the email ask.
@@ -85,12 +153,18 @@ function Crawl({
             Once it has ended there is nothing to cancel, and the result is a long way down a phone.
             The button keeps one width for both, so the header does not reflow when it changes.
           */}
-          <Button variant="quiet" size="sm" href={frame.cancellable ? '#' : resultHref}>
-            <OneWidth
-              shown={frame.cancellable ? CANCEL : SEE_RESULT}
-              labels={[CANCEL, SEE_RESULT]}
-            />
-          </Button>
+          {live && frame.cancellable ? (
+            <Button variant="quiet" size="sm" onClick={live.onCancel} disabled={live.cancelling}>
+              <OneWidth shown={CANCEL} labels={[CANCEL, SEE_RESULT]} />
+            </Button>
+          ) : (
+            <Button variant="quiet" size="sm" href={frame.cancellable ? '#' : resultHref}>
+              <OneWidth
+                shown={frame.cancellable ? CANCEL : SEE_RESULT}
+                labels={[CANCEL, SEE_RESULT]}
+              />
+            </Button>
+          )}
           <Button variant="quiet" size="sm" href={LOG_IN.href}>
             {LOG_IN.label}
           </Button>
@@ -109,6 +183,13 @@ function Crawl({
             {frame.title.note}
           </div>
         </section>
+        {live ? (
+          <div role="status" className={`${layout.mut} ${styles.small}`} data-v2-live-notices="">
+            {live.notices.map((notice) => (
+              <p key={notice}>{notice}</p>
+            ))}
+          </div>
+        ) : null}
 
         <Card as="section" className={styles.stage}>
           {/* Whether the replay is moving: tests wait on it, the reader sees nothing of it. */}
@@ -126,7 +207,7 @@ function Crawl({
             {/* From grading on the log leaves the map where it is drawn over it; under it, it stays. */}
             <FetchLog log={frame.log} placement="over" offMap={offMap} />
           </div>
-          {offMap ? null : (
+          {offMap || !showVerdicts ? null : (
             <VerdictPanel
               verdicts={frame.verdicts}
               testsStarted={frame.testsStarted}
@@ -176,7 +257,7 @@ function Crawl({
               if (!e.currentTarget.contains(e.relatedTarget)) askHadFocus.current = false;
             }}
           >
-            <Ask />
+            {live ? <EmailAsk send={live.sendEmail} does={live.emailDoes} /> : <Ask />}
             <WhileThisRuns />
           </section>
         )}
@@ -196,11 +277,13 @@ function Crawl({
           {offMap ? (
             <StatusPanel frame={frame} placement="after" offMap silent={!frame.finished} />
           ) : null}
-          <VerdictPanel
-            verdicts={frame.verdicts}
-            testsStarted={frame.testsStarted}
-            placement="after"
-          />
+          {showVerdicts ? (
+            <VerdictPanel
+              verdicts={frame.verdicts}
+              testsStarted={frame.testsStarted}
+              placement="after"
+            />
+          ) : null}
           {offMap ? <FetchLog log={frame.log} placement="after" offMap /> : null}
         </section>
       </main>
