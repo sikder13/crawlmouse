@@ -81,6 +81,8 @@ export interface LiveControls {
   emailDoes: string;
   /** Sentences about the stream and the map (view/crawl.ts, `liveNotices`); none when all is well. */
   notices: readonly string[];
+  /** Where "How the grade is calculated" leads; a real page given no address leaves the link out. */
+  gradeHref?: string;
 }
 
 export interface LiveCrawlScreenProps {
@@ -258,7 +260,7 @@ function CrawlBody({
             }}
           >
             {live ? <EmailAsk send={live.sendEmail} does={live.emailDoes} /> : <Ask />}
-            <WhileThisRuns />
+            <WhileThisRuns gradeHref={live ? live.gradeHref : '#'} />
           </section>
         )}
 
@@ -339,7 +341,8 @@ const Legend = memo(function Legend() {
   );
 });
 
-const WhileThisRuns = memo(function WhileThisRuns() {
+/** `gradeHref` is the replay's `#` (the design's placeholder) or a real page's address, if it has one. */
+const WhileThisRuns = memo(function WhileThisRuns({ gradeHref }: { gradeHref?: string }) {
   return (
     <Card className={styles.whileCard}>
       <div className={styles.whileTitle}>While this runs</div>
@@ -348,9 +351,11 @@ const WhileThisRuns = memo(function WhileThisRuns() {
         they read the raw HTML your server sends. If your product pages are built in the browser,
         those bots get an empty shell. The next step measures exactly how much is left.
       </p>
-      <Button variant="quiet" size="sm" href="#" className={styles.whileButton}>
-        How the grade is calculated
-      </Button>
+      {gradeHref ? (
+        <Button variant="quiet" size="sm" href={gradeHref} className={styles.whileButton}>
+          How the grade is calculated
+        </Button>
+      ) : null}
     </Card>
   );
 });
