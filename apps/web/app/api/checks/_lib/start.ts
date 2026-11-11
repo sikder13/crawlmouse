@@ -3,11 +3,14 @@
  *
  * 1. The host, by sign-up's rule (`publicHost`), then the SSRF guard on `https://{host}/`. A refusal
  *    answers one fixed body; the guard's own message names the address a host resolved to.
- * 2. The rows the request's derived ids name. A check that exists is answered as it is, whoever
- *    keeps it, and no bucket is counted. While it is still queued on a site no account keeps,
- *    `requestCheck` is called again first: the insert finds the row and the event goes out under the
- *    same id, so a retry after a send that failed starts the run, and Inngest drops the event when
- *    the first one arrived. In any other state the pipeline is not called.
+ * 2. The rows the request's derived ids name. A check that exists makes this request a repeat: it
+ *    is counted against the caller's address in the replay bucket (`limits.replay`; not for an
+ *    address that is `unknown`) and refused 429 `rate_limited` over it. Under it the check is
+ *    answered as it is, whoever keeps it, and none of step 3's buckets is counted. While it is still
+ *    queued on a site no account keeps, `requestCheck` is called again first: the insert finds the
+ *    row and the event goes out under the same id, so a retry after a send that failed starts the
+ *    run, and Inngest drops the event when the first one arrived. In any other state the pipeline
+ *    is not called.
  * 3. The day's ceiling, then the caller's address (with Turnstile once it is over its limit), then
  *    the domain: v1's order, so a refused request does not count against a later bucket.
  * 4. The site no account keeps, then `requestCheck` with the derived check id as its fresh id.
@@ -28,6 +31,8 @@ export interface StartLimits {
   ip(ip: string, signedIn: boolean): Promise<{ allowed: boolean; resetAt: Date }>;
   /** `domain` is the host without a leading `www.` (`normalizeDomain`). */
   domain(domain: string): Promise<boolean>;
+  /** One more repeat of a request whose check is already there, from this address. */
+  replay(ip: string): Promise<boolean>;
 }
 
 export interface StartDeps {
@@ -84,6 +89,9 @@ export async function startPublicCheck(deps: StartDeps, input: StartInput): Prom
   const request = () =>
     requestCheck({ ...deps.pipeline, newId: () => checkId }, { siteId, trigger: 'first_audit' });
   if (derived.checkStatus !== null) {
+    if (input.ip !== 'unknown' && !(await deps.limits.replay(input.ip))) {
+      return refuse(429, 'rate_limited', 'Too many repeats of this request. Try again later.');
+    }
     if (derived.checkStatus === 'queued' && !derived.siteKept) await request();
     return { ok: true, checkId, created: false };
   }

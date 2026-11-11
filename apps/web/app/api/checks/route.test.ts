@@ -80,6 +80,7 @@ function deps(over: Partial<StartDeps> = {}): Omit<StartDeps, 'signedIn'> {
         return { allowed: true, resetAt: new Date(0) };
       },
       domain: async () => true,
+      replay: async () => true,
     },
     verifyTurnstile: async () => false,
     pipeline: {
@@ -235,6 +236,16 @@ describe('POST /api/checks, a start', () => {
     expect(captured).toEqual([]);
   });
 
+  it('a repeat over the address’s replay limit is a 429 `rate_limited`', async () => {
+    await POST(post(VALID));
+    h.deps = deps({ limits: { ...deps().limits, replay: async () => false } });
+    expect(await read(await POST(post(VALID)))).toEqual({
+      status: 429,
+      body: { code: 'rate_limited', error: 'Too many repeats of this request. Try again later.' },
+    });
+    expect(sent).toHaveLength(1);
+  });
+
   it('a refusal is answered with its status and body', async () => {
     const res = await POST(post({ ...VALID, url: 'https://intranet.example.com/' }));
     expect(res.headers.get('cache-control')).toBe('no-store');
@@ -262,6 +273,7 @@ describe('POST /api/checks, a start', () => {
         global: async () => true,
         ip: async () => ({ allowed: false, resetAt: new Date(0) }),
         domain: async () => true,
+        replay: async () => true,
       },
       verifyTurnstile: async (...args) => {
         seen.push(args);
