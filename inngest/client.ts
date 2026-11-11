@@ -2,6 +2,7 @@ import { Inngest, EventSchemas } from 'inngest';
 import type { AccountState } from '@crawlmouse/types/v2';
 import type {
   CheckCancelRequested,
+  CheckNotifyRequested,
   CheckFailed,
   CheckFinished,
   CheckRequested,
@@ -48,6 +49,9 @@ type Events = {
   'check.finished': { data: CheckFinished };
   'check.failed': { data: CheckFailed };
   'check.cancel.requested': { data: CheckCancelRequested };
+  // A visitor asked to be told when a check ends (CC-22b). CC-28's mailer handles it; the address
+  // stays in checks.notify_email and is not in the event.
+  'check.notify_requested': { data: CheckNotifyRequested };
 };
 
 export const inngest = new Inngest({
