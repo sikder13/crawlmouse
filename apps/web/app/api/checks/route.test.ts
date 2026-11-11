@@ -254,6 +254,7 @@ describe('POST /api/checks, `check_started`', () => {
             trigger: 'first_audit',
             check_ref: checkRef(CHECK),
             $process_person_profile: false,
+            $geoip_disable: true,
           },
         },
       },
@@ -292,10 +293,22 @@ describe('POST /api/checks, `check_started`', () => {
     expect(captured).toEqual([]);
   });
 
-  it('is not sent where analytics needs prior consent, and the start is answered', async () => {
-    const res = await POST(post(VALID, { cookie: 'cm_consent_required=1' }));
+  it.each([
+    ['in a region that needs prior consent, with no decision', 'cm_consent_required=1'],
+    ['for a visitor who declined', 'cm_consent=denied'],
+    [
+      'for a visitor who declined, in a region that needs consent',
+      'cm_consent_required=1; cm_consent=denied',
+    ],
+  ])('is not sent %s, and the start is answered', async (_, cookie) => {
+    const res = await POST(post(VALID, { cookie }));
     expect(await read(res)).toEqual({ status: 200, body: { checkId: CHECK } });
     expect(captured).toEqual([]);
+  });
+
+  it('is sent for a visitor who agreed, in a region that needs prior consent', async () => {
+    await POST(post(VALID, { cookie: 'cm_consent_required=1; cm_consent=granted' }));
+    expect(captured.map((c) => c.body.event)).toEqual(['check_started']);
   });
 
   it('a capture that fails does not fail the start', async () => {
@@ -303,6 +316,7 @@ describe('POST /api/checks, `check_started`', () => {
       throw new Error('network');
     });
     expect(await read(await POST(post(VALID)))).toEqual({ status: 200, body: { checkId: CHECK } });
+    expect(logged).toEqual(['analytics: server capture of check_started failed']);
   });
 });
 

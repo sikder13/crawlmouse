@@ -5,6 +5,7 @@ import { checksPublicEnabled, pipelineEnabled } from '@/lib/auth/flags';
 import { getClientIp } from '@/lib/client-ip';
 import { CRAWL_PAUSED_MESSAGE, isCrawlPaused } from '@/lib/crawl-pause';
 import { supabaseServer } from '@/lib/supabase/server';
+import { UNAVAILABLE_CODES } from '@/lib/v2/unavailable';
 import { capturePublicEvent } from './_lib/events';
 import { scrubbed, startPublicCheck } from './_lib/start';
 import { startDeps } from './_lib/start-deps';
@@ -41,9 +42,13 @@ async function signedIn(): Promise<boolean> {
 export async function POST(req: Request) {
   if (!checksPublicEnabled()) return NextResponse.json({ code: 'not_found' }, { status: 404 });
   if (!pipelineEnabled()) {
-    return answer({ code: 'unavailable', error: 'Audits are not available right now.' }, 503);
+    return answer(
+      { code: UNAVAILABLE_CODES.unavailable, error: 'Audits are not available right now.' },
+      503,
+    );
   }
-  if (isCrawlPaused()) return answer({ error: CRAWL_PAUSED_MESSAGE, code: 'paused' }, 503);
+  if (isCrawlPaused())
+    return answer({ error: CRAWL_PAUSED_MESSAGE, code: UNAVAILABLE_CODES.paused }, 503);
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {

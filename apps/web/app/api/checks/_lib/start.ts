@@ -15,6 +15,7 @@
 import { normalizeDomain } from '../../../../lib/domain';
 import { publicCheckId, publicSiteId } from '../../../../lib/v2/pipeline/public';
 import { requestCheck, type RequestDeps } from '../../../../lib/v2/pipeline/request';
+import { UNAVAILABLE_CODES } from '../../../../lib/v2/unavailable';
 import { publicHost } from './host';
 import type { StartStore } from './start-store';
 
@@ -83,7 +84,11 @@ export async function startPublicCheck(deps: StartDeps, input: StartInput): Prom
   }
 
   if (!(await deps.limits.global())) {
-    return refuse(503, 'capacity', 'We’re at capacity right now. Please try again tomorrow.');
+    return refuse(
+      503,
+      UNAVAILABLE_CODES.capacity,
+      'We’re at capacity right now. Please try again tomorrow.',
+    );
   }
 
   if (input.ip !== 'unknown') {
