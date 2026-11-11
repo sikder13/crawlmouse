@@ -57,6 +57,8 @@ beforeAll(async () => {
     built,
     vantage: pageVantage(crawlRows(input.batches)),
     map_path: null,
+    // A first check: the build read no fix.
+    read: [],
   });
   await db.query(
     `insert into public.alert_rules (account_id, site_id, kind, enabled) values ($1, null, 'crawler_blocked', true)`,
