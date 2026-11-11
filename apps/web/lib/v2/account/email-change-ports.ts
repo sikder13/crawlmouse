@@ -8,9 +8,11 @@ import * as Sentry from '@sentry/nextjs';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { inngest } from '../../../../../inngest/client';
 import { checkRateLimit } from '../../rate-limit';
-import { MAX_RATE_LIMIT_WINDOW_MS } from '../../rate-limit-window';
 import { accountCapture } from './account-events';
 import type { EmailChangePorts } from './email-change';
+
+/** The daily window of both email-change buckets (`EMAIL_CHANGE_LIMITS`). */
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function emailChangePorts(
   admin: SupabaseClient,
@@ -41,7 +43,7 @@ export function emailChangePorts(
     },
     capture: accountCapture(cookieHeader),
     rateLimit: async (bucket, limit) =>
-      (await checkRateLimit(bucket, limit, MAX_RATE_LIMIT_WINDOW_MS, { failClosed: true })).allowed,
+      (await checkRateLimit(bucket, limit, DAY_MS, { failClosed: true })).allowed,
     report: (signal, extra) => {
       Sentry.captureMessage(signal, { level: 'warning', tags: { signal }, extra: { ...extra } });
     },
