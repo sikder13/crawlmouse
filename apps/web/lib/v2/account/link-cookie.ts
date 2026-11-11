@@ -57,12 +57,11 @@ export function landLink(origin: string, flow: LinkFlow, token: string): Respons
 
 /** The flow's token from a request's `Cookie` header, or null. */
 export function linkToken(cookieHeader: string | null, flow: LinkFlow): string | null {
-  const name = `${LINK_FLOWS[flow].cookie}=`;
   for (const part of (cookieHeader ?? '').split(';')) {
-    const pair = part.trim();
-    if (pair.startsWith(name)) {
-      const value = pair.slice(name.length);
-      return isToken(value) ? value : null;
+    const [name, ...value] = part.trim().split('=');
+    if (name === LINK_FLOWS[flow].cookie) {
+      const token = value.join('=');
+      return isToken(token) ? token : null;
     }
   }
   return null;

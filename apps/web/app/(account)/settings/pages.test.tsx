@@ -2,14 +2,14 @@
  * The live Settings, Settings › Plan, Settings › Delete and Trial ending pages (CC-27b D6, D8). Run on
  * PGlite with every migration applied: the session client is the PostgREST stand-in as the signed-in
  * user (row security applies), the service role is the stand-in without one, and the paged reader is
- * the pipeline's PGlite reader. `erase_person_plan` is workstream B's; until it merges, a stand-in
- * answers its `accounts` key from the person's owner seats.
+ * the pipeline's PGlite reader. The delete step reads the erasure's own `erase_person_plan`.
  */
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { FIX_EMAIL_REQUESTS } from '../../../__tests__/helpers/v2-027b-standins';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
@@ -86,17 +86,8 @@ beforeAll(async () => {
   const db = await freshDb();
   await applyAllMigrations(db);
   h.db = db;
-  const { rows } = await db.query<{ n: number }>(
-    `select count(*)::int n from pg_proc where proname = 'erase_person_plan'`,
-  );
-  if (rows[0]!.n === 0) {
-    await db.exec(`
-      create function public.erase_person_plan(p_user uuid, p_email text) returns json
-      language sql stable as $$
-        select json_build_object('accounts', coalesce(json_agg(s.account_id::text order by s.account_id::text), '[]'::json))
-          from public.seats s where s.user_id = p_user and s.role = 'owner' and s.status = 'active'
-      $$;`);
-  }
+  // erase_person_plan reads CC-26b's fix_email_requests, not yet on this branch's migrations.
+  await db.exec(FIX_EMAIL_REQUESTS);
   owner = await person('owner');
   await host(owner, 'owner-site.example');
   empty = await person('empty');
@@ -195,13 +186,20 @@ describe('/settings/plan', () => {
 });
 
 describe('/settings/delete', () => {
-  it('renders the step for the owner, with the hostname to type and the account it removes', async () => {
-    as(owner);
+  it('renders the step for an owner alone on the account, with the hostname and the account it removes', async () => {
+    as(trialing);
     const el = screen(await DeletePage());
     expect(el.type).toBe(DeleteScreen);
     const html = renderToStaticMarkup(el);
+    expect(html).toContain('Type trial-site.example to confirm');
+    expect(html).toContain('Deleting removes 1 account you alone hold: trial-site.example.');
+  });
+
+  it('an account others sit on is not one the person alone holds: the step names none', async () => {
+    as(owner);
+    const html = renderToStaticMarkup(screen(await DeletePage()));
     expect(html).toContain('Type owner-site.example to confirm');
-    expect(html).toContain('Deleting removes 1 account you alone hold: owner-site.example.');
+    expect(html).not.toContain('Deleting removes');
   });
 
   it('an account with no site is retyped by its sign-in address', async () => {

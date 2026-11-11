@@ -64,6 +64,7 @@ const ANONYMOUS: Record<
   string,
   { status: number; body?: unknown; location?: string; reads?: string[] }
 > = {
+  'api/account/email': { status: 401, body: { code: 'auth_required' } },
   'api/alert-rules': { status: 401, body: { code: 'auth_required' } },
   'api/audits/[id]/export': { status: 401, body: { error: 'auth_required' } },
   'api/audits/[id]/llms-txt': { status: 401, body: { error: 'auth_required' } },
@@ -95,7 +96,7 @@ const ID = '6f1c2a8e-0000-4000-8000-000000000000';
 beforeEach(() => {
   calls.length = 0;
   vi.stubEnv('V2_ACCOUNT_DOOR', '1');
-  // The CC-27b routes answer 404 with V2_CHECKS_PUBLIC unset.
+  // The CC-27b account routes answer 404 before reading the session while the flag is off.
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
 });
 afterEach(() => vi.unstubAllEnvs());

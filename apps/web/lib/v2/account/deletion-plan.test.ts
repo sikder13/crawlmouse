@@ -1,12 +1,11 @@
 /**
  * The accounts the delete step lists (CC-27b D6, plan-revision R2), on PGlite with every migration
- * applied. `erase_person_plan` is workstream B's (section B); until that merges, this file creates a
- * stand-in that answers the plan's `accounts` key in its jsonb shape, the only key read here, from
- * the person's owner seats.
+ * applied, read from the erasure's own `erase_person_plan` (section B).
  */
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { FIX_EMAIL_REQUESTS } from '../../../__tests__/helpers/v2-027b-standins';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
@@ -17,18 +16,8 @@ let db: PGlite;
 beforeAll(async () => {
   db = await freshDb();
   await applyAllMigrations(db);
-  const { rows } = await db.query<{ n: number }>(
-    `select count(*)::int n from pg_proc where proname = 'erase_person_plan'`,
-  );
-  if (rows[0]!.n === 0) {
-    await db.exec(`
-      create function public.erase_person_plan(p_user uuid, p_email text) returns json
-      language sql stable as $$
-        select json_build_object('accounts', coalesce(json_agg(s.account_id::text order by s.account_id::text), '[]'::json),
-                                 'refusals', '[]'::json)
-          from public.seats s where s.user_id = p_user and s.role = 'owner' and s.status = 'active'
-      $$;`);
-  }
+  // erase_person_plan reads CC-26b's fix_email_requests, not yet on this branch's migrations.
+  await db.exec(FIX_EMAIL_REQUESTS);
 }, 300_000);
 
 const site = (accountId: string, host: string, at: string) =>

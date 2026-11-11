@@ -6,12 +6,15 @@
  * them, over ports, so the script (a direct connection) and the purge (the service-role client) run
  * the same steps:
  *
- *   plan → refuse if the plan refuses → remove the Storage objects the plan lists → apply (one
- *   transaction; it re-plans and rolls back unless each change touched its planned count) → delete
- *   the Auth user → sweep the Auth audit log again → read the counts back.
+ *   plan → refuse if the plan refuses for any reason but Storage objects → remove the Storage objects
+ *   the plan lists → apply (one transaction; it re-plans and rolls back unless each change touched its
+ *   planned count) → delete the Auth user → sweep the Auth audit log again → read the counts back.
  *
  * Nothing is deleted when the plan refuses. A failure after `apply` (the Auth call) leaves the auth
- * user in place, and running the erasure again finishes it.
+ * user in place, and running the erasure again finishes it: the second plan finds no account left, so
+ * its apply changes only what still holds the person's id or address.
+ *
+ * No Next or `server-only` import: the scripts package imports this file.
  */
 
 export interface StorageObject {
@@ -22,7 +25,7 @@ export interface StorageObject {
 /** What the plan function returns (`erase_person_plan`). */
 export interface ErasurePlan {
   userId: string | null;
-  /** Lower-cased addresses: the one given and those on the user's rows. */
+  /** Lower-cased addresses: the one given, those on the user's rows and `users.previous_emails`. */
   emails: string[];
   /** Accounts the person alone is seated on; deleted with everything that cascades from them. */
   accounts: string[];
@@ -41,23 +44,54 @@ export interface ErasureTarget {
   userId?: string;
 }
 
+/** The counts read again after an erasure, with the erased user id, addresses and accounts. */
+export interface AfterCounts {
+  counts: Record<string, number>;
+  storage: StorageObject[];
+}
+
+/** A redacted takedown requester (the rule `takedown_requests redacted (closed)` writes it). */
+export const REDACTED_EMAIL = 'redacted@erased.invalid';
+
 export interface ErasurePorts {
   plan(target: ErasureTarget): Promise<ErasurePlan>;
-  /** Applies the plan's changes in one transaction; throws, changing nothing, on any mismatch. */
-  apply(plan: ErasurePlan): Promise<void>;
+  /**
+   * Applies the erasure of `target` in one transaction (`erase_person_apply`, which plans again);
+   * throws, changing nothing, on a refusal or a count that moved. `expected` is the plan read first.
+   */
+  apply(target: ErasureTarget, expected: ErasurePlan): Promise<void>;
   removeStorage(objects: readonly StorageObject[]): Promise<void>;
+  /** Deletes the Auth user; an Auth user already gone is success. */
   deleteAuthUser(userId: string): Promise<void>;
   /** Deletes the Auth audit log's entries for the person; called again after the Auth delete. */
   sweepAuditLog(plan: ErasurePlan): Promise<void>;
+  /** Every count again, read with the plan's user id, addresses and accounts. */
+  recount(plan: ErasurePlan): Promise<AfterCounts>;
 }
 
 export type ErasureResult =
-  | { ok: true; before: ErasurePlan; after: ErasurePlan }
+  | { ok: true; before: ErasurePlan; after: AfterCounts }
   | { ok: false; refusals: string[] };
 
+/**
+ * The plan's refusals other than its Storage one. `erase_person_plan` adds that refusal, as its last,
+ * when it lists objects, and this sequence removes them; any other refusal stops the erasure.
+ */
+export function blockingRefusals(plan: ErasurePlan): string[] {
+  return plan.storage.length > 0 ? plan.refusals.slice(0, -1) : plan.refusals;
+}
+
 export async function erasePerson(
-  _ports: ErasurePorts,
-  _target: ErasureTarget,
+  ports: ErasurePorts,
+  target: ErasureTarget,
 ): Promise<ErasureResult> {
-  throw new Error('erasePerson: built by workstream B');
+  const before = await ports.plan(target);
+  if (blockingRefusals(before).length > 0) return { ok: false, refusals: before.refusals };
+  if (before.storage.length > 0) await ports.removeStorage(before.storage);
+  await ports.apply(target, before);
+  if (before.userId !== null) {
+    await ports.deleteAuthUser(before.userId);
+    await ports.sweepAuditLog(before);
+  }
+  return { ok: true, before, after: await ports.recount(before) };
 }

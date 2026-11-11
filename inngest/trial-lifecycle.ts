@@ -57,7 +57,11 @@ export function createTrialLifecycleFn(clock: () => TrialClock) {
     {
       id: TRIAL_LIFECYCLE_FN_ID,
       idempotency: 'event.data.accountId',
-      cancelOn: [{ event: 'trial.converted', match: 'data.accountId' }],
+      // A paid checkout ends the run, and so does the account's deletion (CC-27b): no reminder then.
+      cancelOn: [
+        { event: 'trial.converted', match: 'data.accountId' },
+        { event: 'account.deletion_confirmed', match: 'data.accountId' },
+      ],
       concurrency: { limit: 2 },
     },
     { event: 'trial.started' },
