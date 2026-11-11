@@ -83,7 +83,7 @@ function send(handler: Handler, method: string, id: string, body?: unknown, form
 }
 
 const patch = (id: string, body: unknown) => send(PATCH, 'PATCH', id, body);
-const del = (id: string) => send(DELETE, 'DELETE', id);
+const del = (id: string, body: unknown = { confirm: 'remove' }) => send(DELETE, 'DELETE', id, body);
 
 async function siteRow(id: string) {
   return (
@@ -118,7 +118,7 @@ describe('/api/sites/[id] guards', () => {
     for (const res of [
       await patch(s.id, { schedule: 'none' }),
       await del(s.id),
-      await send(POST, 'POST', s.id, { _method: 'DELETE' }, true),
+      await send(POST, 'POST', s.id, { _method: 'DELETE', confirm: 'remove' }, true),
     ]) {
       expect([res.status, await res.json()]).toEqual([404, { code: 'not_found' }]);
     }
@@ -343,9 +343,28 @@ describe('DELETE /api/sites/[id]', () => {
     const p = await person(h.db, 'form-remove');
     const s = await keptSite(h.db, p.accountId);
     as(p);
-    const res = await send(POST, 'POST', s.id, { _method: 'delete' }, true);
+    const res = await send(POST, 'POST', s.id, { _method: 'delete', confirm: 'remove' }, true);
     expect([res.status, res.headers.get('location')]).toEqual([303, '/dashboard']);
     expect((await siteRow(s.id)).removed_at).not.toBeNull();
+  });
+
+  it('a removal without confirm=remove is 400 confirm_required, and the site stays', async () => {
+    const p = await person(h.db, 'unconfirmed');
+    const s = await keptSite(h.db, p.accountId);
+    as(p);
+    for (const body of [undefined, {}, { confirm: 'yes' }, { confirm: 'remove', extra: 1 }]) {
+      const res = await send(DELETE, 'DELETE', s.id, body);
+      expect([res.status, await res.json()], JSON.stringify(body)).toEqual([
+        400,
+        { code: 'confirm_required' },
+      ]);
+    }
+    const form = await send(POST, 'POST', s.id, { _method: 'DELETE' }, true);
+    expect([form.status, form.headers.get('location')]).toEqual([
+      303,
+      `/sites/${s.id}?notice=confirm_required`,
+    ]);
+    expect((await siteRow(s.id)).removed_at).toBeNull();
   });
 
   it('POST without a PATCH or DELETE _method is 405', async () => {

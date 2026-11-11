@@ -10,7 +10,7 @@ import {
   refuseTo,
   respond,
 } from '@/lib/v2/account/route';
-import { decideEdit, parseEditBody, readSite } from '@/lib/v2/account/sites';
+import { decideEdit, isRemoveConfirmed, parseEditBody, readSite } from '@/lib/v2/account/sites';
 import { editSite, removeSite } from '@/lib/v2/account/sites-store';
 import { readEntitlement } from '@/lib/v2/account/viewer';
 
@@ -25,7 +25,10 @@ export async function PATCH(req: Request, ctx: Context) {
   return change(req, ctx, 'PATCH');
 }
 
-/** Remove a site: `removed_at` is set and its history kept (CC-26b D6). */
+/**
+ * Remove a site: `removed_at` is set and its history kept (CC-26b D6). The body must be
+ * `{confirm: 'remove'}` (a form's ticked box); anything else is 400 `confirm_required`.
+ */
 export async function DELETE(req: Request, ctx: Context) {
   if (!checksPublicEnabled()) return notFound();
   return change(req, ctx, 'DELETE');
@@ -72,6 +75,9 @@ async function change(req: Request, { params }: Context, method: 'PATCH' | 'DELE
   const meant = body === null ? null : meantMethod(req, body);
   const verb = method ?? meant?.method;
   if (verb === 'DELETE') {
+    if (!isRemoveConfirmed(meant?.fields ?? {})) {
+      return refuseTo(req, back, 400, 'confirm_required');
+    }
     const removed = await removeSite(supabaseAdmin(), id);
     if (removed.outcome === 'already_removed') return notFound();
     return body?.kind === 'form' ? respond('form', '/dashboard') : Response.json({ removed: true });
