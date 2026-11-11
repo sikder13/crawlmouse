@@ -375,6 +375,37 @@ describe('fix round 2: reads that fail around a committed confirm or restore', (
   });
 });
 
+describe('fix round 3: a lost restore answer whose state read fails (item 4)', () => {
+  const lostWithFlakyState = (failures: number) => {
+    let left = failures;
+    return recorder({
+      rpc: async <T>(fn: string, args: Record<string, unknown>) => {
+        if (fn === 'erasure_state' && left-- > 0) throw new Error('state read timed out');
+        const r = await rpc<T>(fn, args);
+        if (fn === 'restore_account') throw new Error('connection reset');
+        return r;
+      },
+    });
+  };
+
+  it('retries the read, and with an answer the restore is judged as before', async () => {
+    const { o, delete_confirm, delete_restore } = await requestedLinks();
+    await confirmDeletion(recorder().ports, delete_confirm);
+    const rec = lostWithFlakyState(BAN_ATTEMPTS - 1);
+    expect(await restoreAccount(rec.ports, delete_restore)).toEqual({ ok: true });
+    expect(banned.has(o.userId)).toBe(false);
+    expect(rec.reported).toEqual([['Error: connection reset', o.userId]]);
+  });
+
+  it('on the last failure reports the failed read, user id only, then rethrows', async () => {
+    const { o, delete_confirm, delete_restore } = await requestedLinks();
+    await confirmDeletion(recorder().ports, delete_confirm);
+    const rec = lostWithFlakyState(BAN_ATTEMPTS);
+    await expect(restoreAccount(rec.ports, delete_restore)).rejects.toThrow(/connection reset/);
+    expect(rec.reported).toEqual([['Error: state read timed out', o.userId]]);
+  });
+});
+
 describe('a second confirm through the route (item 6)', () => {
   it('answers 409 already_confirmed to JSON, and sends a form back to its page with the cookie cleared', async () => {
     const o = await owner();
