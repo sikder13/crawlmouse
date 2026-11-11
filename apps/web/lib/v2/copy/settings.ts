@@ -3,6 +3,7 @@
  * lock corrections for the artboard follow.
  */
 import type { Addition, CopyChange } from '../copy-registry';
+import { DELETE_COPY } from './deletion';
 import { listOf } from '../format';
 import { capitalise, count, numberWord, plural } from '../words';
 
@@ -58,9 +59,11 @@ export const SETTINGS_COPY = {
             : `Removes all ${numberWord(sites)} sites, their history and reports`
     }. Takes effect after a confirmation link. For ${numberWord(grace)} days the sign-in email can undo it; after that nothing is kept.`,
   deleteAction: 'Delete…',
-  /** Owner ruling Q7, worded as the published policy is: Terms §8 (app/terms/page.tsx). */
-  deleteMoney:
-    'A paid plan stops renewing when you confirm and ends when the account is deleted. We don’t refund partial periods except where the law requires it (Terms, section 8).',
+  /**
+   * Owner ruling Q7: the deletion page's own money sentences (lib/v2/copy/deletion.ts), the second of
+   * which is the Terms page's refund sentence, so Settings says no more than the confirmation does.
+   */
+  deleteMoney: DELETE_COPY.money.join(' '),
   /** The confirmation step (owner ruling 12). */
   deleteSteps: (what: string, email: string, grace: number) =>
     `Type the ${what} below and we send a confirmation link to ${email}. The link opens a page where you confirm the deletion; sign-in then stops at once, and for ${numberWord(grace)} days a sign-in link from that address restores the account.`,
