@@ -7,7 +7,7 @@
 import type { OpenFixView } from './segment/fixes';
 
 export const NO_PACKET =
-  'The steps for this fix are not written yet. What the audit found, and its estimated effect, are above.';
+  'The steps for this fix are not written yet. What the audit found is above.';
 
 /**
  * Whether one of a section's open fixes has a packet to copy. The first such fix's copy button is

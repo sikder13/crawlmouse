@@ -52,8 +52,6 @@ describe('an audit address written out by hand in the v2 source', () => {
     'lib/v2/view/audit-hrefs.ts',
     // The v1 audit page's own canonical, which is main's line.
     'app/audit/[id]/page.tsx',
-    // The live crawl's link to the result.
-    'app/audit/[id]/_crawl/LiveCrawl.tsx',
   ];
 
   it('is found in the builder, so the scan reads the source', () => {

@@ -28,6 +28,7 @@
  */
 import type { ClaimKeep } from '../../auth/claim';
 import type { Report } from '../../auth/door-store';
+import { checkRef } from './public';
 import { evidenceDir, type EvidenceDirectory } from './evidence';
 import type { KeepStore, PathPair } from './keep-store';
 import { evidencePath, type EvidenceName, type EvidenceOwner, type EvidenceStore } from './types';
@@ -212,8 +213,9 @@ async function discardCopies(
     if (held?.accountId === input.accountId) return;
     await deps.evidence.remove(written);
   } catch {
+    // The check is still unkept, so its id is the capability to read it: the report names its ref.
     deps.report('keep-evidence-discard-failed', {
-      checkId: input.checkId,
+      checkRef: checkRef(input.checkId),
       accountId: input.accountId,
       objects: String(written.length),
     });

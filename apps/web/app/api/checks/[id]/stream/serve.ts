@@ -214,7 +214,8 @@ async function readStored(
 }
 
 /**
- * `check_finished`: `finishedOnce` admits one capture for the check in its bucket's 24-hour window.
+ * `check_finished`: `finishedOnce` admits one capture for the check in its bucket's UTC day, and
+ * admits a second when the limiter cannot be read (it fails open).
  * What it carries is read from the check's rows (`facts`, `scores`) and from `readableCheck`'s
  * answer; the cursor, which the client sends, gives it nothing. The scores are read for a finished
  * or partial check.
