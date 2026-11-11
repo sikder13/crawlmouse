@@ -103,7 +103,34 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { route: 'api/billing/checkout', methods: ['POST'], class: 'member', origin: 'strict' },
   { route: 'api/billing/portal', methods: ['POST'], class: 'member', origin: 'strict' },
   { route: 'api/billing/status', methods: ['GET'], class: 'user', origin: 'any' },
+  {
+    route: 'api/checks/[id]/cancel',
+    methods: ['POST'],
+    class: 'public',
+    reason: 'capability URL (the check id) or a member session: cancels the check it names',
+    session: 'optional',
+    origin: 'strict',
+  },
   { route: 'api/checks/[id]/claim', methods: ['POST'], class: 'user', origin: 'strict' },
+  {
+    route: 'api/checks/[id]/notify',
+    methods: ['POST'],
+    class: 'public',
+    reason:
+      'capability URL (the check id): stores where to send the result; per-IP and per-address limits',
+    session: 'optional',
+    origin: 'lenient',
+    jsonBody: true,
+  },
+  {
+    route: 'api/checks/[id]/stream',
+    methods: ['GET'],
+    class: 'public',
+    reason:
+      'capability URL (the check id) or a member session: the progress stream of the check it names',
+    session: 'optional',
+    origin: 'any',
+  },
   {
     route: 'api/developers',
     methods: ['POST'],

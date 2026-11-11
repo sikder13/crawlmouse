@@ -173,7 +173,10 @@ describe('the finders see what they claim to see', () => {
     expect(hidden).toEqual([
       'app/api/billing/agency-trial/route.ts',
       'app/api/billing/cancel/route.ts',
+      'app/api/checks/[id]/cancel/route.ts',
       'app/api/checks/[id]/claim/route.ts',
+      'app/api/checks/[id]/notify/route.ts',
+      'app/api/checks/[id]/stream/route.ts',
       'app/api/webhooks/stripe-account/route.ts',
     ]);
   });
