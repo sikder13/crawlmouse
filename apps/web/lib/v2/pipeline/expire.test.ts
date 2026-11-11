@@ -188,22 +188,56 @@ describe('expireUnkept', () => {
     expect(await exists('sites', fresh)).toBe(1);
   });
 
-  it('a run stopped after the objects were removed is finished by the next; a third changes nothing', async () => {
+  it('a site whose delete fails after its objects were removed is counted and finished by the next run; a third changes nothing', async () => {
     const check = await storedCheck(db, memory, { host: host(), expiresAt: EXPIRED });
     const real = sqlExpireStore(asService(db));
     const stopped: ExpireStore = {
       ...real,
       deleteExpiredUnkept: async () => {
-        throw new Error('the step was stopped');
+        throw new Error('canceling statement due to statement timeout');
       },
     };
-    await expect(expireUnkept(depsOf({ store: stopped }))).rejects.toThrow('the step was stopped');
+    expect(await expireUnkept(depsOf({ store: stopped }))).toEqual({
+      sites: 0,
+      checks: 0,
+      skipped: 1,
+      left: 0,
+    });
     expect([...memory.objects.keys()]).toEqual([]);
     expect(await exists('checks', check.checkId)).toBe(1);
 
     expect(await expireUnkept(depsOf())).toEqual({ sites: 1, checks: 1, skipped: 0, left: 0 });
     expect(await exists('sites', check.siteId)).toBe(0);
     expect(await expireUnkept(depsOf())).toEqual({ sites: 0, checks: 0, skipped: 0, left: 0 });
+  });
+
+  it('deletes each site in a statement of its own: one whose delete fails stays, and the others go', async () => {
+    const checks: StoredCheck[] = [];
+    for (let i = 0; i < 3; i++) {
+      checks.push(await storedCheck(db, memory, { host: host(), expiresAt: EXPIRED, batches: 0 }));
+    }
+    const stuck = checks[1]!;
+    const real = sqlExpireStore(asService(db));
+    const asked: string[][] = [];
+    const store: ExpireStore = {
+      ...real,
+      deleteExpiredUnkept: async (siteIds, cutoff, bareBefore) => {
+        asked.push([...siteIds]);
+        if (siteIds.includes(stuck.siteId))
+          throw new Error('canceling statement due to statement timeout');
+        return real.deleteExpiredUnkept(siteIds, cutoff, bareBefore);
+      },
+    };
+    expect(await expireUnkept(depsOf({ store }))).toEqual({
+      sites: 2,
+      checks: 2,
+      skipped: 1,
+      left: 0,
+    });
+    expect(asked.map((ids) => ids.length)).toEqual([1, 1, 1]);
+    expect(asked.flat().sort()).toEqual(checks.map((c) => c.siteId).sort());
+    const left = await db.query<{ id: string }>(`select id from public.sites`);
+    expect(left.rows.map((r) => r.id)).toEqual([stuck.siteId]);
   });
 
   it('a site whose objects cannot be removed is skipped with its rows, and the others go', async () => {
@@ -384,7 +418,7 @@ describe('a claim against the expiry, at each point', () => {
     expect(await exists('sites', check.siteId)).toBe(0);
   });
 
-  it('a site an account took after it was listed is not deleted: the delete statement tests the site again', async () => {
+  it('a site an account took after it was listed is not deleted: unkept_site_expired is asked again when the delete runs', async () => {
     const check = await storedCheck(db, memory, { host: host(), expiresAt: EXPIRED });
     const who = await keeper();
     const real = sqlExpireStore(asService(db));
