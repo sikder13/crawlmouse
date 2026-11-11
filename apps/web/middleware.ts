@@ -4,6 +4,7 @@ import { reportRefusal, reportedMethod, type Refusal } from '@/lib/security/refu
 import { isApiPath, isStateChanging, policyForPath } from '@/lib/security/route-policy';
 import { isCrossSite, isJsonBody, isSameOrigin } from '@/lib/security/same-origin';
 import { updateSession } from '@/lib/supabase/middleware';
+import { checksPublicEnabled } from '@/lib/auth/flags';
 
 /**
  * API requests: a state change to a route the registry guards (lib/security/route-policy.ts) is
@@ -59,7 +60,7 @@ export async function handleEdge(
 ): Promise<NextResponse> {
   if (isApiPath(req.nextUrl.pathname)) return guardApi(req, report);
 
-  const res = await refresh(req);
+  const res = v2Rewrite(req, await refresh(req));
 
   // The embed badge is a widget, never a page to index. Report pages (/r/) get no header: each one's
   // robots meta decides (app/r/[slug]/page.tsx generateMetadata), so a claimed report can be indexed.
@@ -81,6 +82,46 @@ export async function handleEdge(
     maxAge: 60 * 60 * 24,
   });
 
+  return res;
+}
+
+/**
+ * The v1 addresses a v2 page serves while V2_CHECKS_PUBLIC is on, and the route that serves each.
+ * A rewrite, not a branch in the v1 page: a production build links a page's stylesheets for every
+ * module the page can reach, through `import()` as well, so a v1 page that could reach a v2 screen
+ * would carry its stylesheets with the flag off (CC-22b, notes/cc-22b/evidence-flag-off.md).
+ */
+export const V2_REWRITES = [{ from: '/', to: '/v2-home' }] as const;
+
+/** A path that no route serves: a rewrite to it is answered by the site's not-found page, 404. */
+export const NO_SUCH_PAGE = '/_v2-rewrite-target';
+
+/** Whether `path` is `at`, or `at` with one trailing slash (which `/` itself cannot take). */
+const isAt = (path: string, at: string) => path === at || (at !== '/' && path === `${at}/`);
+
+/**
+ * Applies V2_REWRITES to a page request, given the response the session refresh made for it.
+ *
+ * - A request for a row's `to`, or for a path under it, is answered as not found, flag on or off:
+ *   a v2 page has one address, the v1 one it is rewritten from.
+ * - With the flag on, a request for a row's `from` (a trailing slash apart) is rewritten to its
+ *   `to`, with the query string. The rewrite carries what the refresh put on its response (the
+ *   rotated auth cookies and the cache headers that ride with them) and the request headers the
+ *   refresh updated, so the page reads the refreshed session as a v1 page would.
+ * - Any other request gets the refresh's own response.
+ */
+export function v2Rewrite(req: NextRequest, refreshed: NextResponse): NextResponse {
+  const path = req.nextUrl.pathname;
+  const direct = V2_REWRITES.some((row) => path === row.to || path.startsWith(`${row.to}/`));
+  const row = checksPublicEnabled() ? V2_REWRITES.find((r) => isAt(path, r.from)) : undefined;
+  if (!direct && !row) return refreshed;
+  const to = direct ? NO_SUCH_PAGE : `${row!.to}${req.nextUrl.search}`;
+  const res = NextResponse.rewrite(new URL(to, req.url), { request: { headers: req.headers } });
+  for (const cookie of refreshed.cookies.getAll()) res.cookies.set(cookie);
+  for (const name of ['cache-control', 'expires', 'pragma']) {
+    const value = refreshed.headers.get(name);
+    if (value !== null) res.headers.set(name, value);
+  }
   return res;
 }
 

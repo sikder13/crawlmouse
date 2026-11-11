@@ -14,10 +14,10 @@ import { HomeScreen } from './HomeScreen';
  * `home_viewed` event, and v1's referral capture. The example audit on the page is the bad-site
  * fixture's first audit, as in the preview.
  *
- * No route renders this yet. `app/page.tsx` cannot: a production build links this module's
- * stylesheets on each page whose module can reach it, through `import()` as well, so the v1 home
- * would carry them with the flag off (measured; notes/cc-22b/evidence-flag-off.md). It is mounted
- * by a route of its own, which `/` is rewritten to under the flag.
+ * `app/v2-home/page.tsx` renders it, and `/` is rewritten there under the flag (middleware.ts).
+ * `app/page.tsx` cannot render it: a production build links this module's stylesheets on each page
+ * whose module can reach it, through `import()` as well, so the v1 home would carry them with the
+ * flag off (measured; notes/cc-22b/evidence-flag-off.md).
  *
  * The plan buttons lead to Sign-up while the account door is open (V2_ACCOUNT_DOOR); the Agency
  * trial has no page yet, so it has no button.

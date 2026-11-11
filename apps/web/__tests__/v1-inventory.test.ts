@@ -181,6 +181,8 @@ describe('the finders see what they claim to see', () => {
       'app/audit/[id]/overview/page.tsx',
       'app/audit/[id]/signals/page.tsx',
       'app/audit/[id]/structure/page.tsx',
+      // CC-22b: the v2 home, which `/` is rewritten to under the flag.
+      'app/v2-home/page.tsx',
       'app/api/billing/agency-trial/route.ts',
       'app/api/billing/cancel/route.ts',
       'app/api/checks/[id]/claim/route.ts',
