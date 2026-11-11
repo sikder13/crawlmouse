@@ -67,6 +67,11 @@ Approved with a change:
 - **Q7.** At confirm the plan ends at its period end through CC-03's path; at purge it is cancelled at once with no proration. The copy follows the published refund policy and promises nothing beyond it.
 - **Q10.** The undo deletes an Auth user holding the old address only when all of these hold: it was created after the change was applied; it has no seat; it has no rows in `audits`, `sessions` or `accounts`; it is not banned. Otherwise the undo refuses, reports to Sentry, and the page sends the person to support. Round 2, Q13: since sign-up gives every user an owner seat and a personal account, "no seat" and "no rows in `accounts`" are read as nothing beyond what sign-up gave it (one personal Free account, no Stripe customer, no other seat, no site).
 
+Round 2 (2026-11-11), approved as built or recommended: **Q13** (the reading of Q10 above); **Q14** (the money copy
+quotes the Terms' refund sentence, pinned to the Terms by a test; the 14-day annual refund is an owner change to
+the Terms at switch-on, and the copy follows it in that commit); **Q15** (`changeLog` and the per-site `alertRules`
+are CC-28's, `integrations` a later page; `ACCOUNT_ACTIONS` says so).
+
 No page here shares a path with a v1 page, so `V2_REWRITES` gains no row.
 
 ## Known gaps
