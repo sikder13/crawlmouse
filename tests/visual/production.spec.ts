@@ -183,6 +183,31 @@ test.describe('the account frame on the production build', () => {
       expect(box!.mainTop).toBe(box!.railTop);
     });
 
+    // On a phone the rail wraps onto its own line above the page. It is as tall as what it holds,
+    // and the page starts under it: a rail line stretched to share the frame's 100vh left a blank
+    // band under the rail on a short page (CC-26b).
+    test(`${p.path}: at 390px the rail is as tall as its content, and the page starts under it`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await openPreview(page, p.path);
+      const box = await page.evaluate(() => {
+        const rail = document.querySelector<HTMLElement>('[data-v2-account-shell] > header');
+        const main = document.querySelector('#account-main');
+        if (!rail || !main || rail.lastElementChild === null) return null;
+        const r = rail.getBoundingClientRect();
+        const last = rail.lastElementChild.getBoundingClientRect();
+        return {
+          railBottom: r.bottom,
+          contentBottom: last.bottom + parseFloat(getComputedStyle(rail).paddingBottom),
+          mainTop: main.getBoundingClientRect().top,
+        };
+      });
+      expect(box, 'the account shell renders a rail and a main').not.toBeNull();
+      expect(Math.abs(box!.railBottom - box!.contentBottom)).toBeLessThanOrEqual(1);
+      expect(Math.abs(box!.mainTop - box!.railBottom)).toBeLessThanOrEqual(1);
+    });
+
     test(`${p.path}: at 390px the page does not scroll sideways`, async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });
       await openPreview(page, p.path);
