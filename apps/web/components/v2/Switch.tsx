@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useLive } from './screens/account/LiveActions';
 import styles from './Switch.module.css';
 
 export interface SwitchProps {
@@ -18,7 +19,7 @@ export interface SwitchProps {
 /**
  * An on/off setting: a native button with role="switch" and aria-checked, inside a POST form. A
  * native button is in the tab order and answers Enter and Space, so it needs no key handling of its
- * own. The routes are not built yet (CC-27b), so the submit is stopped; the switch still flips.
+ * own. A preview stops the submit and the switch still flips; under `LiveActions` the form submits.
  *
  * The form posts the state the switch moves to, `!checked`. The browser reads the form after the
  * click's handlers and React's re-render, so the switch flips in a later task: flipped in the click
@@ -26,12 +27,13 @@ export interface SwitchProps {
  */
 export function Switch({ label, name, on, action, fields }: SwitchProps) {
   const [checked, setChecked] = useState(on);
+  const live = useLive();
   return (
     <form
       method="post"
       action={action}
       className={styles.form}
-      onSubmit={(e: FormEvent) => e.preventDefault()}
+      onSubmit={live ? undefined : (e: FormEvent) => e.preventDefault()}
     >
       {Object.entries(fields).map(([field, value]) => (
         <input key={field} type="hidden" name={field} value={value} />

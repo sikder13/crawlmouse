@@ -1,10 +1,11 @@
 'use client';
 
 import type { FormEvent, ReactNode } from 'react';
+import { useLive } from '../account/LiveActions';
 
 /**
- * A POST form whose route is not built yet (CC-27b): the preview stops its submit, as ActionControl
- * and KeepBar do, so filling it in changes nothing.
+ * A POST form that a preview stops, as ActionControl and KeepBar do, so filling it in there changes
+ * nothing. Under `LiveActions` (a page served from a signed-in account) it submits.
  */
 export function StoppedForm({
   action,
@@ -15,12 +16,13 @@ export function StoppedForm({
   className?: string;
   children: ReactNode;
 }) {
+  const live = useLive();
   return (
     <form
       method="post"
       action={action}
       className={className}
-      onSubmit={(e: FormEvent) => e.preventDefault()}
+      onSubmit={live ? undefined : (e: FormEvent) => e.preventDefault()}
     >
       {children}
     </form>
