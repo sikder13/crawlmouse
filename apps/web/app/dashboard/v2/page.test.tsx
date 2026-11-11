@@ -1,7 +1,8 @@
 /**
  * /dashboard behind V2_CHECKS_PUBLIC (CC-26b D1, R14). v1's page is main's file byte for byte and
  * imports nothing of v2; with the flag on the middleware rewrites /dashboard to this page
- * (`middleware.test.ts`, "the v2 dashboard rewrite"). This page is a 404 with the flag off.
+ * (`middleware.test.ts`, "the v2 rewrites (owner ruling Q17)"). This page is a 404 with the flag off,
+ * and when the request did not come through that rewrite.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';

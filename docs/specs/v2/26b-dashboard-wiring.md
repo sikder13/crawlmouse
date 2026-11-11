@@ -67,6 +67,10 @@ v1's `app/dashboard/page.tsx` is main's file, pinned by its sha256 in
   PostHog person) and by these routes from the server (`account:<id>`); PostHog does not join the
   two.
 
+- A page path that does not percent-decode gets a bare 404 from the middleware (no session refresh,
+  no consent cookie): the rewrite-target check counts it as a target rather than guess
+  (`lib/v2/rewrites.ts`). Next answers such a path 404 itself (measured with `next start`).
+
 ## Deploy order
 
 The code goes out before the migration's apply, never the reverse: the new `persist_built_check`
