@@ -2,11 +2,15 @@ import { Card } from '../../Card';
 import { PageShell } from '../../PageShell';
 import layout from '../../layout.module.css';
 import { DASHBOARD_COPY } from '../../../../lib/v2/copy/dashboard';
+import { SUPPORT_EMAIL } from '../../footer-links';
 import shared from './AccountScreen.module.css';
 
 const STATES = {
   no_account: { title: DASHBOARD_COPY.noAccountTitle, body: DASHBOARD_COPY.noAccountBody },
-  ambiguous: { title: DASHBOARD_COPY.ambiguousTitle, body: DASHBOARD_COPY.ambiguousBody },
+  ambiguous: {
+    title: DASHBOARD_COPY.ambiguousTitle,
+    body: DASHBOARD_COPY.ambiguousBody(SUPPORT_EMAIL),
+  },
 } as const;
 
 /**

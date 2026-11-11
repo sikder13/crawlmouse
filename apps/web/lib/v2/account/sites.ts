@@ -57,7 +57,9 @@ const formNull = (v: unknown) => (v === '' ? null : v);
 /**
  * PATCH /api/sites/[id] (ARCH-2 §5's site page row): `schedule` with its weekday (`dow`, ISO, 1 is
  * Monday) and local hour, `competitorHosts`, and `stagingUrl` (null or empty for none). Each is
- * optional, one at least; a timed schedule carries both `dow` and `hour`, `none` carries neither.
+ * optional, one at least; a timed schedule carries both `dow` and `hour`. With `none` a day and hour
+ * are read and dropped: the site page's form sends them whatever the cadence, since a form without
+ * script cannot leave them out. Without a schedule, neither is taken.
  */
 const EditBody = z
   .strictObject({
@@ -69,9 +71,15 @@ const EditBody = z
   })
   .refine((b) => Object.keys(b).length > 0)
   .refine((b) => {
+    if (b.schedule === 'none') return true;
     const timed = b.schedule === 'weekly' || b.schedule === 'monthly';
     return timed === (b.dow !== undefined) && timed === (b.hour !== undefined);
-  });
+  })
+  .transform(({ dow, hour, ...rest }) =>
+    rest.schedule === 'none'
+      ? rest
+      : { ...rest, ...(dow === undefined ? {} : { dow }), ...(hour === undefined ? {} : { hour }) },
+  );
 
 export type EditBody = z.infer<typeof EditBody>;
 

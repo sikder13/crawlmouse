@@ -347,14 +347,13 @@ const WEEKDAY_NAMES = [
 ];
 
 /**
- * The schedule form as `parseEditBody` (lib/v2/account/sites.ts) reads it: `schedule`, and with a
- * timed one its ISO weekday `dow` and local `hour`, which are not sent with "none". Weekly is offered
- * only to a tier whose gates open it.
+ * The schedule form as `parseEditBody` (lib/v2/account/sites.ts) reads it: `schedule`, its ISO
+ * weekday `dow` and local `hour`. The day and hour are always sent, so the form works without
+ * script; with "none" the parser drops them. Weekly is offered only to a tier whose gates open it.
  */
 function scheduleInputs(s: Site, weekly: boolean): ActionInput[] {
   const sch = s.schedule;
   const cadence = sch && sch.cadence !== 'on_deploy' ? sch.cadence : 'none';
-  const timed = { name: 'schedule', values: ['weekly', 'monthly'] } as const;
   const f = SITE_COPY.fields;
   return [
     {
@@ -374,7 +373,6 @@ function scheduleInputs(s: Site, weekly: boolean): ActionInput[] {
       label: f.weekday,
       value: String(sch?.iso_weekday ?? 1),
       options: WEEKDAY_NAMES.map((label, i) => ({ value: String(i + 1), label })),
-      while: timed,
     },
     {
       kind: 'select',
@@ -385,7 +383,6 @@ function scheduleInputs(s: Site, weekly: boolean): ActionInput[] {
         value: String(h),
         label: `${String(h).padStart(2, '0')}:00`,
       })),
-      while: timed,
     },
   ];
 }

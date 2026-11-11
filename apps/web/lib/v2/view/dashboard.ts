@@ -778,15 +778,19 @@ function startPro(v: AccountView): DashboardView['startPro'] {
     : null;
 }
 
-/** Day 0 before any site: the header asks for one, and nothing else is measured yet. */
+/**
+ * Day 0 before any site: the header asks for one, and nothing else is measured yet. A reader whose
+ * seat cannot add a site is told who can instead.
+ */
 function noSiteView(v: AccountView): DashboardView {
   const zone = zoneOf(v);
+  const adds = addsSites(v);
   const trial = v.account.state === 'pro_trial' || v.account.state === 'agency_trial';
   return {
     shell: accountShellView(v, 'Sites'),
     firstRun: true,
     header: {
-      title: COPY.noSiteTitle,
+      title: adds ? COPY.noSiteTitle : COPY.noSiteSeatTitle,
       line: [
         dayDate(v.now, zone),
         '0 sites',
@@ -806,7 +810,7 @@ function noSiteView(v: AccountView): DashboardView {
       note: `0 of ${v.account.limits.sites} on ${PLAN_NAMES[v.tier]}`,
       upsell: null,
       rows: [],
-      foot: COPY.noSiteNote,
+      foot: adds ? COPY.noSiteNote : COPY.noSiteSeatNote,
     },
     topFixes: null,
     setup: null,

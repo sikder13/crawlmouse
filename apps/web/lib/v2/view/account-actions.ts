@@ -180,11 +180,6 @@ export type ActionInput =
       label: string;
       options: readonly { value: string; label: string }[];
       value: string;
-      /**
-       * Posted only while the select named `name` holds one of `values`: a disabled control is not
-       * sent (the schedule's weekday and hour, with no schedule chosen).
-       */
-      while?: { name: string; values: readonly string[] };
     }
   | { kind: 'checkbox'; name: string; label: string; value: string; required: true };
 

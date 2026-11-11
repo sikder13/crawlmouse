@@ -336,6 +336,28 @@ describe('the controls a seat can use (round 1, item 7)', () => {
     expect(dashboardView({ ...free, seats: [...free.seats, all] }, as(all)).startPro).toBeNull();
   });
 
+  it('day 0 for a seat that cannot add says who adds sites, and offers no add', () => {
+    const noSites: FixtureDataset = {
+      ...bad,
+      sites: [],
+      checks: [],
+      fixes: [],
+      fix_events: [],
+      changes: [],
+      reports: [],
+    };
+    for (const s of [seat('developer'), seat('account_manager', [OUTFITTER])]) {
+      const v = dashboardView(
+        { ...noSites, seats: [...bad.seats, s] },
+        { accountId: ACCOUNT, seatId: s.id, now: bad.as_of },
+      );
+      expect(v.header.title).toBe('No site here yet');
+      expect(v.header.actions).toEqual([]);
+      expect(v.sites.foot).toMatch(/^Sites are added by the account’s owner/);
+      expect(JSON.stringify(v)).not.toMatch(/Add the site to watch|Adding a site starts/);
+    }
+  });
+
   it('the owner is offered all of them', () => {
     const owner = { accountId: ACCOUNT, seatId: bad.seats[0]!.id, now: bad.as_of };
     expect(routes(dashboardView(bad, owner).header.actions)).toContain('/api/sites');

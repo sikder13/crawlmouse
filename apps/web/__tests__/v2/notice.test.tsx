@@ -47,3 +47,17 @@ describe('the notice line', () => {
     }
   });
 });
+
+describe('the screens for a sign-in with no account, or several', () => {
+  it('name the footer’s support address where they point to support', async () => {
+    const { AccountStateScreen } =
+      await import('../../components/v2/screens/account/AccountStateScreen');
+    const { SUPPORT_EMAIL } = await import('../../components/v2/footer-links');
+    const ambiguous = renderToStaticMarkup(<AccountStateScreen state="ambiguous" />);
+    expect(ambiguous).toContain(`write to ${SUPPORT_EMAIL}.`);
+    for (const state of ['ambiguous', 'no_account'] as const)
+      expect(renderToStaticMarkup(<AccountStateScreen state={state} />)).not.toMatch(
+        /write to support(?!@)/,
+      );
+  });
+});

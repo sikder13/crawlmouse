@@ -2,10 +2,12 @@
  * Every live form, as the view renders it, against the route's own reader of its body (CC-26b
  * round 1, item 3). `submitted()` builds what a browser sends for an action: its hidden fields, then
  * each input as the page opens with it (a select's chosen value, a text field's value or a typed
- * sample, a required checkbox ticked), leaving out a select its `while` disables. A field the view
+ * sample, a required checkbox ticked). A field the view
  * names differently from the route turns the form's test red.
  */
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { ThemeControl } from '../../components/v2/ThemeControl';
 import {
   dashboardPreview,
   noSitePreview,
@@ -23,16 +25,10 @@ const TYPED: Record<string, string> = { url: 'example.com', email: 'dev@example.
 
 function submitted(a: ActionView, choose: Record<string, string> = {}): Record<string, string> {
   const fields: Record<string, string> = { ...a.fields };
-  const selected: Record<string, string> = {};
-  for (const i of a.inputs ?? [])
-    if (i.kind === 'select') selected[i.name] = choose[i.name] ?? i.value;
   for (const i of a.inputs ?? []) {
-    if (i.kind === 'select') {
-      if (i.while && !i.while.values.includes(selected[i.while.name]!)) continue;
-      fields[i.name] = selected[i.name]!;
-    } else if (i.kind === 'text') {
-      fields[i.name] = choose[i.name] ?? i.value ?? TYPED[i.name] ?? '';
-    } else fields[i.name] = i.value;
+    if (i.kind === 'select') fields[i.name] = choose[i.name] ?? i.value;
+    else if (i.kind === 'text') fields[i.name] = choose[i.name] ?? i.value ?? TYPED[i.name] ?? '';
+    else fields[i.name] = i.value;
   }
   return fields;
 }
@@ -59,15 +55,16 @@ describe('each live form posts what its route reads', () => {
     }
   });
 
-  it('a site’s schedule: weekly or monthly with its day and hour, or none with neither', () => {
+  it('a site’s schedule: weekly or monthly with its day and hour, none, its day and hour dropped', () => {
     const a = row('Schedule');
     for (const schedule of ['weekly', 'monthly']) {
       const m = asRoute(a, submitted(a, { schedule }));
       expect(m.method).toBe('PATCH');
       expect(parseEditBody(m.fields)).toMatchObject({ schedule });
     }
+    // Without script the form sends its day and hour with none too; the parser drops them.
     const none = asRoute(a, submitted(a, { schedule: 'none' }));
-    expect(none.fields).toEqual({ schedule: 'none' });
+    expect(Object.keys(none.fields).sort()).toEqual(['dow', 'hour', 'schedule']);
     expect(parseEditBody(none.fields)).toEqual({ schedule: 'none' });
   });
 
@@ -87,12 +84,32 @@ describe('each live form posts what its route reads', () => {
     expect(isRemoveConfirmed(m.fields)).toBe(true);
   });
 
-  it('the theme: PATCH {theme}, as the theme control posts it', () => {
+  it('the theme: what the theme control renders, each of its buttons, PATCH {theme}', () => {
     const shell = shellPreview('home');
-    // ThemeControl sends `_method=PATCH` and the pressed button's `theme`.
-    const m = asRoute(shell.themeAction, { _method: 'PATCH', theme: 'dark' });
-    expect(m.method).toBe('PATCH');
-    expect(ThemeBody.safeParse(m.fields).success).toBe(true);
+    const html = renderToStaticMarkup(
+      <ThemeControl initial={shell.theme} action={shell.themeAction.href} />,
+    );
+    const attrs = (tag: string) =>
+      Object.fromEntries([...tag.matchAll(/([a-z-]+)="([^"]*)"/g)].map((m) => [m[1], m[2]]));
+    const form = attrs(html.match(/<form[^>]*>/)![0]);
+    expect(form.action).toBe(shell.themeAction.href);
+    const hidden = (html.match(/<input[^>]*>/g) ?? [])
+      .map(attrs)
+      .filter((a) => a.type === 'hidden');
+    const buttons = (html.match(/<button[^>]*>/g) ?? [])
+      .map(attrs)
+      .filter((a) => a.type === 'submit');
+    expect(buttons.length).toBe(3);
+    for (const b of buttons) {
+      // A pressed submit button sends its own name and value with the form's hidden fields.
+      const fields = {
+        ...Object.fromEntries(hidden.map((h) => [h.name!, h.value!])),
+        [b.name!]: b.value!,
+      };
+      const m = asRoute(shell.themeAction, fields);
+      expect(m.method).toBe('PATCH');
+      expect(ThemeBody.safeParse(m.fields).success, JSON.stringify(m.fields)).toBe(true);
+    }
   });
 
   it('start the trial: {accountId}', () => {
