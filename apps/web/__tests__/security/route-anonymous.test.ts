@@ -77,8 +77,8 @@ const ANONYMOUS: Record<
   'api/billing/portal': { status: 401, body: { error: 'auth_required' } },
   'api/billing/status': { status: 401, body: { pro: false } },
   'api/checks/[id]/claim': { status: 401, body: { code: 'auth_required' } },
-  'api/fixes/[id]/email-developer': { status: 401, body: { error: 'auth_required' } },
-  'api/fixes/[id]/packet': { status: 401, body: { error: 'auth_required' } },
+  'api/fixes/[id]/email-developer': { status: 401, body: { code: 'auth_required' } },
+  'api/fixes/[id]/packet': { status: 401, body: { code: 'auth_required' } },
   'api/reports/[slug]/claim': { status: 401, body: { error: 'auth_required' } },
   'api/reports/[slug]/logo': { status: 401, body: { error: 'auth_required' } },
   // The owner island's probe: a caller with no session gets the deny answer before any read.

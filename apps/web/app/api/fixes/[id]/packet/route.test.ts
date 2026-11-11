@@ -65,13 +65,13 @@ const answer = async (res: Response) => [res.status, await res.json()];
 describe('GET /api/fixes/[id]/packet', () => {
   it('404 with V2_CHECKS_PUBLIC unset, before anything else runs', async () => {
     delete process.env.V2_CHECKS_PUBLIC;
-    expect(await answer(await get(fw.ranked[0]!))).toEqual([404, { error: 'not_found' }]);
+    expect(await answer(await get(fw.ranked[0]!))).toEqual([404, { code: 'not_found' }]);
     expect(h.log).toEqual([]);
   });
 
   it('401 auth_required signed out, with no service-role client', async () => {
     h.user = null;
-    expect(await answer(await get(fw.ranked[0]!))).toEqual([401, { error: 'auth_required' }]);
+    expect(await answer(await get(fw.ranked[0]!))).toEqual([401, { code: 'auth_required' }]);
     expect(h.log).toEqual(['supabaseServer']);
   });
 
@@ -79,7 +79,7 @@ describe('GET /api/fixes/[id]/packet', () => {
     const theirs = fw.stranger.seeded.site_fixes[0]!.pk.id as string;
     for (const id of [theirs, '6f1c2a8e-0000-4000-8000-000000000000', 'not-an-id']) {
       h.log.length = 0;
-      expect(await answer(await get(id))).toEqual([404, { error: 'not_found' }]);
+      expect(await answer(await get(id))).toEqual([404, { code: 'not_found' }]);
       expect(h.log).toEqual(['supabaseServer']);
     }
   });
@@ -92,14 +92,14 @@ describe('GET /api/fixes/[id]/packet', () => {
   it('a developer seat scoped to another site gets the 404', async () => {
     h.user = fw.w.scopedUserId;
     const onSite2 = fw.w.seeded.site_fixes.find((r) => r.scope === 'site2')!.pk.id as string;
-    expect(await answer(await get(onSite2))).toEqual([404, { error: 'not_found' }]);
+    expect(await answer(await get(onSite2))).toEqual([404, { code: 'not_found' }]);
   });
 
   it('402 packets for a fix Free does not open, which Pro opens', async () => {
     const hidden = fw.ranked[3]!;
     expect(await answer(await get(hidden))).toEqual([
       402,
-      { error: 'upgrade_required', gate: 'packets' },
+      { code: 'upgrade_required', gate: 'packets' },
     ]);
     const copy = (await fw.db.clone()) as PGlite;
     h.db = copy;
@@ -117,7 +117,7 @@ describe('GET /api/fixes/[id]/packet', () => {
     h.db = copy;
     try {
       await copy.query(`update public.sites set removed_at = now() where id = $1`, [fw.w.site1]);
-      expect(await answer(await get(fw.ranked[0]!))).toEqual([404, { error: 'not_found' }]);
+      expect(await answer(await get(fw.ranked[0]!))).toEqual([404, { code: 'not_found' }]);
     } finally {
       h.db = fw.db;
       await copy.close();
@@ -129,7 +129,7 @@ describe('GET /api/fixes/[id]/packet', () => {
     h.db = copy;
     try {
       await copy.query(`update public.site_fixes set packet = null where id = $1`, [fw.ranked[1]]);
-      expect(await answer(await get(fw.ranked[1]!))).toEqual([404, { error: 'no_packet' }]);
+      expect(await answer(await get(fw.ranked[1]!))).toEqual([404, { code: 'no_packet' }]);
     } finally {
       h.db = fw.db;
       await copy.close();

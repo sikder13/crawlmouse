@@ -3,10 +3,12 @@
  * only after the caller's own session has answered `is_member_for_fix` for the fix: `site_fixes` and
  * `fix_events` have no client grant, so these reads cannot be made with the caller's client.
  *
- * The one write is `mark_fix_done` (migration 20261112000001), which sets the status and appends its
- * `fix_events` row in one transaction. The one-writer guard in lib/v2/pipeline/persist.test.ts holds
- * this file to that function.
+ * Its one write of a fix is `mark_fix_done` (migration 20261112000001), which sets the status and
+ * appends its `fix_events` row in one transaction; the one-writer guard in
+ * lib/v2/pipeline/persist.test.ts holds this file to that function. It also records a developer
+ * email request as a `fix_email_requests` row, which holds the address (owner ruling Q8).
  */
+import { randomUUID } from 'node:crypto';
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import type { Check, Fix, FixEvent } from '@crawlmouse/types/v2';
 import { z } from 'zod';
@@ -39,6 +41,15 @@ export interface FixesStore {
   fix(fixId: string): Promise<Fix | null>;
   siteFixes(siteId: string): Promise<SiteFixes>;
   markDone(fixId: string, seatId: string): Promise<MarkOutcome>;
+  /** Records the request and returns its id. */
+  requestEmail(req: EmailRequest): Promise<string>;
+}
+
+export interface EmailRequest {
+  fixId: string;
+  accountId: string;
+  seatId: string;
+  to: string;
 }
 
 function rows(what: string, r: { data: unknown; error: PostgrestError | null }) {
@@ -87,6 +98,19 @@ export function supabaseFixesStore(admin: SupabaseClient): FixesStore {
       if (r.error) throw new Error(`${MARK_FIX_DONE_RPC}: ${r.error.code} ${r.error.message}`);
       const a = MarkAnswer.parse(r.data);
       return a.outcome === 'marked' ? { outcome: 'marked', eventId: a.event_id, at: a.at } : a;
+    },
+
+    async requestEmail(req) {
+      const id = randomUUID();
+      const r = await admin.from('fix_email_requests').insert({
+        id,
+        fix_id: req.fixId,
+        account_id: req.accountId,
+        requested_by_seat_id: req.seatId,
+        to_email: req.to,
+      });
+      if (r.error) throw new Error(`fixes-store: fix_email_requests insert: ${r.error.message}`);
+      return id;
     },
   };
 }

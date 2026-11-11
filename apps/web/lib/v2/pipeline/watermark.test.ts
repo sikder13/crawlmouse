@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
-import type { Capture } from '../account/events';
+import type { Sender } from '../account/events';
 import { pageVantage, persistBuiltCheck, readOfFixes } from './persist';
 import { fixEventFromRow, fixFromRow } from './rows';
 import { pglitePersistDb, seedRunning, seedSite } from './test-support/pglite';
@@ -136,7 +136,7 @@ async function run(marked: Fix, readsMark: boolean): Promise<Run> {
       map_path: null,
       read: readOfFixes(read.fixes, read.events),
     },
-    capture as unknown as Capture,
+    capture as unknown as Sender,
   );
   return { db, built, outcome, capture };
 }
@@ -196,7 +196,7 @@ describe('a check whose build read the fix before the mark', () => {
     expect(r.outcome.verified.map((v) => v.fix_id)).not.toContain(marked.id);
     expect(r.capture).not.toHaveBeenCalledWith(
       'fix_closed',
-      accountId,
+      `account:${accountId}`,
       expect.objectContaining({ type: marked.type }),
     );
   });
@@ -233,7 +233,7 @@ describe('a check whose build read the mark', () => {
         type: marked.type,
         checks_to_close: 1,
       });
-      expect(r.capture).toHaveBeenCalledWith('fix_closed', accountId, {
+      expect(r.capture).toHaveBeenCalledWith('fix_closed', `account:${accountId}`, {
         type: marked.type,
         checksToClose: 1,
       });
@@ -271,7 +271,7 @@ describe('a check whose build read the mark', () => {
       expect(r.outcome.verified.map((v) => v.fix_id)).not.toContain(marked.id);
       expect(r.capture).not.toHaveBeenCalledWith(
         'fix_closed',
-        accountId,
+        `account:${accountId}`,
         expect.objectContaining({ type: marked.type }),
       );
     } finally {
@@ -294,7 +294,7 @@ describe('a check whose build read the mark', () => {
           map_path: null,
           read: readOfFixes(read.fixes, read.events),
         },
-        again as unknown as Capture,
+        again as unknown as Sender,
       );
       expect(repeat).toEqual({ written: false, counts: {}, verified: [] });
       expect(again).not.toHaveBeenCalled();

@@ -86,13 +86,20 @@ const post = (id: string, body: string, type = 'application/json') =>
   );
 const answer = async (res: Response) => [res.status, await res.json()];
 const json = (email: unknown) => JSON.stringify({ email });
+const requests = async (fixId: string) =>
+  (
+    await fw.db.query<{ n: number }>(
+      `select count(*)::int as n from public.fix_email_requests where fix_id = $1`,
+      [fixId],
+    )
+  ).rows[0]!.n;
 
 describe('POST /api/fixes/[id]/email-developer', () => {
   it('404 with V2_CHECKS_PUBLIC unset, before anything else runs', async () => {
     delete process.env.V2_CHECKS_PUBLIC;
     expect(await answer(await post(fw.ranked[0]!, json('dev@agency.example')))).toEqual([
       404,
-      { error: 'not_found' },
+      { code: 'not_found' },
     ]);
     expect(h.log).toEqual([]);
   });
@@ -101,7 +108,7 @@ describe('POST /api/fixes/[id]/email-developer', () => {
     h.user = null;
     expect(await answer(await post(fw.ranked[0]!, json('dev@agency.example')))).toEqual([
       401,
-      { error: 'auth_required' },
+      { code: 'auth_required' },
     ]);
     expect(h.log).toEqual(['supabaseServer']);
   });
@@ -110,7 +117,7 @@ describe('POST /api/fixes/[id]/email-developer', () => {
     const theirs = fw.stranger.seeded.site_fixes[0]!.pk.id as string;
     expect(await answer(await post(theirs, json('dev@agency.example')))).toEqual([
       404,
-      { error: 'not_found' },
+      { code: 'not_found' },
     ]);
     expect(h.log).toEqual(['supabaseServer']);
   });
@@ -118,7 +125,7 @@ describe('POST /api/fixes/[id]/email-developer', () => {
   it('402 fixesVisible for a fix Free does not open, before any limit', async () => {
     expect(await answer(await post(fw.ranked[4]!, json('dev@agency.example')))).toEqual([
       402,
-      { error: 'upgrade_required', gate: 'fixesVisible' },
+      { code: 'upgrade_required', gate: 'fixesVisible' },
     ]);
     expect(h.log).not.toContain('rateLimit');
     expect(h.sent).toEqual([]);
@@ -129,34 +136,41 @@ describe('POST /api/fixes/[id]/email-developer', () => {
     ['no address', '{}'],
     ['another field too', JSON.stringify({ email: 'dev@agency.example', cc: 'x@y.example' })],
   ])('400 invalid_email for %s, before any limit', async (_, body) => {
-    expect(await answer(await post(fw.ranked[0]!, body))).toEqual([
-      400,
-      { error: 'invalid_email' },
-    ]);
+    expect(await answer(await post(fw.ranked[0]!, body))).toEqual([400, { code: 'invalid_email' }]);
     expect(h.log).not.toContain('rateLimit');
     expect(h.sent).toEqual([]);
   });
 
-  it('a developer seat sends one event naming the fix’s own ids, the seat and the address', async () => {
+  it('a developer seat records the request and sends one event naming only its row', async () => {
     h.user = fw.w.scopedUserId;
     expect(await answer(await post(fw.ranked[0]!, json('Dev@Agency.example')))).toEqual([
       200,
       { queued: true },
     ]);
-    expect(h.sent).toHaveLength(1);
-    const day = new Date().toISOString().slice(0, 10);
-    expect(h.sent[0]).toMatchObject({
-      id: expect.stringMatching(new RegExp(`^fix-email:${fw.ranked[0]}:[0-9a-f]{32}:${day}$`)),
-      name: 'fix.email_developer_requested',
-      data: {
-        fixId: fw.ranked[0],
-        siteId: fw.w.site1,
-        accountId: fw.w.accountId,
-        requestedBySeatId: fw.w.scopedSeatId,
-        to: 'dev@agency.example',
+    const { rows } = await fw.db.query<Record<string, unknown>>(
+      `select id, fix_id, account_id, requested_by_seat_id, to_email, sent_at
+         from public.fix_email_requests where fix_id = $1`,
+      [fw.ranked[0]],
+    );
+    expect(rows).toEqual([
+      {
+        id: expect.any(String),
+        fix_id: fw.ranked[0],
+        account_id: fw.w.accountId,
+        requested_by_seat_id: fw.w.scopedSeatId,
+        to_email: 'dev@agency.example',
+        sent_at: null,
       },
-    });
-    expect(JSON.stringify((h.sent[0] as { id: string }).id)).not.toContain('agency');
+    ]);
+    expect(h.sent).toEqual([
+      {
+        id: `fix-email:${rows[0]!.id}`,
+        name: 'fix.email_developer_requested',
+        data: { requestId: rows[0]!.id },
+      },
+    ]);
+    // The address is in the row, never in the event.
+    expect(JSON.stringify(h.sent).toLowerCase()).not.toContain('agency.example');
     expect(h.limits).toEqual([
       [`fix-email:user:${fw.w.scopedUserId}`, 5, 3_600_000, { failClosed: true }],
       [`fix-email:fix:${fw.ranked[0]}`, 3, 86_400_000, { failClosed: true }],
@@ -164,12 +178,14 @@ describe('POST /api/fixes/[id]/email-developer', () => {
   });
 
   it.each(['fix-email:user', 'fix-email:fix'])(
-    '429 rate_limited with Retry-After when %s is spent, and nothing sent',
+    '429 rate_limited with Retry-After when %s is spent: no row, nothing sent',
     async (bucket) => {
       h.limited.add(bucket);
-      const res = await post(fw.ranked[0]!, json('dev@agency.example'));
-      expect(await answer(res)).toEqual([429, { error: 'rate_limited' }]);
+      const before = await requests(fw.ranked[1]!);
+      const res = await post(fw.ranked[1]!, json('dev@agency.example'));
+      expect(await answer(res)).toEqual([429, { code: 'rate_limited' }]);
       expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
+      expect(await requests(fw.ranked[1]!)).toBe(before);
       expect(h.sent).toEqual([]);
     },
   );

@@ -16,7 +16,6 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Check, Fix, FixtureDataset } from '@crawlmouse/types/v2';
-import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { Capture } from './events';
 import type { FixesStore, SiteFixes } from './fixes-store';
@@ -199,7 +198,7 @@ export type RateLimit = (
 export interface EmailEvent {
   id: string;
   name: 'fix.email_developer_requested';
-  data: { fixId: string; siteId: string; accountId: string; requestedBySeatId: string; to: string };
+  data: { requestId: string };
 }
 
 export interface EmailDeps extends FixDeps {
@@ -212,10 +211,10 @@ const EmailBody = z.strictObject({ email: z.email().max(254) });
 /**
  * POST /api/fixes/[id]/email-developer `{email}` once membership is established: 402
  * `fixesVisible` for a fix the tier does not see; 400 `invalid_email`; 429 `rate_limited` with
- * `Retry-After` past either limit, both failing closed; otherwise one
- * `fix.email_developer_requested` event, `{queued: true}`. CC-28's mailer sends the email; nothing is
- * sent from here. The event id is the fix, a hash of the address and the day, so a repeat the same
- * day is one event (Inngest drops an id it has seen within 24 hours).
+ * `Retry-After` past either limit, both failing closed; otherwise a `fix_email_requests` row holding
+ * the address, then one `fix.email_developer_requested` event naming only that row, with the row's
+ * id in the event id, and `{queued: true}`. CC-28's mailer reads the row and sends; nothing is sent
+ * from here (owner ruling Q8).
  */
 export async function emailDeveloper(
   deps: EmailDeps,
@@ -239,25 +238,20 @@ export async function emailDeveloper(
         1,
         Math.ceil((verdict.resetAt.getTime() - deps.now().getTime()) / 1000),
       );
-      return Response.json(
-        { error: 'rate_limited' },
-        { status: 429, headers: { 'retry-after': String(seconds) } },
-      );
+      return refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
     }
   }
 
-  const day = deps.now().toISOString().slice(0, 10);
-  const address = createHash('sha256').update(to).digest('hex').slice(0, 32);
+  const requestId = await deps.store.requestEmail({
+    fixId: r.fix.id,
+    accountId: r.site.account_id,
+    seatId: r.seatId,
+    to,
+  });
   await deps.send({
-    id: `fix-email:${r.fix.id}:${address}:${day}`,
+    id: `fix-email:${requestId}`,
     name: 'fix.email_developer_requested',
-    data: {
-      fixId: r.fix.id,
-      siteId: r.site.id,
-      accountId: r.site.account_id,
-      requestedBySeatId: r.seatId,
-      to,
-    },
+    data: { requestId },
   });
   return Response.json({ queued: true });
 }

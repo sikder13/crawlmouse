@@ -43,7 +43,8 @@ import {
   type FixEvent,
 } from '@crawlmouse/types/v2';
 import { z } from 'zod';
-import { posthogCapture, type Capture } from '../account/events';
+import { SERVER_EVENTS, type Sender, type ServerEvents } from '../account/events';
+import { captureServerEvent } from '../account/server-capture-interim';
 import { PERSIST_RPC } from './columns';
 import { DiffInputsSchema } from './rows';
 import type {
@@ -196,16 +197,19 @@ export function persistCalls(input: PersistInput): PersistCalls {
   };
 }
 
+/** The event a verification sends (owner rulings Q6, Q7), one of the catalogue's server events. */
+const FIX_CLOSED = 'fix_closed' satisfies (typeof SERVER_EVENTS)[number];
+
 /**
- * Persists the built check, then captures `fix_closed` for each verification the call wrote, keyed by
- * the usage event's account (a site no account keeps has none, and sends nothing). A repeated call
- * answers no verifications, so a retried step does not send them twice. No request reaches this step,
- * so the consent cookie the routes read (events.ts) cannot be read here.
+ * Persists the built check, then sends `fix_closed` for each verification the call wrote, as
+ * `account:<id>` of the usage event's account (a site no account keeps has none, and sends nothing),
+ * through the product's server sender. A repeated call answers no verifications, so a retried step
+ * does not send them twice. No request reaches this step, so no consent cookie can be read here.
  */
 export async function persistBuiltCheck(
   db: PersistDb,
   input: PersistInput,
-  capture: Capture = posthogCapture,
+  send: Sender = captureServerEvent,
 ): Promise<PersistOutcome> {
   const calls = persistCalls(input);
   for (const s of calls.stages) {
@@ -219,10 +223,11 @@ export async function persistBuiltCheck(
   const accountId = input.built.usage_event?.account_id ?? null;
   if (accountId !== null) {
     for (const v of outcome.verified) {
-      await capture('fix_closed', accountId, {
+      const properties: ServerEvents[typeof FIX_CLOSED] = {
         type: v.type,
         checksToClose: v.checks_to_close,
-      }).catch(() => undefined);
+      };
+      await send(FIX_CLOSED, `account:${accountId}`, properties).catch(() => undefined);
     }
   }
   return outcome;

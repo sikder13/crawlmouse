@@ -108,7 +108,7 @@ describe('markDone', () => {
     const fix = fw.ranked[3]!;
     expect(await answer(await mark(fw.w.ownerId, fix))).toEqual([
       402,
-      { error: 'upgrade_required', gate: 'fixesVisible' },
+      { code: 'upgrade_required', gate: 'fixesVisible' },
     ]);
     expect(await state(fix)).toEqual({ status: 'open', events: [] });
     expect(captured).toEqual([]);
@@ -132,7 +132,7 @@ describe('markDone', () => {
     await makePro(db, fw.w.accountId);
     expect(await answer(await mark(fw.w.ownerId, fix))).toEqual([
       409,
-      { error: 'not_markable', status: 'verified_resolved' },
+      { code: 'not_markable', status: 'verified_resolved' },
     ]);
     expect(asked).toEqual([]);
   });
@@ -156,12 +156,12 @@ describe('markDone', () => {
   it('404 for a fix of a removed site, and for a caller with no seat on the fix’s account', async () => {
     expect(await answer(await mark(fw.stranger.ownerId, fw.ranked[0]!))).toEqual([
       404,
-      { error: 'not_found' },
+      { code: 'not_found' },
     ]);
     await db.query(`update public.sites set removed_at = now() where id = $1`, [fw.w.site1]);
     expect(await answer(await mark(fw.w.ownerId, fw.ranked[0]!))).toEqual([
       404,
-      { error: 'not_found' },
+      { code: 'not_found' },
     ]);
     expect(asked).toEqual([]);
     expect((await state(fw.ranked[0]!)).status).toBe('open');
@@ -181,7 +181,7 @@ describe('markDone', () => {
     // Their own Free account's fix: its only fix carries a verified event, so Free opens none.
     expect(await answer(await mark(fw.stranger.ownerId, theirOwn))).toEqual([
       402,
-      { error: 'upgrade_required', gate: 'fixesVisible' },
+      { code: 'upgrade_required', gate: 'fixesVisible' },
     ]);
     expect(asked.map((a) => a.cap)).toEqual([GATES.pro.manualChecksPerSiteDay]);
   });
