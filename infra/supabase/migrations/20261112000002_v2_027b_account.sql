@@ -154,10 +154,6 @@ create table if not exists public.pending_erasures (
   accounts uuid[] not null check (cardinality(accounts) >= 1),
   confirmed_at timestamptz not null,
   purge_after timestamptz not null check (purge_after > confirmed_at),
-  -- The subscription the confirm asked Stripe to end, and whether this confirm set it to end (false
-  -- when it was already set to, so a restore leaves the person's own cancellation alone).
-  subscription_id text check (subscription_id ~ '^sub_'),
-  we_set_cancel boolean not null default false,
   attempts integer not null default 0,
   last_attempt_at timestamptz
 );
@@ -1009,7 +1005,7 @@ grant execute on function public.erase_auth_audit_log(uuid, text[]) to service_r
 -- The subscriptions a confirmed deletion asked Stripe to end, one row each, and whether this deletion
 -- set it to end (false when the person had already set it to, or Stripe cancelled it at once), so a
 -- restore resumes only what the deletion stopped (plan-revision R5). A person alone on two accounts
--- may hold two subscriptions, which pending_erasures' one subscription_id cannot name. No foreign key:
+-- may hold two subscriptions, one per account. No foreign key:
 -- like pending_erasures, nothing the erasure deletes takes a row with it; finish_erasure and
 -- restore_account delete them.
 create table if not exists public.deletion_cancellations (
