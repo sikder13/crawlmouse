@@ -222,19 +222,22 @@ export async function packet(deps: FixDeps, caller: FixCaller): Promise<Response
 
 // ─── Email a developer ──────────────────────────────────────────────────────────────────────────
 
-/** The fix page's limits (questions.md Q8): per user per hour, and per fix per day. */
-export const EMAIL_LIMITS = {
-  perUserHour: { limit: 5, windowMs: 60 * 60 * 1000 },
-  perFixDay: { limit: 3, windowMs: 24 * 60 * 60 * 1000 },
-} as const;
+/** One limit's verdict, as `checkRateLimit` (lib/rate-limit.ts) answers it. */
+export interface LimitVerdict {
+  allowed: boolean;
+  resetAt: Date;
+}
 
-/** `checkRateLimit`'s shape (lib/rate-limit.ts), passed in so tests need no database. */
-export type RateLimit = (
-  bucketKey: string,
-  limit: number,
-  windowMs: number,
-  opts: { failClosed: true },
-) => Promise<{ allowed: boolean; resetAt: Date }>;
+/**
+ * The fix page's two limits (questions.md Q8), each counting one request when called. The route makes
+ * the `checkRateLimit` calls itself, so the window guard (lib/rate-limit-callers.test.ts) reads them.
+ */
+export interface EmailLimits {
+  /** 3 per fix per day, shared by the account's members. */
+  perFix(): Promise<LimitVerdict>;
+  /** 5 per user per hour. */
+  perUser(): Promise<LimitVerdict>;
+}
 
 export interface EmailEvent {
   id: string;
@@ -243,7 +246,7 @@ export interface EmailEvent {
 }
 
 export interface EmailDeps extends FixDeps {
-  rateLimit: RateLimit;
+  limits: EmailLimits;
   send(event: EmailEvent): Promise<unknown>;
 }
 
@@ -252,7 +255,8 @@ const EmailBody = z.strictObject({ email: z.email().max(254) });
 /**
  * POST /api/fixes/[id]/email-developer `{email}` once membership is established: 402
  * `fixesVisible` for a fix the tier does not see; 400 `invalid_email`; 429 `rate_limited` with
- * `Retry-After` past either limit, both failing closed; otherwise a `fix_email_requests` row holding
+ * `Retry-After` past either limit, both failing closed, the per-fix one counted first so a request
+ * it refuses spends none of the caller's hourly sends; otherwise a `fix_email_requests` row holding
  * the address, then one `fix.email_developer_requested` event naming only that row, with the row's
  * id in the event id, and `{queued: true}`. CC-28's mailer reads the row and sends; nothing is sent
  * from here (owner ruling Q8).
@@ -271,11 +275,8 @@ export async function emailDeveloper(
   if (!input.success) return refuseTo(kind, EMAIL_BACK, 400, 'invalid_email');
   const to = input.data.email.toLowerCase();
 
-  for (const [key, { limit, windowMs }] of [
-    [`fix-email:user:${caller.userId}`, EMAIL_LIMITS.perUserHour],
-    [`fix-email:fix:${r.fix.id}`, EMAIL_LIMITS.perFixDay],
-  ] as const) {
-    const verdict = await deps.rateLimit(key, limit, windowMs, { failClosed: true });
+  for (const limit of [deps.limits.perFix, deps.limits.perUser]) {
+    const verdict = await limit();
     if (!verdict.allowed) {
       const seconds = Math.max(
         1,
