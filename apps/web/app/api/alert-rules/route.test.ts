@@ -10,6 +10,8 @@ const h = vi.hoisted(() => ({
   db: null as unknown as PGlite,
   user: null as { id: string; email: string } | null,
   log: [] as string[],
+  /** Runs after the viewer is read: a change between that read and the role check. */
+  afterViewer: null as null | (() => Promise<void>),
 }));
 
 vi.mock('@/lib/supabase/server', async () => {
@@ -49,7 +51,7 @@ vi.mock('@/lib/v2/account/viewer', async () => {
   return {
     loadViewer: async () => {
       if (!h.user) return { kind: 'signed_out' };
-      return readViewer(
+      const viewer = await readViewer(
         {
           session: postgrestOver(h.db, { as: { userId: h.user.id } }),
           admin: postgrestOver(h.db),
@@ -57,6 +59,8 @@ vi.mock('@/lib/v2/account/viewer', async () => {
         },
         h.user,
       );
+      await h.afterViewer?.();
+      return viewer;
     },
   };
 });
@@ -182,6 +186,31 @@ describe('PUT /api/alert-rules', () => {
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toBe('/alerts');
     expect(await enabledOf(m.ruleId)).toBe(false);
+  });
+
+  it('answers 404 when the role check finds no seat, with no service-role client and no write', async () => {
+    // The account is marked for deletion between the viewer's read and the role check, so
+    // member_role answers null (027b's membership functions refuse a marked account).
+    const m = await member('marked', 'pro');
+    h.user = m.user;
+    h.afterViewer = async () => {
+      await h.db.query(
+        `update public.accounts set deletion_confirmed_at = now(), purge_after = now() + interval '7 days' where id = $1`,
+        [m.accountId],
+      );
+    };
+    try {
+      const res = await PUT(put({ rule: m.ruleId, enabled: false }));
+      expect(res.status).toBe(404);
+      expect(h.log).not.toContain('supabaseAdmin');
+      const { rows } = await h.db.query<{ enabled: boolean }>(
+        `select enabled from public.alert_rules where id = $1`,
+        [m.ruleId],
+      );
+      expect(rows[0]!.enabled).toBe(true);
+    } finally {
+      h.afterViewer = null;
+    }
   });
 
   it('answers 404 for another account’s rule, and writes nothing to it', async () => {

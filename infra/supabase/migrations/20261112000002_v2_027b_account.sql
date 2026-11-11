@@ -308,8 +308,9 @@ grant execute on function public.issue_account_link(uuid) to service_role;
 --   CMA05  the link's token is unknown, of another kind, used, revoked or expired, or its change
 --          was stopped
 --   CMA06  the undo was prepared for a change that was pending, and the change applied in between
---   CMA07  the person's deletion is under way: a live delete_confirm or delete_restore link, or a
---          pending_erasures row
+--   CMA07  the person's deletion is under way: a live delete_confirm link (the 24 hours before a
+--          confirm) or a pending_erasures row (after it). A live delete_restore link alone does not
+--          refuse: every deletion request creates one for 8 days, confirmed or not (fix round 2).
 
 -- users.email_normalized: the rule of apps/web/lib/auth/normalize-email.ts (the trial ledger's key),
 -- for an address request_email_change accepted (lowercase, no surrounding space). The TS function
@@ -395,7 +396,7 @@ begin
   end if;
   if exists (select 1 from public.pending_erasures e where e.user_id = p_user)
      or exists (select 1 from public.account_tokens k
-                 where k.user_id = p_user and k.kind in ('delete_confirm', 'delete_restore')
+                 where k.user_id = p_user and k.kind = 'delete_confirm'
                    and k.used_at is null and k.revoked_at is null and k.expires_at > p_now) then
     raise exception 'request_email_change: the person''s deletion is under way' using errcode = 'CMA07';
   end if;
@@ -1042,10 +1043,11 @@ declare
   v_accounts uuid[];
   v_n bigint;
   v_planned bigint;
+  v_marked uuid[];
   v_applied jsonb := '{}';
 begin
   if p_require_due then
-    perform 1 from public.pending_erasures q
+    select q.accounts into v_marked from public.pending_erasures q
       where q.user_id = p_user and q.purge_after <= now() for update;
     if not found then
       raise exception 'erase_person_apply: no erasure of this person is due' using errcode = '55000';
@@ -1059,6 +1061,12 @@ begin
   v_user := (v_plan->>'userId')::uuid;
   v_emails := array(select jsonb_array_elements_text(v_plan->'emails'));
   v_accounts := array(select jsonb_array_elements_text(v_plan->'accounts')::uuid);
+  -- The purge erases only what its confirm marked, checked here under the queue row's lock, so an
+  -- account the person came to hold after the plan was read is not deleted with the others.
+  if p_require_due and not (v_accounts <@ v_marked) then
+    raise exception 'erase_person_apply: accounts_changed: the accounts to erase are not those the confirm marked'
+      using errcode = '55000';
+  end if;
 
   for r in select * from public.erase_rules() where kind = 'change' loop
     execute case when r.action is null
@@ -1319,11 +1327,16 @@ begin
   if not found or v.used_at is not null or v.revoked_at is not null or v.expires_at <= p_now then
     return jsonb_build_object('ok', false, 'code', 'invalid_link');
   end if;
+  -- One confirm per person at a time: two links (one per account the person holds) posted at once
+  -- would each pass the check below before either inserted the queue row. The lock is the
+  -- transaction's, so the second waits and then reads the first's row.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('account-deletion:' || v.user_id::text, 0));
   v_refusal := case
     -- A link from another account the person holds, after the first confirm marked them all.
     when exists (select 1 from public.pending_erasures q where q.user_id = v.user_id)
       then 'already_confirmed'
-    when public.email_change_live(v.user_id) then 'email_change_pending'
+    when public.email_change_live(v.user_id, p_now) then 'email_change_pending'
     else public.deletion_refusal(v.account_id, v.user_id) end;
   if v_refusal is not null then
     return jsonb_build_object('ok', false, 'code', v_refusal);
@@ -1419,6 +1432,23 @@ as $$
   select exists (select 1 from public.pending_erasures q where q.user_id = p_user);
 $$;
 
+-- Where the person's deletion stands: `pending` (queued), `erased` (the purge removed them: no
+-- public.users row, which cascades from auth.users), `restored` otherwise. What a restore whose answer
+-- was lost asks, to tell a committed restore from one that did not happen or a finished purge.
+create or replace function public.erasure_state(p_user uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select case
+    when exists (select 1 from public.pending_erasures q where q.user_id = p_user) then 'pending'
+    when not exists (select 1 from public.users u where u.id = p_user) then 'erased'
+    else 'restored'
+  end;
+$$;
+
 -- The purge's work: the people whose window has ended by p_now and by the database's clock; those
 -- not yet attempted first, then the least recently attempted, so people a refusal keeps in the queue
 -- cannot hold the others back. A restore refuses once either clock has passed the window's end
@@ -1480,6 +1510,7 @@ revoke all on function public.confirm_account_deletion(text, timestamptz) from p
 revoke all on function public.restore_account(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.record_deletion_cancel(uuid, uuid, text, boolean) from public, anon, authenticated;
 revoke all on function public.erasure_pending(uuid) from public, anon, authenticated;
+revoke all on function public.erasure_state(uuid) from public, anon, authenticated;
 revoke all on function public.due_erasures(timestamptz, integer) from public, anon, authenticated;
 revoke all on function public.record_erasure_attempt(uuid) from public, anon, authenticated;
 revoke all on function public.finish_erasure(uuid) from public, anon, authenticated;
@@ -1491,6 +1522,7 @@ grant execute on function public.confirm_account_deletion(text, timestamptz) to 
 grant execute on function public.restore_account(text, timestamptz) to service_role;
 grant execute on function public.record_deletion_cancel(uuid, uuid, text, boolean) to service_role;
 grant execute on function public.erasure_pending(uuid) to service_role;
+grant execute on function public.erasure_state(uuid) to service_role;
 grant execute on function public.due_erasures(timestamptz, integer) to service_role;
 grant execute on function public.record_erasure_attempt(uuid) to service_role;
 grant execute on function public.finish_erasure(uuid) to service_role;

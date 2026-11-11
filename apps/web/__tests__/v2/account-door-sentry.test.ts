@@ -222,6 +222,9 @@ describe('scrubDoorSecrets, inside strings', () => {
       expect(out.request.url).toBe(`https://crawlmouse.com/account/${flow}/[Filtered]?x=1`);
       expect(out.breadcrumbs[0]!.message).toBe(`to=%2Faccount%2F${flow}%2F[Filtered]`);
     }
+    // URL-encoding may spell the slash in lowercase.
+    const lower = scrubDoorSecrets({ message: `to=%2faccount%2fdelete%2f${token}` });
+    expect(lower.message).toBe('to=%2faccount%2fdelete%2f[Filtered]');
     // The pages the links land on carry no token and are left as they are.
     expect(scrubDoorSecrets({ transaction: 'GET /account/delete' }).transaction).toBe(
       'GET /account/delete',
