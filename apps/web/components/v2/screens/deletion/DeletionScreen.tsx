@@ -1,4 +1,4 @@
-import { DELETE_COPY, LINK_STATES, RESTORE_COPY } from '@/lib/v2/copy/deletion';
+import { DELETE_COPY, deletionMoney, LINK_STATES, RESTORE_COPY } from '@/lib/v2/copy/deletion';
 import { LINK_FLOWS } from '@/lib/v2/account/link-cookie';
 import type { DeletionFlow, DeletionLinkView } from '@/lib/v2/account/deletion-link';
 import { Button } from '../../Button';
@@ -34,21 +34,28 @@ export function DeletionScreen({ flow, view }: { flow: DeletionFlow; view: Delet
               <p className={styles.lead}>{copy.lead}</p>
               <Card className={styles.card}>
                 <ul className={styles.cardBody}>
-                  {view.accounts.map((a) => (
-                    <li key={a.id} className={styles.monoStrong}>
-                      {a.host}
-                    </li>
-                  ))}
+                  {view.accounts.map((a) => {
+                    // What happens to this account's plan, by its state (`deletionMoney`); nothing
+                    // for an account with no plan, or one that has ended.
+                    const money = flow === 'deleteConfirm' ? deletionMoney(a.subscription) : null;
+                    return (
+                      <li key={a.id} data-account={a.id}>
+                        <span className={styles.monoStrong}>{a.host}</span>
+                        {money === null
+                          ? null
+                          : money.map((line) => (
+                              <p key={line} className={styles.cardBody}>
+                                {line}
+                              </p>
+                            ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               </Card>
               {flow === 'deleteConfirm' ? (
                 <>
                   {DELETE_COPY.what.map((line) => (
-                    <p key={line} className={styles.cardBody}>
-                      {line}
-                    </p>
-                  ))}
-                  {DELETE_COPY.money.map((line) => (
                     <p key={line} className={styles.cardBody}>
                       {line}
                     </p>

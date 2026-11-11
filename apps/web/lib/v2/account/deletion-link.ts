@@ -22,7 +22,12 @@ const KIND = { deleteConfirm: 'delete_confirm', restore: 'delete_restore' } as c
 
 /** What a page shows: the link's accounts, or why it has none. */
 export type DeletionLinkView =
-  | { ok: true; accounts: Array<{ id: string; host: string }>; purgeAfter: string | null }
+  | {
+      ok: true;
+      /** `subscription`: the status of the plan the account follows, or null (read_deletion_link). */
+      accounts: Array<{ id: string; host: string; subscription: string | null }>;
+      purgeAfter: string | null;
+    }
   | { ok: false; code: string };
 
 /** The page's read of its link, from the flow's cookie value (or none). Uses nothing. */
