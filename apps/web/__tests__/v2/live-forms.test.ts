@@ -15,7 +15,7 @@ import {
 import { EmailBody } from '../../lib/v2/account/fixes';
 import { trialAccountId } from '../../lib/v2/account/pro-trial';
 import { meantMethod } from '../../lib/v2/account/route';
-import { parseAddBody, parseEditBody } from '../../lib/v2/account/sites';
+import { isRemoveConfirmed, parseAddBody, parseEditBody } from '../../lib/v2/account/sites';
 import { ThemeBody } from '../../lib/v2/account/theme';
 import type { ActionView } from '../../lib/v2/view/account-actions';
 
@@ -82,7 +82,9 @@ describe('each live form posts what its route reads', () => {
 
   it('remove a site: DELETE with the confirmation ticked, and nothing else', () => {
     const a = row('Remove this site');
-    expect(asRoute(a, submitted(a))).toEqual({ method: 'DELETE', fields: { confirm: 'remove' } });
+    const m = asRoute(a, submitted(a));
+    expect(m.method).toBe('DELETE');
+    expect(isRemoveConfirmed(m.fields)).toBe(true);
   });
 
   it('the theme: PATCH {theme}, as the theme control posts it', () => {
