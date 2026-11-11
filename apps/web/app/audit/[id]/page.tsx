@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata, Route } from 'next';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { auditHrefs } from '@/lib/v2/view/audit-hrefs';
 
 // Capability URL: the unguessable audit UUID is the only thing guarding this page, so it must
 // never be indexed. The indexable surface for a result is the minted /r/<slug> report.
@@ -27,12 +28,13 @@ export default async function AuditPage({
 }) {
   const { id } = await params;
   // CC-22b: under V2_CHECKS_PUBLIC an id that names a v2 check the viewer may read is sent to that
-  // check's own page. This page imports no v2 screen, here or through `import()`: a production
+  // check's own page, which loads it; here only its row and its site's are read to decide.
+  // This page imports no v2 screen, here or through `import()`: a production
   // build links a screen's stylesheets on each page whose module can reach it, flag on or off.
   // Any other id is a v1 audit, served below as before.
   if (checksPublicEnabled()) {
-    const { readAudit } = await import('./_lib/access');
-    if (await readAudit(id)) redirect(`/audit/${id}/overview` as Route);
+    const { isReadableAudit } = await import('./_lib/access');
+    if (await isReadableAudit(id)) redirect(auditHrefs(id).overview as Route);
   }
   // Entry-point hint from /ai-readiness-checker. Anything other than the one known value is treated
   // as absent, so a hand-edited URL can only ever produce today's ordering.
@@ -46,7 +48,7 @@ export default async function AuditPage({
   const { data: audit } = await sb.from('audits').select('id, url').eq('id', id).maybeSingle();
   // Under the flag, an id that is neither is answered by the v2 overview's 404, which says the
   // audit does not exist or has expired.
-  if (!audit && checksPublicEnabled()) redirect(`/audit/${id}/overview` as Route);
+  if (!audit && checksPublicEnabled()) redirect(auditHrefs(id).overview as Route);
   if (!audit) notFound();
 
   return (

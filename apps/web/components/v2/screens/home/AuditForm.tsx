@@ -4,6 +4,7 @@ import { useCallback, useId, useRef, useState, type FormEvent } from 'react';
 import { Turnstile } from '@/components/ui/Turnstile';
 import { turnstileEnabled, TURNSTILE_SITE_KEY } from '@/lib/turnstile-client';
 import { checkHost } from '../../../../lib/v2/hostname';
+import { auditHref } from '../../../../lib/v2/view/audit-hrefs';
 import { Button } from '../../Button';
 import { Field } from '../../Field';
 import { START_COPY, startCheck, urlOf, type StartRequest } from './start-check';
@@ -59,7 +60,7 @@ export function AuditForm({
     async (request: StartRequest) => {
       const outcome = await startCheck(request);
       if (outcome.ok) {
-        window.location.assign(`/audit/${outcome.checkId}`);
+        window.location.assign(auditHref(outcome.checkId));
         return;
       }
       // Asked once per submit: a second ask, or no widget to answer with, is a failed check.
