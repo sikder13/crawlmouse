@@ -27,7 +27,13 @@ import {
 } from '../../../app/(v2-preview)/v2-preview/_preview/segments';
 import { RESULT_PREVIEWS } from '../../../app/(v2-preview)/v2-preview/_preview/screens';
 import type { ResultView } from '../../../lib/v2/view/result';
-import { BUDGET, EXPLORER, RUNS, WINDOW_MS } from '../../../../../tests/visual/budgets';
+import {
+  BUDGET,
+  EXPLORER,
+  MEAN_WORK_MS,
+  RUNS,
+  WINDOW_MS,
+} from '../../../../../tests/visual/budgets';
 import { code, readInterfaces, table } from './build-spec-22';
 
 export const SPEC_24_PATH = join(WEB_ROOT, '..', '..', 'docs', 'specs', 'v2', '24-fix-and-map.md');
@@ -188,7 +194,13 @@ function budgetSection(): string {
       [
         [
           `The crawl screen, three windows of ${WINDOW_MS / 1000} s`,
-          `no task over ${BUDGET.stallMs} ms; layout shift at most ${BUDGET.layoutShift}; the main thread busy at most ${BUDGET.meanWorkMs} ms a 16.7 ms slice on average, and at most ${BUDGET.p95WorkMs} ms in 95% of them; no frame over ${BUDGET.maxFrameMs} ms`,
+          `no task over ${BUDGET.stallMs} ms; layout shift at most ${BUDGET.layoutShift}; the main thread busy, per 16.7 ms slice, on average at most ${Object.entries(
+            MEAN_WORK_MS,
+          )
+            .map(([name, ms]) => `${ms} ms (${name})`)
+            .join(
+              ', ',
+            )}, and at most ${BUDGET.p95WorkMs} ms in 95% of slices; no frame over ${BUDGET.maxFrameMs} ms`,
         ],
         [
           `The explorer, ${code(EXPLORER.path)}, ${EXPLORER.ms / 1000} s, a step down the list every ${EXPLORER.stepMs} ms`,

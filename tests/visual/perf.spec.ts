@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { busyPerSlice, quantile } from '../../packages/timing/src/busy';
 import { recordSample } from '../../packages/timing/src/samples';
 import { fmt, median } from '../../packages/timing/src/stats';
-import { ADVISORY, BUDGET, EXPLORER, RUNS, WINDOW_MS } from './budgets';
+import { ADVISORY, BUDGET, EXPLORER, MEAN_WORK_MS, RUNS, WINDOW_MS } from './budgets';
 import { test, expect, type Browser, type Page, type TestInfo } from './pw';
 
 /**
@@ -43,7 +43,7 @@ import { test, expect, type Browser, type Page, type TestInfo } from './pw';
  * - Layout shift within a window: at most 0.001, zero within rounding. The whole replay, end
  *   included, is measured by motion.spec.ts ("layout shift over a whole replay").
  * - Work per frame: the main thread's busy time in each 16.7 ms slice of the traced window (one
- *   60 Hz frame; packages/timing/src/busy.ts). Its mean is at most BUDGET.meanWorkMs, and its 95th
+ *   60 Hz frame; packages/timing/src/busy.ts). Its mean is at most the window's MEAN_WORK_MS, and its 95th
  *   percentile, the bursts, at most BUDGET.p95WorkMs. The slices are fixed in time, so the reading
  *   is what the page did, whatever refresh rate the runner manages. The mean is the one judged
  *   closely: a map rendered and animated twice moved it by about a third, 2.195 to 2.93 ms (the
@@ -237,7 +237,7 @@ test.describe('crawl screen performance', () => {
           { metric: 'longestTaskMs', unit: 'ms', limit: BUDGET.stallMs },
           { metric: 'longTasks', unit: 'tasks', limit: w.longTasks },
           { metric: 'layoutShift', unit: 'score', limit: BUDGET.layoutShift },
-          { metric: 'meanWorkMs', unit: 'ms', limit: BUDGET.meanWorkMs },
+          { metric: 'meanWorkMs', unit: 'ms', limit: meanWorkLimit(w.name) },
           { metric: 'p95WorkMs', unit: 'ms', limit: BUDGET.p95WorkMs },
           { metric: 'maxFrameMs', unit: 'ms', limit: BUDGET.maxFrameMs },
           { metric: 'p95FrameMs', unit: 'ms', limit: ADVISORY.p95FrameMs, advisory: true },
@@ -288,6 +288,13 @@ test.describe('crawl screen performance', () => {
     expect(missed, `medians of ${RUNS} runs`).toEqual([]);
   });
 });
+
+/** The window's mean-work limit; a window without one is a mistake in budgets.ts, not a pass. */
+function meanWorkLimit(name: string): number {
+  if (!Object.hasOwn(MEAN_WORK_MS, name))
+    throw new Error(`budgets.ts has no MEAN_WORK_MS for ${name}`);
+  return MEAN_WORK_MS[name]!;
+}
 
 /**
  * A budget judged on the median of a metric across the runs: at most `limit`. An advisory one is

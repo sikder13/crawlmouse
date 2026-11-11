@@ -69,7 +69,8 @@ window (`packages/timing/src/busy.ts`; its tests pin the arithmetic against sums
 slices). The slices are fixed in time, so the reading is the page's work whatever refresh rate the
 runner manages. Judged on the median of five runs, as before:
 
-- `meanWorkMs`, the mean busy time per slice, at most `BUDGET.meanWorkMs`;
+- `meanWorkMs`, the mean busy time per slice, at most the window's `MEAN_WORK_MS` (each window
+  does its own amount of work, as its long-task cap already says);
 - `p95WorkMs`, its 95th percentile (the bursts), at most `BUDGET.p95WorkMs`;
 - `maxFrameMs`, no frame interval over 100 ms (a stall at any refresh rate), unchanged.
 
@@ -78,7 +79,7 @@ nightly trend, not judged (`ADVISORY` in `tests/visual/budgets.ts`). A run must 
 frames a second to count as measured; it was 50, which failed a 30 fps runner as "measurement
 invalid", an error the retry never excuses.
 
-Read the limits: `sed -n '/^export const BUDGET/,/^};/p' tests/visual/budgets.ts`.
+Read the limits: `sed -n '/^export const BUDGET/,/^};/p;/^export const MEAN_WORK_MS/,/^};/p' tests/visual/budgets.ts`.
 
 **Measured on the production build, the crawl window, five runs each** (a workstation, 2026-11-11;
 logs beside the PR notes). This machine draws about 50 frames a second, so the old rule failed it

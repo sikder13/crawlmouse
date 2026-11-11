@@ -6,9 +6,7 @@ export const BUDGET = {
   /** A main-thread task longer than this is a stall. */
   stallMs: 100,
   layoutShift: 0.001,
-  /** The main thread's mean busy time per 16.7 ms slice of a crawl window. */
-  meanWorkMs: 2.5,
-  /** The 95th percentile of the same: the bursts. */
+  /** The 95th percentile of the main thread's busy time per 16.7 ms slice: the bursts. */
   p95WorkMs: 10,
   /** A frame interval longer than this is a stall, at any refresh rate. */
   maxFrameMs: 100,
@@ -22,6 +20,17 @@ export const ADVISORY = {
   p95FrameMs: 17.5,
   slowFrameMs: 34,
   slowShare: 0.01,
+};
+
+/**
+ * The main thread's mean busy time per 16.7 ms slice, per crawl-screen window: each window does its
+ * own amount of work, as its long-task cap already says. Set from the readings in
+ * docs/specs/v2/ci-cost.md, D3.
+ */
+export const MEAN_WORK_MS: Record<string, number> = {
+  'the crawl, the map growing': 2.5,
+  'the crawler tests, the log and verdicts landing': 1,
+  'on a phone, the crawler tests beginning': 3.2,
 };
 
 /** How long each crawl-screen window plays. */
