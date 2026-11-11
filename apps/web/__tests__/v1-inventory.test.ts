@@ -177,6 +177,9 @@ describe('the finders see what they claim to see', () => {
       'app/api/billing/pro-trial/start/route.ts',
       'app/api/checks/[id]/claim/route.ts',
       'app/api/me/route.ts',
+      'app/api/sites/[id]/checks/route.ts',
+      'app/api/sites/[id]/route.ts',
+      'app/api/sites/route.ts',
       'app/api/webhooks/stripe-account/route.ts',
     ]);
   });
