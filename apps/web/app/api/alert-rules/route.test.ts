@@ -205,11 +205,36 @@ describe('PUT /api/alert-rules', () => {
     expect(h.log).not.toContain('supabaseAdmin');
   });
 
-  it('a POST that does not name PUT is refused with 405', async () => {
+  it('a refused form goes back to Alerts with its code; JSON is answered with JSON', async () => {
+    const m = await member('form-refused', 'free');
+    h.user = m.user;
+    const url = encodeURIComponent(URL_A);
+    const res = await POST(form(`_method=PUT&slackWebhookUrl=${url}`));
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/alerts?error=upgrade_required');
+    const bad = await POST(form('_method=PUT&channel=%23seo'));
+    expect(bad.headers.get('location')).toBe('/alerts?error=invalid');
+    const theirs = await member('form-theirs', 'free');
+    const gone = await POST(form(`_method=PUT&rule=${theirs.ruleId}&enabled=false`));
+    expect(gone.headers.get('location')).toBe('/alerts?error=not_found');
+    expect((await PUT(put({ slackWebhookUrl: URL_A }))).status).toBe(402);
+    expect(await secretsOf(m.accountId)).toEqual([]);
+  });
+
+  it('a POST that does not name PUT is refused: 405 for JSON, back to Alerts for a form', async () => {
     const m = await member('verb', 'pro');
     h.user = m.user;
     const res = await POST(form(`rule=${m.ruleId}&enabled=false`));
-    expect(res.status).toBe(405);
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/alerts?error=method_not_allowed');
+    const json = await POST(
+      new Request(`${ORIGIN}/api/alert-rules`, {
+        method: 'POST',
+        headers: { origin: ORIGIN, 'content-type': 'application/json' },
+        body: JSON.stringify({ rule: m.ruleId, enabled: false }),
+      }),
+    );
+    expect(json.status).toBe(405);
     expect(await enabledOf(m.ruleId)).toBe(true);
   });
 });
