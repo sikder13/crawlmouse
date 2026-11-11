@@ -147,3 +147,8 @@ erased and nothing can be restored until the flag returns.
 - that no client role holds a privilege on `vault.secrets` or `vault.decrypted_secrets`;
 - that `erase_person_plan` runs on the branch for a test user (it reads `auth.users` and
   `storage.objects` as `postgres`).
+
+Read-only on production, 2026-11-11 (the owner): `postgres` may delete `auth.sessions` and `auth.refresh_tokens`;
+`supabase_vault` is installed; `anon` and `authenticated` hold no table privilege in schema `vault`;
+`auth.refresh_tokens` → `auth.sessions` is `on delete cascade`. The audit-log delete and the plan's run are the
+branch's to show.

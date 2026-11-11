@@ -72,6 +72,14 @@ quotes the Terms' refund sentence, pinned to the Terms by a test; the 14-day ann
 the Terms at switch-on, and the copy follows it in that commit); **Q15** (`changeLog` and the per-site `alertRules`
 are CC-28's, `integrations` a later page; `ACCOUNT_ACTIONS` says so).
 
+Round 3 (2026-11-11): **Q16** (Settings' deletion copy names the restore link and what the erasure keeps) and **Q17**
+(Trial ending's reminder line says when it is due, and nothing once its day has passed) approved as built.
+
+**Production prechecks** (`docs/ops/erasure.md` §8), run read-only on production by the owner on 2026-11-11 at about
+08:00: `postgres` may delete `auth.sessions` and `auth.refresh_tokens`; `supabase_vault` is installed; `anon` and
+`authenticated` hold no table privilege in schema `vault`; `auth.refresh_tokens` → `auth.sessions` is `on delete
+cascade`. The owner re-checks them on the dry-run branch.
+
 No page here shares a path with a v1 page, so `V2_REWRITES` gains no row.
 
 ## Known gaps
@@ -89,8 +97,8 @@ No page here shares a path with a v1 page, so `V2_REWRITES` gains no row.
   both are for the next step that edits those files (Q11, and the ledger in the step's notes).
 - An access token issued before a deletion's confirm stays valid to its expiry (at most an hour) against v1 tables,
   whose policies read `auth.uid()` alone; v2 tables refuse it through the membership functions.
-- Before the first apply, on the dry-run branch: `postgres` may delete `auth.sessions` and `auth.refresh_tokens`, and
-  no client role holds a privilege on `vault.secrets` or `vault.decrypted_secrets` (`docs/ops/erasure.md` §8).
+- Before the first apply, on the dry-run branch, the owner re-checks the prechecks recorded under Owner rulings
+  (`docs/ops/erasure.md` §8); production passed them on 2026-11-11.
 - If Inngest refuses `account.deletion_confirmed` three times in the confirm's request, the deletion still stands
   and Sentry is told (user id only), but no `deletionCancelFn` runs: an `active` plan is not set to end during the
   window, and can renew in it. The purge cancels it at once, with no proration, before it erases.
