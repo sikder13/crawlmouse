@@ -133,7 +133,7 @@ async function measure(name: string, textChars: number, linksPerPage: number) {
       scores: async () => ({ seo: null, aiReadability: null, withheld: false }),
     },
     evidence,
-    limit: async () => ({ allowed: true }),
+    limits: { streamOpens: async () => true, finishedOnce: async () => true },
     captureFinished: async () => undefined,
     clientIp: () => 'budget',
     now: () => STARTED + 600_000,

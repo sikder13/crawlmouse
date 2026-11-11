@@ -2,13 +2,13 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { inngest } from '../../../../../../../inngest/client';
 import { getClientIp } from '@/lib/client-ip';
-import { checkRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseEvidenceStore } from '@/lib/v2/pipeline/evidence';
 import { supabaseCheckReader } from '@/lib/v2/pipeline/load';
 import { supabasePipelineStore } from '@/lib/v2/pipeline/store';
 import { supabaseStreamStore } from '@/lib/v2/pipeline/stream-store';
 import { capturePublicEvent } from '../../_lib/events';
+import { checkRouteLimits } from './limits';
 import type { CancelDeps } from '../cancel/cancel';
 import type { NotifyDeps } from '../notify/notify';
 import type { StreamDeps } from '../stream/serve';
@@ -28,7 +28,7 @@ export function checkRouteDeps(caller: SupabaseClient): StreamDeps & NotifyDeps 
     },
     store: { ...supabasePipelineStore(admin), ...supabaseStreamStore(admin) },
     evidence: supabaseEvidenceStore(admin),
-    limit: checkRateLimit,
+    limits: checkRouteLimits,
     captureFinished: (req, checkId, properties) =>
       capturePublicEvent(req, 'check_finished', checkId, properties),
     send: (event) => inngest.send(event),

@@ -13,7 +13,7 @@ import {
   running,
   type Harness,
   type Ids,
-} from '../_lib/test-harness';
+} from '../../../../../__tests__/v2/_lib/check-routes-harness';
 import { cancel } from './cancel';
 
 const anonymous: Viewer = { userId: null };
