@@ -512,6 +512,12 @@ describe('erase-account (B-F2)', () => {
       }),
     ).rejects.toThrow(/HTTP 503/);
     expect(await n(`select count(*) from auth.users where id = $1`, [p.id])).toBe(1);
+    // The transaction already cleared the Auth audit log, before the Auth call that failed.
+    expect(
+      await n(`select count(*) from auth.audit_log_entries where payload->>'actor_id' = $1`, [
+        p.id,
+      ]),
+    ).toBe(0);
     expect(await n(`select count(*) from public.accounts where id = $1`, [p.world.accountId])).toBe(
       0,
     );
