@@ -122,6 +122,16 @@ export const TRIAL_END_COPY = {
           }; add ${plan} any time to resume ${others ? 'them' : 'it'}.`
         : ''
     }`,
+  /** After the end, on Free (CC-27b D8; ARCH-2 §5 "free after trial"). */
+  ended: {
+    title: (plan: string) => `Back on Free: the ${plan} trial ended`,
+    banner: (plan: string, date: string) =>
+      `${plan} ended ${date}. Here is what stays, and what is paused.`,
+    sub: (plan: string) =>
+      `Nothing you can see was deleted. Choose ${plan} any time to resume what is paused.`,
+    choose: (plan: string, price: number) => `Choose ${plan}, $${price} a month`,
+    pausesTitle: (plan: string) => `Paused, until ${plan}`,
+  },
   tables: { stays: 'Stays', pauses: 'Pauses', did: 'Trial summary' },
   columns: { what: 'What', how: 'How', item: 'Item', value: 'Count', detail: 'Detail' },
 };

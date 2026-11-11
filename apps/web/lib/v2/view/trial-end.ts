@@ -311,6 +311,78 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
   };
 }
 
+export interface TrialEndedView {
+  shell: ShellView;
+  header: { title: string; line: string };
+  /** `keep`: the checkout for the plan the trial was of, the page's orange action. */
+  banner: { title: string; sub: string; keep: ActionView };
+  staysTitle: string;
+  stays: TrialRowView[];
+  pausesTitle: string;
+  pauses: TrialRowView[];
+  tables: typeof COPY.tables;
+  columns: typeof COPY.columns;
+}
+
+const TRIAL_TIER = { pro_trial: 'pro', agency_trial: 'agency' } as const;
+
+/**
+ * Trial ending after the end (CC-27b D8): an account on Free whose state before was a trial. What
+ * stays and what is paused are read as before the end, now on Free. Null for any other account, and
+ * for one with no primary site.
+ */
+export function trialEndedView(d: FixtureDataset, viewer: Viewer): TrialEndedView | null {
+  const v = viewAt(d, viewer);
+  const a = v.account;
+  const before = a.state_history.at(-2)?.state;
+  if (a.state !== 'free' || (before !== 'pro_trial' && before !== 'agency_trial')) return null;
+  if (primarySites(v).length === 0) return null;
+  const tier = TRIAL_TIER[before];
+  const plan = PLAN_NAMES[tier];
+  const zone = a.timezone;
+  const { stays, pauses } = staysAndPauses(v, plan);
+  return {
+    shell: accountShellView(v, 'Sites', { plan: 'page' }),
+    header: {
+      title: COPY.ended.title(plan),
+      line: [dayDate(v.now, zone), COPY.sites(v.d.sites.length)].join(' · '),
+    },
+    banner: {
+      title: COPY.ended.banner(plan, dayDate(a.state_history.at(-1)!.since, zone)),
+      sub: COPY.ended.sub(plan),
+      keep: action(
+        'keepPlan',
+        COPY.ended.choose(plan, tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY),
+        {},
+        { primary: true, fields: { plan: tier, interval: 'month' } },
+      ),
+    },
+    staysTitle: COPY.staysTitle,
+    stays,
+    pausesTitle: COPY.ended.pausesTitle(plan),
+    pauses,
+    tables: COPY.tables,
+    columns: COPY.columns,
+  };
+}
+
+/**
+ * What `GET /trial-ended` shows (spec 27 "Trial ending", one page for both states): the trial still
+ * running, read at `now`; the account back on Free after one; null for an account with no trial to
+ * show, or with no primary site to show it of.
+ */
+export function trialPage(
+  d: FixtureDataset,
+  viewer: Viewer,
+): { kind: 'before'; view: TrialEndView } | { kind: 'after'; view: TrialEndedView } | null {
+  const v = viewAt(d, viewer);
+  if (primarySites(v).length === 0) return null;
+  if (v.account.state === 'pro_trial' || v.account.state === 'agency_trial')
+    return { kind: 'before', view: trialEndView(d, viewer) };
+  const view = trialEndedView(d, viewer);
+  return view === null ? null : { kind: 'after', view };
+}
+
 /**
  * What stays on Free and what pauses until the plan, for the trial's `plan`: the oldest primary
  * site with its free three, public link and email alerts stay; the other primary sites, the staging
