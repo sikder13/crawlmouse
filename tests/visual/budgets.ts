@@ -29,7 +29,7 @@ export const ADVISORY = {
  */
 export const MEAN_WORK_MS: Record<string, number> = {
   'the crawl, the map growing': 2.5,
-  'the crawler tests, the log and verdicts landing': 1,
+  'the crawler tests, the log and verdicts landing': 0.9,
   'on a phone, the crawler tests beginning': 3.2,
 };
 

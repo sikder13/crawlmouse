@@ -100,9 +100,21 @@ page's own callbacks, not the browser's compositor.
 **The limits are absolute milliseconds**, so a slower CPU reads more work. That is what the runner
 probe and the one retry in `packages/timing/scripts/perf-retry.sh` already handle
 (`docs/ops/ci-timing.md`): a budget-only failure that repeats on a runner the probe rates slow passes
-as inconclusive. The limit was set on one workstation; the PR records the CI run's readings of all
-three windows against it, and the nightly trend
-shows how close each night runs to it.
+as inconclusive.
+
+**The limits, against CI and a workstation.** Medians of five, the production build. CI is the
+pull request run 43092736453, shard 1, on a runner the probe rated normal (103 ms against a
+105 ms reference), which drew 60 frames a second there:
+
+| window                                          | CI       | workstation | limit  |
+| ----------------------------------------------- | -------- | ----------- | ------ |
+| the crawl, the map growing                      | 2.077 ms | 2.198 ms    | 2.5 ms |
+| the crawler tests, the log and verdicts landing | 0.503 ms | 0.719 ms    | 0.9 ms |
+| on a phone, the crawler tests beginning         | 1.868 ms | 2.704 ms    | 3.2 ms |
+
+Each limit is about 1.2 times the slower of the two readings, the crawl window's rounded down to
+keep the twin-map mutation red: a third more than CI's 2.077 ms is about 2.77 ms. The nightly trend
+shows how close each night runs to them.
 
 ## D4 — superseded runs are cancelled
 
@@ -208,4 +220,5 @@ its 15-minute limit on run 43073710281. It now runs as `test-web-shard`, three j
 `vitest run --shard=N/3`, each with 25 minutes. The required check `test (web)` is the job
 `test-web`, which passes only when every shard passed, so `protect-main` is unchanged. A test
 checks that each of the eleven required check names is reported by exactly one job of `ci.yml`.
-Wall time after the change is in the PR, read from this branch's CI run.
+On this branch's push run 43091979882 the three shards took 3 min, 4 min 25 s and 5 min 27 s, and
+`test (web)` reported 5 min 32 s after they started, against 13 min 25 s as one job.
