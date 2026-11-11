@@ -5,7 +5,7 @@ import { isApiPath, isStateChanging, policyForPath } from '@/lib/security/route-
 import { isCrossSite, isJsonBody, isSameOrigin } from '@/lib/security/same-origin';
 import { updateSession } from '@/lib/supabase/middleware';
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { isRewriteTarget, rewriteOf } from '@/lib/v2/rewrites';
+import { isRewriteTarget, REWRITE_HEADER, rewriteOf } from '@/lib/v2/rewrites';
 
 /**
  * API requests: a state change to a route the registry guards (lib/security/route-policy.ts) is
@@ -61,8 +61,10 @@ export async function handleEdge(
 ): Promise<NextResponse> {
   if (isApiPath(req.nextUrl.pathname)) return guardApi(req, report);
 
-  // A rewrite target has no address of its own (lib/v2/rewrites.ts).
+  // A rewrite target has no address of its own (lib/v2/rewrites.ts): no spelling of one is served,
+  // and only the rewrite below may say a request was rewritten.
   if (isRewriteTarget(req.nextUrl.pathname)) return new NextResponse(null, { status: 404 });
+  req.headers.delete(REWRITE_HEADER);
   const res = v2Rewrite(req, await refresh(req));
 
   // The embed badge is a widget, never a page to index. Report pages (/r/) get no header: each one's
@@ -92,13 +94,15 @@ export async function handleEdge(
  * With V2_CHECKS_PUBLIC on, a path in `V2_REWRITES` is served by its v2 page. The rewrite carries
  * what the session refresh put on its response (the rotated auth cookies and the no-store headers
  * that must ride with them), the request headers the refresh updated, and the query string, so the
- * page reads the refreshed session as a v1 page would.
+ * page reads the refreshed session as a v1 page would; and it marks the request as rewritten.
  */
 function v2Rewrite(req: NextRequest, refreshed: NextResponse): NextResponse {
   const rewrite = checksPublicEnabled() ? rewriteOf(req.nextUrl.pathname) : null;
   if (rewrite === null) return refreshed;
+  const headers = new Headers(req.headers);
+  headers.set(REWRITE_HEADER, '1');
   const res = NextResponse.rewrite(new URL(`${rewrite.to}${req.nextUrl.search}`, req.url), {
-    request: { headers: req.headers },
+    request: { headers },
   });
   for (const cookie of refreshed.cookies.getAll()) res.cookies.set(cookie);
   for (const name of ['cache-control', 'expires', 'pragma']) {
