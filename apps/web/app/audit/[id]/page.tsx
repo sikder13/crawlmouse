@@ -9,7 +9,11 @@ import { checksPublicEnabled } from '@/lib/auth/flags';
 
 // Capability URL: the unguessable audit UUID is the only thing guarding this page, so it must
 // never be indexed. The indexable surface for a result is the minted /r/<slug> report.
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
   const { id } = await params;
   return { robots: { index: false, follow: true }, alternates: { canonical: `/audit/${id}` } };
 }

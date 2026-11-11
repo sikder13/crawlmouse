@@ -1,10 +1,7 @@
 import '../../../../styles/v2/tokens.css';
 import { notFound, redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import {
-  AuditEvent,
-  AuditPageProvider,
-} from '../../../../components/v2/screens/result/AuditPage';
+import { AuditEvent, AuditPageProvider } from '../../../../components/v2/screens/result/AuditPage';
 import { AuditNotice } from '../../../../components/v2/screens/result/ResultStates';
 import { ExplorerScreen } from '../../../../components/v2/screens/map/ExplorerScreen';
 import { FixScreen } from '../../../../components/v2/screens/fix/FixScreen';
@@ -59,13 +56,17 @@ export function segmentScreen(read: ReadyCheck, segment: SegmentKey): ReactNode 
   }
 }
 
-export async function SegmentPage({ id, segment }: { id: string; segment: SegmentKey }) {
-  const read = await readyAudit(id);
+/** A segment page's body: the screen, told which audit page it is on. */
+export function SegmentBody({ read, segment }: { read: ReadyCheck; segment: SegmentKey }) {
   return (
     <AuditPageProvider page={auditPage(read.checkId, 'segment')}>
       {segmentScreen(read, segment)}
     </AuditPageProvider>
   );
+}
+
+export async function SegmentPage({ id, segment }: { id: string; segment: SegmentKey }) {
+  return <SegmentBody read={await readyAudit(id)} segment={segment} />;
 }
 
 /** The fix page's view; null when the id names no fix this check's site had by this check. */
@@ -80,10 +81,14 @@ export function fixOf(read: ReadyCheck, fixId: string) {
   };
 }
 
-export async function FixPage({ id, fixId }: { id: string; fixId: string }) {
-  const read = await readyAudit(id);
-  const found = fixOf(read, fixId);
-  if (!found) notFound();
+/** The fix page's body for a fix `fixOf` found. */
+export function FixBody({
+  read,
+  found,
+}: {
+  read: ReadyCheck;
+  found: NonNullable<ReturnType<typeof fixOf>>;
+}) {
   const page = auditPage(read.checkId, 'fix');
   return (
     <AuditPageProvider page={page}>
@@ -96,6 +101,13 @@ export async function FixPage({ id, fixId }: { id: string; fixId: string }) {
   );
 }
 
+export async function FixPage({ id, fixId }: { id: string; fixId: string }) {
+  const read = await readyAudit(id);
+  const found = fixOf(read, fixId);
+  if (!found) notFound();
+  return <FixBody read={read} found={found} />;
+}
+
 /** The link map of a ready check in `scope`; the hubs scope draws the stored drawing. */
 export function mapOf(read: ReadyCheck, scope: 'hubs' | 'all') {
   return linkMapView(read.dataset, read.checkId, {
@@ -105,8 +117,8 @@ export function mapOf(read: ReadyCheck, scope: 'hubs' | 'all') {
   });
 }
 
-export async function MapPage({ id, scope }: { id: string; scope: 'hubs' | 'all' }) {
-  const read = await readyAudit(id);
+/** The map page's body: the explorer, or a notice when the audit has no page to draw. */
+export function MapBody({ read, scope }: { read: ReadyCheck; scope: 'hubs' | 'all' }) {
   const data = mapOf(read, scope);
   if (data.nodes.length === 0) {
     return (
@@ -125,4 +137,8 @@ export async function MapPage({ id, scope }: { id: string; scope: 'hubs' | 'all'
       <ExplorerScreen data={data} />
     </AuditPageProvider>
   );
+}
+
+export async function MapPage({ id, scope }: { id: string; scope: 'hubs' | 'all' }) {
+  return <MapBody read={await readyAudit(id)} scope={scope} />;
 }

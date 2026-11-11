@@ -167,9 +167,10 @@ describe('loadCheckFor: a finished check built by the engine and persisted', () 
     const ids = new Set(read.dataset.checks.map((c) => c.id));
     expect([...firstSeen].filter((id) => !ids.has(id))).toEqual([]);
     // The rest is what loadCheck reads of the second check.
-    const { checks: _checks, ...rest } = read.dataset;
-    const { checks: _own, ...loaded } = await loadCheck(deps.read, SECOND);
-    expect(rest).toEqual(loaded);
+    expect({ ...read.dataset, checks: [] }).toEqual({
+      ...(await loadCheck(deps.read, SECOND)),
+      checks: [],
+    });
     // No drawing was stored for it.
     expect(read.map).toBeNull();
   });
@@ -187,7 +188,9 @@ describe('loadCheckFor: a finished check built by the engine and persisted', () 
     const stored = deps.evidence.objects.get(path)!;
     const drawing = checkMap(first.page_results, first.link_edges);
     const [anyNode] = drawing.nodes;
-    const { [anyNode!.id]: _dropped, ...positionsLessOne } = drawing.positions;
+    const positionsLessOne = Object.fromEntries(
+      Object.entries(drawing.positions).filter(([id]) => id !== anyNode!.id),
+    );
     const cases: Record<string, Uint8Array | null> = {
       missing: null,
       'not gzip': new TextEncoder().encode('{"version":1}'),

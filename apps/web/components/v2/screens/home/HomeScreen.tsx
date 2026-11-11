@@ -43,7 +43,20 @@ const PLANS = [
  * The locked Home screen (Final-Home). The example audit, the crawler table, the words card and the
  * alert come from the bad-site fixture through `homeView`; the marketing copy is the lock's.
  */
-export function HomeScreen({ data }: { data: HomeView }) {
+export function HomeScreen({
+  data,
+  start = false,
+  planHref,
+}: {
+  data: HomeView;
+  /** The forms start an audit (`POST /api/checks`); omitted (the preview), they post nowhere. */
+  start?: boolean;
+  /**
+   * Where a plan's button goes on a page that has a route for it. Given, a plan it names no route
+   * for has no button; omitted (the preview), each button renders as the locked screen shows it.
+   */
+  planHref?: Partial<Record<string, string>>;
+}) {
   const { crawlers, withoutJs, alert } = data;
 
   return (
@@ -68,6 +81,7 @@ export function HomeScreen({ data }: { data: HomeView }) {
             fieldId="url"
             label="Start an audit"
             primary
+            start={start}
             className={styles.heroForm}
             inputClassName={styles.heroInput}
             buttonClassName={styles.heroButton}
@@ -230,9 +244,11 @@ export function HomeScreen({ data }: { data: HomeView }) {
                   {p.per ? <span className={`${layout.mut} ${styles.per}`}>{p.per}</span> : null}
                 </div>
                 <p className={styles.planBody}>{p.body}</p>
-                <Button href="#" className={styles.planButton}>
-                  {p.action}
-                </Button>
+                {planHref && planHref[p.name] === undefined ? null : (
+                  <Button href={planHref?.[p.name] ?? '#'} className={styles.planButton}>
+                    {p.action}
+                  </Button>
+                )}
                 <div className={`${layout.mut} ${styles.planNote}`}>{p.note}</div>
               </Card>
             ))}
@@ -248,6 +264,7 @@ export function HomeScreen({ data }: { data: HomeView }) {
             <AuditForm
               fieldId="url2"
               primary={false}
+              start={start}
               className={`${styles.heroForm} ${styles.closingForm}`}
               inputClassName={styles.closingInput}
               buttonClassName={`${styles.heroButton} ${styles.closingButton}`}

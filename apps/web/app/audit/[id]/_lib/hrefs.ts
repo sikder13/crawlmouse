@@ -10,6 +10,7 @@ export interface AuditHrefs extends Required<FixHrefs> {
   segment: (key: SegmentKey) => string;
   fix: (fixId: string) => string;
   map: { hubs: string; all: string };
+  check: (checkId: string) => string;
 }
 
 export function auditHrefs(checkId: string): AuditHrefs {
@@ -19,6 +20,7 @@ export function auditHrefs(checkId: string): AuditHrefs {
     segment: (key) => `${overview}/${key}`,
     fix: (fixId) => `${overview}/fix/${fixId}`,
     map: { hubs: `${overview}/map`, all: `${overview}/map?scope=all` },
+    check: (other) => `/audit/${other}`,
   };
 }
 

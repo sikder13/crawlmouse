@@ -5,7 +5,12 @@ vi.mock('@/lib/analytics', () => ({ track: () => {}, trackRaw: () => {} }));
 
 import { projectAuditForClient, type AuditRow } from '@/lib/audit-stream-projection';
 import { deriveAuditViewState, decideAuditSurface } from '@/lib/audit-view-state';
-import { AUDIT_COLS, REFUSAL_REQUIRED_COLS, REFUSAL_COUNT_COLS, auditColumnSet } from '@/lib/audit-columns';
+import {
+  AUDIT_COLS,
+  REFUSAL_REQUIRED_COLS,
+  REFUSAL_COUNT_COLS,
+  auditColumnSet,
+} from '@/lib/audit-columns';
 import { ResultView } from '@/components/audit/ResultView';
 
 /**
@@ -27,58 +32,92 @@ import { ResultView } from '@/components/audit/ResultView';
  * itself is verified by inspection, not by this test. Stated rather than implied.
  */
 
-const refusedRow = (over: Partial<AuditRow> = {}): AuditRow => ({
-  id: 'aud-1',
-  url: 'https://ex.com/',
-  status: 'completed',
-  grade: null,
-  score: null,
-  page_count: 3,
-  link_count: 0,
-  cms_detected: null,
-  user_id: null,
-  settings: null,
-  failure_reason: null,
-  confidence: 'low',
-  coverage_pct: '1',
-  block_rate: '0',
-  partial: false,
-  discovered_count: 3,
-  blocked_count: 0,
-  refusal: { refused: true, triggers: ['site_too_small_to_measure'], confidenceCapped: false, unevaluable: [] },
-  coverage: {
-    fetched: 3, gradeable: 3, excluded: [], sitemapDeclared: null,
-    sitemapRobotsExcluded: null, estimatedTotal: 3, estimateSource: 'frontier', coverageRatio: 1,
-  },
-  ...over,
-} as AuditRow);
+const refusedRow = (over: Partial<AuditRow> = {}): AuditRow =>
+  ({
+    id: 'aud-1',
+    url: 'https://ex.com/',
+    status: 'completed',
+    grade: null,
+    score: null,
+    page_count: 3,
+    link_count: 0,
+    cms_detected: null,
+    user_id: null,
+    settings: null,
+    failure_reason: null,
+    confidence: 'low',
+    coverage_pct: '1',
+    block_rate: '0',
+    partial: false,
+    discovered_count: 3,
+    blocked_count: 0,
+    refusal: {
+      refused: true,
+      triggers: ['site_too_small_to_measure'],
+      confidenceCapped: false,
+      unevaluable: [],
+    },
+    coverage: {
+      fetched: 3,
+      gradeable: 3,
+      excluded: [],
+      sitemapDeclared: null,
+      sitemapRobotsExcluded: null,
+      estimatedTotal: 3,
+      estimateSource: 'frontier',
+      coverageRatio: 1,
+    },
+    ...over,
+  }) as AuditRow;
 
 const conversion = {
   entitlement: { canSeeAllPrescriptions: false, canMonitor: false },
-  isOwner: false, confidenceBand: null, projectedGrade: null, freeFix: null, prescriptions: null,
-  monitoring: null, findings: [], orphanCount: 0, avgDepth: 0, viewerSignedIn: false,
-  graph: null, aiReadiness: null, pageAiSignals: [],
+  isOwner: false,
+  confidenceBand: null,
+  projectedGrade: null,
+  freeFix: null,
+  prescriptions: null,
+  monitoring: null,
+  findings: [],
+  orphanCount: 0,
+  avgDepth: 0,
+  viewerSignedIn: false,
+  graph: null,
+  aiReadiness: null,
+  pageAiSignals: [],
 } as never;
 
 /** The exact decision `AuditView` makes, from the row the route reads. */
 function routeDecision(row: AuditRow) {
   const client = projectAuditForClient(row, conversion);
   const state = deriveAuditViewState(
-    { status: client.status, grade: client.grade, score: client.score, refusal: client.refusal as { refused?: boolean } | null },
+    {
+      status: client.status,
+      grade: client.grade,
+      score: client.score,
+      refusal: client.refusal as { refused?: boolean } | null,
+    },
     true,
     true,
   );
   return { client, state, surface: decideAuditSurface(state, client as never, client as never) };
 }
 
-const TRIGGERS = ['site_too_small_to_measure', 'too_few_gradeable_pages', 'nothing_read', 'no_observed_links'] as const;
+const TRIGGERS = [
+  'site_too_small_to_measure',
+  'too_few_gradeable_pages',
+  'nothing_read',
+  'no_observed_links',
+] as const;
 
 describe('ROUTE LEVEL — a refused audit reaches the Stage 4 presentation, not the failure card', () => {
   for (const trigger of TRIGGERS) {
     it(`${trigger}: the route resolves to REFUSED, not gradeFailed`, () => {
-      const { state } = routeDecision(refusedRow({
-        refusal: { refused: true, triggers: [trigger], confidenceCapped: false, unevaluable: [] },
-      } as Partial<AuditRow>));
+      const { state } = routeDecision(
+        refusedRow({
+          refusal: { refused: true, triggers: [trigger], confidenceCapped: false, unevaluable: [] },
+        } as Partial<AuditRow>),
+      );
       expect(state.refused).toBe(true);
       // The three states that would each render the WRONG screen.
       expect(state.gradeFailed).toBe(false);
@@ -87,9 +126,11 @@ describe('ROUTE LEVEL — a refused audit reaches the Stage 4 presentation, not 
     });
 
     it(`${trigger}: the rendered screen carries the Stage 4 copy and none of the pre-5.1 copy`, () => {
-      const { client } = routeDecision(refusedRow({
-        refusal: { refused: true, triggers: [trigger], confidenceCapped: false, unevaluable: [] },
-      } as Partial<AuditRow>));
+      const { client } = routeDecision(
+        refusedRow({
+          refusal: { refused: true, triggers: [trigger], confidenceCapped: false, unevaluable: [] },
+        } as Partial<AuditRow>),
+      );
       const html = renderToStaticMarkup(<ResultView audit={client as never} />);
       // The invented cause this spec deleted — and the failure colour it was rendered in.
       expect(html).not.toContain('usually a site that blocks crawlers');
@@ -107,9 +148,13 @@ describe('ROUTE LEVEL — a refused audit reaches the Stage 4 presentation, not 
   });
 
   it('a graded audit still routes to graded — the negative control', () => {
-    const { state } = routeDecision(refusedRow({
-      grade: 'B+', score: '81.39', refusal: null,
-    } as unknown as Partial<AuditRow>));
+    const { state } = routeDecision(
+      refusedRow({
+        grade: 'B+',
+        score: '81.39',
+        refusal: null,
+      } as unknown as Partial<AuditRow>),
+    );
     expect(state.graded).toBe(true);
     expect(state.refused).toBe(false);
   });
@@ -164,21 +209,29 @@ describe('the row fixture is the loader’s row — not a shape the loader canno
 describe('ROUTE LEVEL — the chosen SURFACE, per trigger', () => {
   for (const trigger of TRIGGERS) {
     it(`${trigger}: chooses the refusal result surface`, () => {
-      const { surface } = routeDecision(refusedRow({
-        refusal: { refused: true, triggers: [trigger], confidenceCapped: false, unevaluable: [] },
-      } as Partial<AuditRow>));
+      const { surface } = routeDecision(
+        refusedRow({
+          refusal: { refused: true, triggers: [trigger], confidenceCapped: false, unevaluable: [] },
+        } as Partial<AuditRow>),
+      );
       expect(surface).toEqual({ kind: 'result', verdict: 'refused', audit: expect.anything() });
     });
   }
 
   it('a null grade with NO refusal payload chooses the error surface, never the Stage 4 copy', () => {
-    expect(routeDecision(refusedRow({ refusal: null } as Partial<AuditRow>)).surface.kind).toBe('error');
+    expect(routeDecision(refusedRow({ refusal: null } as Partial<AuditRow>)).surface.kind).toBe(
+      'error',
+    );
   });
 
   it('a graded audit chooses the graded surface — the negative control', () => {
-    const { surface } = routeDecision(refusedRow({
-      grade: 'B+', score: '81.39', refusal: null,
-    } as unknown as Partial<AuditRow>));
+    const { surface } = routeDecision(
+      refusedRow({
+        grade: 'B+',
+        score: '81.39',
+        refusal: null,
+      } as unknown as Partial<AuditRow>),
+    );
     expect(surface).toEqual({ kind: 'result', verdict: 'graded', audit: expect.anything() });
   });
 
@@ -188,8 +241,14 @@ describe('ROUTE LEVEL — the chosen SURFACE, per trigger', () => {
     // under a route that had already decided to withhold one. Unreachable today only because the
     // engine happens to null both together — which is agreement, not a guarantee.
     const row = refusedRow({
-      grade: 'B+', score: '81.39',
-      refusal: { refused: true, triggers: ['no_observed_links'], confidenceCapped: false, unevaluable: [] },
+      grade: 'B+',
+      score: '81.39',
+      refusal: {
+        refused: true,
+        triggers: ['no_observed_links'],
+        confidenceCapped: false,
+        unevaluable: [],
+      },
     } as unknown as Partial<AuditRow>);
     const { client, surface } = routeDecision(row);
     expect(surface).toEqual({ kind: 'result', verdict: 'refused', audit: expect.anything() });
@@ -207,12 +266,19 @@ describe('ROUTE LEVEL — nothing_read prints no invented request count', () => 
     // The row shape that produced the defect: 3 requests made, 8 URLs discovered. `attempted` has no
     // column, so the loader cannot supply it and the sentence must be omitted — never backfilled
     // from the one number that happens to be present.
-    const { client } = routeDecision(refusedRow({
-      page_count: 0,
-      discovered_count: 8,
-      blocked_count: 0,
-      refusal: { refused: true, triggers: ['nothing_read'], confidenceCapped: false, unevaluable: [] },
-    } as Partial<AuditRow>));
+    const { client } = routeDecision(
+      refusedRow({
+        page_count: 0,
+        discovered_count: 8,
+        blocked_count: 0,
+        refusal: {
+          refused: true,
+          triggers: ['nothing_read'],
+          confidenceCapped: false,
+          unevaluable: [],
+        },
+      } as Partial<AuditRow>),
+    );
     const html = renderToStaticMarkup(<ResultView audit={client as never} />);
     expect(html).not.toContain('8 requests');
     expect(html).not.toMatch(/\d+\s+requests?/);
@@ -234,11 +300,16 @@ describe('ROUTE LEVEL — nothing_read prints no invented request count', () => 
 // projection to count.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('ROUTE LEVEL — the evidence that survives a refusal', () => {
-  const withFindings = (findings: unknown[]) => ({ ...(conversion as object), findings } as never);
+  const withFindings = (findings: unknown[]) => ({ ...(conversion as object), findings }) as never;
 
   const renderRefused = (findings: unknown[]) => {
     const row = refusedRow({
-      refusal: { refused: true, triggers: ['no_observed_links'], confidenceCapped: false, unevaluable: [] },
+      refusal: {
+        refused: true,
+        triggers: ['no_observed_links'],
+        confidenceCapped: false,
+        unevaluable: [],
+      },
     } as Partial<AuditRow>);
     const client = projectAuditForClient(row, withFindings(findings));
     return renderToStaticMarkup(<ResultView audit={client as never} />);
@@ -249,7 +320,11 @@ describe('ROUTE LEVEL — the evidence that survives a refusal', () => {
     // safety property the type comment claims: the category is no longer in INFORMATIONAL and has no
     // comprehension entry, so an old row cannot resurrect the reachability claim as a banner.
     const html = renderRefused([
-      { category: 'sitemap_unreached', severity: 'critical', payload: { unreached: 820, declared: 821, reachable: 1, robotsExcluded: 0 } },
+      {
+        category: 'sitemap_unreached',
+        severity: 'critical',
+        payload: { unreached: 820, declared: 821, reachable: 1, robotsExcluded: 0 },
+      },
     ]);
     expect(html).not.toContain('Declared in your sitemap');
     expect(html).not.toContain('reached by following links');
@@ -288,5 +363,4 @@ describe('ROUTE LEVEL — the evidence that survives a refusal', () => {
     expect(html).toContain('JavaScript');
     expect(html).not.toContain('estimate until');
   });
-
 });

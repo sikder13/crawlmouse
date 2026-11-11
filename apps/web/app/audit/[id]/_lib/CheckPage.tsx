@@ -1,8 +1,5 @@
 import '../../../../styles/v2/tokens.css';
-import {
-  AuditEvent,
-  AuditPageProvider,
-} from '../../../../components/v2/screens/result/AuditPage';
+import { AuditEvent, AuditPageProvider } from '../../../../components/v2/screens/result/AuditPage';
 import { ResultScreen } from '../../../../components/v2/screens/result/ResultScreen';
 import { AuditNotice } from '../../../../components/v2/screens/result/ResultStates';
 import { dateTimeUtc } from '../../../../lib/v2/format';

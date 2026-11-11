@@ -26,7 +26,7 @@ import {
   clientRenderedTemplates,
 } from '../../sentences';
 import { capitalise, count, numberWord, plural } from '../../words';
-import { accessPill, type CoverageView, type DoorView } from '../result';
+import { accessPill, sampledCoverage, type CoverageView, type DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
 import type { ViewDataset } from '../../fixtures';
@@ -365,11 +365,7 @@ export function accessView(
     cellWithoutEvidence: withheld
       ? `This record holds ${count(withheld.included)} of the ${count(withheld.total)} responses the audit kept, and this cell’s is not one of them.`
       : 'The audit kept no response for this cell.',
-    coverage: {
-      tested: coverage.pages_sampled,
-      total: coverage.pages_discovered,
-      groups: templates.length,
-    },
+    coverage: sampledCoverage(d, check),
     fixes,
     keep: frame.keptUntil
       ? {

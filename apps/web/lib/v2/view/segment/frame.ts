@@ -72,6 +72,8 @@ export interface SegmentHrefs {
   segment: (key: SegmentKey) => string;
   /** The link-map explorer: zoomed to the hubs, and every page. Omitted, "#". */
   map?: { hubs: string; all: string };
+  /** The result page of another check of the site, by its id. Omitted, the history links nowhere. */
+  check?: (checkId: string) => string;
 }
 
 export const NO_HREFS: SegmentHrefs = { overview: '#', segment: () => '#' };

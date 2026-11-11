@@ -18,7 +18,7 @@
         "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/page.tsx:1)",
         "redirect": "n/a — no redirect or next param (app/page.tsx:1)",
         "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
-        "escaping": "pass — JSON-LD from constants (app/page.tsx:15, lib/seo/faq.ts) through JsonLd, lib/seo/jsonld.tsx:118-125 now escapes < > & U+2028 U+2029 (fixed in fed2923e); the audit form posts to /api/audits/start",
+        "escaping": "pass — JSON-LD from constants (app/page.tsx:32, lib/seo/faq.ts) through JsonLd, lib/seo/jsonld.tsx:118-125 now escapes < > & U+2028 U+2029 (fixed in fed2923e); the audit form posts to /api/audits/start",
         "abuse": "pass — the form's action (/api/audits/start) carries Turnstile and per-IP/domain/global limits (app/api/audits/start/route.ts:58-117)"
       }
     },

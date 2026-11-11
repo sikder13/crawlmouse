@@ -54,6 +54,25 @@ export interface CoverageView {
   groups: number;
 }
 
+/**
+ * The pages tested as the crawlers, and the template groups they were drawn from. When the record
+ * holds each sampled page, the groups are counted from those pages; a record that holds fewer (a
+ * contract fixture) cannot say, and the count is then the check's templates, capped by the pages
+ * tested, since a page belongs to one template.
+ */
+export function sampledCoverage(d: ViewDataset, check: Check): CoverageView {
+  const coverage = check.coverage!;
+  const sampled = d.page_results.filter((p) => p.check_id === check.id && p.sampled);
+  return {
+    tested: coverage.pages_sampled,
+    total: coverage.pages_discovered,
+    groups:
+      sampled.length === coverage.pages_sampled
+        ? new Set(sampled.map((p) => p.template_key)).size
+        : Math.min(coverage.templates.length, coverage.pages_sampled),
+  };
+}
+
 /** A door's pill tone. The same names as the StatusPill states, so the screen passes it straight on. */
 export type PillState = 'ok' | 'warn' | 'bad' | 'unverified' | 'neutral';
 
@@ -886,11 +905,7 @@ export function resultView(
   const isOpen = (f: Fix) => opened.has(f.id);
   const grades = grade(check, fixes, isOpen);
   const coverage = check.coverage!;
-  const sampled: CoverageView = {
-    tested: coverage.pages_sampled,
-    total: coverage.pages_discovered,
-    groups: coverage.templates.length,
-  };
+  const sampled = sampledCoverage(d, check);
   const withheld = check.ai_readability!.withheld;
   const clean = !withheld && fixes.length === 0;
   const keptUntil = keptUntilOf(d, check, asFirstSeen);

@@ -19,8 +19,7 @@ export default function AuditNotFound() {
         This audit does not exist, or it has expired.
       </p>
       <p className="mt-3 max-w-md text-ink/70">
-        An audit nobody keeps is visible for 24 hours and is then deleted. Running it again is
-        free.
+        An audit nobody keeps is visible for 24 hours and is then deleted. Running it again is free.
       </p>
       <Button asChild size="lg" className="mt-8">
         <Link href={{ pathname: '/' }}>Start a new audit</Link>

@@ -72,8 +72,13 @@ describe('AuditSurfaceView — one render per descriptor', () => {
 
   it('graded-legacy → the v1 card, from the descriptor’s own numbers', () => {
     const html = render({
-      kind: 'graded-legacy', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4,
-      findingGroups: null, viewerIsPro: false,
+      kind: 'graded-legacy',
+      grade: 'B',
+      score: 81.39,
+      orphanCount: 3,
+      avgDepth: 2.4,
+      findingGroups: null,
+      viewerIsPro: false,
     });
     expect(html).toContain('81');
     // Free viewer → the upgrade path, not the export link.
@@ -83,14 +88,22 @@ describe('AuditSurfaceView — one render per descriptor', () => {
 
   it('graded-legacy → a Pro viewer gets the export link instead', () => {
     const html = render({
-      kind: 'graded-legacy', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4,
-      findingGroups: null, viewerIsPro: true,
+      kind: 'graded-legacy',
+      grade: 'B',
+      score: 81.39,
+      orphanCount: 3,
+      avgDepth: 2.4,
+      findingGroups: null,
+      viewerIsPro: true,
     });
     expect(html).toContain('/api/audits/aud-1/export');
   });
 
   it('error → the failure card, carrying the copy the descriptor chose', () => {
-    const html = render({ kind: 'error', copy: { title: 'Couldn’t grade this site', body: 'Body text.' } });
+    const html = render({
+      kind: 'error',
+      copy: { title: 'Couldn’t grade this site', body: 'Body text.' },
+    });
     expect(html).toContain('Couldn’t grade this site');
     expect(html).toContain('Body text.');
     expect(html).toContain('text-warning');
@@ -110,7 +123,10 @@ describe('AuditSurfaceView — one render per descriptor', () => {
 
   it('running → surfaces a cancel error when there is one', () => {
     const html = renderToStaticMarkup(
-      <AuditSurfaceMap descriptor={{ kind: 'running' }} deps={{ ...DEPS, cancelError: 'Network error — please try again.' }} />,
+      <AuditSurfaceMap
+        descriptor={{ kind: 'running' }}
+        deps={{ ...DEPS, cancelError: 'Network error — please try again.' }}
+      />,
     );
     expect(html).toContain('Network error');
   });
@@ -135,14 +151,27 @@ describe('AuditSurfaceView — one render per descriptor', () => {
       { kind: 'awaiting' },
       { kind: 'result', verdict: 'refused', audit: refusedFixture },
       { kind: 'result', verdict: 'graded', audit: freeFixture },
-      { kind: 'graded-legacy', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4, findingGroups: null, viewerIsPro: false },
+      {
+        kind: 'graded-legacy',
+        grade: 'B',
+        score: 81.39,
+        orphanCount: 3,
+        avgDepth: 2.4,
+        findingGroups: null,
+        viewerIsPro: false,
+      },
       { kind: 'none' },
     ];
     for (const d of nonError) {
       expect(render(d), `${d.kind} rendered the invented cause`).not.toContain(INVENTED_CAUSE);
     }
     // Anti-vacuity: the sentence IS reachable, from the one descriptor that owns it.
-    expect(render({ kind: 'error', copy: { title: 'x', body: `The crawl finished — ${INVENTED_CAUSE}.` } })).toContain(INVENTED_CAUSE);
+    expect(
+      render({
+        kind: 'error',
+        copy: { title: 'x', body: `The crawl finished — ${INVENTED_CAUSE}.` },
+      }),
+    ).toContain(INVENTED_CAUSE);
   });
 });
 
@@ -160,14 +189,20 @@ describe('AuditSurfaceView — the chain, from the snapshot the stream emits', (
     renderToStaticMarkup(<AuditSurfaceView snapshot={snapshot as never} done={done} deps={DEPS} />);
 
   it('a refused snapshot renders the Stage 4 arc, never the failure card', () => {
-    const html = chain({ ...refusedFixture, status: 'completed', orphanCount: 0, avgDepth: 0 }, true);
+    const html = chain(
+      { ...refusedFixture, status: 'completed', orphanCount: 0, avgDepth: 0 },
+      true,
+    );
     expect(html).toContain('No grade');
     expect(html).not.toContain(INVENTED_CAUSE);
     expect(html).not.toContain('contact support');
   });
 
   it('a graded v2 snapshot renders the full arc with its letter', () => {
-    const html = chain({ ...freeFixture, status: 'completed', orphanCount: 3, avgDepth: 2.4 }, true);
+    const html = chain(
+      { ...freeFixture, status: 'completed', orphanCount: 3, avgDepth: 2.4 },
+      true,
+    );
     expect(html).toContain(freeFixture.grade!);
     expect(html).not.toContain(INVENTED_CAUSE);
   });
@@ -204,7 +239,10 @@ describe('AuditSurfaceView — the chain, from the snapshot the stream emits', (
   });
 
   it('a legacy graded snapshot (no crawlHealth) renders the v1 card', () => {
-    const html = chain({ status: 'completed', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4 }, true);
+    const html = chain(
+      { status: 'completed', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4 },
+      true,
+    );
     expect(html).toContain('81');
     expect(html).not.toContain(INVENTED_CAUSE);
   });

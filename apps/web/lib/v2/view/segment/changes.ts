@@ -48,7 +48,8 @@ export interface ChangesView {
   rows: ChangeRowView[];
   /** What a change looks like, for a first audit: an example, not this site's data. */
   example: ChangeRowView[] | null;
-  history: { key: string; when: string; label: string }[];
+  /** Each audit of the site so far; `href` is its result page, where the page has a route for it. */
+  history: { key: string; when: string; label: string; href?: string }[];
   historyNote: string | null;
   coverage: { read: string };
   keep: { title: string; sub: string } | null;
@@ -228,6 +229,7 @@ export function changesView(
     key: c.id,
     when: dateTimeUtc(c.finished_at!),
     label: historyLabel(c),
+    ...(options.hrefs?.check ? { href: options.hrefs.check(c.id) } : {}),
   }));
   const next = scheduleOf(d, check, kept);
   const tiles = (middle: ChangesView['tiles'][number]) => [

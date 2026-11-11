@@ -41,9 +41,6 @@ export function everyView(d: ViewDataset, checkId: string) {
           f.site_id === check.site_id &&
           instant(findCheck(d, f.first_seen_check_id).queued_at) <= instant(check.queued_at),
       )
-      .flatMap((f) => [
-        fixView(d, checkId, f.id),
-        fixView(d, checkId, f.id, { plan: 'pro' }),
-      ]),
+      .flatMap((f) => [fixView(d, checkId, f.id), fixView(d, checkId, f.id, { plan: 'pro' })]),
   };
 }

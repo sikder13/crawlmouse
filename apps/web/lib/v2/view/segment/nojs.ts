@@ -14,7 +14,7 @@ import {
   meetsEdge,
 } from '../../sentences';
 import { capitalise, count, numberWord, plural } from '../../words';
-import type { CoverageView, DoorView } from '../result';
+import { sampledCoverage, type CoverageView, type DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { SEGMENTS, segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
 import type { ViewDataset } from '../../fixtures';
@@ -339,11 +339,7 @@ export function nojsView(d: ViewDataset, checkId: string, options: SegmentOption
     missing: withheld
       ? `This record holds ${count(withheld.included)} of the ${count(withheld.total)} responses the audit kept, and this page’s are not among them.`
       : 'The audit kept no response for this page.',
-    coverage: {
-      tested: coverage.pages_sampled,
-      total: coverage.pages_discovered,
-      groups: templates.length,
-    },
+    coverage: sampledCoverage(d, check),
     fixes,
     fixesNote: fixesNote(fixes),
     keep: frame.keptUntil

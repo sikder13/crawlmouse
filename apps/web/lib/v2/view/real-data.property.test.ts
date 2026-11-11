@@ -17,6 +17,7 @@
 import { buildCheck, type BuildInput, type BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
 import type { BatchResult } from '@crawlmouse/types/v2';
 import fc from 'fast-check';
+import { coverageText, type Coverage } from '../../../components/v2/CoverageLine';
 import { describe, expect, it } from 'vitest';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { fixture } from '../fixtures';
@@ -34,11 +35,25 @@ const note = (name: string, when = true) => {
   if (when) met.set(name, (met.get(name) ?? 0) + 1);
 };
 
+/** Every `{ tested, total, groups }` in a value: the props of a screen's coverage line. */
+function coveragesIn(value: unknown): Coverage[] {
+  if (Array.isArray(value)) return value.flatMap(coveragesIn);
+  if (!value || typeof value !== 'object') return [];
+  const o = value as Record<string, unknown>;
+  const own =
+    typeof o.tested === 'number' && typeof o.total === 'number' && typeof o.groups === 'number'
+      ? [o as unknown as Coverage]
+      : [];
+  return [...own, ...Object.values(o).flatMap(coveragesIn)];
+}
+
 function render(input: BuildInput, builds: readonly BuiltCheck[]) {
   const d = datasetOfBuilds(input.site, builds);
   const check = builds.at(-1)!.check;
   const views = everyView(d, check.id);
   const live = views.result.fixes?.total ?? 0;
+  // Each coverage line a screen draws: `coverageText` refuses counts that cannot be true together.
+  for (const c of coveragesIn(views)) coverageText(c);
   note(check.status);
   note('zero pages', d.page_results.length === 0);
   note('text without JavaScript not measured', check.without_js === null);
@@ -53,10 +68,22 @@ function render(input: BuildInput, builds: readonly BuiltCheck[]) {
   note('more fixes than Free opens', live > FREE_FIXES);
   note('a re-check', check.previous_check_id !== null);
   note('a re-check with changes', d.changes.length > 0 && check.previous_check_id !== null);
-  note('a resolved fix', views.fixes.some((f) => f.kind === 'resolved'));
-  note('a locked fix', views.fixes.some((f) => f.kind === 'locked'));
-  note('a crawler not measured', check.crawlers.some((c) => c.verdict === 'not_measured'));
-  note('a crawler kept out', check.crawlers.some((c) => c.verdict === 'challenged_ua'));
+  note(
+    'a resolved fix',
+    views.fixes.some((f) => f.kind === 'resolved'),
+  );
+  note(
+    'a locked fix',
+    views.fixes.some((f) => f.kind === 'locked'),
+  );
+  note(
+    'a crawler not measured',
+    check.crawlers.some((c) => c.verdict === 'not_measured'),
+  );
+  note(
+    'a crawler kept out',
+    check.crawlers.some((c) => c.verdict === 'challenged_ua'),
+  );
   note('no drawable page', views.mapAll.nodes.length === 0);
   return { d, check, views };
 }
