@@ -36,6 +36,17 @@ import { fixWorld, makePro, type FixWorld } from '@/lib/v2/account/test-support/
 import { GET } from './route';
 
 const PACKET = fixture('bad-site').fixes.find((f) => f.packet !== null)!.packet!;
+/** The answer for a visible fix: its packet, and the prompt Copy fix copies, built from that packet. */
+const ANSWER = {
+  packet: PACKET,
+  prompt: expect.stringMatching(
+    new RegExp(
+      [...PACKET.change, PACKET.verify.command]
+        .map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('[\\s\\S]*'),
+    ),
+  ),
+};
 
 let fw: FixWorld;
 beforeAll(async () => {
@@ -86,7 +97,7 @@ describe('GET /api/fixes/[id]/packet', () => {
 
   it('a developer seat reads the packet of a visible fix on its site', async () => {
     h.user = fw.w.scopedUserId;
-    expect(await answer(await get(fw.ranked[0]!))).toEqual([200, { packet: PACKET }]);
+    expect(await answer(await get(fw.ranked[0]!))).toEqual([200, ANSWER]);
   });
 
   it('a developer seat scoped to another site gets the 404', async () => {
@@ -105,7 +116,7 @@ describe('GET /api/fixes/[id]/packet', () => {
     h.db = copy;
     try {
       await makePro(copy, fw.w.accountId);
-      expect(await answer(await get(hidden))).toEqual([200, { packet: PACKET }]);
+      expect(await answer(await get(hidden))).toEqual([200, ANSWER]);
     } finally {
       h.db = fw.db;
       await copy.close();

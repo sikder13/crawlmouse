@@ -10,6 +10,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { decideTrial, type FirstLoginDeps, type TrialOutcome } from '../../auth/first-login';
 import type { MemberAccount } from '../../auth/door-store';
+import type { NoticeCode } from './route';
+
+type TrialRefusal = NoticeCode | 'not_found';
 
 export interface ProTrialInput {
   accountId: string;
@@ -23,12 +26,12 @@ export interface ProTrialInput {
 
 export type ProTrialAnswer =
   | { outcome: 'started'; variant: 'no_card' }
-  | { outcome: Exclude<TrialOutcome, 'started'>; status: number; code: string };
+  | { outcome: Exclude<TrialOutcome, 'started'>; status: number; code: TrialRefusal };
 
 /** What each outcome other than `started` answers. */
 export const REFUSALS: Record<
   Exclude<TrialOutcome, 'started'>,
-  { status: number; code: string }
+  { status: number; code: TrialRefusal }
 > = {
   not_eligible: { status: 409, code: 'not_eligible' },
   denied: { status: 409, code: 'refused' },

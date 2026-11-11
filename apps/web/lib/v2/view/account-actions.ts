@@ -153,12 +153,17 @@ export interface ActionView {
   context: string | null;
   /** A field the person fills before posting (the add-site address); a live page shows it. */
   input?: ActionInput;
+  /**
+   * A read whose answer is a fix's packet and its prompt: a live page copies the prompt instead of
+   * opening the JSON.
+   */
+  copy?: true;
 }
 
 export interface ActionInput {
   name: string;
   label: string;
-  type: 'text' | 'url';
+  type: 'text' | 'url' | 'email';
   placeholder: string;
 }
 
@@ -173,12 +178,14 @@ export function action(
     fields = {},
     context = null,
     input,
+    copy,
   }: {
     primary?: boolean;
     query?: string;
     fields?: Record<string, string>;
     context?: string | null;
     input?: ActionInput;
+    copy?: true;
   } = {},
 ): ActionView {
   const spec: RouteSpec = ACCOUNT_ACTIONS[key];
@@ -197,6 +204,7 @@ export function action(
     primary,
     context,
     ...(input ? { input } : {}),
+    ...(copy ? { copy } : {}),
   };
 }
 

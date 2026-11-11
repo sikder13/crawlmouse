@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { NextRequest, NextResponse, type NextFetchEvent } from 'next/server';
 import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
 import { config, handleEdge, middleware } from './middleware';
 import { CONSENT_REQUIRED_COOKIE } from '@/lib/consent';
+import { REWRITE_HEADER } from '@/lib/v2/rewrites';
 import { ROUTE_POLICIES, isStateChanging, type RoutePolicy } from '@/lib/security/route-policy';
 import type { Refusal } from '@/lib/security/refusal-event';
 
@@ -81,6 +82,99 @@ describe('handleEdge', () => {
     expect(res.cookies.get(CONSENT_REQUIRED_COOKIE)).toBeDefined();
     expect(res.cookies.get(AUTH_COOKIE)).toBeUndefined();
   });
+});
+
+describe('the v2 rewrites (owner ruling Q17)', () => {
+  const at = (path: string) => new NextRequest(new Request(`https://crawlmouse.com${path}`));
+  const rewriteOf = (res: NextResponse) => res.headers.get('x-middleware-rewrite');
+
+  /** A refresh that rotated the session: a cookie on the response, no-store headers beside it. */
+  function rotated(req: NextRequest) {
+    req.cookies.set(AUTH_COOKIE, 'fresh-token');
+    const res = NextResponse.next({ request: req });
+    res.cookies.set(AUTH_COOKIE, 'fresh-token', { path: '/' });
+    res.headers.set('cache-control', 'private, no-cache, no-store, must-revalidate, max-age=0');
+    return Promise.resolve(res);
+  }
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each(['/dashboard', '/dashboard/'])(
+    'with V2_CHECKS_PUBLIC=1, %s is served by /dashboard/v2',
+    async (path) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+      const res = await handleEdge(at(path), rotated);
+      expect(rewriteOf(res)).toBe('https://crawlmouse.com/dashboard/v2');
+    },
+  );
+
+  it('keeps the query string (v1 reads ?upgraded=1)', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const res = await handleEdge(at('/dashboard?upgraded=1'), rotated);
+    expect(rewriteOf(res)).toBe('https://crawlmouse.com/dashboard/v2?upgraded=1');
+  });
+
+  it('the rewrite keeps the rotated session: its cookie, its no-store header and the updated request', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const res = await handleEdge(at('/dashboard'), rotated);
+    expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
+    expect(res.headers.get('cache-control')).toContain('no-store');
+    expect(res.headers.get('x-middleware-request-cookie')).toContain('fresh-token');
+    expect(res.cookies.get(CONSENT_REQUIRED_COOKIE)).toBeDefined();
+  });
+
+  it.each([
+    ['the flag unset', '', '/dashboard'],
+    ['the flag not 1', 'true', '/dashboard'],
+    ['another page', '1', '/dashboards'],
+    ['the home page', '1', '/'],
+  ])('no rewrite with %s', async (_name, flag, path) => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+    const res = await handleEdge(at(path), rotated);
+    expect(rewriteOf(res)).toBeNull();
+    expect(res.status).toBe(200);
+    expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
+  });
+
+  it('marks its own rewrite, and removes a marker a client sent with any other request', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const spoofed = (path: string) =>
+      new NextRequest(
+        new Request(`https://crawlmouse.com${path}`, {
+          headers: { [REWRITE_HEADER]: '1' },
+        }),
+      );
+    const rewritten = await handleEdge(spoofed('/dashboard'), rotated);
+    expect(rewritten.headers.get(`x-middleware-request-${REWRITE_HEADER}`)).toBe('1');
+    for (const path of ['/pricing', '/sites/x']) {
+      const passed = await handleEdge(spoofed(path), rotated);
+      expect(passed.headers.get(`x-middleware-request-${REWRITE_HEADER}`)).toBeNull();
+      expect(passed.headers.get('x-middleware-override-headers') ?? '').not.toContain(
+        REWRITE_HEADER,
+      );
+    }
+  });
+
+  it.each([
+    ['1', '/dashboard/v2.rsc'],
+    ['1', '/dashboard/%76%32'],
+    ['1', '/dashboard%2Fv2'],
+    ['1', '/dashboard/v2'],
+    ['1', '/dashboard/v2/'],
+    ['1', '/dashboard/v2/anything'],
+    ['', '/dashboard/v2'],
+    ['', '/dashboard/v2?upgraded=1'],
+  ])(
+    'with V2_CHECKS_PUBLIC=%j, a direct request for %s is a 404 and is not refreshed',
+    async (flag, path) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+      const refresh = vi.fn(rotated);
+      const res = await handleEdge(at(path), refresh);
+      expect(res.status).toBe(404);
+      expect(rewriteOf(res)).toBeNull();
+      expect(refresh).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('middleware (exported entrypoint)', () => {

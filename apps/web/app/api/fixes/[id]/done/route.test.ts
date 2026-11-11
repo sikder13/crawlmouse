@@ -92,6 +92,26 @@ describe('POST /api/fixes/[id]/done', () => {
     expect(h.log).toEqual([]);
   });
 
+  it.each([
+    ['CRAWL_PAUSED', '1', 'paused'],
+    ['V2_PIPELINE', '', 'unavailable'],
+  ])('a form with %s=%j goes back to the dashboard with the notice', async (name, value, code) => {
+    process.env[name] = value;
+    const res = await POST(
+      new Request(`https://crawlmouse.com/api/fixes/${fw.ranked[0]!}/done`, {
+        method: 'POST',
+        headers: {
+          origin: 'https://crawlmouse.com',
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body: '',
+      }),
+      { params: Promise.resolve({ id: fw.ranked[0]! }) },
+    );
+    expect([res.status, res.headers.get('location')]).toEqual([303, `/dashboard?notice=${code}`]);
+    expect(h.log).toEqual([]);
+  });
+
   it('401 auth_required signed out, with no service-role client', async () => {
     h.user = null;
     expect(await answer(await post(fw.ranked[0]!))).toEqual([401, { code: 'auth_required' }]);

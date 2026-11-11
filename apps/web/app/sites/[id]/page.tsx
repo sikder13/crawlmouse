@@ -11,6 +11,7 @@ import { readAccount, siteOfCaller } from '@/lib/v2/account/pages';
 import { viewAt } from '@/lib/v2/view/account';
 import { accountShellView } from '@/lib/v2/view/account-shell';
 import { sitePage } from '@/lib/v2/view/site';
+import { noticeLine } from '@/lib/v2/copy/notices';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +26,13 @@ export const metadata: Metadata = {
  * malformed id, a site that does not exist, a removed one, or one on an account the caller does
  * not sit on; the sign-in page for a caller who is not signed in.
  */
-export default async function SitePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SitePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   if (!checksPublicEnabled()) return notFound();
   const { id } = await params;
   const session = await supabaseServer();
@@ -39,12 +46,17 @@ export default async function SitePage({ params }: { params: Promise<{ id: strin
   if (site === null) notFound();
   const { d, viewer } = await readAccount(session, site.accountId, site.seatId, now);
   const page = sitePage(d, viewer, id);
+  const notice = noticeLine(await searchParams, d.accounts[0]!.timezone);
   return (
     <LiveActions>
       {page.kind === 'site' ? (
-        <SiteScreen data={page.site} shell={accountShellView(viewAt(d, viewer), 'Sites')} />
+        <SiteScreen
+          data={page.site}
+          shell={accountShellView(viewAt(d, viewer), 'Sites')}
+          notice={notice}
+        />
       ) : (
-        <FirstCheckScreen data={page.first} />
+        <FirstCheckScreen data={page.first} notice={notice} />
       )}
     </LiveActions>
   );

@@ -58,6 +58,16 @@ export const DASHBOARD_COPY = {
   noSiteTitle: 'Add the site to watch',
   noSiteNote:
     'Adding a site starts its first check. Its grades, crawlers and fixes appear here when that check ends.',
+  /** The email-a-developer form's one field, on a live page. */
+  developerField: { label: 'Developer’s email', placeholder: 'dev@example.com' },
+  /** Copy fix on a live page: what the status line says. */
+  copyFix: {
+    copying: 'Copying…',
+    copied: 'Copied the fix as a prompt.',
+    paywall: 'This fix’s packet is on a paid plan.',
+    failed: 'The fix could not be fetched. Try again, or open it from the site page.',
+    blocked: 'This browser did not allow copying.',
+  },
   /** The add-site form's one field, on a live page. */
   siteField: { label: 'Site address', placeholder: 'example.com' },
   /** A signed-in person whose sign-in reaches no account, or several with none chosen. */
@@ -548,5 +558,10 @@ export const DASHBOARD_ADDITIONS: Addition[] = [
     screen: 'dashboard',
     what: 'A sign-in with no account, or several with none chosen: a plain page that says so',
     source: 'CC-26b plan revision R22',
+  },
+  {
+    screen: 'dashboard',
+    what: 'On a live page, Email to my developer’s address field, and Copy fix copying the packet as a prompt with a status line',
+    source: 'CC-26b follow-up (live fix actions)',
   },
 ];

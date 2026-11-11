@@ -1,7 +1,7 @@
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
-import { meantMethod, notFound, readBody, refuse, respond } from '@/lib/v2/account/route';
+import { meantMethod, notFound, readBody, refuse, refuseTo, respond } from '@/lib/v2/account/route';
 import { saveTheme, ThemeBody } from '@/lib/v2/account/theme';
 
 export const runtime = 'nodejs';
@@ -20,11 +20,11 @@ async function update(req: Request): Promise<Response> {
   if (!user) return refuse(401, 'auth_required');
 
   const body = await readBody(req);
-  if (!body) return refuse(400, 'invalid');
+  if (!body) return refuseTo(req, '/dashboard', 400, 'invalid');
   const { method, fields } = meantMethod(req, body);
   if (method !== 'PATCH') return refuse(405, 'method_not_allowed');
   const parsed = ThemeBody.safeParse(fields);
-  if (!parsed.success) return refuse(400, 'invalid');
+  if (!parsed.success) return refuseTo(req, '/dashboard', 400, 'invalid');
 
   await saveTheme(supabaseAdmin(), user.id, parsed.data.theme);
   return body.kind === 'form'

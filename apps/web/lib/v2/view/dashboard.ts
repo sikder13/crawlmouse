@@ -541,12 +541,20 @@ function changeRow(v: AccountView, site: Site, c: Change): ChangeRowView {
       ),
       ...(openFix
         ? [
-            action('copyFix', 'Copy fix', { id: fix.id }, { context: `for: ${c.summary}` }),
+            action(
+              'copyFix',
+              'Copy fix',
+              { id: fix.id },
+              { context: `for: ${c.summary}`, copy: true },
+            ),
             action(
               'emailDeveloper',
               'Email to my developer',
               { id: fix.id },
-              { context: `about: ${c.summary}` },
+              {
+                context: `about: ${c.summary}`,
+                input: { name: 'email', type: 'email', ...COPY.developerField },
+              },
             ),
           ]
         : []),

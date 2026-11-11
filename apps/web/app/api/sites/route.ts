@@ -4,17 +4,13 @@ import { isCrawlPaused } from '@/lib/crawl-pause';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { captureFor, checkStarted } from '@/lib/v2/account/events';
-import {
-  notFound,
-  paywall,
-  readBody,
-  refuse,
-  respond,
-  serviceRefusal,
-} from '@/lib/v2/account/route';
-import { admittedHost, parseAddBody, tooSoon } from '@/lib/v2/account/sites';
+import { notFound, readBody, refuse, refuseTo, respond, tooSoonTo } from '@/lib/v2/account/route';
+import { admittedHost, parseAddBody } from '@/lib/v2/account/sites';
 import { supabaseAddSite } from '@/lib/v2/account/sites-store';
 import { loadViewer } from '@/lib/v2/account/viewer';
+
+/** The page a form posts this from, and is sent back to when it is refused. */
+const BACK = '/dashboard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,8 +28,8 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: Request) {
   if (!checksPublicEnabled()) return notFound();
-  if (isCrawlPaused()) return serviceRefusal('paused');
-  if (!pipelineEnabled()) return serviceRefusal('unavailable');
+  if (isCrawlPaused()) return refuseTo(req, BACK, 503, 'paused');
+  if (!pipelineEnabled()) return refuseTo(req, BACK, 503, 'unavailable');
 
   const sb = await supabaseServer();
   const {
@@ -43,24 +39,26 @@ export async function POST(req: Request) {
 
   const viewer = await loadViewer();
   if (viewer.kind === 'signed_out') return refuse(401, 'auth_required');
-  if (viewer.kind === 'no_account') return refuse(409, 'no_account');
-  if (viewer.kind === 'ambiguous') return refuse(409, 'account_ambiguous');
+  if (viewer.kind === 'no_account') return refuseTo(req, BACK, 409, 'no_account');
+  if (viewer.kind === 'ambiguous') return refuseTo(req, BACK, 409, 'account_ambiguous');
   const { account, seat, tier, limits } = viewer.viewer;
 
   const { data: role, error: roleError } = await sb.rpc('member_role', { p_account: account.id });
   if (roleError) throw new Error(`member_role failed: ${roleError.message}`);
-  if (role !== 'owner' && role !== 'account_manager') return refuse(403, 'role_refused');
+  if (role !== 'owner' && role !== 'account_manager')
+    return refuseTo(req, BACK, 403, 'role_refused');
   const scope = await sb.from('seats').select('client_scope_all').eq('id', seat.id).maybeSingle();
   if (scope.error) throw new Error(`seats read failed: ${scope.error.message}`);
   if ((scope.data as { client_scope_all?: unknown } | null)?.client_scope_all !== true) {
-    return refuse(403, 'scoped_seat');
+    return refuseTo(req, BACK, 403, 'scoped_seat');
   }
 
   const body = await readBody(req);
   const input = body && parseAddBody(body.fields);
-  if (!body || !input) return refuse(400, 'invalid');
+  if (!body || !input) return refuseTo(req, BACK, 400, 'invalid');
   const admitted = await admittedHost(input.url);
-  if (!admitted.ok) return refuse(admitted.code === 'invalid_host' ? 400 : 422, admitted.code);
+  if (!admitted.ok)
+    return refuseTo(req, BACK, admitted.code === 'invalid_host' ? 400 : 422, admitted.code);
 
   // The schedule is the door's rule (lib/auth/schedule.ts): a Free account's first site is checked
   // monthly. Whether this is the first is read here; add_site counts the slots under its lock.
@@ -93,14 +91,14 @@ export async function POST(req: Request) {
         : Response.json({ siteId: added.siteId, checkId: added.checkId }, { status: 201 });
     }
     case 'exists':
-      return refuse(409, 'site_exists', { siteId: added.siteId });
+      return refuseTo(req, BACK, 409, 'site_exists', { siteId: added.siteId });
     case 'full':
-      return paywall('sites');
+      return refuseTo(req, BACK, 402, 'upgrade_required', { gate: 'sites' });
     case 'adds_capped':
-      return tooSoon('adds_capped', added.nextAllowedAt);
+      return tooSoonTo(req, BACK, 'adds_capped', added.nextAllowedAt);
     case 'domain_capped':
-      return tooSoon('domain_capped', added.nextAllowedAt);
+      return tooSoonTo(req, BACK, 'domain_capped', added.nextAllowedAt);
     case 'capacity':
-      return serviceRefusal('capacity');
+      return refuseTo(req, BACK, 503, 'capacity');
   }
 }

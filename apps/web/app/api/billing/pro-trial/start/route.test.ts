@@ -112,6 +112,7 @@ const post = (body: string, type = 'application/x-www-form-urlencoded', cookie =
     }),
   );
 const form = `accountId=${ACCOUNT}`;
+const asJson = () => post(JSON.stringify({ accountId: ACCOUNT }), 'application/json');
 
 beforeEach(() => {
   h.log.length = 0;
@@ -161,7 +162,7 @@ describe('membership', () => {
 
   it.each(['developer', 'account_manager'])('a %s is refused: owners only', async (role) => {
     h.state.role = role;
-    const res = await post(form);
+    const res = await asJson();
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ code: 'not_owner' });
     expect(h.log).not.toContain('supabaseAdmin');
@@ -207,7 +208,7 @@ describe('the owner', () => {
 
   it('an account that already had its trial is not eligible: 409, nothing applied or sent', async () => {
     h.state.trialUsedAt = '2026-10-01T00:00:00.000Z';
-    const res = await post(form);
+    const res = await asJson();
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ code: 'not_eligible' });
     expect(h.startTrial).not.toHaveBeenCalled();
@@ -217,7 +218,7 @@ describe('the owner', () => {
 
   it('the ledger’s refusal is a 409 refused, with nothing dispatched or sent', async () => {
     h.state.decision = { outcome: 'refused', hits: ['device'] };
-    const res = await post(form);
+    const res = await asJson();
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ code: 'refused' });
     expect(h.dispatch).not.toHaveBeenCalled();
@@ -226,10 +227,17 @@ describe('the owner', () => {
 
   it('without the ledger pepper nothing is asked: 503', async () => {
     vi.stubEnv('TRIAL_LEDGER_PEPPER', '');
-    const res = await post(form);
+    const res = await asJson();
     expect(res.status).toBe(503);
     expect(h.startTrial).not.toHaveBeenCalled();
     expect(h.capture).not.toHaveBeenCalled();
+  });
+
+  it('a refused form goes back to the dashboard with its notice, naming nothing it was sent', async () => {
+    h.state.trialUsedAt = '2026-10-01T00:00:00.000Z';
+    const res = await post(form);
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/dashboard?notice=not_eligible');
   });
 
   it('a body that is neither a form nor JSON is a 400', async () => {

@@ -209,6 +209,22 @@ describe('POST /api/sites/[id]/checks', () => {
     expect(h.capture).not.toHaveBeenCalled();
   });
 
+  it('the third Free re-check from the page goes back to it with the notice and the next time', async () => {
+    const p = await person(h.db, 'cappedform');
+    const s = await keptSite(h.db, p.accountId);
+    await pastRecheck(s.id, 3);
+    await pastRecheck(s.id, 2);
+    as(p);
+    const res = await recheck(s.id, 'application/x-www-form-urlencoded', '');
+    expect(res.status).toBe(303);
+    const to = new URL(res.headers.get('location')!, 'https://crawlmouse.com');
+    expect(to.pathname).toBe(`/sites/${s.id}`);
+    expect(to.searchParams.get('notice')).toBe('capped');
+    expect(Date.parse(to.searchParams.get('next')!)).toBeGreaterThan(Date.now() + 20.9 * 3600_000);
+    expect([...to.searchParams.keys()]).toEqual(['notice', 'next']);
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
   it('a user on a Free and a Pro account gets each account’s own cap (R3)', async () => {
     const u = await person(h.db, 'both');
     const proOwner = await person(h.db, 'pro-owner');

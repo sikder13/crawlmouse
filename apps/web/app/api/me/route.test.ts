@@ -120,6 +120,13 @@ describe('PATCH /api/me', () => {
     expect(h.update).not.toHaveBeenCalled();
   });
 
+  it('a refused form goes back to the dashboard with its notice', async () => {
+    const res = await POST(form('_method=PATCH&theme=sepia'));
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/dashboard?notice=invalid');
+    expect(h.update).not.toHaveBeenCalled();
+  });
+
   it('a POST that does not name PATCH is refused', async () => {
     const res = await POST(json({ theme: 'dark' }, 'POST'));
     expect(res.status).toBe(405);

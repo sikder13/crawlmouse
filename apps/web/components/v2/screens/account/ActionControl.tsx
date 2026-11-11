@@ -6,6 +6,7 @@ import { Field } from '../../Field';
 import { VisuallyHidden } from '../../VisuallyHidden';
 import type { ActionView } from '../../../../lib/v2/view/account-actions';
 import styles from './AccountScreen.module.css';
+import { CopyPacket } from './CopyPacket';
 import { useLive } from './LiveActions';
 
 /**
@@ -39,6 +40,17 @@ export function ActionControl({
       e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
   };
+  if (action.method === 'get' && live && action.copy) {
+    return (
+      <CopyPacket
+        href={action.href}
+        label={action.label}
+        context={action.context}
+        variant={v}
+        size={size}
+      />
+    );
+  }
   if (action.method === 'get') {
     return (
       <span className={styles.inlineForm} onFocus={reveal}>

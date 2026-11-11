@@ -12,7 +12,10 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { captureFor } from '@/lib/v2/account/events';
 import { ownedAccount, startProTrial } from '@/lib/v2/account/pro-trial';
-import { isId, notFound, readBody, refuse, respond } from '@/lib/v2/account/route';
+import { isId, notFound, readBody, refuse, refuseTo, respond } from '@/lib/v2/account/route';
+
+/** The page the offer is on, where a form is sent back to when it is refused. */
+const BACK = '/dashboard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,13 +35,13 @@ export async function POST(req: Request) {
   if (!user) return refuse(401, 'auth_required');
 
   const body = await readBody(req);
-  if (!body) return refuse(400, 'invalid');
+  if (!body) return refuseTo(req, BACK, 400, 'invalid');
   const accountId = body.fields.accountId;
   if (typeof accountId !== 'string' || !isId(accountId)) return notFound();
   const { data: role, error } = await sb.rpc('member_role', { p_account: accountId });
   if (error) throw new Error(`member_role failed: ${error.message}`);
   if (role === null) return notFound();
-  if (role !== 'owner') return refuse(403, 'not_owner');
+  if (role !== 'owner') return refuseTo(req, BACK, 403, 'not_owner');
   const account = await ownedAccount(sb, accountId, user.id);
   if (account === null || !user.email) return notFound();
 
@@ -62,7 +65,7 @@ export async function POST(req: Request) {
       ip: getClientIp(req),
     },
   );
-  if (answer.outcome !== 'started') return refuse(answer.status, answer.code);
+  if (answer.outcome !== 'started') return refuseTo(req, BACK, answer.status, answer.code);
   await captureFor(req)('trial_started', accountId, { kind: 'pro', variant: answer.variant });
   return respond(body.kind, '/dashboard');
 }
