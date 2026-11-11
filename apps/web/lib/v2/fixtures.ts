@@ -17,7 +17,6 @@ import challengedSite from '../fixtures/v2/challenged-site.json';
 import builtSite from '../fixtures/v2/built-site.json';
 
 import { type FixtureName } from './fixture-names';
-import type { ViewDataset } from './view/dataset';
 
 export { FIXTURE_NAMES, type FixtureName } from './fixture-names';
 
@@ -26,6 +25,15 @@ const RAW: Record<FixtureName, unknown> = {
   'clean-site': cleanSite,
   'challenged-site': challengedSite,
   'built-site': builtSite,
+};
+
+/**
+ * What a view function reads: the collections of a contract fixture, whatever says where they came
+ * from. A fixture, a persisted check read back by the pipeline (`provenance: 'measured'`) and an
+ * account's checks read together each satisfy it. No view reads `provenance`.
+ */
+export type ViewDataset = Omit<FixtureDataset, 'provenance'> & {
+  provenance: 'fixture' | 'measured';
 };
 
 const parsed = new Map<FixtureName, FixtureDataset>();

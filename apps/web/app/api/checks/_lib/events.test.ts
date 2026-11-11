@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { FUNNEL_EVENTS } from '../../../../lib/analytics-events';
 import { checkRef } from '../../../../lib/v2/pipeline/public';
-import { capturePublicEvent, type CaptureBody } from './events';
+import type { CaptureBody } from '../../../../lib/analytics-server';
+import { capturePublicEvent } from './events';
 
 const CHECK = '7b1f6c1e-8a53-4c0e-9d3a-2f6f1d0e4b11';
 const request = (cookie?: string) =>
@@ -31,6 +32,7 @@ describe('capturePublicEvent', () => {
           trigger: 'first_audit',
           check_ref: checkRef(CHECK),
           $process_person_profile: false,
+          $geoip_disable: true,
         },
       },
     ]);
@@ -63,13 +65,16 @@ describe('capturePublicEvent', () => {
     expect(r.sent).toEqual([]);
   });
 
-  it('drops a send that fails', async () => {
-    const failing = async () => {
-      throw new Error('network');
-    };
-    await expect(
-      capturePublicEvent(request(), 'check_started', CHECK, { trigger: 'first_audit' }, failing),
-    ).resolves.toBeUndefined();
+  it('sends nothing for a visitor who declined analytics', async () => {
+    const r = recorder();
+    await capturePublicEvent(
+      request('cm_consent=denied'),
+      'check_started',
+      CHECK,
+      { trigger: 'first_audit' },
+      r.send,
+    );
+    expect(r.sent).toEqual([]);
   });
 
   it('uses names the catalogue holds', () => {
