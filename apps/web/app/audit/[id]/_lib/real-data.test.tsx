@@ -128,6 +128,15 @@ describe('/audit/[id]: the result of a measured check, read by a visitor', () =>
     expect(primaries(markup)).toHaveLength(1);
   });
 
+  it('the first-fix card does not say steps are open: the fix it names has no packet', () => {
+    const data = resultOf(one);
+    const fix = fixesAsOf(one.dataset, one.dataset.checks[0]!)[0]!;
+    expect(data.first).toMatchObject({ kind: 'fix', title: fix.title });
+    expect(fix.packet).toBeNull();
+    expect(data.first.body).toMatch(/ The evidence is open, free\.$/);
+    expect(html(<CheckPage read={one} />)).not.toMatch(/The steps\b/);
+  });
+
   it('renders no control that has no route in this step', () => {
     const markup = html(<CheckPage read={one} />);
     for (const label of ['Share', 'Re-run, free', 'Email this fix', 'What Pro includes'])

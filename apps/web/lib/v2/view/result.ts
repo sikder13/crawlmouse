@@ -752,7 +752,11 @@ function fixFirstBody(check: Check, f: Fix, siteFixes: readonly Fix[]): string {
         : seo === null || h.kind === 'seo_not_estimated'
           ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
           : `Technical SEO ${seo} → ${Math.min(100, seo + h.points)}, estimated.`;
-  return `${what ? `${capitalise(what)}. ` : ''}${effect} The steps and the evidence are open, free.`;
+  // What the fix page holds of this fix: its evidence, and its steps where a packet was written.
+  const open = f.packet
+    ? 'The steps and the evidence are open, free.'
+    : 'The evidence is open, free.';
+  return `${what ? `${capitalise(what)}. ` : ''}${effect} ${open}`;
 }
 
 /** Whether a title states the number `n` as a whole number, grouped ("1,120") or not. */
