@@ -131,6 +131,16 @@ describe('persistBuiltCheck: what it sends', () => {
     expect(sent).toHaveLength(1);
   });
 
+  it('refuses a built check stored with no `read` (one built before the watermark), before any call', async () => {
+    // Taking a missing read as empty would let that check overwrite a mark its build never saw.
+    const { db, sent, stages } = recording();
+    const { read: _read, ...stale } = inputOf();
+    void _read;
+    await expect(persistBuiltCheck(db, stale as PersistInput)).rejects.toThrow();
+    expect(sent).toEqual([]);
+    expect(stages).toEqual([]);
+  });
+
   it('refuses a page with no vantage, before any call', async () => {
     const { db, sent, stages } = recording();
     const partial = new Map(vantage);

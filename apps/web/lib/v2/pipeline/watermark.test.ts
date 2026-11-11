@@ -35,6 +35,8 @@ let times: SecondTimes;
 let plain: BuiltCheck;
 
 const plus = (ms: number) => new Date(Date.now() + ms).toISOString();
+/** A third check of the site, after the second. */
+const THIRD = 'b0000000-0000-4000-8000-0000000000c3';
 
 beforeAll(async () => {
   const recorded = recordedBuild();
@@ -200,6 +202,54 @@ describe('a check whose build read the fix before the mark', () => {
       expect.objectContaining({ type: marked.type }),
     );
   });
+
+  it('KNOWN GAP: the next check, which reads the mark, verifies the fix but writes no changes row for it', async () => {
+    // Pins today's behaviour, not the wanted one: the engine writes a resolution row only when the
+    // previous check measured the fix (diff.ts, `measuredBefore`), and the withheld check did not
+    // record its measurement on the fix. The fix closes; the changes log does not say so.
+    const read = await tableRead(r.db);
+    const base = inputFor(read.fixes, read.events);
+    const renamed = JSON.parse(JSON.stringify(base).replaceAll(SECOND, THIRD)) as BuildInput;
+    const at = Date.parse(times.finished_at);
+    const iso = (ms: number) => new Date(at + ms).toISOString();
+    const input: BuildInput = {
+      ...renamed,
+      check: {
+        ...renamed.check,
+        previous_check_id: SECOND,
+        queued_at: iso(60_000),
+        started_at: iso(62_000),
+        finished_at: iso(600_000),
+      },
+      now: iso(600_000),
+      previous: { check: r.built.check, ...r.built.diff_inputs },
+      fixes: read.fixes,
+      events: read.events,
+    };
+    const built = buildCheck(input);
+    await seedRunning(r.db, input.check);
+    const outcome = await persistBuiltCheck(
+      pglitePersistDb(r.db),
+      {
+        built,
+        vantage: vantageOf(secondCrawl()),
+        map_path: null,
+        read: readOfFixes(read.fixes, read.events),
+      },
+      async () => undefined,
+    );
+    expect(outcome.verified.map((v) => v.fix_id)).toContain(marked.id);
+    expect((await fixRow(r.db, marked.id)).status).toBe('verified_resolved');
+    const of = async (table: 'fix_events' | 'changes') =>
+      (
+        await r.db.query<{ kind: string }>(
+          `select kind from public.${table} where fix_id = $1 and check_id = $2`,
+          [marked.id, THIRD],
+        )
+      ).rows.map((x) => x.kind);
+    expect(await of('fix_events')).toEqual(['verified']);
+    expect(await of('changes')).toEqual([]);
+  }, 120_000);
 
   it('writes the rest of the check, and counts what it withheld against what it was given', () => {
     const of = (rows: { fix_id?: string | null }[]) =>
