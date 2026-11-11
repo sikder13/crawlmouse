@@ -1,11 +1,11 @@
 import 'server-only';
 import * as Sentry from '@sentry/nextjs';
+import { startLimits } from '../../app/api/checks/_lib/start-limits';
 import { supabaseAdmin } from '../supabase/admin';
 import { supabaseEntitlementStore } from '../billing/state-machine-apply';
 import { billingDispatcher } from '../billing/effect-sinks';
 import { isCrawlPaused } from '../crawl-pause';
 import { inngest } from '../inngest';
-import { checkRateLimit } from '../rate-limit';
 import { supabaseEvidenceStore } from '../v2/pipeline/evidence';
 import { firstAuditRequester } from '../v2/pipeline/first-audit';
 import { claimKeep } from '../v2/pipeline/keep';
@@ -47,7 +47,7 @@ export function doorDeps(): { firstLogin: FirstLoginDeps; claim: ClaimDeps } {
             now: Date.now,
           },
           hasLiveOrGradedCheck: (siteId) => keepStore.hasLiveOrGradedCheck(siteId),
-          limit: checkRateLimit,
+          limits: startLimits,
           paused: () => isCrawlPaused(),
         })
       : undefined;

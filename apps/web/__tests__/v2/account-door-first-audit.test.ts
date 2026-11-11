@@ -38,7 +38,10 @@ function requester(allowed: (key: string) => boolean = () => true) {
       now: () => NOW.getTime(),
     },
     hasLiveOrGradedCheck: (siteId) => sqlKeepStore(asService(db)).hasLiveOrGradedCheck(siteId),
-    limit: async (key) => ({ allowed: allowed(key) }),
+    limits: {
+      global: async () => allowed('global:audits:day'),
+      domain: async (domain) => allowed(`domain:${domain}`),
+    },
     paused: () => false,
   });
   return { firstAudit, sent };

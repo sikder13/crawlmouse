@@ -6,15 +6,12 @@ import type { PGlite } from '@electric-sql/pglite';
 import { stableId } from '@crawlmouse/engine/v2/pipeline';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { accountOf, doorDb, signUp } from '../../../__tests__/v2/_lib/door-pglite';
-import { DOMAIN_AUDITS_PER_HOUR, GLOBAL_AUDITS_PER_DAY } from '../../limits';
 import { firstAuditId, firstAuditRequester, type FirstAuditDeps } from './first-audit';
 import { sqlKeepStore } from './test-support/sql-keep-store';
 import { sqlPipelineStore } from './test-support/sql-store';
 import { asService } from './test-support/stored-check';
 
 const NOW = Date.parse('2026-11-10T12:00:00.000Z');
-const DAY_MS = 24 * 60 * 60 * 1000;
-const HOUR_MS = 60 * 60 * 1000;
 
 let db: PGlite;
 let n = 0;
@@ -36,9 +33,12 @@ async function keptSite(host: string): Promise<{ siteId: string; userId: string 
   return { siteId: rows[0]!.id, userId };
 }
 
-type LimitCall = [key: string, limit: number, windowMs: number, opts?: { failClosed?: boolean }];
+/** A limit asked: the day's ceiling, or a domain's bucket. */
+type LimitCall = 'global' | `domain:${string}`;
 
-function harness(over: { refuse?: string; paused?: boolean; onLimit?: () => Promise<void> } = {}) {
+function harness(
+  over: { refuse?: 'global' | 'domain'; paused?: boolean; onLimit?: () => Promise<void> } = {},
+) {
   const sent: { id: string; name: string; data: Record<string, unknown> }[] = [];
   const limits: LimitCall[] = [];
   const deps: FirstAuditDeps = {
@@ -48,10 +48,17 @@ function harness(over: { refuse?: string; paused?: boolean; onLimit?: () => Prom
       now: () => NOW,
     },
     hasLiveOrGradedCheck: (siteId) => sqlKeepStore(asService(db)).hasLiveOrGradedCheck(siteId),
-    limit: async (...call) => {
-      limits.push(call);
-      await over.onLimit?.();
-      return { allowed: !call[0].startsWith(over.refuse ?? 'no bucket') };
+    limits: {
+      global: async () => {
+        limits.push('global');
+        await over.onLimit?.();
+        return over.refuse !== 'global';
+      },
+      domain: async (domain) => {
+        limits.push(`domain:${domain}`);
+        await over.onLimit?.();
+        return over.refuse !== 'domain';
+      },
     },
     paused: () => over.paused === true,
   };
@@ -87,11 +94,8 @@ describe('firstAuditRequester', () => {
         requestedByUserId: userId,
       },
     });
-    // The start route's two buckets, the global one first and failing closed; www. shares the host's.
-    expect(limits).toEqual([
-      ['global:audits:day', GLOBAL_AUDITS_PER_DAY, DAY_MS, { failClosed: true }],
-      ['domain:first-one.example', DOMAIN_AUDITS_PER_HOUR, HOUR_MS],
-    ]);
+    // The day's ceiling first, then the host's bucket; www. shares the host's.
+    expect(limits).toEqual(['global', 'domain:first-one.example']);
   });
 
   it('asked again, starts nothing and uses no bucket: the site has its check', async () => {
@@ -139,16 +143,16 @@ describe('firstAuditRequester', () => {
 
   it('at the daily ceiling starts no check and does not reach the host’s bucket', async () => {
     const { siteId, userId } = await keptSite('capacity.example');
-    const { request, sent, limits } = harness({ refuse: 'global:' });
+    const { request, sent, limits } = harness({ refuse: 'global' });
     expect(await request({ siteId, host: 'capacity.example', userId })).toBe('capacity');
     expect(await checksOf(siteId)).toEqual([]);
     expect(sent).toEqual([]);
-    expect(limits.map((c) => c[0])).toEqual(['global:audits:day']);
+    expect(limits).toEqual(['global']);
   });
 
   it('past the host’s hourly bucket starts no check', async () => {
     const { siteId, userId } = await keptSite('busy.example');
-    const { request, sent } = harness({ refuse: 'domain:' });
+    const { request, sent } = harness({ refuse: 'domain' });
     expect(await request({ siteId, host: 'busy.example', userId })).toBe('domain_limit');
     expect(await checksOf(siteId)).toEqual([]);
     expect(sent).toEqual([]);

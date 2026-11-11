@@ -427,7 +427,7 @@ describe('claimCheck with keep (V2_CHECKS_PUBLIC=1): one transaction, with the e
           now: Date.now,
         },
         hasLiveOrGradedCheck: (siteId) => sqlKeepStore(asService(db)).hasLiveOrGradedCheck(siteId),
-        limit: async () => ({ allowed: true }),
+        limits: { global: async () => true, domain: async () => true },
         paused: () => false,
       });
       return { ...keepDeps(memory, { firstAudit }), sent };
