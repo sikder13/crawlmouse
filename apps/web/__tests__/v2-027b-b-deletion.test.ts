@@ -669,6 +669,7 @@ describe('the catalogue', () => {
       'restore_account',
       'record_deletion_cancel',
       'erasure_pending',
+      'erasure_state',
       'due_erasures',
       'record_erasure_attempt',
       'finish_erasure',

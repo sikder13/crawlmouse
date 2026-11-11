@@ -1420,6 +1420,23 @@ as $$
   select exists (select 1 from public.pending_erasures q where q.user_id = p_user);
 $$;
 
+-- Where the person's deletion stands: `pending` (queued), `erased` (the purge removed them: no
+-- public.users row, which cascades from auth.users), `restored` otherwise. What a restore whose answer
+-- was lost asks, to tell a committed restore from one that did not happen or a finished purge.
+create or replace function public.erasure_state(p_user uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select case
+    when exists (select 1 from public.pending_erasures q where q.user_id = p_user) then 'pending'
+    when not exists (select 1 from public.users u where u.id = p_user) then 'erased'
+    else 'restored'
+  end;
+$$;
+
 -- The purge's work: the people whose window has ended by p_now and by the database's clock; those
 -- not yet attempted first, then the least recently attempted, so people a refusal keeps in the queue
 -- cannot hold the others back. A restore refuses once either clock has passed the window's end
@@ -1481,6 +1498,7 @@ revoke all on function public.confirm_account_deletion(text, timestamptz) from p
 revoke all on function public.restore_account(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.record_deletion_cancel(uuid, uuid, text, boolean) from public, anon, authenticated;
 revoke all on function public.erasure_pending(uuid) from public, anon, authenticated;
+revoke all on function public.erasure_state(uuid) from public, anon, authenticated;
 revoke all on function public.due_erasures(timestamptz, integer) from public, anon, authenticated;
 revoke all on function public.record_erasure_attempt(uuid) from public, anon, authenticated;
 revoke all on function public.finish_erasure(uuid) from public, anon, authenticated;
@@ -1492,6 +1510,7 @@ grant execute on function public.confirm_account_deletion(text, timestamptz) to 
 grant execute on function public.restore_account(text, timestamptz) to service_role;
 grant execute on function public.record_deletion_cancel(uuid, uuid, text, boolean) to service_role;
 grant execute on function public.erasure_pending(uuid) to service_role;
+grant execute on function public.erasure_state(uuid) to service_role;
 grant execute on function public.due_erasures(timestamptz, integer) to service_role;
 grant execute on function public.record_erasure_attempt(uuid) to service_role;
 grant execute on function public.finish_erasure(uuid) to service_role;
