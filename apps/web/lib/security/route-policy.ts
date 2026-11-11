@@ -105,6 +105,15 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { route: 'api/billing/status', methods: ['GET'], class: 'user', origin: 'any' },
   { route: 'api/checks/[id]/claim', methods: ['POST'], class: 'user', origin: 'strict' },
   {
+    route: 'api/checks',
+    methods: ['POST'],
+    class: 'public',
+    reason: 'anonymous checks by design; Turnstile and per-IP, per-domain and global limits',
+    session: 'optional',
+    origin: 'lenient',
+    jsonBody: true,
+  },
+  {
     route: 'api/developers',
     methods: ['POST'],
     class: 'public',
