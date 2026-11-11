@@ -17,6 +17,7 @@ import challengedSite from '../fixtures/v2/challenged-site.json';
 import builtSite from '../fixtures/v2/built-site.json';
 
 import { type FixtureName } from './fixture-names';
+import type { ViewDataset } from './view/dataset';
 
 export { FIXTURE_NAMES, type FixtureName } from './fixture-names';
 
@@ -38,13 +39,13 @@ export function fixture(name: FixtureName): FixtureDataset {
   return d;
 }
 
-export function findCheck(d: FixtureDataset, id: string): Check {
+export function findCheck(d: ViewDataset, id: string): Check {
   const c = d.checks.find((x) => x.id === id);
   if (!c) throw new Error(`No check ${id} in the fixture`);
   return c;
 }
 
-export function siteOf(d: FixtureDataset, check: Check) {
+export function siteOf(d: ViewDataset, check: Check) {
   const s = d.sites.find((x) => x.id === check.site_id);
   if (!s) throw new Error(`No site ${check.site_id} for check ${check.id}`);
   return s;
@@ -63,7 +64,7 @@ export function crawlerOf(check: Check, ua: string): CrawlerResult {
  * Ranks are stored once, at each fix's last measured check, so an earlier check reuses that order
  * with the later fixes left out.
  */
-export function fixesAsOf(d: FixtureDataset, check: Check): Fix[] {
+export function fixesAsOf(d: ViewDataset, check: Check): Fix[] {
   if (check.finished_at === null) throw new Error(`Check ${check.id} has not finished`);
   const end = instant(check.finished_at);
   const queued = (id: string) => instant(findCheck(d, id).queued_at);

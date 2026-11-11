@@ -4,14 +4,8 @@
  * the changes it found. A change is reported as first observed at a check, after what we found
  * with it, never as caused by it: a check sees that something differs, not why.
  */
-import type {
-  Change,
-  Check,
-  EvidenceClass,
-  FixtureDataset,
-  GradeName,
-  Verdict,
-} from '@crawlmouse/types/v2';
+import type { Change, Check, EvidenceClass, GradeName, Verdict } from '@crawlmouse/types/v2';
+import type { ViewDataset } from '../dataset';
 
 type ChangeKind = Change['kind'];
 type ChangeSubject = Change['subject'];
@@ -142,7 +136,7 @@ const EXAMPLE: ChangeRowView[] = [
 ];
 
 /** The account's clock, or UTC for an audit nobody has kept. */
-function clockOf(d: FixtureDataset, check: Check) {
+function clockOf(d: ViewDataset, check: Check) {
   const account = d.accounts.find((a) => a.id === siteOf(d, check).account_id);
   return (ts: string) =>
     account ? weekdayTime(ts, account.timezone) : `${weekdayTime(ts, 'UTC')} UTC`;
@@ -200,7 +194,7 @@ function historyLabel(c: Check): string {
 }
 
 /** The site's graded checks up to and including this one, newest first. */
-function auditsUpTo(d: FixtureDataset, check: Check): Check[] {
+function auditsUpTo(d: ViewDataset, check: Check): Check[] {
   const at = Date.parse(check.queued_at);
   return d.checks
     .filter(
@@ -213,7 +207,7 @@ function auditsUpTo(d: FixtureDataset, check: Check): Check[] {
 }
 
 /** "weekly, Fri around 06:00" (FACTS H4), or null when nothing re-checks the site. */
-function scheduleOf(d: FixtureDataset, check: Check, kept: boolean): string | null {
+function scheduleOf(d: ViewDataset, check: Check, kept: boolean): string | null {
   const s = siteOf(d, check).schedule;
   if (!kept || !s) return null;
   if (s.cadence === 'on_deploy') return 'on each deploy';
@@ -221,7 +215,7 @@ function scheduleOf(d: FixtureDataset, check: Check, kept: boolean): string | nu
 }
 
 export function changesView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   options: SegmentOptions = {},
 ): ChangesView {

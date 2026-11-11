@@ -2,7 +2,7 @@
  * The Home screen's example audit, its crawler table, its words-without-JavaScript card and its
  * alert card, as data from the bad-site fixture. The marketing copy around them is the component's.
  */
-import type { AccessCause, CrawlerResult, FixtureDataset } from '@crawlmouse/types/v2';
+import type { AccessCause, CrawlerResult } from '@crawlmouse/types/v2';
 import { crawlerOf, findCheck, fixesAsOf, siteOf, templateOf } from '../fixtures';
 import { duration, percent, templateNoun, weekdayTime } from '../format';
 import { mapLabel } from '../map-label';
@@ -13,6 +13,7 @@ import type { GradeView } from './result';
 import { isFreeFix } from './free-fixes';
 import { aiShortSummary, seoShortSummary } from '../sentences';
 import { capitalise } from '../words';
+import type { ViewDataset } from './dataset';
 
 /** The four crawlers the locked Home table shows, in its order. Which crawlers is a layout choice. */
 export const HOME_CRAWLERS = ['Googlebot', 'GPTBot', 'ClaudeBot', 'PerplexityBot'] as const;
@@ -86,7 +87,7 @@ function obstacle(c: CrawlerResult, productNoun: string): string {
  * last frame; its counts are the stream's own (synthesise.test.ts shows they equal the check's).
  */
 export function homeView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   { map, end }: { map: MapDrawing; end: CrawlState },
 ): HomeView {

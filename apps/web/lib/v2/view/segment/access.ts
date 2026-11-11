@@ -11,7 +11,6 @@ import type {
   CrawlerGroup,
   CrawlerResult,
   EvidenceClass,
-  FixtureDataset,
   Verdict,
 } from '@crawlmouse/types/v2';
 import { findCheck } from '../../fixtures';
@@ -30,6 +29,7 @@ import { capitalise, count, numberWord, plural } from '../../words';
 import { accessPill, type CoverageView, type DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
+import type { ViewDataset } from '../dataset';
 
 export interface MatrixCell {
   /** Unique on the page: the crawler and the section ("*" for a cell spanning every section). */
@@ -288,7 +288,7 @@ function rowOf(
 }
 
 export function accessView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   options: SegmentOptions = {},
 ): AccessView {

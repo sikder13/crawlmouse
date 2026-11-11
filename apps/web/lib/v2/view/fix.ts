@@ -6,7 +6,7 @@
  * fix as `withoutPacket` copies it, and fix.test.ts makes the field throw when read.
  */
 import { RECHECK_MINUTES } from '../recheck';
-import type { Check, CrawlerResult, Fix, FixtureDataset } from '@crawlmouse/types/v2';
+import type { Check, CrawlerResult, Fix } from '@crawlmouse/types/v2';
 import { instant } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { dayTimeUtc, listOf, percent } from '../format';
@@ -30,6 +30,7 @@ import {
   type SegmentKey,
   type SegmentLink,
 } from './segment/frame';
+import type { ViewDataset } from './dataset';
 
 /** A packet's framework; the contract names the schema, not the type. */
 export type PacketFramework = FixPacket['framework'];
@@ -375,7 +376,7 @@ function withoutPacket(f: Fix): Omit<Fix, 'packet'> {
 }
 
 export function fixView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   fixId: string,
   { plan = 'free', asFirstSeen = false, hrefs = NO_HREFS }: FixOptions = {},

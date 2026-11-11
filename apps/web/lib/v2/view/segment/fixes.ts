@@ -9,7 +9,6 @@ import {
   type Check,
   type Fix,
   type FixSection,
-  type FixtureDataset,
   type RecommendationClass,
 } from '@crawlmouse/types/v2';
 import { fixesAsOf } from '../../fixtures';
@@ -17,6 +16,7 @@ import { listOf } from '../../format';
 import { numberWord, plural } from '../../words';
 import { effectHeadline } from '../effect-headline';
 import { freeFixes } from '../free-fixes';
+import type { ViewDataset } from '../dataset';
 
 /** A fix's packet; the contract names the schema, not the type. */
 export type FixPacket = NonNullable<Fix['packet']>;
@@ -217,11 +217,7 @@ export function openFix(f: Fix, siteFixes: readonly Fix[]): OpenFixView {
   };
 }
 
-export function sectionFixes(
-  d: FixtureDataset,
-  check: Check,
-  section: FixSection,
-): SectionFixesView {
+export function sectionFixes(d: ViewDataset, check: Check, section: FixSection): SectionFixesView {
   const all = fixesAsOf(d, check);
   const free = freeFixes(d, check);
   const here = all.filter((f) => f.section === section);
