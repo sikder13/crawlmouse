@@ -159,7 +159,7 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
     locked: 'We sent this once, today, as promised.',
     rendered: 'The reminder is due once, on Wed 4 Nov.',
     source:
-      'Owner ruling pending (CC-27b Q17): nothing records that the reminder was sent (CC-28 sends it), so the sentence says when it is due, and nothing once its day has passed',
+      'Owner ruling (CC-27b Q17, 2026-11-11): nothing records that the reminder was sent (CC-28 sends it), so the sentence says when it is due, and nothing once its day has passed',
   },
   {
     screen: 'trial-end',

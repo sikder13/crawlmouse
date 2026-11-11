@@ -48,7 +48,7 @@ export const SETTINGS_COPY = {
     `Those are the ${numberWord(kinds)} kinds from us. If you pay, Stripe sends the receipts. There is no newsletter and no product-update mail to unsubscribe from.`,
   dangerTitle: 'Danger',
   deleteLabel: 'Delete this account',
-  /** FACTS E6: the seven-day undo, by the restore link (questions.md Q16). */
+  /** FACTS E6: the seven-day undo, by the restore link (owner ruling, CC-27b Q16). */
   deleteText: (sites: number, grace: number) =>
     `${
       sites === 0
@@ -222,7 +222,7 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     rendered:
       'Takes effect after a confirmation link. For seven days the restore link in that email undoes it; after that the account is erased, apart from the few things the confirmation page lists.',
     source:
-      'FACTS E6, as CC-27b built it (questions.md Q16): the restore link restores, a sign-in link cannot once sign-in is stopped, and the erasure keeps what the confirmation page lists',
+      'FACTS E6, as CC-27b built it and the owner approved (CC-27b Q16, 2026-11-11): the restore link restores, a sign-in link cannot once sign-in is stopped, and the erasure keeps what the confirmation page lists',
   },
   {
     screen: 'settings',
