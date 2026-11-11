@@ -1,5 +1,6 @@
+import { supabaseServer } from '@/lib/supabase/server';
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { requestAccess } from '@/lib/v2/pipeline/public-deps';
+import type { Viewer } from '@/lib/v2/pipeline/public';
 import { checkRouteDeps } from '../_lib/deps';
 import { serveStream } from './serve';
 
@@ -11,8 +12,11 @@ export const maxDuration = 300;
 /** A check's progress as server-sent events (CC-22b D5): see serve.ts. 404 with V2_CHECKS_PUBLIC unset. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!checksPublicEnabled()) return Response.json({ code: 'not_found' }, { status: 404 });
-  // The session's viewer, and the audit pages' own membership test for that session.
-  const { deps: access, viewer } = await requestAccess();
+  const sb = await supabaseServer();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  const viewer: Viewer = { userId: user?.id ?? null };
   const { id } = await params;
-  return serveStream(req, id, viewer, checkRouteDeps(access.isMember));
+  return serveStream(req, id, viewer, checkRouteDeps(sb, viewer));
 }

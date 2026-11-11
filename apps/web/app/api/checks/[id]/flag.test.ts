@@ -3,22 +3,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 /**
  * The three routes behind V2_CHECKS_PUBLIC (D1): with it unset each answers 404 before the session
  * is asked for or a dependency is built; with it set each hands its handler the viewer the session
- * names. The handlers, `requestAccess` and the dependency factory are stand-ins here; wiring.test.ts
- * runs the routes into the real two.
+ * names. The handlers, the session client and the dependency factory are stand-ins here;
+ * wiring.test.ts runs the routes into the real factory.
  */
 const calls = vi.hoisted(() => [] as string[]);
 const user = vi.hoisted(() => ({ id: null as string | null }));
 
-const isMember = vi.hoisted(() => async () => false);
-vi.mock('@/lib/v2/pipeline/public-deps', () => ({
-  requestAccess: async () => {
-    calls.push('requestAccess');
-    return { viewer: { userId: user.id }, deps: { isMember } };
+const session = vi.hoisted(() => ({
+  auth: { getUser: async () => ({ data: { user: null as { id: string } | null } }) },
+}));
+vi.mock('@/lib/supabase/server', () => ({
+  supabaseServer: async () => {
+    calls.push('supabaseServer');
+    session.auth.getUser = async () => ({
+      data: { user: user.id === null ? null : { id: user.id } },
+    });
+    return session;
   },
 }));
 vi.mock('./_lib/deps', () => ({
-  checkRouteDeps: (given: unknown) => {
-    calls.push(given === isMember ? 'deps(isMember)' : 'deps(?)');
+  checkRouteDeps: (client: unknown, viewer: unknown) => {
+    calls.push(`deps(${client === session ? 'session' : '?'}, ${JSON.stringify(viewer)})`);
     return {};
   },
 }));
@@ -71,13 +76,13 @@ describe.each(routes)('/api/checks/[id]/%s', (name, method, load) => {
     expect(await (await route(req(method), ctx)).json()).toEqual({ handled: name });
     user.id = 'user-1';
     await route(req(method), ctx);
-    // Each request: the session's access, the dependencies built on its membership test, the handler.
+    // Each request: the session, the dependencies built on its client and viewer, the handler.
     expect(calls).toEqual([
-      'requestAccess',
-      'deps(isMember)',
+      'supabaseServer',
+      'deps(session, {"userId":null})',
       `${name}({"userId":null})`,
-      'requestAccess',
-      'deps(isMember)',
+      'supabaseServer',
+      'deps(session, {"userId":"user-1"})',
       `${name}({"userId":"user-1"})`,
     ]);
   });

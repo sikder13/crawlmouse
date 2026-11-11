@@ -132,7 +132,8 @@ beforeEach(async () => {
   dns.set('example.com', [PUBLIC_ADDRESS]);
   dns.set('www.example.com', [PUBLIC_ADDRESS]);
   dns.set('other.example', ['198.51.100.7']);
-});
+  // The first call of `doorDb` applies each migration to the template database; later calls clone it.
+}, 120_000);
 
 describe('a first start', () => {
   it('makes one unkept site and one queued check under the derived ids, and sends one event', async () => {

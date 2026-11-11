@@ -50,7 +50,7 @@ afterEach(() => {
 
 describe('checkRouteDeps().captureFinished', () => {
   it('resolves before the capture is sent: the capture is left for `after`', async () => {
-    const deps = checkRouteDeps(async () => false);
+    const deps = checkRouteDeps({} as never, { userId: null });
     await deps.captureFinished(req(), CHECK, FINISHED);
     expect([h.afterTasks.length, fetched]).toEqual([1, []]);
 
@@ -67,7 +67,7 @@ describe('checkRouteDeps().captureFinished', () => {
 
   it('awaits the capture itself when `after` refuses it', async () => {
     h.afterThrows = true;
-    const deps = checkRouteDeps(async () => false);
+    const deps = checkRouteDeps({} as never, { userId: null });
     let settled = false;
     const captured = deps.captureFinished(req(), CHECK, FINISHED).then(() => {
       settled = true;

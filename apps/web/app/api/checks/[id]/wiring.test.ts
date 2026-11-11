@@ -1,7 +1,6 @@
 /**
- * The stream, notify and cancel routes run into production's wiring: `requestAccess`
- * (lib/v2/pipeline/public-deps.ts), `checkRouteDeps` (_lib/deps.ts) and `checkRouteLimits`
- * (_lib/limits.ts) are the real modules. Replaced at the module boundary: the two Supabase clients
+ * The stream, notify and cancel routes run into production's wiring: `checkRouteDeps`
+ * (_lib/deps.ts) and `checkRouteLimits` (_lib/limits.ts) are the real modules. Replaced at the module boundary: the two Supabase clients
  * (each records its requests), the limiter's database call, Inngest, Next's `after`, and the three
  * handlers, which here hand back the viewer and the dependencies they were given.
  */
@@ -78,6 +77,7 @@ vi.mock('./cancel/cancel', () => ({ cancel: handler }));
 import { POST as cancelRoute } from './cancel/route';
 import { POST as notifyRoute } from './notify/route';
 import { GET as streamRoute } from './stream/route';
+import { requestAccess } from '../../../../lib/v2/pipeline/public-deps';
 
 const CHECK = '0b0e7a52-5f0b-4b53-9c0e-0d4a3a1f2c11';
 const SITE = '5d0c7d0e-11a4-4b0b-8a43-6f3b4f8f2a10';
@@ -181,5 +181,36 @@ describe.each(routes)('/api/checks/[id]/%s, as production wires it', (_name, met
     const keys = h.limited.map((l) => l[0]).join(' ');
     expect(keys).not.toContain(CHECK);
     expect(keys).not.toContain('dana');
+  });
+});
+
+describe('the routes’ membership test and the audit pages’ (requestAccess)', () => {
+  it('make the same request and give the same answer, case by case', async () => {
+    const { deps } = await wired(streamRoute, 'GET', USER);
+    const pages = (await requestAccess()).deps;
+    const member = { data: [{ id: SITE }], error: null };
+    const cases: [string, string, { data: unknown; error: unknown }][] = [
+      ['a member', USER, member],
+      ['not a member', USER, { data: [], error: null }],
+      ['a user id that is not the session’s', '00000000-0000-4000-8000-000000000000', member],
+      ['a read that fails', USER, { data: null, error: { code: '57014', message: 'timeout' } }],
+    ];
+    const seen: unknown[] = [];
+    for (const [name, userId, answer] of cases) {
+      const outcomes = [];
+      for (const isMember of [deps.isMember, pages.isMember]) {
+        h.session.requests.length = 0;
+        h.session.answer.value = answer;
+        const outcome = await isMember(SITE, userId).then(
+          (v) => v,
+          () => 'throws',
+        );
+        outcomes.push({ outcome, asked: [...h.session.requests], admin: h.admin.requests.length });
+      }
+      expect(outcomes[0], name).toEqual(outcomes[1]);
+      seen.push(outcomes[0]!.outcome);
+    }
+    // The four cases gave four different things to agree on.
+    expect(seen).toEqual([true, false, false, 'throws']);
   });
 });
