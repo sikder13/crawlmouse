@@ -1255,7 +1255,8 @@ end;
 $$;
 
 -- What a deletion link's page shows, without using the link: {ok: false, code} with `invalid_link`
--- (no such token of that kind, or used, revoked or expired), `not_confirmed` (a restore link before its
+-- (no such token of that kind, or used, revoked or expired; or a restore link whose own request was
+-- not the one confirmed), `not_confirmed` (a restore link before its
 -- deletion was confirmed) or `window_closed` (a restore link after its window); otherwise {ok: true,
 -- userId, accounts: [{id, host, subscription}], purgeAfter}: for a confirmation link, the accounts the confirm would mark,
 -- and for a restore link, those its confirm marked (purgeAfter null for a confirmation link). `host` is
