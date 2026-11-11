@@ -121,6 +121,12 @@ describe('GATES, one assertion per gate per tier (ARCH-2 §3.1)', () => {
     expect(GATES.agency.checksPerSiteDay).toBe(12);
   });
 
+  it('manual re-checks per site per day (DECISION-LOG E6)', () => {
+    expect(GATES.free.manualChecksPerSiteDay).toBe(2);
+    expect(GATES.pro.manualChecksPerSiteDay).toBe(10);
+    expect(GATES.agency.manualChecksPerSiteDay).toBe(10);
+  });
+
   it('has no gate this file does not assert', () => {
     // A gate added to GATES without a line above would otherwise go untested.
     expect(Object.keys(GATES.free).sort()).toEqual(
@@ -131,6 +137,7 @@ describe('GATES, one assertion per gate per tier (ARCH-2 §3.1)', () => {
         'exports',
         'fixesVisible',
         'fullRendersPerMonth',
+        'manualChecksPerSiteDay',
         'maxSites',
         'observedCrawlerActivity',
         'packets',

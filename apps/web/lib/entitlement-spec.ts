@@ -131,6 +131,10 @@ const GATE_ROWS: Readonly<Record<keyof TierGates, { label: string; source: strin
     label: 'Checks per site per day, per eTLD+1 across accounts',
     source: 'DECISION-LOG J9',
   },
+  manualChecksPerSiteDay: {
+    label: 'Manual and fix re-checks per site per day',
+    source: 'DECISION-LOG E6',
+  },
 };
 
 // ─── Transition fixtures ──────────────────────────────────────────────────────────────────────────
