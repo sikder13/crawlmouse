@@ -5,7 +5,7 @@
  * as one service-role transaction.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { accountOf, count, doorDb, signUp } from '../../../__tests__/v2/_lib/door-pglite';
 import type { EvidenceDirectory } from './evidence';
 import {
@@ -57,7 +57,7 @@ beforeEach(async () => {
   db = await doorDb();
   memory = memoryEvidenceStore();
 }, 120_000);
-afterAll(async () => {
+afterEach(async () => {
   await db?.close();
 });
 

@@ -8,8 +8,9 @@
  * 2. each is read, written under the account and read back, and the bytes compared;
  * 3. the stored paths are rewritten by the pairs that were copied, in the database;
  * 4. the `anon/` objects are removed.
- * A stored path is rewritten only when every listed object was copied and read back, so a path in
- * the database names an object that exists before and after each step.
+ * The stored paths are rewritten when the listed objects were copied and read back, and not when a
+ * copy failed, so a stored path names an object that exists whichever step fails
+ * (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/keep.test.ts -t property`).
  *
  * `claimKeep` is what the claim calls (lib/auth/claim.ts, through door-deps.ts): its commit is
  * `keep_check`, which takes the site and rewrites the paths in one transaction. A copy that fails

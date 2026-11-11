@@ -25,8 +25,8 @@ export function memoryEvidenceStore(): EvidenceStore &
       for (const p of paths) objects.delete(p);
     },
     async list(dir) {
-      const inDir = (p: string) =>
-        p.startsWith(`${dir}/`) && !p.slice(dir.length + 1).includes('/');
+      // Directly in `dir`: its last slash is the one after `dir`.
+      const inDir = (p: string) => p.startsWith(`${dir}/`) && p.lastIndexOf('/') === dir.length;
       return [...objects.keys()].filter(inDir).sort();
     },
   };
