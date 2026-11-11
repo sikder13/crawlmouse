@@ -113,7 +113,7 @@ describe('sitePage: a site whose first check has not ended', () => {
       technical_seo: null,
       ai_readability: null,
       progress: {
-        steps: [{ phase: 'crawl', state: 'running' }],
+        steps: [{ phase: 'crawl', state: 'now' }],
         pages_crawled: 1234,
         pages_estimated: null,
         links_found: 9,
