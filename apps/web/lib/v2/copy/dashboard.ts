@@ -54,6 +54,19 @@ export const DASHBOARD_COPY = {
   startProBody: (days: number, competitors: number, sites: number) =>
     `Weekly checks, every fix with its packet, Slack alerts and ${numberWord(competitors)} ${plural(competitors, 'competitor', 'competitors')} per site, on up to ${sites} sites, for ${days} days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.`,
   sitesFirstRun: (free: string) => `Checked weekly for ${TRIAL_DAYS} days, then ${free} on Free`,
+  /** Day 0 with no site yet: the account exists, nothing is watched. */
+  noSiteTitle: 'Add the site to watch',
+  noSiteNote:
+    'Adding a site starts its first check. Its grades, crawlers and fixes appear here when that check ends.',
+  /** The add-site form's one field, on a live page. */
+  siteField: { label: 'Site address', placeholder: 'example.com' },
+  /** A signed-in person whose sign-in reaches no account, or several with none chosen. */
+  noAccountTitle: 'No account to show',
+  noAccountBody:
+    'This sign-in is not a member of any account. If you were invited, open the invitation link from its email.',
+  ambiguousTitle: 'More than one account',
+  ambiguousBody:
+    'This sign-in is a member of more than one account and none is set as the one to open. Ask the owner of the account you want, or write to support.',
 };
 
 /** The Pro set-up items (FACTS l.57), each as an offer and as done. */
@@ -520,5 +533,20 @@ export const DASHBOARD_ADDITIONS: Addition[] = [
     screen: 'dashboard',
     what: 'The one-time "Start 14 days of Pro" card, for a Free account that never had a trial',
     source: 'CC-26 brief, D7; DECISION-LOG H5',
+  },
+  {
+    screen: 'dashboard',
+    what: 'Day 0 with no site: the header asks for the site, the sites card says a first check starts when one is added',
+    source: 'CC-26b brief, D8',
+  },
+  {
+    screen: 'dashboard',
+    what: 'On a live page, the add-site form’s address field',
+    source: 'CC-26b plan revision R13',
+  },
+  {
+    screen: 'dashboard',
+    what: 'A sign-in with no account, or several with none chosen: a plain page that says so',
+    source: 'CC-26b plan revision R22',
   },
 ];

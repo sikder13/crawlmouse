@@ -20,6 +20,21 @@ export const SITE_COPY = {
   noAlerts: 'No alert rules yet.',
   searchEngineCause: 'allowed by robots.txt; verified bot, not fetched',
   alertsFoot: (to: string) => `Sent to ${to}, once per check, only when something fires.`,
+  /** A site whose first check has not ended with a result. */
+  firstCheck: {
+    queued: 'First check queued',
+    running: 'First check running',
+    deferred: (until: string) => `First check waiting until ${until}`,
+    failed: 'First check failed',
+    none: 'Not checked yet',
+    pagesRead: (n: string) => `${n} pages read so far`,
+    body: 'Grades, crawlers and fixes appear here when the first check ends.',
+    failedBody: 'The first check ended without a result. Run it again to grade the site.',
+    noneBody: 'No check has been asked for yet. Run one to grade the site.',
+    watch: 'Watch the check',
+  },
+  /** The fix row's control on a live page. */
+  markDone: 'Mark done',
 };
 
 /** Each alert rule as the Site and Alerts screens name it. */
@@ -190,5 +205,15 @@ export const SITE_ADDITIONS: Addition[] = [
     screen: 'site',
     what: 'A crawler row read aloud in full ("Googlebot: allowed by robots.txt at all six checks"), and each glyph cell’s verdict in words, for screen readers',
     source: 'CC-26 brief, scope 6 (accessibility); FACTS row 223',
+  },
+  {
+    screen: 'site',
+    what: 'A site whose first check has not ended: its state, the pages read so far and a link to the check',
+    source: 'CC-26b brief, D8',
+  },
+  {
+    screen: 'site',
+    what: 'A Mark done control on each fix row still to do, on a live page',
+    source: 'CC-26b plan revision R13',
   },
 ];

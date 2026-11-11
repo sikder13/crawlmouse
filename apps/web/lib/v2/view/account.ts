@@ -20,9 +20,22 @@ import {
 } from '../../entitlement-v2';
 import { TRIAL_DAYS } from '../copy/account';
 
+/**
+ * The records the account screens read: a contract fixture, or an account's rows read back as the
+ * same collections (lib/v2/account/dataset.ts), which say they were measured.
+ */
+export type AccountDataset = Omit<FixtureDataset, 'provenance'> & {
+  provenance: 'fixture' | 'measured';
+};
+
 export interface Viewer {
   /** The account whose screens these are. */
   accountId: string;
+  /**
+   * The reader's own seat, whose theme the frame wears. A preview names none and reads as the
+   * account's owner.
+   */
+  seatId?: string;
   /** The reader's "now", an ISO instant. */
   now: string;
   /**
@@ -65,9 +78,16 @@ export const NOT_ROLLED_BACK = [
 ] as const;
 
 export interface AccountView {
-  /** The account's own records, none of them later than `now`. A valid FixtureDataset. */
+  /**
+   * The account's own records, none of them later than `now`. Typed as the shared readers take a
+   * dataset (`fixesAsOf` and `findCheck` in lib/v2/fixtures.ts, `freeFixes` in view/free-fixes.ts),
+   * which read its collections only; `provenance` is the input's own, "measured" for an account read
+   * back from its rows.
+   */
   d: FixtureDataset;
   account: Account;
+  /** The reader's seat (Viewer.seatId), or null for a preview, which reads as the owner. */
+  seatId: string | null;
   now: string;
   /** The account's tier at `now` (lib/entitlement-v2.ts `effectiveTier`). */
   tier: Tier;
@@ -89,7 +109,7 @@ const RESULT = new Set<Check['status']>(['finished', 'partial']);
 
 const at = (ts: string) => instant(ts);
 
-function accountOf(d: FixtureDataset, viewer: Pick<Viewer, 'accountId' | 'account'>): Account {
+function accountOf(d: AccountDataset, viewer: Pick<Viewer, 'accountId' | 'account'>): Account {
   const a = viewer.account ?? d.accounts.find((x) => x.id === viewer.accountId);
   if (!a || a.id !== viewer.accountId) throw new Error(`No account ${viewer.accountId}`);
   return a;
@@ -142,7 +162,7 @@ function accountAt(a: Account, t: number): Account {
 }
 
 /** The first moment the account's dashboard can be read: it exists and its first audit is done. */
-export function firstRunNow(d: FixtureDataset, viewer: Omit<Viewer, 'now'>): string {
+export function firstRunNow(d: AccountDataset, viewer: Omit<Viewer, 'now'>): string {
   const a = accountOf(d, viewer);
   const sites = new Set(
     d.sites.filter((s) => s.account_id === a.id || viewer.adopt?.includes(s.id)).map((s) => s.id),
@@ -179,7 +199,7 @@ const LAST_STATE_AFTER: Partial<Record<Fix['status'], Fix['last_state']>> = {
 /** A fix's status at `t`, from its events up to then (the contract says status follows them). */
 function fixAt(
   f: FixtureDataset['fixes'][number],
-  d: FixtureDataset,
+  d: AccountDataset,
   t: number,
   rankAfter: number,
 ) {
@@ -203,7 +223,7 @@ function fixAt(
   };
 }
 
-export function viewAt(d: FixtureDataset, viewer: Viewer): AccountView {
+export function viewAt(d: AccountDataset, viewer: Viewer): AccountView {
   const t = at(viewer.now);
   const account = accountAt(accountOf(d, viewer), t);
   const adopt = new Set(viewer.adopt ?? []);
@@ -247,7 +267,7 @@ export function viewAt(d: FixtureDataset, viewer: Viewer): AccountView {
   );
   const reportIds = new Set(reports.map((r) => r.id));
 
-  const scoped: FixtureDataset = {
+  const scoped: AccountDataset = {
     ...d,
     as_of: viewer.now,
     accounts: [account],
@@ -279,7 +299,15 @@ export function viewAt(d: FixtureDataset, viewer: Viewer): AccountView {
   };
 
   const tier = effectiveTier(clockOf(account), new Date(t));
-  return { d: scoped, account, now: viewer.now, tier, gates: GATES[tier], inFlight };
+  return {
+    d: scoped as FixtureDataset,
+    account,
+    seatId: viewer.seatId ?? null,
+    now: viewer.now,
+    tier,
+    gates: GATES[tier],
+    inFlight,
+  };
 }
 
 /** The oldest site that is not another site's staging copy: the one Free keeps (ARCH-2 §3.2). */

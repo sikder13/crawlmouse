@@ -1,7 +1,7 @@
 /**
- * Every action the account screens offer, and the route it posts or links to (D8). The previews
- * stop each form's submit, as KeepBar does; the step each entry's `owner` names builds the handler
- * on that same path. lib/v2/view/dashboard.ts re-exports them, where the brief looks for them.
+ * Every action the account screens offer, and the route it posts or links to (D8). A preview
+ * stops each form's submit, as KeepBar does; a live page (`LiveActions`) submits it. The step each
+ * entry's `owner` names builds the handler on that same path. lib/v2/view/dashboard.ts re-exports them, where the brief looks for them.
  */
 type Verb = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
@@ -16,8 +16,8 @@ export interface RouteSpec {
 }
 
 /**
- * Every action the account screens offer, and the route it posts or links to. The previews stop
- * each form's submit (as KeepBar does); `owner` names the step that builds the handler.
+ * Every action the account screens offer, and the route it posts or links to; `owner` names the
+ * step that builds the handler.
  */
 export const ACCOUNT_ACTIONS = {
   addSite: {
@@ -32,7 +32,7 @@ export const ACCOUNT_ACTIONS = {
     route: '/api/sites/[id]/checks',
     owner: 'CC-26b',
     guard:
-      'Signed-in member of the site’s account; re-check debounce; manual re-checks per site per day: E6 says Free 2 / Pro 10 / Agency 10, `GATES.checksPerSiteDay` says 3 / 12 / 12 (owner ruling pending); queued, never refused.',
+      'Signed-in member of the site’s account; re-check debounce; manual and fix re-checks per site per rolling 24 hours, `GATES.manualChecksPerSiteDay` (Free 2 / Pro 10 / Agency 10); over the cap it is refused with 429 and when the next is allowed.',
   },
   editSite: {
     verb: 'PATCH',
@@ -151,6 +151,15 @@ export interface ActionView {
    * for which change, "Packet" for which fix (WCAG 2.4.4).
    */
   context: string | null;
+  /** A field the person fills before posting (the add-site address); a live page shows it. */
+  input?: ActionInput;
+}
+
+export interface ActionInput {
+  name: string;
+  label: string;
+  type: 'text' | 'url';
+  placeholder: string;
 }
 
 /** An action, its route's parameters filled from `params`. */
@@ -163,11 +172,13 @@ export function action(
     query = '',
     fields = {},
     context = null,
+    input,
   }: {
     primary?: boolean;
     query?: string;
     fields?: Record<string, string>;
     context?: string | null;
+    input?: ActionInput;
   } = {},
 ): ActionView {
   const spec: RouteSpec = ACCOUNT_ACTIONS[key];
@@ -185,6 +196,7 @@ export function action(
       spec.verb === 'GET' || spec.verb === 'POST' ? fields : { _method: spec.verb, ...fields },
     primary,
     context,
+    ...(input ? { input } : {}),
   };
 }
 
