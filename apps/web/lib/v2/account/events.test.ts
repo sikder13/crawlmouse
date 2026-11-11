@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FUNNEL_EVENTS } from '../../analytics-events';
-import { captureFor, checkStarted, SERVER_EVENTS, type Sender } from './events';
+import type { SendCapture } from '../../analytics-server';
+import { captureFor, checkStarted, SERVER_EVENTS } from './events';
 
 const req = (cookie?: string) =>
   new Request('https://crawlmouse.com/api/sites', {
@@ -11,10 +12,14 @@ const req = (cookie?: string) =>
 const CHECK = '0f8fad5b-d9cb-469f-a165-70867728950e';
 
 describe('captureFor', () => {
-  it('sends the event keyed by the account, with nothing added', async () => {
-    const send = vi.fn<Sender>(async () => undefined);
+  it('sends the event keyed by the account, with no person profile and no location', async () => {
+    const send = vi.fn<SendCapture>(async () => undefined);
     await captureFor(req('other=1'), send)('site_added', 'acc-1', { n: 1 });
-    expect(send).toHaveBeenCalledWith('site_added', 'account:acc-1', { n: 1 });
+    expect(send).toHaveBeenCalledWith({
+      event: 'site_added',
+      distinct_id: 'account:acc-1',
+      properties: { n: 1, $process_person_profile: false, $geoip_disable: true },
+    });
   });
 
   it.each([
@@ -23,7 +28,7 @@ describe('captureFor', () => {
     ['denied outside one', 'cm_consent=denied', false],
     ['no decision outside one', '', true],
   ])('%s: sent = %s', async (_name, cookie, sent) => {
-    const send = vi.fn<Sender>(async () => undefined);
+    const send = vi.fn<SendCapture>(async () => undefined);
     await captureFor(req(cookie), send)('fix_marked_done', 'acc-1', { type: 'robots' });
     expect(send).toHaveBeenCalledTimes(sent ? 1 : 0);
   });

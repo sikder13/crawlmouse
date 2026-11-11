@@ -43,8 +43,12 @@ import {
   type FixEvent,
 } from '@crawlmouse/types/v2';
 import { z } from 'zod';
-import { SERVER_EVENTS, type Sender, type ServerEvents } from '../account/events';
-import { captureServerEvent } from '../account/server-capture-interim';
+import {
+  SERVER_EVENTS,
+  sendWithoutRequest,
+  type Sender,
+  type ServerEvents,
+} from '../account/events';
 import { PERSIST_RPC } from './columns';
 import { DiffInputsSchema } from './rows';
 import type {
@@ -209,7 +213,7 @@ const FIX_CLOSED = 'fix_closed' satisfies (typeof SERVER_EVENTS)[number];
 export async function persistBuiltCheck(
   db: PersistDb,
   input: PersistInput,
-  send: Sender = captureServerEvent,
+  send: Sender = sendWithoutRequest,
 ): Promise<PersistOutcome> {
   const calls = persistCalls(input);
   for (const s of calls.stages) {
