@@ -35,6 +35,7 @@ import {
 import { action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
+import { DELETE_COPY, deletionMoney } from '../copy/deletion';
 import { REFUSAL_SENTENCES, SETTINGS_NOTICES as NOTICES } from '../copy/settings-notices';
 import type { SeatRole } from '../account/profile';
 
@@ -271,7 +272,10 @@ export function settingsView(
   {
     billingEnd = null,
     role = 'owner',
+    subscriptionStatus,
   }: {
+    /** The subscription mirror's `status`, or null for none; left out in a preview (`deleteText`). */
+    subscriptionStatus?: string | null;
     /** When a paid plan set to cancel at its period's end ends (the subscription mirror's
      * current_period_end); null when it is not set to. The contract's Account has no field for it. */
     billingEnd?: string | null;
@@ -368,7 +372,7 @@ export function settingsView(
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
-    shell: accountShellView(v, 'Settings', { plan: 'page', billingEnd }),
+    shell: accountShellView(v, 'Settings', { plan: 'page', billingEnd, role }),
     header: {
       title: COPY.title,
       line: [a.email, trial ? COPY.trialLeft(plan, days!) : plan].join(' · '),
@@ -406,7 +410,7 @@ export function settingsView(
       title: COPY.dangerTitle,
       tableLabel: COPY.tables.danger,
       label: COPY.deleteLabel,
-      text: deleteText(v),
+      text: deleteText(v, subscriptionStatus),
       action: owner ? routeAction('deleteConfirm', COPY.deleteAction) : null,
     },
     plan: {
@@ -497,14 +501,19 @@ export function settingsView(
 }
 
 /**
- * What deleting removes, and, on a paid plan (a subscription the account is billed by), what happens
- * to the money: the plan stops renewing at the confirm and ends at the purge, with what the published
- * refund policy (Terms §8) says and nothing more (owner ruling Q7).
+ * What deleting removes, and what happens to the money: `deletionMoney` (copy/deletion.ts) for the
+ * subscription mirror's status, the mapping the confirmation page reads too. `undefined` is a
+ * preview, which has no mirror: a billed paid tier gets the period-end lines.
  */
-function deleteText(v: ReturnType<typeof viewAt>): string {
-  const billed = v.tier !== 'free' && v.account.billing_period_months !== null;
+function deleteText(v: ReturnType<typeof viewAt>, status: string | null | undefined): string {
   const text = COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS);
-  return billed ? `${text} ${COPY.deleteMoney}` : text;
+  const money =
+    status === undefined
+      ? v.tier !== 'free' && v.account.billing_period_months !== null
+        ? DELETE_COPY.money
+        : null
+      : deletionMoney(status);
+  return money === null ? text : `${text} ${money.join(' ')}`;
 }
 
 // ── Deleting the account: the confirmation step ─────────────────────────────────────────────
@@ -544,7 +553,10 @@ export function deleteStepView(
     removes = null,
     role = 'owner',
     blocked = null,
+    subscriptionStatus,
   }: {
+    /** The subscription mirror's `status`, or null for none; left out in a preview (`deleteText`). */
+    subscriptionStatus?: string | null;
     /** The code the request would be refused with (`account_deletion_blocked`), or null. */
     blocked?: string | null;
     /** Each account the erasure plan names, by its primary site's host (null for none). */
@@ -558,10 +570,10 @@ export function deleteStepView(
   const site = primarySites(v).length ? primarySite(v) : null;
   const expected = site ? site.host : a.email;
   return {
-    shell: accountShellView(v, 'Settings'),
+    shell: accountShellView(v, 'Settings', { role }),
     header: { title: COPY.deleteLabel, line: a.email },
     cardTitle: COPY.deleteCardTitle,
-    text: deleteText(v),
+    text: deleteText(v, subscriptionStatus),
     steps: COPY.deleteSteps(site ? COPY.hostnameNoun : COPY.emailNoun, a.email, DELETE_GRACE_DAYS),
     removes:
       removes === null || removes.length === 0

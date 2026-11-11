@@ -11,6 +11,7 @@ import { ACCOUNT_COPY as COPY } from '../copy/account';
 import { calendarDays, dayDate, daysBefore, hourMinute } from '../format';
 import { plural } from '../words';
 import { PLAN_NAMES, primarySite, primarySites, resultChecks, type AccountView } from './account';
+import type { SeatRole } from '../account/profile';
 import { ACCOUNT_NAV, action, type ActionView } from './account-actions';
 
 export interface NavItemView {
@@ -81,6 +82,7 @@ function trialCard(
   v: AccountView,
   plan: PlanPlace,
   billingEnd: string | null,
+  owner: boolean,
 ): TrialCardView | null {
   const a = v.account;
   if (a.state !== 'pro_trial' && a.state !== 'agency_trial') return null;
@@ -123,15 +125,17 @@ function trialCard(
           primarySites(v).length - 1,
           reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
         ),
-    billing: firstRun ? action('plan', 'Billing') : null,
-    keep: firstRun
-      ? null
-      : action(
-          'keepPlan',
-          `Keep ${PLAN_NAMES[tier]}, $${price} a month`,
-          {},
-          { fields: { plan: tier, interval: 'month' } },
-        ),
+    // Billing and Keep are the owner's: Settings › Plan and the checkout refuse anyone else.
+    billing: owner && firstRun ? action('plan', 'Billing') : null,
+    keep:
+      !owner || firstRun
+        ? null
+        : action(
+            'keepPlan',
+            `Keep ${PLAN_NAMES[tier]}, $${price} a month`,
+            {},
+            { fields: { plan: tier, interval: 'month' } },
+          ),
   };
 }
 
@@ -145,7 +149,13 @@ export function accountShellView(
   {
     plan = 'rail',
     billingEnd = null,
+    role = 'owner',
   }: {
+    /**
+     * The reader's seat role: the rail's Billing and Keep are offered to the owner only. Defaults to
+     * the owner, as every caller read before the option existed.
+     */
+    role?: SeatRole;
     plan?: PlanPlace;
     /** A subscription set to cancel at its period's end: a card trial's card is then not charged. */
     billingEnd?: string | null;
@@ -165,7 +175,7 @@ export function accountShellView(
       current: n.label === current,
       fresh: n.label === 'Changes' && fresh > 0,
     })),
-    trial: trialCard(v, plan, billingEnd),
+    trial: trialCard(v, plan, billingEnd, role === 'owner'),
     theme: seat?.theme ?? 'system',
     themeAction: action('theme', 'Theme'),
   };

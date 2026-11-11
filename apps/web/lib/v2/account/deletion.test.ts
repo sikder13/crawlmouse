@@ -12,6 +12,8 @@ import {
   type DeletionPorts,
 } from './deletion';
 import type { AccountEmailEvent } from './emails';
+import { postDeletionLink } from './deletion-link';
+import { LINK_FLOWS } from './link-cookie';
 
 /**
  * The deletion's three steps over the real SQL (PGlite, every migration) and recording ports for
@@ -292,6 +294,168 @@ describe('confirmDeletion’s Inngest send', () => {
   });
 });
 
+/** A person whose deletion was requested, with both links as the mailer issues them. */
+async function requestedLinks() {
+  const o = await owner();
+  const rec = recorder();
+  await requestAccountDeletion(rec.ports, {
+    userId: o.userId,
+    accountId: o.accountId,
+    hostname: o.host,
+    ip: null,
+  });
+  return { o, ...(await links(rec.emails[0]!)) };
+}
+
+describe('fix round 2: reads that fail around a committed confirm or restore', () => {
+  it('a restore that committed unbans without reading erasure_pending, so a failing read cannot keep the ban (item 1)', async () => {
+    const { o, delete_confirm, delete_restore } = await requestedLinks();
+    await confirmDeletion(recorder().ports, delete_confirm);
+    expect(banned.has(o.userId)).toBe(true);
+    const flaky = recorder({
+      rpc: async <T>(fn: string, args: Record<string, unknown>) => {
+        if (fn === 'erasure_pending') throw new Error('read timed out');
+        return rpc<T>(fn, args);
+      },
+    });
+    expect(await restoreAccount(flaky.ports, delete_restore)).toEqual({ ok: true });
+    expect(banned.has(o.userId)).toBe(false);
+  });
+
+  it('a confirm whose first read fails still bans and still sends (item 1)', async () => {
+    const { o, delete_confirm } = await requestedLinks();
+    banned.delete(o.userId);
+    const flaky = recorder({
+      rpc: async <T>(fn: string, args: Record<string, unknown>) => {
+        if (fn === 'erasure_pending') throw new Error('read timed out');
+        return rpc<T>(fn, args);
+      },
+    });
+    expect(await confirmDeletion(flaky.ports, delete_confirm)).toEqual({ ok: true });
+    expect(banned.has(o.userId)).toBe(true);
+    expect(flaky.events.map((e) => e.name)).toEqual(['account.deletion_confirmed']);
+  });
+
+  it('a restore whose answer was lost after it committed is reported with the user id only (item 2)', async () => {
+    const { o, delete_confirm, delete_restore } = await requestedLinks();
+    await confirmDeletion(recorder().ports, delete_confirm);
+    const lost = recorder({
+      rpc: async <T>(fn: string, args: Record<string, unknown>) => {
+        const r = await rpc<T>(fn, args);
+        if (fn === 'restore_account') throw new Error('connection reset');
+        return r;
+      },
+    });
+    expect(await restoreAccount(lost.ports, delete_restore)).toEqual({ ok: true });
+    expect(lost.reported).toEqual([['Error: connection reset', o.userId]]);
+    expect(banned.has(o.userId)).toBe(false);
+  });
+
+  it('a lost answer after the purge erased the person does not say the account was restored (item 2)', async () => {
+    const { o, delete_confirm, delete_restore } = await requestedLinks();
+    await confirmDeletion(recorder().ports, delete_confirm);
+    const erasedMeanwhile = recorder({
+      rpc: async <T>(fn: string, args: Record<string, unknown>) => {
+        if (fn === 'restore_account') {
+          // The purge finished between the read and the restore: the person is gone.
+          await db.query(`delete from public.pending_erasures where user_id = $1`, [o.userId]);
+          await db.query(`delete from public.accounts where id = $1`, [o.accountId]);
+          await db.query(`delete from auth.users where id = $1`, [o.userId]);
+          throw new Error('connection reset');
+        }
+        return rpc<T>(fn, args);
+      },
+    });
+    expect(await restoreAccount(erasedMeanwhile.ports, delete_restore)).toEqual({
+      ok: false,
+      status: 410,
+      code: 'window_closed',
+    });
+    expect(erasedMeanwhile.reported).toEqual([['Error: connection reset', o.userId]]);
+  });
+});
+
+describe('fix round 3: a lost restore answer whose state read fails (item 4)', () => {
+  const lostWithFlakyState = (failures: number) => {
+    let left = failures;
+    return recorder({
+      rpc: async <T>(fn: string, args: Record<string, unknown>) => {
+        if (fn === 'erasure_state' && left-- > 0) throw new Error('state read timed out');
+        const r = await rpc<T>(fn, args);
+        if (fn === 'restore_account') throw new Error('connection reset');
+        return r;
+      },
+    });
+  };
+
+  it('retries the read, and with an answer the restore is judged as before', async () => {
+    const { o, delete_confirm, delete_restore } = await requestedLinks();
+    await confirmDeletion(recorder().ports, delete_confirm);
+    const rec = lostWithFlakyState(BAN_ATTEMPTS - 1);
+    expect(await restoreAccount(rec.ports, delete_restore)).toEqual({ ok: true });
+    expect(banned.has(o.userId)).toBe(false);
+    expect(rec.reported).toEqual([['Error: connection reset', o.userId]]);
+  });
+
+  it('on the last failure reports the failed read, user id only, then rethrows', async () => {
+    const { o, delete_confirm, delete_restore } = await requestedLinks();
+    await confirmDeletion(recorder().ports, delete_confirm);
+    const rec = lostWithFlakyState(BAN_ATTEMPTS);
+    await expect(restoreAccount(rec.ports, delete_restore)).rejects.toThrow(/connection reset/);
+    expect(rec.reported).toEqual([['Error: state read timed out', o.userId]]);
+  });
+});
+
+describe('a second confirm through the route (item 6)', () => {
+  it('answers 409 already_confirmed to JSON, and sends a form back to its page with the cookie cleared', async () => {
+    const o = await owner();
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+       values ('agency', 'free', 'free', 1, 1, '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]')
+       returning id`,
+    );
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'x@example.com', 'owner', 'active', now())`,
+      [rows[0]!.id, o.userId],
+    );
+    const ask = async (accountId: string, hostname: string) => {
+      const rec = recorder();
+      await requestAccountDeletion(rec.ports, { userId: o.userId, accountId, hostname, ip: null });
+      return links(rec.emails[0]!);
+    };
+    const email = (
+      await db.query<{ email: string }>(`select email from public.users where id = $1`, [o.userId])
+    ).rows[0]!.email;
+    const first = await ask(o.accountId, o.host);
+    const second = await ask(rows[0]!.id, email);
+    expect(await confirmDeletion(recorder().ports, first.delete_confirm)).toEqual({ ok: true });
+    const post = (type: string) =>
+      postDeletionLink(
+        new Request('https://crawlmouse.com/api/account/delete/confirm', {
+          method: 'POST',
+          headers: {
+            'content-type': type,
+            cookie: `${LINK_FLOWS.deleteConfirm.cookie}=${second.delete_confirm}`,
+          },
+          body: '',
+        }),
+        'https://crawlmouse.com',
+        'deleteConfirm',
+        confirmDeletion,
+        () => recorder().ports,
+      );
+    const json = await post('application/json');
+    expect(json.status).toBe(409);
+    expect(await json.json()).toEqual({ code: 'already_confirmed' });
+    const form = await post('application/x-www-form-urlencoded');
+    expect(form.headers.get('location')).toBe(
+      'https://crawlmouse.com/account/delete?result=already_confirmed',
+    );
+    expect(form.headers.get('set-cookie')).toMatch(/^cm_link_delete=; .*Max-Age=0/);
+  });
+});
+
 describe('restoreAccount', () => {
   async function confirmed() {
     const o = await owner();
@@ -318,7 +482,6 @@ describe('restoreAccount', () => {
     expect(rec.log).toEqual([
       'rpc:read_deletion_link',
       'rpc:restore_account',
-      'rpc:erasure_pending',
       `unban:${o.userId}`,
       'send:account.restored',
     ]);

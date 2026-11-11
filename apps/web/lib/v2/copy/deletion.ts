@@ -11,6 +11,9 @@ export const REFUND_POLICY = 'We don’t refund partial periods except where the
 /** The window a restore link has, in days (confirm_account_deletion's `purge_after`). */
 export const RESTORE_DAYS = 7;
 
+const MONEY_ENDS =
+  'A plan, or a trial with a card, is set to end when its current period ends, and nothing more is charged. If that comes after the seven days, it is cancelled when the account is erased.';
+
 export const DELETE_COPY = {
   title: 'Delete your account',
   lead: 'Pressing the button deletes these accounts and everything in them:',
@@ -19,14 +22,42 @@ export const DELETE_COPY = {
     `For ${RESTORE_DAYS} days the restore link in the same email undoes it. After that the accounts, their sites, checks and reports, and your sign-in are erased.`,
     'A few things are kept: one-way fingerprints that stop a second free trial, any takedown request of yours that is still open, and public reports you published, which no longer name you.',
   ],
-  money: [
-    'A paid plan is set to end at the end of the period you have paid for. If that comes after the seven days, the plan is cancelled when the account is erased.',
-    REFUND_POLICY,
-  ],
+  /**
+   * A plan the confirm sets to end (`active`, or `trialing` with a card): true of a trial, which has
+   * paid for nothing yet, as of a paid period.
+   */
+  moneyEnds: MONEY_ENDS,
+  /** The confirmation page's lines when it does not know the subscription's state. */
+  money: [MONEY_ENDS, REFUND_POLICY],
+  /**
+   * A plan the confirm does not set to end, which the purge cancels at once (C3b): `past_due` and
+   * `unpaid` (overdue) and `paused` (on hold), so the sentence names no failure a pause has not had.
+   */
+  moneyNotCollected:
+    'A plan whose payments are overdue or on hold is not set to end when you confirm. It is cancelled when the account is erased, after the seven days.',
   button: 'Delete these accounts',
   /** The account named by its sign-in address has no site. */
   noSite: 'no site yet',
 } as const;
+
+/**
+ * What happens to the money, by the subscription mirror's `status` (owner ruling Q7, C3b): the one
+ * mapping every page that speaks of a deletion reads. `active` and `trialing` are set to end at the
+ * confirm; `past_due`, `unpaid` and `paused` are not, and the purge cancels them at once. Each is
+ * followed by the published refund policy. Null for any other state, or for no subscription.
+ */
+export function deletionMoney(status: string | null): readonly [string, string] | null {
+  if (status === null || !Object.hasOwn(MONEY_BY_STATUS, status)) return null;
+  return [MONEY_BY_STATUS[status]!, REFUND_POLICY];
+}
+
+const MONEY_BY_STATUS: Readonly<Record<string, string>> = {
+  active: MONEY_ENDS,
+  trialing: MONEY_ENDS,
+  past_due: DELETE_COPY.moneyNotCollected,
+  unpaid: DELETE_COPY.moneyNotCollected,
+  paused: DELETE_COPY.moneyNotCollected,
+};
 
 export const RESTORE_COPY = {
   title: 'Restore your account',

@@ -32,6 +32,7 @@ vi.mock('@/lib/v2/pipeline/load', () => ({
   supabaseCheckReader: () => pgliteCheckReader(h.db as PGlite),
 }));
 
+import { DELETE_COPY, REFUND_POLICY } from '@/lib/v2/copy/deletion';
 import { REFUSAL_SENTENCES, SETTINGS_NOTICES } from '@/lib/v2/copy/settings-notices';
 import { DeleteScreen } from '@/components/v2/screens/settings/DeleteScreen';
 import { PlanScreen } from '@/components/v2/screens/settings/PlanScreen';
@@ -54,6 +55,7 @@ let trialing: Person; // a no-card Pro trial with one site
 let ended: Person; // back on Free after a Pro trial, one site
 let shared: Person; // a no-card Pro trial with a manager seated on it
 let sharedManager: { id: string; email: string };
+let pastDue: Person; // Pro with its last payment failed
 let cancelling: Person; // a Pro trial with a card, its subscription set to cancel at the trial's end
 let manager: { id: string; email: string };
 let developer: { id: string; email: string };
@@ -150,6 +152,25 @@ beforeAll(async () => {
     [shared.accountId],
   );
   sharedManager = await seat(shared.accountId, 'account_manager');
+  pastDue = await person('past-due');
+  await host(pastDue, 'past-due-site.example');
+  await db.query(
+    `insert into public.subscriptions (id, account_id, status, plan, interval, current_period_end)
+     values ('sub_past_due', $1, 'past_due', 'pro', 'month', now() + interval '20 days')`,
+    [pastDue.accountId],
+  );
+  await db.query(
+    `update public.accounts
+        set state = 'past_due', tier = 'pro', past_due_tier = 'pro', past_due_since = now(),
+            current_subscription_id = 'sub_past_due',
+            state_history = state_history || jsonb_build_array(
+              jsonb_build_object('state', 'pro',
+                'since', (state_history->0->>'since')::timestamptz + interval '1 millisecond'),
+              jsonb_build_object('state', 'past_due',
+                'since', (state_history->0->>'since')::timestamptz + interval '2 milliseconds'))
+      where id = $1`,
+    [pastDue.accountId],
+  );
   manager = await seat(owner.accountId, 'account_manager');
   developer = await seat(owner.accountId, 'developer');
 }, 300_000);
@@ -348,5 +369,30 @@ describe('/trial-ended for a seat that is not the owner’s', () => {
     expect(html).toContain('of Pro left');
     expect(html).not.toContain('action="/api/billing/checkout"');
     expect(html).not.toContain('href="/settings/plan"');
+  });
+});
+
+describe('the money on the delete step, by the subscription’s state (fix round 2, item 5)', () => {
+  const html = async (p: Person) => {
+    as(p);
+    return renderToStaticMarkup(screen(await DeletePage(q())));
+  };
+  const text = (t: string) => renderToStaticMarkup(<>{t}</>);
+
+  it('a plan whose payment failed: cancelled when the account is erased, not set to end', async () => {
+    const page = await html(pastDue);
+    expect(page).toContain(text(DELETE_COPY.moneyNotCollected));
+    expect(page).not.toContain(text(DELETE_COPY.moneyEnds));
+    expect(page).toContain(text(REFUND_POLICY));
+  });
+
+  it('a trialing plan: set to end at the end of the period', async () => {
+    const page = await html(cancelling);
+    expect(page).toContain(text(DELETE_COPY.moneyEnds));
+    expect(page).not.toContain(text(DELETE_COPY.moneyNotCollected));
+  });
+
+  it('no subscription: nothing about money', async () => {
+    expect(await html(trialing)).not.toContain(text(REFUND_POLICY));
   });
 });

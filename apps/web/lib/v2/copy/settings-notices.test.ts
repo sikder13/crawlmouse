@@ -1,8 +1,9 @@
 /**
  * What /settings and /settings/delete say after a form comes back (CC-27b review, item 6): the
  * success lines, and a sentence for each refusal code the routes behind them can answer. The codes
- * are read from the routes' and modules' sources, so a code added there without a sentence here
- * turns this red.
+ * are read from the TypeScript sources below, in the forms `codesIn` matches, and from three SQL
+ * functions in the forms `sqlCodesIn` matches: a code added in one of those forms without a sentence
+ * here turns this red; a code written in another form, or in another function, is not seen.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -33,8 +34,45 @@ const SOURCES = [
   'lib/v2/account/alert-rules.ts',
 ];
 
+/** The SQL functions whose codes reach the delete step through `account_deletion_blocked`. */
+const SQL_FUNCTIONS = ['account_deletion_blocked', 'deletion_refusal', 'erase_person_refusals'];
+const MIGRATION = '../../infra/supabase/migrations/20261112000002_v2_027b_account.sql';
+
+/** The body of `name`'s definition in the migration: from its `create` to the next `$$;`. */
+function sqlBody(sql: string, name: string): string {
+  const start = sql.indexOf(`create or replace function public.${name}(`);
+  if (start < 0) throw new Error(`no function ${name} in the migration`);
+  return sql.slice(start, sql.indexOf('$$;', sql.indexOf('$$', start) + 2));
+}
+
+/**
+ * The codes a SQL body names in two forms: a refusal row of `erase_person_refusals`
+ * (`select <n>, <key>, '<code>'`), and a literal `'<code>'` after a `then` or an `else`. A code a
+ * body names in any other form is not read.
+ */
+function sqlCodesIn(body: string): string[] {
+  const out = new Set<string>();
+  for (const re of [
+    /select \d+(?: as o)?, [^,]+?(?: as k)?, '([a-z][a-z0-9_]*)'/g,
+    /\b(?:then|else) '([a-z][a-z0-9_]*)'/g,
+  ])
+    for (const m of body.matchAll(re)) out.add(m[1]!);
+  return [...out];
+}
+
+const sqlCodes = (() => {
+  const sql = read(MIGRATION);
+  return [...new Set(SQL_FUNCTIONS.flatMap((f) => sqlCodesIn(sqlBody(sql, f))))].sort();
+})();
+
 describe('the refusal sentences', () => {
-  const codes = [...new Set(SOURCES.flatMap((p) => codesIn(read(p))))].sort();
+  const codes = [...new Set([...SOURCES.flatMap((p) => codesIn(read(p))), ...sqlCodes])].sort();
+
+  it('the migration’s functions name the codes the delete step can show, so the scan reads them', () => {
+    expect(sqlCodes).toEqual(
+      expect.arrayContaining(['email_change_pending', 'others_seated', 'v1_subscription']),
+    );
+  });
 
   it('the sources answer the codes the coordinator listed, so the scan reads them', () => {
     for (const c of [
@@ -100,5 +138,12 @@ describe('settingsNotice', () => {
   it('nothing in the query: no line', () => {
     expect(settingsNotice({}, 'settings')).toBeNull();
     expect(settingsNotice({ saved: '0', email: 'x' }, 'settings')).toBeNull();
+  });
+});
+
+describe('the live_subscription sentence (fix round 3, item 2)', () => {
+  it('claims nothing about the confirm, which sets only an active or trialing plan to end', () => {
+    expect(REFUSAL_SENTENCES.live_subscription).not.toMatch(/confirm/i);
+    expect(REFUSAL_SENTENCES.live_subscription).toMatch(/erased/);
   });
 });

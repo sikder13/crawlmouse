@@ -5,12 +5,13 @@
  * this module adds what SQL cannot do: the Auth ban, the emails, the events, and the Inngest event that
  * ends the subscription.
  *
- * The database decides the Auth ban: a person is banned while they have a pending_erasures row
- * (`settleBan`). Confirm: the SQL confirm (marks the accounts, queues the person, ends their
- * sessions); then the ban, which a failure only reports, because the purge bans again before it
- * erases; then one `account.deletion_confirmed` per marked account. Restore: the link is read, the
- * SQL restore consumes the token and clears the row, and then the ban is lifted; a restore whose
- * answer is lost is judged by whether the row is still there.
+ * The Auth ban follows the pending_erasures row. Confirm: the SQL confirm (marks the accounts,
+ * queues the person, ends their sessions); then the ban (`banAfterConfirm`), which a failure only
+ * reports, because the purge bans again before it erases; then one `account.deletion_confirmed` per
+ * marked account. Restore: the link is read, the SQL restore consumes the token and clears the row,
+ * and then the ban is lifted (`unbanAfterRestore`). A restore whose answer is lost is judged by
+ * `erasure_state`: still pending (it did not commit, so the error is thrown), restored, or erased by
+ * the purge in between.
  * A subscription the deletion set to end is resumed by `account.restored` (deletionResumeFn).
  */
 import type { Tier } from '../../entitlement-v2';
@@ -116,7 +117,7 @@ export async function confirmDeletion(
   >('confirm_account_deletion', { p_hash: hashToken(token), p_now: ports.now().toISOString() });
   if (!r.ok) return refusal(r.code);
 
-  await settleBan(ports, r.userId);
+  await banAfterConfirm(ports, r.userId);
   // Tried BAN_ATTEMPTS times, then reported: the deletion stands either way, and the purge cancels any
   // subscription still live before it erases.
   await withRetries(ports, r.userId, () =>
@@ -135,17 +136,32 @@ export async function confirmDeletion(
 }
 
 /**
- * Brings the person's Auth ban in line with the database: banned while they have a pending_erasures
- * row, not banned once it is gone. Each Auth call is tried BAN_ATTEMPTS times and a failure is
- * reported with the user id only. After a ban the row is read again, so a restore that committed
- * while the ban was on its way still ends unbanned (its own settle may have run first).
+ * The confirm's ban, in line with the database: banned while the person has a pending_erasures row.
+ * The confirm has committed, so a read that fails counts as "pending" (reported, user id only): the
+ * person is banned, never left signed in. After the ban the row is read again, so a restore that
+ * committed while the ban was on its way still ends unbanned.
  */
-async function settleBan(ports: DeletionPorts, userId: string): Promise<void> {
-  const pending = () => ports.rpc<boolean>('erasure_pending', { p_user: userId });
-  if (await pending()) {
-    if (!(await withRetries(ports, userId, () => ports.auth.ban(userId)))) return;
-    if (await pending()) return;
-  }
+async function banAfterConfirm(ports: DeletionPorts, userId: string): Promise<void> {
+  const pending = async () => {
+    try {
+      return await ports.rpc<boolean>('erasure_pending', { p_user: userId });
+    } catch (error) {
+      ports.report(error, userId);
+      return true;
+    }
+  };
+  if (!(await pending())) return unbanAfterRestore(ports, userId);
+  if (!(await withRetries(ports, userId, () => ports.auth.ban(userId)))) return;
+  if (!(await pending())) await unbanAfterRestore(ports, userId);
+}
+
+/**
+ * A committed restore lifts the ban with no read first: the restore cleared the person's
+ * pending_erasures row. A confirm whose ban lands after this unban reads the row again after banning
+ * and lifts the ban when the row is gone; if that read fails it counts as pending, so that ban stays
+ * (reported, user id only).
+ */
+async function unbanAfterRestore(ports: DeletionPorts, userId: string): Promise<void> {
   await withRetries(ports, userId, () => ports.auth.unban(userId));
 }
 
@@ -182,13 +198,24 @@ export async function restoreAccount(ports: DeletionPorts, token: string): Promi
   try {
     r = await ports.rpc('restore_account', { p_hash: hash, p_now: now });
   } catch (error) {
-    // The answer may be lost after the restore committed: the database says which.
-    if (await ports.rpc<boolean>('erasure_pending', { p_user: link.userId })) throw error;
-    await settleBan(ports, link.userId);
+    // The answer may be lost after the restore committed: the database says which. Nothing can be
+    // sent for the plans the restore would resume (their names went with the answer), so it is
+    // reported, user id only, for the subscriptions to be resumed by hand.
+    let state: 'pending' | 'restored' | 'erased' | null = null;
+    // Tried BAN_ATTEMPTS times; on the last failure reported (user id only), and the restore's own
+    // error is thrown, as when the restore did not commit: the page says it did not work.
+    await withRetries(ports, link.userId, async () => {
+      state = await ports.rpc('erasure_state', { p_user: link.userId });
+    });
+    if (state === null || state === 'pending') throw error;
+    ports.report(error, link.userId);
+    // The purge finished in between: the account is not back.
+    if (state === 'erased') return refusal('window_closed');
+    await unbanAfterRestore(ports, link.userId);
     return { ok: true };
   }
   if (!r.ok) return refusal(r.code);
-  await settleBan(ports, link.userId);
+  await unbanAfterRestore(ports, link.userId);
   if (r.resume.length > 0) {
     try {
       await ports.send([

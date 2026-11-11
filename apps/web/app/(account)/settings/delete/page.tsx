@@ -35,7 +35,12 @@ export default async function DeletePage({
     <LiveActions>
       <DeleteScreen
         notice={settingsNotice(await searchParams, 'delete')}
-        data={deleteStepView(page.d, page.viewer, { removes, role: page.role, blocked })}
+        data={deleteStepView(page.d, page.viewer, {
+          removes,
+          role: page.role,
+          blocked,
+          subscriptionStatus: page.subscriptionStatus,
+        })}
       />
     </LiveActions>
   );

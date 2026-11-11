@@ -17,11 +17,10 @@ export const TRIAL_END_COPY = {
   bannerTitle: (plan: string, date: string) =>
     `${plan} ends ${date}. Here is exactly what changes, and what doesn't.`,
   /**
-   * What the reminder does, not that it was sent: nothing records a send until CC-28's mailer, and the
-   * person may have turned it off since.
+   * When the reminder is due, never that it was sent: nothing records a send until CC-28's mailer.
+   * Shown while the reminder is on and its day has not passed.
    */
-  reminderToday: 'The reminder goes out once, today, unless you turned it off.',
-  reminderOn: (date: string) => `The reminder goes out once, on ${date}, unless you turned it off.`,
+  reminderDue: (date: string) => `The reminder is due once, on ${date}.`,
   noCard: 'No card is on file, so nothing is charged either way.',
   /** A trial with a card on file becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
   card: (last4: string, date: string) =>
@@ -158,9 +157,9 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
     screen: 'trial-end',
     kind: 'ruling',
     locked: 'We sent this once, today, as promised.',
-    rendered: 'The reminder goes out once, today, unless you turned it off.',
+    rendered: 'The reminder is due once, on Wed 4 Nov.',
     source:
-      'Owner ruling pending (CC-27b Q17): nothing records that the reminder was sent (CC-28 sends it), so the sentence says what the reminder does',
+      'Owner ruling pending (CC-27b Q17): nothing records that the reminder was sent (CC-28 sends it), so the sentence says when it is due, and nothing once its day has passed',
   },
   {
     screen: 'trial-end',

@@ -535,7 +535,142 @@ describe('the window’s edge when the two clocks disagree (T1)', () => {
   });
 });
 
+describe('fix round 2', () => {
+  it('the apply refuses accounts_changed when the person holds an account the confirm did not mark (item 4)', async () => {
+    const o = await owner();
+    const { confirm: raw } = await request(o);
+    await confirm(raw);
+    await db.query(
+      `update public.pending_erasures set confirmed_at = confirmed_at - interval '8 days',
+              purge_after = purge_after - interval '8 days' where user_id = $1`,
+      [o.userId],
+    );
+    const plan = await json(`select public.erase_person_plan($1, null) as r`, [o.userId]);
+    // Between the purge's plan and its apply, the person comes to hold another account alone.
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+       values ('agency', 'free', 'free', 1, 1, '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]')
+       returning id`,
+    );
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'x@example.com', 'owner', 'active', now())`,
+      [rows[0]!.id, o.userId],
+    );
+    await expect(
+      db.query(`select public.erase_person_apply($1, null, $2::jsonb, true)`, [
+        o.userId,
+        JSON.stringify(plan),
+      ]),
+    ).rejects.toThrow(/accounts_changed/);
+    expect(
+      await n(`select count(*) from public.accounts where id = any($1)`, [
+        [o.accountId, rows[0]!.id],
+      ]),
+    ).toBe(2);
+  });
+
+  it('the confirm judges an email change at its own p_now, not the database clock (item 5)', async () => {
+    const o = await owner();
+    const { confirm: raw } = await request(o);
+    // A confirmation link live by the database's clock, expired by the confirm's p_now.
+    await db.query(
+      `insert into public.account_tokens (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, expires_at)
+       values ($1, $2, 'email_change', $3, now(), 'new@example.com', $4, now() + interval '1 hour')`,
+      [o.accountId, o.userId, hashToken(newToken()), o.email],
+    );
+    expect((await confirm(raw, `now() + interval '2 hours'`)).ok).toBe(true);
+  });
+
+  it('one change applied long ago and a second abandoned: nothing is in flight (item 9)', async () => {
+    const o = await owner();
+    await db.query(
+      `insert into public.account_tokens
+         (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, created_at, expires_at,
+          used_at, revoked_at)
+       values ($1, $2, 'email_change', $3, now() - interval '30 days', 'a@example.com', $4,
+               now() - interval '30 days', now() - interval '30 days' + interval '1 hour',
+               now() - interval '30 days', null),
+              -- The second request revoked what was left of the first, as request_email_change does.
+              ($1, $2, 'email_change_undo', $5, now() - interval '30 days', 'a@example.com', $4,
+               now() - interval '30 days', now() - interval '23 days', null, now() - interval '2 hours'),
+              ($1, $2, 'email_change', $6, now() - interval '2 hours', 'b@example.com', $4,
+               now() - interval '2 hours', now() - interval '1 hour', null, null),
+              ($1, $2, 'email_change_undo', $7, now() - interval '2 hours', 'b@example.com', $4,
+               now() - interval '2 hours', now() + interval '7 days', null, null)`,
+      [
+        o.accountId,
+        o.userId,
+        hashToken(newToken()),
+        o.email,
+        hashToken(newToken()),
+        hashToken(newToken()),
+        hashToken(newToken()),
+      ],
+    );
+    expect(await json<boolean>(`select public.email_change_live($1) as r`, [o.userId])).toBe(false);
+  });
+});
+
+describe('fix round 3: restore links and the person’s other links', () => {
+  /** A person alone on two accounts, X (personal, with a site) and Y, each with a requested deletion. */
+  async function twoRequests() {
+    const o = await owner();
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+       values ('agency', 'free', 'free', 1, 1, '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]')
+       returning id`,
+    );
+    const y = rows[0]!.id;
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'x@example.com', 'owner', 'active', now())`,
+      [y, o.userId],
+    );
+    const x = await request(o);
+    const yLinks = await request({ ...o, accountId: y }, o.email);
+    return { o, y, x, yLinks };
+  }
+
+  it('a restore revokes the person’s other confirmation links (item 2)', async () => {
+    const { o, x, yLinks } = await twoRequests();
+    expect((await confirm(x.confirm)).ok).toBe(true);
+    expect((await restore(x.restore)).ok).toBe(true);
+    expect((await confirm(yLinks.confirm)).code).toBe('invalid_link');
+    expect(await marked(o.accountId)).toBe(0);
+  });
+
+  it('a restore link works only for the deletion it was sent with (item 3)', async () => {
+    const { o, x, yLinks } = await twoRequests();
+    // Confirmed through Y's link; X's request was never confirmed.
+    expect((await confirm(yLinks.confirm)).ok).toBe(true);
+    expect((await restore(x.restore)).code).toBe('invalid_link');
+    expect(await marked(o.accountId)).toBe(1);
+    expect((await restore(yLinks.restore)).ok).toBe(true);
+    expect(await marked(o.accountId)).toBe(0);
+  });
+});
+
 describe('read_deletion_link', () => {
+  it('names each account’s subscription status, from the plan the account follows (R3 item 1)', async () => {
+    const o = await owner();
+    const sub = `sub_read${serial}`;
+    await db.query(
+      `insert into public.subscriptions (id, account_id, status, plan, interval) values ($1, $2, 'past_due', 'pro', 'month')`,
+      [sub, o.accountId],
+    );
+    await db.query(`update public.accounts set current_subscription_id = $2 where id = $1`, [
+      o.accountId,
+      sub,
+    ]);
+    const { confirm: raw } = await request(o);
+    const r = await json<{ accounts: Array<{ id: string; subscription: string | null }> }>(
+      `select public.read_deletion_link('delete_confirm', $1, now()) as r`,
+      [hashToken(raw)],
+    );
+    expect(r.accounts.map((a) => [a.id, a.subscription])).toEqual([[o.accountId, 'past_due']]);
+  });
+
   it('shows the accounts and the window without using the link', async () => {
     const o = await owner();
     const { confirm: raw, restore: restoreRaw } = await request(o);
@@ -548,7 +683,7 @@ describe('read_deletion_link', () => {
       ok: true,
       userId: o.userId,
       purgeAfter: null,
-      accounts: [{ id: o.accountId, host: o.host.toLowerCase() }],
+      accounts: [{ id: o.accountId, host: o.host.toLowerCase(), subscription: null }],
     });
     expect((await read('delete_confirm', restoreRaw)).code).toBe('invalid_link');
     expect((await read('delete_restore', restoreRaw)).code).toBe('not_confirmed');
@@ -669,6 +804,7 @@ describe('the catalogue', () => {
       'restore_account',
       'record_deletion_cancel',
       'erasure_pending',
+      'erasure_state',
       'due_erasures',
       'record_erasure_attempt',
       'finish_erasure',
