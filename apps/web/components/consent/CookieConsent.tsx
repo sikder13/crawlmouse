@@ -1,7 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
 import posthog from 'posthog-js';
-import { shouldShowConsentBanner, CONSENT_DECISION_STORAGE_KEY, CONSENT_OPEN_EVENT } from '@/lib/consent';
+import {
+  shouldShowConsentBanner,
+  consentDecisionCookie,
+  consentDecisionFromCookie,
+  CONSENT_DECISION_STORAGE_KEY,
+  CONSENT_OPEN_EVENT,
+} from '@/lib/consent';
 
 /**
  * Geo-gated analytics consent banner. Shown ONLY to visitors whose region requires prior opt-in
@@ -13,8 +19,16 @@ export function CookieConsent() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (shouldShowConsentBanner(document.cookie, localStorage.getItem(CONSENT_DECISION_STORAGE_KEY))) {
+    const stored = localStorage.getItem(CONSENT_DECISION_STORAGE_KEY);
+    if (shouldShowConsentBanner(document.cookie, stored)) {
       setVisible(true);
+    }
+    // A decision made before the cookie existed is copied to it, so the server reads it too.
+    if (
+      (stored === 'granted' || stored === 'denied') &&
+      consentDecisionFromCookie(document.cookie) !== stored
+    ) {
+      document.cookie = consentDecisionCookie(stored);
     }
     // Re-open on demand (footer "Cookie settings") so any visitor can change or WITHDRAW a prior
     // decision as easily as they gave it (GDPR Art. 7(3)) — works regardless of region/decision.
@@ -27,7 +41,9 @@ export function CookieConsent() {
 
   const decide = (granted: boolean) => {
     try {
-      localStorage.setItem(CONSENT_DECISION_STORAGE_KEY, granted ? 'granted' : 'denied');
+      const decision = granted ? 'granted' : 'denied';
+      localStorage.setItem(CONSENT_DECISION_STORAGE_KEY, decision);
+      document.cookie = consentDecisionCookie(decision);
       if (granted) posthog.opt_in_capturing();
       else posthog.opt_out_capturing();
     } catch {
@@ -46,7 +62,10 @@ export function CookieConsent() {
         <p className="text-sm text-ink/80">
           We use privacy-friendly analytics (PostHog) to make Crawlmouse better. Allow non-essential
           analytics? You can change your mind anytime &mdash; see our{' '}
-          <a className="text-peach underline" href="/privacy">Privacy Policy</a>.
+          <a className="text-peach underline" href="/privacy">
+            Privacy Policy
+          </a>
+          .
         </p>
         <div className="flex shrink-0 gap-2">
           <button
