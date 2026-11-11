@@ -34,6 +34,8 @@ const PERSIST_LOCK = '    order by f.id\n    for update;\n';
 const MARK_LOCK = '     for update of f;\n';
 /** How long to watch for B waiting. */
 const WAIT_WATCH_MS = 2000;
+/** Each race's own bound: a persist of the recorded check runs for seconds on a loaded machine. */
+const RACE_TIMEOUT_MS = 60_000;
 
 type Sql = postgres.Sql;
 
@@ -73,6 +75,8 @@ interface Calls {
   stages: { collection: string; chunk: number; rows: unknown[] }[];
   payload: Record<string, unknown>;
 }
+
+type Seeded = Awaited<ReturnType<typeof seeded>>;
 
 /** The recorded site kept by a new account, its first check persisted, its second running. */
 async function seeded(sql: Sql) {
@@ -229,6 +233,8 @@ describe.skipIf(!URL_ENV)(
     let persistFirstDb: Sql;
     let persistUnlocked: Sql;
     let markUnlocked: Sql;
+    /** Each database's site, seeded and its second check staged, ahead of the race it runs. */
+    const ready = new Map<Sql, Seeded>();
 
     beforeAll(async () => {
       admin = postgres(URL_ENV!, { max: 1, onnotice: () => {} });
@@ -236,7 +242,14 @@ describe.skipIf(!URL_ENV)(
       persistFirstDb = await migrated(admin, names.persistFirst);
       persistUnlocked = await migrated(admin, names.persistUnlocked, removing(PERSIST_LOCK));
       markUnlocked = await migrated(admin, names.markUnlocked, removing(MARK_LOCK));
-    }, 180_000);
+      // Seeding imports and runs the engine, which takes seconds on a loaded machine, so it is done
+      // here and not inside each race.
+      for (const sql of [markFirstDb, persistFirstDb, persistUnlocked, markUnlocked]) {
+        const s = await seeded(sql);
+        await stage(sql, s.calls);
+        ready.set(sql, s);
+      }
+    }, 600_000);
 
     afterAll(async () => {
       for (const s of [markFirstDb, persistFirstDb, persistUnlocked, markUnlocked])
@@ -248,8 +261,7 @@ describe.skipIf(!URL_ENV)(
 
     /** A marks the orphan fix, B persists the second check over it. */
     async function markFirst(sql: Sql) {
-      const s = await seeded(sql);
-      await stage(sql, s.calls);
+      const s = ready.get(sql)!;
       const r = await race(
         sql,
         (t) => markCall(t, s.orphan, s.seatId),
@@ -260,8 +272,7 @@ describe.skipIf(!URL_ENV)(
 
     /** A persists the second check, B marks the orphan fix. */
     async function persistFirst(sql: Sql) {
-      const s = await seeded(sql);
-      await stage(sql, s.calls);
+      const s = ready.get(sql)!;
       const r = await race(
         sql,
         (t) => persistCall(t, s.calls),
@@ -270,34 +281,50 @@ describe.skipIf(!URL_ENV)(
       return { ...r, fix: await fixOf(sql, s.orphan) };
     }
 
-    it('mark first: the persist waits for it, then withholds the fix; the mark stands', async () => {
-      const r = await markFirst(markFirstDb);
-      expect(r.waited, 'B waited on a lock while A held it').toBe(true);
-      expect(r.a).toMatchObject({ outcome: 'marked' });
-      expect(r.b).toMatchObject({ written: true, counts: { fixes_withheld: 1 } });
-      const verified = (r.b.verified as { fix_id: string }[]).map((v) => v.fix_id);
-      expect(verified).not.toContain(r.orphan);
-      expect(r.fix).toEqual({ status: 'marked_done', events: ['marked_done'] });
-    });
+    it(
+      'mark first: the persist waits for it, then withholds the fix; the mark stands',
+      async () => {
+        const r = await markFirst(markFirstDb);
+        expect(r.waited, 'B waited on a lock while A held it').toBe(true);
+        expect(r.a).toMatchObject({ outcome: 'marked' });
+        expect(r.b).toMatchObject({ written: true, counts: { fixes_withheld: 1 } });
+        const verified = (r.b.verified as { fix_id: string }[]).map((v) => v.fix_id);
+        expect(verified).not.toContain(r.orphan);
+        expect(r.fix).toEqual({ status: 'marked_done', events: ['marked_done'] });
+      },
+      RACE_TIMEOUT_MS,
+    );
 
-    it('persist first: the mark waits for it, then finds the fix verified and refuses', async () => {
-      const r = await persistFirst(persistFirstDb);
-      expect(r.waited, 'B waited on a lock while A held it').toBe(true);
-      expect(r.a).toMatchObject({ written: true, counts: { fixes_withheld: 0 } });
-      expect(r.b).toEqual({ outcome: 'refused', status: 'verified_resolved' });
-      expect(r.fix).toEqual({ status: 'verified_resolved', events: ['verified'] });
-    });
+    it(
+      'persist first: the mark waits for it, then finds the fix verified and refuses',
+      async () => {
+        const r = await persistFirst(persistFirstDb);
+        expect(r.waited, 'B waited on a lock while A held it').toBe(true);
+        expect(r.a).toMatchObject({ written: true, counts: { fixes_withheld: 0 } });
+        expect(r.b).toEqual({ outcome: 'refused', status: 'verified_resolved' });
+        expect(r.fix).toEqual({ status: 'verified_resolved', events: ['verified'] });
+      },
+      RACE_TIMEOUT_MS,
+    );
 
-    it('mutation: without persist’s lock, the check verifies over a mark its build never read', async () => {
-      const r = await markFirst(persistUnlocked);
-      expect(r.b).toMatchObject({ written: true, counts: { fixes_withheld: 0 } });
-      expect(r.fix).toEqual({ status: 'verified_resolved', events: ['marked_done', 'verified'] });
-    });
+    it(
+      'mutation: without persist’s lock, the check verifies over a mark its build never read',
+      async () => {
+        const r = await markFirst(persistUnlocked);
+        expect(r.b).toMatchObject({ written: true, counts: { fixes_withheld: 0 } });
+        expect(r.fix).toEqual({ status: 'verified_resolved', events: ['marked_done', 'verified'] });
+      },
+      RACE_TIMEOUT_MS,
+    );
 
-    it('mutation: without mark_fix_done’s lock, the mark reads the fix before the persist and writes over it', async () => {
-      // It reads `open`, its update waits for the persist, then writes marked_done over the verified
-      // row, which the row's rank rule refuses: an error, where the lock gives a refusal.
-      await expect(persistFirst(markUnlocked)).rejects.toThrow(/site_fixes_rank/);
-    });
+    it(
+      'mutation: without mark_fix_done’s lock, the mark reads the fix before the persist and writes over it',
+      async () => {
+        // It reads `open`, its update waits for the persist, then writes marked_done over the verified
+        // row, which the row's rank rule refuses: an error, where the lock gives a refusal.
+        await expect(persistFirst(markUnlocked)).rejects.toThrow(/site_fixes_rank/);
+      },
+      RACE_TIMEOUT_MS,
+    );
   },
 );

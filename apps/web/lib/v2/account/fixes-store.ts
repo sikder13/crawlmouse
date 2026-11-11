@@ -12,7 +12,9 @@ import { randomUUID } from 'node:crypto';
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import type { Check, Fix, FixEvent } from '@crawlmouse/types/v2';
 import { z } from 'zod';
+import { supabaseCheckReader } from '../pipeline/load';
 import { checkFromRow, fixEventFromRow, fixFromRow } from '../pipeline/rows';
+import type { CheckReader } from '../pipeline/types';
 
 export const MARK_FIX_DONE_RPC = 'mark_fix_done';
 
@@ -57,7 +59,14 @@ function rows(what: string, r: { data: unknown; error: PostgrestError | null }) 
   return (r.data ?? []) as Record<string, unknown>[];
 }
 
-export function supabaseFixesStore(admin: SupabaseClient): FixesStore {
+/**
+ * `reader` reads a site's checks, fixes and events page by page (`supabaseCheckReader`, the same
+ * reader the check loader uses); a test passes its own.
+ */
+export function supabaseFixesStore(
+  admin: SupabaseClient,
+  reader: CheckReader = supabaseCheckReader(admin),
+): FixesStore {
   return {
     async fix(fixId) {
       const [row] = rows(
@@ -68,29 +77,24 @@ export function supabaseFixesStore(admin: SupabaseClient): FixesStore {
     },
 
     async siteFixes(siteId) {
-      const [checks, fixes] = await Promise.all([
-        admin
-          .from('checks')
-          .select('*')
-          .eq('site_id', siteId)
-          .in('status', ['finished', 'partial']),
-        admin.from('site_fixes').select('*').eq('site_id', siteId),
+      // Through the paged reader: a site's checks and fix events can pass PostgREST's row cap.
+      const [checkRows, fixRows] = await Promise.all([
+        reader.rows('checks', 'site_id', [siteId]),
+        reader.rows('site_fixes', 'site_id', [siteId]),
       ]);
-      const fixRows = rows('site_fixes read', fixes).map(fixFromRow);
-      const events =
-        fixRows.length === 0
-          ? []
-          : rows(
-              'fix_events read',
-              await admin
-                .from('fix_events')
-                .select('*')
-                .in(
-                  'fix_id',
-                  fixRows.map((f) => f.id),
-                ),
-            ).map(fixEventFromRow);
-      return { checks: rows('checks read', checks).map(checkFromRow), fixes: fixRows, events };
+      const fixes = fixRows.map(fixFromRow);
+      const events = await reader.rows(
+        'fix_events',
+        'fix_id',
+        fixes.map((f) => f.id),
+      );
+      return {
+        checks: checkRows
+          .filter((r) => r.status === 'finished' || r.status === 'partial')
+          .map(checkFromRow),
+        fixes,
+        events: events.map(fixEventFromRow),
+      };
     },
 
     async markDone(fixId, seatId) {
