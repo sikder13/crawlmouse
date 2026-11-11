@@ -40,7 +40,8 @@ describe('readableCheck', () => {
       account.id,
       kept.siteId,
     ]);
-  });
+    // Applying every migration to a new database takes longer than vitest's 10 s under load.
+  }, 120_000);
 
   it('reads a check on an unkept site by its id, signed in or not', async () => {
     for (const viewer of [anonymous, { userId: owner }, { userId: stranger }]) {

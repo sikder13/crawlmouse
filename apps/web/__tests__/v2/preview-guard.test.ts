@@ -11,6 +11,12 @@ const GROUP = join(WEB_ROOT, 'app', '(v2-preview)');
  */
 const ACCOUNT_GROUP = join(WEB_ROOT, 'app', '(account)');
 const PREVIEW = join(GROUP, 'v2-preview');
+/**
+ * The public check flow's live pages (CC-22b), each a 404 while V2_CHECKS_PUBLIC is off: a v2
+ * check's pages, which sit under v1's audit route with no layout of their own, and the page `/` is
+ * rewritten to. `__tests__/v1-inventory.test.ts` holds the list of flag-gated page files.
+ */
+const V2_LIVE = [join(WEB_ROOT, 'app', 'audit', '[id]'), join(WEB_ROOT, 'app', 'v2-home')];
 
 function walk(dir: string, out: string[] = []): string[] {
   if (!existsSync(dir)) return out;
@@ -173,6 +179,7 @@ describe('v2 stays out of live pages', () => {
   const allowed = (file: string) =>
     file.startsWith(GROUP + '/') ||
     file.startsWith(ACCOUNT_GROUP + '/') ||
+    V2_LIVE.some((dir) => file.startsWith(dir + '/')) ||
     file.startsWith(join(WEB_ROOT, 'components', 'v2') + '/') ||
     file.startsWith(join(WEB_ROOT, '__tests__', 'v2') + '/');
 
@@ -193,7 +200,7 @@ describe('v2 stays out of live pages', () => {
     expect(isV2(resolveSpec(from, 'components/v2'))).toBe(false);
   });
 
-  it('no module outside the preview and account groups imports the v2 components or tokens', () => {
+  it('no module outside the preview group, the account group and the public check pages imports the v2 components or tokens', () => {
     const offenders: string[] = [];
     for (const file of sources) {
       if (allowed(file)) continue;

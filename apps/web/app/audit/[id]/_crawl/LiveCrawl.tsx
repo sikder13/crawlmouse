@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { LiveCrawlScreen } from '../../../../components/v2/screens/crawl/CrawlScreen';
 import type { EmailOutcome } from '../../../../components/v2/screens/crawl/EmailAsk';
+import { auditHref } from '../../../../lib/v2/view/audit-hrefs';
 import { liveNotices, type CrawlContext } from '../../../../lib/v2/view/crawl';
 import { createLiveSource } from './live-source';
 
@@ -130,7 +131,7 @@ export function LiveCrawl({ checkId, host, crawlers = NO_CRAWLERS }: LiveCrawlPr
     <LiveCrawlScreen
       source={source}
       context={context}
-      resultHref={`/audit/${checkId}`}
+      resultHref={auditHref(checkId)}
       live={{
         onCancel,
         cancelling,
