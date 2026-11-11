@@ -17,7 +17,7 @@ import { capitalise, count, numberWord, plural } from '../../words';
 import type { CoverageView, DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { SEGMENTS, segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
-import type { ViewDataset } from '../dataset';
+import type { ViewDataset } from '../../fixtures';
 
 export interface NoJsEvidence {
   title: string;

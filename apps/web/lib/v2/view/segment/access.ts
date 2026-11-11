@@ -29,7 +29,7 @@ import { capitalise, count, numberWord, plural } from '../../words';
 import { accessPill, type CoverageView, type DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
-import type { ViewDataset } from '../dataset';
+import type { ViewDataset } from '../../fixtures';
 
 export interface MatrixCell {
   /** Unique on the page: the crawler and the section ("*" for a cell spanning every section). */

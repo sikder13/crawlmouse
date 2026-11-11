@@ -5,7 +5,7 @@
  * with it, never as caused by it: a check sees that something differs, not why.
  */
 import type { Change, Check, EvidenceClass, GradeName, Verdict } from '@crawlmouse/types/v2';
-import type { ViewDataset } from '../dataset';
+import type { ViewDataset } from '../../fixtures';
 
 type ChangeKind = Change['kind'];
 type ChangeSubject = Change['subject'];

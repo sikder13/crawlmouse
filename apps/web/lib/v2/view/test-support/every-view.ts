@@ -4,6 +4,8 @@
  * "does any view throw on this data" calls this.
  */
 import { checkMap } from '@crawlmouse/engine/v2/pipeline';
+import { instant } from '@crawlmouse/types/v2';
+import { findCheck, type ViewDataset } from '../../fixtures';
 import { fixView } from '../fix';
 import { linkMapView } from '../link-map';
 import { resultView } from '../result';
@@ -13,12 +15,12 @@ import { contentView } from '../segment/content';
 import { nojsView } from '../segment/nojs';
 import { signalsView } from '../segment/signals';
 import { structureView } from '../segment/structure';
-import type { ViewDataset } from '../dataset';
 
 export function everyView(d: ViewDataset, checkId: string) {
   const pages = d.page_results.filter((p) => p.check_id === checkId);
   const links = d.link_edges.filter((e) => e.check_id === checkId);
   const drawing = checkMap(pages, links);
+  const check = findCheck(d, checkId);
   return {
     result: resultView(d, checkId, { map: drawing }),
     resultUndrawn: resultView(d, checkId, { map: null }),
@@ -32,9 +34,16 @@ export function everyView(d: ViewDataset, checkId: string) {
     changes: changesView(d, checkId),
     mapHubs: linkMapView(d, checkId, { scope: 'hubs', drawing }),
     mapAll: linkMapView(d, checkId, { scope: 'all' }),
-    fixes: d.fixes.flatMap((f) => [
-      fixView(d, checkId, f.id),
-      fixView(d, checkId, f.id, { plan: 'pro' }),
-    ]),
+    // The fixes a loaded check holds: its site's, first seen by it or by a check queued before it.
+    fixes: d.fixes
+      .filter(
+        (f) =>
+          f.site_id === check.site_id &&
+          instant(findCheck(d, f.first_seen_check_id).queued_at) <= instant(check.queued_at),
+      )
+      .flatMap((f) => [
+        fixView(d, checkId, f.id),
+        fixView(d, checkId, f.id, { plan: 'pro' }),
+      ]),
   };
 }

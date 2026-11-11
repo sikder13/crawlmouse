@@ -30,7 +30,7 @@ import {
   type SegmentKey,
   type SegmentLink,
 } from './segment/frame';
-import type { ViewDataset } from './dataset';
+import type { ViewDataset } from '../fixtures';
 
 /** A packet's framework; the contract names the schema, not the type. */
 export type PacketFramework = FixPacket['framework'];

@@ -37,7 +37,7 @@ import {
   verbFor,
 } from '../sentences';
 import { capitalise, count, numberWord, plural } from '../words';
-import type { ViewDataset } from './dataset';
+import type { ViewDataset } from '../fixtures';
 
 export interface GradeView {
   label: string;

@@ -5,6 +5,7 @@ import { AuditUrlHeader } from '@/components/audit/AuditUrlHeader';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
+import { checksPublicEnabled } from '@/lib/auth/flags';
 
 // Capability URL: the unguessable audit UUID is the only thing guarding this page, so it must
 // never be indexed. The indexable surface for a result is the minted /r/<slug> report.
@@ -21,6 +22,17 @@ export default async function AuditPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { id } = await params;
+  // CC-22b: under V2_CHECKS_PUBLIC an id that names a v2 check the viewer may read shows that check.
+  // The v2 modules are loaded here, not imported above, so this page links none of their
+  // stylesheets while the flag is off. Any other id is a v1 audit, served below as before.
+  if (checksPublicEnabled()) {
+    const { readAudit } = await import('./_lib/access');
+    const read = await readAudit(id);
+    if (read) {
+      const { CheckPage } = await import('./_lib/CheckPage');
+      return <CheckPage read={read} />;
+    }
+  }
   // Entry-point hint from /ai-readiness-checker. Anything other than the one known value is treated
   // as absent, so a hand-edited URL can only ever produce today's ordering.
   const sp = await searchParams;

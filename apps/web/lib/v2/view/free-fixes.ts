@@ -7,7 +7,7 @@
  */
 import type { Check, Fix } from '@crawlmouse/types/v2';
 import { fixesAsOf } from '../fixtures';
-import type { ViewDataset } from './dataset';
+import type { ViewDataset } from '../fixtures';
 
 /** How many of an audit's fixes Free opens (FACTS: "3 fixes per audit"). */
 export const FREE_FIXES = 3;

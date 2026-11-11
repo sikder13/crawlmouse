@@ -24,7 +24,7 @@ import { keptUntilOf } from './result';
 import { sectionFixes } from './segment/fixes';
 import { NO_HREFS, SEGMENT_KEYS, SEGMENTS, type SegmentLink } from './segment/frame';
 import { drawingOf } from './segment/structure';
-import type { ViewDataset } from './dataset';
+import type { ViewDataset } from '../fixtures';
 
 /** The most nodes drawn as SVG; a larger map is drawn on a canvas (CC-24 brief, scope 2). */
 export const EXPLORER_SVG_MAX = 500;

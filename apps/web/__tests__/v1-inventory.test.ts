@@ -171,6 +171,15 @@ describe('the finders see what they claim to see', () => {
       isFlagGated(join(WEB, p)),
     );
     expect(hidden).toEqual([
+      // CC-22b: the audit's sub-pages, 404 while V2_CHECKS_PUBLIC is off.
+      'app/audit/[id]/access/page.tsx',
+      'app/audit/[id]/changes/page.tsx',
+      'app/audit/[id]/content/page.tsx',
+      'app/audit/[id]/fix/[fixId]/page.tsx',
+      'app/audit/[id]/map/page.tsx',
+      'app/audit/[id]/nojs/page.tsx',
+      'app/audit/[id]/signals/page.tsx',
+      'app/audit/[id]/structure/page.tsx',
       'app/api/billing/agency-trial/route.ts',
       'app/api/billing/cancel/route.ts',
       'app/api/checks/[id]/claim/route.ts',

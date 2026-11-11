@@ -16,7 +16,7 @@ import { listOf } from '../../format';
 import { numberWord, plural } from '../../words';
 import { effectHeadline } from '../effect-headline';
 import { openFixes, type FixPlan } from '../free-fixes';
-import type { ViewDataset } from '../dataset';
+import type { ViewDataset } from '../../fixtures';
 
 /** A fix's packet; the contract names the schema, not the type. */
 export type FixPacket = NonNullable<Fix['packet']>;

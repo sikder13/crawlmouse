@@ -13,7 +13,7 @@ import { isFreeFix } from '../free-fixes';
 import type { CoverageView, DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
-import type { ViewDataset } from '../dataset';
+import type { ViewDataset } from '../../fixtures';
 
 export interface ContentCell {
   id: string;

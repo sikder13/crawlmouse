@@ -8,7 +8,7 @@ import { SCREEN_SIGNALS, screenSignals } from '../screen-signals';
 import { findCheck, siteOf } from '../../fixtures';
 import { dayTimeUtc, percent } from '../../format';
 import { keptUntilOf } from '../result';
-import type { ViewDataset } from '../dataset';
+import type { ViewDataset } from '../../fixtures';
 import type { FixPlan } from '../free-fixes';
 
 export const SEGMENT_KEYS = [

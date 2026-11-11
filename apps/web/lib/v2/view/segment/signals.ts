@@ -13,7 +13,7 @@ import { capitalise, numberWord, plural } from '../../words';
 import type { DoorView } from '../result';
 import { RECOMMENDATION_LABELS, type RecommendationView } from './fixes';
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
-import type { ViewDataset } from '../dataset';
+import type { ViewDataset } from '../../fixtures';
 
 /**
  * The recommendation class of each signal. PROPOSED: the contract's SignalResult has no
