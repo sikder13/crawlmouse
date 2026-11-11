@@ -120,7 +120,7 @@ async function purgeOne(ports: PurgePorts, person: DuePerson): Promise<PurgeOutc
     await ports.stripe.cancel(id, { prorate: false }, { idempotencyKey: `purge:${id}` });
   }
 
-  const result = await erasePerson(ports.erasure, { userId });
+  const result = await erasePerson(marked(ports.erasure, accounts), { userId });
   if (!result.ok) {
     await ports.rpc('record_erasure_attempt', { p_user: userId });
     if (live.length === 0) ports.report('account.purge_refused', userId);
@@ -129,4 +129,28 @@ async function purgeOne(ports: PurgePorts, person: DuePerson): Promise<PurgeOutc
   await ports.rpc('finish_erasure', { p_user: userId });
   await ports.capture('account_purged', accounts[0]!, { counts: result.before.counts });
   return { outcome: 'purged', counts: result.before.counts };
+}
+
+/**
+ * The erasure's ports with one more refusal: every account the plan would delete must be one the
+ * confirm marked (`pending_erasures.accounts`), so the purge never erases an account it was not asked
+ * to (S5). A marked account missing from the plan is one an earlier run already deleted (after which
+ * the Auth delete failed), so the rule is "a subset", not "the same set". The refusal goes first,
+ * ahead of the plan's own; the Storage refusal stays last.
+ */
+function marked(erasure: ErasurePorts, accounts: readonly string[]): ErasurePorts {
+  return {
+    ...erasure,
+    async plan(target) {
+      const plan = await erasure.plan(target);
+      if (plan.accounts.every((a) => accounts.includes(a))) return plan;
+      return {
+        ...plan,
+        refusals: [
+          `the accounts to erase (${plan.accounts.join(', ')}) are not the accounts the confirm marked (${accounts.join(', ')})`,
+          ...plan.refusals,
+        ],
+      };
+    },
+  };
 }

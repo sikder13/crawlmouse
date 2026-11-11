@@ -279,6 +279,37 @@ describe('the purge', () => {
     expect((await steps.purgeOne(person)).outcome).toBe('purged');
   });
 
+  it('refuses, and reports, when the accounts to erase are not those the confirm marked', async () => {
+    const d = await deleted();
+    // An account the person alone holds that the confirm did not mark.
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+       values ('agency', 'free', 'free', 1, 1, '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]')
+       returning id`,
+    );
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'x@example.com', 'owner', 'active', now())`,
+      [rows[0]!.id, d.userId],
+    );
+    const { captureMessage } = await import('@sentry/nextjs');
+    vi.mocked(captureMessage).mockClear();
+    const log: string[] = [];
+    const { steps } = purgeOver(log);
+    const out = await steps.purgeOne({ userId: d.userId, accounts: [d.accountId] });
+    expect(out.outcome).toBe('refused');
+    expect(out.refusals![0]).toMatch(/not the accounts the confirm marked/);
+    expect(log).toEqual(['ban:876000h']);
+    expect(vi.mocked(captureMessage).mock.calls).toEqual([
+      ['account.purge_refused', { level: 'error', user: { id: d.userId } }],
+    ]);
+    expect(
+      await n(`select count(*) from public.accounts where id = any($1)`, [
+        [d.accountId, rows[0]!.id],
+      ]),
+    ).toBe(2);
+  });
+
   it('any other refusal is counted and reported with the user id only', async () => {
     const d = await deleted();
     const other = await signUp(db, `joined-${serial}@example.com`);
