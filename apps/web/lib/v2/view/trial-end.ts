@@ -57,9 +57,9 @@ export interface TrialEndView {
   /**
    * `keep`: on a trial with no card, the checkout that keeps the plan (the page's orange action);
    * null on a trial with a card, which becomes the plan at its end unless it is cancelled. `end`:
-   * leaving it to end (no card), or cancelling it (a card).
+   * leaving it to end (no card, or a card trial already set to cancel), or cancelling it (a card).
+   * Both are null for a seat that is not the owner's: the choice is the owner's to make.
    */
-  /** `end` is null for a seat that is not the owner's: the choice is the owner's to make. */
   banner: { title: string; sub: string; keep: ActionView | null; end: ActionView | null };
   staysTitle: string;
   stays: TrialRowView[];
