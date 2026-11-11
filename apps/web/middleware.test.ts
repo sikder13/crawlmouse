@@ -192,8 +192,11 @@ describe('middleware (exported entrypoint)', () => {
     );
     const res = await middleware(spoofed, event);
     // The page sees the request as forwarded: the override list and the headers it names.
-    const forwarded = (res.headers.get('x-middleware-override-headers') ?? '').split(',');
-    expect(forwarded.length).toBeGreaterThan(0);
+    // Without an override list Next forwards the client's own headers, marker included, so the list
+    // must be there.
+    const list = res.headers.get('x-middleware-override-headers');
+    expect(list).not.toBeNull();
+    const forwarded = list!.split(',');
     expect(forwarded).not.toContain(REWRITE_HEADER);
     expect(res.headers.get(`x-middleware-request-${REWRITE_HEADER}`)).toBeNull();
   });
