@@ -49,6 +49,15 @@ export const FUNNEL_EVENTS = [
   // login starts the no-card Pro trial, `site_added {n}` when it attaches the named first site.
   'trial_started',
   'site_added',
+  // CC-22b — the public check flow. `check_started` and `check_finished` are sent from the server
+  // (app/api/checks/_lib/events.ts); the other four go through track(), so a visitor's consent
+  // decision applies.
+  'home_viewed',
+  'check_started',
+  'check_finished',
+  'result_viewed',
+  'fix_opened',
+  'keep_clicked',
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];
