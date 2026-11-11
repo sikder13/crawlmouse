@@ -289,12 +289,16 @@ describe('what the v1 page and its 404 import', () => {
     );
   });
 
-  it('the paths of a check, which the v1 page imports, are a module that imports types only', () => {
-    const source = readFileSync(join(HERE, '../../../lib/v2/view/audit-hrefs.ts'), 'utf8');
-    const imports = [...source.matchAll(/^import\s+(type\s)?[^;]*;/gms)];
-    expect(imports.length).toBeGreaterThan(0);
-    expect(imports.filter((m) => m[1] === undefined).map((m) => m[0])).toEqual([]);
-  });
+  // audit-hrefs.ts is what the v1 page imports; no-packet.ts is what the screens import of a view.
+  it.each(['audit-hrefs.ts', 'no-packet.ts'])(
+    'lib/v2/view/%s imports types only, so importing it brings no other module',
+    (file) => {
+      const source = readFileSync(join(HERE, '../../../lib/v2/view', file), 'utf8');
+      const imports = [...source.matchAll(/^import\s+(type\s)?[^;]*;/gms)];
+      expect(imports.length).toBeGreaterThan(0);
+      expect(imports.filter((m) => m[1] === undefined).map((m) => m[0])).toEqual([]);
+    },
+  );
 
   it('the scan sees a static v2 import where there is one, with `from` and without', () => {
     expect(staticImports('access/page.tsx').filter((m) => V2.test(m))).not.toEqual([]);

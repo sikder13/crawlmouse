@@ -28,7 +28,8 @@ export default async function AuditPage({
 }) {
   const { id } = await params;
   // CC-22b: under V2_CHECKS_PUBLIC an id that names a v2 check the viewer may read is sent to that
-  // check's own page, which loads it; here only its row and its site's are read to decide.
+  // check's own page, which loads it; here its row and its site's are read to decide
+  // (`_lib/access.test.ts` lists the reads).
   // This page imports no v2 screen, here or through `import()`: a production
   // build links a screen's stylesheets on each page whose module can reach it, flag on or off.
   // Any other id is a v1 audit, served below as before.

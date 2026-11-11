@@ -1,7 +1,8 @@
 /**
  * A fix the reader may open whose steps the audit did not write (a fix with no packet): the one
  * sentence the fix page and a segment's open fix say in the packet's place, and the rule for where
- * a segment's orange element goes. This module imports types only, so a screen can import it.
+ * a segment's orange element goes. This module imports types only
+ * (`app/audit/[id]/audit-routes.test.tsx` reads its imports), so a screen can import it.
  */
 import type { OpenFixView } from './segment/fixes';
 
