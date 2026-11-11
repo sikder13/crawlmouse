@@ -391,4 +391,38 @@ describe('the fix to do first', () => {
     expect(v.first.body).toMatch(/about one minute[.,]/);
     expect(view('bad-site').first.body).toMatch(/about ten minutes/);
   });
+
+  const WITH_STEPS = ' The steps and the evidence are open, free.';
+  const NAMES = Object.keys(CHECK_OF) as FixtureName[];
+  /** The fix a fixture's card names, and whether it has a packet. */
+  const firstFix = (name: FixtureName, { first }: ResultView) =>
+    first.kind === 'fix' ? fixture(name).fixes.find((f) => f.title === first.title)! : null;
+
+  it('says the steps are open when the fix it names has a packet', () => {
+    let met = 0;
+    for (const name of NAMES) {
+      const v = view(name);
+      const fix = firstFix(name, v);
+      if (!fix?.packet) continue;
+      met += 1;
+      expect(v.first.body.endsWith(WITH_STEPS), name).toBe(true);
+    }
+    expect(met).toBeGreaterThan(0);
+  });
+
+  it('does not mention steps when the fix it names has no packet', () => {
+    let met = 0;
+    for (const name of NAMES) {
+      const fix = firstFix(name, view(name));
+      if (!fix) continue;
+      met += 1;
+      const v = view(name, (_, d) => {
+        d.fixes.find((f) => f.id === fix.id)!.packet = null;
+      });
+      expect(v.first).toMatchObject({ kind: 'fix', title: fix.title });
+      expect(v.first.body.endsWith(' The evidence is open, free.'), name).toBe(true);
+      expect(v.first.body).not.toMatch(/steps/i);
+    }
+    expect(met).toBeGreaterThan(0);
+  });
 });

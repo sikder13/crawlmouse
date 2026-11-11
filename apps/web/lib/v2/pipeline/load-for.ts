@@ -2,7 +2,8 @@
  * `loadCheckFor` (CC-22b D3): what `/audit/[id]` and its sub-pages show for an id and a viewer.
  *
  * `readableCheck` decides whether the viewer may read the check at all (null is a 404). After it, in
- * this order: a check past its `expires_at` is `expired`, whatever its status; a queued, running or
+ * this order: a check past its `expires_at` is `expired`, whatever its status (its `finishedAt` is
+ * set for a finished or partial check, which is what the page calls crawled); a queued, running or
  * deferred one is `waiting`; a failed one is `failed` with its stored reason; a finished or partial
  * one is `ready`, with the dataset `loadCheck` reads, the site's checks queued at or before this one
  * (the views look other checks up by id and read `checks` as the site's history), the plan that
@@ -119,7 +120,9 @@ export async function loadCheckFor(
       checkId,
       host,
       expiredAt: access.expiresAt!,
-      finishedAt: access.finishedAt,
+      // When it was graded. A failed check's row has a finish time too: the time it stopped.
+      finishedAt:
+        access.status === 'finished' || access.status === 'partial' ? access.finishedAt : null,
     };
   }
   const { status } = access;

@@ -319,14 +319,14 @@ function withoutJsDoor(
     coverage.tested < coverage.total
       ? `Every page measured with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen)}`
       : fixCount(fixes, SECTIONS.withoutJs!, isOpen);
-  // No page was rendered in a browser, so there is no share to show.
+  // The check holds no site-wide share. Why is not in the check, so the door does not say why.
   if (!check.without_js) {
     return {
       title: 'Readable without JavaScript',
       pill: { state: 'neutral', label: 'not measured' },
-      body: 'No page was rendered in a browser in this audit, so how much of the text is in the HTML before JavaScript runs was not measured.',
+      body: 'How much of the text is in the HTML before JavaScript runs was not measured in this audit.',
       footer,
-      coverage: { read: 'No page was rendered for this measurement.' },
+      coverage: { read: 'No site-wide share was recorded for this measurement.' },
       href: '#',
     };
   }
@@ -752,7 +752,11 @@ function fixFirstBody(check: Check, f: Fix, siteFixes: readonly Fix[]): string {
         : seo === null || h.kind === 'seo_not_estimated'
           ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
           : `Technical SEO ${seo} → ${Math.min(100, seo + h.points)}, estimated.`;
-  return `${what ? `${capitalise(what)}. ` : ''}${effect} The steps and the evidence are open, free.`;
+  // What the fix page holds of this fix: its evidence, and its steps where a packet was written.
+  const open = f.packet
+    ? 'The steps and the evidence are open, free.'
+    : 'The evidence is open, free.';
+  return `${what ? `${capitalise(what)}. ` : ''}${effect} ${open}`;
 }
 
 /** Whether a title states the number `n` as a whole number, grouped ("1,120") or not. */

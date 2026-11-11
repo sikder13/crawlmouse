@@ -12,7 +12,11 @@ import type { CheckRead } from '../../../lib/v2/pipeline/public';
 vi.mock('server-only', () => ({}));
 
 const readAudit = vi.fn<(id: string) => Promise<CheckRead | null>>();
-vi.mock('./_lib/access', () => ({ readAudit: (id: string) => readAudit(id) }));
+const isReadableAudit = vi.fn<(id: string) => Promise<boolean>>();
+vi.mock('./_lib/access', () => ({
+  readAudit: (id: string) => readAudit(id),
+  isReadableAudit: (id: string) => isReadableAudit(id),
+}));
 
 const v1Audit = vi.fn<() => { id: string; url: string } | null>(() => null);
 vi.mock('@/lib/supabase/admin', () => ({
@@ -75,6 +79,7 @@ beforeAll(async () => {
 afterEach(() => {
   vi.unstubAllEnvs();
   readAudit.mockReset();
+  isReadableAudit.mockReset();
   v1Audit.mockReset();
   v1Audit.mockReturnValue(null);
 });
@@ -130,6 +135,7 @@ describe('with V2_CHECKS_PUBLIC off', () => {
       searchParams: Promise.resolve({}),
     })) as ReactElement;
     expect(readAudit).not.toHaveBeenCalled();
+    expect(isReadableAudit).not.toHaveBeenCalled();
     expect(v1Audit).toHaveBeenCalledTimes(1);
     // The v1 page's own markup (a fragment), not a v2 component.
     expect(typeof node.type).not.toBe('function');
@@ -158,15 +164,18 @@ describe('with V2_CHECKS_PUBLIC off', () => {
 });
 
 describe('with V2_CHECKS_PUBLIC on', () => {
-  it('/audit/[id] sends a v2 check the viewer may read to its overview, without a v1 lookup', async () => {
+  it('/audit/[id] sends a v2 check the viewer may read to its overview, without loading it or a v1 lookup', async () => {
     flag(true);
-    readAudit.mockResolvedValue(waiting);
+    isReadableAudit.mockResolvedValue(true);
     const route = await import('./page');
     const digest = await digestOf(() =>
       route.default({ params: params('page.tsx'), searchParams: Promise.resolve({}) }),
     );
     expect(digest).toContain('NEXT_REDIRECT');
     expect(digest).toContain(`/audit/${ID}/overview;`);
+    expect(isReadableAudit.mock.calls).toEqual([[ID]]);
+    // The overview, a request of its own, is what loads the check.
+    expect(readAudit).not.toHaveBeenCalled();
     expect(v1Audit).not.toHaveBeenCalled();
   });
 
@@ -187,7 +196,7 @@ describe('with V2_CHECKS_PUBLIC on', () => {
 
   it('an id that reads no v2 check is looked up as a v1 audit; one that is neither goes to the overview’s 404', async () => {
     flag(true);
-    readAudit.mockResolvedValue(null);
+    isReadableAudit.mockResolvedValue(false);
     const route = await import('./page');
     const run = () =>
       route.default({ params: params('page.tsx'), searchParams: Promise.resolve({}) });
@@ -197,6 +206,7 @@ describe('with V2_CHECKS_PUBLIC on', () => {
     expect(v1Audit).toHaveBeenCalledTimes(1);
     v1Audit.mockReturnValue({ id: ID, url: 'https://example.com' });
     expect(await digestOf(run)).toBe('returned');
+    expect(readAudit).not.toHaveBeenCalled();
   });
 
   it.each(GRADED)('%s is a 404 for an id that reads no check', async (file) => {
@@ -241,15 +251,18 @@ describe('with V2_CHECKS_PUBLIC on', () => {
 });
 
 describe('what the v1 page and its 404 import', () => {
-  /** The module specifiers a file imports statically (`import … from`), not through `import()`. */
-  const staticImports = (file: string) =>
-    [...readFileSync(join(HERE, file), 'utf8').matchAll(/^import\s[^;]*?from\s+'([^']+)';/gms)].map(
-      (m) => m[1]!,
-    );
+  /**
+   * The module specifiers a file imports statically, not through `import()`: `import … from '…'`,
+   * and the bare `import '…'` a stylesheet is imported with. One file deep: the modules it names
+   * are not read in turn.
+   */
+  const importsOf = (source: string) =>
+    [...source.matchAll(/^import\s(?:[^;'"]*?\sfrom\s+)?'([^']+)';/gm)].map((m) => m[1]!);
+  const staticImports = (file: string) => importsOf(readFileSync(join(HERE, file), 'utf8'));
   const V2 = /_lib\/|_crawl\/|components\/v2|styles\/v2|lib\/v2/;
 
-  /** A v2 module that holds no screen, and so no stylesheet: the reader of a check. */
-  const NO_SCREEN = ['./_lib/access'];
+  /** The v2 modules that hold no screen, and so no stylesheet: the reader of a check, and its paths. */
+  const NO_SCREEN = ['./_lib/access', '@/lib/v2/view/audit-hrefs'];
   /** Each module a file reaches: `import … from`, and `import()`. */
   const reached = (file: string) => [
     ...staticImports(file),
@@ -276,7 +289,27 @@ describe('what the v1 page and its 404 import', () => {
     );
   });
 
-  it('the scan sees a static v2 import where there is one', () => {
+  // audit-hrefs.ts is what the v1 page imports; no-packet.ts is what the screens import of a view.
+  it.each(['audit-hrefs.ts', 'no-packet.ts'])(
+    'lib/v2/view/%s imports types only, so importing it brings no other module',
+    (file) => {
+      const source = readFileSync(join(HERE, '../../../lib/v2/view', file), 'utf8');
+      const imports = [...source.matchAll(/^import\s+(type\s)?[^;]*;/gms)];
+      expect(imports.length).toBeGreaterThan(0);
+      expect(imports.filter((m) => m[1] === undefined).map((m) => m[0])).toEqual([]);
+    },
+  );
+
+  it('the scan sees a static v2 import where there is one, with `from` and without', () => {
     expect(staticImports('access/page.tsx').filter((m) => V2.test(m))).not.toEqual([]);
+    // A stylesheet is imported bare. This one is the v2 tokens, in a file the v1 page must not reach.
+    const bare = staticImports('_lib/CheckPage.tsx').filter((m) => /\.css$/.test(m));
+    expect(bare).toEqual(['../../../../styles/v2/tokens.css']);
+    expect(bare.filter((m) => V2.test(m))).toEqual(bare);
+    // An import written over several lines is one import, named by its `from`.
+    expect(importsOf("import {\n  a,\n  type B,\n} from './x';\nimport './y.css';\n")).toEqual([
+      './x',
+      './y.css',
+    ]);
   });
 });

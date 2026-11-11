@@ -121,6 +121,39 @@ describe('loadCheckFor: the five states', () => {
   });
 });
 
+describe('loadCheckFor: when an expired check was crawled', () => {
+  let db: PGlite;
+  let deps: TestDeps;
+  const ENDED = '2026-11-06T12:00:00Z';
+
+  beforeAll(async () => {
+    db = await doorDb();
+    deps = publicDeps(db, () => NOW);
+  }, 120_000);
+
+  const expired = async (host: string, set: string) => {
+    const { checkId } = await anonymousCheck(db, host, new Date(NOW - 1));
+    await db.query(
+      `update public.checks set ${set}, started_at = '2026-11-06T11:59:00Z', finished_at = $2
+        where id = $1`,
+      [checkId, ENDED],
+    );
+    const read = await loadCheckFor(deps, checkId, anonymous);
+    if (read?.state !== 'expired') throw new Error(`expected expired, got ${read?.state}`);
+    return read;
+  };
+
+  it('a check that ended ungraded has no crawl time, though its row has a finish time', async () => {
+    for (const reason of ['canceled', 'worker_unavailable', 'internal'] as const) {
+      const read = await expired(
+        `expired-${reason.replace('_', '-')}.example`,
+        `status = 'failed', failure_reason = '${reason}'`,
+      );
+      expect(read.finishedAt, reason).toBeNull();
+    }
+  });
+});
+
 describe('loadCheckFor: a finished check built by the engine and persisted', () => {
   let db: PGlite;
   let deps: TestDeps;
@@ -140,6 +173,19 @@ describe('loadCheckFor: a finished check built by the engine and persisted', () 
     owner = await signUp(db, 'owner@example.com');
     stranger = await signUp(db, 'stranger@example.com');
   }, 180_000);
+
+  it('once expired, a finished and a partial check carry the time each finished', async () => {
+    // Both were persisted to expire on 6 Dec 2026 (test-support/public-checks.ts).
+    const late = publicDeps(db, () => Date.parse('2026-12-06T10:00:00Z'));
+    for (const built of [first, second]) {
+      const read = await loadCheckFor(late, built.check.id, anonymous);
+      expect(read).toMatchObject({ state: 'expired' });
+      expect(read?.state === 'expired' && Date.parse(read.finishedAt!)).toBe(
+        Date.parse(built.check.finished_at!),
+      );
+    }
+    expect([first.check.status, second.check.status]).toEqual(['finished', 'partial']);
+  });
 
   it('is ready for a visitor: the dataset loadCheck reads, on the Free plan, with the stored drawing', async () => {
     const read = await loadCheckFor(deps, FIRST, anonymous);

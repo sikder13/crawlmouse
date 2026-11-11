@@ -3,12 +3,13 @@ import { notFound } from 'next/navigation';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { readAudit } from '../_lib/access';
 import { CheckPage } from '../_lib/CheckPage';
+import { auditHrefs } from '../_lib/hrefs';
 import { auditMetadata } from '../_lib/metadata';
 
 type Params = Promise<{ id: string }>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  return auditMetadata((await params).id, '/overview');
+  return auditMetadata(auditHrefs((await params).id).overview);
 }
 
 /**

@@ -11,7 +11,7 @@ import { LOG_IN } from '../../footer-links';
 import { MapSvg } from '../../map/MapSvg';
 import type { DoorView, GradeView, ResultView } from '../../../../lib/v2/view/result';
 import { capitalise, count, numberWord, plural } from '../../../../lib/v2/words';
-import { AuditLink } from './AuditPage';
+import { AuditLink, AuditLinkWords } from './AuditPage';
 import { KeepBar } from './KeepBar';
 import layout from '../../layout.module.css';
 import styles from './ResultScreen.module.css';
@@ -120,7 +120,12 @@ export function ResultScreen({
           </Heading>
           <div className={`${layout.mut} ${styles.meta}`}>
             {data.crawledLine} · {data.crawledAt}
-            {kept ? '' : ` · this result and its share link are kept until ${data.keptUntil}`}
+            {kept ? null : (
+              <AuditLinkWords
+                to="share"
+                otherwise={` · this result is kept until ${data.keptUntil}`}
+              >{` · this result and its share link are kept until ${data.keptUntil}`}</AuditLinkWords>
+            )}
           </div>
           {notice ? (
             <p role="note" className={`${layout.mut} ${styles.meta}`}>

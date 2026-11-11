@@ -5,6 +5,7 @@
  */
 import type { AccessTest, Check, FixSection, PageResult } from '@crawlmouse/types/v2';
 import { findCheck } from '../../fixtures';
+import { AI_WAITING } from '../effect-headline';
 import { listOf, percent, templateNoun, testedAt, timeOfDay } from '../../format';
 import {
   EDGE_SENTENCE,
@@ -197,7 +198,10 @@ function fixesNote(fixes: SectionFixesView): string | null {
   }.`;
 }
 
-/** The page of a check no page of which was rendered in a browser: what it holds, and no share. */
+/**
+ * The page of a check with no site-wide share (`without_js` null). What it says of the pages is
+ * counted from the check's page rows; what it says of AI readability is read from the grade.
+ */
 function notMeasured(
   d: ViewDataset,
   check: Check,
@@ -206,27 +210,42 @@ function notMeasured(
   options: SegmentOptions,
 ): NoJsView {
   const fixes = sectionFixes(d, check, 'without_js', options.plan);
+  const measured = d.page_results.filter((p) => p.check_id === check.id && p.without_js);
+  const n = measured.length;
+  const pages = `${capitalise(numberWord(n))} ${plural(n, 'page', 'pages')}`;
+  const record =
+    n === 0
+      ? 'No page in this audit’s record has its text measured without JavaScript, so there is no share to show.'
+      : `${pages} in this audit’s record ${plural(n, 'has its', 'have their')} text measured without JavaScript, but the audit recorded no site-wide share, so there is none to show.`;
+  const aiWaits = check.ai_readability?.withheld_reasons.includes('readable_unmeasured');
   return {
     frame,
     headline: {
       title: 'Text without JavaScript was not measured in this audit.',
       pill: { state: 'neutral', label: 'not measured' },
-      body: 'No page was rendered in a browser, so there is nothing to compare the HTML your server sends with. The other sections do not depend on this measurement.',
+      body: aiWaits ? `${record} ${AI_WAITING.readable_unmeasured}.` : record,
     },
     tiles: [
       {
         label: 'Pages measured',
-        value: `0 of ${count(coverage.pages_discovered)}`,
+        value: `${count(n)} of ${count(coverage.pages_discovered)}`,
         note: null,
       },
     ],
-    measuredSet: 'No page was measured without JavaScript.',
+    measuredSet:
+      n === 0
+        ? 'No page was measured without JavaScript.'
+        : `${pages} measured without JavaScript; no site-wide share was recorded.`,
     recordLine: null,
     proLabel: 'CSV with Pro',
     rows: [],
     initial: null,
     missing: 'The audit kept no response for this page.',
-    coverage: { tested: 0, total: coverage.pages_discovered, groups: 0 },
+    coverage: {
+      tested: n,
+      total: coverage.pages_discovered,
+      groups: new Set(measured.map((p) => p.template_key)).size,
+    },
     fixes,
     fixesNote: fixesNote(fixes),
     keep: frame.keptUntil

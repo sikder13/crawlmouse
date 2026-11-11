@@ -150,14 +150,14 @@ const challengedAsCrawler = (r: { verdict: Verdict; cause: AccessCause | null })
 
 /**
  * What a challenged crawler's response shows, with the control fetch of the same page beside it
- * when the record holds one: served, or challenged too.
+ * when the record holds one that was served. Of a control row that was not served the caption says
+ * nothing: its verdict does not say what the browser identity got back.
  */
 function challengedCaption(control: AccessTest | undefined): string {
-  if (!control) return 'the edge challenged the request made as this crawler';
+  const challenged = 'the edge challenged the request made as this crawler';
+  if (!control || !isAllowed(control.verdict)) return challenged;
   const status = control.raw_status === null ? '' : ` (status ${control.raw_status})`;
-  return isAllowed(control.verdict)
-    ? `the edge challenged the request made as this crawler; the same page asked for with a browser identity, untagged, was served${status}`
-    : `the edge challenged the request made as this crawler, and the same page asked for with a browser identity, untagged${status}`;
+  return `${challenged}; the same page asked for with a browser identity, untagged, was served${status}`;
 }
 
 const SEARCH_ENGINE_CAUSE = 'verified-bot response not testable from outside';

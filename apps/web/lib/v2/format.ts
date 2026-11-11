@@ -223,16 +223,20 @@ export const TEMPLATE_NOUNS: Record<string, { inList: string; adjective: string;
 
 type TemplateNoun = (typeof TEMPLATE_NOUNS)[string];
 
+/** The listed labels that name a section of pages. "Homepage" names one page, the path "/". */
+const SECTION_NAMES = Object.keys(TEMPLATE_NOUNS).filter((name) => name !== 'Homepage');
+
 const PLACEHOLDER = /^\{[^}]+\}$/;
 
 /**
  * The noun for a label that is not in TEMPLATE_NOUNS. A measured check labels a template with its
  * key ("/", "/blog/{slug}", "/about": packages/engine/src/v2/build/assemble.ts `templatesOf`), so a
- * label that is a path is named from the path, by the rule the engine's own fix titles use
- * (packages/engine/src/v2/build/template-noun.ts): "/" is the homepage; a first segment that names
- * a listed section, with a placeholder after it, is that section; a path with no placeholder is
- * one page; any other is the pages under its first segment. In a list and as an adjective the path
- * stands for itself. A label that is not a path is used as it is written.
+ * label that is a path is named from the path, as the engine's fix titles name it
+ * (packages/engine/src/v2/build/template-noun.ts; format.test.ts compares `pages` with the engine's
+ * noun over generated keys): "/" is the homepage; a first segment that names a listed section, with
+ * a placeholder after it, is that section; a path with no placeholder is one page; any other is the
+ * pages under its first segment. In a list and as an adjective the path stands for itself. A label
+ * that is not a path is used as it is written.
  */
 function nounOfKey(label: string): TemplateNoun {
   if (!label.startsWith('/')) {
@@ -244,7 +248,7 @@ function nounOfKey(label: string): TemplateNoun {
   if (!segments.some((s) => PLACEHOLDER.test(s))) {
     return { inList: label, adjective: label, pages: `the ${label} page` };
   }
-  const section = Object.keys(TEMPLATE_NOUNS).find((name) => name.toLowerCase() === first);
+  const section = SECTION_NAMES.find((name) => name.toLowerCase() === first);
   if (section) return TEMPLATE_NOUNS[section]!;
   return {
     inList: label,

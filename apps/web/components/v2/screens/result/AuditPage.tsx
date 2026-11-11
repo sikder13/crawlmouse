@@ -50,6 +50,23 @@ export function AuditLink({ to, ...button }: { to: keyof AuditLinks } & Omit<But
   return href === undefined ? null : <Button {...button} href={href} />;
 }
 
+/**
+ * Words about a control of `AuditLinks`. A preview, and an audit page with a route for the control,
+ * say `children`; an audit page with no route for it says `otherwise`.
+ */
+export function AuditLinkWords({
+  to,
+  otherwise,
+  children,
+}: {
+  to: keyof AuditLinks;
+  otherwise: string;
+  children: string;
+}) {
+  const page = useAuditPage();
+  return page && page.links[to] === undefined ? otherwise : children;
+}
+
 /** Sends one product event when the page it is on mounts. */
 export function AuditEvent({
   event,

@@ -6,7 +6,6 @@
  */
 import type { PGlite } from '@electric-sql/pglite';
 import { buildCheck, type BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
-import type { BatchResult } from '@crawlmouse/types/v2';
 import { isValidElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
@@ -25,14 +24,22 @@ import {
   type TestDeps,
 } from '../../../../lib/v2/pipeline/test-support/public-checks';
 import { fixesAsOf, fixture } from '../../../../lib/v2/fixtures';
+import { AI_WAITING } from '../../../../lib/v2/view/effect-headline';
 import { FREE_FIXES } from '../../../../lib/v2/view/free-fixes';
-import { SEGMENT_KEYS } from '../../../../lib/v2/view/segment/frame';
+import { NO_PACKET } from '../../../../lib/v2/view/no-packet';
+import type { SectionFixesView } from '../../../../lib/v2/view/segment/fixes';
+import { SEGMENT_KEYS, type SegmentKey } from '../../../../lib/v2/view/segment/frame';
 import { datasetOfBuilds } from '../../../../lib/v2/view/test-support/built-dataset';
 import {
   TESTED_UAS,
   inputOf,
   type SiteShape,
 } from '../../../../lib/v2/view/test-support/generated-check';
+import {
+  AuditEvent,
+  AuditPageProvider,
+  type AuditPage,
+} from '../../../../components/v2/screens/result/AuditPage';
 import { LiveCrawl } from '../_crawl/LiveCrawl';
 import { CheckPage, noticeOf, resultOf } from './CheckPage';
 import { FAILURE_COPY } from './failure-copy';
@@ -126,6 +133,15 @@ describe('/audit/[id]: the result of a measured check, read by a visitor', () =>
     expect(primaries(markup)).toHaveLength(1);
   });
 
+  it('the first-fix card does not say steps are open: the fix it names has no packet', () => {
+    const data = resultOf(one);
+    const fix = fixesAsOf(one.dataset, one.dataset.checks[0]!)[0]!;
+    expect(data.first).toMatchObject({ kind: 'fix', title: fix.title });
+    expect(fix.packet).toBeNull();
+    expect(data.first.body).toMatch(/ The evidence is open, free\.$/);
+    expect(html(<CheckPage read={one} />)).not.toMatch(/The steps\b/);
+  });
+
   it('renders no control that has no route in this step', () => {
     const markup = html(<CheckPage read={one} />);
     for (const label of ['Share', 'Re-run, free', 'Email this fix', 'What Pro includes'])
@@ -134,6 +150,17 @@ describe('/audit/[id]: the result of a measured check, read by a visitor', () =>
     const preview = html(resultScreenAlone(one));
     for (const label of ['Share', 'Re-run, free', 'Email this fix', 'What Pro includes'])
       expect(preview).toContain(`>${label}`);
+  });
+
+  it('says a share link is kept only where the page has one', () => {
+    const until = resultOf(one).keptUntil!;
+    const markup = html(<CheckPage read={one} />);
+    expect(markup).toContain(`this result is kept until ${until}`);
+    expect(markup).not.toContain('share link');
+    // The preview, which shows Share, says both are kept.
+    expect(html(resultScreenAlone(one))).toContain(
+      `this result and its share link are kept until ${until}`,
+    );
   });
 
   it('asks to keep the audit with the check it shows, and for no email to read it', () => {
@@ -222,6 +249,8 @@ describe('/audit/[id]: the states around a result', () => {
       kept: false,
     };
     const markup = html(<CheckPage read={read} />);
+    expect(markup).toContain('This audit did not finish');
+    expect(markup).not.toContain('before it could grade');
     expect(markup).toContain(`What happened: ${FAILURE_COPY[reason]}.`);
     expect(markup).toContain('6 Nov 2026');
     // The stored word is not shown: no reason word that is not also plain English appears.
@@ -239,12 +268,15 @@ describe('/audit/[id]: the states around a result', () => {
   it('an expired check says until when it was visible, and when it was crawled if it was', () => {
     const expired = { ...base, state: 'expired' as const, expiredAt: '2026-11-07T10:00:00Z' };
     const crawled = noticeOf({ ...expired, finishedAt: '2026-11-06T10:11:00Z' });
+    expect(crawled.title).toBe('This result has expired');
     expect(crawled.lines[0]).toMatch(/^It was crawled on 6 Nov 2026.* visible until 7 Nov 2026/);
+    // No finish time: the check ended ungraded or never ran, so the page names no crawl and no result.
     const never = noticeOf({ ...expired, finishedAt: null });
+    expect(never.title).toBe('This audit has expired');
     expect(never.lines[0]).toMatch(/^Nobody kept this audit, so it was visible until 7 Nov 2026/);
-    expect(never.lines.join(' ')).not.toContain('crawled on');
+    expect([never.title, ...never.lines].join(' ')).not.toMatch(/crawled on|result/);
     const markup = html(<CheckPage read={{ ...expired, finishedAt: null }} />);
-    expect(markup).toContain('This result has expired');
+    expect(markup).toContain('This audit has expired');
     expect(dead(markup)).toEqual([]);
   });
 });
@@ -262,11 +294,71 @@ describe('the six segment pages on a measured check', () => {
     },
   );
 
-  it('the re-check, which rendered no page, says text without JavaScript was not measured', () => {
-    expect(two.dataset.checks.find((c) => c.id === SECOND)!.without_js).toBeNull();
+  it('the re-check, whose record has no page measured without JavaScript, says so from its rows', () => {
+    const check = two.dataset.checks.find((c) => c.id === SECOND)!;
+    expect(check.without_js).toBeNull();
+    const rows = two.dataset.page_results.filter((p) => p.check_id === SECOND);
+    expect(rows.filter((p) => p.without_js)).toEqual([]);
     const markup = html(<SegmentBody read={two} segment="nojs" />);
     expect(markup).toContain('Text without JavaScript was not measured in this audit.');
+    expect(markup).toContain(
+      'No page in this audit’s record has its text measured without JavaScript, so there is no share to show.',
+    );
+    expect(markup).toContain(`>0 of ${check.coverage!.pages_discovered}<`);
     expect(markup).not.toMatch(/\d+% site-wide/);
+    // What the data does not hold is not said: whether a browser rendered a page, and that no
+    // other section uses the measurement.
+    expect(markup).not.toMatch(/rendered in a browser|do not depend/);
+    // AI readability waits on this measurement on this check, and the page says so from the grade.
+    expect(check.ai_readability!.withheld_reasons).toContain('readable_unmeasured');
+    expect(markup).toContain(`${AI_WAITING.readable_unmeasured}.`);
+    const door = resultOf(two).doors.find((x) => x.title === 'Readable without JavaScript')!;
+    expect(door.pill.label).toBe('not measured');
+    expect(JSON.stringify(door)).not.toMatch(/rendered/);
+  });
+
+  it('pages that were measured, with no site-wide share recorded, are counted and not denied', () => {
+    const rows = two.dataset.page_results.filter((p) => p.check_id === SECOND);
+    const measured = {
+      raw_words: 40,
+      rendered_words: 400,
+      text_share: 0.1,
+      state: 'empty_shell' as const,
+    };
+    const [a, b] = rows;
+    const withRows = (urls: string[], reasons: 'readable_unmeasured'[]): ReadyCheck => ({
+      ...two,
+      dataset: {
+        ...two.dataset,
+        page_results: two.dataset.page_results.map((p) =>
+          p.check_id === SECOND && urls.includes(p.url) ? { ...p, without_js: measured } : p,
+        ),
+        checks: two.dataset.checks.map((c) =>
+          c.id === SECOND
+            ? {
+                ...c,
+                ai_readability: {
+                  ...c.ai_readability!,
+                  withheld_reasons: reasons,
+                },
+              }
+            : c,
+        ),
+      },
+    });
+    const oneRow = html(<SegmentBody read={withRows([a!.url], [])} segment="nojs" />);
+    expect(oneRow).toContain(
+      'One page in this audit’s record has its text measured without JavaScript, but the audit recorded no site-wide share, so there is none to show.',
+    );
+    expect(oneRow).toContain('>1 of ');
+    expect(oneRow).not.toContain('No page');
+    // With that reason gone from the grade, the sentence about AI readability goes too.
+    expect(oneRow).not.toContain(AI_WAITING.readable_unmeasured);
+    const twoRows = html(
+      <SegmentBody read={withRows([a!.url, b!.url], ['readable_unmeasured'])} segment="nojs" />,
+    );
+    expect(twoRows).toContain('Two pages in this audit’s record have their text measured');
+    expect(twoRows).toContain(`${AI_WAITING.readable_unmeasured}.`);
   });
 
   it("the re-check's changes page lists each of its change rows and names the check before it", () => {
@@ -281,6 +373,88 @@ describe('the six segment pages on a measured check', () => {
     expect(one.map!.nodes.length).toBeGreaterThan(0);
     const without = html(segmentScreen(two, 'structure'));
     expect(without).not.toContain('The map below shows');
+  });
+});
+
+describe('an open fix on a segment page whose steps the audit did not write (ruling 0.2)', () => {
+  /** A packet the contract accepts: the bad-site fixture's first. */
+  const PACKET = fixture('bad-site').fixes.find((f) => f.packet !== null)!.packet!;
+  const HANDOFF = 'The packet contains the steps above';
+  const COPY = 'Copy as a prompt for your coding tool';
+  const paid = (): ReadyCheck => ({ ...one, plan: 'pro' });
+  const withPackets = (read: ReadyCheck): ReadyCheck => ({
+    ...read,
+    dataset: {
+      ...read.dataset,
+      fixes: read.dataset.fixes.map((f) => ({ ...f, packet: PACKET })),
+    },
+  });
+  /** The open fixes a segment's view holds. */
+  const openOn = (read: ReadyCheck, key: SegmentKey) =>
+    (segmentScreen(read, key) as ReactElement<{ data: { fixes?: SectionFixesView } }>).props.data
+      .fixes?.open ?? [];
+  /** The segments whose page has a fixes card. Changes has none; Signals lists no fix of its own. */
+  const PAGES = SEGMENT_KEYS.filter((k) => k !== 'changes');
+  /** Those where the measured check, read with every fix open (a paid plan), has an open fix. */
+  const withOpen = (read: ReadyCheck) => PAGES.filter((k) => openOn(read, k).length > 0);
+
+  it('the measured check has an open fix with no packet on more than one segment page', () => {
+    expect(first.fixes.map((f) => f.packet)).toEqual(first.fixes.map(() => null));
+    expect(withOpen(paid()).length).toBeGreaterThan(1);
+    const shown = PAGES.flatMap((k) => openOn(paid(), k));
+    expect(shown.length).toBeGreaterThan(FREE_FIXES);
+    expect(shown.map((f) => f.packet)).toEqual(shown.map(() => null));
+  });
+
+  it.each(PAGES)(
+    '%s: says the one line once for each open fix, under its title and effect, with no packet block, handoff or copy button',
+    (key) => {
+      const open = openOn(paid(), key);
+      const markup = html(<SegmentBody read={paid()} segment={key} />);
+      expect(markup.split(escaped(NO_PACKET))).toHaveLength(open.length + 1);
+      for (const f of open) {
+        expect(markup).toContain(escaped(f.title));
+        expect(markup).toContain(escaped(f.unit));
+        expect(f).toMatchObject({ paragraph: [], packet: null, handoff: null, prompt: null });
+      }
+      expect(markup).not.toContain(HANDOFF);
+      expect(markup).not.toContain(COPY);
+      expect(markup).not.toContain('Mark done and re-check now');
+      expect(markup).not.toMatch(/<pre[^>]*>\s*<\/pre>/);
+      // No copy button to hold the orange: the page's one orange element is its next step.
+      expect(primaries(markup)).toHaveLength(1);
+      expect(dead(markup)).toEqual([]);
+    },
+  );
+
+  it.each(PAGES)('%s: the line is absent when the fix has a packet', (key) => {
+    const read = withPackets(paid());
+    const open = openOn(read, key);
+    expect(withOpen(read)).toEqual(withOpen(paid()));
+    const markup = html(<SegmentBody read={read} segment={key} />);
+    expect(markup).not.toContain(escaped(NO_PACKET));
+    expect(markup.split(HANDOFF)).toHaveLength(open.length + 1);
+    expect(markup.split(COPY)).toHaveLength(open.length + 1);
+    expect(primaries(markup)).toHaveLength(1);
+  });
+
+  it('the line is absent for a locked fix: a visitor sees it on the Free three only', () => {
+    const live = fixesAsOf(one.dataset, one.dataset.checks[0]!);
+    const free = new Set(live.slice(0, FREE_FIXES).map((f) => f.id));
+    let lines = 0;
+    let lockedOnly = 0;
+    for (const key of PAGES) {
+      const open = openOn(one, key);
+      expect(open.every((f) => free.has(f.id))).toBe(true);
+      const markup = html(<SegmentBody read={one} segment={key} />);
+      const said = markup.split(escaped(NO_PACKET)).length - 1;
+      expect(said, key).toBe(open.length);
+      lines += said;
+      if (open.length === 0 && markup.includes('See this fix with Pro')) lockedOnly += 1;
+    }
+    expect(lines).toBe(FREE_FIXES);
+    // A page that lists locked fixes and no open one was met, and it did not say the line.
+    expect(lockedOnly).toBeGreaterThan(0);
   });
 });
 
@@ -306,6 +480,22 @@ describe('/audit/[id]/fix/[fixId]', () => {
     // The page says so, in one line, and shows what the audit does hold of the fix.
     expect(markup.split(NO_PACKET)).toHaveLength(2);
     expect(markup).toContain(escaped(live()[0]!.title));
+  });
+
+  it('a page with no way to mark a fix done leaves out the card that describes it', () => {
+    const SHIPPED = 'When you&#x27;ve shipped it';
+    for (const read of [one, withPackets()]) {
+      const found = fixOf(read, live()[0]!.id)!;
+      expect(found.view).toMatchObject({ kind: 'open', shipped: null });
+      const markup = html(<FixBody read={read} found={found} />);
+      expect(markup).not.toContain(SHIPPED);
+      expect(markup).not.toContain('Mark done and re-check now');
+      expect(markup).not.toContain('replaces this audit');
+    }
+    // The preview, which passes no page options, shows the card for the same fix.
+    const preview = fixView(one.dataset, FIRST, live()[0]!.id);
+    expect(preview).toMatchObject({ kind: 'open', shipped: { heading: "When you've shipped it" } });
+    expect(html(fixScreen(preview))).toContain(SHIPPED);
   });
 
   it('the no-steps line is absent when the fix has a packet, and on a locked fix', () => {
@@ -470,6 +660,54 @@ describe('nothing internal goes on the wire for a kept check (D3)', () => {
     await kept.close();
   });
 
+  type Provider = ReactElement<{ page: AuditPage; children: unknown }>;
+  const pageOf = (node: unknown) => {
+    const el = node as Provider;
+    expect(el.type).toBe(AuditPageProvider);
+    return el.props.page;
+  };
+
+  it('each page tells its screens which page it is, which is what keep_clicked reports as `from`', () => {
+    const fix = fixesAsOf(one.dataset, one.dataset.checks[0]!)[0]!;
+    const from = {
+      result: pageOf(CheckPage({ read: one })),
+      segment: pageOf(SegmentBody({ read: one, segment: 'access' })),
+      fix: pageOf(FixBody({ read: one, found: fixOf(one, fix.id)! })),
+      map: pageOf(MapBody({ read: one, scope: 'hubs' })),
+    };
+    for (const [name, page] of Object.entries(from)) {
+      expect(page, name).toEqual({
+        checkId: FIRST,
+        checkRef: checkRef(FIRST),
+        from: name,
+        links: {},
+      });
+    }
+  });
+
+  it('a fix page sends fix_opened with the fix’s type and whether it is one of the Free three', () => {
+    const live = fixesAsOf(one.dataset, one.dataset.checks[0]!);
+    const sent = (fixId: string) => {
+      const body = FixBody({ read: one, found: fixOf(one, fixId)! }) as Provider;
+      const [event] = body.props.children as ReactElement<{ event: string; props: object }>[];
+      expect(event!.type).toBe(AuditEvent);
+      return event!.props;
+    };
+    const free = live[0]!;
+    const locked = live[FREE_FIXES]!;
+    expect(sent(free.id)).toEqual({
+      event: 'fix_opened',
+      props: { type: free.type, free: true, check_ref: checkRef(FIRST) },
+    });
+    expect(sent(locked.id)).toEqual({
+      event: 'fix_opened',
+      props: { type: locked.type, free: false, check_ref: checkRef(FIRST) },
+    });
+    // The two differ in what they send, so swapping `type` and `free` or dropping one is seen.
+    expect(typeof free.type).toBe('string');
+    expect(JSON.stringify([sent(free.id), sent(locked.id)])).not.toContain(FIRST);
+  });
+
   it('events name the check by a reference that is not its id', () => {
     const page = CheckPage({ read: one }) as ReactElement<{ page: { checkRef: string } }>;
     expect(page.props.page.checkRef).toBe(checkRef(FIRST));
@@ -487,8 +725,8 @@ describe('nothing internal goes on the wire for a kept check (D3)', () => {
   });
 });
 
-import { FixScreen, NO_PACKET } from '../../../../components/v2/screens/fix/FixScreen';
-import type { FixView } from '../../../../lib/v2/view/fix';
+import { FixScreen } from '../../../../components/v2/screens/fix/FixScreen';
+import { fixView, type FixView } from '../../../../lib/v2/view/fix';
 
 const fixScreen = (view: FixView) => <FixScreen data={view} />;
 /** A string as React writes it into markup. */
@@ -501,7 +739,9 @@ const escaped = (s: string) =>
     .replace(/'/g, '&#x27;');
 
 describe('a challenged crawler is said as the rows hold it (D11)', () => {
-  const site = (control: 'allowed' | 'challenged_ua') => {
+  const SERVED = 'the same page asked for with a browser identity';
+  /** One crawler challenged; `control` is what becomes of the control fetch's rows after the build. */
+  const site = (control: 'served' | 'no response' | 'no row') => {
     const shape: SiteShape = {
       home: 'ok',
       pages: [0, 1, 2].map((family) => ({ family, answer: 'ok', features: 'server' })),
@@ -514,55 +754,55 @@ describe('a challenged crawler is said as the rows hold it (D11)', () => {
       access: TESTED_UAS.map((_, i) => (i === 0 ? 'challenged_ua' : 'allowed')),
     };
     const input = inputOf(shape);
-    // The generated control fetch is served; the second case challenges it as well.
-    const batches = (input.batches as BatchResult[]).map((b) =>
-      b.kind !== 'access' || control === 'allowed'
-        ? b
-        : {
-            ...b,
-            access_tests: b.access_tests.map((t) =>
-              t.identity_role === 'control'
-                ? {
-                    ...t,
-                    verdict: 'challenged_ua' as const,
-                    cause: 'automation_challenge' as const,
-                    raw_status: 403,
-                  }
-                : t,
-            ),
-          },
-    );
-    const built = buildCheck({ ...input, batches });
+    const built = buildCheck(input);
+    const dataset = datasetOfBuilds(input.site, [built]);
+    const isControl = (t: { identity_role: string }) => t.identity_role === 'control';
+    expect(dataset.access_tests.filter(isControl).length).toBeGreaterThan(0);
     const read: ReadyCheck = {
       state: 'ready',
       checkId: built.check.id,
       host: input.site.host,
       kept: false,
       plan: 'free',
-      dataset: datasetOfBuilds(input.site, [built]),
+      dataset: {
+        ...dataset,
+        access_tests:
+          control === 'served'
+            ? dataset.access_tests
+            : control === 'no row'
+              ? dataset.access_tests.filter((t) => !isControl(t))
+              : dataset.access_tests.map((t) =>
+                  isControl(t)
+                    ? { ...t, verdict: 'not_measured' as const, cause: null, raw_status: null }
+                    : t,
+                ),
+      },
       map: null,
     };
     return { read, built, markup: html(<SegmentBody read={read} segment="access" />) };
   };
 
   it('with the control fetch served, the page says so and does not say all automation is challenged', () => {
-    const { markup, built } = site('allowed');
+    const { markup, built } = site('served');
     const challenged = built.check.crawlers.find((c) => c.verdict === 'challenged_ua')!;
     expect(challenged).toMatchObject({ ua: TESTED_UAS[0], cause: 'automation_challenge' });
     expect(markup).toContain('edge challenge of this crawler');
-    expect(markup).toContain(
-      'the same page asked for with a browser identity, untagged, was served (status 200)',
-    );
+    expect(markup).toContain(`${SERVED}, untagged, was served (status 200)`);
     expect(markup).not.toContain('on all automation');
     expect(markup).not.toContain('with or without a crawler user agent');
     expect(markup).toContain(challenged.ua);
   });
 
-  it('with the control fetch challenged too, the page says both were', () => {
-    const { markup } = site('challenged_ua');
-    expect(markup).toContain(
-      'and the same page asked for with a browser identity, untagged (status 403)',
-    );
-    expect(markup).not.toContain('was served');
-  });
+  // The worker pairs a challenged crawler with a served control (packages/worker verdict table:
+  // any other control makes the verdict edge_blocks_automation or not_measured). The view does not
+  // rest on that: of a control row that was not served, or of none, it says nothing.
+  it.each(['no response', 'no row'] as const)(
+    'with %s for the control fetch, the page says only that the crawler was challenged',
+    (control) => {
+      const { markup } = site(control);
+      expect(markup).toContain('the edge challenged the request made as this crawler');
+      expect(markup).not.toContain(SERVED);
+      expect(markup).not.toContain('was served');
+    },
+  );
 });

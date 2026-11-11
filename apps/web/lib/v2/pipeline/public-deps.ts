@@ -8,6 +8,7 @@
  * the membership answer.
  */
 import 'server-only';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../supabase/admin';
 import { supabaseServer } from '../../supabase/server';
 import { supabaseEvidenceStore } from './evidence';
@@ -18,6 +19,25 @@ import type { PublicCheckDeps, Viewer } from './public';
 export interface RequestAccess {
   deps: PublicCheckDeps;
   viewer: Viewer;
+}
+
+/**
+ * `isMember` for one request: whether `userId` is a member of the site, asked through that
+ * request's own session client so the `sites` row-level policy answers. A user id other than the
+ * session's own is refused without a read; a database error is thrown, not answered as "no".
+ * The audit pages and the check routes (stream, notify, cancel) build theirs here;
+ * `public-deps.test.ts` runs it as a member, a stranger and a visitor.
+ */
+export function sessionMembership(
+  session: Pick<SupabaseClient, 'from'>,
+  sessionUserId: string | null,
+): PublicCheckDeps['isMember'] {
+  return async (siteId, userId) => {
+    if (userId !== sessionUserId) return false;
+    const { data: rows, error } = await session.from('sites').select('id').eq('id', siteId);
+    if (error) throw new Error(`public check: reading the site as its member: ${error.code}`);
+    return rows.length === 1;
+  };
 }
 
 /** The deps and the viewer of the request being served: one session client answers both. */
@@ -33,13 +53,7 @@ export async function requestAccess(): Promise<RequestAccess> {
       read: supabaseCheckReader(admin),
       evidence: supabaseEvidenceStore(admin),
       now,
-      async isMember(siteId, userId) {
-        // The session's own user is the one the policy answers for; any other is refused here.
-        if (userId !== viewer.userId) return false;
-        const { data: rows, error } = await session.from('sites').select('id').eq('id', siteId);
-        if (error) throw new Error(`public check: reading the site as its member: ${error.code}`);
-        return rows.length === 1;
-      },
+      isMember: sessionMembership(session, viewer.userId),
       async planOf(accountId) {
         const { data: row, error } = await admin
           .from('accounts')

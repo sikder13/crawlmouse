@@ -87,9 +87,11 @@ export async function handleEdge(
 
 /**
  * The v1 addresses a v2 page serves while V2_CHECKS_PUBLIC is on, and the route that serves each.
- * A rewrite, not a branch in the v1 page: a production build links a page's stylesheets for every
- * module the page can reach, through `import()` as well, so a v1 page that could reach a v2 screen
- * would carry its stylesheets with the flag off (CC-22b, notes/cc-22b/evidence-flag-off.md).
+ * A rewrite, not a branch in the v1 page. In a production build of this branch made on 2026-11-10
+ * with `app/page.tsx` loading the v2 home through `import()` behind the flag, `/` linked four
+ * stylesheets with the flag off, three of them the v2 tokens and screens, where main's `/` links
+ * one. So `app/page.tsx` stays main's file and imports no v2 module, which
+ * `components/v2/screens/home/live-home.test.tsx` holds.
  */
 export const V2_REWRITES = [{ from: '/', to: '/v2-home' }] as const;
 

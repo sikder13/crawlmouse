@@ -2,6 +2,7 @@ import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
 import type { FixView } from '../../../../lib/v2/view/fix';
+import { NO_PACKET } from '../../../../lib/v2/view/no-packet';
 import { ResultShell } from '../result/ResultScreen';
 import { KeepBar } from '../result/KeepBar';
 import { PacketActions } from '../segment/PacketActions';
@@ -12,10 +13,6 @@ import { FrameworkSwitch } from './FrameworkSwitch';
 import layout from '../../layout.module.css';
 import segment from '../segment/SegmentScreen.module.css';
 import styles from './FixScreen.module.css';
-
-/** Said in the packet card of a fix the reader may open whose steps the audit did not write. */
-export const NO_PACKET =
-  'The steps for this fix are not written yet. What the audit found, and its estimated effect, are above.';
 
 /** The packet card of an open fix: the stack it is written for, the packet, and what to do with it. */
 function PacketCard({ data }: { data: Extract<FixView, { kind: 'open' }> }) {
