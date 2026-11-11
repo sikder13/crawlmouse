@@ -178,7 +178,7 @@ export function refuseTo(
 export function tooSoonTo(
   from: Request | RequestBody['kind'],
   back: string,
-  code: Extract<NoticeCode, 'capped' | 'adds_capped' | 'domain_capped'>,
+  code: Extract<NoticeCode, 'capped' | 'recently_checked' | 'adds_capped' | 'domain_capped'>,
   nextAllowedAt: string,
   now = Date.now(),
 ): Response {
