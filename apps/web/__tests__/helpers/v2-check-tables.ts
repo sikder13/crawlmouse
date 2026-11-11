@@ -79,7 +79,7 @@ export const LINEAGE = '1e000000-0000-4000-8000-0000000000aa';
 const T1 = '2026-10-20T06:05:00.000Z';
 const T2 = '2026-10-20T06:20:00.000Z';
 
-/** A valid row for every public table migrations 003 and 006b create. Measurement rows need prepareMeasurement(). */
+/** A valid row for every public table migrations 003, 006b, 008 and 027b create. Measurement rows need prepareMeasurement(). */
 export const ROWS = {
   measurement_lineages: (id: string, n: number): Row => ({
     id,
@@ -373,6 +373,42 @@ export const ROWS = {
     occurred_at: T2,
     idempotency_key: `check:${id}`,
   }),
+  // 027b's tables (account settings, deletion, the Slack destination). No client role reads any of
+  // them; a link row is seeded revoked, and the queue rows name a window long past, so no flow
+  // under test treats the world's owner as mid-deletion or mid-change by their presence alone.
+  account_tokens: (id: string, accountId: string, userId: string): Row => ({
+    id,
+    account_id: accountId,
+    user_id: userId,
+    kind: 'delete_confirm',
+    recipient: 'owner@example.com',
+    expires_at: '2099-01-01T00:00:00.000Z',
+    revoked_at: T1,
+  }),
+  account_events: (id: string, accountId: string, userId: string): Row => ({
+    id,
+    account_id: accountId,
+    kind: 'delete_requested',
+    actor_user_id: userId,
+    at: T1,
+  }),
+  pending_erasures: (userId: string, accountId: string): Row => ({
+    user_id: userId,
+    accounts: [accountId],
+    confirmed_at: T1,
+    purge_after: T2,
+  }),
+  deletion_cancellations: (subscriptionId: string, userId: string, accountId: string): Row => ({
+    subscription_id: subscriptionId,
+    user_id: userId,
+    account_id: accountId,
+    we_set_cancel: true,
+  }),
+  account_slack_destinations: (accountId: string, secretId: string): Row => ({
+    account_id: accountId,
+    vault_secret_id: secretId,
+    last4: 'abcd',
+  }),
   crawl_batches: (checkId: string, batch: number): Row => ({
     check_id: checkId,
     batch,
@@ -454,11 +490,19 @@ export type NewTable = keyof typeof ROWS;
 export const TABLES_006B: readonly NewTable[] = ['check_ledger_links', 'usage_events'];
 /** The public tables 008 creates. */
 export const TABLES_008: readonly NewTable[] = ['crawl_batches', 'persist_chunks'];
+/** The public tables 027b creates. */
+export const TABLES_027B: readonly NewTable[] = [
+  'account_tokens',
+  'account_events',
+  'pending_erasures',
+  'deletion_cancellations',
+  'account_slack_destinations',
+];
 /** The tables 003 creates. */
 export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
-  .filter((t) => !TABLES_006B.includes(t) && !TABLES_008.includes(t))
+  .filter((t) => !TABLES_006B.includes(t) && !TABLES_008.includes(t) && !TABLES_027B.includes(t))
   .sort();
-/** Every public table 003, 006b and 008 create. */
+/** Every public table 003, 006b, 008 and 027b create. */
 export const ALL_NEW_TABLES = (Object.keys(ROWS) as NewTable[]).sort();
 
 /** Where a seeded row belongs: one of the account's two sites, or the account as a whole. */
@@ -497,6 +541,11 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.crawl_batches')::text as t`,
   );
   const with008 = batches[0]!.t !== null;
+  // Nor, migrated before 027b, the account tables.
+  const { rows: tokens } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.account_tokens')::text as t`,
+  );
+  const with027b = tokens[0]!.t !== null;
   // A database migrated before 006d (the revert tests of 003 to 006c) has no identity columns.
   const { rows: identity } = await db.query<{ n: number }>(
     `select count(*)::int as n from pg_attribute
@@ -630,6 +679,41 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
   );
   const key = randomUUID();
   await put('api_keys', ROWS.api_keys(key, accountId, SHA(++k)), { id: key }, 'account');
+  if (with027b) {
+    const token = randomUUID();
+    await put(
+      'account_tokens',
+      ROWS.account_tokens(token, accountId, ownerId),
+      { id: token },
+      'account',
+    );
+    const event = randomUUID();
+    await put(
+      'account_events',
+      ROWS.account_events(event, accountId, ownerId),
+      { id: event },
+      'account',
+    );
+    await put(
+      'pending_erasures',
+      ROWS.pending_erasures(ownerId, accountId),
+      { user_id: ownerId },
+      'account',
+    );
+    const sub = `sub_${tag}${n}`;
+    await put(
+      'deletion_cancellations',
+      ROWS.deletion_cancellations(sub, ownerId, accountId),
+      { subscription_id: sub },
+      'account',
+    );
+    await put(
+      'account_slack_destinations',
+      ROWS.account_slack_destinations(accountId, randomUUID()),
+      { account_id: accountId },
+      'account',
+    );
+  }
   await put(
     'seat_sites',
     ROWS.seat_sites(scopedSeatId, site1, accountId),
