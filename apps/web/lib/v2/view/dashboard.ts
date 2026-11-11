@@ -545,7 +545,7 @@ function changeRow(v: AccountView, site: Site, c: Change): ChangeRowView {
               'copyFix',
               'Copy fix',
               { id: fix.id },
-              { context: `for: ${c.summary}`, copy: { title: fix.title } },
+              { context: `for: ${c.summary}`, copy: true },
             ),
             action(
               'emailDeveloper',

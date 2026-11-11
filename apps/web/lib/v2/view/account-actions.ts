@@ -154,10 +154,10 @@ export interface ActionView {
   /** A field the person fills before posting (the add-site address); a live page shows it. */
   input?: ActionInput;
   /**
-   * A read whose answer is a fix's packet: a live page copies it as a prompt, headed by `title`,
-   * instead of opening the JSON.
+   * A read whose answer is a fix's packet and its prompt: a live page copies the prompt instead of
+   * opening the JSON.
    */
-  copy?: { title: string };
+  copy?: true;
 }
 
 export interface ActionInput {
@@ -185,7 +185,7 @@ export function action(
     fields?: Record<string, string>;
     context?: string | null;
     input?: ActionInput;
-    copy?: { title: string };
+    copy?: true;
   } = {},
 ): ActionView {
   const spec: RouteSpec = ACCOUNT_ACTIONS[key];

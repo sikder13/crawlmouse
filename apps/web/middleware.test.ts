@@ -3,6 +3,7 @@ import { NextRequest, NextResponse, type NextFetchEvent } from 'next/server';
 import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
 import { config, handleEdge, middleware } from './middleware';
 import { CONSENT_REQUIRED_COOKIE } from '@/lib/consent';
+import { REWRITE_HEADER } from '@/lib/v2/rewrites';
 import { ROUTE_POLICIES, isStateChanging, type RoutePolicy } from '@/lib/security/route-policy';
 import type { Refusal } from '@/lib/security/refusal-event';
 
@@ -83,7 +84,7 @@ describe('handleEdge', () => {
   });
 });
 
-describe('the v2 dashboard rewrite (CC-26b D1)', () => {
+describe('the v2 rewrites (owner ruling Q17)', () => {
   const at = (path: string) => new NextRequest(new Request(`https://crawlmouse.com${path}`));
   const rewriteOf = (res: NextResponse) => res.headers.get('x-middleware-rewrite');
 
@@ -125,14 +126,55 @@ describe('the v2 dashboard rewrite (CC-26b D1)', () => {
   it.each([
     ['the flag unset', '', '/dashboard'],
     ['the flag not 1', 'true', '/dashboard'],
-    ['another page', '1', '/dashboard/x'],
+    ['another page', '1', '/dashboards'],
     ['the home page', '1', '/'],
   ])('no rewrite with %s', async (_name, flag, path) => {
     vi.stubEnv('V2_CHECKS_PUBLIC', flag);
     const res = await handleEdge(at(path), rotated);
     expect(rewriteOf(res)).toBeNull();
+    expect(res.status).toBe(200);
     expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
   });
+
+  it('marks its own rewrite, and removes a marker a client sent with any other request', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const spoofed = (path: string) =>
+      new NextRequest(
+        new Request(`https://crawlmouse.com${path}`, {
+          headers: { [REWRITE_HEADER]: '1' },
+        }),
+      );
+    const rewritten = await handleEdge(spoofed('/dashboard'), rotated);
+    expect(rewritten.headers.get(`x-middleware-request-${REWRITE_HEADER}`)).toBe('1');
+    for (const path of ['/pricing', '/sites/x']) {
+      const passed = await handleEdge(spoofed(path), rotated);
+      expect(passed.headers.get(`x-middleware-request-${REWRITE_HEADER}`)).toBeNull();
+      expect(passed.headers.get('x-middleware-override-headers') ?? '').not.toContain(
+        REWRITE_HEADER,
+      );
+    }
+  });
+
+  it.each([
+    ['1', '/dashboard/v2.rsc'],
+    ['1', '/dashboard/%76%32'],
+    ['1', '/dashboard%2Fv2'],
+    ['1', '/dashboard/v2'],
+    ['1', '/dashboard/v2/'],
+    ['1', '/dashboard/v2/anything'],
+    ['', '/dashboard/v2'],
+    ['', '/dashboard/v2?upgraded=1'],
+  ])(
+    'with V2_CHECKS_PUBLIC=%j, a direct request for %s is a 404 and is not refreshed',
+    async (flag, path) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+      const refresh = vi.fn(rotated);
+      const res = await handleEdge(at(path), refresh);
+      expect(res.status).toBe(404);
+      expect(rewriteOf(res)).toBeNull();
+      expect(refresh).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('middleware (exported entrypoint)', () => {

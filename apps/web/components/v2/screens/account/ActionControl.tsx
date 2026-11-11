@@ -44,7 +44,6 @@ export function ActionControl({
     return (
       <CopyPacket
         href={action.href}
-        title={action.copy.title}
         label={action.label}
         context={action.context}
         variant={v}
