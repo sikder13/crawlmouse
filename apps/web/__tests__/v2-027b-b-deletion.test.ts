@@ -319,6 +319,7 @@ describe('read_deletion_link', () => {
       );
     expect(await read('delete_confirm', raw)).toEqual({
       ok: true,
+      userId: o.userId,
       purgeAfter: null,
       accounts: [{ id: o.accountId, host: o.host.toLowerCase() }],
     });

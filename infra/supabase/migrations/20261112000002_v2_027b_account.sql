@@ -754,7 +754,7 @@ $$;
 -- `hostname_mismatch`, `email_change_pending`, `others_seated`, `v1_subscription`. Otherwise issues the
 -- confirmation link (24 hours) and the restore link (the 24 hours plus the 7-day window; restore_account
 -- also requires the window), revoking any earlier pair, records `delete_requested`, and returns
--- {ok: true, confirmTokenId, restoreTokenId}. The route has checked that p_user is the account's owner
+-- {ok: true, confirmTokenId, restoreTokenId, tier}. The route has checked that p_user is the account's owner
 -- through the caller's own session; this checks it again under the account's row lock.
 create or replace function public.request_account_deletion(
   p_account uuid, p_user uuid, p_hostname text,
@@ -792,14 +792,15 @@ begin
                                           p_restore_raw, now() + interval '8 days');
   insert into public.account_events (account_id, kind, actor_user_id)
   values (p_account, 'delete_requested', p_user);
-  return jsonb_build_object('ok', true, 'confirmTokenId', v_confirm, 'restoreTokenId', v_restore);
+  return jsonb_build_object('ok', true, 'confirmTokenId', v_confirm, 'restoreTokenId', v_restore,
+                            'tier', (select a.tier from public.accounts a where a.id = p_account));
 end;
 $$;
 
 -- What a deletion link's page shows, without using the link: {ok: false, code} with `invalid_link`
 -- (no such token of that kind, or used, revoked or expired), `not_confirmed` (a restore link before its
 -- deletion was confirmed) or `window_closed` (a restore link after its window); otherwise {ok: true,
--- accounts: [{id, host}], purgeAfter}: for a confirmation link, the accounts the confirm would mark,
+-- userId, accounts: [{id, host}], purgeAfter}: for a confirmation link, the accounts the confirm would mark,
 -- and for a restore link, those its confirm marked (purgeAfter null for a confirmation link). `host` is
 -- deletion_hostname's, so the sign-in address for an account with no site.
 create or replace function public.read_deletion_link(p_kind text, p_hash text, p_now timestamptz)
@@ -831,6 +832,7 @@ begin
   end if;
   return jsonb_build_object(
     'ok', true,
+    'userId', v.user_id,
     'purgeAfter', v_purge,
     'accounts', coalesce((select jsonb_agg(jsonb_build_object(
                                    'id', a.id, 'host', public.deletion_hostname(a.id, v.user_id))
@@ -843,7 +845,8 @@ $$;
 -- refuses as request_account_deletion does (the token stays usable: the person can resolve it and
 -- press again), marks every account the person alone holds, queues the person in pending_erasures
 -- with the window's end, ends every session, revokes any email change in flight, and records
--- `delete_confirmed` on each account. Returns {ok: true, userId, accounts, purgeAfter} or
+-- `delete_confirmed` on each account. Returns {ok: true, userId, accountId, tier, accounts,
+-- purgeAfter} (accountId and tier: the account the link was issued for) or
 -- {ok: false, code} (`invalid_link`, `others_seated`, `v1_subscription`). Signing-in is stopped by the
 -- caller's Auth ban; the subscription is ended by deletionCancelFn.
 create or replace function public.confirm_account_deletion(p_hash text, p_now timestamptz)
@@ -880,7 +883,8 @@ begin
      and t.used_at is null and t.revoked_at is null;
   insert into public.account_events (account_id, kind, actor_user_id)
   select a, 'delete_confirmed', v.user_id from unnest(v_accounts) a;
-  return jsonb_build_object('ok', true, 'userId', v.user_id,
+  return jsonb_build_object('ok', true, 'userId', v.user_id, 'accountId', v.account_id,
+                            'tier', (select a.tier from public.accounts a where a.id = v.account_id),
                             'accounts', to_jsonb(v_accounts), 'purgeAfter', v_purge);
 end;
 $$;
@@ -888,7 +892,7 @@ $$;
 -- The restore link's POST, in one transaction: consumes the token (by kind) only while the person's
 -- pending_erasures row, locked as erase_person_apply locks it, is inside its window; clears the
 -- accounts' marks and the queue row, records `delete_restored`, and returns {ok: true, userId,
--- accounts, resume}: `resume` names the subscriptions this deletion set to end, which the caller asks
+-- accountId, tier, accounts, resume}: `resume` names the subscriptions this deletion set to end, which the caller asks
 -- Stripe to continue. Otherwise {ok: false, code} as read_deletion_link, and nothing changes.
 create or replace function public.restore_account(p_hash text, p_now timestamptz)
 returns jsonb
@@ -919,8 +923,9 @@ begin
     from gone g where g.we_set_cancel;
   insert into public.account_events (account_id, kind, actor_user_id)
   select a.id, 'delete_restored', q.user_id from public.accounts a where a.id = any(q.accounts);
-  return jsonb_build_object('ok', true, 'userId', q.user_id, 'accounts', to_jsonb(q.accounts),
-                            'resume', to_jsonb(v_resume));
+  return jsonb_build_object('ok', true, 'userId', q.user_id, 'accountId', v.account_id,
+                            'tier', (select a.tier from public.accounts a where a.id = v.account_id),
+                            'accounts', to_jsonb(q.accounts), 'resume', to_jsonb(v_resume));
 end;
 $$;
 
