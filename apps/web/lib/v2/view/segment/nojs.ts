@@ -14,10 +14,10 @@ import {
   meetsEdge,
 } from '../../sentences';
 import { capitalise, count, numberWord, plural } from '../../words';
-import type { CoverageView, DoorView } from '../result';
+import { sampledCoverage, type CoverageView, type DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { SEGMENTS, segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
-import type { ViewDataset } from '../dataset';
+import type { ViewDataset } from '../../fixtures';
 
 export interface NoJsEvidence {
   title: string;
@@ -197,13 +197,56 @@ function fixesNote(fixes: SectionFixesView): string | null {
   }.`;
 }
 
+/** The page of a check no page of which was rendered in a browser: what it holds, and no share. */
+function notMeasured(
+  d: ViewDataset,
+  check: Check,
+  coverage: NonNullable<Check['coverage']>,
+  frame: SegmentFrame,
+  options: SegmentOptions,
+): NoJsView {
+  const fixes = sectionFixes(d, check, 'without_js', options.plan);
+  return {
+    frame,
+    headline: {
+      title: 'Text without JavaScript was not measured in this audit.',
+      pill: { state: 'neutral', label: 'not measured' },
+      body: 'No page was rendered in a browser, so there is nothing to compare the HTML your server sends with. The other sections do not depend on this measurement.',
+    },
+    tiles: [
+      {
+        label: 'Pages measured',
+        value: `0 of ${count(coverage.pages_discovered)}`,
+        note: null,
+      },
+    ],
+    measuredSet: 'No page was measured without JavaScript.',
+    recordLine: null,
+    proLabel: 'CSV with Pro',
+    rows: [],
+    initial: null,
+    missing: 'The audit kept no response for this page.',
+    coverage: { tested: 0, total: coverage.pages_discovered, groups: 0 },
+    fixes,
+    fixesNote: fixesNote(fixes),
+    keep: frame.keptUntil
+      ? {
+          title:
+            'Keep this audit: an email when a template stops shipping its text, and every fix for 14 days.',
+          sub: `One email creates a free account that re-checks monthly, with 14 days of Pro to start, including CSV and PDF export. Otherwise this page expires ${frame.keptUntil}.`,
+        }
+      : null,
+  };
+}
+
 export function nojsView(d: ViewDataset, checkId: string, options: SegmentOptions = {}): NoJsView {
   const check = findCheck(d, checkId);
   const coverage = check.coverage;
-  if (!coverage || !check.without_js) {
-    throw new Error(`Check ${check.id} was not measured without JavaScript`);
+  if (!coverage) {
+    throw new Error(`Check ${check.id} has no coverage; the segments show graded checks`);
   }
   const frame = segmentFrame(d, checkId, 'nojs', options);
+  if (!check.without_js) return notMeasured(d, check, coverage, frame, options);
   const templates = coverage.templates;
   const order = (k: string) => templates.findIndex((t) => t.template_key === k);
   const measured = d.page_results
@@ -242,7 +285,7 @@ export function nojsView(d: ViewDataset, checkId: string, options: SegmentOption
   const withheld = d.withheld.find(
     (w) => w.check_id === check.id && w.collection === 'access_tests',
   );
-  const fixes = sectionFixes(d, check, 'without_js');
+  const fixes = sectionFixes(d, check, 'without_js', options.plan);
   return {
     frame,
     headline: {
@@ -296,11 +339,7 @@ export function nojsView(d: ViewDataset, checkId: string, options: SegmentOption
     missing: withheld
       ? `This record holds ${count(withheld.included)} of the ${count(withheld.total)} responses the audit kept, and this page’s are not among them.`
       : 'The audit kept no response for this page.',
-    coverage: {
-      tested: coverage.pages_sampled,
-      total: coverage.pages_discovered,
-      groups: templates.length,
-    },
+    coverage: sampledCoverage(d, check),
     fixes,
     fixesNote: fixesNote(fixes),
     keep: frame.keptUntil

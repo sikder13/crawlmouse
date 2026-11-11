@@ -170,7 +170,7 @@ export function ChangesScreen({ data }: { data: ChangesView }) {
                   key="o"
                   variant="quiet"
                   size="sm"
-                  href={i === 0 ? frame.tabs[0]!.href : '#'}
+                  href={h.href ?? (i === 0 ? frame.tabs[0]!.href : '#')}
                 >
                   Open
                 </Button>,

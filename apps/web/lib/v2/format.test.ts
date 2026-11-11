@@ -64,7 +64,7 @@ describe('formatting', () => {
     expect(listOf(['a', 'b', 'c'])).toBe('a, b and c');
   });
 
-  it('has a noun for every template in every fixture, and refuses one it does not know', () => {
+  it('has a listed noun for every template in every contract fixture', () => {
     for (const name of FIXTURE_NAMES) {
       const labels = fixture(name).checks.flatMap((c) =>
         (c.coverage?.templates ?? []).map((t) => t.label),
@@ -74,7 +74,38 @@ describe('formatting', () => {
       if (NOUNLESS[name] === null) expect(missing, name).toEqual([]);
       else expect(missing.length, `${name}: ${NOUNLESS[name]}`).toBeGreaterThan(0);
     }
-    expect(() => templateNoun('toString')).toThrow(/No noun/);
+  });
+
+  it('names a template whose label is its key, as a measured check labels it, from the key', () => {
+    expect(templateNoun('/')).toEqual(TEMPLATE_NOUNS.Homepage);
+    expect(templateNoun('/blog/{slug}')).toEqual(TEMPLATE_NOUNS.Blog);
+    expect(templateNoun('/products/{slug}/reviews')).toEqual(TEMPLATE_NOUNS.Products);
+    expect(templateNoun('/about')).toEqual({
+      inList: '/about',
+      adjective: '/about',
+      pages: 'the /about page',
+    });
+    // A section's own index page is one page, not the section.
+    expect(templateNoun('/blog').pages).toBe('the /blog page');
+    expect(templateNoun('/docs/guide/{slug}')).toEqual({
+      inList: '/docs/guide/{slug}',
+      adjective: '/docs/guide/{slug}',
+      pages: 'pages under /docs/',
+    });
+    expect(templateNoun('/{slug}').pages).toBe('pages like /{slug}');
+  });
+
+  it('uses a label that is neither listed nor a path as it is written, an inherited name included', () => {
+    expect(templateNoun('Recipes')).toEqual({
+      inList: 'Recipes',
+      adjective: 'Recipes',
+      pages: 'Recipes pages',
+    });
+    expect(templateNoun('toString')).toEqual({
+      inList: 'toString',
+      adjective: 'toString',
+      pages: 'toString pages',
+    });
   });
 });
 

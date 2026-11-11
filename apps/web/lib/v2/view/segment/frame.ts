@@ -8,7 +8,8 @@ import { SCREEN_SIGNALS, screenSignals } from '../screen-signals';
 import { findCheck, siteOf } from '../../fixtures';
 import { dayTimeUtc, percent } from '../../format';
 import { keptUntilOf } from '../result';
-import type { ViewDataset } from '../dataset';
+import type { ViewDataset } from '../../fixtures';
+import type { FixPlan } from '../free-fixes';
 
 export const SEGMENT_KEYS = [
   'access',
@@ -71,6 +72,8 @@ export interface SegmentHrefs {
   segment: (key: SegmentKey) => string;
   /** The link-map explorer: zoomed to the hubs, and every page. Omitted, "#". */
   map?: { hubs: string; all: string };
+  /** The result page of another check of the site, by its id. Omitted, the history links nowhere. */
+  check?: (checkId: string) => string;
 }
 
 export const NO_HREFS: SegmentHrefs = { overview: '#', segment: () => '#' };
@@ -79,6 +82,13 @@ export interface SegmentOptions {
   /** Show a since-kept check as it was at its finish, as the Result preview does. */
   asFirstSeen?: boolean;
   hrefs?: SegmentHrefs;
+  /** The reader's plan: Free opens the free fixes (free-fixes.ts), Pro opens every live fix. */
+  plan?: FixPlan;
+  /**
+   * Whether the page's header offers "Re-run, free", which the Changes page of a first audit
+   * mentions. The previews show it; a page that has no such control passes false.
+   */
+  rerun?: boolean;
 }
 
 export interface SegmentLink {

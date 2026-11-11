@@ -8,6 +8,8 @@ import { cadenceOf, trialDays } from '../signup/door-copy';
 import { browserZone, rememberPending, SEND_COPY, type LinkRequest } from '../signup/send-link';
 import { useLinkSender, VERIFYING_COPY } from '../signup/useLinkSender';
 import { LiveRegion } from '../signup/LiveRegion';
+import { track } from '../../../../lib/analytics';
+import { useAuditPage } from './AuditPage';
 import styles from './ResultScreen.module.css';
 
 export type KeepState = 'waiting' | 'open' | 'dismissed';
@@ -43,11 +45,14 @@ export function KeepBar({
   initial?: KeepState;
   inline?: InlineKeep;
   /**
-   * The anonymous check this page shows. With it, "Keep it" asks for a sign-in link that claims the
-   * check (CC-25); without it (the previews) the form stays inert.
+   * The anonymous check this page shows. With it, or inside an audit page (AuditPage.tsx), "Keep
+   * it" asks for a sign-in link that claims the check (CC-25); with neither (the previews) the form
+   * stays inert.
    */
   checkId?: string;
 }) {
+  const page = useAuditPage();
+  const claimCheckId = checkId ?? page?.checkId;
   const [state, setState] = useState<KeepState>(inline ? 'open' : (initial ?? 'waiting'));
   const onSent = useCallback(
     (body: LinkRequest) => {
@@ -62,9 +67,10 @@ export function KeepBar({
   // POST, and stopped here, so an email never lands in a URL; the JSON goes to the magic-link route.
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!checkId) return;
+    if (!claimCheckId) return;
     const email = (e.currentTarget.elements.namedItem('email') as HTMLInputElement).value.trim();
-    sender.request({ email, claimCheckId: checkId, tz: browserZone() });
+    if (page) track('keep_clicked', { from: page.from, check_ref: page.checkRef });
+    sender.request({ email, claimCheckId, tz: browserZone() });
   }
   const Wrapper = inline ? 'section' : 'aside';
 

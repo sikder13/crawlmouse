@@ -3,12 +3,17 @@ import { Footer } from '@/components/layout/Footer';
 import { AuditView } from './AuditView';
 import { AuditUrlHeader } from '@/components/audit/AuditUrlHeader';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { notFound } from 'next/navigation';
-import type { Metadata } from 'next';
+import { notFound, redirect } from 'next/navigation';
+import type { Metadata, Route } from 'next';
+import { checksPublicEnabled } from '@/lib/auth/flags';
 
 // Capability URL: the unguessable audit UUID is the only thing guarding this page, so it must
 // never be indexed. The indexable surface for a result is the minted /r/<slug> report.
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
   const { id } = await params;
   return { robots: { index: false, follow: true }, alternates: { canonical: `/audit/${id}` } };
 }
@@ -21,6 +26,14 @@ export default async function AuditPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { id } = await params;
+  // CC-22b: under V2_CHECKS_PUBLIC an id that names a v2 check the viewer may read is sent to that
+  // check's own page. This page imports no v2 screen, here or through `import()`: a production
+  // build links a screen's stylesheets on each page whose module can reach it, flag on or off.
+  // Any other id is a v1 audit, served below as before.
+  if (checksPublicEnabled()) {
+    const { readAudit } = await import('./_lib/access');
+    if (await readAudit(id)) redirect(`/audit/${id}/overview` as Route);
+  }
   // Entry-point hint from /ai-readiness-checker. Anything other than the one known value is treated
   // as absent, so a hand-edited URL can only ever produce today's ordering.
   const sp = await searchParams;
@@ -31,6 +44,9 @@ export default async function AuditPage({
   // would otherwise 404 anonymous audits (user_id = null).
   const sb = supabaseAdmin();
   const { data: audit } = await sb.from('audits').select('id, url').eq('id', id).maybeSingle();
+  // Under the flag, an id that is neither is answered by the v2 overview's 404, which says the
+  // audit does not exist or has expired.
+  if (!audit && checksPublicEnabled()) redirect(`/audit/${id}/overview` as Route);
   if (!audit) notFound();
 
   return (

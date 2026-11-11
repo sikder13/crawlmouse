@@ -13,7 +13,7 @@ import { mapDrawing, type MapDrawing } from '../map';
 import type { CoverageView, DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
-import type { ViewDataset } from '../dataset';
+import type { ViewDataset } from '../../fixtures';
 
 export interface OrphanRow {
   page: string;
@@ -256,7 +256,7 @@ export function structureView(
     },
     map: mapView(check, drawing, options.hrefs?.map?.all ?? '#'),
     orphans: { ...orphanTable(check, rows), explorerHref: options.hrefs?.map?.hubs ?? '#' },
-    fixes: sectionFixes(d, check, 'structure'),
+    fixes: sectionFixes(d, check, 'structure', options.plan),
     keep: frame.keptUntil
       ? {
           title:

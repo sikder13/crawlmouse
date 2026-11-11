@@ -95,10 +95,12 @@ Every interface the segment view modules export, read through the TypeScript com
 
 #### `SegmentOptions`
 
-| Field         | Type                        | Note                                                                         |
-| ------------- | --------------------------- | ---------------------------------------------------------------------------- |
-| `asFirstSeen` | `boolean \| undefined`      | Show a since-kept check as it was at its finish, as the Result preview does. |
-| `hrefs`       | `SegmentHrefs \| undefined` |                                                                              |
+| Field         | Type                        | Note                                                                                                                                                                   |
+| ------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `asFirstSeen` | `boolean \| undefined`      | Show a since-kept check as it was at its finish, as the Result preview does.                                                                                           |
+| `hrefs`       | `SegmentHrefs \| undefined` |                                                                                                                                                                        |
+| `plan`        | `FixPlan \| undefined`      | The reader's plan: Free opens the free fixes (free-fixes.ts), Pro opens every live fix.                                                                                |
+| `rerun`       | `boolean \| undefined`      | Whether the page's header offers "Re-run, free", which the Changes page of a first audit mentions. The previews show it; a page that has no such control passes false. |
 
 #### `SegmentLink`
 
