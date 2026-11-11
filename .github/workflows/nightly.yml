@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# A newer dispatch on a branch cancels the older run; on main each run has its own group, so no
+# nightly run on main is cancelled. The visual set runs nightly from ci.yml's schedule, not here.
+concurrency:
+  group: nightly-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: true
+
 env:
   NEXT_TELEMETRY_DISABLED: '1'
   TURBO_TELEMETRY_DISABLED: '1'
