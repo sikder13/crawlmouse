@@ -514,6 +514,17 @@ describe('the undo', () => {
     expect((await userRow(p.userId)).email).toBe('raced@example.net');
   });
 
+  it('refuses a live, unused confirmation link posted to either undo step, and leaves it usable (CMA05)', async () => {
+    const p = await person();
+    const r = await request(p, 'wrong-kind@example.net');
+    // Before any apply: the confirmation link is issued, unused, unrevoked and unexpired, so only
+    // the kind can refuse it.
+    expect(await sqlstate(prepare(r.hash))).toBe('CMA05');
+    expect(await sqlstate(undo(r.hash, NOW(), false))).toBe('CMA05');
+    expect((await token(r.id)).revoked).toBe(false);
+    expect((await apply(r.hash)).applied.new_email).toBe('wrong-kind@example.net');
+  });
+
   it('accepts its link once, before it expires, and not a confirmation link (CMA05)', async () => {
     const p = await person();
     const r = await request(p, 'twice@example.net');
