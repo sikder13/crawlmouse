@@ -71,5 +71,28 @@ export interface DoorStore {
   clearExpiry(checkId: string): Promise<void>;
 }
 
-/** A Sentry signal: a name, and ids only (never an email or a ledger value). */
+/** What a first-audit request did, each with the case that produces it. */
+export const FIRST_AUDIT_OUTCOMES = {
+  requested: 'a first audit of the site was requested',
+  has_check:
+    'the site has a check that is queued, running, deferred, finished or partial, or its first audit was requested before',
+  paused: 'CRAWL_PAUSED is set',
+  capacity: 'the daily ceiling `global:audits:day` is reached, or could not be read',
+  domain_limit: 'the host’s hourly bucket is used up',
+} as const;
+
+export type FirstAuditOutcome = keyof typeof FIRST_AUDIT_OUTCOMES;
+
+/**
+ * Requests a kept site's first audit (lib/v2/pipeline/first-audit.ts), given to the first-login hook
+ * and the claim by door-deps.ts under V2_CHECKS_PUBLIC with V2_PIPELINE. Injected, not imported:
+ * `requestCheck` loads the engine, which must not reach a client bundle (admit-site.ts).
+ */
+export type FirstAudit = (input: {
+  siteId: string;
+  host: string;
+  userId: string;
+}) => Promise<FirstAuditOutcome>;
+
+/** A Sentry signal: a name, with ids and counts (never an email or a ledger value). */
 export type Report = (signal: string, extra: Record<string, string>) => void;

@@ -6,12 +6,12 @@
  * fix as `withoutPacket` copies it, and fix.test.ts makes the field throw when read.
  */
 import { RECHECK_MINUTES } from '../recheck';
-import type { Check, CrawlerResult, Fix, FixtureDataset } from '@crawlmouse/types/v2';
+import type { Check, CrawlerResult, Fix } from '@crawlmouse/types/v2';
 import { instant } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { dayTimeUtc, listOf, percent } from '../format';
 import { count, numberWord, plural } from '../words';
-import { freeFixes } from './free-fixes';
+import { freeFixes, type FixPlan } from './free-fixes';
 import { keptUntilOf, points } from './result';
 import {
   effectOf,
@@ -30,11 +30,12 @@ import {
   type SegmentKey,
   type SegmentLink,
 } from './segment/frame';
+import type { ViewDataset } from '../fixtures';
 
 /** A packet's framework; the contract names the schema, not the type. */
 export type PacketFramework = FixPacket['framework'];
 
-export type FixPlan = 'free' | 'pro';
+export type { FixPlan };
 
 export interface FixHrefs extends SegmentHrefs {
   /** A fix's own page, by id. Omitted, a fix links nowhere yet ("#"). */
@@ -47,6 +48,11 @@ export interface FixOptions {
   /** Show a since-kept check as it was at its finish, as the Result preview does. */
   asFirstSeen?: boolean;
   hrefs?: FixHrefs;
+  /**
+   * Whether the page can mark a fix done and re-check, which the "When you've shipped it" card
+   * describes. The previews show the card; a page with no such action passes false and has none.
+   */
+  rerun?: boolean;
 }
 
 export interface FixFrame {
@@ -126,7 +132,8 @@ export interface OpenFixPage extends FixBase {
   switcher: { heading: string; detected: string | null; options: FrameworkOption[] } | null;
   /**
    * What happens once the fix ships, with the ask that opens the keep bar; null on a kept audit,
-   * whose account action the preview does not have.
+   * whose account action the preview does not have, and on a page that cannot re-check
+   * (`FixOptions.rerun`).
    */
   shipped: { heading: string; body: string; action: SegmentLink } | null;
 }
@@ -375,10 +382,10 @@ function withoutPacket(f: Fix): Omit<Fix, 'packet'> {
 }
 
 export function fixView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   fixId: string,
-  { plan = 'free', asFirstSeen = false, hrefs = NO_HREFS }: FixOptions = {},
+  { plan = 'free', asFirstSeen = false, hrefs = NO_HREFS, rerun = true }: FixOptions = {},
 ): FixView {
   const check = findCheck(d, checkId);
   const fix = d.fixes.find((x) => x.id === fixId);
@@ -472,7 +479,7 @@ export function fixView(
   const p = fix.packet;
   const pages = bare.affected_pages > 1 ? `the ${count(bare.affected_pages)} pages` : 'the page';
   const shipped =
-    keptUntil === null
+    keptUntil === null || !rerun
       ? null
       : {
           heading: "When you've shipped it",

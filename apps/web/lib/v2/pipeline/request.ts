@@ -7,7 +7,7 @@ import { canonicalizeUrl, GRADE_VERSION } from '@crawlmouse/engine/v2/pipeline';
 import type { Check } from '@crawlmouse/types/v2';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { bucketedKey, checkIdOfKey, freshKey } from './ids';
-import { ANONYMOUS_EXPIRY_DAYS, DEFAULT_PAGE_CAP } from './limits';
+import { ANONYMOUS_EXPIRY_HOURS, DEFAULT_PAGE_CAP } from './limits';
 import type { PipelineStore } from './store';
 
 export interface RequestDeps {
@@ -25,7 +25,7 @@ export interface CheckRequest {
   requestedByUserId?: string;
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 
 /** Where a site's crawl starts: its host's root, in the engine's canonical spelling. */
 export const homepageOf = (host: string): string => canonicalizeUrl(`https://${host}/`);
@@ -64,7 +64,7 @@ export async function requestCheck(
     queued_at: at,
     // Q9: a queued check has a heartbeat from the start, so the reaper can tell it is waiting.
     heartbeat_at: at,
-    expires_at: kept ? null : new Date(now + ANONYMOUS_EXPIRY_DAYS * DAY_MS).toISOString(),
+    expires_at: kept ? null : new Date(now + ANONYMOUS_EXPIRY_HOURS * HOUR_MS).toISOString(),
   });
   await deps.send({
     id: bucketed ?? freshKey(keyed, checkId),

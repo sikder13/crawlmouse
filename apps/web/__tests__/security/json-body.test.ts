@@ -85,3 +85,62 @@ describe('POST /api/audits/start with a body not declared JSON', () => {
     expect(calls).toContain('admin.insert');
   });
 });
+
+// POST /api/checks (CC-22b D2) reads JSON and is a public route with the lenient origin rule. Its row
+// in the registry is what the middleware reads, so these requests go through the middleware and, when
+// it passes them, on to the real route with V2_CHECKS_PUBLIC unset, where the route is a 404.
+async function sendCheck(headers: Record<string, string>): Promise<Response> {
+  const request = () =>
+    new Request('https://crawlmouse.com/api/checks', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        url: 'https://example.com',
+        requestId: '0b9d3c52-7c1e-4f0a-9a44-1f2e3d4c5b6a',
+      }),
+    });
+  const edge = await handleEdge(
+    new NextRequest(request()),
+    (r) => Promise.resolve(NextResponse.next({ request: r })),
+    () => {},
+  );
+  if (edge.headers.get('x-middleware-next') !== '1') return edge;
+  const { POST } = await import('../../app/api/checks/route');
+  return POST(request());
+}
+
+describe('POST /api/checks through the middleware, V2_CHECKS_PUBLIC unset', () => {
+  beforeEach(() => {
+    delete process.env.V2_CHECKS_PUBLIC;
+  });
+
+  it('a body not declared JSON gets 415 from the middleware', async () => {
+    const res = await sendCheck({ 'content-type': 'text/plain;charset=UTF-8' });
+    expect(res.status).toBe(415);
+    expect(await res.json()).toEqual({
+      error: 'Send the request body as JSON',
+      code: 'unsupported_media_type',
+    });
+  });
+
+  it('a cross-site post gets 403 from the middleware', async () => {
+    const res = await sendCheck({
+      'content-type': 'application/json',
+      origin: 'https://evil.example',
+      'sec-fetch-site': 'cross-site',
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'Cross-site request refused', code: 'cross_site' });
+  });
+
+  it('a JSON post from our own page reaches the route, which is a 404 with nothing touched', async () => {
+    const res = await sendCheck({
+      'content-type': 'application/json',
+      origin: 'https://crawlmouse.com',
+    });
+    expect(res.status).toBe(404);
+    // The route's own body: the middleware's 404 for an unregistered path also carries `error`.
+    expect(await res.json()).toEqual({ code: 'not_found' });
+    expect(calls).toEqual([]);
+  });
+});

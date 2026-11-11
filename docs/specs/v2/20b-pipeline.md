@@ -103,7 +103,7 @@ The worst case these allow fits the finish timeout, and the worst-case step coun
 | `deploy`                                     | `check:{site}:deploy:{bucket}`, a 600-second bucket           |
 | `first_audit`, and any site no account keeps | by a fresh check id                                           |
 
-A bucketed key’s check id is the engine’s `stableId` of the key, so two requests in one bucket insert one row and send events of one id, which Inngest keeps once (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/request.test.ts`). A site no account keeps gets `expires_at` 30 days out. No caps are enforced here (CC-26b).
+A bucketed key’s check id is the engine’s `stableId` of the key, so two requests in one bucket insert one row and send events of one id, which Inngest keeps once (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/request.test.ts`). A site no account keeps gets `expires_at` 24 hours out. No caps are enforced here (CC-26b).
 
 ## Migrations
 

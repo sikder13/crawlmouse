@@ -143,6 +143,9 @@ const DATABASE_ONLY: Record<string, string[]> = {
     'technical_seo_status',
     'ai_readability_status',
     ...CHECK_PIPELINE_COLUMNS,
+    // 022b: the notify address and the accounts a Keep copied for.
+    'notify_email',
+    'copied_for',
   ],
   page_results: [
     'url_hash',

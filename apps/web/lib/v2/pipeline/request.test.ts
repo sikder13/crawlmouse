@@ -94,13 +94,13 @@ describe('requestCheck (D13)', () => {
     expect(bucketedKey({ ...k, trigger: 'first_audit' })).toBeNull();
   });
 
-  it('gives an audit nobody keeps a fresh check, keyed by its id, that expires in 30 days', async () => {
+  it('gives an audit nobody keeps a fresh check, keyed by its id, that expires in 24 hours', async () => {
     const h = harness({ ...SITE, account_id: null, next_check_at: null });
     const a = await requestCheck(h.deps, { siteId: SITE.id, trigger: 'manual' });
     const b = await requestCheck(h.deps, { siteId: SITE.id, trigger: 'manual' });
     expect(a.checkId).not.toBe(b.checkId);
     expect(h.sent.map((e) => e.id)).toEqual([`check:anon:${a.checkId}`, `check:anon:${b.checkId}`]);
-    expect(h.rows.get(a.checkId)!.expires_at).toBe('2026-12-08T12:00:00.000Z');
+    expect(h.rows.get(a.checkId)!.expires_at).toBe('2026-11-09T12:00:00.000Z');
   });
 
   it('writes the queued row and the event the run reads', async () => {

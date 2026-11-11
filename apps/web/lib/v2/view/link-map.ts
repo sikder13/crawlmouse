@@ -3,9 +3,11 @@
  * the record says about it. Two scopes:
  *
  * - `hubs`: the hubs and their neighbours, found by the engine's `hubsAndNeighbours` among the
- *   pages and links the check's record holds, laid out by the engine's layout. A check whose record
- *   holds no page has no hubs to find, so it is drawn whole instead.
- * - `all`: every page crawled, from the crawl's recording (the drawing the Structure page shows).
+ *   pages and links the check's record holds, laid out by the engine's layout; or the drawing the
+ *   pipeline stored of them when the check was built (`drawing`), which is that same layout. A
+ *   check whose record holds no page has no hubs to find, so it is drawn whole instead.
+ * - `all`: every page crawled, from the crawl's recording (the drawing the Structure page shows);
+ *   a check with no recording is laid out from its record (`everyPage`).
  *
  * `generated` replaces the drawing with one that is no audit's (the 2,000-node preview); no page in
  * it has a record. Above EXPLORER_SVG_MAX nodes the screen draws on a canvas.
@@ -17,11 +19,12 @@ import { hubsAndNeighbours, layoutMap, nodeRadius, type LayoutNode } from '../ma
 import { count, plural } from '../words';
 import { type FixHrefs } from './fix';
 import type { MapDrawing } from './map';
-import { isFreeFix } from './free-fixes';
+import { openFixes, type FixPlan } from './free-fixes';
 import { keptUntilOf } from './result';
 import { sectionFixes } from './segment/fixes';
 import { NO_HREFS, SEGMENT_KEYS, SEGMENTS, type SegmentLink } from './segment/frame';
 import { drawingOf } from './segment/structure';
+import type { ViewDataset } from '../fixtures';
 
 /** The most nodes drawn as SVG; a larger map is drawn on a canvas (CC-24 brief, scope 2). */
 export const EXPLORER_SVG_MAX = 500;
@@ -36,6 +39,10 @@ export interface LinkMapOptions {
   hrefs?: FixHrefs;
   /** A drawing that is no audit's, shown in place of the check's. */
   generated?: MapDrawing;
+  /** The hubs drawing stored with the check; given, the hubs scope draws it as stored. */
+  drawing?: MapDrawing;
+  /** The reader's plan: Free opens the free fixes (free-fixes.ts), Pro opens every live fix. */
+  plan?: FixPlan;
 }
 
 export interface MapNodeView {
@@ -153,7 +160,7 @@ const TEXT_STATE: Record<NonNullable<PageResult['without_js']>['state'], PillVie
 };
 
 function detailsOf(
-  d: FixtureDataset,
+  d: ViewDataset,
   check: Check,
   page: PageResult,
   fixLink: (p: PageResult) => SegmentLink | null,
@@ -270,13 +277,79 @@ function detailsOf(
   };
 }
 
+const byUrl = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * The pages of a check's record as layout nodes, by the hubs map's rules (the engine's hubs.ts)
+ * without its selection: a breadth-first walk of the links from the homepage (the page at depth 0),
+ * links taken in URL order, gives each page it reaches its depth and, as parent, the nearest page
+ * on the way back to the homepage. A page the walk does not reach is drawn only as an orphan or a
+ * JavaScript-only page, which the layout places in its band.
+ */
+export function everyPage(
+  pages: readonly PageResult[],
+  links: readonly ViewDataset['link_edges'][number][],
+): LayoutNode[] {
+  const page = new Map(pages.map((p) => [p.url, p]));
+  const outgoing = new Map<string, (typeof links)[number][]>();
+  for (const l of [...links].sort(
+    (a, b) => byUrl(a.from_url, b.from_url) || byUrl(a.to_url, b.to_url) || +a.js_only - +b.js_only,
+  )) {
+    outgoing.set(l.from_url, [...(outgoing.get(l.from_url) ?? []), l]);
+  }
+  const home = pages
+    .filter((p) => p.depth === 0)
+    .sort((a, b) => b.links_in - a.links_in || byUrl(a.url, b.url))[0];
+  const reachedBy = new Map<string, (typeof links)[number] | null>(home ? [[home.url, null]] : []);
+  const depth = new Map<string, number>(home ? [[home.url, 0]] : []);
+  for (let queue = home ? [home.url] : [], k = 0; k < queue.length; k++) {
+    const from = queue[k]!;
+    for (const l of outgoing.get(from) ?? []) {
+      if (reachedBy.has(l.to_url)) continue;
+      reachedBy.set(l.to_url, l);
+      depth.set(l.to_url, depth.get(from)! + 1);
+      queue.push(l.to_url);
+    }
+  }
+  const pageAbove = (url: string): string | null => {
+    for (let l = reachedBy.get(url); l; l = reachedBy.get(l.from_url)) {
+      if (page.has(l.from_url)) return l.from_url;
+    }
+    return null;
+  };
+  return [...page.values()]
+    .sort((a, b) => byUrl(a.url, b.url))
+    .flatMap((p): LayoutNode[] => {
+      const kind = p.js_only ? 'js_only' : p.is_orphan ? 'orphan' : 'page';
+      const reached = depth.has(p.url);
+      if (!reached && kind === 'page') return [];
+      const by = reachedBy.get(p.url);
+      return [
+        {
+          id: p.url,
+          parent: reached ? pageAbove(p.url) : null,
+          depth: depth.get(p.url) ?? null,
+          kind,
+          via: by ? (by.js_only ? 'javascript' : 'link') : null,
+        },
+      ];
+    });
+}
+
 const ORDER = (a: MapNodeView, b: MapNodeView) =>
   (a.depth ?? Infinity) - (b.depth ?? Infinity) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 
 export function linkMapView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
-  { scope, asFirstSeen = false, hrefs = NO_HREFS, generated }: LinkMapOptions,
+  {
+    scope,
+    asFirstSeen = false,
+    hrefs = NO_HREFS,
+    generated,
+    drawing: stored,
+    plan,
+  }: LinkMapOptions,
 ): LinkMapView {
   const check = findCheck(d, checkId);
   const s = check.structure;
@@ -291,17 +364,28 @@ export function linkMapView(
   // Which drawing: the hubs among the record, the crawl's whole map, or a generated one.
   let drawing: MapDrawing;
   let drawnScope: 'hubs' | 'all' | 'generated';
+  // Whether `all` was laid out here from the record, which leaves out a page no link path reaches.
+  let fromRecord = false;
   if (generated) {
     drawing = generated;
     drawnScope = 'generated';
   } else if (scope === 'hubs' && records.length) {
-    const nodes = hubsAndNeighbours(records, links);
-    drawing = { nodes, positions: layoutMap(nodes) };
+    if (stored) {
+      drawing = stored;
+    } else {
+      const nodes = hubsAndNeighbours(records, links);
+      drawing = { nodes, positions: layoutMap(nodes) };
+    }
     drawnScope = 'hubs';
   } else {
-    const whole = drawingOf(checkId);
-    if (!whole) throw new Error(`Check ${checkId} has no drawing of its crawl`);
-    drawing = whole;
+    const recorded = drawingOf(checkId);
+    if (recorded) {
+      drawing = recorded;
+    } else {
+      const nodes = everyPage(records, links);
+      drawing = { nodes, positions: layoutMap(nodes) };
+      fromRecord = true;
+    }
     drawnScope = 'all';
   }
 
@@ -337,10 +421,12 @@ export function linkMapView(
   }
   const order = [...nodes].sort(ORDER).map((n) => n.path);
   // Open first on a page whose fix the reader can open now, so the fix link is worth following.
+  const opened = new Set(openFixes(d, check, plan).map((f) => f.id));
   const freeFix = (path: string) => {
     const r = drawing.nodes.find((n) => pathOf(n.id) === path);
-    const f = r ? fixOf(record(r.id)!) : undefined;
-    return f !== undefined && isFreeFix(d, check, f);
+    const page = r ? record(r.id) : undefined;
+    const f = page ? fixOf(page) : undefined;
+    return f !== undefined && opened.has(f.id);
   };
   // First a page whose crawler requests the record holds, so the panel shows that evidence too.
   const initial =
@@ -348,7 +434,9 @@ export function linkMapView(
     order.find((p) => details[p]?.fix && freeFix(p)) ??
     order.find((p) => details[p]?.fix) ??
     order.find((p) => details[p]) ??
-    order[0]!;
+    order[0] ??
+    // A drawing with no node selects nothing; the page shows a notice in place of the explorer.
+    '';
 
   const isGenerated = drawnScope === 'generated';
   const linkCount = isGenerated ? nodes.filter((n) => n.parent).length : s.internal_links;
@@ -382,12 +470,14 @@ export function linkMapView(
     drawnScope === 'hubs'
       ? `Zoomed to the hubs and their neighbours, ${count(nodes.length)} of ${count(crawled)}. The audit’s record holds ${count(held?.included ?? records.length)} of its ${count(held?.total ?? crawled)} pages and ${count(heldLinks?.included ?? links.length)} of its ${count(heldLinks?.total ?? s.internal_links)} links, so the hubs are found among those. ${select}${orphansDrawn}`
       : drawnScope === 'all'
-        ? `Every page crawled, ${count(nodes.length)} of ${count(crawled)}, each drawn from the page whose link first reached it. ${select}${orphansDrawn}`
+        ? fromRecord && nodes.length < crawled
+          ? `${count(nodes.length)} of the ${count(crawled)} pages crawled, each drawn from the page whose link first reached it. A page no link path from the homepage reaches is drawn only when it is an orphan or reachable only through JavaScript. ${select}${orphansDrawn}`
+          : `Every page crawled, ${count(nodes.length)} of ${count(crawled)}, each drawn from the page whose link first reached it. ${select}${orphansDrawn}`
         : `A generated graph of ${count(nodes.length)} pages for the performance test, drawn ${nodes.length > EXPLORER_SVG_MAX ? 'on a canvas' : 'as SVG'}. It is not an audit, so no page has a record. ${select}`;
 
   const keptUntil = keptUntilOf(d, check, asFirstSeen);
   const kept = keptUntil === null ? null : dayTimeUtc(keptUntil);
-  const structureFixes = sectionFixes(d, check, 'structure');
+  const structureFixes = sectionFixes(d, check, 'structure', plan);
   const open = structureFixes.open.length;
   const anyFix = structureFixes.open.length + structureFixes.proCount > 0;
   return {

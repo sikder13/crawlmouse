@@ -10,6 +10,7 @@ import type { BatchKind } from '../../worker-client/types';
 /** The pipeline's events live with the Inngest functions that send and receive them. */
 export type {
   CheckCancelRequested,
+  CheckNotifyRequested,
   CheckFailed,
   CheckFinished,
   CheckRequested,

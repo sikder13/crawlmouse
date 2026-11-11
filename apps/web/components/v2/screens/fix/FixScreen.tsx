@@ -2,6 +2,7 @@ import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
 import type { FixView } from '../../../../lib/v2/view/fix';
+import { NO_PACKET } from '../../../../lib/v2/view/no-packet';
 import { ResultShell } from '../result/ResultScreen';
 import { KeepBar } from '../result/KeepBar';
 import { PacketActions } from '../segment/PacketActions';
@@ -22,11 +23,7 @@ function PacketCard({ data }: { data: Extract<FixView, { kind: 'open' }> }) {
         <Heading level={2} size="s">
           The packet
         </Heading>
-        <div className={styles.hdSub}>
-          {p
-            ? p.stack
-            : 'No packet was written for this fix. The audit names it, and its effect, above.'}
-        </div>
+        <div className={styles.hdSub}>{p ? p.stack : NO_PACKET}</div>
       </div>
       {p ? (
         <>

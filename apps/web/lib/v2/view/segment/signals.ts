@@ -4,7 +4,7 @@
  * What each signal is and who reads it is product copy (SIGNAL_COPY); what the check found is the
  * fixture's.
  */
-import type { Check, FixtureDataset, RecommendationClass } from '@crawlmouse/types/v2';
+import type { Check, RecommendationClass } from '@crawlmouse/types/v2';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from '../screen-signals';
 import { findCheck } from '../../fixtures';
 import { listOf, percent, testedAt } from '../../format';
@@ -13,6 +13,7 @@ import { capitalise, numberWord, plural } from '../../words';
 import type { DoorView } from '../result';
 import { RECOMMENDATION_LABELS, type RecommendationView } from './fixes';
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
+import type { ViewDataset } from '../../fixtures';
 
 /**
  * The recommendation class of each signal. PROPOSED: the contract's SignalResult has no
@@ -256,7 +257,7 @@ function competitorOf(check: Check, present: number): SignalsView['competitor'] 
 }
 
 export function signalsView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   options: SegmentOptions = {},
 ): SignalsView {

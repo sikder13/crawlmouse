@@ -3,7 +3,7 @@
  * section, the pages in the record that fail each, and the first words a crawler reads of one of
  * them. Sentences about the checks are built from their counts.
  */
-import type { Check, ContentCheck, FixtureDataset } from '@crawlmouse/types/v2';
+import type { Check, ContentCheck } from '@crawlmouse/types/v2';
 import { ContentCheckSchema } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf } from '../../fixtures';
 import { listOf, templateNoun, testedAt } from '../../format';
@@ -13,6 +13,7 @@ import { isFreeFix } from '../free-fixes';
 import type { CoverageView, DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
+import type { ViewDataset } from '../../fixtures';
 
 export interface ContentCell {
   id: string;
@@ -171,7 +172,7 @@ function body(check: Check, rows: readonly Row[]): string {
 
 /** The note above the fixes when none here is free: the free ones, Pro, and what waits on them. */
 function fixesNote(
-  d: FixtureDataset,
+  d: ViewDataset,
   check: Check,
   fixes: SectionFixesView,
   unkept: boolean,
@@ -212,7 +213,7 @@ function fixesNote(
 }
 
 export function contentView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   options: SegmentOptions = {},
 ): ContentView {
@@ -221,7 +222,7 @@ export function contentView(
   if (!coverage)
     throw new Error(`Check ${check.id} has no coverage; the segments show graded checks`);
   const frame = segmentFrame(d, checkId, 'content', options);
-  const fixes = sectionFixes(d, check, 'content');
+  const fixes = sectionFixes(d, check, 'content', options.plan);
   const templates = coverage.templates;
   const here = fixes.open.length + fixes.proCount;
   const keepFor = (what: string) =>

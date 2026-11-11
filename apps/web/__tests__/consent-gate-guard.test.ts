@@ -78,6 +78,7 @@ describe('CookieConsent banner is wired correctly', () => {
     expect(src).toContain('posthog.opt_in_capturing()');
     expect(src).toContain('posthog.opt_out_capturing()');
     expect(src).toContain('localStorage.setItem(CONSENT_DECISION_STORAGE_KEY');
+    expect(src).toContain('document.cookie = consentDecisionCookie(decision)');
     expect(src).toMatch(/granted\s*\?\s*'granted'\s*:\s*'denied'/);
   });
 

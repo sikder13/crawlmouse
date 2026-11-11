@@ -30,8 +30,8 @@ export const SITEMAP_URL_CAP = 5000;
 export const DEFAULT_PAGE_CAP = 500;
 /** The reaper fails a queued or running check whose heartbeat is older than this (D13). */
 export const REAP_AFTER_S = 30 * 60;
-/** An audit nobody keeps stays readable this long after it was requested (ARCH-2 §4.3). */
-export const ANONYMOUS_EXPIRY_DAYS = 30;
+/** An audit nobody keeps stays readable this long after it was requested (CC-22b D8). */
+export const ANONYMOUS_EXPIRY_HOURS = 24;
 /** Manual and fix re-check requests in one 2-minute bucket are one check (ARCH-2 §4.1). */
 export const MANUAL_BUCKET_S = 120;
 /** Deploy hooks in one 10-minute bucket are one check (ARCH-2 §4.1, J9). */

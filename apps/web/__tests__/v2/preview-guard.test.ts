@@ -11,6 +11,12 @@ const GROUP = join(WEB_ROOT, 'app', '(v2-preview)');
  */
 const ACCOUNT_GROUP = join(WEB_ROOT, 'app', '(account)');
 const PREVIEW = join(GROUP, 'v2-preview');
+/**
+ * The public check flow's live pages (CC-22b), each a 404 while V2_CHECKS_PUBLIC is off: a v2
+ * check's pages, which sit under v1's audit route with no layout of their own, and the page `/` is
+ * rewritten to. `__tests__/v1-inventory.test.ts` holds the list of flag-gated page files.
+ */
+const V2_LIVE = [join(WEB_ROOT, 'app', 'audit', '[id]'), join(WEB_ROOT, 'app', 'v2-home')];
 
 function walk(dir: string, out: string[] = []): string[] {
   if (!existsSync(dir)) return out;
@@ -173,8 +179,11 @@ describe('v2 stays out of live pages', () => {
   const allowed = (file: string) =>
     file.startsWith(GROUP + '/') ||
     file.startsWith(ACCOUNT_GROUP + '/') ||
+    V2_LIVE.some((dir) => file.startsWith(dir + '/')) ||
     file.startsWith(join(WEB_ROOT, 'components', 'v2') + '/') ||
-    file.startsWith(join(WEB_ROOT, '__tests__', 'v2') + '/');
+    file.startsWith(join(WEB_ROOT, '__tests__', 'v2') + '/') ||
+    // A test beside the code it tests; the next case holds that no other module imports one.
+    /\.test\.tsx?$/.test(file);
 
   const sources = walk(WEB_ROOT).filter(
     (f) => /\.(tsx?|jsx?|mjs|css)$/.test(f) && !f.includes('/tests/e2e/'),
@@ -193,7 +202,7 @@ describe('v2 stays out of live pages', () => {
     expect(isV2(resolveSpec(from, 'components/v2'))).toBe(false);
   });
 
-  it('no module outside the preview and account groups imports the v2 components or tokens', () => {
+  it('no module outside the preview group, the account group and the public check pages imports the v2 components or tokens', () => {
     const offenders: string[] = [];
     for (const file of sources) {
       if (allowed(file)) continue;
@@ -202,6 +211,24 @@ describe('v2 stays out of live pages', () => {
         const spec = m[1] ?? '';
         const abs = resolveSpec(file, spec);
         if (abs && isV2(abs)) offenders.push(`${relative(WEB_ROOT, file)} -> ${spec}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('no module that is not a test imports a test file, which the rule above lets import v2', () => {
+    // An import can name a test file with no extension, with its own, or with `.js` (which
+    // next.config.mjs resolves to the `.ts` or `.tsx` file).
+    const isTest = (file: string) => /\.test(\.[cm]?[jt]sx?)?$/.test(file);
+    for (const spec of ['./x.test', './x.test.ts', './x.test.tsx', '@/lib/x.test', './x.test.js'])
+      expect(isTest(spec), spec).toBe(true);
+    for (const spec of ['./x', './testing', './x.tests', './x.test.css', '@/lib/test'])
+      expect(isTest(spec), spec).toBe(false);
+    const offenders: string[] = [];
+    for (const file of sources.filter((f) => !isTest(f))) {
+      for (const m of readFileSync(file, 'utf8').matchAll(SPEC)) {
+        const spec = m[1] ?? '';
+        if (isTest(spec)) offenders.push(`${relative(WEB_ROOT, file)} -> ${spec}`);
       }
     }
     expect(offenders).toEqual([]);

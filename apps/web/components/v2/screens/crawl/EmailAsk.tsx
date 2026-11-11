@@ -14,12 +14,32 @@ import styles from './CrawlScreen.module.css';
  * then the browser would post the form back to this preview page, whose route reads no request
  * body. Focus follows the change: to the confirmation once sent, back to the field after "Wrong
  * address?".
+ *
+ * On a real check's screen `send` posts the address (app/audit/[id]/_crawl/LiveCrawl.tsx), the
+ * confirmation waits for its answer, and a refusal is said under the field.
  */
 export const RESULT_EMAIL_DOES = 'That email opens the result for 30 days, and nothing else.';
 
 const FIELD_ID = 'w-email';
 
-export function EmailAsk() {
+/** What became of an address that was sent: stored, or why it was not. */
+export type EmailOutcome = 'stored' | 'ended' | 'limited' | 'failed';
+export type SendEmail = (email: string) => Promise<EmailOutcome>;
+
+const REFUSED: Record<Exclude<EmailOutcome, 'stored'>, string> = {
+  ended: 'This audit has already ended. Reload the page to see how.',
+  limited: 'Too many addresses were sent from here today. Try again tomorrow.',
+  failed: 'That did not go through. Try again.',
+};
+
+export interface EmailAskProps {
+  /** Sends the address; without it the address stays on the page. */
+  send?: SendEmail;
+  /** What the address is used for. */
+  does?: string;
+}
+
+export function EmailAsk({ send: post, does = RESULT_EMAIL_DOES }: EmailAskProps = {}) {
   const errorId = useId();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +52,7 @@ export function EmailAsk() {
     focusNext.current = null;
   }, [sentTo]);
 
-  function send(e: FormEvent<HTMLFormElement>) {
+  async function send(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const input = e.currentTarget.elements.namedItem('email') as HTMLInputElement;
     const value = input.value.trim();
@@ -42,6 +62,13 @@ export function EmailAsk() {
       return;
     }
     setError(null);
+    if (post) {
+      const outcome = await post(value).catch((): EmailOutcome => 'failed');
+      if (outcome !== 'stored') {
+        setError(REFUSED[outcome]);
+        return;
+      }
+    }
     focusNext.current = 'sent';
     setSentTo(value);
   }
@@ -53,13 +80,13 @@ export function EmailAsk() {
           <div className={styles.askTitle}>
             Don&apos;t want to wait? We&apos;ll email you the result when it&apos;s done.
           </div>
-          <div className={styles.askSub}>{RESULT_EMAIL_DOES}</div>
+          <div className={styles.askSub}>{does}</div>
           <form
             className={`${layout.row} ${styles.askForm}`}
             aria-label="Email me the result"
             method="post"
             noValidate
-            onSubmit={send}
+            onSubmit={(e) => void send(e)}
           >
             {/* The field with its error under it; the alert region is there, empty, from the start. */}
             <div className={styles.askField}>
@@ -98,7 +125,7 @@ export function EmailAsk() {
             </span>
           </div>
           <div className={styles.askSub}>
-            {RESULT_EMAIL_DOES} You can close this tab.{' '}
+            {does} You can close this tab.{' '}
             <Button
               variant="quiet"
               size="sm"

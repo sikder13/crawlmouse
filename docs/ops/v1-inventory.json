@@ -56,8 +56,8 @@
       "replacedBy": "v2 result and segment pages under /audit/[id] (CC-22), same ids",
       "redirect": "same",
       "checks": {
-        "input": "pass — id is an .eq filter on the admin client (app/audit/[id]/page.tsx:33); non-uuid makes Postgres reject the cast, data is null → notFound(); measured 404 for /audit/garbage; ?view accepts only 'ai' (:27-28)",
-        "output": "pass — capability read selects id, url only (app/audit/[id]/page.tsx:33); the rest arrives through the SSE projection chokepoint, which emits no user_id or session id (lib/audit-stream-projection.ts:249-275)",
+        "input": "pass — id is an .eq filter on the admin client (app/audit/[id]/page.tsx:46); non-uuid makes Postgres reject the cast, data is null → notFound(); measured 404 for /audit/garbage; ?view accepts only 'ai' (:40-41)",
+        "output": "pass — capability read selects id, url only (app/audit/[id]/page.tsx:46); the rest arrives through the SSE projection chokepoint, which emits no user_id or session id (lib/audit-stream-projection.ts:249-275)",
         "cache": "pass — dynamic; measured Cache-Control: private, no-cache, no-store",
         "redirect": "n/a — no redirect param",
         "errors": "pass — notFound() only",
@@ -625,6 +625,13 @@
       "ruling": "keep",
       "reason": "site 404 page",
       "evidence": "apps/web/app/not-found.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/audit/[id]/overview/not-found.tsx",
+      "ruling": "keep",
+      "reason": "404 of a v2 check's overview (CC-22b): the site 404 page while V2_CHECKS_PUBLIC is off, and with it on the wording for an audit that does not exist or has expired",
+      "evidence": "apps/web/app/audit/[id]/overview/not-found.tsx:17"
     },
     {
       "kind": "metadata",
