@@ -330,6 +330,38 @@ describe('no email change while the person’s deletion is under way (fix round 
     expect(await sqlstate(request(p, 'after-abandoned@example.org', later))).toBe('none');
   });
 
+  it('accepts it after the deletion was confirmed and restored, inside the confirm link’s 24 hours', async () => {
+    const p = await person();
+    const asked = await db.query<{ r: { ok: boolean; confirmTokenId: string } }>(
+      `select public.request_account_deletion($1, $2, public.deletion_hostname($1, $2)) as r`,
+      [p.accountId, p.userId],
+    );
+    expect(asked.rows[0]!.r.ok).toBe(true);
+    const links = await db.query<{ kind: string; token: string }>(
+      `select kind, token from public.issue_account_link($1)`,
+      [asked.rows[0]!.r.confirmTokenId],
+    );
+    const raw = (kind: string) => links.rows.find((r) => r.kind === kind)!.token;
+    const confirmed = await db.query<{ r: { ok: boolean } }>(
+      `select public.confirm_account_deletion($1, now()) as r`,
+      [hashToken(raw('delete_confirm'))],
+    );
+    expect(confirmed.rows[0]!.r.ok).toBe(true);
+    const restored = await db.query<{ r: { ok: boolean } }>(
+      `select public.restore_account($1, now()) as r`,
+      [hashToken(raw('delete_restore'))],
+    );
+    expect(restored.rows[0]!.r.ok).toBe(true);
+    // The confirm link is used, not expired: its 24 hours have not run out.
+    const { rows } = await db.query<{ used: boolean; live: boolean }>(
+      `select used_at is not null as used, expires_at > now() as live from public.account_tokens
+        where user_id = $1 and kind = 'delete_confirm'`,
+      [p.userId],
+    );
+    expect(rows).toEqual([{ used: true, live: true }]);
+    expect(await sqlstate(request(p, 'after-restore@example.org'))).toBe('none');
+  });
+
   it('allows it once the deletion link is used, revoked or expired', async () => {
     const p = await person();
     await db.query(
