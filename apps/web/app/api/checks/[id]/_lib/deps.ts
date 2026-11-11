@@ -1,11 +1,11 @@
 import 'server-only';
 import { after } from 'next/server';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { inngest } from '../../../../../../../inngest/client';
 import { getClientIp } from '@/lib/client-ip';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseEvidenceStore } from '@/lib/v2/pipeline/evidence';
 import { supabaseCheckReader } from '@/lib/v2/pipeline/load';
+import type { PublicCheckDeps } from '@/lib/v2/pipeline/public';
 import { supabasePipelineStore } from '@/lib/v2/pipeline/store';
 import { supabaseStreamStore } from '@/lib/v2/pipeline/stream-store';
 import { capturePublicEvent } from '../../_lib/events';
@@ -16,17 +16,18 @@ import type { StreamDeps } from '../stream/serve';
 
 /**
  * Production's dependencies for the stream, notify and cancel routes. Rows are read and written
- * through the service role; `isMember` asks with the caller's own client, so the answer is the
- * `sites` row-level policy's for that caller.
+ * through the service role. `isMember` is handed in: the routes pass the one the audit pages use
+ * (`requestAccess`, lib/v2/pipeline/public-deps.ts), which asks with the caller's own session, so
+ * the answer is the `sites` row-level policy's for that caller. wiring.test.ts runs the three
+ * routes into this factory with both Supabase clients recording.
  */
-export function checkRouteDeps(caller: SupabaseClient): StreamDeps & NotifyDeps & CancelDeps {
+export function checkRouteDeps(
+  isMember: PublicCheckDeps['isMember'],
+): StreamDeps & NotifyDeps & CancelDeps {
   const admin = supabaseAdmin();
   return {
     read: supabaseCheckReader(admin),
-    async isMember(siteId) {
-      const { data } = await caller.from('sites').select('id').eq('id', siteId).maybeSingle();
-      return data !== null;
-    },
+    isMember,
     store: { ...supabasePipelineStore(admin), ...supabaseStreamStore(admin) },
     evidence: supabaseEvidenceStore(admin),
     limits: checkRouteLimits,

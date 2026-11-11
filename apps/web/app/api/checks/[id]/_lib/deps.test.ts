@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkRef } from '../../../../../lib/v2/pipeline/public';
 
 /**
- * `checkRouteDeps` executed, with the Supabase service client, Inngest and Next's `after` replaced
- * at the module boundary.
+ * `checkRouteDeps().captureFinished` executed, with the Supabase service client, Inngest and Next's
+ * `after` replaced at the module boundary. What else the factory wires is in ../wiring.test.ts.
  */
 const h = vi.hoisted(() => ({
   afterTasks: [] as Array<() => unknown>,
@@ -50,7 +50,7 @@ afterEach(() => {
 
 describe('checkRouteDeps().captureFinished', () => {
   it('resolves before the capture is sent: the capture is left for `after`', async () => {
-    const deps = checkRouteDeps({} as never);
+    const deps = checkRouteDeps(async () => false);
     await deps.captureFinished(req(), CHECK, FINISHED);
     expect([h.afterTasks.length, fetched]).toEqual([1, []]);
 
@@ -67,7 +67,7 @@ describe('checkRouteDeps().captureFinished', () => {
 
   it('awaits the capture itself when `after` refuses it', async () => {
     h.afterThrows = true;
-    const deps = checkRouteDeps({} as never);
+    const deps = checkRouteDeps(async () => false);
     let settled = false;
     const captured = deps.captureFinished(req(), CHECK, FINISHED).then(() => {
       settled = true;
