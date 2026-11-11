@@ -3,6 +3,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import type { Metadata } from 'next';
 import { WEB_ROOT } from './_lib/tokens-css';
+import { V2_REWRITES } from '../../lib/v2/rewrites';
+import { isFlagGated } from '../v1-inventory-source';
 
 const GROUP = join(WEB_ROOT, 'app', '(v2-preview)');
 /**
@@ -170,9 +172,20 @@ describe('v2 stays out of live pages', () => {
       : spec.startsWith('.')
         ? resolve(dirname(from), spec)
         : '';
+  /**
+   * The signed-in v2 pages outside the groups (CC-26b): the targets of `V2_REWRITES`, which the
+   * middleware alone serves, and the site page. Each page in them is a 404 with V2_CHECKS_PUBLIC
+   * off, checked below with the v1 inventory's own reader of that shape.
+   */
+  const V2_PAGE_DIRS = [
+    ...V2_REWRITES.map((r) => join(WEB_ROOT, 'app', ...r.to.split('/').filter(Boolean))),
+    join(WEB_ROOT, 'app', 'sites'),
+  ];
+  const inV2PageDir = (file: string) => V2_PAGE_DIRS.some((d) => file.startsWith(d + '/'));
   const allowed = (file: string) =>
     file.startsWith(GROUP + '/') ||
     file.startsWith(ACCOUNT_GROUP + '/') ||
+    inV2PageDir(file) ||
     file.startsWith(join(WEB_ROOT, 'components', 'v2') + '/') ||
     file.startsWith(join(WEB_ROOT, '__tests__', 'v2') + '/');
 
@@ -191,6 +204,15 @@ describe('v2 stays out of live pages', () => {
     expect(isV2(resolveSpec(from, '@/styles/v2/tokens.css'))).toBe(true);
     expect(isV2(resolveSpec(from, '@/components/ui/Button'))).toBe(false);
     expect(isV2(resolveSpec(from, 'components/v2'))).toBe(false);
+  });
+
+  it('each page in the signed-in v2 page folders is a 404 with its flag off', () => {
+    const pages = sources.filter((f) => inV2PageDir(f) && PAGE.test(f));
+    expect(pages.map((f) => relative(WEB_ROOT, f)).sort()).toEqual([
+      'app/dashboard/v2/page.tsx',
+      'app/sites/[id]/page.tsx',
+    ]);
+    for (const page of pages) expect(isFlagGated(page), relative(WEB_ROOT, page)).toBe(true);
   });
 
   it('no module outside the preview and account groups imports the v2 components or tokens', () => {

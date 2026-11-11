@@ -97,7 +97,7 @@ const INVENTORY: [entry: string, why: string][] = [
     'STRING slice of a request path in the middleware, to drop one trailing ASCII `/` before matching `V2_REWRITES` (CC-26b). Not crawled text, never persisted or rendered.',
   ],
   [
-    "apps/web/lib/v2/rewrites.ts :: return path.endsWith('.rsc') ? [path, withoutSlash(path.slice(0, -'.rsc'.length))] : [path];",
+    "apps/web/lib/v2/rewrites.ts :: ? [path, withoutSlash(path.slice(0, -'.rsc'.length))]",
     'STRING slice of a request path in the middleware, dropping the ASCII `.rsc` suffix before matching (CC-26b). Not crawled text, never persisted or rendered.',
   ],
   [
