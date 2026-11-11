@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isId, meantMethod, paywall } from './route';
+import { isId, meantMethod, paywall, refuse, serviceRefusal } from './route';
 
 const post = new Request('https://crawlmouse.com/api/sites/x', { method: 'POST' });
 
@@ -33,7 +33,7 @@ describe('paywall', () => {
   it('is a 402 naming the gate', async () => {
     const r = paywall('stagingAndDeployHooks');
     expect(r.status).toBe(402);
-    expect(await r.json()).toEqual({ error: 'upgrade_required', gate: 'stagingAndDeployHooks' });
+    expect(await r.json()).toEqual({ code: 'upgrade_required', gate: 'stagingAndDeployHooks' });
   });
 });
 
@@ -43,5 +43,20 @@ describe('isId', () => {
     expect(isId('0F8FAD5B-D9CB-469F-A165-70867728950E')).toBe(false);
     expect(isId('0f8fad5b-d9cb-469f-a165-70867728950e ')).toBe(false);
     expect(isId('1')).toBe(false);
+  });
+});
+
+describe('refusals', () => {
+  it('carry a code that detail cannot overwrite, and any headers', async () => {
+    const r = refuse(429, 'capped', { code: 'x', nextAllowedAt: 'later' }, { 'retry-after': '60' });
+    expect(r.status).toBe(429);
+    expect(r.headers.get('retry-after')).toBe('60');
+    expect(await r.json()).toEqual({ code: 'capped', nextAllowedAt: 'later' });
+  });
+
+  it.each(['paused', 'unavailable', 'capacity'] as const)('503 %s', async (code) => {
+    const r = serviceRefusal(code);
+    expect(r.status).toBe(503);
+    expect(await r.json()).toEqual({ code });
   });
 });
