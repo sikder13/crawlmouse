@@ -103,3 +103,6 @@ No page here shares a path with a v1 page, so `V2_REWRITES` gains no row.
   CC-28's must read the code as Settings does (`lib/v2/copy/settings-notices.ts`).
 - `PATCH /api/account`: when the owner's email change is accepted and the profile write after it then fails, the
   answer is a 500 while the change's links are already created.
+- The erasure's `v1_subscription` refusal reads `users.pro_until` in SQL (`erase_person_refusals`); migration 009,
+  which drops the column, must delete that refusal. Spec 01's scan of v1 entitlement readers covers TypeScript only, so
+  it no longer lists the erasure.

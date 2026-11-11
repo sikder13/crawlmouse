@@ -833,6 +833,8 @@ as $$
                             where o.account_id = s.account_id and o.status = 'active'
                               and o.user_id is distinct from p_user)) s
     union all
+    -- v1's entitlement: migration 009 drops users.pro_until and must delete this row with it (the plan
+    -- spec 01 kept for scripts/ops/erase-account.ts, whose TypeScript no longer reads the column).
     select 2, '', 'v1_subscription',
            'users.pro_until is in the future; cancel the subscription in Stripe first'
       from public.users u where u.id = p_user and u.pro_until > now()
