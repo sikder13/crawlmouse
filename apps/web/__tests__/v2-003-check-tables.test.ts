@@ -257,8 +257,9 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   measurement_lineages: [],
   // 008's pipeline columns: no client reads them.
   sites: [...SITE_SCHEDULE_COLUMNS],
-  // 022b's notify_email is a visitor's address: granted to no client role.
-  checks: [...CHECK_PIPELINE_COLUMNS, 'notify_email'],
+  // 022b's notify_email is a visitor's address and copied_for holds other accounts' ids: neither
+  // is granted to a client role.
+  checks: [...CHECK_PIPELINE_COLUMNS, 'notify_email', 'copied_for'],
   page_results: [],
   link_edges: [],
   access_tests: [],

@@ -1,14 +1,20 @@
 /**
- * Migration 022b section D in PGlite with every migration applied: who may call its six functions,
- * what kind they are, and what `keep_check` and `move_check_paths` refuse. Their use by the claim
- * and the expiry is in lib/v2/pipeline/keep.test.ts and expire.test.ts.
+ * Migration 022b section D in PGlite with every migration applied: who may call its seven
+ * functions, what kind they are, what `keep_check` and `move_check_paths` refuse, what
+ * `checks.copied_for` holds after `note_check_copy` and `keep_check`, and that the migration and
+ * its revert each run twice. Their use by the claim and the expiry is in
+ * lib/v2/pipeline/keep.test.ts and expire.test.ts.
  */
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { asRole } from './helpers/pglite-migrations';
+import { asRole, readMigration, readRollback } from './helpers/pglite-migrations';
 import { accountOf, anonymousCheck, doorDb, signUp } from './v2/_lib/door-pglite';
 
+const MIGRATION = '20261111000001_v2_022b_public_checks.sql';
+const REVERT = '20261111000001_v2_022b_public_checks.revert.sql';
+
 const FUNCTIONS = [
+  'note_check_copy(uuid, uuid)',
   'keep_check(uuid, uuid, uuid, text, integer, integer, jsonb)',
   'move_check_paths(uuid, uuid, jsonb)',
   'unkept_site_expired(uuid, timestamp with time zone, timestamp with time zone)',
@@ -54,7 +60,7 @@ const siteRow = async (siteId: string) =>
   ).rows[0]!;
 
 describe('section D’s functions: kind, search_path and grants', () => {
-  it('are the six the migration’s header names, each SECURITY INVOKER with search_path pg_catalog, public, pg_temp', async () => {
+  it('are the seven the migration’s header names, each SECURITY INVOKER with search_path pg_catalog, public, pg_temp', async () => {
     const { rows } = await db.query<{ signature: string; definer: boolean; config: string[] }>(
       `select format('%s(%s)', p.proname, pg_get_function_identity_arguments(p.oid)) as signature,
               p.prosecdef as definer, p.proconfig as config
@@ -233,6 +239,121 @@ describe('keep_check', () => {
       [`${mine}/batch-0.json.gz`, `${anon}/batch-1.json.gz`, `${mine}/map.json.gz`].sort(),
     );
   });
+});
+
+describe('checks.copied_for', () => {
+  const note = (checkId: string, accountId: string | null) =>
+    asRole(db, 'service_role', null, async (tx) => {
+      const { rows } = await tx.query<{ r: boolean }>(
+        `select public.note_check_copy($1::uuid, $2::uuid) as r`,
+        [checkId, accountId],
+      );
+      return rows[0]!.r;
+    });
+  const copiedFor = async (checkId: string) =>
+    (
+      await db.query<{ copied_for: string[] }>(
+        `select copied_for from public.checks where id = $1`,
+        [checkId],
+      )
+    ).rows[0]!.copied_for;
+
+  it('is empty on a new check; note_check_copy adds an account once, in the order noted, and answers false for no such check', async () => {
+    const a = await keeper();
+    const b = await keeper();
+    const { checkId } = await anonymousCheck(db, `noted-${++n}.example`, later());
+    const other = await anonymousCheck(db, `noted-${++n}.example`, later());
+    expect(await copiedFor(checkId)).toEqual([]);
+    expect(await note(checkId, a.accountId)).toBe(true);
+    expect(await note(checkId, b.accountId)).toBe(true);
+    expect(await note(checkId, a.accountId)).toBe(true);
+    expect(await copiedFor(checkId)).toEqual([a.accountId, b.accountId]);
+    expect(await copiedFor(other.checkId)).toEqual([]);
+    expect(await note('00000000-0000-4000-8000-000000000000', a.accountId)).toBe(false);
+    await expect(note(checkId, null)).rejects.toMatchObject({ code: '22004' });
+    expect(await copiedFor(checkId)).toEqual([a.accountId, b.accountId]);
+  });
+
+  it('keep_check takes the keeping account out and leaves the others; a refused keep leaves the list as it was', async () => {
+    const winner = await keeper();
+    const loser = await keeper();
+    const { checkId } = await anonymousCheck(db, `strays-${++n}.example`, later());
+    await note(checkId, loser.accountId);
+    await note(checkId, winner.accountId);
+    expect(await keep(checkId, winner, [])).toBe('taken');
+    expect(await copiedFor(checkId)).toEqual([loser.accountId]);
+    expect(await keep(checkId, loser, [])).toBe('not_unowned');
+    expect(await copiedFor(checkId)).toEqual([loser.accountId]);
+
+    const past = await anonymousCheck(db, `strays-${++n}.example`, new Date(Date.now() - 1));
+    await note(past.checkId, loser.accountId);
+    expect(await keep(past.checkId, loser, [])).toBe('expired');
+    expect(await copiedFor(past.checkId)).toEqual([loser.accountId]);
+  });
+
+  it('no client role reads or writes it', async () => {
+    const { rows } = await db.query<{ role: string; granted: boolean }>(
+      `select r.role, has_column_privilege(r.role, 'public.checks', 'copied_for', p.priv) as granted
+         from unnest(array['anon', 'authenticated']) as r(role),
+              unnest(array['SELECT', 'INSERT', 'UPDATE']) as p(priv)`,
+    );
+    expect(rows).toHaveLength(6);
+    expect(rows.filter((r) => r.granted)).toEqual([]);
+  });
+});
+
+describe('the migration and its revert', () => {
+  const NAMES = FUNCTIONS.map((f) => f.slice(0, f.indexOf('(')));
+  const sectionD = async (own: PGlite) => {
+    const functions = await own.query<{ name: string }>(
+      `select p.proname as name from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+        where ns.nspname = 'public' and p.proname = any($1::text[]) order by 1`,
+      [NAMES],
+    );
+    const columns = await own.query<{ column_name: string }>(
+      `select column_name from information_schema.columns
+        where table_schema = 'public' and table_name = 'checks'
+          and column_name in ('notify_email', 'copied_for') order by 1`,
+    );
+    const index = await own.query(
+      `select 1 from pg_indexes where schemaname = 'public' and indexname = 'sites_unkept_idx'`,
+    );
+    return {
+      functions: functions.rows.map((r) => r.name),
+      columns: columns.rows.map((r) => r.column_name),
+      index: index.rows.length,
+    };
+  };
+
+  it('applies twice and reverts twice, and applies again after the revert', async () => {
+    const own = await doorDb();
+    try {
+      const applied = {
+        functions: [...NAMES].sort(),
+        columns: ['copied_for', 'notify_email'],
+        index: 1,
+      };
+      expect(await sectionD(own)).toEqual(applied);
+      const { checkId } = await anonymousCheck(own, 'rerun.example', later());
+      await own.query(`select public.note_check_copy($1::uuid, gen_random_uuid())`, [checkId]);
+      await own.exec(readMigration(MIGRATION));
+      expect(await sectionD(own)).toEqual(applied);
+      // A second run keeps what the column held.
+      expect(
+        await own.query(`select 1 from public.checks where cardinality(copied_for) = 1`),
+      ).toMatchObject({ rows: [{}] });
+
+      await own.exec(readRollback(REVERT));
+      expect(await sectionD(own)).toEqual({ functions: [], columns: [], index: 0 });
+      await own.exec(readRollback(REVERT));
+      expect(await sectionD(own)).toEqual({ functions: [], columns: [], index: 0 });
+
+      await own.exec(readMigration(MIGRATION));
+      expect(await sectionD(own)).toEqual(applied);
+    } finally {
+      await own.close();
+    }
+  }, 120_000);
 });
 
 describe('move_check_paths', () => {
