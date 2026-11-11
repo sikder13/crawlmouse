@@ -180,7 +180,7 @@ describe('supabaseStreamStore', () => {
     expect(await supabaseStreamStore(none.client).setNotifyEmail('c', 'a@example.com')).toBe(false);
   });
 
-  it('reads the check narrowly, then its batch rows, and never selects the notify address', async () => {
+  it('reads one check by its id, then that check’s batch rows in batch order, and does not select the notify address', async () => {
     const { client, queries } = recordingClient({
       'checks:select': {
         site_id: 's',
@@ -213,18 +213,64 @@ describe('supabaseStreamStore', () => {
       expiresAt: null,
       batches: [{ batch: 1, kind: 'crawl', status: 'done', resultPath: 'p', pages: 3, links: 9 }],
     });
-    expect(queries.map((q) => [q.table, q.calls[0]])).toEqual([
-      [
-        'checks',
-        [
-          'select',
-          'site_id, status, progress, started_at, finished_at, expires_at, sites(account_id, removed_at)',
+    // Each call of both requests: without `eq('check_id', …)` the second would read the batch rows
+    // of each check there is.
+    expect(queries).toEqual([
+      {
+        table: 'checks',
+        calls: [
+          [
+            'select',
+            'site_id, status, progress, started_at, finished_at, expires_at, sites(account_id, removed_at)',
+          ],
+          ['eq', 'id', 'c'],
+          ['maybeSingle'],
         ],
-      ],
-      ['crawl_batches', ['select', 'batch, kind, status, result_path, summary']],
+      },
+      {
+        table: 'crawl_batches',
+        calls: [
+          ['select', 'batch, kind, status, result_path, summary'],
+          ['eq', 'check_id', 'c'],
+          ['order', 'batch'],
+        ],
+      },
     ]);
     expect(JSON.stringify(queries)).not.toContain('notify_email');
     expect(JSON.stringify(queries)).not.toContain('*');
+  });
+
+  it('the `sites(…)` embed has one foreign key to follow, from checks.site_id', async () => {
+    // The recording client answers canned rows, so the embed meets no schema above. PostgREST
+    // resolves it by the foreign key between the two tables, and refuses when there are two.
+    const { rows } = await db.query<{ columns: string }>(
+      `select (select string_agg(a.attname, ',') from pg_attribute a
+                where a.attrelid = c.conrelid and a.attnum = any(c.conkey)) as columns
+         from pg_constraint c
+        where c.contype = 'f' and c.conrelid = 'public.checks'::regclass
+          and c.confrelid = 'public.sites'::regclass`,
+    );
+    expect(rows).toEqual([{ columns: 'site_id' }]);
+  });
+
+  it('reads an ended check’s two scores from that check’s row', async () => {
+    const { client, queries } = recordingClient({
+      'checks:select': {
+        technical_seo: { score: 71.5 },
+        ai_readability: { withheld: false, total: 64 },
+      },
+    });
+    expect(await supabaseStreamStore(client).scores('c')).toEqual({
+      seo: 71.5,
+      aiReadability: 64,
+      withheld: false,
+    });
+    expect(queries).toEqual([
+      {
+        table: 'checks',
+        calls: [['select', 'technical_seo, ai_readability'], ['eq', 'id', 'c'], ['maybeSingle']],
+      },
+    ]);
   });
 
   it('answers null for a check that is not there, and throws on a database error', async () => {
