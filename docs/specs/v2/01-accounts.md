@@ -409,6 +409,7 @@ is Free from `trial_ends_at` whether or not `trial_expired` was applied.
 | Search Console overlay                                             | no                      | yes               | yes                  | ARCH-2 §3.1                           |
 | Observed crawler activity                                          | no                      | yes               | yes                  | ARCH-2 §3.1                           |
 | Checks per site per day, per eTLD+1 across accounts                | 3                       | 12                | 12                   | DECISION-LOG J9                       |
+| Manual and fix re-checks per site per day                          | 2                       | 10                | 10                   | DECISION-LOG E6                       |
 
 ## Where this differs from the design documents
 
