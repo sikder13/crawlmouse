@@ -4,7 +4,8 @@
  * This module sits beside v1's `entitlement.ts` and `pro.ts` and is not imported by any live route.
  * A later step switches the routes over behind a flag (see docs/specs/v2/01-accounts.md, follow-ups).
  *
- * Sources: ARCH-2 §3.1 for every gate except `checksPerSiteDay`, which is DECISION-LOG J9.
+ * Sources: ARCH-2 §3.1 for every gate except `checksPerSiteDay`, which is DECISION-LOG J9, and
+ * `manualChecksPerSiteDay`, which is DECISION-LOG E6.
  */
 import type { AccountState } from '@crawlmouse/types/v2';
 
@@ -54,6 +55,11 @@ export interface TierGates {
    * in the pipeline's `claim` step, so it is a crawl cap rather than a per-account allowance.
    */
   checksPerSiteDay: number;
+  /**
+   * Re-checks a member may ask for, per site per day (DECISION-LOG E6): `manual` and `fix_recheck`
+   * requests together, counted per site over the last 24 hours by migration 20261112000001.
+   */
+  manualChecksPerSiteDay: number;
 }
 
 const PAID: Omit<
@@ -71,6 +77,7 @@ const PAID: Omit<
   searchConsole: true,
   observedCrawlerActivity: true,
   checksPerSiteDay: 12,
+  manualChecksPerSiteDay: 10,
 };
 
 export const GATES: Readonly<Record<Tier, Readonly<TierGates>>> = Object.freeze({
@@ -92,6 +99,7 @@ export const GATES: Readonly<Record<Tier, Readonly<TierGates>>> = Object.freeze(
     searchConsole: false,
     observedCrawlerActivity: false,
     checksPerSiteDay: 3,
+    manualChecksPerSiteDay: 2,
   }),
   pro: Object.freeze({
     ...PAID,

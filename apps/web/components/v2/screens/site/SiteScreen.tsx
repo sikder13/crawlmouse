@@ -7,6 +7,8 @@ import type { ShellView } from '../../../../lib/v2/view/account-shell';
 import type { GradeCardView, SiteView } from '../../../../lib/v2/view/site';
 import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
+import { Notice, type NoticeView } from '../account/Notice';
+import { MarkDone } from './MarkDone';
 import { CardHead } from '../account/parts';
 import { verdictCell } from '../account/verdict-cells';
 import { CopyText } from '../segment/CopyText';
@@ -51,7 +53,16 @@ function GradeHalf({ g }: { g: GradeCardView }) {
  * The site page (Final-Site): one site's grades and crawlers across its checks, its fixes, its
  * settings and the alert rules that apply to it.
  */
-export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }) {
+export function SiteScreen({
+  data,
+  shell,
+  notice,
+}: {
+  data: SiteView;
+  shell: ShellView;
+  /** A refused form's notice, on a live page. */
+  notice?: NoticeView | null;
+}) {
   const { header, grades, crawlers, fixes, settings, alerts } = data;
   return (
     <AccountFrame shell={shell} currentIs="location">
@@ -66,6 +77,7 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
           ))}
         </div>
       </header>
+      <Notice notice={notice} />
 
       <Card as="section" className={shared.panel}>
         <CardHead title={grades.title} sub={grades.sub}>
@@ -159,7 +171,10 @@ export function SiteScreen({ data, shell }: { data: SiteView; shell: ShellView }
                   <span key="s" className={shared.muted}>
                     {f.status}
                   </span>,
-                  <ActionControl key="p" action={f.packet} variant="quiet" />,
+                  <span key="p">
+                    {f.markDone ? <MarkDone action={f.markDone} /> : null}
+                    <ActionControl action={f.packet} variant="quiet" />
+                  </span>,
                 ],
               })),
               ...(fixes.rest

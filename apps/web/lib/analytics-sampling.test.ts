@@ -31,9 +31,9 @@ describe('shouldSendEvent', () => {
 });
 
 describe('FUNNEL_EVENTS list-drift lock', () => {
-  it('has exactly the 41 funnel events (7 launch + 9 conversion-spine + 10 SPEC 04 viral loop + 7 SPEC 05 AI + 2 CC-25 account door + 6 CC-22b public check flow) with no duplicates', () => {
-    expect(FUNNEL_EVENTS.length).toBe(41);
-    expect(new Set(FUNNEL_EVENTS).size).toBe(41);
+  it('has exactly the 43 funnel events (7 launch + 9 conversion-spine + 10 SPEC 04 viral loop + 7 SPEC 05 AI + 2 CC-25 account door + 6 CC-22b public check flow + 2 CC-26b) with no duplicates', () => {
+    expect(FUNNEL_EVENTS.length).toBe(43);
+    expect(new Set(FUNNEL_EVENTS).size).toBe(43);
     for (const e of ['trial_started', 'site_added']) expect(FUNNEL_EVENTS).toContain(e);
     for (const e of [
       'home_viewed',
@@ -42,6 +42,8 @@ describe('FUNNEL_EVENTS list-drift lock', () => {
       'result_viewed',
       'fix_opened',
       'keep_clicked',
+      'fix_marked_done',
+      'fix_closed',
     ]) {
       expect(FUNNEL_EVENTS).toContain(e);
     }

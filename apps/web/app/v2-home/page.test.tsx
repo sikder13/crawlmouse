@@ -6,7 +6,7 @@
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { V2_REWRITES } from '../../middleware';
+import { V2_REWRITES } from '@/lib/v2/rewrites';
 
 vi.mock('@/components/analytics/TrackView', () => ({
   TrackView: ({ event }: { event: string }) => <i data-event={event} />,

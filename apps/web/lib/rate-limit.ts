@@ -1,6 +1,6 @@
 import 'server-only';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { MAX_RATE_LIMIT_WINDOW_MS } from './rate-limit-window';
+import { MAX_RATE_LIMIT_WINDOW_MS, rateLimitWindowStart } from './rate-limit-window';
 
 interface CheckResult {
   allowed: boolean;
@@ -33,7 +33,7 @@ export async function checkRateLimit(
     );
   }
   const sb = supabaseAdmin();
-  const windowStart = new Date(Math.floor(Date.now() / windowMs) * windowMs);
+  const windowStart = rateLimitWindowStart(Date.now(), windowMs);
   const resetAt = new Date(windowStart.getTime() + windowMs);
 
   const { data, error } = await sb.rpc('increment_rate_limit', {

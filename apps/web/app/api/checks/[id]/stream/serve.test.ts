@@ -4,7 +4,11 @@ import { recordedBuild } from '../../../../../../../packages/engine/fixtures/v2/
 import { buildCheck } from '@crawlmouse/engine/v2/pipeline';
 import type { BatchResult, CrawlPage } from '@crawlmouse/types/v2';
 import { doorDb, signUp } from '../../../../../__tests__/v2/_lib/door-pglite';
-import { pageVantage, persistBuiltCheck } from '../../../../../lib/v2/pipeline/persist';
+import {
+  pageVantage,
+  persistBuiltCheck,
+  readOfFixes,
+} from '../../../../../lib/v2/pipeline/persist';
 import { checkRef } from '../../../../../lib/v2/pipeline/public';
 import { BATCH_GZIP_BYTES } from '../../../../../lib/v2/pipeline/stream';
 import { crawlResult, edge, row, urlOf } from '../../../../../lib/v2/pipeline/stream.fixtures';
@@ -433,6 +437,7 @@ describe('a check that finished', () => {
       built,
       vantage: pageVantage(crawl),
       map_path: null,
+      read: readOfFixes(recorded.fixes, recorded.events),
     });
     h.clock.now = Date.parse(recorded.check.finished_at) + 60_000;
     const ids = { siteId: recorded.site.id, checkId: recorded.check.id };

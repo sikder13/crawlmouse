@@ -14,9 +14,9 @@ import { HomeScreen } from './HomeScreen';
  * `home_viewed` event, and v1's referral capture. The example audit on the page is the bad-site
  * fixture's first audit, as in the preview.
  *
- * `app/v2-home/page.tsx` renders it, and `/` is rewritten there under the flag (middleware.ts,
- * `V2_REWRITES`, which says what a production build linked when `app/page.tsx` could reach this
- * module). `app/page.tsx` does not import it; `live-home.test.tsx` holds that.
+ * `app/v2-home/page.tsx` renders it, and `/` is rewritten there under the flag (`V2_REWRITES` in
+ * lib/v2/rewrites.ts, whose row says what a production build linked when `app/page.tsx` could reach
+ * this module). `app/page.tsx` does not import it; `live-home.test.tsx` holds that.
  *
  * The plan buttons lead to Sign-up while the account door is open (V2_ACCOUNT_DOOR); the Agency
  * trial has no page yet, so it has no button.

@@ -10,7 +10,7 @@ import type { BatchResult } from '@crawlmouse/types/v2';
 import { recordedBuild } from '../../../../../../packages/engine/fixtures/v2/build/recorded';
 import { asRole } from '../../../../__tests__/helpers/pglite-migrations';
 import { gzipJson } from '../evidence';
-import { pageVantage, persistBuiltCheck } from '../persist';
+import { pageVantage, persistBuiltCheck, readOfFixes } from '../persist';
 import { evidencePath, type EvidenceName, type EvidenceOwner, type EvidenceStore } from '../types';
 import { pglitePersistDb, seedRunning, seedSite } from './pglite';
 import type { RunSql } from './sql-keep-store';
@@ -150,6 +150,7 @@ export async function recordedStoredCheck(
       (input.batches as BatchResult[]).flatMap((b) => (b.kind === 'crawl' ? b.pages : [])),
     ),
     map_path: mapPath,
+    read: readOfFixes(input.fixes, input.events),
   });
   return { ...check, built };
 }

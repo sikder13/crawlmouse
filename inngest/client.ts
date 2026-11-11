@@ -52,6 +52,11 @@ type Events = {
   // A visitor asked to be told when a check ends (CC-22b). CC-28's mailer handles it; the address
   // stays in checks.notify_email and is not in the event.
   'check.notify_requested': { data: CheckNotifyRequested };
+  // CC-26b: a member asked for a fix's packet to be emailed to a developer
+  // (POST /api/fixes/[id]/email-developer). The request, address included, is a
+  // fix_email_requests row; the event names only that row, so no address sits in Inngest's event
+  // history. CC-28's mailer reads the row and sends; nothing in CC-26b does.
+  'fix.email_developer_requested': { data: { requestId: string } };
 };
 
 export const inngest = new Inngest({
