@@ -20,6 +20,11 @@ export interface PublicServerEvents {
     status: 'finished' | 'partial' | 'failed';
     pages: number;
     durationMs: number;
+    /** A finished or partial check's Technical SEO score; null when that grade was refused. */
+    seo?: number | null;
+    /** Its AI readability total; null when `withheld`. */
+    aiReadability?: number | null;
+    withheld?: boolean;
   };
 }
 
