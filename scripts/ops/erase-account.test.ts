@@ -291,6 +291,7 @@ describe('erase-account (B-F2)', () => {
     expect(plan.refusals).toEqual([
       `${p.storage.length} storage objects are still stored; delete them through the Storage API first (docs/ops/erasure.md §4)`,
     ]);
+    expect(plan.refusalCodes).toEqual(['storage']);
     // Every count, each from the fixture: none of domain_verifications, embed_badges, or a
     // share link or API key this person created; seedWorld gives the account two sites, each with a
     // check and a report.
@@ -327,6 +328,7 @@ describe('erase-account (B-F2)', () => {
     expect(plan.kept).toEqual({
       'trial_ledger (peppered hashes; account reference set null)': 1,
       'takedown_requests (open; the address stays until closed)': 1,
+      'previous address now held by another person': 0,
     });
     expect(plan.mintedReports).toEqual([p.slug]);
     expect(plan.storage).toEqual(p.storage);
@@ -548,9 +550,11 @@ describe('erase-account (B-F2)', () => {
       `update public.users set pro_until = now() + interval '1 day' where id = $1`,
       [p.id],
     );
-    expect((await planErasure(db(), { userId: p.id })).refusals).toEqual([
+    const withV1 = await planErasure(db(), { userId: p.id });
+    expect(withV1.refusals).toEqual([
       'users.pro_until is in the future; cancel the subscription in Stripe first',
     ]);
+    expect(withV1.refusalCodes).toEqual(['v1_subscription']);
     const withPro = await everything();
     await expect(executeErasure(db(), { userId: p.id }, sqlDelete)).rejects.toThrow(
       /refusing to erase/,
@@ -645,6 +649,39 @@ describe('erase-account (B-F2)', () => {
     await bare.close();
   }, 300_000);
 
+  it('redacts a rejected takedown request as it does a removed one (T8)', async () => {
+    const p = await person();
+    await pglite.query(
+      `insert into public.takedown_requests (domain, requester_email, reason, status, public_report_slug)
+       values ('a.example', $1, 'mine', 'rejected', $2)`,
+      [p.email.toUpperCase(), p.slug],
+    );
+    const plan = await planErasure(db(), { userId: p.id });
+    expect(plan.counts['takedown_requests redacted (closed)']).toBe(2);
+    await removeObjects(plan.storage);
+    await executeErasure(db(), { userId: p.id }, sqlDelete);
+    expect(
+      await n(
+        `select count(*) from public.takedown_requests where status = 'rejected' and public_report_slug = $1
+            and requester_email = $2`,
+        [p.slug, REDACTED_EMAIL],
+      ),
+    ).toBe(1);
+  }, 120_000);
+
+  it('takes the address from auth.users and from public.users when the two differ (T10)', async () => {
+    const p = await person();
+    const auth = `auth-only-${p.email}`;
+    await pglite.query(`update auth.users set email = $2 where id = $1`, [p.id, auth]);
+    await pglite.query(`insert into public.waitlist (email, source) values ($1, 'developers')`, [
+      auth,
+    ]);
+    const plan = await planErasure(db(), { userId: p.id });
+    expect([...plan.emails].sort()).toEqual([auth, p.email].sort());
+    // A row under each address is counted.
+    expect(plan.counts['waitlist deleted']).toBe(2);
+  }, 120_000);
+
   it('refuses an address that names more than one user, and changes nothing', async () => {
     const tag = `twice-${++serial}@example.com`;
     await pglite.query(`insert into auth.users (id, email) values (gen_random_uuid(), $1)`, [tag]);
@@ -733,6 +770,42 @@ describe('the rules 027b adds (D5)', () => {
         )
       ).rows[0]!.p,
     ).toEqual(['kept@example.com']);
+  }, 120_000);
+
+  it('leaves out a previous address another person now signs in with, and keeps what is theirs', async () => {
+    const p = await plain();
+    const old = `taken-${p.email}`;
+    await pglite.query(`update public.users set previous_emails = array[$2] where id = $1`, [
+      p.id,
+      old,
+    ]);
+    // Someone else signs up with the address this person moved away from.
+    const other = await plain();
+    await pglite.query(`update auth.users set email = $2 where id = $1`, [other.id, old]);
+    await pglite.query(`update public.users set email = $2 where id = $1`, [other.id, old]);
+    await pglite.query(`insert into public.waitlist (email, source) values ($1, 'developers')`, [
+      old,
+    ]);
+    await pglite.query(
+      `insert into public.seats (account_id, invited_email, role, status) values ($1, $2, 'developer', 'invited')`,
+      [p.bystander.accountId, old],
+    );
+    await pglite.query(
+      `insert into auth.audit_log_entries (id, payload, created_at)
+       values (gen_random_uuid(), json_build_object('actor_username', $1::text, 'action', 'login'), now())`,
+      [old],
+    );
+    const plan = await planErasure(db(), { userId: p.id });
+    expect(plan.emails).toEqual([p.email]);
+    expect(plan.kept['previous address now held by another person']).toBe(1);
+    await erase({ userId: p.id });
+    expect(await n(`select count(*) from public.waitlist where email = $1`, [old])).toBe(1);
+    expect(await n(`select count(*) from public.seats where invited_email = $1`, [old])).toBe(1);
+    expect(
+      await n(`select count(*) from auth.audit_log_entries where payload->>'actor_username' = $1`, [
+        old,
+      ]),
+    ).toBe(1);
   }, 120_000);
 
   it('nulls checks.notify_email outside the person’s accounts, and every one with no user', async () => {

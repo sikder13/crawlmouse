@@ -51,6 +51,8 @@ export const REFUSAL_SENTENCES: Readonly<Record<string, string>> = {
   invalid_link: 'That link has been used, has expired, or was replaced by a newer one.',
   link_unusable: 'That link has been used, has expired, or was replaced by a newer one.',
   not_confirmed: 'That restore link belongs to a deletion that was never confirmed.',
+  already_confirmed:
+    'This deletion is already confirmed. The restore link in the deletion email undoes it for seven days.',
   window_closed: 'The seven days to restore the account have passed.',
 };
 

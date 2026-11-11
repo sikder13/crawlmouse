@@ -33,7 +33,7 @@ export const RESTORE_COPY = {
   lead: 'Pressing the button undoes the deletion of these accounts:',
   until: (date: string) => `The restore link works until ${date}.`,
   money:
-    'A plan the deletion set to end carries on as before. A plan that had already ended, or was ended at once after a failed payment, is not started again; you can choose one in Settings › Plan.',
+    'A plan the deletion set to end carries on as before. A plan that had already ended is not started again; you can choose one in Settings › Plan.',
   button: 'Restore these accounts',
 } as const;
 
@@ -42,6 +42,14 @@ export const LINK_STATES: Readonly<Record<string, { title: string; body: string 
   invalid_link: {
     title: 'This link no longer works',
     body: 'It has been used, it has expired, or a newer email replaced it. Use the link in the latest email.',
+  },
+  already_confirmed: {
+    title: 'Your account is already deleted',
+    body: 'An earlier link deleted every account you hold, this one with it. The restore link in that email undoes it.',
+  },
+  email_change_pending: {
+    title: 'An email change is in progress',
+    body: 'Finish or cancel the change of your sign-in address first, then press this link again.',
   },
   not_confirmed: {
     title: 'Nothing to restore yet',

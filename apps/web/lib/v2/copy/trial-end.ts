@@ -156,11 +156,11 @@ const A8 =
 export const TRIAL_END_CHANGES: CopyChange[] = [
   {
     screen: 'trial-end',
-    kind: 'facts',
+    kind: 'ruling',
     locked: 'We sent this once, today, as promised.',
     rendered: 'The reminder goes out once, today, unless you turned it off.',
     source:
-      'CC-27b review: nothing records that the reminder was sent (CC-28 sends it), so the sentence says what the reminder does',
+      'Owner ruling pending (CC-27b Q17): nothing records that the reminder was sent (CC-28 sends it), so the sentence says what the reminder does',
   },
   {
     screen: 'trial-end',

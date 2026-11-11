@@ -231,7 +231,7 @@ describe('requestEmailChange', () => {
   it('refuses with 409 deletion_pending while the person’s deletion is under way, and sends nothing', async () => {
     const p = await person();
     await db.query(
-      `select public.create_account_token($1, $2, 'delete_confirm', now() + interval '1 hour')`,
+      `select public.create_account_token($1, $2, 'delete_confirm', now() + interval '1 hour', p_recipient => 'x@example.com')`,
       [p.accountId, p.userId],
     );
     const { ports: pp, rec } = ports();

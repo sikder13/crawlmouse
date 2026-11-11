@@ -30,6 +30,11 @@ export interface ErasurePlan {
   /** Accounts the person alone is seated on; deleted with everything that cascades from them. */
   accounts: string[];
   refusals: string[];
+  /**
+   * Each refusal's code, in the same order: `storage` (the plan lists Storage objects, which this
+   * sequence removes), and the codes `erase_person_refusals` gives.
+   */
+  refusalCodes: string[];
   /** Rows the erasure deletes or changes, by `table.action`. */
   counts: Record<string, number>;
   /** Rows deliberately kept, by `table.reason`. */
@@ -74,11 +79,11 @@ export type ErasureResult =
   | { ok: false; refusals: string[] };
 
 /**
- * The plan's refusals other than its Storage one. `erase_person_plan` adds that refusal, as its last,
- * when it lists objects, and this sequence removes them; any other refusal stops the erasure.
+ * The plan's refusals other than its Storage one, told apart by code: this sequence removes the
+ * objects, and any other refusal stops the erasure.
  */
 export function blockingRefusals(plan: ErasurePlan): string[] {
-  return plan.storage.length > 0 ? plan.refusals.slice(0, -1) : plan.refusals;
+  return plan.refusals.filter((_, i) => plan.refusalCodes[i] !== 'storage');
 }
 
 export async function erasePerson(

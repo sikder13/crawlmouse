@@ -107,6 +107,9 @@ create table if not exists public.account_tokens (
   -- email_change and email_change_undo only: the address moved to and the one moved from.
   new_email text,
   old_email text,
+  -- delete_confirm and delete_restore only: the sign-in address when the deletion was requested, where
+  -- both links go even if the address changes before the mailer sends.
+  recipient text,
   created_at timestamptz not null default now(),
   expires_at timestamptz not null,
   used_at timestamptz,
@@ -117,7 +120,9 @@ create table if not exists public.account_tokens (
   constraint account_tokens_emails check (
     (kind in ('email_change', 'email_change_undo')) = (new_email is not null and old_email is not null)),
   constraint account_tokens_expiry check (expires_at > created_at),
-  constraint account_tokens_pair check (paired_with is null or kind = 'delete_restore')
+  constraint account_tokens_pair check (paired_with is null or kind = 'delete_restore'),
+  constraint account_tokens_recipient check (
+    (kind in ('delete_confirm', 'delete_restore')) = (recipient is not null))
 );
 create index if not exists account_tokens_account_idx on public.account_tokens (account_id, kind);
 alter table public.account_tokens enable row level security;
@@ -197,7 +202,8 @@ grant execute on function public.end_user_sessions(uuid, uuid) to service_role;
 -- is refused while one is in flight, by request_email_change and account_tokens_one_live_email_link_uq).
 create or replace function public.create_account_token(
   p_account uuid, p_user uuid, p_kind text, p_expires_at timestamptz,
-  p_new_email text default null, p_old_email text default null, p_paired_with uuid default null)
+  p_new_email text default null, p_old_email text default null, p_paired_with uuid default null,
+  p_recipient text default null)
 returns uuid
 language plpgsql
 security definer
@@ -208,8 +214,9 @@ declare
 begin
   update public.account_tokens t set revoked_at = now()
    where t.account_id = p_account and t.kind = p_kind and t.used_at is null and t.revoked_at is null;
-  insert into public.account_tokens (account_id, user_id, kind, new_email, old_email, expires_at, paired_with)
-  values (p_account, p_user, p_kind, p_new_email, p_old_email, p_expires_at, p_paired_with)
+  insert into public.account_tokens
+    (account_id, user_id, kind, new_email, old_email, expires_at, paired_with, recipient)
+  values (p_account, p_user, p_kind, p_new_email, p_old_email, p_expires_at, p_paired_with, p_recipient)
   returning id into v_id;
   return v_id;
 end;
@@ -221,8 +228,9 @@ $$;
 -- one stops working because its hash is replaced.
 -- The token is 32 bytes from two gen_random_uuid() values (pg_catalog's; pgcrypto lives in a
 -- different schema on production and in the test sandbox): 244 random bits, base64url, 43 characters,
--- the shape apps/web/lib/v2/account/tokens.ts `isToken` accepts. The recipient is the new address
--- for an email_change, the old one for its undo, and the sign-in address otherwise.
+-- the shape apps/web/lib/v2/account/tokens.ts `isToken` accepts. The recipient is read from the row:
+-- the new address for an email_change, the old one for its undo, and for a deletion link the sign-in
+-- address request_account_deletion stored on it.
 create or replace function public.issue_account_link(p_token uuid)
 returns table (kind text, token text, recipient text)
 language plpgsql
@@ -255,17 +263,17 @@ begin
     recipient := case v.kind
                    when 'email_change' then v.new_email
                    when 'email_change_undo' then v.old_email
-                   else (select u.email from public.users u where u.id = v.user_id)
+                   else v.recipient
                  end;
     return next;
   end loop;
 end;
 $$;
 
-revoke all on function public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid)
+revoke all on function public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid, text)
   from public, anon, authenticated;
 revoke all on function public.issue_account_link(uuid) from public, anon, authenticated;
-grant execute on function public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid)
+grant execute on function public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid, text)
   to service_role;
 grant execute on function public.issue_account_link(uuid) to service_role;
 
@@ -391,15 +399,8 @@ begin
                    and k.used_at is null and k.revoked_at is null and k.expires_at > p_now) then
     raise exception 'request_email_change: the person''s deletion is under way' using errcode = 'CMA07';
   end if;
-  if exists (
-       select 1 from public.account_tokens k
-        where k.user_id = p_user and k.used_at is null and k.revoked_at is null
-          and k.expires_at > p_now
-          and (k.kind = 'email_change'
-               or (k.kind = 'email_change_undo' and exists (
-                     select 1 from public.account_tokens c
-                      where c.account_id = k.account_id and c.kind = 'email_change'
-                        and c.created_at = k.created_at and c.used_at is not null)))) then
+  -- The one definition of "in flight", which a deletion's request and confirm also ask (section B).
+  if public.email_change_live(p_user, p_now) then
     raise exception 'request_email_change: an email change is in flight' using errcode = 'CMA02';
   end if;
   -- What is left of the person's earlier requests cannot be used (the check above passed), on this
@@ -704,9 +705,9 @@ grant execute on function public.undo_email_change(text, timestamptz, boolean) t
 -- The erasure's rules, the in-app deletion's three steps and the purge's queue reads. Functions are
 -- owned by postgres, revoked from every client role and granted to service_role (erase_rules,
 -- erase_person_refusals, deletion_refusal and email_change_live to no role: only the functions here
--- call them). Tests:
--- apps/web/__tests__/v2-027b-b-erasure.test.ts, apps/web/__tests__/v2-027b-b-deletion.test.ts and,
--- for the rules carried over from the script, scripts/ops/erase-account.test.ts.
+-- call them). Tests: apps/web/__tests__/v2-027b-b-deletion.test.ts (the deletion, the queue and the
+-- catalogue), apps/web/lib/v2/account/deletion-purge.test.ts (the purge over this SQL) and, for the
+-- erasure's rules, scripts/ops/erase-account.test.ts.
 
 -- ─── The erasure's rules (D5) ─────────────────────────────────────────────────────────────────────
 -- One row per rule. `kind`: `with_user` and `with_accounts` are counted only (they go with the Auth
@@ -910,9 +911,10 @@ $$;
 
 -- What an erasure would do. Changes nothing (a stable function: Postgres refuses a write in it).
 -- Name the person by user id or by address, not both. An address that names more than one user, or
--- an id no user has, raises. Returns {userId, emails, accounts, refusals, counts, kept, storage,
--- mintedReports}, the keys scripts/ops/erase-account.ts prints. `emails` is the address given, the
--- user's current ones and users.previous_emails, lower-cased.
+-- an id no user has, raises (unless a confirmed deletion queued that id: see below). Returns {userId,
+-- emails, accounts, refusals, refusalCodes, counts, kept, storage, mintedReports}: the keys
+-- scripts/ops/erase-account.ts prints, and each refusal's code. `emails` is the address given, the
+-- user's current ones and users.previous_emails (less any another person now holds), lower-cased.
 create or replace function public.erase_person_plan(p_user uuid, p_email text)
 returns json
 language plpgsql
@@ -927,7 +929,10 @@ declare
   v_emails text[];
   v_accounts uuid[] := '{}';
   v_refusals text[] := '{}';
+  v_codes text[] := '{}';
   v_counts json;
+  v_held bigint := 0;
+  v_orphan boolean := false;
 begin
   if (p_user is null) = (v_given is null) then
     raise exception 'erase_person_plan: name exactly one of a user id and an address' using errcode = '22023';
@@ -940,7 +945,14 @@ begin
     raise exception 'the address names % users; erase by user id', cardinality(v_ids) using errcode = '22023';
   end if;
   v_user := v_ids[1];
-  if p_user is not null and v_user is null then
+  -- An Auth user deleted outside the erasure (the dashboard) whose deletion was confirmed in the app:
+  -- public.users and its seats are gone with it, the accounts it marked are not. The erasure goes on
+  -- by the queue row: the user id, and the marked accounts that still exist with no active member.
+  if p_user is not null and v_user is null
+     and exists (select 1 from public.pending_erasures q where q.user_id = p_user) then
+    v_user := p_user;
+    v_orphan := true;
+  elsif p_user is not null and v_user is null then
     raise exception 'no user has that id' using errcode = '22023';
   end if;
 
@@ -950,19 +962,39 @@ begin
                         || array(select lower(btrim(a.email)) from auth.users a where a.id = v_user)
                         || array(select lower(btrim(pu.email)) from public.users pu where pu.id = v_user)
                         || array(select lower(btrim(p.e)) from public.users pu, unnest(pu.previous_emails) p(e)
-                                  where pu.id = v_user)) with ordinality t(e, i)
+                                  where pu.id = v_user
+                                    and not public.email_held_by_other(p.e, v_user))) with ordinality t(e, i)
            where e is not null and e <> ''
            group by e) s;
 
-  if v_user is not null then
+  if v_orphan then
+    v_accounts := array(select a.id from public.pending_erasures q
+                          join public.accounts a on a.id = any(q.accounts)
+                         where q.user_id = p_user
+                           and not exists (select 1 from public.seats s
+                                            where s.account_id = a.id and s.status = 'active')
+                         order by a.id::text);
+  elsif v_user is not null then
     v_accounts := public.erase_person_accounts(v_user);
-    v_refusals := array(select f.message from public.erase_person_refusals(v_user, v_accounts) f);
+  end if;
+  if v_user is not null then
+    select coalesce(array_agg(f.message order by f.i), '{}'), coalesce(array_agg(f.code order by f.i), '{}')
+      into v_refusals, v_codes
+      from public.erase_person_refusals(v_user, v_accounts) with ordinality f(code, message, i);
+  end if;
+  -- A previous address that another person now signs in with is theirs: it is left out of the
+  -- addresses, so nothing of theirs is erased, and counted under `kept`.
+  if v_user is not null then
+    select count(*) into v_held
+      from public.users pu, unnest(pu.previous_emails) p(e)
+     where pu.id = v_user and public.email_held_by_other(p.e, v_user);
   end if;
   v_counts := public.erase_person_counts(v_user, v_emails, v_accounts);
   if json_array_length(v_counts->'storage') > 0 then
     -- The rows that name them go with the erasure, after which nothing can list them.
     v_refusals := v_refusals || (json_array_length(v_counts->'storage')::text
       || ' storage objects are still stored; delete them through the Storage API first (docs/ops/erasure.md §4)');
+    v_codes := v_codes || 'storage'::text;
   end if;
 
   return json_build_object(
@@ -970,8 +1002,17 @@ begin
     'emails', to_json(v_emails),
     'accounts', to_json(array(select a::text from unnest(v_accounts) a order by 1)),
     'refusals', to_json(v_refusals),
+    -- Each refusal's code, in the same order (`storage` for the line above): what the sequence in
+    -- lib/v2/account/erase.ts reads, so it never depends on where a line sits.
+    'refusalCodes', to_json(v_codes),
     'counts', v_counts->'counts',
-    'kept', v_counts->'kept',
+    'kept', case when v_user is null then v_counts->'kept'
+                 else (select json_object_agg(k.key, k.value order by k.i)
+                         from (select e.key, e.value, e.i
+                                 from json_each(v_counts->'kept') with ordinality e(key, value, i)
+                               union all
+                               select 'previous address now held by another person', to_json(v_held), 1000) k)
+            end,
     'storage', v_counts->'storage',
     'mintedReports', to_json(array(select r.slug from public.public_reports r
                                     where v_user is not null and r.minted_by = v_user order by r.slug)));
@@ -1131,18 +1172,27 @@ as $$
     case when p_account = any(public.erase_person_accounts(p_user)) then null else 'others_seated' end);
 $$;
 
--- An email change in flight for the person: its confirmation or its "this wasn't me" link is live. A
--- deletion waits for it, so the undo stays possible (plan-revision R6a).
-create or replace function public.email_change_live(p_user uuid)
+-- An email change in flight for the person, at p_now: a live confirmation link, or a live undo link
+-- whose change has applied (its partner confirmation link, created in the same transaction, was
+-- used). An undo link whose change was never confirmed and has expired is an abandoned request, and
+-- holds nothing. The one definition: request_email_change (CMA02, section A) and the deletion's
+-- request and confirm (a deletion waits for the change, so its undo stays possible, R6a) ask it.
+create or replace function public.email_change_live(p_user uuid, p_now timestamptz default now())
 returns boolean
 language sql
 stable
 security definer
 set search_path = pg_catalog, public, pg_temp
 as $$
-  select exists (select 1 from public.account_tokens t
-                  where t.user_id = p_user and t.kind in ('email_change', 'email_change_undo')
-                    and t.used_at is null and t.revoked_at is null and t.expires_at > now());
+  select exists (
+    select 1 from public.account_tokens k
+     where k.user_id = p_user and k.used_at is null and k.revoked_at is null
+       and k.expires_at > p_now
+       and (k.kind = 'email_change'
+            or (k.kind = 'email_change_undo' and exists (
+                  select 1 from public.account_tokens c
+                   where c.account_id = k.account_id and c.kind = 'email_change'
+                     and c.created_at = k.created_at and c.used_at is not null))));
 $$;
 
 -- The owner asks to delete the account (deletes nothing). Refuses with {ok: false, code}:
@@ -1162,6 +1212,7 @@ set search_path = pg_catalog, public, pg_temp
 as $$
 declare
   v_refusal text;
+  v_recipient text;
   v_confirm uuid;
   v_restore uuid;
 begin
@@ -1182,10 +1233,12 @@ begin
   if v_refusal is not null then
     return jsonb_build_object('ok', false, 'code', v_refusal);
   end if;
+  select u.email into v_recipient from public.users u where u.id = p_user;
   v_confirm := public.create_account_token(p_account, p_user, 'delete_confirm',
-                                           now() + interval '24 hours');
+                                           now() + interval '24 hours', p_recipient => v_recipient);
   v_restore := public.create_account_token(p_account, p_user, 'delete_restore',
-                                           now() + interval '8 days', p_paired_with => v_confirm);
+                                           now() + interval '8 days', p_paired_with => v_confirm,
+                                           p_recipient => v_recipient);
   insert into public.account_events (account_id, kind, actor_user_id)
   values (p_account, 'delete_requested', p_user);
   return jsonb_build_object('ok', true, 'confirmTokenId', v_confirm,
@@ -1240,14 +1293,15 @@ begin
 end;
 $$;
 
--- The confirmation link's POST, in one transaction (plan-revision R4): consumes the token (an issued one, by hash and kind),
--- refuses as request_account_deletion does (the token stays usable: the person can resolve it and
--- press again), marks every account the person alone holds, queues the person in pending_erasures
--- with the window's end, ends every session, revokes any email change in flight, and records
--- `delete_confirmed` on each account. Returns {ok: true, userId, accountId, tier, accounts,
--- purgeAfter} (accountId and tier: the account the link was issued for) or
--- {ok: false, code} (`invalid_link`, `others_seated`, `v1_subscription`). Signing-in is stopped by the
--- caller's Auth ban; the subscription is ended by deletionCancelFn.
+-- The confirmation link's POST, in one transaction (plan-revision R4): consumes the token (an issued
+-- one, by hash and kind); refuses as request_account_deletion does, and while an email change is in
+-- flight (its "this wasn't me" link must stay usable), leaving the token usable so the person can
+-- press again once that is resolved; marks every account the person alone holds, queues the person in
+-- pending_erasures with the window's end, ends every session, and records `delete_confirmed` on each
+-- account. Returns {ok: true, userId, accountId, tier, accounts, purgeAfter} (accountId and tier: the
+-- account the link was issued for) or {ok: false, code} (`invalid_link`, `already_confirmed`,
+-- `email_change_pending`, `others_seated`, `v1_subscription`). Signing-in is stopped by the caller's Auth ban; the
+-- subscription is ended by deletionCancelFn.
 create or replace function public.confirm_account_deletion(p_hash text, p_now timestamptz)
 returns jsonb
 language plpgsql
@@ -1265,7 +1319,12 @@ begin
   if not found or v.used_at is not null or v.revoked_at is not null or v.expires_at <= p_now then
     return jsonb_build_object('ok', false, 'code', 'invalid_link');
   end if;
-  v_refusal := public.deletion_refusal(v.account_id, v.user_id);
+  v_refusal := case
+    -- A link from another account the person holds, after the first confirm marked them all.
+    when exists (select 1 from public.pending_erasures q where q.user_id = v.user_id)
+      then 'already_confirmed'
+    when public.email_change_live(v.user_id) then 'email_change_pending'
+    else public.deletion_refusal(v.account_id, v.user_id) end;
   if v_refusal is not null then
     return jsonb_build_object('ok', false, 'code', v_refusal);
   end if;
@@ -1277,9 +1336,6 @@ begin
   insert into public.pending_erasures (user_id, accounts, confirmed_at, purge_after)
   values (v.user_id, v_accounts, p_now, v_purge);
   perform public.end_user_sessions(v.user_id);
-  update public.account_tokens t set revoked_at = p_now
-   where t.user_id = v.user_id and t.kind in ('email_change', 'email_change_undo')
-     and t.used_at is null and t.revoked_at is null;
   insert into public.account_events (account_id, kind, actor_user_id)
   select a, 'delete_confirmed', v.user_id from unnest(v_accounts) a;
   return jsonb_build_object('ok', true, 'userId', v.user_id, 'accountId', v.account_id,
@@ -1351,8 +1407,21 @@ begin
 end;
 $$;
 
--- The purge's work: the people whose window has ended by p_now and by the database's clock, the
--- longest waiting first. A restore refuses once either clock has passed the window's end
+-- Whether the person is waiting for erasure: the source of truth for their Auth ban. A route that
+-- bans or unbans reads it after its own change, so the last writer's ban follows the database.
+create or replace function public.erasure_pending(p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select exists (select 1 from public.pending_erasures q where q.user_id = p_user);
+$$;
+
+-- The purge's work: the people whose window has ended by p_now and by the database's clock; those
+-- not yet attempted first, then the least recently attempted, so people a refusal keeps in the queue
+-- cannot hold the others back. A restore refuses once either clock has passed the window's end
 -- (restore_account), and a person is due only once both have, so a restore cannot succeed for someone
 -- the purge has started on (it removes Storage objects before its apply takes the queue row's lock).
 create or replace function public.due_erasures(p_now timestamptz, p_limit integer)
@@ -1364,7 +1433,7 @@ set search_path = pg_catalog, public, pg_temp
 as $$
   select q.user_id, q.accounts, q.purge_after, q.attempts from public.pending_erasures q
    where q.purge_after <= least(p_now, now())
-   order by q.purge_after, q.user_id
+   order by q.last_attempt_at nulls first, q.purge_after, q.user_id
    limit greatest(p_limit, 0);
 $$;
 
@@ -1403,13 +1472,14 @@ $$;
 
 revoke all on function public.deletion_hostname(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.deletion_refusal(uuid, uuid) from public, anon, authenticated, service_role;
-revoke all on function public.email_change_live(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.email_change_live(uuid, timestamptz) from public, anon, authenticated, service_role;
 revoke all on function public.request_account_deletion(uuid, uuid, text)
   from public, anon, authenticated;
 revoke all on function public.read_deletion_link(text, text, timestamptz) from public, anon, authenticated;
 revoke all on function public.confirm_account_deletion(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.restore_account(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.record_deletion_cancel(uuid, uuid, text, boolean) from public, anon, authenticated;
+revoke all on function public.erasure_pending(uuid) from public, anon, authenticated;
 revoke all on function public.due_erasures(timestamptz, integer) from public, anon, authenticated;
 revoke all on function public.record_erasure_attempt(uuid) from public, anon, authenticated;
 revoke all on function public.finish_erasure(uuid) from public, anon, authenticated;
@@ -1420,6 +1490,7 @@ grant execute on function public.read_deletion_link(text, text, timestamptz) to 
 grant execute on function public.confirm_account_deletion(text, timestamptz) to service_role;
 grant execute on function public.restore_account(text, timestamptz) to service_role;
 grant execute on function public.record_deletion_cancel(uuid, uuid, text, boolean) to service_role;
+grant execute on function public.erasure_pending(uuid) to service_role;
 grant execute on function public.due_erasures(timestamptz, integer) to service_role;
 grant execute on function public.record_erasure_attempt(uuid) to service_role;
 grant execute on function public.finish_erasure(uuid) to service_role;
