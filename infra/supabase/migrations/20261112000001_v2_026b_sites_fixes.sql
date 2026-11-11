@@ -13,11 +13,37 @@
 
 -- ═══ B: fixes and the persist watermark (D5) ══════════════════════════════════════════════════════
 
--- Functions, each security definer with search_path pg_catalog, pg_temp, owned by postgres and
--- revoked from every client role: is_member_for_fix is granted to authenticated and service_role,
--- mark_fix_done and persist_built_check to service_role only.
+-- The table fix_email_requests, service_role only. Functions, each security definer with
+-- search_path pg_catalog, pg_temp, owned by postgres and revoked from every client role:
+-- is_member_for_fix is granted to authenticated and service_role, mark_fix_done and
+-- persist_built_check to service_role only.
 -- Tests: apps/web/__tests__/v2-026b-fixes.test.ts, apps/web/lib/v2/pipeline/watermark.test.ts and,
 -- on a real Postgres, scripts/db/fixes-race.test.ts.
+
+-- ─── fix_email_requests ───────────────────────────────────────────────────────────────────────────
+-- A member's request that a fix's packet be emailed to a developer (D9, owner ruling Q8). The address
+-- is held here, not in the Inngest event, which names only the row (an address in a third party's
+-- event history cannot be erased). CC-28's mailer reads the row and sets sent_at. RLS on and no client
+-- grant: the route writes it with the service role once the caller's membership is established.
+
+create table if not exists public.fix_email_requests (
+  id uuid primary key default gen_random_uuid(),
+  fix_id uuid not null references public.site_fixes (id) on delete cascade,
+  account_id uuid not null references public.accounts (id) on delete cascade,
+  requested_by_seat_id uuid references public.seats (id) on delete set null,
+  to_email text not null check (char_length(to_email) between 3 and 254),
+  requested_at timestamptz not null default now(),
+  sent_at timestamptz
+);
+
+create index if not exists fix_email_requests_fix_idx on public.fix_email_requests (fix_id);
+create index if not exists fix_email_requests_account_idx on public.fix_email_requests (account_id);
+create index if not exists fix_email_requests_seat_idx
+  on public.fix_email_requests (requested_by_seat_id);
+
+alter table public.fix_email_requests enable row level security;
+revoke all on table public.fix_email_requests from public, anon, authenticated, service_role;
+grant select, insert, update, delete on table public.fix_email_requests to service_role;
 
 -- ─── is_member_for_fix ────────────────────────────────────────────────────────────────────────────
 -- is_member_for_site of the fix's site, for the caller's session: site_fixes has no client grant, so

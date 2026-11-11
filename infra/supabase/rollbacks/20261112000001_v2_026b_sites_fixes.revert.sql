@@ -10,6 +10,7 @@
 
 -- ═══ B: fixes and the persist watermark ═══════════════════════════════════════════════════════════
 
+drop table if exists public.fix_email_requests;
 drop function if exists public.mark_fix_done(uuid, uuid);
 drop function if exists public.is_member_for_fix(uuid);
 

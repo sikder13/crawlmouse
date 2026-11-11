@@ -219,6 +219,40 @@ describe('grants', () => {
   });
 });
 
+describe('fix_email_requests', () => {
+  it('has row security on and no privilege for a client role; service_role reads and writes it', async () => {
+    const { rows } = await db.query<{ rls: boolean }>(
+      `select relrowsecurity as rls from pg_class where oid = 'public.fix_email_requests'::regclass`,
+    );
+    expect(rows[0]!.rls).toBe(true);
+    for (const role of ['anon', 'authenticated'])
+      for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+        const { rows: held } = await db.query<{ ok: boolean }>(
+          `select has_table_privilege($1, 'public.fix_email_requests', $2) as ok`,
+          [role, privilege],
+        );
+        expect(held[0]!.ok, `${role} ${privilege}`).toBe(false);
+      }
+    const { rows: svc } = await db.query<{ ok: boolean }>(
+      `select has_table_privilege('service_role', 'public.fix_email_requests', 'SELECT, INSERT, UPDATE') as ok`,
+    );
+    expect(svc[0]!.ok).toBe(true);
+  });
+
+  it('goes with its account', async () => {
+    const world = await seedWorld(db, 'email');
+    const id = randomUUID();
+    await db.query(
+      `insert into public.fix_email_requests (id, fix_id, account_id, requested_by_seat_id, to_email)
+       values ($1, $2, $3, $4, 'dev@agency.example')`,
+      [id, fixOf(world, 'site1'), world.accountId, world.ownerSeatId],
+    );
+    await db.query(`delete from public.accounts where id = $1`, [world.accountId]);
+    const { rows } = await db.query(`select 1 from public.fix_email_requests where id = $1`, [id]);
+    expect(rows).toEqual([]);
+  });
+});
+
 describe('the migration applies twice and reverts section B to migration 008', () => {
   const persistDef = async (d: PGlite) =>
     (
@@ -261,6 +295,10 @@ describe('the migration applies twice and reverts section B to migration 008', (
         expect(await persistDef(d)).toEqual(pre);
         expect(await exists(d, 'mark_fix_done')).toBe(0);
         expect(await exists(d, 'is_member_for_fix')).toBe(0);
+        const { rows } = await d.query<{ t: string | null }>(
+          `select to_regclass('public.fix_email_requests')::text as t`,
+        );
+        expect(rows[0]!.t).toBeNull();
       }
     } finally {
       await d.close();
