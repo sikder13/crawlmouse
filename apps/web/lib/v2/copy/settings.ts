@@ -21,6 +21,8 @@ export const SETTINGS_COPY = {
   accountTitle: 'Account',
   emailLabel: 'Email',
   emailHint: 'Sign-in links and alerts go here. Changing it sends a link to the new address first.',
+  /** The sign-in address, read by anyone but the owner (ARCH-2 §5: the change is the owner's). */
+  emailOwnerOnly: 'Sign-in links and alerts go here. Only the account’s owner can change it.',
   nameLabel: 'Name',
   namePlaceholder: 'Optional',
   nameHint: (agency: boolean) =>

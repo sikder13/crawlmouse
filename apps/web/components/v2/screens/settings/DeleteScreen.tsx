@@ -15,7 +15,7 @@ import styles from './SettingsScreen.module.css';
  * which the Settings artboard draws as a quiet control, never as the screen's best action.
  */
 export function DeleteScreen({ data }: { data: DeleteStepView }) {
-  const { header, field: f } = data;
+  const { header, field: f, submit } = data;
   const hint = `${f.id}-hint`;
   return (
     <AccountFrame shell={data.shell} currentIs="location">
@@ -27,35 +27,43 @@ export function DeleteScreen({ data }: { data: DeleteStepView }) {
       </header>
       <Card as="section" className={shared.panel}>
         <CardHead title={data.cardTitle} sub={data.text} />
-        <StoppedForm action={data.submit.href} className={styles.form}>
-          {Object.entries(data.submit.fields).map(([name, value]) => (
-            <input key={name} type="hidden" name={name} value={value} />
-          ))}
-          {data.removes ? <p className={styles.hint}>{data.removes}</p> : null}
-          <p className={styles.hint}>{data.steps}</p>
-          <div className={field.stack}>
-            <label htmlFor={f.id} className={field.label}>
-              {f.label}
-            </label>
-            <input
-              id={f.id}
-              name={f.name}
-              type="text"
-              required
-              autoComplete="off"
-              spellCheck={false}
-              aria-describedby={hint}
-              className={`${field.input} ${styles.input}`}
-            />
-            <div id={hint} className={styles.hint}>
-              {f.hint}
+        {submit === null ? (
+          <div className={styles.form}>
+            <div className={shared.actions}>
+              <ActionControl action={data.back} variant="quiet" size="md" />
             </div>
           </div>
-          <div className={shared.actions}>
-            <Button type="submit">{data.submit.label}</Button>
-            <ActionControl action={data.back} variant="quiet" size="md" />
-          </div>
-        </StoppedForm>
+        ) : (
+          <StoppedForm action={submit.href} className={styles.form}>
+            {Object.entries(submit.fields).map(([name, value]) => (
+              <input key={name} type="hidden" name={name} value={value} />
+            ))}
+            {data.removes ? <p className={styles.hint}>{data.removes}</p> : null}
+            <p className={styles.hint}>{data.steps}</p>
+            <div className={field.stack}>
+              <label htmlFor={f.id} className={field.label}>
+                {f.label}
+              </label>
+              <input
+                id={f.id}
+                name={f.name}
+                type="text"
+                required
+                autoComplete="off"
+                spellCheck={false}
+                aria-describedby={hint}
+                className={`${field.input} ${styles.input}`}
+              />
+              <div id={hint} className={styles.hint}>
+                {f.hint}
+              </div>
+            </div>
+            <div className={shared.actions}>
+              <Button type="submit">{submit.label}</Button>
+              <ActionControl action={data.back} variant="quiet" size="md" />
+            </div>
+          </StoppedForm>
+        )}
       </Card>
     </AccountFrame>
   );

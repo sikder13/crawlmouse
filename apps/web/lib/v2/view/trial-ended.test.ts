@@ -130,3 +130,34 @@ describe('which state the page shows', () => {
     ).toBeNull();
   });
 });
+
+describe('what a seat that is not the owner’s is offered', () => {
+  it('before the end: no checkout and no choice; the owner keeps both', () => {
+    const d = fixture('bad-site');
+    const viewer = trialEndViewer(d, BAD);
+    const owner = trialPage(d, viewer, { role: 'owner' });
+    expect(owner?.kind === 'before' && owner.view.banner.keep).not.toBeNull();
+    for (const role of ['account_manager', 'developer'] as const) {
+      const p = trialPage(d, viewer, { role });
+      if (p?.kind !== 'before') throw new Error('expected the before state');
+      expect(p.view.banner.keep).toBeNull();
+      expect(p.view.banner.end).toBeNull();
+      expect(JSON.stringify(p.view)).not.toContain('/settings/plan');
+    }
+  });
+
+  it('a card trial: no link to cancel it from Settings › Plan', () => {
+    const d = fixture('bad-site');
+    const card = {
+      ...d,
+      accounts: d.accounts.map((a) => (a.id === BAD ? { ...a, card_last4: '4242' } : a)),
+    };
+    const p = trialPage(card, trialEndViewer(card, BAD), { role: 'account_manager' });
+    expect(p?.kind === 'before' && JSON.stringify(p.view)).not.toContain('/settings/plan');
+  });
+
+  it('after the end: no checkout', () => {
+    const p = trialPage(ended(), { accountId: BAD, now: NOW }, { role: 'account_manager' });
+    expect(p?.kind === 'after' && p.view.banner.keep).toBeNull();
+  });
+});

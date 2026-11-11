@@ -26,7 +26,7 @@ export default async function DeletePage() {
   const removes = await deletionAccounts(supabaseAdmin(), page.userId);
   return (
     <LiveActions>
-      <DeleteScreen data={deleteStepView(page.d, page.viewer, { removes })} />
+      <DeleteScreen data={deleteStepView(page.d, page.viewer, { removes, role: page.role })} />
     </LiveActions>
   );
 }

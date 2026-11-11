@@ -51,6 +51,8 @@ let owner: Person; // a Free account with one site
 let empty: Person; // a Free account with no site
 let trialing: Person; // a no-card Pro trial with one site
 let ended: Person; // back on Free after a Pro trial, one site
+let shared: Person; // a no-card Pro trial with a manager seated on it
+let sharedManager: { id: string; email: string };
 let cancelling: Person; // a Pro trial with a card, its subscription set to cancel at the trial's end
 let manager: { id: string; email: string };
 let developer: { id: string; email: string };
@@ -135,6 +137,18 @@ beforeAll(async () => {
       where id = $1`,
     [cancelling.accountId],
   );
+  shared = await person('shared');
+  await host(shared, 'shared-site.example');
+  await db.query(
+    `update public.accounts
+        set state = 'pro_trial', tier = 'pro', trial_variant = 'no_card',
+            trial_ends_at = now() + interval '5 days', trial_used_at = now(),
+            state_history = state_history || jsonb_build_array(jsonb_build_object('state', 'pro_trial',
+              'since', (state_history->0->>'since')::timestamptz + interval '1 millisecond'))
+      where id = $1`,
+    [shared.accountId],
+  );
+  sharedManager = await seat(shared.accountId, 'account_manager');
   manager = await seat(owner.accountId, 'account_manager');
   developer = await seat(owner.accountId, 'developer');
 }, 300_000);
@@ -181,6 +195,19 @@ describe('/settings', () => {
       expect(html).toContain(owner.email);
       expect(html).toContain('action="/api/account"');
     }
+  });
+
+  it('offers the owner Delete… and the address to change, and a manager neither', async () => {
+    as(owner);
+    const mine = renderToStaticMarkup(screen(await SettingsPage()));
+    expect(mine).toContain('href="/settings/delete"');
+    expect(mine).not.toMatch(
+      /<input[^>]*name="newEmail"[^>]*readOnly|<input[^>]*readonly[^>]*name="newEmail"/i,
+    );
+    as(manager);
+    const theirs = renderToStaticMarkup(screen(await SettingsPage()));
+    expect(theirs).not.toContain('href="/settings/delete"');
+    expect(theirs).toMatch(/<input(?=[^>]*name="newEmail")(?=[^>]*readonly)[^>]*>/i);
   });
 
   it('is a 404 for a developer', async () => {
@@ -275,6 +302,20 @@ describe('a trial with a card whose subscription is set to cancel at its end', (
     const html = renderToStaticMarkup(screen(await TrialEndedPage()));
     expect(html).toContain('The trial is cancelled: it ends on');
     expect(html).not.toMatch(CHARGE);
+    expect(html).not.toContain('href="/settings/plan"');
+  });
+});
+
+describe('/trial-ended for a seat that is not the owner’s', () => {
+  it('offers the owner the checkout, and the manager neither it nor a link to Settings › Plan', async () => {
+    as(shared);
+    expect(renderToStaticMarkup(screen(await TrialEndedPage()))).toContain(
+      'action="/api/billing/checkout"',
+    );
+    as(sharedManager);
+    const html = renderToStaticMarkup(screen(await TrialEndedPage()));
+    expect(html).toContain('of Pro left');
+    expect(html).not.toContain('action="/api/billing/checkout"');
     expect(html).not.toContain('href="/settings/plan"');
   });
 });

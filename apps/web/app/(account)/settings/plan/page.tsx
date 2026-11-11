@@ -22,7 +22,9 @@ export default async function PlanPage() {
   if (page.kind === 'none' || page.role !== 'owner') notFound();
   return (
     <LiveActions>
-      <PlanScreen data={settingsView(page.d, page.viewer, { billingEnd: page.billingEnd })} />
+      <PlanScreen
+        data={settingsView(page.d, page.viewer, { billingEnd: page.billingEnd, role: page.role })}
+      />
     </LiveActions>
   );
 }

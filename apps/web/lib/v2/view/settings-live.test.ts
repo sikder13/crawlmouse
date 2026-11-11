@@ -101,3 +101,44 @@ describe('deleting an account with a paid plan: the money (owner ruling Q7)', ()
     }
   });
 });
+
+describe('what each role is offered (CC-27b review, item 5)', () => {
+  const home = fixture('bad-site');
+  const paid = fixture('challenged-site');
+  const onAgency = { accountId: ACCOUNT_VIEWERS.withheld().accountId, now: '2026-10-31T12:00:00Z' };
+
+  it('the owner: the address to change, Delete…, Keep, and on a paid plan Cancel and the portal', () => {
+    const v = settingsView(home, ACCOUNT_VIEWERS.home(), { role: 'owner' });
+    expect(v.account.email.readOnly).toBe(false);
+    expect(v.danger.action).toMatchObject({ href: '/settings/delete' });
+    expect(v.plan.keep).not.toBeNull();
+    const p = settingsView(paid, onAgency, { role: 'owner' }).plan;
+    expect(p.terms.map((t) => t.action?.href ?? null)).toEqual([
+      '/api/billing/cancel',
+      '/api/billing/portal',
+    ]);
+  });
+
+  it('an account manager: the address read-only, and no Delete…, Keep, Cancel or portal', () => {
+    const v = settingsView(home, ACCOUNT_VIEWERS.home(), { role: 'account_manager' });
+    expect(v.account.email.readOnly).toBe(true);
+    expect(v.danger.action).toBeNull();
+    expect(v.plan.keep).toBeNull();
+    const p = settingsView(paid, onAgency, { role: 'account_manager' }).plan;
+    expect(p.terms.map((t) => t.action)).toEqual([null, null]);
+    // The name and the email kinds stay theirs to change.
+    expect(v.account.save.href).toBe('/api/account');
+  });
+
+  it('a preview is read as the owner’s', () => {
+    expect(settingsView(home, ACCOUNT_VIEWERS.home())).toEqual(
+      settingsView(home, ACCOUNT_VIEWERS.home(), { role: 'owner' }),
+    );
+  });
+
+  it('the delete step’s request is the owner’s alone', () => {
+    expect(deleteStepView(home, ACCOUNT_VIEWERS.home(), { role: 'owner' }).submit).not.toBeNull();
+    for (const role of ['account_manager', 'developer'] as const)
+      expect(deleteStepView(home, ACCOUNT_VIEWERS.home(), { role }).submit).toBeNull();
+  });
+});

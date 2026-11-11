@@ -31,6 +31,7 @@ function Input({ f, type }: { f: FieldView; type: 'email' | 'text' }) {
         defaultValue={f.value}
         placeholder={f.placeholder ?? undefined}
         aria-describedby={hint}
+        readOnly={f.readOnly}
         className={`${field.input} ${styles.input} ${type === 'email' ? '' : styles.text}`}
       />
       <div id={hint} className={styles.hint}>
@@ -136,7 +137,9 @@ export function SettingsScreen({ data }: { data: SettingsView }) {
                     <span key="t" className={shared.muted}>
                       {danger.text}
                     </span>,
-                    <ActionControl key="a" action={danger.action} variant="quiet" />,
+                    danger.action ? (
+                      <ActionControl key="a" action={danger.action} variant="quiet" />
+                    ) : null,
                   ],
                 },
               ]}

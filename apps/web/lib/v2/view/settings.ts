@@ -35,6 +35,7 @@ import {
 import { action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
+import type { SeatRole } from '../account/profile';
 
 export const CC27B_ROUTES = {
   accountAlertRules: {
@@ -206,6 +207,8 @@ export interface FieldView {
   value: string;
   placeholder: string | null;
   hint: string;
+  /** Shown but not changeable by this reader: the sign-in address, for anyone but the owner. */
+  readOnly: boolean;
 }
 
 export interface EmailKindRowView {
@@ -228,7 +231,14 @@ export interface SettingsView {
     save: ActionView;
   };
   email: { title: string; tableLabel: string; rows: EmailKindRowView[]; foot: string };
-  danger: { title: string; tableLabel: string; label: string; text: string; action: ActionView };
+  /** `action` is null for anyone but the owner: deleting is the owner's alone. */
+  danger: {
+    title: string;
+    tableLabel: string;
+    label: string;
+    text: string;
+    action: ActionView | null;
+  };
   plan: {
     title: string;
     name: string;
@@ -259,13 +269,21 @@ export function settingsView(
   viewer: Viewer,
   {
     billingEnd = null,
+    role = 'owner',
   }: {
     /** When a paid plan set to cancel at its period's end ends (the subscription mirror's
      * current_period_end); null when it is not set to. The contract's Account has no field for it. */
     billingEnd?: string | null;
+    /**
+     * The reader's seat role. The owner alone changes the sign-in address, deletes the account, and
+     * reaches the checkout, the cancel and the billing portal (spec 27's guards); a manager keeps the
+     * name and the email kinds. A preview reads as the owner.
+     */
+    role?: SeatRole;
   } = {},
 ): SettingsView {
   const v = viewAt(d, viewer);
+  const owner = role === 'owner';
   const a = v.account;
   const zone = a.timezone;
   const trial = a.state === 'pro_trial' || a.state === 'agency_trial';
@@ -324,8 +342,9 @@ export function settingsView(
   const monthly = v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY;
   // A trial with a card becomes the plan at its end, and an account past due on Free gets back by
   // updating its card: neither has a Keep. A trial with no card keeps its plan; Free chooses Pro.
-  const keep =
-    trial && !cardTrial
+  const keep = !owner
+    ? null
+    : trial && !cardTrial
       ? action(
           'keepPlan',
           COPY.keep(plan, monthly),
@@ -343,8 +362,8 @@ export function settingsView(
           )
         : null;
   const keepShown = keep !== null;
-  const cancel = routeAction('cancelPlan', COPY.cancelAction);
-  const portal = routeAction('billingPortal', COPY.portalAction);
+  const cancel = owner ? routeAction('cancelPlan', COPY.cancelAction) : null;
+  const portal = owner ? routeAction('billingPortal', COPY.portalAction) : null;
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
@@ -361,7 +380,8 @@ export function settingsView(
         name: 'newEmail',
         value: a.email,
         placeholder: null,
-        hint: COPY.emailHint,
+        hint: owner ? COPY.emailHint : COPY.emailOwnerOnly,
+        readOnly: !owner,
       },
       name: {
         id: 'account-name',
@@ -370,6 +390,7 @@ export function settingsView(
         value: a.name ?? '',
         placeholder: COPY.namePlaceholder,
         hint: COPY.nameHint(agency),
+        readOnly: false,
       },
       signIn: { title: COPY.signInTitle, text: COPY.signIn(AUTH_LINK_MINUTES) },
       save: routeAction('account', COPY.save, {}, { primary: true }),
@@ -385,7 +406,7 @@ export function settingsView(
       tableLabel: COPY.tables.danger,
       label: COPY.deleteLabel,
       text: deleteText(v),
-      action: routeAction('deleteConfirm', COPY.deleteAction),
+      action: owner ? routeAction('deleteConfirm', COPY.deleteAction) : null,
     },
     plan: {
       title: COPY.planTitle,
@@ -502,7 +523,8 @@ export interface DeleteStepView {
   removes: string | null;
   /** The in-page guard: the primary site's hostname, typed again. */
   field: { id: string; label: string; name: string; expected: string; hint: string };
-  submit: ActionView;
+  /** The request for the link; null for anyone but the owner. */
+  submit: ActionView | null;
   /** Back to Settings, deleting nothing. */
   back: ActionView;
 }
@@ -517,9 +539,12 @@ export function deleteStepView(
   viewer: Viewer,
   {
     removes = null,
+    role = 'owner',
   }: {
     /** Each account the erasure plan names, by its primary site's host (null for none). */
     removes?: readonly { host: string | null }[] | null;
+    /** The reader's seat role: the request is the owner's alone. A preview reads as the owner. */
+    role?: SeatRole;
   } = {},
 ): DeleteStepView {
   const v = viewAt(d, viewer);
@@ -543,7 +568,7 @@ export function deleteStepView(
       expected,
       hint: COPY.retypeHint,
     },
-    submit: routeAction('deleteAccount', COPY.sendDeleteLink),
+    submit: role === 'owner' ? routeAction('deleteAccount', COPY.sendDeleteLink) : null,
     back: action('emailSettings', COPY.keepAccount),
   };
 }

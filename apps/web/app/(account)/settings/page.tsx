@@ -23,7 +23,9 @@ export default async function SettingsPage() {
   if (page.role !== 'owner' && page.role !== 'account_manager') notFound();
   return (
     <LiveActions>
-      <SettingsScreen data={settingsView(page.d, page.viewer, { billingEnd: page.billingEnd })} />
+      <SettingsScreen
+        data={settingsView(page.d, page.viewer, { billingEnd: page.billingEnd, role: page.role })}
+      />
     </LiveActions>
   );
 }
