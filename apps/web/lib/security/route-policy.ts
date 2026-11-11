@@ -105,6 +105,13 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { route: 'api/billing/status', methods: ['GET'], class: 'user', origin: 'any' },
   { route: 'api/checks/[id]/claim', methods: ['POST'], class: 'user', origin: 'strict' },
   {
+    route: 'api/fixes/[id]/email-developer',
+    methods: ['POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  { route: 'api/fixes/[id]/packet', methods: ['GET'], class: 'member', origin: 'any' },
+  {
     route: 'api/developers',
     methods: ['POST'],
     class: 'public',
