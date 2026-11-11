@@ -19,11 +19,11 @@
  *   consumes the link last), so a failure on the way leaves the link usable and the page can be
  *   posted again. Either way every session of the person ends.
  */
-import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { Tier } from '../../entitlement-v2';
 import type { CaptureAccountEvent } from './account-events';
 import { accountEmail, type SendEmails } from './emails';
+import { ipHash } from './rate-keys';
 import { hashToken, isToken } from './tokens';
 
 export interface RpcError {
@@ -68,6 +68,7 @@ const REFUSALS: Readonly<Record<string, EmailChangeOutcome>> = {
   CMA04: refused(409, 'address_taken'),
   CMA05: refused(410, 'link_unusable'),
   CMA06: refused(409, 'try_again'),
+  CMA07: refused(409, 'deletion_pending'),
 };
 
 const LINK_UNUSABLE = REFUSALS.CMA05!;
@@ -121,12 +122,13 @@ export async function requestEmailChange(
   const newEmail = parsed.data;
   if (newEmail === input.currentEmail.toLowerCase()) return REFUSALS.CMA01!;
 
-  // Both buckets end in a value the erasure finds (the user id, or the address's hash), and both
-  // refuse when they cannot be counted.
-  const ipHash = createHash('sha256').update(input.ip, 'utf8').digest('hex');
+  // Both buckets refuse when they cannot be counted. The person's ends in the user id, which the
+  // erasure finds and deletes. The address's ends in the address's sha256 (`ipHash`): nothing ties
+  // it to a person, so the erasure does not remove it, and `prune_rate_limits` deletes it 25 hours
+  // after its window starts.
   if (!(await ports.rateLimit(`account-email:user:${input.userId}`, EMAIL_CHANGE_LIMITS.perUser)))
     return refused(429, 'rate_limited');
-  if (!(await ports.rateLimit(`account-email:ip:${ipHash}`, EMAIL_CHANGE_LIMITS.perIp)))
+  if (!(await ports.rateLimit(`account-email:ip:${ipHash(input.ip)}`, EMAIL_CHANGE_LIMITS.perIp)))
     return refused(429, 'rate_limited');
 
   const created = await call(

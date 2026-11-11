@@ -62,11 +62,17 @@ async function handle(req: Request, verb: 'PATCH' | 'DELETE' | null): Promise<Re
   const meant = meantMethod(req, body);
   const method = verb ?? meant.method;
   if (method !== 'PATCH' && method !== 'DELETE') return refuse(405, 'method_not_allowed');
+  // A form is sent back to the page it came from, with the refusal's code to show; JSON gets JSON.
+  const page = method === 'DELETE' ? `${SETTINGS}/delete` : SETTINGS;
+  const no = (status: number, code: string): Response =>
+    body.kind === 'form'
+      ? respond('form', `${page}?error=${encodeURIComponent(code)}`)
+      : refuse(status, code);
 
   const viewer = await loadViewer();
-  if (viewer.kind === 'signed_out') return refuse(401, 'auth_required');
-  if (viewer.kind === 'no_account') return refuse(409, 'no_account');
-  if (viewer.kind === 'ambiguous') return refuse(409, 'account_ambiguous');
+  if (viewer.kind === 'signed_out') return no(401, 'auth_required');
+  if (viewer.kind === 'no_account') return no(409, 'no_account');
+  if (viewer.kind === 'ambiguous') return no(409, 'account_ambiguous');
   const accountId = viewer.viewer.account.id;
 
   const { data: role, error: roleError } = await sb.rpc('member_role', { p_account: accountId });
@@ -75,14 +81,14 @@ async function handle(req: Request, verb: 'PATCH' | 'DELETE' | null): Promise<Re
 
   const admin = supabaseAdmin();
   if (method === 'DELETE') {
-    if (role !== 'owner') return refuse(403, 'not_owner');
+    if (role !== 'owner') return no(403, 'not_owner');
     const input = DeleteBody.safeParse(meant.fields);
-    if (!input.success) return refuse(400, 'invalid');
+    if (!input.success) return no(400, 'invalid');
     const answer = await requestAccountDeletion(
       routeDeletionPorts(admin, req.headers.get('cookie')),
       { userId: user.id, accountId, hostname: input.data.hostname, ip: clientIp(req) },
     );
-    if (!answer.ok) return refuse(answer.status, answer.code);
+    if (!answer.ok) return no(answer.status, answer.code);
     return body.kind === 'form'
       ? respond('form', `${SETTINGS}/delete?sent=1`)
       : Response.json({ sent: true }, { status: 202 });
@@ -100,7 +106,7 @@ async function handle(req: Request, verb: 'PATCH' | 'DELETE' | null): Promise<Re
       body: { kind: body.kind, fields: meant.fields },
     },
   );
-  if (!outcome.ok) return refuse(outcome.status, outcome.code);
+  if (!outcome.ok) return no(outcome.status, outcome.code);
   if (outcome.forwardEmailChange !== null) {
     const change = await requestEmailChange(emailChangePorts(admin, req.headers.get('cookie')), {
       accountId,
@@ -109,7 +115,7 @@ async function handle(req: Request, verb: 'PATCH' | 'DELETE' | null): Promise<Re
       newEmail: outcome.forwardEmailChange,
       ip: getClientIp(req),
     });
-    if (!change.ok) return refuse(change.status, change.code);
+    if (!change.ok) return no(change.status, change.code);
   }
   const write = supabaseProfilePorts(admin);
   for (const p of pending) await write.updateAccount(p.accountId, p.columns);

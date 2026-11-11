@@ -264,6 +264,30 @@ describe('DELETE: the deletion request', () => {
   });
 });
 
+describe('a refused form', () => {
+  it('goes back to the delete step with the refusal’s code', async () => {
+    h.deletionAnswer = { ok: false, status: 422, code: 'hostname_mismatch' };
+    const res = await (await route()).POST(form({ _method: 'DELETE', hostname: 'wrong.example' }));
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/settings/delete?error=hostname_mismatch');
+  });
+
+  it('goes back to Settings with the refusal’s code, saving nothing', async () => {
+    h.role = 'developer';
+    const res = await (await route()).POST(form({ _method: 'PATCH', name: 'x' }));
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/settings?error=role_refused');
+    expect(h.saved).toEqual([]);
+  });
+
+  it('JSON is still answered with the status and code', async () => {
+    h.role = 'developer';
+    const res = await (await route()).PATCH(json('PATCH', { name: 'x' }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ code: 'role_refused' });
+  });
+});
+
 describe('a form’s verb', () => {
   it('refuses a POST whose _method is neither PATCH nor DELETE', async () => {
     const res = await (await route()).POST(form({ _method: 'PUT', name: 'x' }));
