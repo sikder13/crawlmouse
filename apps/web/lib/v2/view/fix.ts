@@ -11,7 +11,7 @@ import { instant } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { dayTimeUtc, listOf, percent } from '../format';
 import { count, numberWord, plural } from '../words';
-import { freeFixes } from './free-fixes';
+import { freeFixes, type FixPlan } from './free-fixes';
 import { keptUntilOf, points } from './result';
 import {
   effectOf,
@@ -35,7 +35,7 @@ import type { ViewDataset } from './dataset';
 /** A packet's framework; the contract names the schema, not the type. */
 export type PacketFramework = FixPacket['framework'];
 
-export type FixPlan = 'free' | 'pro';
+export type { FixPlan };
 
 export interface FixHrefs extends SegmentHrefs {
   /** A fix's own page, by id. Omitted, a fix links nowhere yet ("#"). */

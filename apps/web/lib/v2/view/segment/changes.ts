@@ -264,7 +264,11 @@ export function changesView(
       history,
       historyNote: kept
         ? null
-        : 'The second row appears after the next check. "Re-run, free" in the header runs one now, without an account, but it replaces this audit rather than comparing with it.',
+        : `The second row appears after the next check.${
+            options.rerun === false
+              ? ''
+              : ' "Re-run, free" in the header runs one now, without an account, but it replaces this audit rather than comparing with it.'
+          }`,
       coverage: { read: 'No earlier audit of this site to compare with' },
       keep: kept
         ? null
@@ -277,7 +281,7 @@ export function changesView(
   }
 
   const rows = d.changes.filter((c) => c.check_id === check.id).map((c) => rowOf(c, check, at));
-  const previous = findCheck(d, check.previous_check_id);
+  const previous = d.checks.find((c) => c.id === check.previous_check_id);
   const when = at(check.finished_at!);
   return {
     frame,
@@ -301,7 +305,7 @@ export function changesView(
     history,
     historyNote: null,
     coverage: {
-      read: previous.finished_at
+      read: previous?.finished_at
         ? `Compared with the check of ${dateTimeUtc(previous.finished_at)}`
         : 'Compared with the check before it',
     },

@@ -75,7 +75,11 @@ export async function persistBuild(
   const built = buildCheck(input);
   if (!siteSeeded) await seedSite(db, input.site);
   await seedRunning(db, input.check);
-  const owner = { accountId: input.site.account_id, siteId: input.site.id, checkId: input.check.id };
+  const owner = {
+    accountId: input.site.account_id,
+    siteId: input.site.id,
+    checkId: input.check.id,
+  };
   const map_path = map ? evidencePath(owner, 'map') : null;
   if (map_path) await putJson(evidence, map_path, checkMap(built.page_results, built.link_edges));
   await persistBuiltCheck(pglitePersistDb(db), {

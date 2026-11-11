@@ -256,7 +256,7 @@ export function structureView(
     },
     map: mapView(check, drawing, options.hrefs?.map?.all ?? '#'),
     orphans: { ...orphanTable(check, rows), explorerHref: options.hrefs?.map?.hubs ?? '#' },
-    fixes: sectionFixes(d, check, 'structure'),
+    fixes: sectionFixes(d, check, 'structure', options.plan),
     keep: frame.keptUntil
       ? {
           title:

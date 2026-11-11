@@ -222,7 +222,7 @@ export function contentView(
   if (!coverage)
     throw new Error(`Check ${check.id} has no coverage; the segments show graded checks`);
   const frame = segmentFrame(d, checkId, 'content', options);
-  const fixes = sectionFixes(d, check, 'content');
+  const fixes = sectionFixes(d, check, 'content', options.plan);
   const templates = coverage.templates;
   const here = fixes.open.length + fixes.proCount;
   const keepFor = (what: string) =>

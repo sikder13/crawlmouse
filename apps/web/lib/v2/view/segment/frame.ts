@@ -9,6 +9,7 @@ import { findCheck, siteOf } from '../../fixtures';
 import { dayTimeUtc, percent } from '../../format';
 import { keptUntilOf } from '../result';
 import type { ViewDataset } from '../dataset';
+import type { FixPlan } from '../free-fixes';
 
 export const SEGMENT_KEYS = [
   'access',
@@ -79,6 +80,13 @@ export interface SegmentOptions {
   /** Show a since-kept check as it was at its finish, as the Result preview does. */
   asFirstSeen?: boolean;
   hrefs?: SegmentHrefs;
+  /** The reader's plan: Free opens the free fixes (free-fixes.ts), Pro opens every live fix. */
+  plan?: FixPlan;
+  /**
+   * Whether the page's header offers "Re-run, free", which the Changes page of a first audit
+   * mentions. The previews show it; a page that has no such control passes false.
+   */
+  rerun?: boolean;
 }
 
 export interface SegmentLink {

@@ -17,6 +17,14 @@ export function freeFixes(d: ViewDataset, check: Check): Fix[] {
   return fixesAsOf(d, check).slice(0, FREE_FIXES);
 }
 
+/** What a reader's plan opens of an audit's fixes: the Free ones, or each live fix. */
+export type FixPlan = 'free' | 'pro';
+
+/** The fixes `plan` opens at `check`, in order: the live fixes on a paid plan, Free's otherwise. */
+export function openFixes(d: ViewDataset, check: Check, plan: FixPlan = 'free'): Fix[] {
+  return plan === 'pro' ? fixesAsOf(d, check) : freeFixes(d, check);
+}
+
 /** Whether Free opens `fix` at `check`. A fix of another site, or one resolved by then, is not open. */
 export function isFreeFix(d: ViewDataset, check: Check, fix: Pick<Fix, 'id'>): boolean {
   return freeFixes(d, check).some((f) => f.id === fix.id);

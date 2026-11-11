@@ -329,7 +329,7 @@ export function accessView(
     (w) => w.check_id === check.id && w.collection === 'access_tests',
   );
   const ai = check.crawlers.filter(isAi);
-  const fixes = sectionFixes(d, check, 'crawler_access');
+  const fixes = sectionFixes(d, check, 'crawler_access', options.plan);
   return {
     frame,
     headline: { title: headlineTitle(check), pill: accessPill(check), body: headlineBody(check) },

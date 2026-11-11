@@ -35,9 +35,7 @@ describe('loadCheckFor: the five states', () => {
   }, 120_000);
 
   it('answers null for an id that names no check', async () => {
-    expect(
-      await loadCheckFor(deps, '00000000-0000-4000-8000-000000000000', anonymous),
-    ).toBeNull();
+    expect(await loadCheckFor(deps, '00000000-0000-4000-8000-000000000000', anonymous)).toBeNull();
   });
 
   it('a queued check is waiting, with what its row holds', async () => {
@@ -182,7 +180,10 @@ describe('loadCheckFor: a finished check built by the engine and persisted', () 
   });
 
   it('answers map: null for a drawing that is missing, not gzip, not JSON, or of another shape', async () => {
-    const path = evidencePath({ accountId: null, siteId: first.check.site_id, checkId: FIRST }, 'map');
+    const path = evidencePath(
+      { accountId: null, siteId: first.check.site_id, checkId: FIRST },
+      'map',
+    );
     const stored = deps.evidence.objects.get(path)!;
     const drawing = checkMap(first.page_results, first.link_edges);
     const [anyNode] = drawing.nodes;
