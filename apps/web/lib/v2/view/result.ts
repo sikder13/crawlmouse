@@ -7,6 +7,7 @@
 import {
   instant,
   scoredCrawlersMeasured,
+  type Change,
   type Check,
   type CrawlerResult,
   type Fix,
@@ -14,7 +15,7 @@ import {
 } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { AI_WAITING, effectHeadline } from './effect-headline';
-import { isFreeFix } from './free-fixes';
+import { openFixes, type FixPlan } from './free-fixes';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
@@ -36,7 +37,7 @@ import {
   verbFor,
 } from '../sentences';
 import { capitalise, count, numberWord, plural } from '../words';
-import type { ViewDataset } from './dataset';
+import type { ViewDataset } from '../fixtures';
 
 export interface GradeView {
   label: string;
@@ -51,6 +52,25 @@ export interface CoverageView {
   tested: number;
   total: number;
   groups: number;
+}
+
+/**
+ * The pages tested as the crawlers, and the template groups they were drawn from. When the record
+ * holds each sampled page, the groups are counted from those pages; a record that holds fewer (a
+ * contract fixture) cannot say, and the count is then the check's templates, capped by the pages
+ * tested, since a page belongs to one template.
+ */
+export function sampledCoverage(d: ViewDataset, check: Check): CoverageView {
+  const coverage = check.coverage!;
+  const sampled = d.page_results.filter((p) => p.check_id === check.id && p.sampled);
+  return {
+    tested: coverage.pages_sampled,
+    total: coverage.pages_discovered,
+    groups:
+      sampled.length === coverage.pages_sampled
+        ? new Set(sampled.map((p) => p.template_key)).size
+        : Math.min(coverage.templates.length, coverage.pages_sampled),
+  };
 }
 
 /** A door's pill tone. The same names as the StatusPill states, so the screen passes it straight on. */
@@ -118,9 +138,11 @@ export interface ResultView {
     orphans: number;
     /** Where the map door opens: the link-map explorer. */
     href: string;
-    nodes: LayoutNode[];
-    positions: Record<string, Point>;
-  };
+  } & (
+    | { nodes: LayoutNode[]; positions: Record<string, Point> }
+    /** No drawing was stored for the check, so the door has no thumbnail. */
+    | { nodes: null; positions: null }
+  );
 }
 
 export type ResultPageView =
@@ -291,7 +313,24 @@ function withoutJsDoor(
   isOpen: (f: Fix) => boolean,
   coverage: CoverageView,
 ): DoorView {
-  const share = check.without_js!.site_text_share;
+  // FACTS K9: the free result measures a sample; Pro measures every page. A sample that was
+  // every page leaves Pro nothing more to offer here.
+  const footer =
+    coverage.tested < coverage.total
+      ? `Every page measured with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen)}`
+      : fixCount(fixes, SECTIONS.withoutJs!, isOpen);
+  // The check holds no site-wide share. Why is not in the check, so the door does not say why.
+  if (!check.without_js) {
+    return {
+      title: 'Readable without JavaScript',
+      pill: { state: 'neutral', label: 'not measured' },
+      body: 'How much of the text is in the HTML before JavaScript runs was not measured in this audit.',
+      footer,
+      coverage: { read: 'No site-wide share was recorded for this measurement.' },
+      href: '#',
+    };
+  }
+  const share = check.without_js.site_text_share;
   const templates = check.coverage!.templates;
   const known = clientRenderedTemplates(check);
   const thin = known ?? [];
@@ -316,12 +355,7 @@ function withoutJsDoor(
     pill: { state: share >= 0.9 ? 'ok' : 'warn', label: `${percent(share)}% of text` },
     bar: { percent: percent(share), tone: share >= 0.9 ? 'neutral' : 'warn' },
     body,
-    // FACTS K9: the free result measures a sample; Pro measures every page. A sample that was
-    // every page leaves Pro nothing more to offer here.
-    footer:
-      coverage.tested < coverage.total
-        ? `Every page measured with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen)}`
-        : fixCount(fixes, SECTIONS.withoutJs!, isOpen),
+    footer,
     coverage: { pages: coverage },
     href: '#',
   };
@@ -564,11 +598,52 @@ function signalsDoor(check: Check): DoorView {
   };
 }
 
-/** The changes door shows a first audit only (it throws otherwise), so there is nothing before it. */
+/** A first audit has nothing before it. */
 const FIRST_AUDIT = { read: 'No earlier audit of this site to compare with' };
 
-function changesDoor(check: Check, kept: boolean, cadence: string | null): DoorView {
-  if (check.previous_check_id !== null) throw new Error('Only a first audit is shown here');
+/** How the door counts a change of each kind, in the order it lists them. */
+const CHANGE_KINDS: readonly [Change['kind'], string][] = [
+  ['opened', 'opened'],
+  ['resolved', 'resolved'],
+  ['changed', 'changed'],
+  ['baseline', 'first recorded'],
+];
+
+/** The door of a check that has one before it: its own change rows, counted by kind. */
+function recheckDoor(d: ViewDataset, check: Check): DoorView {
+  const changes = d.changes.filter((c) => c.check_id === check.id);
+  const counted = CHANGE_KINDS.map(
+    ([kind, word]) => [changes.filter((c) => c.kind === kind).length, word] as const,
+  ).filter(([n]) => n > 0);
+  const previous = d.checks.find((c) => c.id === check.previous_check_id);
+  return {
+    title: 'What changed since last time',
+    pill: {
+      state: 'neutral',
+      label: changes.length
+        ? `${changes.length} ${plural(changes.length, 'change', 'changes')}`
+        : 'no changes',
+    },
+    body: counted.length
+      ? `${capitalise(listOf(counted.map(([n, word]) => `${numberWord(n)} ${word}`)))} since the check before this one.`
+      : 'Nothing changed since the check before this one.',
+    footer: 'Each change with what we found beside it',
+    coverage: {
+      read: previous?.finished_at
+        ? `Compared with the check of ${dateTimeUtc(previous.finished_at)}`
+        : 'Compared with the check before it',
+    },
+    href: '#',
+  };
+}
+
+function changesDoor(
+  d: ViewDataset,
+  check: Check,
+  kept: boolean,
+  cadence: string | null,
+): DoorView {
+  if (check.previous_check_id !== null) return recheckDoor(d, check);
   if (kept) {
     return {
       title: 'What changed since last time',
@@ -677,7 +752,9 @@ function fixFirstBody(check: Check, f: Fix, siteFixes: readonly Fix[]): string {
         : seo === null || h.kind === 'seo_not_estimated'
           ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
           : `Technical SEO ${seo} → ${Math.min(100, seo + h.points)}, estimated.`;
-  return `${what ? `${capitalise(what)}. ` : ''}${effect} The steps and the evidence are open, free.`;
+  // The steps are named only where a packet was written; a fix with none ends at its effect.
+  const open = f.packet ? ' The steps and the evidence are open, free.' : '';
+  return `${what ? `${capitalise(what)}. ` : ''}${effect}${open}`;
 }
 
 /** Whether a title states the number `n` as a whole number, grouped ("1,120") or not. */
@@ -756,8 +833,13 @@ function crawledLine(check: Check) {
 }
 
 export interface ResultOptions {
-  /** The map's drawing: the layout of this check's crawl, made by the caller. */
-  map: { nodes: LayoutNode[]; positions: Record<string, Point> };
+  /**
+   * The map's drawing: the layout of this check's crawl, made by the caller. Null when the check
+   * has no drawing to show; the map door then carries its counts and no thumbnail.
+   */
+  map: { nodes: LayoutNode[]; positions: Record<string, Point> } | null;
+  /** The reader's plan: Free opens the free fixes (free-fixes.ts), Pro opens every live fix. */
+  plan?: FixPlan;
   /**
    * Show a check that has since been kept as it was at its finish, before anyone kept it: the
    * locked Result screen is that moment of the bad-site audit. Its expiry is then the finish plus
@@ -802,7 +884,14 @@ const CADENCE: Record<string, string> = {
 export function resultView(
   d: ViewDataset,
   checkId: string,
-  { map, asFirstSeen = false, segmentHref, fixHref = () => '#', mapHref = '#' }: ResultOptions,
+  {
+    map,
+    plan = 'free',
+    asFirstSeen = false,
+    segmentHref,
+    fixHref = () => '#',
+    mapHref = '#',
+  }: ResultOptions,
 ): ResultView {
   const check = findCheck(d, checkId);
   if (check.status !== 'finished' && check.status !== 'partial') {
@@ -814,14 +903,11 @@ export function resultView(
   const fixes = fixesAsOf(d, check);
   // a pending AI effect names fixes of this site by fingerprint, resolved or not
   const siteFixes = d.fixes.filter((x) => x.site_id === check.site_id);
-  const isOpen = (f: Fix) => isFreeFix(d, check, f);
+  const opened = new Set(openFixes(d, check, plan).map((f) => f.id));
+  const isOpen = (f: Fix) => opened.has(f.id);
   const grades = grade(check, fixes, isOpen);
   const coverage = check.coverage!;
-  const sampled: CoverageView = {
-    tested: coverage.pages_sampled,
-    total: coverage.pages_discovered,
-    groups: coverage.templates.length,
-  };
+  const sampled = sampledCoverage(d, check);
   const withheld = check.ai_readability!.withheld;
   const clean = !withheld && fixes.length === 0;
   const keptUntil = keptUntilOf(d, check, asFirstSeen);
@@ -850,7 +936,7 @@ export function resultView(
       structureDoor(check, fixes, isOpen),
       contentDoor(check, fixes, isOpen),
       signalsDoor(check),
-      changesDoor(check, kept, cadence),
+      changesDoor(d, check, kept, cadence),
     ].map((door, i) =>
       // The keep door asks for an email; every other door opens its segment.
       door.keep || !segmentHref ? door : { ...door, href: segmentHref(DOOR_SEGMENTS[i]!) },
@@ -869,10 +955,33 @@ export function resultView(
       links: check.structure!.internal_links,
       orphans: check.structure!.orphan_pages,
       href: mapHref,
-      nodes: map.nodes,
-      positions: map.positions,
+      ...(map ? { nodes: map.nodes, positions: map.positions } : { nodes: null, positions: null }),
     },
   };
+}
+
+/**
+ * What a partial check did not measure, in one sentence built from its own figures; null for a
+ * finished check. The parts: pages found and not crawled, AI crawlers with no measurement, and
+ * the text share when no page was rendered.
+ */
+export function partialNotice(d: ViewDataset, checkId: string): string | null {
+  const check = findCheck(d, checkId);
+  if (check.status !== 'partial' || !check.coverage) return null;
+  const { pages_crawled: crawled, pages_discovered: found } = check.coverage;
+  const unmeasured = check.crawlers.filter(isAi).filter((c) => c.verdict === 'not_measured');
+  const parts = [
+    crawled < found
+      ? `${count(found - crawled)} of the ${count(found)} ${plural(found, 'page', 'pages')} found ${plural(found - crawled, 'was', 'were')} not crawled`
+      : null,
+    unmeasured.length
+      ? `${listOf(unmeasured.map((c) => c.ua))} ${plural(unmeasured.length, 'was', 'were')} not measured`
+      : null,
+    check.without_js ? null : 'text without JavaScript was not measured',
+  ].filter((x): x is string => x !== null);
+  return parts.length
+    ? `This audit is partial: ${parts.join('; ')}.`
+    : 'This audit is partial: a part of the crawl or of the crawler tests did not finish.';
 }
 
 /** The states around a result: a check that has not run, one that failed, one that expired. */

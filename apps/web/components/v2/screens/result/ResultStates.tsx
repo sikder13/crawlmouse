@@ -63,24 +63,45 @@ export function ResultState({ data }: { data: State }) {
             ],
             action: { label: 'Re-run, free', href: '#' },
           };
+  // A failed or expired audit can be run again, from the button in its body.
+  return <AuditNotice domain={data.domain} {...body} />;
+}
+
+/**
+ * A page that stands where a result would be: the site, what happened in a heading and a few
+ * lines, and the reader's way forward as the page's one orange element (none when `action` is
+ * null).
+ */
+export function AuditNotice({
+  domain,
+  title,
+  lines,
+  action,
+}: {
+  domain: string;
+  title: string;
+  lines: readonly string[];
+  action: { label: string; href: string } | null;
+}) {
   return (
-    // A failed or expired audit can be run again, from the button in its body.
     <ResultShell>
       <section className={styles.state}>
-        <div className={`${layout.mono} ${layout.mut}`}>{data.domain}</div>
+        <div className={`${layout.mono} ${layout.mut}`}>{domain}</div>
         <Heading level={1} size="m">
-          {body.title}
+          {title}
         </Heading>
-        {body.lines.map((l) => (
+        {lines.map((l) => (
           <p key={l} className={styles.stateLine}>
             {l}
           </p>
         ))}
-        <div>
-          <Button variant="primary" href={body.action.href}>
-            {body.action.label}
-          </Button>
-        </div>
+        {action ? (
+          <div>
+            <Button variant="primary" href={action.href}>
+              {action.label}
+            </Button>
+          </div>
+        ) : null}
       </section>
     </ResultShell>
   );

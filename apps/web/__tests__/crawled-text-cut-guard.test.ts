@@ -96,6 +96,11 @@ const INVENTORY: [entry: string, why: string][] = [
       '(CC-20a). No string is indexed.',
   ],
   [
+    "apps/web/lib/v2/pipeline/expire.ts :: error: cause instanceof Error ? cause.message.slice(0, 200) : 'not an Error',",
+    'NOT A CUT of crawled text. The message of an error thrown by the evidence store or the database ' +
+      'when the expiry could not delete a site, bounded for the report line. It holds no page text.',
+  ],
+  [
     'apps/web/lib/v2/pipeline/load.ts :: const chunk = values.slice(i, i + VALUES_PER_REQUEST);',
     'ARRAY slice of the ids a read filters on, VALUES_PER_REQUEST at a time so the URL stays short ' +
       '(CC-20b); every chunk is read. No string is indexed.',

@@ -15,8 +15,8 @@ import { fixesAsOf } from '../../fixtures';
 import { listOf } from '../../format';
 import { numberWord, plural } from '../../words';
 import { effectHeadline } from '../effect-headline';
-import { freeFixes } from '../free-fixes';
-import type { ViewDataset } from '../dataset';
+import { openFixes, type FixPlan } from '../free-fixes';
+import type { ViewDataset } from '../../fixtures';
 
 /** A fix's packet; the contract names the schema, not the type. */
 export type FixPacket = NonNullable<Fix['packet']>;
@@ -43,13 +43,17 @@ export interface OpenFixView {
   unit: string;
   effort: string | null;
   recommendation: RecommendationView;
-  /** What the packet says about the problem. */
+  /** What the packet says about the problem; empty when the fix has no packet. */
   paragraph: string[];
-  /** The steps, what to keep, and the check we run afterwards, as the packet block shows them. */
-  packet: string;
-  handoff: string;
+  /**
+   * The steps, what to keep, and the check we run afterwards, as the packet block shows them. Null
+   * when the audit wrote no packet for the fix: `handoff` and `prompt` are then null too, and the
+   * screen says `NO_PACKET` (`../no-packet`) in their place.
+   */
+  packet: string | null;
+  handoff: string | null;
   /** The whole packet as plain text, for "Copy as a prompt". */
-  prompt: string;
+  prompt: string | null;
 }
 
 export interface ProFixView {
@@ -194,15 +198,7 @@ export function packetPrompt(f: Pick<Fix, 'title'>, p: FixPacket): string {
 
 export function openFix(f: Fix, siteFixes: readonly Fix[]): OpenFixView {
   const { points, unit } = effectOf(f, siteFixes);
-  const p = f.packet;
-  const paragraph = p ? packetParagraph(p) : [];
-  const verify = p ? verifyLines(p) : [];
-  const block = p
-    ? [...p.change, ...(p.keep.length ? ['', ...p.keep] : []), '', ...verify].join('\n')
-    : '';
-  const prompt = p ? packetPrompt(f, p) : f.title;
-  const check = p?.verify.ua ? 'request' : 'check';
-  return {
+  const head = {
     id: f.id,
     number: f.number,
     title: f.title,
@@ -210,16 +206,28 @@ export function openFix(f: Fix, siteFixes: readonly Fix[]): OpenFixView {
     unit,
     effort: effortText(f),
     recommendation: recommendation(f),
-    paragraph,
-    packet: block,
+  };
+  const p = f.packet;
+  if (!p) return { ...head, paragraph: [], packet: null, handoff: null, prompt: null };
+  const block = [...p.change, ...(p.keep.length ? ['', ...p.keep] : []), '', ...verifyLines(p)];
+  const check = p.verify.ua ? 'request' : 'check';
+  return {
+    ...head,
+    paragraph: packetParagraph(p),
+    packet: block.join('\n'),
     handoff: `Handing this to your coding tool or your developer? The packet contains the steps above and the ${check} we’ll run afterwards to confirm it worked.`,
-    prompt,
+    prompt: packetPrompt(f, p),
   };
 }
 
-export function sectionFixes(d: ViewDataset, check: Check, section: FixSection): SectionFixesView {
+export function sectionFixes(
+  d: ViewDataset,
+  check: Check,
+  section: FixSection,
+  plan: FixPlan = 'free',
+): SectionFixesView {
   const all = fixesAsOf(d, check);
-  const free = freeFixes(d, check);
+  const free = openFixes(d, check, plan);
   const here = all.filter((f) => f.section === section);
   const isFree = (f: Fix) => free.some((x) => x.id === f.id);
   const open = here.filter(isFree);

@@ -11,6 +11,7 @@ import { LOG_IN } from '../../footer-links';
 import { MapSvg } from '../../map/MapSvg';
 import type { DoorView, GradeView, ResultView } from '../../../../lib/v2/view/result';
 import { capitalise, count, numberWord, plural } from '../../../../lib/v2/words';
+import { AuditLink, AuditLinkWords } from './AuditPage';
 import { KeepBar } from './KeepBar';
 import layout from '../../layout.module.css';
 import styles from './ResultScreen.module.css';
@@ -44,14 +45,14 @@ export function ResultShell({
       actions={
         <>
           {share ? (
-            <Button variant="quiet" size="sm" href="#" title={shareNote(share.keptUntil)}>
+            <AuditLink to="share" variant="quiet" size="sm" title={shareNote(share.keptUntil)}>
               Share
-            </Button>
+            </AuditLink>
           ) : null}
           {rerun ? (
-            <Button variant="quiet" size="sm" href="#">
+            <AuditLink to="rerun" variant="quiet" size="sm">
               Re-run, free
-            </Button>
+            </AuditLink>
           ) : null}
           <Button variant="quiet" size="sm" href={LOG_IN.href}>
             {LOG_IN.label}
@@ -91,7 +92,16 @@ function GradeCard({ g }: { g: GradeView }) {
  * locked, the clean bill, or a check whose AI readability is withheld. What it says about the site
  * comes from `resultView`.
  */
-export function ResultScreen({ data, checkId }: { data: ResultView; checkId?: string }) {
+export function ResultScreen({
+  data,
+  checkId,
+  notice,
+}: {
+  data: ResultView;
+  checkId?: string;
+  /** What a partial audit did not measure (`partialNotice`), said under the heading. */
+  notice?: string | null;
+}) {
   const { grades, first, doors, fixes, map, crawlers } = data;
   const kept = data.keptUntil === null;
 
@@ -110,8 +120,18 @@ export function ResultScreen({ data, checkId }: { data: ResultView; checkId?: st
           </Heading>
           <div className={`${layout.mut} ${styles.meta}`}>
             {data.crawledLine} · {data.crawledAt}
-            {kept ? '' : ` · this result and its share link are kept until ${data.keptUntil}`}
+            {kept ? null : (
+              <AuditLinkWords
+                to="share"
+                otherwise={` · this result is kept until ${data.keptUntil}`}
+              >{` · this result and its share link are kept until ${data.keptUntil}`}</AuditLinkWords>
+            )}
           </div>
+          {notice ? (
+            <p role="note" className={`${layout.mut} ${styles.meta}`}>
+              {notice}
+            </p>
+          ) : null}
         </div>
         <div className={styles.g31}>
           {grades.map((g) => (
@@ -128,9 +148,14 @@ export function ResultScreen({ data, checkId }: { data: ResultView; checkId?: st
                 <Button variant="primary" href={first.href}>
                   Open the fix
                 </Button>
-                <Button variant="quiet" size="sm" href="#" title={shareNote(data.keptUntil)}>
+                <AuditLink
+                  to="emailFix"
+                  variant="quiet"
+                  size="sm"
+                  title={shareNote(data.keptUntil)}
+                >
                   Email this fix to my developer
-                </Button>
+                </AuditLink>
               </div>
             </Card>
           ) : (
@@ -261,9 +286,9 @@ export function ResultScreen({ data, checkId }: { data: ResultView; checkId?: st
               </p>
               <div className={`${layout.row} ${styles.actions} ${styles.proActions}`}>
                 <Button href="#keep">Keep this audit, start 14 days of{'\u00a0'}Pro</Button>
-                <Button variant="quiet" size="sm" href="#">
+                <AuditLink to="pro" variant="quiet" size="sm">
                   What Pro includes
-                </Button>
+                </AuditLink>
               </div>
             </div>
           )}
@@ -287,9 +312,11 @@ export function ResultScreen({ data, checkId }: { data: ResultView; checkId?: st
       )}
 
       <Card href={map.href} className={styles.mapDoor}>
-        <div className={styles.mapThumb}>
-          <MapSvg nodes={map.nodes} positions={map.positions} className={styles.mapSvg} />
-        </div>
+        {map.nodes ? (
+          <div className={styles.mapThumb}>
+            <MapSvg nodes={map.nodes} positions={map.positions} className={styles.mapSvg} />
+          </div>
+        ) : null}
         <div className={styles.mapText}>
           <strong className={styles.doorTitle}>Explore the link map</strong>
           <div className={`${layout.mut} ${styles.small} ${styles.mapSummary}`}>
@@ -297,6 +324,9 @@ export function ResultScreen({ data, checkId }: { data: ResultView; checkId?: st
             {plural(map.links, 'link', 'links')}, {count(map.orphans)}{' '}
             {plural(map.orphans, 'orphan', 'orphans')}. Select any page to see what links to it,
             what it links to, and which crawlers can reach it.
+            {map.nodes
+              ? ''
+              : ' No drawing was stored with this audit; the map is laid out when it opens.'}
           </div>
         </div>
         <div className={styles.mapOpen}>

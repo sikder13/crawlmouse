@@ -5,7 +5,7 @@
  * with it, never as caused by it: a check sees that something differs, not why.
  */
 import type { Change, Check, EvidenceClass, GradeName, Verdict } from '@crawlmouse/types/v2';
-import type { ViewDataset } from '../dataset';
+import type { ViewDataset } from '../../fixtures';
 
 type ChangeKind = Change['kind'];
 type ChangeSubject = Change['subject'];
@@ -48,7 +48,8 @@ export interface ChangesView {
   rows: ChangeRowView[];
   /** What a change looks like, for a first audit: an example, not this site's data. */
   example: ChangeRowView[] | null;
-  history: { key: string; when: string; label: string }[];
+  /** Each audit of the site so far; `href` is its result page, where the page has a route for it. */
+  history: { key: string; when: string; label: string; href?: string }[];
   historyNote: string | null;
   coverage: { read: string };
   keep: { title: string; sub: string } | null;
@@ -228,6 +229,7 @@ export function changesView(
     key: c.id,
     when: dateTimeUtc(c.finished_at!),
     label: historyLabel(c),
+    ...(options.hrefs?.check ? { href: options.hrefs.check(c.id) } : {}),
   }));
   const next = scheduleOf(d, check, kept);
   const tiles = (middle: ChangesView['tiles'][number]) => [
@@ -264,7 +266,11 @@ export function changesView(
       history,
       historyNote: kept
         ? null
-        : 'The second row appears after the next check. "Re-run, free" in the header runs one now, without an account, but it replaces this audit rather than comparing with it.',
+        : `The second row appears after the next check.${
+            options.rerun === false
+              ? ''
+              : ' "Re-run, free" in the header runs one now, without an account, but it replaces this audit rather than comparing with it.'
+          }`,
       coverage: { read: 'No earlier audit of this site to compare with' },
       keep: kept
         ? null
@@ -277,7 +283,7 @@ export function changesView(
   }
 
   const rows = d.changes.filter((c) => c.check_id === check.id).map((c) => rowOf(c, check, at));
-  const previous = findCheck(d, check.previous_check_id);
+  const previous = d.checks.find((c) => c.id === check.previous_check_id);
   const when = at(check.finished_at!);
   return {
     frame,
@@ -301,7 +307,7 @@ export function changesView(
     history,
     historyNote: null,
     coverage: {
-      read: previous.finished_at
+      read: previous?.finished_at
         ? `Compared with the check of ${dateTimeUtc(previous.finished_at)}`
         : 'Compared with the check before it',
     },

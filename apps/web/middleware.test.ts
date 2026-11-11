@@ -1,7 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { NextRequest, NextResponse, type NextFetchEvent } from 'next/server';
 import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
-import { config, handleEdge, middleware } from './middleware';
+import { NO_SUCH_PAGE, V2_REWRITES, config, handleEdge, middleware } from './middleware';
 import { CONSENT_REQUIRED_COOKIE } from '@/lib/consent';
 import { ROUTE_POLICIES, isStateChanging, type RoutePolicy } from '@/lib/security/route-policy';
 import type { Refusal } from '@/lib/security/refusal-event';
@@ -157,6 +159,7 @@ describe('a state-changing API request from another site is refused before the r
       'api/billing/cancel',
       'api/billing/checkout',
       'api/billing/portal',
+      'api/checks/[id]/cancel',
       'api/checks/[id]/claim',
       'api/reports/[slug]/claim',
       'api/reports/[slug]/logo',
@@ -303,6 +306,8 @@ describe('a public route that reads JSON refuses another site and a body not dec
       'api/audits/[id]/notify',
       'api/audits/start',
       'api/auth/magic-link',
+      'api/checks',
+      'api/checks/[id]/notify',
       'api/developers',
       'api/reports/hide',
       'api/reports/mint',
@@ -372,5 +377,116 @@ describe('the matcher sends every guarded route through the middleware', () => {
     ]) {
       expect(matches(url), url).toBe(false);
     }
+  });
+});
+
+describe('the v2 rewrite table (CC-22b)', () => {
+  const HOME = V2_REWRITES.find((r) => r.from === '/')!;
+  const at = (path: string) => new NextRequest(new Request(`https://crawlmouse.com${path}`));
+  /** The path a response is rewritten to, with its query string; null for no rewrite. */
+  const rewrittenTo = (res: NextResponse) => {
+    const to = res.headers.get('x-middleware-rewrite');
+    return to === null ? null : new URL(to).pathname + new URL(to).search;
+  };
+  /** A refresh that rotated the auth cookie and marked its response as not to be stored. */
+  function refreshNoStore(req: NextRequest) {
+    const res = NextResponse.next({ request: req });
+    res.cookies.set(AUTH_COOKIE, 'fresh-token', { path: '/' });
+    res.headers.set('cache-control', 'private, no-store');
+    res.headers.set('expires', '0');
+    res.headers.set('pragma', 'no-cache');
+    return Promise.resolve(res);
+  }
+  const flag = (on: boolean) => vi.stubEnv('V2_CHECKS_PUBLIC', on ? '1' : '');
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('has the home row, and each target is a path of its own', () => {
+    expect(HOME.to).toBe('/v2-home');
+    for (const row of V2_REWRITES) expect(row.to).toMatch(/^\/[a-z0-9-]+(\/[a-z0-9-]+)*$/);
+    expect(new Set(V2_REWRITES.map((r) => r.to)).size).toBe(V2_REWRITES.length);
+  });
+
+  it.each(['/', '/?ref=abc'])('with the flag off, %s is not rewritten', async (path) => {
+    flag(false);
+    const res = await handleEdge(at(path), refreshNoStore);
+    expect(rewrittenTo(res)).toBeNull();
+    expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
+  });
+
+  it.each(['0', 'true', ' 0 '])('a flag value of "%s" is off', async (value) => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', value);
+    expect(rewrittenTo(await handleEdge(at('/'), refreshNoStore))).toBeNull();
+  });
+
+  it('with the flag on, / is rewritten to its target, with the query string', async () => {
+    flag(true);
+    expect(rewrittenTo(await handleEdge(at('/'), refreshNoStore))).toBe(HOME.to);
+    expect(rewrittenTo(await handleEdge(at('/?ref=abc&x=1'), refreshNoStore))).toBe(
+      `${HOME.to}?ref=abc&x=1`,
+    );
+  });
+
+  it('the rewrite carries the refreshed cookies, its cache headers and the consent cookie', async () => {
+    flag(true);
+    const res = await handleEdge(at('/'), refreshNoStore);
+    expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
+    expect(res.headers.get('cache-control')).toBe('private, no-store');
+    expect(res.headers.get('expires')).toBe('0');
+    expect(res.headers.get('pragma')).toBe('no-cache');
+    expect(res.cookies.get(CONSENT_REQUIRED_COOKIE)).toBeDefined();
+  });
+
+  it('the rewrite passes the request headers on to the page', async () => {
+    flag(true);
+    const req = new NextRequest(
+      new Request('https://crawlmouse.com/', { headers: { 'x-from-test': 'kept' } }),
+    );
+    const res = await handleEdge(req, refreshNoStore);
+    expect(res.headers.get('x-middleware-request-x-from-test')).toBe('kept');
+  });
+
+  it.each(['/pricing', '/blog', '/dashboard', '/audit/abc', '//', '/index'])(
+    'with the flag on, %s is not rewritten: a row matches its own path only',
+    async (path) => {
+      flag(true);
+      expect(rewrittenTo(await handleEdge(at(path), refreshNoStore))).toBeNull();
+    },
+  );
+
+  describe.each([true, false])('with the flag on: %s', (on) => {
+    it.each(['', '/', '?x=1', '/?x=1', '/anything', '/a/b'].map((rest) => `${HOME.to}${rest}`))(
+      'a direct request for %s is answered as not found, never as the page',
+      async (path) => {
+        flag(on);
+        const res = await handleEdge(at(path), refreshNoStore);
+        const to = rewrittenTo(res);
+        expect(to).not.toBeNull();
+        expect(V2_REWRITES.some((r) => to === r.to || to!.startsWith(`${r.to}/`))).toBe(false);
+        expect(to).not.toBe('/');
+        // What the refresh did still rides on the answer.
+        expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
+      },
+    );
+
+    it.each([`${HOME.to}-extra`, `${HOME.to}x/y`, `/x${HOME.to}`, '/v2', '/v2-hom'])(
+      '%s, which only resembles the target, is left alone',
+      async (path) => {
+        flag(on);
+        expect(rewrittenTo(await handleEdge(at(path), refreshNoStore))).toBeNull();
+      },
+    );
+  });
+
+  it('the matcher sends / and each target through the middleware', () => {
+    const matches = (url: string) => unstable_doesMiddlewareMatch({ config, nextConfig: {}, url });
+    for (const row of V2_REWRITES) {
+      expect(matches(row.from), row.from).toBe(true);
+      expect(matches(row.to), row.to).toBe(true);
+      expect(matches(`${row.to}/`), row.to).toBe(true);
+    }
+  });
+
+  it('the path a direct request is sent to has no page', () => {
+    expect(existsSync(join(__dirname, 'app', NO_SUCH_PAGE.slice(1)))).toBe(false);
   });
 });

@@ -13,7 +13,7 @@ import type { GradeView } from './result';
 import { isFreeFix } from './free-fixes';
 import { aiShortSummary, seoShortSummary } from '../sentences';
 import { capitalise } from '../words';
-import type { ViewDataset } from './dataset';
+import type { ViewDataset } from '../fixtures';
 
 /** The four crawlers the locked Home table shows, in its order. Which crawlers is a layout choice. */
 export const HOME_CRAWLERS = ['Googlebot', 'GPTBot', 'ClaudeBot', 'PerplexityBot'] as const;

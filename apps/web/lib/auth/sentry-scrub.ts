@@ -16,9 +16,15 @@
  *   and arrays (never the SDK's `sdkProcessingMetadata`, which holds the live scope and client);
  *   drops `cookie`, `cookies`, `set-cookie`, `token_hash`, `post_login_next` and span cookie-header
  *   keys at any depth; and replaces a `token_hash` or `code` query value (URL-encoded or not), a
- *   `post_login_next=` value, a PostgREST `=eq.` filter value, a check id in a `/check/` or
- *   `/checks/` path and an emailed account link's token in its `/account/…/` path wherever a string
- *   holds one.
+ *   `post_login_next=` value, a PostgREST `=eq.` filter value, the id after `/check/`,
+ *   `/checks/`, `/audit/` or `/audits/` in a path, and an emailed account link's token in its
+ *   `/account/…/` path, wherever a string holds one.
+ *
+ * The browser SDK runs `scrubDoorSecrets` too (`sentryBrowserOptions`, instrumentation-client.ts):
+ * a check's pages are at `/audit/<id>/…`, so the browser's own URL, its navigation and fetch
+ * breadcrumbs and the Referer of its calls hold the id. That part is tested in sentry-scrub.test.ts.
+ * Sentry's replay integration is not installed in the browser, so no recording is sent that this
+ * does not see (`grep -c replayIntegration apps/web/instrumentation-client.ts` is 0).
  */
 
 /**
@@ -41,18 +47,27 @@ const NEXT_IN_STRING = /(post_login_next=)[^;&\s"]*/gi;
  */
 const POSTGREST_FILTER = /(=(?:eq|neq|in|is)\.)[^&#\s"]*/gi;
 /**
- * A check id in a path (`/api/checks/<id>/claim`, a `/check/<id>` page in a Referer), with the
- * slashes plain or URL-encoded: the check id is the right to claim it (ARCH-2 §4.3).
+ * An id in a path, after `check`, `checks`, `audit` or `audits` as a whole segment
+ * (`/api/checks/<id>/claim`, a `/check/<id>` page, a v2 check's or a v1 audit's page at
+ * `/audit/<id>/…`, v1's `/api/audits/<id>/…`), with the slashes plain, URL-encoded, or encoded more
+ * than once (`%252F`), in either case. A check id is the right to read, cancel and claim its check
+ * (ARCH-2 §4.3; CC-22b D3), and a v1 audit id the right to read its audit.
  */
-const CHECK_PATH =
-  /((?:\/|%2F)checks?(?:\/|%2F))[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+const SLASH = '(?:\\/|%(?:25)*2F)';
+const CHECK_PATH = new RegExp(
+  `(${SLASH}(?:checks?|audits?)${SLASH})[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`,
+  'gi',
+);
 /**
  * An emailed account link's token in its path (`/account/delete/<token>`, and `restore`, `email`,
- * `email-undo`; CC-27b), with the slashes plain or URL-encoded. The link's own GET is the one request
- * that carries the token in a URL before it moves into a cookie (`lib/v2/account/link-cookie.ts`).
+ * `email-undo`; CC-27b), with the slashes as CHECK_PATH reads them. The link's own GET is the one
+ * request that carries the token in a URL before it moves into a cookie
+ * (`lib/v2/account/link-cookie.ts`).
  */
-const ACCOUNT_LINK_PATH =
-  /((?:\/|%2F)account(?:\/|%2F)(?:delete|restore|email|email-undo)(?:\/|%2F))[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/gi;
+const ACCOUNT_LINK_PATH = new RegExp(
+  `(${SLASH}account${SLASH}(?:delete|restore|email|email-undo)${SLASH})[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])`,
+  'gi',
+);
 /**
  * The SDK's own processing state, which holds the live scope and client: never part of what is
  * sent, and not ours to walk (a getter-only property on it throws when assigned).
@@ -109,6 +124,17 @@ export function sentryServerOptions<I>(
 ) {
   return {
     integrations: [requestDataIntegration({ include: { cookies: false, data: false } })],
+    beforeSend: <E>(event: E) => scrubDoorSecrets(event),
+    beforeSendTransaction: <E>(event: E) => scrubDoorSecrets(event),
+  };
+}
+
+/**
+ * The browser SDK's options that run the same scrubber on what the browser sends, for `Sentry.init`
+ * in instrumentation-client.ts.
+ */
+export function sentryBrowserOptions() {
+  return {
     beforeSend: <E>(event: E) => scrubDoorSecrets(event),
     beforeSendTransaction: <E>(event: E) => scrubDoorSecrets(event),
   };

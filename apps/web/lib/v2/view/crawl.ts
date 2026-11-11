@@ -338,3 +338,32 @@ function gradeViews(g: NonNullable<CrawlState['grades']>): [GradeView, GradeView
         },
   ];
 }
+
+/** What a real check's screen knows beyond the stream's state. */
+export interface LiveCondition {
+  /** Whether the stream is connected, or was until a moment ago. */
+  reachable: boolean;
+  cancelFailed: boolean;
+}
+
+/**
+ * What a real check's screen says about its stream and its map, each sentence only when it is so:
+ * the stream cannot be reached; the map shows fewer pages than the count of pages fetched (a row
+ * the stream could not draw, or a batch it could not read); a cancel did not go through.
+ */
+export function liveNotices(state: CrawlState, live: LiveCondition): string[] {
+  const notices: string[] = [];
+  if (!live.reachable && state.ended === null) {
+    notices.push(
+      `The live view lost its connection, and is trying again. The audit keeps running; the counts here are the last received.`,
+    );
+  }
+  const drawn = state.nodes.length;
+  if (state.pages_crawled > drawn) {
+    notices.push(
+      `The map shows ${count(drawn)} of the ${count(state.pages_crawled)} ${plural(state.pages_crawled, 'page', 'pages')} fetched so far.`,
+    );
+  }
+  if (live.cancelFailed) notices.push('The audit could not be cancelled. Try again.');
+  return notices;
+}

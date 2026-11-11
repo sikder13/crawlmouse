@@ -1,3 +1,8 @@
+import fc from 'fast-check';
+import {
+  SECTIONS as ENGINE_SECTIONS,
+  templateNoun as engineTemplateNoun,
+} from '../../../../packages/engine/src/v2/build/template-noun';
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_NAMES, fixture, type FixtureName } from './fixtures';
 import {
@@ -64,7 +69,7 @@ describe('formatting', () => {
     expect(listOf(['a', 'b', 'c'])).toBe('a, b and c');
   });
 
-  it('has a noun for every template in every fixture, and refuses one it does not know', () => {
+  it('has a listed noun for every template in every contract fixture', () => {
     for (const name of FIXTURE_NAMES) {
       const labels = fixture(name).checks.flatMap((c) =>
         (c.coverage?.templates ?? []).map((t) => t.label),
@@ -74,7 +79,76 @@ describe('formatting', () => {
       if (NOUNLESS[name] === null) expect(missing, name).toEqual([]);
       else expect(missing.length, `${name}: ${NOUNLESS[name]}`).toBeGreaterThan(0);
     }
-    expect(() => templateNoun('toString')).toThrow(/No noun/);
+  });
+
+  it('names a template whose label is its key, as a measured check labels it, from the key', () => {
+    expect(templateNoun('/')).toEqual(TEMPLATE_NOUNS.Homepage);
+    expect(templateNoun('/blog/{slug}')).toEqual(TEMPLATE_NOUNS.Blog);
+    expect(templateNoun('/products/{slug}/reviews')).toEqual(TEMPLATE_NOUNS.Products);
+    expect(templateNoun('/about')).toEqual({
+      inList: '/about',
+      adjective: '/about',
+      pages: 'the /about page',
+    });
+    // A section's own index page is one page, not the section.
+    expect(templateNoun('/blog').pages).toBe('the /blog page');
+    expect(templateNoun('/docs/guide/{slug}')).toEqual({
+      inList: '/docs/guide/{slug}',
+      adjective: '/docs/guide/{slug}',
+      pages: 'pages under /docs/',
+    });
+    expect(templateNoun('/{slug}').pages).toBe('pages like /{slug}');
+  });
+
+  it('names /homepage/{slug} as a section of pages, not as the homepage', () => {
+    // "Homepage" is a fixture label in TEMPLATE_NOUNS, not one of the engine's sections.
+    expect(templateNoun('/homepage/{slug}')).toEqual({
+      inList: '/homepage/{slug}',
+      adjective: '/homepage/{slug}',
+      pages: 'pages under /homepage/',
+    });
+  });
+
+  it('names the pages of a key as the engine’s fix titles do, for generated keys', () => {
+    const firsts = [
+      ...new Set([
+        ...Object.keys(TEMPLATE_NOUNS).map((name) => name.toLowerCase()),
+        ...Object.keys(ENGINE_SECTIONS),
+        'shop',
+        'docs',
+        '{slug}',
+        '{n}',
+      ]),
+    ];
+    const rest = fc.array(fc.constantFrom('{slug}', '{n}', 'reviews', 'page', 'a-b'), {
+      maxLength: 3,
+    });
+    const seen = new Set<string>();
+    fc.assert(
+      fc.property(fc.constantFrom(...firsts), rest, (first, more) => {
+        const key = `/${[first, ...more].join('/')}`;
+        seen.add(first);
+        expect(templateNoun(key).pages, key).toBe(engineTemplateNoun(key));
+      }),
+      { numRuns: 600, seed: 20261111 },
+    );
+    expect(engineTemplateNoun('/')).toBe(templateNoun('/').pages);
+    // Each first segment was drawn, "homepage" among them.
+    expect([...seen].sort()).toEqual([...firsts].sort());
+    expect(firsts).toContain('homepage');
+  });
+
+  it('uses a label that is neither listed nor a path as it is written, an inherited name included', () => {
+    expect(templateNoun('Recipes')).toEqual({
+      inList: 'Recipes',
+      adjective: 'Recipes',
+      pages: 'Recipes pages',
+    });
+    expect(templateNoun('toString')).toEqual({
+      inList: 'toString',
+      adjective: 'toString',
+      pages: 'toString pages',
+    });
   });
 });
 
