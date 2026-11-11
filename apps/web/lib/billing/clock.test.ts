@@ -200,6 +200,21 @@ describe('supabaseDeletionState (CC-27b)', () => {
     expect(await read(id)).toBe('marked');
     expect(await read('00000000-0000-4000-8000-00000000dead')).toBe('gone');
   });
+
+  it('rejects when the read fails, rather than calling the account gone (R2 item 8)', async () => {
+    const failing = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            limit: async () => ({ data: null, error: { message: 'connection refused' } }),
+          }),
+        }),
+      }),
+    } as unknown as SupabaseClient;
+    await expect(
+      supabaseDeletionState(failing)('00000000-0000-4000-8000-000000000001'),
+    ).rejects.toThrow(/accounts read failed: connection refused/);
+  });
 });
 
 describe('applyClockEvent on the real schema', () => {

@@ -255,6 +255,23 @@ describe('the purge', () => {
     expect(await queued(d.userId)).toBe(0);
   });
 
+  it('the orphan path keeps a marked account another active member is on (R2 item 7)', async () => {
+    const d = await deleted();
+    const member = await signUp(db, `stays-${serial}@example.com`);
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'stays@example.com', 'developer', 'active', now())`,
+      [d.accountId, member],
+    );
+    await db.query(`delete from auth.users where id = $1`, [d.userId]);
+    const { steps } = purgeOver([]);
+    await expect(steps.purgeOne({ userId: d.userId, accounts: [d.accountId] })).rejects.toThrow(
+      /an account it marked is still there/,
+    );
+    expect(await n(`select count(*) from public.accounts where id = $1`, [d.accountId])).toBe(1);
+    expect(await queued(d.userId)).toBe(1);
+  });
+
   it('finish_erasure refuses while an account it marked is still there', async () => {
     const d = await deleted();
     await db.query(`delete from auth.users where id = $1`, [d.userId]);
