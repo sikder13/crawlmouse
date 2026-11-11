@@ -125,7 +125,7 @@ describe('what the clients can reach', () => {
 });
 
 describe('one live email link per kind', () => {
-  it('holds an account to one live link of each email kind, and lets the two kinds live together', async () => {
+  it('holds a person to one live link of each email kind, and lets the two kinds live together', async () => {
     const o = await owner('flight@example.com');
     const insert = (hash: string, kind: string) =>
       db.query(

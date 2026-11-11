@@ -141,13 +141,15 @@ create index if not exists account_events_account_idx on public.account_events (
 alter table public.account_events enable row level security;
 revoke all on public.account_events from public, anon, authenticated;
 
--- One live link of each email kind per account. A request creates the confirmation link and the old
--- address's undo link together, so the two kinds live side by side; request_email_change refuses a
+-- One live link of each email kind per person, whichever of their accounts it is on (fix round 1,
+-- C5: the address is the person's, not the account's). A request creates the confirmation link and the
+-- old address's undo link together, so the two kinds live side by side; request_email_change refuses a
 -- second change while either of the first one's links is live (CMA02), and this index is what holds
--- when two requests race past that check.
+-- when two requests race past that check. Dropped and created on every run, since its key changed.
 drop index if exists public.account_tokens_one_email_change_uq;
-create unique index if not exists account_tokens_one_live_email_link_uq
-  on public.account_tokens (account_id, kind)
+drop index if exists public.account_tokens_one_live_email_link_uq;
+create unique index account_tokens_one_live_email_link_uq
+  on public.account_tokens (user_id, kind)
   where kind in ('email_change', 'email_change_undo') and used_at is null and revoked_at is null;
 
 -- The addresses a person signed in with before an email change. The erasure reads them with the current
@@ -289,13 +291,14 @@ grant execute on function public.issue_account_link(uuid) to service_role;
 -- account created in the same transaction: their created_at, the transaction's now(), is equal, and
 -- so are their addresses. That is how each function here finds a link's partner.
 --
--- One change is in flight per account: a request is refused (CMA02) while the account has a live
--- confirmation link, or a live undo link whose change has applied; an undo link whose change was
--- never confirmed and has expired does not hold the account. account_tokens_one_live_email_link_uq
--- holds when two requests race. Both links are rows with no token until the mailer issues them
--- (issue_account_link, owner ruling Q5); a function here accepts a token only for a row that was
--- issued (`issued_at is not null`), so a row the mailer never issued, whose token_hash is null,
--- cannot be consumed.
+-- One change is in flight per person, across every account they hold: a request is refused (CMA02)
+-- while the person has a live confirmation link, or a live undo link whose change has applied; an undo
+-- link whose change was never confirmed and has expired does not hold them, and the next request
+-- revokes it. account_tokens_one_live_email_link_uq holds when two requests race. No change starts
+-- while the person's deletion is under way (CMA07). Both links are rows with no token until the
+-- mailer issues them (issue_account_link, owner ruling Q5); a function here accepts a token only for
+-- a row that was issued (`issued_at is not null`), so a row the mailer never issued, whose
+-- token_hash is null, cannot be consumed.
 --
 -- Refusals, by SQLSTATE; lib/v2/account/email-change.ts answers each:
 --   CMA01  the new address is the person's current one
@@ -305,6 +308,8 @@ grant execute on function public.issue_account_link(uuid) to service_role;
 --   CMA05  the link's token is unknown, of another kind, used, revoked or expired, or its change
 --          was stopped
 --   CMA06  the undo was prepared for a change that was pending, and the change applied in between
+--   CMA07  the person's deletion is under way: a live delete_confirm or delete_restore link, or a
+--          pending_erasures row
 
 -- users.email_normalized: the rule of apps/web/lib/auth/normalize-email.ts (the trial ledger's key),
 -- for an address request_email_change accepted (lowercase, no surrounding space). The TS function
@@ -388,9 +393,15 @@ begin
   if pg_catalog.lower(v_current) = p_new_email then
     raise exception 'request_email_change: that is the current address' using errcode = 'CMA01';
   end if;
+  if exists (select 1 from public.pending_erasures e where e.user_id = p_user)
+     or exists (select 1 from public.account_tokens k
+                 where k.user_id = p_user and k.kind in ('delete_confirm', 'delete_restore')
+                   and k.used_at is null and k.revoked_at is null and k.expires_at > p_now) then
+    raise exception 'request_email_change: the person''s deletion is under way' using errcode = 'CMA07';
+  end if;
   if exists (
        select 1 from public.account_tokens k
-        where k.account_id = p_account and k.used_at is null and k.revoked_at is null
+        where k.user_id = p_user and k.used_at is null and k.revoked_at is null
           and k.expires_at > p_now
           and (k.kind = 'email_change'
                or (k.kind = 'email_change_undo' and exists (
@@ -399,6 +410,11 @@ begin
                         and c.created_at = k.created_at and c.used_at is not null)))) then
     raise exception 'request_email_change: an email change is in flight' using errcode = 'CMA02';
   end if;
+  -- What is left of the person's earlier requests cannot be used (the check above passed), on this
+  -- account or another; ending it frees the index. create_account_token revokes this account's only.
+  update public.account_tokens k set revoked_at = now()
+   where k.user_id = p_user and k.kind in ('email_change', 'email_change_undo')
+     and k.used_at is null and k.revoked_at is null;
   begin
     v_change := public.create_account_token(p_account, p_user, 'email_change',
                                             p_now + interval '60 minutes', p_new_email, v_current);

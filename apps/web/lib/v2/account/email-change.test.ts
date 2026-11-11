@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
@@ -140,7 +139,8 @@ describe('requestEmailChange', () => {
       ip: '203.0.113.9',
     });
     expect(out).toEqual({ ok: true });
-    const ipHash = createHash('sha256').update('203.0.113.9').digest('hex');
+    // printf '%s' '203.0.113.9' | sha256sum
+    const ipHash = 'd861b7e91033ebc1c1e8e7af3929010158b3241b54ca87ef73e79c32f26400ec';
     expect(rec.buckets).toEqual([`account-email:user:${p.userId}`, `account-email:ip:${ipHash}`]);
     expect(rec.emails.map((e) => [e.data.template, e.data.accountId])).toEqual([
       ['email_change_confirm', p.accountId],
@@ -226,6 +226,25 @@ describe('requestEmailChange', () => {
       ).toEqual({ ok: false, status: 429, code: 'rate_limited' });
       expect(rec.emails).toEqual([]);
     }
+  });
+
+  it('refuses with 409 deletion_pending while the person’s deletion is under way, and sends nothing', async () => {
+    const p = await person();
+    await db.query(
+      `select public.create_account_token($1, $2, 'delete_confirm', now() + interval '1 hour')`,
+      [p.accountId, p.userId],
+    );
+    const { ports: pp, rec } = ports();
+    expect(
+      await requestEmailChange(pp, {
+        accountId: p.accountId,
+        userId: p.userId,
+        currentEmail: p.email,
+        newEmail: 'while-deleting@example.org',
+        ip: '203.0.113.9',
+      }),
+    ).toEqual({ ok: false, status: 409, code: 'deletion_pending' });
+    expect(rec.emails).toEqual([]);
   });
 
   it('refuses a second change while the first one’s undo link is live', async () => {
