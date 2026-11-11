@@ -147,7 +147,7 @@ export async function serveStream(
           const out = checkEvents(cursor, facts);
           send(out.events, out.cursor);
           if (cursor.ended) {
-            if (!before.ended) await finished(req, checkId, access.trigger, facts, cursor, deps);
+            if (!before.ended) await finished(req, checkId, access.trigger, facts, deps);
             break;
           }
           // A comment line when there was nothing to send, so an idle connection is not dropped.
@@ -183,15 +183,16 @@ export async function serveStream(
 }
 
 /**
- * `check_finished`, once for a check: `finishedOnce` admits one capture for the check in its
- * bucket's 24-hour window. The scores are read for a finished or partial check.
+ * `check_finished`: `finishedOnce` admits one capture for the check in its bucket's 24-hour window.
+ * What it carries is read from the check's rows (`facts`, `scores`) and from `readableCheck`'s
+ * answer; the cursor, which the client sends, gives it nothing. The scores are read for a finished
+ * or partial check.
  */
 async function finished(
   req: Request,
   checkId: string,
   trigger: PublicServerEvents['check_finished']['trigger'],
   facts: ReturnType<typeof factsOf>,
-  cursor: Cursor,
   deps: StreamDeps,
 ): Promise<void> {
   const status = facts.status as PublicServerEvents['check_finished']['status'];
@@ -200,7 +201,7 @@ async function finished(
   await deps.captureFinished(req, checkId, {
     trigger,
     status,
-    pages: cursor.pages,
+    pages: facts.counts?.pages_crawled ?? 0,
     durationMs: Math.round(facts.elapsedMs),
     ...scores,
   });

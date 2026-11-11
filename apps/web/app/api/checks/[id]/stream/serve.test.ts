@@ -116,6 +116,18 @@ describe('the stream of a check anyone with its id may read', () => {
     expect(h.limits.filter((k) => k.startsWith('event:check_finished:'))).toHaveLength(2);
   });
 
+  it('check_finished carries the row’s page count, whatever counts the Last-Event-ID names', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'forged-cursor.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await h.pipeline.fail(ids.checkId, 'canceled', null);
+    // A cursor that fits the check (batch 0, not ended) and names counts the check never had.
+    const res = await open(h, ids, anonymous, '1.0.0.999999999.999999999.0.0');
+    expect(res.status).toBe(200);
+    await res.text();
+    expect(h.captured.map((c) => [c.event, c.properties.pages])).toEqual([['check_finished', 2]]);
+  });
+
   it('sends nothing to PostHog for a visitor whose consent is required', async () => {
     const h = harness(db);
     const ids = await running(db, h, 'consent.example');
