@@ -87,11 +87,12 @@ Every interface the segment view modules export, read through the TypeScript com
 
 #### `SegmentHrefs`
 
-| Field      | Type                                                                                        | Note                                                                     |
-| ---------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `overview` | `string`                                                                                    |                                                                          |
-| `segment`  | `(key: "structure" \| "content" \| "access" \| "nojs" \| "signals" \| "changes") => string` |                                                                          |
-| `map`      | `{ hubs: string; all: string; } \| undefined`                                               | The link-map explorer: zoomed to the hubs, and every page. Omitted, "#". |
+| Field      | Type                                                                                        | Note                                                                                         |
+| ---------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `overview` | `string`                                                                                    |                                                                                              |
+| `segment`  | `(key: "structure" \| "content" \| "access" \| "nojs" \| "signals" \| "changes") => string` |                                                                                              |
+| `map`      | `{ hubs: string; all: string; } \| undefined`                                               | The link-map explorer: zoomed to the hubs, and every page. Omitted, "#".                     |
+| `check`    | `((checkId: string) => string) \| undefined`                                                | The result page of another check of the site, by its id. Omitted, the history links nowhere. |
 
 #### `SegmentOptions`
 
@@ -137,21 +138,21 @@ Every interface the segment view modules export, read through the TypeScript com
 
 #### `OpenFixView`
 
-| Field                  | Type                                                                                  | Note                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `id`                   | `string`                                                                              |                                                                                               |
-| `number`               | `number`                                                                              |                                                                                               |
-| `title`                | `string`                                                                              |                                                                                               |
-| `points`               | `string`                                                                              | The estimated points, as a number with its sign ("+24"); the screen sets it in the data face. |
-| `unit`                 | `string`                                                                              |                                                                                               |
-| `effort`               | `string \| null`                                                                      |                                                                                               |
-| `recommendation`       | `object`                                                                              |                                                                                               |
-| `recommendation.cls`   | `"confirmed_defect" \| "documented_requirement" \| "best_practice" \| "experimental"` |                                                                                               |
-| `recommendation.label` | `string`                                                                              |                                                                                               |
-| `paragraph`            | `string[]`                                                                            | What the packet says about the problem.                                                       |
-| `packet`               | `string`                                                                              | The steps, what to keep, and the check we run afterwards, as the packet block shows them.     |
-| `handoff`              | `string`                                                                              |                                                                                               |
-| `prompt`               | `string`                                                                              | The whole packet as plain text, for "Copy as a prompt".                                       |
+| Field                  | Type                                                                                  | Note                                                                                                                                                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                   | `string`                                                                              |                                                                                                                                                                                                                                                       |
+| `number`               | `number`                                                                              |                                                                                                                                                                                                                                                       |
+| `title`                | `string`                                                                              |                                                                                                                                                                                                                                                       |
+| `points`               | `string`                                                                              | The estimated points, as a number with its sign ("+24"); the screen sets it in the data face.                                                                                                                                                         |
+| `unit`                 | `string`                                                                              |                                                                                                                                                                                                                                                       |
+| `effort`               | `string \| null`                                                                      |                                                                                                                                                                                                                                                       |
+| `recommendation`       | `object`                                                                              |                                                                                                                                                                                                                                                       |
+| `recommendation.cls`   | `"confirmed_defect" \| "documented_requirement" \| "best_practice" \| "experimental"` |                                                                                                                                                                                                                                                       |
+| `recommendation.label` | `string`                                                                              |                                                                                                                                                                                                                                                       |
+| `paragraph`            | `string[]`                                                                            | What the packet says about the problem; empty when the fix has no packet.                                                                                                                                                                             |
+| `packet`               | `string \| null`                                                                      | The steps, what to keep, and the check we run afterwards, as the packet block shows them. Null when the audit wrote no packet for the fix: `handoff` and `prompt` are then null too, and the screen says `NO_PACKET` (`../no-packet`) in their place. |
+| `handoff`              | `string \| null`                                                                      |                                                                                                                                                                                                                                                       |
+| `prompt`               | `string \| null`                                                                      | The whole packet as plain text, for "Copy as a prompt".                                                                                                                                                                                               |
 
 #### `ProFixView`
 
@@ -518,30 +519,30 @@ Every interface the segment view modules export, read through the TypeScript com
 
 #### `ChangesView`
 
-| Field             | Type                                                                       | Note                                                                                |
-| ----------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `frame`           | `object`                                                                   |                                                                                     |
-| `frame.key`       | `"content" \| "structure" \| "access" \| "nojs" \| "signals" \| "changes"` |                                                                                     |
-| `frame.domain`    | `string`                                                                   |                                                                                     |
-| `frame.title`     | `string`                                                                   |                                                                                     |
-| `frame.keptUntil` | `string \| null`                                                           | "26 Oct, 02:34 UTC" while nobody has kept the audit; null once an account keeps it. |
-| `frame.tabs`      | `(SegmentLink & { current: boolean; })[]`                                  |                                                                                     |
-| `frame.back`      | `SegmentLink`                                                              |                                                                                     |
-| `frame.next`      | `SegmentLink`                                                              |                                                                                     |
-| `frame.keepHref`  | `string`                                                                   | Where an ask that needs an account goes: the keep bar, while there is one.          |
-| `state`           | `"changes" \| "first"`                                                     |                                                                                     |
-| `headline`        | `object`                                                                   |                                                                                     |
-| `headline.title`  | `string`                                                                   |                                                                                     |
-| `headline.pill`   | `{ state: PillState; label: string; }`                                     |                                                                                     |
-| `body`            | `string`                                                                   |                                                                                     |
-| `tiles`           | `{ label: string; value: string; note: string \| null; }[]`                |                                                                                     |
-| `rows`            | `ChangeRowView[]`                                                          |                                                                                     |
-| `example`         | `ChangeRowView[] \| null`                                                  | What a change looks like, for a first audit: an example, not this site's data.      |
-| `history`         | `{ key: string; when: string; label: string; }[]`                          |                                                                                     |
-| `historyNote`     | `string \| null`                                                           |                                                                                     |
-| `coverage`        | `object`                                                                   |                                                                                     |
-| `coverage.read`   | `string`                                                                   |                                                                                     |
-| `keep`            | `{ title: string; sub: string; } \| null`                                  |                                                                                     |
+| Field             | Type                                                                          | Note                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `frame`           | `object`                                                                      |                                                                                              |
+| `frame.key`       | `"content" \| "structure" \| "access" \| "nojs" \| "signals" \| "changes"`    |                                                                                              |
+| `frame.domain`    | `string`                                                                      |                                                                                              |
+| `frame.title`     | `string`                                                                      |                                                                                              |
+| `frame.keptUntil` | `string \| null`                                                              | "26 Oct, 02:34 UTC" while nobody has kept the audit; null once an account keeps it.          |
+| `frame.tabs`      | `(SegmentLink & { current: boolean; })[]`                                     |                                                                                              |
+| `frame.back`      | `SegmentLink`                                                                 |                                                                                              |
+| `frame.next`      | `SegmentLink`                                                                 |                                                                                              |
+| `frame.keepHref`  | `string`                                                                      | Where an ask that needs an account goes: the keep bar, while there is one.                   |
+| `state`           | `"changes" \| "first"`                                                        |                                                                                              |
+| `headline`        | `object`                                                                      |                                                                                              |
+| `headline.title`  | `string`                                                                      |                                                                                              |
+| `headline.pill`   | `{ state: PillState; label: string; }`                                        |                                                                                              |
+| `body`            | `string`                                                                      |                                                                                              |
+| `tiles`           | `{ label: string; value: string; note: string \| null; }[]`                   |                                                                                              |
+| `rows`            | `ChangeRowView[]`                                                             |                                                                                              |
+| `example`         | `ChangeRowView[] \| null`                                                     | What a change looks like, for a first audit: an example, not this site's data.               |
+| `history`         | `{ key: string; when: string; label: string; href?: string \| undefined; }[]` | Each audit of the site so far; `href` is its result page, where the page has a route for it. |
+| `historyNote`     | `string \| null`                                                              |                                                                                              |
+| `coverage`        | `object`                                                                      |                                                                                              |
+| `coverage.read`   | `string`                                                                      |                                                                                              |
+| `keep`            | `{ title: string; sub: string; } \| null`                                     |                                                                                              |
 
 ## Values that come from a check
 

@@ -5,6 +5,7 @@ import { Card } from '../../Card';
 import { CoverageLine, type Coverage } from '../../CoverageLine';
 import { Heading } from '../../Heading';
 import { StatusPill, type PillState } from '../../StatusPill';
+import { NO_PACKET } from '../../../../lib/v2/view/no-packet';
 import type {
   OpenFixView,
   RecommendationView,
@@ -127,29 +128,36 @@ function OpenFix({ f, primary, ask }: { f: OpenFixView; primary: boolean; ask: s
           {f.effort ? ` · ${f.effort}` : ''}
         </span>
       </div>
-      {f.paragraph.map((p) => (
-        <p key={p} className={styles.fixPara}>
-          {p}
-        </p>
-      ))}
-      <div className={styles.packetGrid}>
-        <pre className={styles.packet}>{f.packet}</pre>
-        <div className={styles.handoffCol}>
-          <div className={styles.handoff}>{f.handoff}</div>
-          <PacketActions prompt={f.prompt} primary={primary} ask={ask}>
-            <Button variant="quiet" size="sm" href={ask}>
-              {`Mark done and re-check now, about ${RECHECK_MINUTES} minutes`}
-            </Button>
-          </PacketActions>
-        </div>
-      </div>
+      {f.packet === null || f.handoff === null || f.prompt === null ? (
+        <p className={styles.fixPara}>{NO_PACKET}</p>
+      ) : (
+        <>
+          {f.paragraph.map((p) => (
+            <p key={p} className={styles.fixPara}>
+              {p}
+            </p>
+          ))}
+          <div className={styles.packetGrid}>
+            <pre className={styles.packet}>{f.packet}</pre>
+            <div className={styles.handoffCol}>
+              <div className={styles.handoff}>{f.handoff}</div>
+              <PacketActions prompt={f.prompt} primary={primary} ask={ask}>
+                <Button variant="quiet" size="sm" href={ask}>
+                  {`Mark done and re-check now, about ${RECHECK_MINUTES} minutes`}
+                </Button>
+              </PacketActions>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 /**
- * A section's fixes: its open ones in full, with the packet, and the rest as Pro rows. The first
- * open fix's copy button is the page's orange element (FACTS orange convention).
+ * A section's fixes: its open ones with their packets, and the rest as Pro rows. An open fix with no
+ * packet shows its head and `NO_PACKET`. The copy button of the first open fix that has a packet is
+ * the page's orange element (FACTS orange convention).
  */
 export function SectionFixes({
   id,
@@ -170,6 +178,7 @@ export function SectionFixes({
   /** Said under the fixes, where a locked page puts its note there. */
   footnote?: ReactNode;
 }) {
+  const firstWithPacket = fixes.open.findIndex((f) => f.packet !== null);
   return (
     <Card as="section" id={id} className={styles.panel}>
       <div className={`${layout.row} ${styles.hd}`}>
@@ -180,7 +189,7 @@ export function SectionFixes({
       </div>
       {note ? <div className={styles.fixNote}>{note}</div> : null}
       {fixes.open.map((f, i) => (
-        <OpenFix key={f.id} f={f} primary={i === 0} ask={ask} />
+        <OpenFix key={f.id} f={f} primary={i === firstWithPacket} ask={ask} />
       ))}
       {fixes.pro.map((p) => (
         <div key={p.key} className={`${layout.row} ${styles.proRow}`}>

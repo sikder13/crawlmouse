@@ -26,7 +26,9 @@ import {
 } from '../../../../lib/v2/pipeline/test-support/public-checks';
 import { fixesAsOf, fixture } from '../../../../lib/v2/fixtures';
 import { FREE_FIXES } from '../../../../lib/v2/view/free-fixes';
-import { SEGMENT_KEYS } from '../../../../lib/v2/view/segment/frame';
+import { NO_PACKET } from '../../../../lib/v2/view/no-packet';
+import type { SectionFixesView } from '../../../../lib/v2/view/segment/fixes';
+import { SEGMENT_KEYS, type SegmentKey } from '../../../../lib/v2/view/segment/frame';
 import { datasetOfBuilds } from '../../../../lib/v2/view/test-support/built-dataset';
 import {
   TESTED_UAS,
@@ -284,6 +286,88 @@ describe('the six segment pages on a measured check', () => {
   });
 });
 
+describe('an open fix on a segment page whose steps the audit did not write (ruling 0.2)', () => {
+  /** A packet the contract accepts: the bad-site fixture's first. */
+  const PACKET = fixture('bad-site').fixes.find((f) => f.packet !== null)!.packet!;
+  const HANDOFF = 'The packet contains the steps above';
+  const COPY = 'Copy as a prompt for your coding tool';
+  const paid = (): ReadyCheck => ({ ...one, plan: 'pro' });
+  const withPackets = (read: ReadyCheck): ReadyCheck => ({
+    ...read,
+    dataset: {
+      ...read.dataset,
+      fixes: read.dataset.fixes.map((f) => ({ ...f, packet: PACKET })),
+    },
+  });
+  /** The open fixes a segment's view holds. */
+  const openOn = (read: ReadyCheck, key: SegmentKey) =>
+    (segmentScreen(read, key) as ReactElement<{ data: { fixes?: SectionFixesView } }>).props.data
+      .fixes?.open ?? [];
+  /** The segments whose page has a fixes card. Changes has none; Signals lists no fix of its own. */
+  const PAGES = SEGMENT_KEYS.filter((k) => k !== 'changes');
+  /** Those where the measured check, read with every fix open (a paid plan), has an open fix. */
+  const withOpen = (read: ReadyCheck) => PAGES.filter((k) => openOn(read, k).length > 0);
+
+  it('the measured check has an open fix with no packet on more than one segment page', () => {
+    expect(first.fixes.map((f) => f.packet)).toEqual(first.fixes.map(() => null));
+    expect(withOpen(paid()).length).toBeGreaterThan(1);
+    const shown = PAGES.flatMap((k) => openOn(paid(), k));
+    expect(shown.length).toBeGreaterThan(FREE_FIXES);
+    expect(shown.map((f) => f.packet)).toEqual(shown.map(() => null));
+  });
+
+  it.each(PAGES)(
+    '%s: says the one line once for each open fix, under its title and effect, with no packet block, handoff or copy button',
+    (key) => {
+      const open = openOn(paid(), key);
+      const markup = html(<SegmentBody read={paid()} segment={key} />);
+      expect(markup.split(escaped(NO_PACKET))).toHaveLength(open.length + 1);
+      for (const f of open) {
+        expect(markup).toContain(escaped(f.title));
+        expect(markup).toContain(escaped(f.unit));
+        expect(f).toMatchObject({ paragraph: [], packet: null, handoff: null, prompt: null });
+      }
+      expect(markup).not.toContain(HANDOFF);
+      expect(markup).not.toContain(COPY);
+      expect(markup).not.toContain('Mark done and re-check now');
+      expect(markup).not.toMatch(/<pre[^>]*>\s*<\/pre>/);
+      // No copy button to hold the orange: the page's one orange element is its next step.
+      expect(primaries(markup)).toHaveLength(1);
+      expect(dead(markup)).toEqual([]);
+    },
+  );
+
+  it.each(PAGES)('%s: the line is absent when the fix has a packet', (key) => {
+    const read = withPackets(paid());
+    const open = openOn(read, key);
+    expect(withOpen(read)).toEqual(withOpen(paid()));
+    const markup = html(<SegmentBody read={read} segment={key} />);
+    expect(markup).not.toContain(escaped(NO_PACKET));
+    expect(markup.split(HANDOFF)).toHaveLength(open.length + 1);
+    expect(markup.split(COPY)).toHaveLength(open.length + 1);
+    expect(primaries(markup)).toHaveLength(1);
+  });
+
+  it('the line is absent for a locked fix: a visitor sees it on the Free three only', () => {
+    const live = fixesAsOf(one.dataset, one.dataset.checks[0]!);
+    const free = new Set(live.slice(0, FREE_FIXES).map((f) => f.id));
+    let lines = 0;
+    let lockedOnly = 0;
+    for (const key of PAGES) {
+      const open = openOn(one, key);
+      expect(open.every((f) => free.has(f.id))).toBe(true);
+      const markup = html(<SegmentBody read={one} segment={key} />);
+      const said = markup.split(escaped(NO_PACKET)).length - 1;
+      expect(said, key).toBe(open.length);
+      lines += said;
+      if (open.length === 0 && markup.includes('See this fix with Pro')) lockedOnly += 1;
+    }
+    expect(lines).toBe(FREE_FIXES);
+    // A page that lists locked fixes and no open one was met, and it did not say the line.
+    expect(lockedOnly).toBeGreaterThan(0);
+  });
+});
+
 describe('/audit/[id]/fix/[fixId]', () => {
   const live = () => fixesAsOf(one.dataset, one.dataset.checks[0]!);
   /** A packet the contract accepts: the bad-site fixture's first. */
@@ -487,7 +571,7 @@ describe('nothing internal goes on the wire for a kept check (D3)', () => {
   });
 });
 
-import { FixScreen, NO_PACKET } from '../../../../components/v2/screens/fix/FixScreen';
+import { FixScreen } from '../../../../components/v2/screens/fix/FixScreen';
 import type { FixView } from '../../../../lib/v2/view/fix';
 
 const fixScreen = (view: FixView) => <FixScreen data={view} />;
