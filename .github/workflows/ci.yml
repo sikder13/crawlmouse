@@ -2,15 +2,23 @@ name: CI
 
 # Every push runs the cheap jobs. The visual set (the six visual shards, security-browser and
 # zap-baseline) runs when a branch is up for merge: on main, when the branch has an open pull
-# request, when ci-pr.yml dispatches this workflow because a pull request was opened, reopened or
-# marked ready, or when it is dispatched by hand with `visual: true`. On any other push the `changes`
-# job defers it, and the `visual` job takes another name, so the required check `visual` is never
-# reported for that commit. docs/specs/v2/ci-cost.md has the rules and their costs.
+# request, when a pull request is opened, reopened or marked ready (the `pull_request` trigger, those
+# three types only), or when the workflow is dispatched by hand with `visual: true`. On any other push
+# the `changes` job defers it and the `visual` job takes another name, so the required check `visual`
+# is never reported for that commit. docs/specs/v2/ci-cost.md has the rules and their costs.
+#
+# A pull request event runs every job, not only the visual set: a job skipped by a condition reports
+# success, and a skipped twin of a required check on the head commit could stand in for one that
+# failed. It tests the pull request's merge commit, as GitHub checks it out; its checks attach to the
+# head commit. A pull request can merge only up to date with main, where the two trees are the same.
+#
 # The nightly run on main runs everything, the visual set included; a failure is red here, and
 # GitHub emails the user who last edited the schedule.
 on:
   push:
     branches: ['**']
+  pull_request:
+    types: [opened, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       visual:
@@ -23,7 +31,8 @@ on:
 permissions:
   contents: read
 
-# A newer run of a branch cancels its older run. On main each run has its own group, so no main run
+# A newer run of a branch cancels its older run, and a pull request event its older run (its ref is
+# refs/pull/<n>/merge, so it never cancels a push run). On main each run has its own group, so no main run
 # is cancelled or replaced, not even by a dispatch or the nightly run of the same commit: GitHub also
 # drops a PENDING run when a newer one joins its group, and the Prettier job on main checks only what
 # that push added.
@@ -36,8 +45,9 @@ env:
   TURBO_TELEMETRY_DISABLED: '1'
 
 jobs:
-  # Whether the visual set runs. `gate` is `open` when the commit is up for merge (main, an open pull
-  # request for the branch, or a dispatch with `visual: true`) and `deferred` otherwise. GitHub's
+  # Whether the visual set runs. `gate` is `open` when the commit is up for merge (main, a pull
+  # request event, an open pull request for the branch, or a dispatch with `visual: true`) and
+  # `deferred` otherwise. GitHub's
   # answer to "is a pull request open" is the one input from outside the repository; when it cannot
   # be had, the gate opens, as the run would have before this rule. Inside an open gate the path
   # filter decides: the visual set runs unless every file the branch changed is on the reviewed skip
@@ -77,7 +87,9 @@ jobs:
             echo "visual=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if [ "$EVENT" = workflow_dispatch ] && [ "$DISPATCH_VISUAL" = true ]; then
+          if [ "$EVENT" = pull_request ]; then
+            echo "a pull request was opened, reopened or marked ready"
+          elif [ "$EVENT" = workflow_dispatch ] && [ "$DISPATCH_VISUAL" = true ]; then
             echo "dispatched with visual: true"
           elif ! open="$(gh api -X GET "repos/$REPO/pulls" -f state=open -f head="$OWNER:$BRANCH" --jq length)"; then
             echo "::warning::could not ask GitHub for open pull requests, so the gate is open"

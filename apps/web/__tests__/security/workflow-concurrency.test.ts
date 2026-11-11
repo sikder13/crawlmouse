@@ -20,17 +20,12 @@ const EXPECTED: Record<string, { group: string; cancel: boolean; why: string }> 
   'ci.yml': {
     group: `ci-\${{ github.ref }}${ON_MAIN_ITS_OWN}`,
     cancel: true,
-    why: 'a newer push makes the older run of the branch moot',
+    why: 'a newer push makes the older run of the branch moot; a pull request event has its own ref',
   },
   'nightly.yml': {
     group: `nightly-\${{ github.ref }}${ON_MAIN_ITS_OWN}`,
     cancel: true,
     why: 'a dispatch on a branch replaces the older one; on main nothing is cancelled',
-  },
-  'ci-pr.yml': {
-    group: 'ci-pr-${{ github.event.pull_request.number }}',
-    cancel: true,
-    why: 'the newer event dispatches the same run',
   },
   'db-apply-prod.yml': { group: 'db-production', cancel: false, why: 'production' },
   'db-rollback-prod.yml': { group: 'db-production-rollback', cancel: false, why: 'production' },

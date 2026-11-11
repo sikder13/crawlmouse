@@ -62,9 +62,10 @@ function needs(name: string): string[] {
 }
 
 describe('ci.yml triggers', () => {
-  it('runs on pushes to every branch, a dispatch with a boolean visual input, and nightly', () => {
+  it('runs on pushes, a pull request opened, reopened or marked ready, a dispatch, and nightly', () => {
     expect(ci.on).toEqual({
       push: { branches: ['**'] },
+      pull_request: { types: ['opened', 'reopened', 'ready_for_review'] },
       workflow_dispatch: {
         inputs: {
           visual: {
@@ -85,8 +86,14 @@ describe('ci.yml triggers', () => {
     );
   });
 
-  it('has no step left that reads the pull_request event', () => {
-    expect(readFileSync(CI_FILE, 'utf8')).not.toMatch(/pull_request/);
+  // A pull request's later pushes run the visual set from the push itself (its pull request is open),
+  // so a pull_request run on `synchronize` would only run everything a second time.
+  it('runs on a pull request only when it is opened, reopened or marked ready', () => {
+    expect((ci.on as { pull_request: { types: string[] } }).pull_request.types).toEqual([
+      'opened',
+      'reopened',
+      'ready_for_review',
+    ]);
   });
 });
 
@@ -539,6 +546,18 @@ describe("the changes job's decide step", () => {
     expect(output).toBe('gate=deferred\nvisual=false\n');
   });
 
+  it('on a pull request event, opens the gate without asking GitHub; the path filter decides', () => {
+    const rendering = run({
+      ref: 'refs/pull/7/merge',
+      event: 'pull_request',
+      diff: ['apps/web/lib/x.ts'],
+    });
+    expect(rendering.output).toBe('gate=open\nvisual=true\n');
+    expect(rendering.gh).toEqual([]);
+    const docs = run({ ref: 'refs/pull/7/merge', event: 'pull_request', diff: ['docs/a.md'] });
+    expect(docs.output).toBe('gate=open\nvisual=false\n');
+  });
+
   it('on a dispatch with visual true, opens the gate without asking GitHub', () => {
     const { output, gh } = run({
       ref: 'refs/heads/x',
@@ -779,76 +798,6 @@ describe('the import closure of what the gated jobs render and serve', () => {
 
   it('contains no file on the skip list', () => {
     expect(inRepo.filter((f) => skippable(f))).toEqual([]);
-  });
-});
-
-// A pull request opened, reopened or marked ready starts one full CI run on its head branch, with
-// the visual set: ci-pr.yml dispatches ci.yml there (a dispatch sent with the workflow's own token
-// starts a run). The dispatched run is an ordinary run of every job, so no required check gets a
-// skipped twin on the head commit (docs/specs/v2/ci-cost.md, D1).
-describe('ci-pr.yml', () => {
-  const PR_FILE = join(REPO, '.github/workflows/ci-pr.yml');
-  const pr = parse(readFileSync(PR_FILE, 'utf8')) as {
-    on: unknown;
-    permissions: unknown;
-    jobs: Record<string, Job & { permissions?: unknown; 'runs-on'?: string }>;
-  };
-
-  it('runs only when a pull request is opened, reopened or marked ready', () => {
-    expect(pr.on).toEqual({ pull_request: { types: ['opened', 'reopened', 'ready_for_review'] } });
-  });
-
-  it('has one job, which alone may write Actions, for heads in this repository', () => {
-    expect(pr.permissions).toEqual({});
-    expect(Object.keys(pr.jobs)).toEqual(['dispatch']);
-    expect(pr.jobs.dispatch!.permissions).toEqual({ actions: 'write' });
-    expect(pr.jobs.dispatch!.if).toBe(
-      'github.event.pull_request.head.repo.full_name == github.repository',
-    );
-  });
-
-  it('dispatches ci.yml on the head branch with visual=true', () => {
-    const [step] = pr.jobs.dispatch!.steps ?? [];
-    expect(pr.jobs.dispatch!.steps).toHaveLength(1);
-    expect(step?.env).toEqual({
-      GH_TOKEN: '${{ github.token }}',
-      REPO: '${{ github.repository }}',
-      HEAD_REF: '${{ github.event.pull_request.head.ref }}',
-    });
-    const dir = mkdtempSync(join(tmpdir(), 'ci-pr-'));
-    const log = join(dir, 'gh.log');
-    writeFileSync(
-      join(dir, 'gh'),
-      `#!/usr/bin/env bash\n{ printf '%s\\037' "$@"; printf '\\n'; } >> '${log}'\n`,
-    );
-    chmodSync(join(dir, 'gh'), 0o755);
-    const r = spawnSync('bash', ['-e', '-c', step?.run ?? 'exit 99'], {
-      env: {
-        PATH: `${dir}:/usr/bin:/bin`,
-        REPO: 'owner/repo',
-        HEAD_REF: 'build/a branch',
-        GH_TOKEN: 't',
-      },
-      encoding: 'utf8',
-    });
-    expect(r.status, r.stdout + r.stderr).toBe(0);
-    const calls = readFileSync(log, 'utf8')
-      .split('\n')
-      .filter((l) => l !== '')
-      .map((l) => l.split('\x1f').slice(0, -1));
-    expect(calls).toEqual([
-      [
-        'workflow',
-        'run',
-        'ci.yml',
-        '--repo',
-        'owner/repo',
-        '--ref',
-        'build/a branch',
-        '-f',
-        'visual=true',
-      ],
-    ]);
   });
 });
 
