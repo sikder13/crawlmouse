@@ -992,6 +992,7 @@ const PERSIST_BODY = [...WRITTEN];
 const WRITERS: Readonly<Record<string, readonly string[]>> = {
   [WRITER]: ['stage_check_rows', 'persist_built_check'],
   [MIGRATION]: PERSIST_BODY,
+  'apps/web/lib/v2/account/fixes-store.ts': ['mark_fix_done'],
   'infra/supabase/migrations/20261112000001_v2_026b_sites_fixes.sql': PERSIST_BODY,
   'infra/supabase/rollbacks/20261112000001_v2_026b_sites_fixes.revert.sql': PERSIST_BODY,
 };
