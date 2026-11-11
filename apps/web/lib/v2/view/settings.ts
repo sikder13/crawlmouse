@@ -42,7 +42,7 @@ export const CC27B_ROUTES = {
     route: '/api/alert-rules',
     owner: 'CC-27b',
     guard:
-      'Signed-in member; the account’s rules (`site_id` null); Slack needs a paid tier. ARCH-2 §5 has only the per-site route: this one is CC-27b’s contract (owner ruling 6).',
+      'Signed-in member; the account’s rules (`site_id` null); Slack needs a paid tier, and its URL is kept in Vault and never answered back (its last four characters are). ARCH-2 §5 has only the per-site route: this one is CC-27b’s contract (owner ruling 6).',
   },
   account: {
     verb: 'PATCH',
@@ -56,7 +56,7 @@ export const CC27B_ROUTES = {
     route: '/api/account/email',
     owner: 'CC-27b',
     guard:
-      'Signed-in owner; sends a confirmation link to the new address (GET renders, POST confirms) and a notice to the old one, so a change made from a stolen session is seen; writes `account_events`.',
+      'Signed-in owner; a confirmation link to the new address and, at the same time, a notice to the old one whose link stops the change, or reverts it for 7 days after it applies, so a change made from a stolen session is seen; each link lands at `/account/email[-undo]/[token]`, which moves its token into a cookie, and its page posts to `/api/account/email/confirm` or `/undo`; writes `account_events` (CC-27b D3, owner ruling Q8).',
   },
   deleteConfirm: {
     verb: 'GET',
@@ -77,7 +77,7 @@ export const CC27B_ROUTES = {
     route: '/account/delete/[token]',
     owner: 'CC-27b',
     guard:
-      'The confirmation link: GET renders the page, POST confirms, so a link scanner cannot delete. On confirm, sign-in is disabled at once, the Stripe subscription cancelled and `account.deleted` sent; a sign-in link within 7 days restores the account (`POST /api/account/restore`); then `accountDeletedFn` purges Storage and hard-deletes (ARCH-2 §5 lifecycle, owner ruling 12).',
+      'The confirmation link: its GET moves the token into a cookie and redirects to `/account/delete`, whose form posts to `/api/account/delete/confirm` (owner ruling Q1), so a link scanner cannot delete. On confirm, every account the person alone holds is marked, sessions end, sign-in is banned and `account.deletion_confirmed` ends each subscription at its period end; the restore link in the same email undoes it for 7 days (`/account/restore/[token]` → `POST /api/account/restore`); then the daily `purgeDeletedAccountsFn` erases the person (CC-27b D4).',
   },
   cancelPlan: {
     verb: 'POST',
@@ -96,14 +96,14 @@ export const CC27B_ROUTES = {
   reportDownload: {
     verb: 'GET',
     route: '/api/report-files/[id]/download',
-    owner: 'CC-27b',
+    owner: 'wave 2',
     guard:
       'Signed-in member of the report’s account; redirects to a 10-minute signed URL. Under `/api/report-files`, not `/api/reports/[id]`, because `/api/reports/[slug]` is a live segment and Next refuses two names at one level.',
   },
   reportShare: {
     verb: 'POST',
     route: '/api/report-files/[id]/share',
-    owner: 'CC-27b',
+    owner: 'wave 2',
     guard: 'Signed-in member; a share link works for 30 days and needs no account to open.',
   },
   trialEnded: {
@@ -144,7 +144,7 @@ export const CC27B_REQUIREMENTS = [
   },
   {
     what: 'Account deletion',
-    rule: 'The owner re-types the primary site’s hostname on the confirmation step; a confirmation link then goes to the sign-in address. Opening it disables sign-in at once and cancels the Stripe subscription; a sign-in link within 7 days restores the account (`POST /api/account/restore`); after that `accountDeletedFn` (sleep 7 d, cancelled by the restore) purges Storage prefixes and hard-deletes in dependency order. What the reader is told is FACTS E6’s.',
+    rule: 'The owner re-types the primary site’s hostname on the confirmation step; a confirmation link then goes to the sign-in address. Confirming it disables sign-in at once and sets the Stripe subscription to end; the restore link in the same email undoes it for 7 days (`POST /api/account/restore`); after that the daily `purgeDeletedAccountsFn` runs the one erasure (`erase_person_apply`), which removes the Storage objects, the rows and the Auth user. What the reader is told is FACTS E6’s.',
     source:
       'Owner ruling 12; ARCH-2 §2.3, §3.2, §4.6 and §5; DECISION-LOG E6; SECURITY-DESIGN item 17 (CC-SEC-18)',
   },
@@ -254,7 +254,17 @@ export interface SettingsView {
  * page). Its forms post to CC27B_ROUTES paths, and Keep to the checkout route ACCOUNT_ACTIONS names;
  * the preview stops each submit.
  */
-export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
+export function settingsView(
+  d: FixtureDataset,
+  viewer: Viewer,
+  {
+    billingEnd = null,
+  }: {
+    /** When a paid plan set to cancel at its period's end ends (the subscription mirror's
+     * current_period_end); null when it is not set to. The contract's Account has no field for it. */
+    billingEnd?: string | null;
+  } = {},
+): SettingsView {
   const v = viewAt(d, viewer);
   const a = v.account;
   const zone = a.timezone;
@@ -301,6 +311,7 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
     ...v.d.sites.map((s) => resultChecks(v, s.id).at(-1)?.coverage?.pages_crawled ?? 0),
   );
   const paid = v.tier !== 'free';
+  const ending = paid && billingEnd !== null ? billingEnd : null;
   const card = a.card_last4;
   const cardTrial = trial && card !== null;
   const pastDue = a.state === 'past_due';
@@ -373,7 +384,7 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
       title: COPY.dangerTitle,
       tableLabel: COPY.tables.danger,
       label: COPY.deleteLabel,
-      text: COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS),
+      text: deleteText(v),
       action: routeAction('deleteConfirm', COPY.deleteAction),
     },
     plan: {
@@ -388,9 +399,11 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
           ? v.tier === 'free'
             ? COPY.pastDueEnded(date(pastDueSince), date(graceEnds))
             : COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
-          : paid
-            ? null
-            : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
+          : ending !== null
+            ? COPY.cancelling(plan, date(ending))
+            : paid
+              ? null
+              : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
       usageLabel: COPY.tables.usage,
       usage: [
         [COPY.sitesUsed, COPY.of(primarySites(v).length, a.limits.sites)],
@@ -428,17 +441,23 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
                 text: COPY.cancelTrial(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
                 action: null,
               }
-            : paid
+            : ending !== null
               ? {
                   label: COPY.cancel,
-                  text: COPY.cancelPaid(
-                    CANCEL_CLICKS,
-                    EVIDENCE_CONDENSED_AFTER_DAYS,
-                    a.billing_period_months === 12 ? 'year' : 'month',
-                  ),
-                  action: cancel,
+                  text: COPY.cancelled(date(ending), EVIDENCE_CONDENSED_AFTER_DAYS),
+                  action: null,
                 }
-              : { label: COPY.cancel, text: COPY.cancelFree, action: null },
+              : paid
+                ? {
+                    label: COPY.cancel,
+                    text: COPY.cancelPaid(
+                      CANCEL_CLICKS,
+                      EVIDENCE_CONDENSED_AFTER_DAYS,
+                      a.billing_period_months === 12 ? 'year' : 'month',
+                    ),
+                    action: cancel,
+                  }
+                : { label: COPY.cancel, text: COPY.cancelFree, action: null },
         // A card on file means a Stripe customer, whose receipts the portal lists.
         card === null
           ? { label: COPY.receipts, text: COPY.noReceipts, action: null }
@@ -447,6 +466,17 @@ export function settingsView(d: FixtureDataset, viewer: Viewer): SettingsView {
     },
     columns: COPY.columns,
   };
+}
+
+/**
+ * What deleting removes, and, on a paid plan (a subscription the account is billed by), what happens
+ * to the money: the plan stops renewing at the confirm and ends at the purge, with what the published
+ * refund policy (Terms §8) says and nothing more (owner ruling Q7).
+ */
+function deleteText(v: ReturnType<typeof viewAt>): string {
+  const billed = v.tier !== 'free' && v.account.billing_period_months !== null;
+  const text = COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS);
+  return billed ? `${text} ${COPY.deleteMoney}` : text;
 }
 
 // ── Deleting the account: the confirmation step ─────────────────────────────────────────────
@@ -459,6 +489,11 @@ export interface DeleteStepView {
   text: string;
   /** How it goes from here: the link to the sign-in address, sign-in stopping, the restore. */
   steps: string;
+  /**
+   * The accounts the person alone holds, which go with them (plan-revision R2), when the page was
+   * given them; null otherwise, as in a preview.
+   */
+  removes: string | null;
   /** The in-page guard: the primary site's hostname, typed again. */
   field: { id: string; label: string; name: string; expected: string; hint: string };
   submit: ActionView;
@@ -471,7 +506,16 @@ export interface DeleteStepView {
  * account's sign-in address when it holds no site), and the form asks for a confirmation link to the
  * sign-in address. Nothing is deleted on this page; the link does it. There is no artboard for it.
  */
-export function deleteStepView(d: FixtureDataset, viewer: Viewer): DeleteStepView {
+export function deleteStepView(
+  d: FixtureDataset,
+  viewer: Viewer,
+  {
+    removes = null,
+  }: {
+    /** Each account the erasure plan names, by its primary site's host (null for none). */
+    removes?: readonly { host: string | null }[] | null;
+  } = {},
+): DeleteStepView {
   const v = viewAt(d, viewer);
   const a = v.account;
   const site = primarySites(v).length ? primarySite(v) : null;
@@ -480,8 +524,12 @@ export function deleteStepView(d: FixtureDataset, viewer: Viewer): DeleteStepVie
     shell: accountShellView(v, 'Settings'),
     header: { title: COPY.deleteLabel, line: a.email },
     cardTitle: COPY.deleteCardTitle,
-    text: COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS),
+    text: deleteText(v),
     steps: COPY.deleteSteps(site ? COPY.hostnameNoun : COPY.emailNoun, a.email, DELETE_GRACE_DAYS),
+    removes:
+      removes === null || removes.length === 0
+        ? null
+        : COPY.removes(removes.map((r) => r.host ?? COPY.noSiteAccount)),
     field: {
       id: 'delete-hostname',
       label: COPY.retype(expected),

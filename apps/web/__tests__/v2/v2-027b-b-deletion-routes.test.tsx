@@ -2,16 +2,16 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DeletionScreen } from '../components/v2/screens/deletion/DeletionScreen';
-import type { DeletionAnswer, DeletionPorts } from '../lib/v2/account/deletion';
+import { DeletionScreen } from '../../components/v2/screens/deletion/DeletionScreen';
+import type { DeletionAnswer, DeletionPorts } from '../../lib/v2/account/deletion';
 import {
   postDeletionLink,
   readDeletionLink,
   type DeletionFlow,
-} from '../lib/v2/account/deletion-link';
-import { LINK_FLOWS } from '../lib/v2/account/link-cookie';
-import { newToken } from '../lib/v2/account/tokens';
-import { DELETE_COPY, REFUND_POLICY, RESTORE_COPY } from '../lib/v2/copy/deletion';
+} from '../../lib/v2/account/deletion-link';
+import { LINK_FLOWS } from '../../lib/v2/account/link-cookie';
+import { newToken } from '../../lib/v2/account/tokens';
+import { DELETE_COPY, REFUND_POLICY, RESTORE_COPY } from '../../lib/v2/copy/deletion';
 
 vi.mock('server-only', () => ({}));
 
@@ -20,7 +20,7 @@ vi.mock('server-only', () => ({}));
  * from its cookie, and no token in a URL, a Location or the page's HTML.
  */
 
-const WEB = join(__dirname, '..');
+const WEB = join(__dirname, '../..');
 const ORIGIN = 'https://crawlmouse.com';
 const TOKEN = newToken();
 const ports = () => ({}) as DeletionPorts;
@@ -187,10 +187,10 @@ describe('the routes', () => {
   } as const;
   const load = (route: keyof typeof ROUTES): Promise<Record<string, unknown>> =>
     ({
-      'account/delete/[token]': () => import('../app/account/delete/[token]/route'),
-      'account/restore/[token]': () => import('../app/account/restore/[token]/route'),
-      'api/account/delete/confirm': () => import('../app/api/account/delete/confirm/route'),
-      'api/account/restore': () => import('../app/api/account/restore/route'),
+      'account/delete/[token]': () => import('../../app/(account)/account/delete/[token]/route'),
+      'account/restore/[token]': () => import('../../app/(account)/account/restore/[token]/route'),
+      'api/account/delete/confirm': () => import('../../app/api/account/delete/confirm/route'),
+      'api/account/restore': () => import('../../app/api/account/restore/route'),
     })[route]();
 
   it('the API routes take POST only (Next answers 405 to a GET), and the links GET only', async () => {
@@ -224,7 +224,7 @@ describe('the routes', () => {
   it('the link lands its token in the cookie and redirects to a page URL without it', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
     vi.stubEnv('NEXT_PUBLIC_BASE_URL', ORIGIN);
-    const mod = await import('../app/account/delete/[token]/route');
+    const mod = await import('../../app/(account)/account/delete/[token]/route');
     const res = await mod.GET(new Request(`${ORIGIN}/account/delete/${TOKEN}`), {
       params: Promise.resolve({ token: TOKEN }),
     });

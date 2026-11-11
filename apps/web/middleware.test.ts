@@ -141,8 +141,15 @@ const lenient = ROUTE_POLICIES.filter((p) => p.origin === 'lenient');
 const passes = (res: NextResponse) => res.headers.get('x-middleware-next') === '1';
 
 describe('a state-changing API request from another site is refused before the route runs', () => {
-  it('guards exactly the fourteen strict routes, named here', () => {
+  it('guards exactly the strict routes named here', () => {
     expect(guarded.map((p) => p.route).sort()).toEqual([
+      'api/account',
+      'api/account/delete/confirm',
+      'api/account/email',
+      'api/account/email/confirm',
+      'api/account/email/undo',
+      'api/account/restore',
+      'api/alert-rules',
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
       'api/auth/logout',

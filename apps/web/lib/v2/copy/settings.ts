@@ -3,6 +3,7 @@
  * lock corrections for the artboard follow.
  */
 import type { Addition, CopyChange } from '../copy-registry';
+import { listOf } from '../format';
 import { capitalise, count, numberWord, plural } from '../words';
 
 /** Evidence older than this is condensed to headers and changed parts (FACTS A6, long form). */
@@ -57,6 +58,9 @@ export const SETTINGS_COPY = {
             : `Removes all ${numberWord(sites)} sites, their history and reports`
     }. Takes effect after a confirmation link. For ${numberWord(grace)} days the sign-in email can undo it; after that nothing is kept.`,
   deleteAction: 'Delete…',
+  /** Owner ruling Q7, worded as the published policy is: Terms §8 (app/terms/page.tsx). */
+  deleteMoney:
+    'A paid plan stops renewing when you confirm and ends when the account is deleted. We don’t refund partial periods except where the law requires it (Terms, section 8).',
   /** The confirmation step (owner ruling 12). */
   deleteSteps: (what: string, email: string, grace: number) =>
     `Type the ${what} below and we send a confirmation link to ${email}. The link opens a page where you confirm the deletion; sign-in then stops at once, and for ${numberWord(grace)} days a sign-in link from that address restores the account.`,
@@ -67,6 +71,10 @@ export const SETTINGS_COPY = {
   sendDeleteLink: 'Send the confirmation link',
   deleteCardTitle: 'What deleting removes',
   keepAccount: 'Keep the account',
+  /** The accounts the person alone holds, which the deletion removes with them (plan-revision R2). */
+  removes: (hosts: readonly string[]) =>
+    `Deleting removes ${count(hosts.length)} ${plural(hosts.length, 'account', 'accounts')} you alone hold: ${listOf(hosts)}.`,
+  noSiteAccount: 'an account with no site',
   planTitle: 'Plan',
   trialName: (plan: string) => `${plan}, trial`,
   daysLeft: (n: number) => `${count(n)} ${plural(n, 'day', 'days')} left`,
@@ -105,6 +113,11 @@ export const SETTINGS_COPY = {
   cancelPaid: (clicks: number, days: number, period: 'month' | 'year') =>
     `${capitalise(numberWord(clicks))} clicks, effective at the end of the paid ${period}. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
   cancelAction: 'Cancel, back to Free',
+  /** A paid plan set to end at its period's end is shown until then (spec 27 "Cancel"). */
+  cancelling: (plan: string, date: string) =>
+    `${plan} until ${date}, then Free. Nothing more is charged.`,
+  cancelled: (date: string, days: number) =>
+    `Cancelled; it takes effect ${date}. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
   cancelFree: 'Nothing to cancel on Free.',
   receipts: 'Receipts',
   /** FACTS A9. */

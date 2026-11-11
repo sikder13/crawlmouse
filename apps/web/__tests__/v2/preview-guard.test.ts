@@ -207,13 +207,27 @@ describe('v2 stays out of live pages', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('the account group holds exactly the four account-door files', () => {
+  it('the account group holds exactly the account-door files, the account’s link pages, and the Settings and Trial ending pages', () => {
     const inGroup = sources.filter((f) => f.startsWith(ACCOUNT_GROUP + '/'));
     expect(inGroup.map((f) => relative(WEB_ROOT, f)).sort()).toEqual([
+      'app/(account)/account/delete/[token]/route.ts',
+      'app/(account)/account/delete/page.tsx',
+      'app/(account)/account/email-undo/[token]/route.ts',
+      'app/(account)/account/email-undo/page.tsx',
+      'app/(account)/account/email/[token]/route.ts',
+      'app/(account)/account/email/page.test.tsx',
+      'app/(account)/account/email/page.tsx',
+      'app/(account)/account/restore/[token]/route.ts',
+      'app/(account)/account/restore/page.tsx',
       'app/(account)/check-email/page.tsx',
       'app/(account)/layout.tsx',
       'app/(account)/login/verify/continue/page.tsx',
+      'app/(account)/settings/delete/page.tsx',
+      'app/(account)/settings/page.tsx',
+      'app/(account)/settings/pages.test.tsx',
+      'app/(account)/settings/plan/page.tsx',
       'app/(account)/signup/page.tsx',
+      'app/(account)/trial-ended/page.tsx',
     ]);
   });
 });
