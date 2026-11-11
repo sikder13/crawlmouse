@@ -5,7 +5,8 @@
  * case here, and so do the states no preview shows.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import type { BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
+import { buildCheck, type BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
+import type { BatchResult } from '@crawlmouse/types/v2';
 import { isValidElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
@@ -27,6 +28,11 @@ import { fixesAsOf, fixture } from '../../../../lib/v2/fixtures';
 import { FREE_FIXES } from '../../../../lib/v2/view/free-fixes';
 import { SEGMENT_KEYS } from '../../../../lib/v2/view/segment/frame';
 import { datasetOfBuilds } from '../../../../lib/v2/view/test-support/built-dataset';
+import {
+  TESTED_UAS,
+  inputOf,
+  type SiteShape,
+} from '../../../../lib/v2/view/test-support/generated-check';
 import { LiveCrawl } from '../_crawl/LiveCrawl';
 import { CheckPage, noticeOf, resultOf } from './CheckPage';
 import { FAILURE_COPY } from './failure-copy';
@@ -475,3 +481,70 @@ const escaped = (s: string) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#x27;');
+
+describe('a challenged crawler is said as the rows hold it (D11)', () => {
+  const site = (control: 'allowed' | 'challenged_ua') => {
+    const shape: SiteShape = {
+      home: 'ok',
+      pages: [0, 1, 2].map((family) => ({ family, answer: 'ok', features: 'server' })),
+      links: [
+        [0, 1],
+        [0, 2],
+        [0, 3],
+      ],
+      capped: false,
+      access: TESTED_UAS.map((_, i) => (i === 0 ? 'challenged_ua' : 'allowed')),
+    };
+    const input = inputOf(shape);
+    // The generated control fetch is served; the second case challenges it as well.
+    const batches = (input.batches as BatchResult[]).map((b) =>
+      b.kind !== 'access' || control === 'allowed'
+        ? b
+        : {
+            ...b,
+            access_tests: b.access_tests.map((t) =>
+              t.identity_role === 'control'
+                ? {
+                    ...t,
+                    verdict: 'challenged_ua' as const,
+                    cause: 'automation_challenge' as const,
+                    raw_status: 403,
+                  }
+                : t,
+            ),
+          },
+    );
+    const built = buildCheck({ ...input, batches });
+    const read: ReadyCheck = {
+      state: 'ready',
+      checkId: built.check.id,
+      host: input.site.host,
+      kept: false,
+      plan: 'free',
+      dataset: datasetOfBuilds(input.site, [built]),
+      map: null,
+    };
+    return { read, built, markup: html(<SegmentBody read={read} segment="access" />) };
+  };
+
+  it('with the control fetch served, the page says so and does not say all automation is challenged', () => {
+    const { markup, built } = site('allowed');
+    const challenged = built.check.crawlers.find((c) => c.verdict === 'challenged_ua')!;
+    expect(challenged).toMatchObject({ ua: TESTED_UAS[0], cause: 'automation_challenge' });
+    expect(markup).toContain('edge challenge of this crawler');
+    expect(markup).toContain(
+      'the same page asked for with a browser identity, untagged, was served (status 200)',
+    );
+    expect(markup).not.toContain('on all automation');
+    expect(markup).not.toContain('with or without a crawler user agent');
+    expect(markup).toContain(challenged.ua);
+  });
+
+  it('with the control fetch challenged too, the page says both were', () => {
+    const { markup } = site('challenged_ua');
+    expect(markup).toContain(
+      'and the same page asked for with a browser identity, untagged (status 403)',
+    );
+    expect(markup).not.toContain('was served');
+  });
+});

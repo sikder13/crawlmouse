@@ -137,6 +137,29 @@ const CAUSE_MEANS: Record<AccessCause, string> = {
   verified_bot_only: 'the site admits this crawler only from its verified IPs',
 };
 
+/**
+ * `automation_challenge` is the worker's cause for two verdicts: an edge that challenges every
+ * automated request (`edge_blocks_automation`), and a challenge of one crawler's requests
+ * (`challenged_ua`), where the same page asked for with a browser identity may have been served.
+ * The two tables above word the first. These word the second from the rows themselves.
+ */
+const CHALLENGED_UA_SHORT = 'edge challenge of this crawler';
+
+const challengedAsCrawler = (r: { verdict: Verdict; cause: AccessCause | null }) =>
+  r.verdict === 'challenged_ua' && r.cause === 'automation_challenge';
+
+/**
+ * What a challenged crawler's response shows, with the control fetch of the same page beside it
+ * when the record holds one: served, or challenged too.
+ */
+function challengedCaption(control: AccessTest | undefined): string {
+  if (!control) return 'the edge challenged the request made as this crawler';
+  const status = control.raw_status === null ? '' : ` (status ${control.raw_status})`;
+  return isAllowed(control.verdict)
+    ? `the edge challenged the request made as this crawler; the same page asked for with a browser identity, untagged, was served${status}`
+    : `the edge challenged the request made as this crawler, and the same page asked for with a browser identity, untagged${status}`;
+}
+
 const SEARCH_ENGINE_CAUSE = 'verified-bot response not testable from outside';
 
 const FOOTNOTE =
@@ -146,14 +169,22 @@ const FOOTNOTE =
 const qualifierOf = (verdict: Verdict, evidence: EvidenceClass) =>
   verdict === 'allowed' && evidence === 'declared' ? 'by robots.txt' : null;
 
-function evidenceView(t: AccessTest, section: string): EvidenceView {
+function evidenceView(
+  t: AccessTest,
+  section: string,
+  control: AccessTest | undefined,
+): EvidenceView {
   const who = t.ua ?? 'Browser identity';
   const status = t.raw_status === null ? 'No response' : `Status ${t.raw_status}`;
   const moved = t.final_url && t.final_url !== t.page_url ? [`Final URL: ${t.final_url}`] : [];
   return {
     id: t.id,
     title: `Evidence · ${who} · ${section} · ${timeOfDay(t.tested_at)}`,
-    caption: t.cause ? CAUSE_MEANS[t.cause] : null,
+    caption: challengedAsCrawler(t)
+      ? challengedCaption(control)
+      : t.cause
+        ? CAUSE_MEANS[t.cause]
+        : null,
     request: [t.page_url, ...t.request_headers.map((h) => `${h.name}: ${h.value}`)].join('\n'),
     response: [
       status,
@@ -283,7 +314,13 @@ function rowOf(
     cells,
     text:
       c.text_share === null ? 'not measured' : `${percent(c.text_share)}%${footnoted ? '*' : ''}`,
-    cause: footnoted ? SEARCH_ENGINE_CAUSE : c.cause ? CAUSE_SHORT[c.cause] : '—',
+    cause: footnoted
+      ? SEARCH_ENGINE_CAUSE
+      : challengedAsCrawler(c)
+        ? CHALLENGED_UA_SHORT
+        : c.cause
+          ? CAUSE_SHORT[c.cause]
+          : '—',
   };
 }
 
@@ -319,7 +356,13 @@ export function accessView(
   const shown = new Set(cells.map((c) => c.evidenceId).filter(Boolean));
   const evidence = tests
     .filter((t) => shown.has(t.id))
-    .map((t) => evidenceView(t, sectionName(t.template_key)));
+    .map((t) =>
+      evidenceView(
+        t,
+        sectionName(t.template_key),
+        tests.find((x) => x.identity_role === 'control' && x.page_url === t.page_url),
+      ),
+    );
   const blocked = cells.find(
     (c) =>
       c.evidenceId && (c.verdict === 'disallowed_by_robots' || c.verdict === 'blocked_by_ua_rule'),

@@ -1,4 +1,5 @@
 import '../../../../styles/v2/tokens.css';
+import type { Route } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AuditEvent, AuditPageProvider } from '../../../../components/v2/screens/result/AuditPage';
@@ -33,7 +34,7 @@ import { auditPage, viewOptions, type ReadyCheck } from './page-data';
 export async function readyAudit(id: string): Promise<ReadyCheck> {
   const read = await readAudit(id);
   if (read === null) notFound();
-  if (read.state !== 'ready') redirect(auditHrefs(read.checkId).overview);
+  if (read.state !== 'ready') redirect(auditHrefs(read.checkId).overview as Route);
   return read;
 }
 
