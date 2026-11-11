@@ -29,8 +29,12 @@ vi.mock('../persist', () => ({
     ),
   persistBuiltCheck: async (_db: unknown, input: unknown) => {
     persisted.push(input);
-    return { written: true, counts: {} };
+    return { written: true, counts: {}, verified: [] };
   },
+  // What the build read of the fixes, marked so the persist step's hand-over can be seen.
+  readOfFixes: (fixes: unknown[], events: unknown[]) => [
+    { read_by: 'build', fixes: fixes.length, events: events.length },
+  ],
 }));
 vi.mock('@crawlmouse/engine/v2/pipeline', async (original) => ({
   ...(await original<object>()),
@@ -215,6 +219,13 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
     expect([...input.vantage.keys()].sort()).toEqual(
       input.built.page_results.map((p) => p.url).sort(),
     );
+  });
+
+  it('hands persistence what the build read of the site’s fixes, for the watermark (CC-26b D5)', async () => {
+    await runRecorded();
+    expect((persisted[0] as { read: unknown }).read).toEqual([
+      { read_by: 'build', fixes: 0, events: 0 },
+    ]);
   });
 
   it('keeps the check running with its progress while it runs', async () => {

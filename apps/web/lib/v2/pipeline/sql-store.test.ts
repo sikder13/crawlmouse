@@ -288,6 +288,7 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
       built,
       vantage: pageVantage(crawl),
       map_path: null,
+      read: [],
     });
     return { input, built };
   }

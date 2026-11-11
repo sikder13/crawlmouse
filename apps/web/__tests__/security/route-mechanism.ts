@@ -6,7 +6,12 @@ import ts from 'typescript';
 import type { RouteClass } from '../../lib/security/route-policy';
 import { callPositions, exportedMethods, importSource, statusPositions } from './route-source';
 
-const MEMBERSHIP_FUNCTIONS = new Set(['is_member', 'is_member_for_site', 'member_role']);
+const MEMBERSHIP_FUNCTIONS = new Set([
+  'is_member',
+  'is_member_for_site',
+  'is_member_for_fix',
+  'member_role',
+]);
 
 const first = (xs: number[]) => (xs.length ? Math.min(...xs) : Infinity);
 
