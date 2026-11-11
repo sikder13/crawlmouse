@@ -91,26 +91,33 @@ as $$
   );
 $$;
 
--- A link we email: only its sha256 is stored. `link_secret_id` names the Vault secret that holds the
--- raw token until the mailer takes it (take_account_link); it is null once taken or expired.
+-- A link we email. The row is created with no token (Q5 ruling): `token_hash` and `issued_at` are null
+-- until the mailer calls issue_account_link, which mints the raw token, stores only its sha256 and
+-- returns the raw token once. No raw token is kept in the database, in Vault or in an event.
 create table if not exists public.account_tokens (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null references public.accounts (id) on delete cascade,
   user_id uuid not null,
   kind text not null check (kind in ('email_change', 'email_change_undo', 'delete_confirm', 'delete_restore')),
-  token_hash text not null unique check (token_hash ~ '^[0-9a-f]{64}$'),
+  token_hash text unique check (token_hash ~ '^[0-9a-f]{64}$'),
+  issued_at timestamptz,
+  -- A link sent in the same email as another: the deletion email's restore link names its confirm
+  -- link here, and issue_account_link on the confirm link issues both.
+  paired_with uuid references public.account_tokens (id) on delete cascade,
   -- email_change and email_change_undo only: the address moved to and the one moved from.
   new_email text,
   old_email text,
-  link_secret_id uuid,
   created_at timestamptz not null default now(),
   expires_at timestamptz not null,
   used_at timestamptz,
   -- A token another action ended before it was used (an undo, a newer request, a restore).
   revoked_at timestamptz,
+  constraint account_tokens_issued check ((token_hash is null) = (issued_at is null)),
+  constraint account_tokens_used_after_issue check (used_at is null or issued_at is not null),
   constraint account_tokens_emails check (
     (kind in ('email_change', 'email_change_undo')) = (new_email is not null and old_email is not null)),
-  constraint account_tokens_expiry check (expires_at > created_at)
+  constraint account_tokens_expiry check (expires_at > created_at),
+  constraint account_tokens_pair check (paired_with is null or kind = 'delete_restore')
 );
 create index if not exists account_tokens_account_idx on public.account_tokens (account_id, kind);
 alter table public.account_tokens enable row level security;
@@ -183,13 +190,12 @@ $$;
 revoke all on function public.end_user_sessions(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.end_user_sessions(uuid, uuid) to service_role;
 
--- Issues a link: the token row with its hash, and the raw token in a Vault secret until the mailer
--- takes it. The secret's name carries the token row's id only. A token of the same kind for the same
--- account that is still live is revoked first, so a second request ends the first link (email
--- changes are also held to one in flight by account_tokens_one_email_change_uq).
-create or replace function public.issue_account_token(
-  p_account uuid, p_user uuid, p_kind text, p_hash text, p_raw text, p_expires_at timestamptz,
-  p_new_email text default null, p_old_email text default null)
+-- Creates a link's row, with no token yet (the mailer issues it at send). A live token of the same kind
+-- for the same account is revoked first, so a second request ends the first link (email changes are
+-- also held to one in flight by account_tokens_one_email_change_uq).
+create or replace function public.create_account_token(
+  p_account uuid, p_user uuid, p_kind text, p_expires_at timestamptz,
+  p_new_email text default null, p_old_email text default null, p_paired_with uuid default null)
 returns uuid
 language plpgsql
 security definer
@@ -198,25 +204,24 @@ as $$
 declare
   v_id uuid;
 begin
-  if p_raw is null or p_raw !~ '^[A-Za-z0-9_-]{43}$' then
-    raise exception 'issue_account_token: the raw token is not one newToken() makes' using errcode = '22023';
-  end if;
   update public.account_tokens t set revoked_at = now()
    where t.account_id = p_account and t.kind = p_kind and t.used_at is null and t.revoked_at is null;
-  insert into public.account_tokens (account_id, user_id, kind, token_hash, new_email, old_email, expires_at)
-  values (p_account, p_user, p_kind, p_hash, p_new_email, p_old_email, p_expires_at)
+  insert into public.account_tokens (account_id, user_id, kind, new_email, old_email, expires_at, paired_with)
+  values (p_account, p_user, p_kind, p_new_email, p_old_email, p_expires_at, p_paired_with)
   returning id into v_id;
-  update public.account_tokens t
-     set link_secret_id = vault.create_secret(p_raw, 'account_link:' || v_id::text, '')
-   where t.id = v_id;
   return v_id;
 end;
 $$;
 
--- The mailer's one read of a link (CC-28): the raw token and where it goes, after which the secret is
--- gone. Null when the token is used, revoked, expired or already taken. The recipient is the new
--- address for an email_change, the old one for its undo, and the sign-in address otherwise.
-create or replace function public.take_account_link(p_token uuid)
+-- The mailer's call at send time (CC-28): mints a raw token, stores its sha256 and returns the raw
+-- token with the recipient read from the row; for a deletion email, its paired restore link too, as a
+-- second row. Answers only for a row that is unexpired, unused and unrevoked; otherwise no row. A retried send calls it again and gets a fresh token, and the earlier
+-- one stops working because its hash is replaced.
+-- The token is 32 bytes from two gen_random_uuid() values (pg_catalog's; pgcrypto lives in a
+-- different schema on production and in the test sandbox): 244 random bits, base64url, 43 characters,
+-- the shape apps/web/lib/v2/account/tokens.ts `isToken` accepts. The recipient is the new address
+-- for an email_change, the old one for its undo, and the sign-in address otherwise.
+create or replace function public.issue_account_link(p_token uuid)
 returns table (kind text, token text, recipient text)
 language plpgsql
 security definer
@@ -224,81 +229,43 @@ set search_path = pg_catalog, public, pg_temp
 as $$
 declare
   v public.account_tokens%rowtype;
+  v_raw text;
 begin
-  select * into v from public.account_tokens t where t.id = p_token for update;
-  if not found or v.link_secret_id is null then return; end if;
-  if v.used_at is not null or v.revoked_at is not null or v.expires_at <= now() then
-    delete from vault.secrets s where s.id = v.link_secret_id;
-    update public.account_tokens t set link_secret_id = null where t.id = v.id;
-    return;
-  end if;
-  kind := v.kind;
-  select d.decrypted_secret into token from vault.decrypted_secrets d where d.id = v.link_secret_id;
-  recipient := case v.kind
-                 when 'email_change' then v.new_email
-                 when 'email_change_undo' then v.old_email
-                 else (select u.email from public.users u where u.id = v.user_id)
-               end;
-  delete from vault.secrets s where s.id = v.link_secret_id;
-  update public.account_tokens t set link_secret_id = null where t.id = v.id;
-  return next;
-end;
-$$;
-
--- A token row that goes (its account's cascade, or the sweep) takes its unsent secret with it. Definer,
--- because a cascaded delete fires the trigger as the role that deleted the account.
-create or replace function public.account_tokens_drop_secret()
-returns trigger
-language plpgsql
-security definer
-set search_path = pg_catalog, public, pg_temp
-as $$
-begin
-  if old.link_secret_id is not null then
-    delete from vault.secrets s where s.id = old.link_secret_id;
-  end if;
-  return old;
-end;
-$$;
-drop trigger if exists account_tokens_drop_secret on public.account_tokens;
-create trigger account_tokens_drop_secret after delete on public.account_tokens
-  for each row execute function public.account_tokens_drop_secret();
-
--- Removes the secrets of links that can no longer be used and were never taken. Run by the daily purge.
-create or replace function public.sweep_account_links()
-returns integer
-language plpgsql
-security definer
-set search_path = pg_catalog, public, pg_temp
-as $$
-declare
-  v integer;
-begin
-  with stale as (
-    select t.id, t.link_secret_id from public.account_tokens t
-     where t.link_secret_id is not null
-       and (t.used_at is not null or t.revoked_at is not null or t.expires_at <= now())
+  -- The link named, then any link sent in the same email (its paired restore link), in that order.
+  for v in
+    select * from public.account_tokens t
+     where t.id = p_token
+        or (t.paired_with = p_token
+            and exists (select 1 from public.account_tokens c where c.id = p_token
+                         and c.used_at is null and c.revoked_at is null and c.expires_at > now()))
+     order by (t.id <> p_token), t.id
        for update
-  ), dropped as (
-    delete from vault.secrets s using stale where s.id = stale.link_secret_id returning s.id
-  ), cleared as (
-    update public.account_tokens t set link_secret_id = null from stale where t.id = stale.id returning t.id
-  )
-  -- A data-modifying CTE runs whether or not the outer query reads it, so `dropped` always runs.
-  select count(*) into v from cleared;
-  return v;
+  loop
+    continue when v.used_at is not null or v.revoked_at is not null or v.expires_at <= now();
+    v_raw := rtrim(translate(encode(decode(
+               replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''), 'hex'),
+               'base64'), '+/', '-_'), '=');
+    update public.account_tokens t
+       set token_hash = encode(sha256(convert_to(v_raw, 'UTF8')), 'hex'), issued_at = now()
+     where t.id = v.id;
+    kind := v.kind;
+    token := v_raw;
+    recipient := case v.kind
+                   when 'email_change' then v.new_email
+                   when 'email_change_undo' then v.old_email
+                   else (select u.email from public.users u where u.id = v.user_id)
+                 end;
+    return next;
+  end loop;
 end;
 $$;
 
-revoke all on function public.issue_account_token(uuid, uuid, text, text, text, timestamptz, text, text)
+revoke all on function public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid)
   from public, anon, authenticated;
-revoke all on function public.take_account_link(uuid) from public, anon, authenticated;
-revoke all on function public.account_tokens_drop_secret() from public, anon, authenticated;
-revoke all on function public.sweep_account_links() from public, anon, authenticated;
-grant execute on function public.issue_account_token(uuid, uuid, text, text, text, timestamptz, text, text)
+revoke all on function public.issue_account_link(uuid) from public, anon, authenticated;
+grant execute on function public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid)
   to service_role;
-grant execute on function public.take_account_link(uuid) to service_role;
-grant execute on function public.sweep_account_links() to service_role;
+grant execute on function public.issue_account_link(uuid) to service_role;
 
 -- ═══ A: email change (D3) ═════════════════════════════════════════════════════════════════════════
 

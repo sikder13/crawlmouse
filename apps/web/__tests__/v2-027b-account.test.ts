@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -7,6 +8,7 @@ import {
   readMigration,
   readRollback,
 } from './helpers/pglite-migrations';
+import { hashToken, isToken, newToken } from '../lib/v2/account/tokens';
 import { personalAccount, signUp } from './helpers/v2-check-tables';
 
 /**
@@ -23,7 +25,7 @@ let db: PGlite;
 beforeAll(async () => {
   db = await freshDb();
   await applyAllMigrations(db);
-});
+}, 120_000);
 afterAll(async () => db.close());
 
 async function owner(email: string) {
@@ -127,8 +129,8 @@ describe('one email change in flight', () => {
     const o = await owner('flight@example.com');
     const insert = (hash: string, kind = 'email_change') =>
       db.query(
-        `insert into public.account_tokens (account_id, user_id, kind, token_hash, new_email, old_email, expires_at)
-         values ($1, $2, $3, $4, 'new@example.com', 'flight@example.com', now() + interval '1 hour')`,
+        `insert into public.account_tokens (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, expires_at)
+         values ($1, $2, $3, $4, now(), 'new@example.com', 'flight@example.com', now() + interval '1 hour')`,
         [o.accountId, o.userId, kind, hash],
       );
     await insert('a'.repeat(64));
@@ -143,130 +145,150 @@ describe('one email change in flight', () => {
 });
 
 describe('the file', () => {
-  it('applies twice, and its rollback leaves the catalogue as it was', async () => {
-    const twice = await freshDb();
-    try {
-      await applyAllMigrations(twice);
-      await twice.exec(readMigration(MIGRATION));
-      await twice.exec(readRollback(ROLLBACK));
-      const { rows } = await twice.query<{ n: number }>(
-        `select count(*)::int n from information_schema.columns
+  it(
+    'applies twice, and its rollback leaves the catalogue as it was',
+    { timeout: 120_000 },
+    async () => {
+      const twice = await freshDb();
+      try {
+        await applyAllMigrations(twice);
+        await twice.exec(readMigration(MIGRATION));
+        await twice.exec(readRollback(ROLLBACK));
+        const { rows } = await twice.query<{ n: number }>(
+          `select count(*)::int n from information_schema.columns
           where (table_name = 'accounts' and column_name in ('deletion_confirmed_at', 'purge_after'))
              or (table_name = 'users' and column_name = 'previous_emails')
              or table_name in ('account_tokens', 'account_events', 'pending_erasures')`,
-      );
-      expect(rows[0]!.n).toBe(0);
-      const fn = await twice.query<{ src: string }>(
-        `select prosrc as src from pg_proc where proname = 'is_member' and pronamespace = 'public'::regnamespace`,
-      );
-      expect(fn.rows[0]!.src).not.toMatch(/deletion_confirmed_at/);
-    } finally {
-      await twice.close();
-    }
-  });
+        );
+        expect(rows[0]!.n).toBe(0);
+        const fn = await twice.query<{ src: string }>(
+          `select prosrc as src from pg_proc where proname = 'is_member' and pronamespace = 'public'::regnamespace`,
+        );
+        expect(fn.rows[0]!.src).not.toMatch(/deletion_confirmed_at/);
+      } finally {
+        await twice.close();
+      }
+    },
+  );
 });
 
-describe('issuing and taking a link', () => {
-  const RAW = 'A'.repeat(43);
-  const issue = (
+describe('a link is minted at send, never stored', () => {
+  const create = (
     o: { accountId: string; userId: string },
     kind: string,
-    hash: string,
     expires = `now() + interval '1 hour'`,
   ) =>
     db.query<{ id: string }>(
-      `select public.issue_account_token($1, $2, $3, $4, $5, ${expires}, $6, $7) as id`,
+      `select public.create_account_token($1, $2, $3, ${expires}, $4, $5) as id`,
       kind.startsWith('email')
-        ? [o.accountId, o.userId, kind, hash, RAW, 'new@example.com', 'old@example.com']
-        : [o.accountId, o.userId, kind, hash, RAW, null, null],
+        ? [o.accountId, o.userId, kind, 'new@example.com', 'old@example.com']
+        : [o.accountId, o.userId, kind, null, null],
     );
-  const secrets = async () =>
-    (await db.query<{ n: number }>(`select count(*)::int n from vault.secrets`)).rows[0]!.n;
-
-  it('stores the hash on the row and the raw token only in Vault, and the mailer can take it once', async () => {
-    const o = await owner('take@example.com');
-    const before = await secrets();
-    const id = (await issue(o, 'delete_confirm', '1'.repeat(64))).rows[0]!.id;
-    const row = await db.query<{ token_hash: string; name: string }>(
-      `select t.token_hash, s.name from public.account_tokens t join vault.secrets s on s.id = t.link_secret_id where t.id = $1`,
+  const issue = (id: string) =>
+    db.query<{ kind: string; token: string; recipient: string }>(
+      `select * from public.issue_account_link($1)`,
       [id],
     );
-    expect(row.rows[0]).toEqual({ token_hash: '1'.repeat(64), name: `account_link:${id}` });
-    expect(await secrets()).toBe(before + 1);
+  const row = async (id: string) =>
+    (
+      await db.query<Record<string, unknown>>(`select * from public.account_tokens where id = $1`, [
+        id,
+      ])
+    ).rows[0]!;
 
-    const first = await db.query(`select * from public.take_account_link($1)`, [id]);
-    expect(first.rows).toEqual([
-      { kind: 'delete_confirm', token: RAW, recipient: 'take@example.com' },
+  it('creates the row with nothing that confirms anything: no hash, not issued, no token-shaped value', async () => {
+    const o = await owner('before@example.com');
+    const id = (await create(o, 'delete_confirm')).rows[0]!.id;
+    const r = await row(id);
+    expect(r.token_hash).toBeNull();
+    expect(r.issued_at).toBeNull();
+    for (const v of Object.values(r)) expect(isToken(v)).toBe(false);
+    // No hash of any token can find it: a lookup by hash never matches a null.
+    const { rows } = await db.query(`select 1 from public.account_tokens where token_hash = $1`, [
+      hashToken(newToken()),
     ]);
-    expect(await secrets()).toBe(before);
-    expect((await db.query(`select * from public.take_account_link($1)`, [id])).rows).toEqual([]);
+    expect(rows).toEqual([]);
+  });
+
+  it('mints a token whose sha256, computed here, is what the row now holds', async () => {
+    const o = await owner('mint@example.com');
+    const id = (await create(o, 'delete_confirm')).rows[0]!.id;
+    const [link] = (await issue(id)).rows;
+    expect(link).toMatchObject({ kind: 'delete_confirm', recipient: 'mint@example.com' });
+    expect(isToken(link!.token)).toBe(true);
+    const expected = createHash('sha256').update(link!.token, 'utf8').digest('hex');
+    expect((await row(id)).token_hash).toBe(expected);
+    expect((await row(id)).issued_at).not.toBeNull();
+  });
+
+  it('a retried send gets a fresh token, and the earlier one no longer matches', async () => {
+    const o = await owner('retry@example.com');
+    const id = (await create(o, 'delete_confirm')).rows[0]!.id;
+    const first = (await issue(id)).rows[0]!.token;
+    const second = (await issue(id)).rows[0]!.token;
+    expect(second).not.toBe(first);
+    const match = async (t: string) =>
+      (await db.query(`select 1 from public.account_tokens where token_hash = $1`, [hashToken(t)]))
+        .rows.length;
+    expect(await match(first)).toBe(0);
+    expect(await match(second)).toBe(1);
+  });
+
+  it('answers nothing for a used, revoked or expired row', async () => {
+    const o = await owner('dead@example.com');
+    const used = (await create(o, 'delete_confirm')).rows[0]!.id;
+    await issue(used);
+    await db.query(`update public.account_tokens set used_at = now() where id = $1`, [used]);
+    const expired = (await create(o, 'delete_restore')).rows[0]!.id;
+    await db.query(
+      `update public.account_tokens set expires_at = created_at + interval '1 millisecond' where id = $1`,
+      [expired],
+    );
+    const revoked = (await create(o, 'email_change')).rows[0]!.id;
+    await db.query(`update public.account_tokens set revoked_at = now() where id = $1`, [revoked]);
+    for (const id of [used, expired, revoked]) expect((await issue(id)).rows).toEqual([]);
   });
 
   it('sends an email change to the new address and its undo to the old one', async () => {
     const o = await owner('route@example.com');
-    const change = (await issue(o, 'email_change', '2'.repeat(64))).rows[0]!.id;
-    expect(
-      (await db.query(`select recipient from public.take_account_link($1)`, [change])).rows,
-    ).toEqual([{ recipient: 'new@example.com' }]);
+    const change = (await create(o, 'email_change')).rows[0]!.id;
+    expect((await issue(change)).rows[0]!.recipient).toBe('new@example.com');
     await db.query(`update public.account_tokens set used_at = now() where id = $1`, [change]);
-    const undo = (await issue(o, 'email_change_undo', '3'.repeat(64))).rows[0]!.id;
-    expect(
-      (await db.query(`select recipient from public.take_account_link($1)`, [undo])).rows,
-    ).toEqual([{ recipient: 'old@example.com' }]);
+    const undo = (await create(o, 'email_change_undo')).rows[0]!.id;
+    expect((await issue(undo)).rows[0]!.recipient).toBe('old@example.com');
   });
 
-  it('revokes a live token of the same kind for the account when a new one is issued', async () => {
+  it('revokes a live token of the same kind for the account when a new one is created', async () => {
     const o = await owner('again@example.com');
-    const first = (await issue(o, 'delete_confirm', '4'.repeat(64))).rows[0]!.id;
-    await issue(o, 'delete_confirm', '5'.repeat(64));
-    const { rows } = await db.query<{ revoked: boolean }>(
-      `select revoked_at is not null as revoked from public.account_tokens where id = $1`,
-      [first],
-    );
-    expect(rows[0]!.revoked).toBe(true);
-    expect((await db.query(`select * from public.take_account_link($1)`, [first])).rows).toEqual(
-      [],
-    );
+    const first = (await create(o, 'delete_confirm')).rows[0]!.id;
+    await create(o, 'delete_confirm');
+    expect((await row(first)).revoked_at).not.toBeNull();
+    expect((await issue(first)).rows).toEqual([]);
   });
 
-  it('refuses a raw value newToken() would not make', async () => {
-    const o = await owner('raw@example.com');
-    await expect(
-      db.query(
-        `select public.issue_account_token($1, $2, 'delete_confirm', $3, 'short', now() + interval '1 hour')`,
-        [o.accountId, o.userId, '6'.repeat(64)],
-      ),
-    ).rejects.toThrow(/raw token/);
+  it('issues the deletion email’s restore link with its confirm link, and not on its own', async () => {
+    const o = await owner('pair@example.org');
+    const confirm = (await create(o, 'delete_confirm')).rows[0]!.id;
+    const restore = (
+      await db.query<{ id: string }>(
+        `select public.create_account_token($1, $2, 'delete_restore', now() + interval '8 days', null, null, $3) as id`,
+        [o.accountId, o.userId, confirm],
+      )
+    ).rows[0]!.id;
+    const links = (await issue(confirm)).rows;
+    expect(links.map((l) => l.kind)).toEqual(['delete_confirm', 'delete_restore']);
+    expect(new Set(links.map((l) => l.recipient))).toEqual(new Set(['pair@example.org']));
+    expect((await row(restore)).token_hash).toBe(hashToken(links[1]!.token));
+    // Once the confirm link is used, asking for it again issues neither.
+    await db.query(`update public.account_tokens set used_at = now() where id = $1`, [confirm]);
+    expect((await issue(confirm)).rows).toEqual([]);
   });
 
-  it('leaves no secret behind when an account goes, or when the sweep finds a dead link', async () => {
-    const o = await owner('cascade@example.com');
-    const before = await secrets();
-    await issue(o, 'delete_confirm', '7'.repeat(64));
-    const dead = (await issue(o, 'delete_restore', '8'.repeat(64), `now() + interval '1 second'`))
-      .rows[0]!.id;
-    expect(await secrets()).toBe(before + 2);
-    await db.query(
-      `update public.account_tokens set expires_at = created_at + interval '1 millisecond' where id = $1`,
-      [dead],
-    );
-    expect(
-      (await db.query<{ n: number }>(`select public.sweep_account_links() n`)).rows[0]!.n,
-    ).toBe(1);
-    expect(await secrets()).toBe(before + 1);
-    await db.query(`delete from public.accounts where id = $1`, [o.accountId]);
-    expect(await secrets()).toBe(before);
-  });
-
-  it('grants the client roles nothing on Vault or on the link functions', async () => {
+  it('grants the client roles nothing on the link functions', async () => {
     const { rows } = await db.query<{ role: string; what: string }>(
-      `select r.role, w.what from (values ('anon'), ('authenticated')) r(role),
-         (values ('vault.secrets'), ('vault.decrypted_secrets')) w(what)
-        where has_table_privilege(r.role, w.what, 'select,insert,update,delete')
-       union all
-       select r.role, f.what from (values ('anon'), ('authenticated')) r(role),
-         (values ('public.issue_account_token(uuid, uuid, text, text, text, timestamptz, text, text)'),
-                 ('public.take_account_link(uuid)'), ('public.sweep_account_links()')) f(what)
+      `select r.role, f.what from (values ('anon'), ('authenticated')) r(role),
+         (values ('public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid)'),
+                 ('public.issue_account_link(uuid)')) f(what)
         where has_function_privilege(r.role, f.what, 'execute')`,
     );
     expect(rows).toEqual([]);

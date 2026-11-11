@@ -43,15 +43,15 @@ type Events = {
   'trial.converted': { data: { accountId: string } };
   'entitlement.changed': { data: { accountId: string; from: AccountState; to: AccountState } };
   // CC-28's mailer handles it; nothing in CC-03 does.
-  // CC-27b's three account emails name their link rows (account_tokens), never an address or a raw
-  // token; the mailer reads each through take_account_link (apps/web/lib/v2/account/emails.ts).
+  // CC-27b's three account emails name one link row (account_tokens), never an address or a token;
+  // the mailer mints the link through issue_account_link (apps/web/lib/v2/account/emails.ts).
   'email.requested': {
     data:
       | { accountId: string; template: 'trial_reminder' }
       | {
           accountId: string;
           template: 'email_change_confirm' | 'email_change_notice' | 'account_delete';
-          tokenIds: string[];
+          tokenId: string;
         };
   };
   // CC-27b: a deletion was confirmed, one event per account it marked. deletionCancelFn ends the
