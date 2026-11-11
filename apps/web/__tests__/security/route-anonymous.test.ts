@@ -64,6 +64,7 @@ const ANONYMOUS: Record<
   string,
   { status: number; body?: unknown; location?: string; reads?: string[] }
 > = {
+  'api/account': { status: 401, body: { code: 'auth_required' } },
   'api/account/email': { status: 401, body: { code: 'auth_required' } },
   'api/alert-rules': { status: 401, body: { code: 'auth_required' } },
   'api/audits/[id]/export': { status: 401, body: { error: 'auth_required' } },

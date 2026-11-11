@@ -16,6 +16,8 @@ import { sentryServerOptions } from '../../../lib/auth/sentry-scrub';
 const CANARY = 'pkce_LEAKCANARY_77';
 /** A check id: the right to claim that check. */
 const CHECK_ID = 'c4ec4c4e-c4ec-4c4e-8c4e-c4ec4c4ec4ec';
+/** An emailed account link's token (43 base64url characters, as `newToken()` makes them). */
+const LINK_TOKEN = `LINKCANARY${'A'.repeat(33)}`;
 
 type SentryNext = {
   init: (o: Record<string, unknown>) => void;
@@ -88,6 +90,12 @@ async function capturedWith(options: Record<string, unknown>): Promise<string> {
         res.on('end', resolve);
       },
     ).end(),
+  );
+  await new Promise<void>((resolve) =>
+    request({ port, path: `/account/delete/${LINK_TOKEN}`, method: 'GET' }, (res) => {
+      res.resume();
+      res.on('end', resolve);
+    }).end(),
   );
   await Sentry.flush(2000);
   server.close();

@@ -33,6 +33,12 @@ export interface RoutePolicy {
 }
 
 export const ROUTE_POLICIES: readonly RoutePolicy[] = [
+  {
+    route: 'api/account',
+    methods: ['DELETE', 'PATCH', 'POST'],
+    class: 'member',
+    origin: 'strict',
+  },
   { route: 'api/account/email', methods: ['POST'], class: 'member', origin: 'strict' },
   {
     route: 'api/account/email/confirm',

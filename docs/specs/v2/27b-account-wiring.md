@@ -21,7 +21,31 @@ signed-in viewer's account. Everything here is behind `V2_CHECKS_PUBLIC` (`check
 
 ## Routes
 
-Filled in as each is built.
+Pages are in the `(account)` group, whose layout sets `noindex` and per-request rendering for each of them;
+`__tests__/v2/preview-guard.test.ts` lists the group's files. Each API row is in `ROUTE_POLICIES`
+(`lib/security/route-policy.ts`), which `__tests__/security/route-policy.test.ts` holds to the files on disk.
+
+| Path                                                                                                           | Verb                          | Who                                       | What                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `/api/account`                                                                                                 | PATCH (form: POST `_method`)  | owner or account manager                  | `{name, timezone, email_prefs}`; a changed `newEmail` from the owner starts the email change, from anyone else 403     |
+| `/api/account`                                                                                                 | DELETE (form: POST `_method`) | owner                                     | `hostname` re-typed; creates the deletion's links and asks the mailer to send them; deletes nothing                    |
+| `/api/account/email`                                                                                           | POST                          | owner                                     | `newEmail`; creates the confirmation link (new address) and the undo link (old address)                                |
+| `/account/email/[token]`, `/account/email-undo/[token]`, `/account/delete/[token]`, `/account/restore/[token]` | GET                           | the link's holder                         | moves the token into its cookie (`link-cookie.ts`) and redirects to the page with no token in its URL; changes nothing |
+| `/account/email`, `/account/email-undo`, `/account/delete`, `/account/restore`                                 | GET                           | the link's holder                         | says what the button does; the form posts to the flow's API route                                                      |
+| `/api/account/email/confirm`, `/api/account/email/undo`, `/api/account/delete/confirm`, `/api/account/restore` | POST                          | the link's holder (token from the cookie) | apply the change, stop or revert it, confirm the deletion, restore the account                                         |
+| `/api/alert-rules`                                                                                             | PUT (form: POST `_method`)    | any member                                | one account-level rule's switch; set, replace or clear the Slack webhook (paid tier); answers `{slack: {set, last4}}`  |
+| `/settings`                                                                                                    | GET                           | owner or account manager                  | profile, email kinds, plan card, danger zone                                                                           |
+| `/settings/plan`                                                                                               | GET                           | owner                                     | the plan, with an account that holds no site, and a cancelled plan until its period ends                               |
+| `/settings/delete`                                                                                             | GET                           | owner                                     | the hostname step and the accounts the deletion removes                                                                |
+| `/trial-ended`                                                                                                 | GET                           | member                                    | the trial before its end, or back on Free after it                                                                     |
+
+Moved out of this step (D10): `reports`, `reportDownload` and `reportShare` go to wave 2 with the agency
+workspace; seats and roles to CC-31; alert sending and unsubscribe headers to CC-28.
+
+Inngest, registered only with `V2_CHECKS_PUBLIC=1` (`lib/v2/pipeline/functions.ts`): `deletionCancelFn` and the
+resume on `account.deletion_confirmed` and on a restore, and `purgeDeletedAccountsFn` (daily, concurrency 1).
+With the flag unset during a window, the purge is not registered and the link routes answer 404: nothing is erased
+and nothing can be restored until the flag is back.
 
 ## Owner rulings
 
@@ -46,3 +70,13 @@ Approved with a change:
 No page here shares a path with a v1 page, so `V2_REWRITES` gains no row.
 
 ## Known gaps
+
+- Nothing is emailed until CC-28's mailer handles `email.requested` for the three account templates and calls
+  `issue_account_link`. Until then a request creates its link rows and they expire unused.
+- The scheduler of v2 checks does not exist yet (CC-28): it must skip accounts with `deletion_confirmed_at` set.
+- The past-due sweep (`lib/billing/clock.ts`) and `lib/auth/stores.ts` `loadMember` do not read the deletion mark;
+  both are for the next step that edits those files (Q11, and the ledger in the step's notes).
+- An access token issued before a deletion's confirm stays valid to its expiry (at most an hour) against v1 tables,
+  whose policies read `auth.uid()` alone; v2 tables refuse it through the membership functions.
+- Before the first apply, on the dry-run branch: `postgres` may delete `auth.sessions` and `auth.refresh_tokens`, and
+  no client role holds a privilege on `vault.secrets` or `vault.decrypted_secrets` (`docs/ops/erasure.md` §8).

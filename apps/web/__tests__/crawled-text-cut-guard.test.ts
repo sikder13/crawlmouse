@@ -223,6 +223,14 @@ const INVENTORY: [entry: string, why: string][] = [
     'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
   ],
   [
+    'apps/web/lib/v2/account/deletion-ports.ts :: const { error } = await sb.storage.from(bucket).remove(names.slice(i, i + REMOVE_BATCH));',
+    'array slice (a batch of Storage object names) \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/v2/account/erase.ts :: return plan.storage.length > 0 ? plan.refusals.slice(0, -1) : plan.refusals;',
+    'array slice (the erasure plan\u2019s refusals) \u2014 cannot split a surrogate pair',
+  ],
+  [
     'apps/web/lib/audit-stream-projection.ts :: .slice(0, AI_CLIENT_MAX_FINDINGS),',
     'array slice \u2014 cannot split a surrogate pair',
   ],
