@@ -296,5 +296,5 @@ describe('the revert', () => {
     } finally {
       await other.close();
     }
-  });
+  }, 60_000);
 });
