@@ -5,6 +5,7 @@
 -- search_path 20261108000002 set.
 
 -- ─── C ────────────────────────────────────────────────────────────────────────────────────────────
+drop function if exists public.account_deletion_blocked(uuid, uuid);
 -- The stored Slack URLs are Vault secrets the table names; they go with it, so a revert leaves none
 -- behind and every account has to save its URL again after a re-apply.
 do $$ begin
