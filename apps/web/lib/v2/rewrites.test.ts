@@ -39,6 +39,11 @@ describe('V2_REWRITES', () => {
     expect(isRewriteTarget('/dashboard/%E0%A4%A')).toBe(true);
   });
 
+  it('a source is not rewritten by its .rsc spelling', () => {
+    expect(rewriteOf('/dashboard.rsc')).toBeNull();
+    expect(rewriteOf('/%64ashboard.rsc')).toBeNull();
+  });
+
   it('an encoded spelling of a source is rewritten as the source is', () => {
     expect(rewriteOf('/%64ashboard')).toEqual({ from: '/dashboard', to: '/dashboard/v2' });
   });
