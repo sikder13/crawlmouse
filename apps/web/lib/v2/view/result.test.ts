@@ -395,8 +395,8 @@ describe('the fix to do first', () => {
   const WITH_STEPS = ' The steps and the evidence are open, free.';
   const NAMES = Object.keys(CHECK_OF) as FixtureName[];
   /** The fix a fixture's card names, and whether it has a packet. */
-  const firstFix = (name: FixtureName, v: ResultView) =>
-    v.first.kind === 'fix' ? fixture(name).fixes.find((f) => f.title === v.first.title)! : null;
+  const firstFix = (name: FixtureName, { first }: ResultView) =>
+    first.kind === 'fix' ? fixture(name).fixes.find((f) => f.title === first.title)! : null;
 
   it('says the steps are open when the fix it names has a packet', () => {
     let met = 0;
@@ -419,7 +419,7 @@ describe('the fix to do first', () => {
       const v = view(name, (_, d) => {
         d.fixes.find((f) => f.id === fix.id)!.packet = null;
       });
-      expect(v.first.title).toBe(fix.title);
+      expect(v.first).toMatchObject({ kind: 'fix', title: fix.title });
       expect(v.first.body.endsWith(' The evidence is open, free.'), name).toBe(true);
       expect(v.first.body).not.toMatch(/steps/i);
     }

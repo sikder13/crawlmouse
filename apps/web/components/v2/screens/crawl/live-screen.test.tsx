@@ -12,7 +12,7 @@ const LABEL = 'How the grade is calculated';
 const live: LiveControls = {
   onCancel: () => undefined,
   cancelling: false,
-  sendEmail: async () => 'sent',
+  sendEmail: async () => 'stored',
   emailDoes: 'Said under the field.',
   notices: [],
 };

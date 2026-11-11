@@ -319,14 +319,14 @@ function withoutJsDoor(
     coverage.tested < coverage.total
       ? `Every page measured with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen)}`
       : fixCount(fixes, SECTIONS.withoutJs!, isOpen);
-  // No page was rendered in a browser, so there is no share to show.
+  // The check holds no site-wide share. Why is not in the check, so the door does not say why.
   if (!check.without_js) {
     return {
       title: 'Readable without JavaScript',
       pill: { state: 'neutral', label: 'not measured' },
-      body: 'No page was rendered in a browser in this audit, so how much of the text is in the HTML before JavaScript runs was not measured.',
+      body: 'How much of the text is in the HTML before JavaScript runs was not measured in this audit.',
       footer,
-      coverage: { read: 'No page was rendered for this measurement.' },
+      coverage: { read: 'No site-wide share was recorded for this measurement.' },
       href: '#',
     };
   }

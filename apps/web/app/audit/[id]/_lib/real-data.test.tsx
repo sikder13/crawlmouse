@@ -6,7 +6,6 @@
  */
 import type { PGlite } from '@electric-sql/pglite';
 import { buildCheck, type BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
-import type { BatchResult } from '@crawlmouse/types/v2';
 import { isValidElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
@@ -25,6 +24,7 @@ import {
   type TestDeps,
 } from '../../../../lib/v2/pipeline/test-support/public-checks';
 import { fixesAsOf, fixture } from '../../../../lib/v2/fixtures';
+import { AI_WAITING } from '../../../../lib/v2/view/effect-headline';
 import { FREE_FIXES } from '../../../../lib/v2/view/free-fixes';
 import { NO_PACKET } from '../../../../lib/v2/view/no-packet';
 import type { SectionFixesView } from '../../../../lib/v2/view/segment/fixes';
@@ -289,11 +289,71 @@ describe('the six segment pages on a measured check', () => {
     },
   );
 
-  it('the re-check, which rendered no page, says text without JavaScript was not measured', () => {
-    expect(two.dataset.checks.find((c) => c.id === SECOND)!.without_js).toBeNull();
+  it('the re-check, whose record has no page measured without JavaScript, says so from its rows', () => {
+    const check = two.dataset.checks.find((c) => c.id === SECOND)!;
+    expect(check.without_js).toBeNull();
+    const rows = two.dataset.page_results.filter((p) => p.check_id === SECOND);
+    expect(rows.filter((p) => p.without_js)).toEqual([]);
     const markup = html(<SegmentBody read={two} segment="nojs" />);
     expect(markup).toContain('Text without JavaScript was not measured in this audit.');
+    expect(markup).toContain(
+      'No page in this audit’s record has its text measured without JavaScript, so there is no share to show.',
+    );
+    expect(markup).toContain(`>0 of ${check.coverage!.pages_discovered}<`);
     expect(markup).not.toMatch(/\d+% site-wide/);
+    // What the data does not hold is not said: whether a browser rendered a page, and that no
+    // other section uses the measurement.
+    expect(markup).not.toMatch(/rendered in a browser|do not depend/);
+    // AI readability waits on this measurement on this check, and the page says so from the grade.
+    expect(check.ai_readability!.withheld_reasons).toContain('readable_unmeasured');
+    expect(markup).toContain(`${AI_WAITING.readable_unmeasured}.`);
+    const door = resultOf(two).doors.find((x) => x.title === 'Readable without JavaScript')!;
+    expect(door.pill.label).toBe('not measured');
+    expect(JSON.stringify(door)).not.toMatch(/rendered/);
+  });
+
+  it('pages that were measured, with no site-wide share recorded, are counted and not denied', () => {
+    const rows = two.dataset.page_results.filter((p) => p.check_id === SECOND);
+    const measured = {
+      raw_words: 40,
+      rendered_words: 400,
+      text_share: 0.1,
+      state: 'empty_shell' as const,
+    };
+    const [a, b] = rows;
+    const withRows = (urls: string[], reasons: 'readable_unmeasured'[]): ReadyCheck => ({
+      ...two,
+      dataset: {
+        ...two.dataset,
+        page_results: two.dataset.page_results.map((p) =>
+          p.check_id === SECOND && urls.includes(p.url) ? { ...p, without_js: measured } : p,
+        ),
+        checks: two.dataset.checks.map((c) =>
+          c.id === SECOND
+            ? {
+                ...c,
+                ai_readability: {
+                  ...c.ai_readability!,
+                  withheld_reasons: reasons,
+                },
+              }
+            : c,
+        ),
+      },
+    });
+    const oneRow = html(<SegmentBody read={withRows([a!.url], [])} segment="nojs" />);
+    expect(oneRow).toContain(
+      'One page in this audit’s record has its text measured without JavaScript, but the audit recorded no site-wide share, so there is none to show.',
+    );
+    expect(oneRow).toContain('>1 of ');
+    expect(oneRow).not.toContain('No page');
+    // With that reason gone from the grade, the sentence about AI readability goes too.
+    expect(oneRow).not.toContain(AI_WAITING.readable_unmeasured);
+    const twoRows = html(
+      <SegmentBody read={withRows([a!.url, b!.url], ['readable_unmeasured'])} segment="nojs" />,
+    );
+    expect(twoRows).toContain('Two pages in this audit’s record have their text measured');
+    expect(twoRows).toContain(`${AI_WAITING.readable_unmeasured}.`);
   });
 
   it("the re-check's changes page lists each of its change rows and names the check before it", () => {
@@ -626,7 +686,9 @@ const escaped = (s: string) =>
     .replace(/'/g, '&#x27;');
 
 describe('a challenged crawler is said as the rows hold it (D11)', () => {
-  const site = (control: 'allowed' | 'challenged_ua') => {
+  const SERVED = 'the same page asked for with a browser identity';
+  /** One crawler challenged; `control` is what becomes of the control fetch's rows after the build. */
+  const site = (control: 'served' | 'no response' | 'no row') => {
     const shape: SiteShape = {
       home: 'ok',
       pages: [0, 1, 2].map((family) => ({ family, answer: 'ok', features: 'server' })),
@@ -639,55 +701,55 @@ describe('a challenged crawler is said as the rows hold it (D11)', () => {
       access: TESTED_UAS.map((_, i) => (i === 0 ? 'challenged_ua' : 'allowed')),
     };
     const input = inputOf(shape);
-    // The generated control fetch is served; the second case challenges it as well.
-    const batches = (input.batches as BatchResult[]).map((b) =>
-      b.kind !== 'access' || control === 'allowed'
-        ? b
-        : {
-            ...b,
-            access_tests: b.access_tests.map((t) =>
-              t.identity_role === 'control'
-                ? {
-                    ...t,
-                    verdict: 'challenged_ua' as const,
-                    cause: 'automation_challenge' as const,
-                    raw_status: 403,
-                  }
-                : t,
-            ),
-          },
-    );
-    const built = buildCheck({ ...input, batches });
+    const built = buildCheck(input);
+    const dataset = datasetOfBuilds(input.site, [built]);
+    const isControl = (t: { identity_role: string }) => t.identity_role === 'control';
+    expect(dataset.access_tests.filter(isControl).length).toBeGreaterThan(0);
     const read: ReadyCheck = {
       state: 'ready',
       checkId: built.check.id,
       host: input.site.host,
       kept: false,
       plan: 'free',
-      dataset: datasetOfBuilds(input.site, [built]),
+      dataset: {
+        ...dataset,
+        access_tests:
+          control === 'served'
+            ? dataset.access_tests
+            : control === 'no row'
+              ? dataset.access_tests.filter((t) => !isControl(t))
+              : dataset.access_tests.map((t) =>
+                  isControl(t)
+                    ? { ...t, verdict: 'not_measured' as const, cause: null, raw_status: null }
+                    : t,
+                ),
+      },
       map: null,
     };
     return { read, built, markup: html(<SegmentBody read={read} segment="access" />) };
   };
 
   it('with the control fetch served, the page says so and does not say all automation is challenged', () => {
-    const { markup, built } = site('allowed');
+    const { markup, built } = site('served');
     const challenged = built.check.crawlers.find((c) => c.verdict === 'challenged_ua')!;
     expect(challenged).toMatchObject({ ua: TESTED_UAS[0], cause: 'automation_challenge' });
     expect(markup).toContain('edge challenge of this crawler');
-    expect(markup).toContain(
-      'the same page asked for with a browser identity, untagged, was served (status 200)',
-    );
+    expect(markup).toContain(`${SERVED}, untagged, was served (status 200)`);
     expect(markup).not.toContain('on all automation');
     expect(markup).not.toContain('with or without a crawler user agent');
     expect(markup).toContain(challenged.ua);
   });
 
-  it('with the control fetch challenged too, the page says both were', () => {
-    const { markup } = site('challenged_ua');
-    expect(markup).toContain(
-      'and the same page asked for with a browser identity, untagged (status 403)',
-    );
-    expect(markup).not.toContain('was served');
-  });
+  // The worker pairs a challenged crawler with a served control (packages/worker verdict table:
+  // any other control makes the verdict edge_blocks_automation or not_measured). The view does not
+  // rest on that: of a control row that was not served, or of none, it says nothing.
+  it.each(['no response', 'no row'] as const)(
+    'with %s for the control fetch, the page says only that the crawler was challenged',
+    (control) => {
+      const { markup } = site(control);
+      expect(markup).toContain('the edge challenged the request made as this crawler');
+      expect(markup).not.toContain(SERVED);
+      expect(markup).not.toContain('was served');
+    },
+  );
 });
