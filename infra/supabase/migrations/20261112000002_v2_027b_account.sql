@@ -625,6 +625,729 @@ grant execute on function public.undo_email_change(text, timestamptz) to service
 
 -- ═══ B: deletion, restore, purge and the erasure (D4, D5) ═════════════════════════════════════════
 
+-- The erasure's rules, the in-app deletion's three steps and the purge's queue reads. Functions are
+-- owned by postgres, revoked from every client role and granted to service_role (erase_rules,
+-- erase_person_refusals, deletion_refusal and email_change_live to no role: only the functions here
+-- call them). Tests:
+-- apps/web/__tests__/v2-027b-b-erasure.test.ts, apps/web/__tests__/v2-027b-b-deletion.test.ts and,
+-- for the rules carried over from the script, scripts/ops/erase-account.test.ts.
+
+-- ─── The erasure's rules (D5) ─────────────────────────────────────────────────────────────────────
+-- One row per rule. `kind`: `with_user` and `with_accounts` are counted only (they go with the Auth
+-- user's and the accounts' cascades), `change` rows are what erase_person_apply changes, in `ord`
+-- order, and `kept` rows are counted to say what stays. `target` names the table as `x`, `pred` is
+-- the rows, over $1 the user id (null when there is none), $2 the lower-cased addresses and $3 the
+-- accounts the person alone holds; `action` is the SET list of an update, or null for a delete. The
+-- count and the change of a rule are built from the same `pred`, so they cannot disagree.
+-- `fix_email_requests deleted` comes before `accounts deleted`: its seat reference is set null when a
+-- seat goes, after which a request cannot be traced to the person.
+create or replace function public.erase_rules()
+returns table (ord integer, kind text, key text, target text, action text, pred text)
+language sql
+stable
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select r.ord, r.kind, r.key, r.target, r.action, r.pred
+    from (values
+      (1, 'with_user', 'auth.users deleted', 'auth.users x', null, 'x.id = $1'),
+      (2, 'with_user', 'users deleted', 'public.users x', null, 'x.id = $1'),
+      (3, 'with_user', 'audits deleted', 'public.audits x', null, 'x.user_id = $1'),
+      (4, 'with_user', 'sessions deleted', 'public.sessions x', null, 'x.user_id = $1'),
+      (5, 'with_user', 'domain_verifications deleted', 'public.domain_verifications x', null,
+       'x.user_id = $1'),
+      (6, 'with_user', 'embed_badges deleted', 'public.embed_badges x', null, 'x.user_id = $1'),
+      (7, 'with_user', 'seats deleted (own)', 'public.seats x', null, 'x.user_id = $1'),
+      (8, 'with_user', 'public_reports.minted_by nulled', 'public.public_reports x', null,
+       'x.minted_by = $1'),
+      (9, 'with_user', 'share_links.created_by nulled', 'public.share_links x', null,
+       'x.created_by = $1'),
+      (10, 'with_user', 'api_keys.created_by nulled', 'public.api_keys x', null, 'x.created_by = $1'),
+      -- Supabase Auth's audit log, where the project keeps one. An entry names the user by id and
+      -- address in its JSON payload.
+      (20, 'change', 'auth.audit_log_entries deleted', 'auth.audit_log_entries x', null,
+       $p$($1 is not null and x.payload->>'actor_id' = $1::text)
+          or ($1 is not null and x.payload->'traits'->>'user_id' = $1::text)
+          or lower(x.payload->>'actor_username') = any($2)
+          or lower(x.payload->'traits'->>'user_email') = any($2)$p$),
+      -- Not the user's own audits, which go with the user; with no user, every audit holding it.
+      (21, 'change', 'audits.notify_email nulled', 'public.audits x', 'notify_email = null',
+       'lower(x.notify_email) = any($2) and ($1 is null or x.user_id is distinct from $1)'),
+      -- Checks of sites outside the person's own accounts (theirs go with the accounts).
+      (22, 'change', 'checks.notify_email nulled', 'public.checks x', 'notify_email = null',
+       $p$lower(x.notify_email) = any($2)
+          and not exists (select 1 from public.sites s where s.id = x.site_id and s.account_id = any($3))$p$),
+      (23, 'change', 'email_events deleted', 'public.email_events x', null,
+       'lower(x.email_address) = any($2)'),
+      (24, 'change', 'waitlist deleted', 'public.waitlist x', null, 'lower(x.email) = any($2)'),
+      -- The column is NOT NULL, so the address is replaced, not nulled.
+      (25, 'change', 'takedown_requests redacted (closed)', 'public.takedown_requests x',
+       $p$requester_email = 'redacted@erased.invalid'$p$,
+       $p$lower(x.requester_email) = any($2) and x.status in ('removed', 'rejected')$p$),
+      (26, 'change', 'rate_limits deleted', 'public.rate_limits x', null,
+       $p$($1 is not null and right(x.bucket_key, 37) = ':' || $1::text)
+          or exists (select 1 from unnest($2) e where right(x.bucket_key, length(e) + 1) = ':' || e)$p$),
+      -- Another person's record of the address as one they used before (an email change).
+      (27, 'change', 'users.previous_emails pruned', 'public.users x',
+       'previous_emails = array(select e from unnest(x.previous_emails) e where lower(e) <> all($2))',
+       $p$x.id is distinct from $1
+          and exists (select 1 from unnest(x.previous_emails) e where lower(e) = any($2))$p$),
+      (28, 'change', 'seats deleted (invitations in other accounts)', 'public.seats x', null,
+       'lower(x.invited_email) = any($2) and x.user_id is null and not (x.account_id = any($3))'),
+      (29, 'change', 'reports.recipient_email nulled', 'public.reports x', 'recipient_email = null',
+       'lower(x.recipient_email) = any($2) and not (x.account_id = any($3))'),
+      (30, 'change', 'sites.client_contact_email nulled', 'public.sites x',
+       'client_contact_email = null',
+       'lower(x.client_contact_email) = any($2) and not (x.account_id = any($3))'),
+      (31, 'change', 'fix_email_requests deleted', 'public.fix_email_requests x', null,
+       $p$(x.requested_by_seat_id in (select s.id from public.seats s where s.user_id = $1)
+           or lower(x.to_email) = any($2))
+          and not (x.account_id = any($3))$p$),
+      (32, 'change', 'accounts deleted', 'public.accounts x', null, 'x.id = any($3)'),
+      (40, 'with_accounts', 'sites deleted', 'public.sites x', null, 'x.account_id = any($3)'),
+      (41, 'with_accounts', 'checks deleted', 'public.checks x', null,
+       'exists (select 1 from public.sites s where s.id = x.site_id and s.account_id = any($3))'),
+      (42, 'with_accounts', 'reports deleted', 'public.reports x', null, 'x.account_id = any($3)'),
+      (50, 'kept', 'trial_ledger (peppered hashes; account reference set null)',
+       'public.trial_ledger x', null, 'x.account_id = any($3)'),
+      (51, 'kept', 'takedown_requests (open; the address stays until closed)',
+       'public.takedown_requests x', null,
+       $p$lower(x.requester_email) = any($2) and x.status not in ('removed', 'rejected')$p$)
+    ) r(ord, kind, key, target, action, pred)
+   where r.target <> 'auth.audit_log_entries x'
+      or pg_catalog.to_regclass('auth.audit_log_entries') is not null
+   order by r.ord;
+$$;
+
+-- The accounts the person alone is seated on (through an active seat): what an erasure deletes, and
+-- what a deletion marks.
+create or replace function public.erase_person_accounts(p_user uuid)
+returns uuid[]
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select coalesce(array_agg(a.id order by a.id::text), '{}')
+    from (select distinct s.account_id as id
+            from public.seats s
+           where s.user_id = p_user and s.status = 'active'
+             and not exists (select 1 from public.seats o
+                              where o.account_id = s.account_id and o.status = 'active'
+                                and o.user_id is distinct from p_user)) a;
+$$;
+
+-- Why an erasure of the person cannot run yet, apart from the Storage objects (erase_person_plan
+-- adds that one): `others_seated`, `v1_subscription` and `live_subscription`, each with the line the
+-- dry run prints.
+create or replace function public.erase_person_refusals(p_user uuid, p_accounts uuid[])
+returns table (code text, message text)
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select c.code, c.message from (
+    select 1 as o, s.account_id::text as k, 'others_seated' as code,
+           'account ' || s.account_id::text || ': other people are seated on it; transfer ownership first' as message
+      from (select distinct s.account_id from public.seats s
+             where s.user_id = p_user and s.role = 'owner'
+               and exists (select 1 from public.seats o
+                            where o.account_id = s.account_id and o.status = 'active'
+                              and o.user_id is distinct from p_user)) s
+    union all
+    select 2, '', 'v1_subscription',
+           'users.pro_until is in the future; cancel the subscription in Stripe first'
+      from public.users u where u.id = p_user and u.pro_until > now()
+    union all
+    select 3, sb.id, 'live_subscription', 'subscription ' || sb.id || ' is live; cancel it in Stripe first'
+      from public.subscriptions sb
+     where sb.account_id = any(p_accounts) and sb.status not in ('canceled', 'incomplete_expired')
+  ) c
+  order by c.o, c.k;
+$$;
+
+-- Every count an erasure reports, for a user id (or null), its addresses and its accounts:
+-- {counts, kept, storage}. `counts` holds the `with_user` rules only when there is a user. `storage`
+-- lists the objects to delete through the Storage API (SQL cannot), listed before any row that names
+-- them is gone: those the person uploaded (storage.objects.owner), and those the accounts' rows name.
+create or replace function public.erase_person_counts(p_user uuid, p_emails text[], p_accounts uuid[])
+returns json
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  r record;
+  v_n bigint;
+  v_keys text[] := '{}';
+  v_vals bigint[] := '{}';
+  v_kept_keys text[] := '{}';
+  v_kept_vals bigint[] := '{}';
+  v_storage json;
+  v_emails text[] := coalesce(p_emails, '{}');
+  v_accounts uuid[] := coalesce(p_accounts, '{}');
+begin
+  for r in select * from public.erase_rules() loop
+    continue when r.kind = 'with_user' and p_user is null;
+    execute format('select count(*) from %s where %s', r.target, r.pred)
+      into v_n using p_user, v_emails, v_accounts;
+    if r.kind = 'kept' then
+      v_kept_keys := v_kept_keys || r.key;
+      v_kept_vals := v_kept_vals || v_n;
+    else
+      v_keys := v_keys || r.key;
+      v_vals := v_vals || v_n;
+    end if;
+  end loop;
+
+  with paths(bucket, name) as (
+    select 'report-logos', b.logo_path from public.agency_brands b
+     where b.account_id = any(v_accounts) and b.logo_path is not null
+    union all
+    select 'reports', rp.storage_path from public.reports rp
+     where rp.account_id = any(v_accounts) and rp.storage_path is not null
+    union all
+    select 'evidence', e.storage_path from public.evidence_blobs e
+      join public.checks c on c.id = e.check_id join public.sites s on s.id = c.site_id
+     where s.account_id = any(v_accounts)
+    union all
+    select 'evidence', c.map_path from public.checks c join public.sites s on s.id = c.site_id
+     where s.account_id = any(v_accounts) and c.map_path is not null
+    union all
+    select 'evidence', cb.result_path from public.crawl_batches cb
+      join public.checks c on c.id = cb.check_id join public.sites s on s.id = c.site_id
+     where s.account_id = any(v_accounts) and cb.result_path is not null
+  )
+  select coalesce(json_agg(json_build_object('bucket', o.bucket_id, 'name', o.name)
+                           order by o.bucket_id, o.name), '[]'::json)
+    into v_storage
+    from storage.objects o
+   where o.owner = p_user or (o.bucket_id, o.name) in (select p.bucket, p.name from paths p);
+
+  return json_build_object(
+    'counts', (select json_object_agg(k, v order by i) from unnest(v_keys, v_vals) with ordinality t(k, v, i)),
+    'kept', (select json_object_agg(k, v order by i) from unnest(v_kept_keys, v_kept_vals) with ordinality t(k, v, i)),
+    'storage', v_storage);
+end;
+$$;
+
+-- What an erasure would do. Changes nothing (a stable function: Postgres refuses a write in it).
+-- Name the person by user id or by address, not both. An address that names more than one user, or
+-- an id no user has, raises. Returns {userId, emails, accounts, refusals, counts, kept, storage,
+-- mintedReports}, the keys scripts/ops/erase-account.ts prints. `emails` is the address given, the
+-- user's current ones and users.previous_emails, lower-cased.
+create or replace function public.erase_person_plan(p_user uuid, p_email text)
+returns json
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v_given text := nullif(lower(btrim(p_email)), '');
+  v_ids uuid[];
+  v_user uuid;
+  v_emails text[];
+  v_accounts uuid[] := '{}';
+  v_refusals text[] := '{}';
+  v_counts json;
+begin
+  if (p_user is null) = (v_given is null) then
+    raise exception 'erase_person_plan: name exactly one of a user id and an address' using errcode = '22023';
+  end if;
+  select coalesce(array_agg(distinct u.id), '{}') into v_ids
+    from (select a.id from auth.users a where a.id = p_user or lower(a.email) = v_given
+          union
+          select pu.id from public.users pu where pu.id = p_user or lower(pu.email) = v_given) u;
+  if cardinality(v_ids) > 1 then
+    raise exception 'the address names % users; erase by user id', cardinality(v_ids) using errcode = '22023';
+  end if;
+  v_user := v_ids[1];
+  if p_user is not null and v_user is null then
+    raise exception 'no user has that id' using errcode = '22023';
+  end if;
+
+  select coalesce(array_agg(e order by first_at), '{}') into v_emails
+    from (select e, min(i) as first_at
+            from unnest(array[v_given]
+                        || array(select lower(btrim(a.email)) from auth.users a where a.id = v_user)
+                        || array(select lower(btrim(pu.email)) from public.users pu where pu.id = v_user)
+                        || array(select lower(btrim(p.e)) from public.users pu, unnest(pu.previous_emails) p(e)
+                                  where pu.id = v_user)) with ordinality t(e, i)
+           where e is not null and e <> ''
+           group by e) s;
+
+  if v_user is not null then
+    v_accounts := public.erase_person_accounts(v_user);
+    v_refusals := array(select f.message from public.erase_person_refusals(v_user, v_accounts) f);
+  end if;
+  v_counts := public.erase_person_counts(v_user, v_emails, v_accounts);
+  if json_array_length(v_counts->'storage') > 0 then
+    -- The rows that name them go with the erasure, after which nothing can list them.
+    v_refusals := v_refusals || (json_array_length(v_counts->'storage')::text
+      || ' storage objects are still stored; delete them through the Storage API first (docs/ops/erasure.md §4)');
+  end if;
+
+  return json_build_object(
+    'userId', v_user,
+    'emails', to_json(v_emails),
+    'accounts', to_json(array(select a::text from unnest(v_accounts) a order by 1)),
+    'refusals', to_json(v_refusals),
+    'counts', v_counts->'counts',
+    'kept', v_counts->'kept',
+    'storage', v_counts->'storage',
+    'mintedReports', to_json(array(select r.slug from public.public_reports r
+                                    where v_user is not null and r.minted_by = v_user order by r.slug)));
+end;
+$$;
+
+-- Carries out an erasure, in the caller's transaction. Plans again inside itself and raises on any
+-- refusal. Applies each `change` rule, counting the rows it changed, and raises unless that equals the
+-- count its own plan read, so a row that changed in between, or a change that touches more than its
+-- count, commits nothing. With p_require_due (the purge), the person's pending_erasures row is locked
+-- first and must have reached purge_after, so a restore cannot run beside it (restore_account takes
+-- the same lock). Returns {applied, drift}: the rows changed by key, and the keys whose count differs
+-- from p_expected's (the plan the caller read before it removed Storage objects), for its report only.
+-- The Auth user is not deleted here: the caller does that through the Auth admin API.
+create or replace function public.erase_person_apply(
+  p_user uuid, p_email text, p_expected jsonb, p_require_due boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  r record;
+  v_plan jsonb;
+  v_user uuid;
+  v_emails text[];
+  v_accounts uuid[];
+  v_n bigint;
+  v_planned bigint;
+  v_applied jsonb := '{}';
+begin
+  if p_require_due then
+    perform 1 from public.pending_erasures q
+      where q.user_id = p_user and q.purge_after <= now() for update;
+    if not found then
+      raise exception 'erase_person_apply: no erasure of this person is due' using errcode = '55000';
+    end if;
+  end if;
+  v_plan := public.erase_person_plan(p_user, p_email)::jsonb;
+  if jsonb_array_length(v_plan->'refusals') > 0 then
+    raise exception 'refusing to erase:%', (select string_agg(E'\n- ' || x, '' order by i)
+      from jsonb_array_elements_text(v_plan->'refusals') with ordinality t(x, i)) using errcode = '55000';
+  end if;
+  v_user := (v_plan->>'userId')::uuid;
+  v_emails := array(select jsonb_array_elements_text(v_plan->'emails'));
+  v_accounts := array(select jsonb_array_elements_text(v_plan->'accounts')::uuid);
+
+  for r in select * from public.erase_rules() where kind = 'change' loop
+    execute case when r.action is null
+                 then format('with done as (delete from %s where %s returning 1) select count(*) from done',
+                             r.target, r.pred)
+                 else format('with done as (update %s set %s where %s returning 1) select count(*) from done',
+                             r.target, r.action, r.pred) end
+      into v_n using v_user, v_emails, v_accounts;
+    v_planned := (v_plan->'counts'->>r.key)::bigint;
+    if v_n is distinct from v_planned then
+      raise exception '%: counted %, changed %; nothing was committed', r.key, v_planned, v_n
+        using errcode = '40001';
+    end if;
+    v_applied := v_applied || jsonb_build_object(r.key, v_n);
+  end loop;
+
+  return jsonb_build_object(
+    'applied', v_applied,
+    'drift', coalesce((select jsonb_object_agg(k.key, jsonb_build_object(
+                         'expected', p_expected->'counts'->k.key, 'planned', v_plan->'counts'->k.key))
+                         from jsonb_object_keys(v_plan->'counts') k(key)
+                        where (p_expected->'counts'->k.key) is distinct from (v_plan->'counts'->k.key)),
+                      '{}'));
+end;
+$$;
+
+-- Supabase Auth may log the deletion of the user, naming the address, after erase_person_apply
+-- cleared the log: the same rule, run again after the Auth delete. 0 where there is no audit log.
+create or replace function public.erase_auth_audit_log(p_user uuid, p_emails text[])
+returns integer
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  r record;
+  v integer := 0;
+begin
+  for r in select * from public.erase_rules() where key = 'auth.audit_log_entries deleted' loop
+    execute format('with done as (delete from %s where %s returning 1) select count(*) from done',
+                   r.target, r.pred)
+      into v using p_user, coalesce(p_emails, '{}'::text[]), '{}'::uuid[];
+  end loop;
+  return v;
+end;
+$$;
+
+revoke all on function public.erase_rules() from public, anon, authenticated, service_role;
+revoke all on function public.erase_person_accounts(uuid) from public, anon, authenticated;
+revoke all on function public.erase_person_refusals(uuid, uuid[]) from public, anon, authenticated, service_role;
+revoke all on function public.erase_person_counts(uuid, text[], uuid[]) from public, anon, authenticated;
+revoke all on function public.erase_person_plan(uuid, text) from public, anon, authenticated;
+revoke all on function public.erase_person_apply(uuid, text, jsonb, boolean) from public, anon, authenticated;
+revoke all on function public.erase_auth_audit_log(uuid, text[]) from public, anon, authenticated;
+grant execute on function public.erase_person_accounts(uuid) to service_role;
+grant execute on function public.erase_person_counts(uuid, text[], uuid[]) to service_role;
+grant execute on function public.erase_person_plan(uuid, text) to service_role;
+grant execute on function public.erase_person_apply(uuid, text, jsonb, boolean) to service_role;
+grant execute on function public.erase_auth_audit_log(uuid, text[]) to service_role;
+
+-- ─── The in-app deletion (D4) ─────────────────────────────────────────────────────────────────────
+-- Request → confirm → seven days in which the restore link undoes the confirm → the purge erases.
+-- What the person is told, and the routes, are lib/v2/account/deletion.ts's.
+
+-- The subscriptions a confirmed deletion asked Stripe to end, one row each, and whether this deletion
+-- set it to end (false when the person had already set it to, or Stripe cancelled it at once), so a
+-- restore resumes only what the deletion stopped (plan-revision R5). A person alone on two accounts
+-- may hold two subscriptions, which pending_erasures' one subscription_id cannot name. No foreign key:
+-- like pending_erasures, nothing the erasure deletes takes a row with it; finish_erasure and
+-- restore_account delete them.
+create table if not exists public.deletion_cancellations (
+  subscription_id text primary key check (subscription_id ~ '^sub_'),
+  user_id uuid not null,
+  account_id uuid not null,
+  we_set_cancel boolean not null,
+  recorded_at timestamptz not null default now()
+);
+create index if not exists deletion_cancellations_user_idx on public.deletion_cancellations (user_id);
+alter table public.deletion_cancellations enable row level security;
+revoke all on public.deletion_cancellations from public, anon, authenticated;
+
+-- The host the owner re-types to delete an account: its primary site's (the oldest site that is not
+-- a staging copy and not removed), or, with no site, the sign-in address. Lower-cased.
+create or replace function public.deletion_hostname(p_account uuid, p_user uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select lower(coalesce(
+    (select s.host from public.sites s
+      where s.account_id = p_account and s.staging_of_site_id is null and s.removed_at is null
+      order by s.created_at, s.id limit 1),
+    (select u.email from public.users u where u.id = p_user)));
+$$;
+
+-- Why the person's deletion cannot be requested or confirmed: the erasure's refusals, apart from a live
+-- subscription (the confirm ends it, and the purge ends any still live) and Storage objects (the purge
+-- removes them), and an account that is not the person's alone. The first code, or null.
+create or replace function public.deletion_refusal(p_account uuid, p_user uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select coalesce(
+    (select f.code from public.erase_person_refusals(p_user, public.erase_person_accounts(p_user)) f
+      where f.code <> 'live_subscription' limit 1),
+    case when p_account = any(public.erase_person_accounts(p_user)) then null else 'others_seated' end);
+$$;
+
+-- An email change in flight for the person: its confirmation or its "this wasn't me" link is live. A
+-- deletion waits for it, so the undo stays possible (plan-revision R6a).
+create or replace function public.email_change_live(p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select exists (select 1 from public.account_tokens t
+                  where t.user_id = p_user and t.kind in ('email_change', 'email_change_undo')
+                    and t.used_at is null and t.revoked_at is null and t.expires_at > now());
+$$;
+
+-- The owner asks to delete the account (deletes nothing). Refuses with {ok: false, code}:
+-- `hostname_mismatch`, `email_change_pending`, `others_seated`, `v1_subscription`. Otherwise creates
+-- the confirmation link's row (24 hours) and the restore link's row (the 24 hours plus the 7-day
+-- window; restore_account also requires the window) paired with it, both with no token until the
+-- mailer's issue_account_link on the confirmation row issues the two, revoking any earlier pair;
+-- records `delete_requested`; and returns {ok: true, confirmTokenId, tier}. The route has checked
+-- that p_user is the account's owner through the caller's own session; this checks it again under the
+-- account's row lock.
+create or replace function public.request_account_deletion(
+  p_account uuid, p_user uuid, p_hostname text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v_refusal text;
+  v_confirm uuid;
+  v_restore uuid;
+begin
+  perform 1 from public.accounts a
+    where a.id = p_account and a.deleted_at is null and a.deletion_confirmed_at is null for update;
+  if not found or not exists (select 1 from public.seats s
+                               where s.account_id = p_account and s.user_id = p_user
+                                 and s.role = 'owner' and s.status = 'active') then
+    raise exception 'request_account_deletion: not the owner of a live account' using errcode = '42501';
+  end if;
+  if lower(btrim(coalesce(p_hostname, ''))) <> public.deletion_hostname(p_account, p_user) then
+    return jsonb_build_object('ok', false, 'code', 'hostname_mismatch');
+  end if;
+  if public.email_change_live(p_user) then
+    return jsonb_build_object('ok', false, 'code', 'email_change_pending');
+  end if;
+  v_refusal := public.deletion_refusal(p_account, p_user);
+  if v_refusal is not null then
+    return jsonb_build_object('ok', false, 'code', v_refusal);
+  end if;
+  v_confirm := public.create_account_token(p_account, p_user, 'delete_confirm',
+                                           now() + interval '24 hours');
+  v_restore := public.create_account_token(p_account, p_user, 'delete_restore',
+                                           now() + interval '8 days', p_paired_with => v_confirm);
+  insert into public.account_events (account_id, kind, actor_user_id)
+  values (p_account, 'delete_requested', p_user);
+  return jsonb_build_object('ok', true, 'confirmTokenId', v_confirm,
+                            'tier', (select a.tier from public.accounts a where a.id = p_account));
+end;
+$$;
+
+-- What a deletion link's page shows, without using the link: {ok: false, code} with `invalid_link`
+-- (no such token of that kind, or used, revoked or expired), `not_confirmed` (a restore link before its
+-- deletion was confirmed) or `window_closed` (a restore link after its window); otherwise {ok: true,
+-- userId, accounts: [{id, host}], purgeAfter}: for a confirmation link, the accounts the confirm would mark,
+-- and for a restore link, those its confirm marked (purgeAfter null for a confirmation link). `host` is
+-- deletion_hostname's, so the sign-in address for an account with no site.
+create or replace function public.read_deletion_link(p_kind text, p_hash text, p_now timestamptz)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v public.account_tokens%rowtype;
+  v_accounts uuid[];
+  v_purge timestamptz;
+begin
+  if p_kind not in ('delete_confirm', 'delete_restore') then
+    raise exception 'read_deletion_link: not a deletion link kind' using errcode = '22023';
+  end if;
+  select * into v from public.account_tokens t
+   where t.token_hash = p_hash and t.kind = p_kind and t.issued_at is not null;
+  if not found or v.used_at is not null or v.revoked_at is not null or v.expires_at <= p_now then
+    return jsonb_build_object('ok', false, 'code', 'invalid_link');
+  end if;
+  if p_kind = 'delete_confirm' then
+    v_accounts := public.erase_person_accounts(v.user_id);
+  else
+    select q.accounts, q.purge_after into v_accounts, v_purge
+      from public.pending_erasures q where q.user_id = v.user_id;
+    if not found then return jsonb_build_object('ok', false, 'code', 'not_confirmed'); end if;
+    if v_purge <= greatest(p_now, now()) then
+      return jsonb_build_object('ok', false, 'code', 'window_closed');
+    end if;
+  end if;
+  return jsonb_build_object(
+    'ok', true,
+    'userId', v.user_id,
+    'purgeAfter', v_purge,
+    'accounts', coalesce((select jsonb_agg(jsonb_build_object(
+                                   'id', a.id, 'host', public.deletion_hostname(a.id, v.user_id))
+                                 order by a.id::text)
+                            from unnest(v_accounts) a(id)), '[]'));
+end;
+$$;
+
+-- The confirmation link's POST, in one transaction (plan-revision R4): consumes the token (an issued one, by hash and kind),
+-- refuses as request_account_deletion does (the token stays usable: the person can resolve it and
+-- press again), marks every account the person alone holds, queues the person in pending_erasures
+-- with the window's end, ends every session, revokes any email change in flight, and records
+-- `delete_confirmed` on each account. Returns {ok: true, userId, accountId, tier, accounts,
+-- purgeAfter} (accountId and tier: the account the link was issued for) or
+-- {ok: false, code} (`invalid_link`, `others_seated`, `v1_subscription`). Signing-in is stopped by the
+-- caller's Auth ban; the subscription is ended by deletionCancelFn.
+create or replace function public.confirm_account_deletion(p_hash text, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v public.account_tokens%rowtype;
+  v_refusal text;
+  v_accounts uuid[];
+  v_purge timestamptz := p_now + interval '7 days';
+begin
+  select * into v from public.account_tokens t
+   where t.token_hash = p_hash and t.kind = 'delete_confirm' and t.issued_at is not null for update;
+  if not found or v.used_at is not null or v.revoked_at is not null or v.expires_at <= p_now then
+    return jsonb_build_object('ok', false, 'code', 'invalid_link');
+  end if;
+  v_refusal := public.deletion_refusal(v.account_id, v.user_id);
+  if v_refusal is not null then
+    return jsonb_build_object('ok', false, 'code', v_refusal);
+  end if;
+  v_accounts := public.erase_person_accounts(v.user_id);
+
+  update public.account_tokens t set used_at = p_now where t.id = v.id;
+  update public.accounts a set deletion_confirmed_at = p_now, purge_after = v_purge
+   where a.id = any(v_accounts);
+  insert into public.pending_erasures (user_id, accounts, confirmed_at, purge_after)
+  values (v.user_id, v_accounts, p_now, v_purge);
+  perform public.end_user_sessions(v.user_id);
+  update public.account_tokens t set revoked_at = p_now
+   where t.user_id = v.user_id and t.kind in ('email_change', 'email_change_undo')
+     and t.used_at is null and t.revoked_at is null;
+  insert into public.account_events (account_id, kind, actor_user_id)
+  select a, 'delete_confirmed', v.user_id from unnest(v_accounts) a;
+  return jsonb_build_object('ok', true, 'userId', v.user_id, 'accountId', v.account_id,
+                            'tier', (select a.tier from public.accounts a where a.id = v.account_id),
+                            'accounts', to_jsonb(v_accounts), 'purgeAfter', v_purge);
+end;
+$$;
+
+-- The restore link's POST, in one transaction: consumes the token (an issued one, by hash and kind) only while the person's
+-- pending_erasures row, locked as erase_person_apply locks it, is inside its window; clears the
+-- accounts' marks and the queue row, records `delete_restored`, and returns {ok: true, userId,
+-- accountId, tier, accounts, resume}: `resume` names the subscriptions this deletion set to end, which the caller asks
+-- Stripe to continue. Otherwise {ok: false, code} as read_deletion_link, and nothing changes.
+create or replace function public.restore_account(p_hash text, p_now timestamptz)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v public.account_tokens%rowtype;
+  q public.pending_erasures%rowtype;
+  v_resume text[];
+begin
+  select * into v from public.account_tokens t
+   where t.token_hash = p_hash and t.kind = 'delete_restore' and t.issued_at is not null for update;
+  if not found or v.used_at is not null or v.revoked_at is not null or v.expires_at <= p_now then
+    return jsonb_build_object('ok', false, 'code', 'invalid_link');
+  end if;
+  select * into q from public.pending_erasures e where e.user_id = v.user_id for update;
+  if not found then return jsonb_build_object('ok', false, 'code', 'not_confirmed'); end if;
+  if q.purge_after <= greatest(p_now, now()) then
+    return jsonb_build_object('ok', false, 'code', 'window_closed');
+  end if;
+
+  update public.account_tokens t set used_at = p_now where t.id = v.id;
+  update public.accounts a set deletion_confirmed_at = null, purge_after = null
+   where a.id = any(q.accounts);
+  delete from public.pending_erasures e where e.user_id = q.user_id;
+  with gone as (delete from public.deletion_cancellations c where c.user_id = q.user_id returning c.*)
+  select coalesce(array_agg(g.subscription_id order by g.subscription_id), '{}') into v_resume
+    from gone g where g.we_set_cancel;
+  insert into public.account_events (account_id, kind, actor_user_id)
+  select a.id, 'delete_restored', q.user_id from public.accounts a where a.id = any(q.accounts);
+  return jsonb_build_object('ok', true, 'userId', q.user_id, 'accountId', v.account_id,
+                            'tier', (select a.tier from public.accounts a where a.id = v.account_id),
+                            'accounts', to_jsonb(q.accounts), 'resume', to_jsonb(v_resume));
+end;
+$$;
+
+-- deletionCancelFn's record of a subscription it is about to end, under the queue row's lock. False,
+-- recording nothing, when the person is no longer waiting for erasure with that account (a restore came
+-- first), so a late run does not cancel a restored plan.
+create or replace function public.record_deletion_cancel(
+  p_user uuid, p_account uuid, p_subscription text, p_we_set_cancel boolean)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  perform 1 from public.pending_erasures q
+    where q.user_id = p_user and p_account = any(q.accounts) for update;
+  if not found then return false; end if;
+  insert into public.deletion_cancellations (subscription_id, user_id, account_id, we_set_cancel)
+  values (p_subscription, p_user, p_account, p_we_set_cancel)
+  on conflict (subscription_id) do nothing;
+  return true;
+end;
+$$;
+
+-- The purge's work: the people whose window has ended by p_now and by the database's clock, the
+-- longest waiting first. A restore refuses once either clock has passed the window's end
+-- (restore_account), and a person is due only once both have, so a restore cannot succeed for someone
+-- the purge has started on (it removes Storage objects before its apply takes the queue row's lock).
+create or replace function public.due_erasures(p_now timestamptz, p_limit integer)
+returns table (user_id uuid, accounts uuid[], purge_after timestamptz, attempts integer)
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select q.user_id, q.accounts, q.purge_after, q.attempts from public.pending_erasures q
+   where q.purge_after <= least(p_now, now())
+   order by q.purge_after, q.user_id
+   limit greatest(p_limit, 0);
+$$;
+
+-- A purge attempt that did not finish: counted, for the report and the next run.
+create or replace function public.record_erasure_attempt(p_user uuid)
+returns void
+language sql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  update public.pending_erasures q set attempts = q.attempts + 1, last_attempt_at = now()
+   where q.user_id = p_user;
+$$;
+
+-- The purge's last step: the queue row and the person's cancellation records go, once the Auth user and
+-- the accounts the confirm marked are gone. Raises while either is still there, so the row cannot go
+-- before the erasure is complete (R1).
+create or replace function public.finish_erasure(p_user uuid)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  if exists (select 1 from auth.users u where u.id = p_user) then
+    raise exception 'finish_erasure: the Auth user is still there' using errcode = '55000';
+  end if;
+  if exists (select 1 from public.pending_erasures q join public.accounts a on a.id = any(q.accounts)
+              where q.user_id = p_user) then
+    raise exception 'finish_erasure: an account it marked is still there' using errcode = '55000';
+  end if;
+  delete from public.deletion_cancellations c where c.user_id = p_user;
+  delete from public.pending_erasures q where q.user_id = p_user;
+end;
+$$;
+
+revoke all on function public.deletion_hostname(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.deletion_refusal(uuid, uuid) from public, anon, authenticated, service_role;
+revoke all on function public.email_change_live(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.request_account_deletion(uuid, uuid, text)
+  from public, anon, authenticated;
+revoke all on function public.read_deletion_link(text, text, timestamptz) from public, anon, authenticated;
+revoke all on function public.confirm_account_deletion(text, timestamptz) from public, anon, authenticated;
+revoke all on function public.restore_account(text, timestamptz) from public, anon, authenticated;
+revoke all on function public.record_deletion_cancel(uuid, uuid, text, boolean) from public, anon, authenticated;
+revoke all on function public.due_erasures(timestamptz, integer) from public, anon, authenticated;
+revoke all on function public.record_erasure_attempt(uuid) from public, anon, authenticated;
+revoke all on function public.finish_erasure(uuid) from public, anon, authenticated;
+grant execute on function public.deletion_hostname(uuid, uuid) to service_role;
+grant execute on function public.request_account_deletion(uuid, uuid, text)
+  to service_role;
+grant execute on function public.read_deletion_link(text, text, timestamptz) to service_role;
+grant execute on function public.confirm_account_deletion(text, timestamptz) to service_role;
+grant execute on function public.restore_account(text, timestamptz) to service_role;
+grant execute on function public.record_deletion_cancel(uuid, uuid, text, boolean) to service_role;
+grant execute on function public.due_erasures(timestamptz, integer) to service_role;
+grant execute on function public.record_erasure_attempt(uuid) to service_role;
+grant execute on function public.finish_erasure(uuid) to service_role;
+
 -- ═══ end B ════════════════════════════════════════════════════════════════════════════════════════
 
 -- ═══ C: the account's Slack destination (D7) ══════════════════════════════════════════════════════

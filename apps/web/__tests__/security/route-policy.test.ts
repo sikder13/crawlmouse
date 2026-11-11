@@ -275,9 +275,11 @@ describe('cross-site refusal covers every state change a session or a visitor ca
         .map((p) => p.route)
         .sort(),
     ).toEqual([
+      'api/account/delete/confirm',
       'api/account/email',
       'api/account/email/confirm',
       'api/account/email/undo',
+      'api/account/restore',
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
       'api/auth/logout',

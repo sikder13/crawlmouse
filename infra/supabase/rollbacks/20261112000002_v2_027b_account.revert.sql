@@ -7,6 +7,25 @@
 -- ─── C ────────────────────────────────────────────────────────────────────────────────────────────
 
 -- ─── B ────────────────────────────────────────────────────────────────────────────────────────────
+drop function if exists public.finish_erasure(uuid);
+drop function if exists public.record_erasure_attempt(uuid);
+drop function if exists public.due_erasures(timestamptz, integer);
+drop function if exists public.record_deletion_cancel(uuid, uuid, text, boolean);
+drop function if exists public.restore_account(text, timestamptz);
+drop function if exists public.confirm_account_deletion(text, timestamptz);
+drop function if exists public.read_deletion_link(text, text, timestamptz);
+drop function if exists public.request_account_deletion(uuid, uuid, text);
+drop function if exists public.email_change_live(uuid);
+drop function if exists public.deletion_refusal(uuid, uuid);
+drop function if exists public.deletion_hostname(uuid, uuid);
+drop table if exists public.deletion_cancellations;
+drop function if exists public.erase_auth_audit_log(uuid, text[]);
+drop function if exists public.erase_person_apply(uuid, text, jsonb, boolean);
+drop function if exists public.erase_person_plan(uuid, text);
+drop function if exists public.erase_person_counts(uuid, text[], uuid[]);
+drop function if exists public.erase_person_refusals(uuid, uuid[]);
+drop function if exists public.erase_person_accounts(uuid);
+drop function if exists public.erase_rules();
 
 -- ─── A ────────────────────────────────────────────────────────────────────────────────────────────
 drop function if exists public.undo_email_change(text, timestamptz);
