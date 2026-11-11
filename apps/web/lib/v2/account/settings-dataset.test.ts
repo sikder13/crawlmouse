@@ -15,7 +15,7 @@ import {
   type CrawlPage,
   type FixtureDataset,
 } from '@crawlmouse/types/v2';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
@@ -65,6 +65,9 @@ beforeAll(async () => {
     [owner.accountId],
   );
 }, 300_000);
+afterAll(async () => {
+  await db.close();
+});
 
 const load = (userId: string, accountId = owner.accountId) =>
   loadSettingsDataset(

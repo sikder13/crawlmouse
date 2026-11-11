@@ -5,7 +5,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { GATES } from '../../entitlement-v2';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
@@ -26,6 +26,9 @@ beforeAll(async () => {
   db = await freshDb();
   await applyAllMigrations(db);
 }, 300_000);
+afterAll(async () => {
+  await db.close();
+});
 
 const json = (fields: Record<string, unknown>) => ({ kind: 'json' as const, fields });
 const form = (fields: Record<string, string>) => ({ kind: 'form' as const, fields });

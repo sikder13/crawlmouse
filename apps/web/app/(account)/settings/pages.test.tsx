@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
@@ -91,7 +91,6 @@ beforeAll(async () => {
   const db = await freshDb();
   await applyAllMigrations(db);
   h.db = db;
-  // erase_person_plan reads CC-26b's fix_email_requests, not yet on this branch's migrations.
   owner = await person('owner');
   await host(owner, 'owner-site.example');
   empty = await person('empty');
@@ -172,6 +171,9 @@ beforeAll(async () => {
   manager = await seat(owner.accountId, 'account_manager');
   developer = await seat(owner.accountId, 'developer');
 }, 300_000);
+afterAll(async () => {
+  await (h.db as PGlite).close();
+});
 
 afterEach(() => vi.unstubAllEnvs());
 
