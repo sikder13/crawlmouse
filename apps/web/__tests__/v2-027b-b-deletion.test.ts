@@ -535,6 +535,83 @@ describe('the window’s edge when the two clocks disagree (T1)', () => {
   });
 });
 
+describe('fix round 2', () => {
+  it('the apply refuses accounts_changed when the person holds an account the confirm did not mark (item 4)', async () => {
+    const o = await owner();
+    const { confirm: raw } = await request(o);
+    await confirm(raw);
+    await db.query(
+      `update public.pending_erasures set confirmed_at = confirmed_at - interval '8 days',
+              purge_after = purge_after - interval '8 days' where user_id = $1`,
+      [o.userId],
+    );
+    const plan = await json(`select public.erase_person_plan($1, null) as r`, [o.userId]);
+    // Between the purge's plan and its apply, the person comes to hold another account alone.
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+       values ('agency', 'free', 'free', 1, 1, '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]')
+       returning id`,
+    );
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'x@example.com', 'owner', 'active', now())`,
+      [rows[0]!.id, o.userId],
+    );
+    await expect(
+      db.query(`select public.erase_person_apply($1, null, $2::jsonb, true)`, [
+        o.userId,
+        JSON.stringify(plan),
+      ]),
+    ).rejects.toThrow(/accounts_changed/);
+    expect(
+      await n(`select count(*) from public.accounts where id = any($1)`, [
+        [o.accountId, rows[0]!.id],
+      ]),
+    ).toBe(2);
+  });
+
+  it('the confirm judges an email change at its own p_now, not the database clock (item 5)', async () => {
+    const o = await owner();
+    const { confirm: raw } = await request(o);
+    // A confirmation link live by the database's clock, expired by the confirm's p_now.
+    await db.query(
+      `insert into public.account_tokens (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, expires_at)
+       values ($1, $2, 'email_change', $3, now(), 'new@example.com', $4, now() + interval '1 hour')`,
+      [o.accountId, o.userId, hashToken(newToken()), o.email],
+    );
+    expect((await confirm(raw, `now() + interval '2 hours'`)).ok).toBe(true);
+  });
+
+  it('one change applied long ago and a second abandoned: nothing is in flight (item 9)', async () => {
+    const o = await owner();
+    await db.query(
+      `insert into public.account_tokens
+         (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, created_at, expires_at,
+          used_at, revoked_at)
+       values ($1, $2, 'email_change', $3, now() - interval '30 days', 'a@example.com', $4,
+               now() - interval '30 days', now() - interval '30 days' + interval '1 hour',
+               now() - interval '30 days', null),
+              -- The second request revoked what was left of the first, as request_email_change does.
+              ($1, $2, 'email_change_undo', $5, now() - interval '30 days', 'a@example.com', $4,
+               now() - interval '30 days', now() - interval '23 days', null, now() - interval '2 hours'),
+              ($1, $2, 'email_change', $6, now() - interval '2 hours', 'b@example.com', $4,
+               now() - interval '2 hours', now() - interval '1 hour', null, null),
+              ($1, $2, 'email_change_undo', $7, now() - interval '2 hours', 'b@example.com', $4,
+               now() - interval '2 hours', now() + interval '7 days', null, null)`,
+      [
+        o.accountId,
+        o.userId,
+        hashToken(newToken()),
+        o.email,
+        hashToken(newToken()),
+        hashToken(newToken()),
+        hashToken(newToken()),
+      ],
+    );
+    expect(await json<boolean>(`select public.email_change_live($1) as r`, [o.userId])).toBe(false);
+  });
+});
+
 describe('read_deletion_link', () => {
   it('shows the accounts and the window without using the link', async () => {
     const o = await owner();
@@ -669,6 +746,7 @@ describe('the catalogue', () => {
       'restore_account',
       'record_deletion_cancel',
       'erasure_pending',
+      'erasure_state',
       'due_erasures',
       'record_erasure_attempt',
       'finish_erasure',
