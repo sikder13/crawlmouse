@@ -20,7 +20,15 @@ import { z } from 'zod';
 import { checkStarted, type Capture } from './events';
 import type { FixesStore, SiteFixes } from './fixes-store';
 import type { RecheckOutcome, RequestRecheck } from './recheck';
-import { notFound, paywall, refuse, type RequestBody } from './route';
+import {
+  noticeTo,
+  notFound,
+  paywall,
+  refuse,
+  refuseTo,
+  type NoticeCode,
+  type RequestBody,
+} from './route';
 import { readEntitlement, type Entitlement } from './viewer-read';
 import { isFreeFix } from '../view/free-fixes';
 import type { CheckDataset } from '../pipeline/types';
@@ -146,10 +154,13 @@ export async function markDone(
 ): Promise<Response> {
   const r = await reach(deps, caller);
   if (r === null) return notFound();
-  if (!(await visible(deps, r))) return paywall('fixesVisible');
+  const back = `/sites/${r.site.id}`;
+  if (!(await visible(deps, r)))
+    return refuseTo(kind, back, 402, 'upgrade_required', { gate: 'fixesVisible' });
   const marked = await deps.store.markDone(r.fix.id, r.seatId);
   if (marked.outcome === 'not_found' || marked.outcome === 'removed') return notFound();
-  if (marked.outcome === 'refused') return refuse(409, 'not_markable', { status: marked.status });
+  if (marked.outcome === 'refused')
+    return refuseTo(kind, back, 409, 'not_markable', { status: marked.status });
   if (marked.outcome === 'marked') {
     await deps.capture('fix_marked_done', r.site.account_id, { type: r.fix.type });
   }
@@ -171,10 +182,25 @@ export async function markDone(
       ? { ...outcome, pausedReason: r.site.paused_reason }
       : outcome;
   if (kind === 'form') {
-    return new Response(null, { status: 303, headers: { location: `/sites/${r.site.id}` } });
+    return outcome.queued
+      ? noticeTo(back, 'marked_done')
+      : noticeTo(
+          back,
+          UNQUEUED[outcome.reason],
+          outcome.reason === 'capped' ? outcome.nextAllowedAt : null,
+        );
   }
   return Response.json({ status: 'marked_done', recheck });
 }
+
+/** A form's notice when the mark stands and its re-check was not queued, by the reason. */
+const UNQUEUED: Record<Extract<RecheckOutcome, { queued: false }>['reason'], NoticeCode> = {
+  capped: 'marked_done_capped',
+  check_running: 'marked_done_check_running',
+  capacity: 'marked_done_capacity',
+  paused: 'marked_done_site_paused',
+  removed: 'marked_done_not_checked',
+};
 
 // ─── The packet ─────────────────────────────────────────────────────────────────────────────────
 
@@ -237,9 +263,11 @@ export async function emailDeveloper(
 ): Promise<Response> {
   const r = await reach(deps, caller);
   if (r === null) return notFound();
-  if (!(await visible(deps, r))) return paywall('fixesVisible');
+  const kind = body?.kind ?? 'json';
+  if (!(await visible(deps, r)))
+    return refuseTo(kind, EMAIL_BACK, 402, 'upgrade_required', { gate: 'fixesVisible' });
   const input = EmailBody.safeParse(body?.fields ?? {});
-  if (!input.success) return refuse(400, 'invalid_email');
+  if (!input.success) return refuseTo(kind, EMAIL_BACK, 400, 'invalid_email');
   const to = input.data.email.toLowerCase();
 
   for (const [key, { limit, windowMs }] of [
@@ -252,7 +280,10 @@ export async function emailDeveloper(
         1,
         Math.ceil((verdict.resetAt.getTime() - deps.now().getTime()) / 1000),
       );
-      return refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
+      // The JSON answer carries the wait as Retry-After only; a form's notice says when.
+      return kind === 'form'
+        ? noticeTo(EMAIL_BACK, 'rate_limited', verdict.resetAt.toISOString())
+        : refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
     }
   }
 
@@ -267,5 +298,10 @@ export async function emailDeveloper(
     name: 'fix.email_developer_requested',
     data: { requestId },
   });
-  return Response.json({ queued: true });
+  return kind === 'form'
+    ? noticeTo(EMAIL_BACK, 'email_requested')
+    : Response.json({ queued: true });
 }
+
+/** The page the email action is on (the dashboard's change rows). */
+const EMAIL_BACK = '/dashboard';

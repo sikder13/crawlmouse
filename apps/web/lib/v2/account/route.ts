@@ -100,6 +100,18 @@ export const NOTICE_CODES = [
   'conflict',
   'trial_failed',
   'trial_unavailable',
+  // mark done: the mark, and what happened to its re-check
+  'not_markable',
+  'marked_done',
+  'marked_done_capped',
+  'marked_done_check_running',
+  'marked_done_capacity',
+  'marked_done_site_paused',
+  'marked_done_not_checked',
+  // email a developer
+  'email_requested',
+  'invalid_email',
+  'rate_limited',
   // any body the route could not read
   'invalid',
 ] as const;
@@ -120,39 +132,55 @@ const isFormRequest = (req: Request): boolean =>
 const isInstant = (v: unknown): v is string =>
   typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(v) && !Number.isNaN(Date.parse(v));
 
+/** Whether an answer goes to a form: from its request's content type, or its body's kind. */
+const toForm = (from: Request | RequestBody['kind']): boolean =>
+  typeof from === 'string' ? from === 'form' : isFormRequest(from);
+
 /**
- * A refusal, answered for what sent it. A form is sent back to `back` (303) with the code as
+ * A form's answer: a 303 to `back` with `notice` and, when given, the next-allowed time as `next`.
+ * Only the code and that timestamp go into the address.
+ */
+export function noticeTo(back: string, code: NoticeCode, next?: string | null): Response {
+  if (!BACK.test(back)) throw new Error(`refuseTo: not a page to go back to: ${back}`);
+  if (!NOTICE_SET.has(code)) throw new Error(`refuseTo: ${code} has no notice`);
+  const query = new URLSearchParams({ notice: code });
+  if (isInstant(next)) query.set('next', next);
+  return new Response(null, { status: 303, headers: { location: `${back}?${query}` } });
+}
+
+/**
+ * A refusal, answered for what sent it (a request, or the kind of its body). A form is sent back to `back` (303) with the code as
  * `notice` and, when the detail carries one, `nextAllowedAt` as `next`; no other detail and nothing
  * from the request goes into the address. JSON gets `refuse()`'s `{code, …detail}`. A 401 and a 404
  * are `refuse()`'s for a form too, so a stranger's id is not answered with a page.
  */
 export function refuseTo(
-  req: Request,
+  from: Request | RequestBody['kind'],
   back: string,
   status: number,
   code: NoticeCode | 'auth_required' | 'not_found',
   detail: Readonly<Record<string, unknown>> = {},
   headers: Readonly<Record<string, string>> = {},
 ): Response {
-  if (status === 401 || status === 404 || !isFormRequest(req))
+  if (status === 401 || status === 404 || !toForm(from))
     return refuse(status, code, detail, headers);
-  if (!BACK.test(back)) throw new Error(`refuseTo: not a page to go back to: ${back}`);
-  if (!NOTICE_SET.has(code)) throw new Error(`refuseTo: ${code} has no notice`);
-  const query = new URLSearchParams({ notice: code });
-  if (isInstant(detail.nextAllowedAt)) query.set('next', detail.nextAllowedAt);
-  return new Response(null, { status: 303, headers: { location: `${back}?${query}` } });
+  return noticeTo(
+    back,
+    code as NoticeCode,
+    isInstant(detail.nextAllowedAt) ? detail.nextAllowedAt : null,
+  );
 }
 
 /** A request over a bound: 429 with when the next is allowed (`Retry-After` too), or its notice. */
 export function tooSoonTo(
-  req: Request,
+  from: Request | RequestBody['kind'],
   back: string,
   code: Extract<NoticeCode, 'capped' | 'adds_capped' | 'domain_capped'>,
   nextAllowedAt: string,
   now = Date.now(),
 ): Response {
   const seconds = Math.max(1, Math.ceil((Date.parse(nextAllowedAt) - now) / 1000));
-  return refuseTo(req, back, 429, code, { nextAllowedAt }, { 'retry-after': String(seconds) });
+  return refuseTo(from, back, 429, code, { nextAllowedAt }, { 'retry-after': String(seconds) });
 }
 
 /** A page's `notice` and `next` search params, read back: null unless the notice is one of ours. */

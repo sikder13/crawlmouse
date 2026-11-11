@@ -19,7 +19,9 @@ import { effectHeadline } from '../effect-headline';
 import { freeFixes } from '../free-fixes';
 
 /** A fix's packet; the contract names the schema, not the type. */
-export type FixPacket = NonNullable<Fix['packet']>;
+import { packetPrompt, verifyLines, type FixPacket } from '../packet-prompt';
+
+export { packetPrompt, type FixPacket } from '../packet-prompt';
 
 /** The four recommendation classes as a reader sees them (the CC-23 brief's wording). */
 export const RECOMMENDATION_LABELS: Record<RecommendationClass, string> = {
@@ -166,31 +168,6 @@ export function effectOf(
 
 /** The packet's problem lines: its context without the line naming the site and audit. */
 export const packetParagraph = (p: FixPacket) => p.context.filter((l) => !SITE_LINE.test(l));
-
-/** The verify lines of the segment's packet block and of the prompt. */
-const verifyLines = (p: FixPacket) => [
-  'Verify (we run this after you mark done):',
-  `  ${p.verify.command}`,
-  `  → expect ${p.verify.expect}`,
-];
-
-/**
- * The whole packet as plain text, for "Copy as a prompt": the fix page and the segment copy this,
- * so the same fix is handed over in the same words wherever it is copied from.
- */
-export function packetPrompt(f: Pick<Fix, 'title'>, p: FixPacket): string {
-  return [
-    f.title,
-    '',
-    ...p.context,
-    '',
-    'Change:',
-    ...p.change,
-    ...(p.keep.length ? ['', 'Keep:', ...p.keep] : []),
-    '',
-    ...verifyLines(p),
-  ].join('\n');
-}
 
 export function openFix(f: Fix, siteFixes: readonly Fix[]): OpenFixView {
   const { points, unit } = effectOf(f, siteFixes);

@@ -112,20 +112,21 @@ From `apps/web/lib/v2/view`, read through the TypeScript compiler. The screens r
 
 #### `ShellView`
 
-| Field                 | Type                            | Note                                                                                                                                               |
-| --------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nav`                 | `NavItemView[]`                 |                                                                                                                                                    |
-| `trial`               | `TrialCardView \| null`         |                                                                                                                                                    |
-| `theme`               | `"system" \| "light" \| "dark"` | The signed-in seat's theme.                                                                                                                        |
-| `themeAction`         | `object`                        | Where a new theme is saved (PATCH /api/me {theme}).                                                                                                |
-| `themeAction.label`   | `string`                        |                                                                                                                                                    |
-| `themeAction.route`   | `string`                        | The route pattern from ACCOUNT_ACTIONS, so a test can tie the button to its route.                                                                 |
-| `themeAction.href`    | `string`                        | The concrete path, its parameters filled.                                                                                                          |
-| `themeAction.method`  | `"get" \| "post"`               | A link for GET; otherwise a POST form, with `_method` naming the verb HTML forms lack.                                                             |
-| `themeAction.fields`  | `Record<string, string>`        |                                                                                                                                                    |
-| `themeAction.primary` | `boolean`                       | The screen's one orange element (rule 3).                                                                                                          |
-| `themeAction.context` | `string \| null`                | Read after the label by a screen reader only, where the same label recurs on a page: "Diff" for which change, "Packet" for which fix (WCAG 2.4.4). |
-| `themeAction.input`   | `ActionInput \| undefined`      | A field the person fills before posting (the add-site address); a live page shows it.                                                              |
+| Field                 | Type                              | Note                                                                                                                                               |
+| --------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nav`                 | `NavItemView[]`                   |                                                                                                                                                    |
+| `trial`               | `TrialCardView \| null`           |                                                                                                                                                    |
+| `theme`               | `"system" \| "light" \| "dark"`   | The signed-in seat's theme.                                                                                                                        |
+| `themeAction`         | `object`                          | Where a new theme is saved (PATCH /api/me {theme}).                                                                                                |
+| `themeAction.label`   | `string`                          |                                                                                                                                                    |
+| `themeAction.route`   | `string`                          | The route pattern from ACCOUNT_ACTIONS, so a test can tie the button to its route.                                                                 |
+| `themeAction.href`    | `string`                          | The concrete path, its parameters filled.                                                                                                          |
+| `themeAction.method`  | `"get" \| "post"`                 | A link for GET; otherwise a POST form, with `_method` naming the verb HTML forms lack.                                                             |
+| `themeAction.fields`  | `Record<string, string>`          |                                                                                                                                                    |
+| `themeAction.primary` | `boolean`                         | The screen's one orange element (rule 3).                                                                                                          |
+| `themeAction.context` | `string \| null`                  | Read after the label by a screen reader only, where the same label recurs on a page: "Diff" for which change, "Packet" for which fix (WCAG 2.4.4). |
+| `themeAction.input`   | `ActionInput \| undefined`        | A field the person fills before posting (the add-site address); a live page shows it.                                                              |
+| `themeAction.copy`    | `{ title: string; } \| undefined` | A read whose answer is a fix's packet: a live page copies it as a prompt, headed by `title`, instead of opening the JSON.                          |
 
 #### `NavItemView`
 
@@ -151,16 +152,17 @@ From `apps/web/lib/v2/view`, read through the TypeScript compiler. The screens r
 
 #### `ActionView`
 
-| Field     | Type                       | Note                                                                                                                                               |
-| --------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `label`   | `string`                   |                                                                                                                                                    |
-| `route`   | `string`                   | The route pattern from ACCOUNT_ACTIONS, so a test can tie the button to its route.                                                                 |
-| `href`    | `string`                   | The concrete path, its parameters filled.                                                                                                          |
-| `method`  | `"get" \| "post"`          | A link for GET; otherwise a POST form, with `_method` naming the verb HTML forms lack.                                                             |
-| `fields`  | `Record<string, string>`   |                                                                                                                                                    |
-| `primary` | `boolean`                  | The screen's one orange element (rule 3).                                                                                                          |
-| `context` | `string \| null`           | Read after the label by a screen reader only, where the same label recurs on a page: "Diff" for which change, "Packet" for which fix (WCAG 2.4.4). |
-| `input`   | `ActionInput \| undefined` | A field the person fills before posting (the add-site address); a live page shows it.                                                              |
+| Field     | Type                              | Note                                                                                                                                               |
+| --------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `label`   | `string`                          |                                                                                                                                                    |
+| `route`   | `string`                          | The route pattern from ACCOUNT_ACTIONS, so a test can tie the button to its route.                                                                 |
+| `href`    | `string`                          | The concrete path, its parameters filled.                                                                                                          |
+| `method`  | `"get" \| "post"`                 | A link for GET; otherwise a POST form, with `_method` naming the verb HTML forms lack.                                                             |
+| `fields`  | `Record<string, string>`          |                                                                                                                                                    |
+| `primary` | `boolean`                         | The screen's one orange element (rule 3).                                                                                                          |
+| `context` | `string \| null`                  | Read after the label by a screen reader only, where the same label recurs on a page: "Diff" for which change, "Packet" for which fix (WCAG 2.4.4). |
+| `input`   | `ActionInput \| undefined`        | A field the person fills before posting (the add-site address); a live page shows it.                                                              |
+| `copy`    | `{ title: string; } \| undefined` | A read whose answer is a fix's packet: a live page copies it as a prompt, headed by `title`, instead of opening the JSON.                          |
 
 #### `RouteSpec`
 
@@ -341,39 +343,41 @@ From `apps/web/lib/v2/view`, read through the TypeScript compiler. The screens r
 
 #### `TopFixesView`
 
-| Field         | Type                       | Note                                                                                                                                               |
-| ------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `title`       | `string`                   |                                                                                                                                                    |
-| `rows`        | `TopFixRowView[]`          |                                                                                                                                                    |
-| `foot`        | `string`                   |                                                                                                                                                    |
-| `run`         | `object`                   |                                                                                                                                                    |
-| `run.label`   | `string`                   |                                                                                                                                                    |
-| `run.route`   | `string`                   | The route pattern from ACCOUNT_ACTIONS, so a test can tie the button to its route.                                                                 |
-| `run.href`    | `string`                   | The concrete path, its parameters filled.                                                                                                          |
-| `run.method`  | `"get" \| "post"`          | A link for GET; otherwise a POST form, with `_method` naming the verb HTML forms lack.                                                             |
-| `run.fields`  | `Record<string, string>`   |                                                                                                                                                    |
-| `run.primary` | `boolean`                  | The screen's one orange element (rule 3).                                                                                                          |
-| `run.context` | `string \| null`           | Read after the label by a screen reader only, where the same label recurs on a page: "Diff" for which change, "Packet" for which fix (WCAG 2.4.4). |
-| `run.input`   | `ActionInput \| undefined` | A field the person fills before posting (the add-site address); a live page shows it.                                                              |
+| Field         | Type                              | Note                                                                                                                                               |
+| ------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`       | `string`                          |                                                                                                                                                    |
+| `rows`        | `TopFixRowView[]`                 |                                                                                                                                                    |
+| `foot`        | `string`                          |                                                                                                                                                    |
+| `run`         | `object`                          |                                                                                                                                                    |
+| `run.label`   | `string`                          |                                                                                                                                                    |
+| `run.route`   | `string`                          | The route pattern from ACCOUNT_ACTIONS, so a test can tie the button to its route.                                                                 |
+| `run.href`    | `string`                          | The concrete path, its parameters filled.                                                                                                          |
+| `run.method`  | `"get" \| "post"`                 | A link for GET; otherwise a POST form, with `_method` naming the verb HTML forms lack.                                                             |
+| `run.fields`  | `Record<string, string>`          |                                                                                                                                                    |
+| `run.primary` | `boolean`                         | The screen's one orange element (rule 3).                                                                                                          |
+| `run.context` | `string \| null`                  | Read after the label by a screen reader only, where the same label recurs on a page: "Diff" for which change, "Packet" for which fix (WCAG 2.4.4). |
+| `run.input`   | `ActionInput \| undefined`        | A field the person fills before posting (the add-site address); a live page shows it.                                                              |
+| `run.copy`    | `{ title: string; } \| undefined` | A read whose answer is a fix's packet: a live page copies it as a prompt, headed by `title`, instead of opening the JSON.                          |
 
 #### `TopFixRowView`
 
-| Field          | Type                       | Note                                                                                                                                               |
-| -------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `key`          | `string`                   |                                                                                                                                                    |
-| `number`       | `number`                   |                                                                                                                                                    |
-| `title`        | `string`                   |                                                                                                                                                    |
-| `effort`       | `string \| null`           |                                                                                                                                                    |
-| `effect`       | `string`                   |                                                                                                                                                    |
-| `open`         | `object`                   |                                                                                                                                                    |
-| `open.label`   | `string`                   |                                                                                                                                                    |
-| `open.route`   | `string`                   | The route pattern from ACCOUNT_ACTIONS, so a test can tie the button to its route.                                                                 |
-| `open.href`    | `string`                   | The concrete path, its parameters filled.                                                                                                          |
-| `open.method`  | `"get" \| "post"`          | A link for GET; otherwise a POST form, with `_method` naming the verb HTML forms lack.                                                             |
-| `open.fields`  | `Record<string, string>`   |                                                                                                                                                    |
-| `open.primary` | `boolean`                  | The screen's one orange element (rule 3).                                                                                                          |
-| `open.context` | `string \| null`           | Read after the label by a screen reader only, where the same label recurs on a page: "Diff" for which change, "Packet" for which fix (WCAG 2.4.4). |
-| `open.input`   | `ActionInput \| undefined` | A field the person fills before posting (the add-site address); a live page shows it.                                                              |
+| Field          | Type                              | Note                                                                                                                                               |
+| -------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key`          | `string`                          |                                                                                                                                                    |
+| `number`       | `number`                          |                                                                                                                                                    |
+| `title`        | `string`                          |                                                                                                                                                    |
+| `effort`       | `string \| null`                  |                                                                                                                                                    |
+| `effect`       | `string`                          |                                                                                                                                                    |
+| `open`         | `object`                          |                                                                                                                                                    |
+| `open.label`   | `string`                          |                                                                                                                                                    |
+| `open.route`   | `string`                          | The route pattern from ACCOUNT_ACTIONS, so a test can tie the button to its route.                                                                 |
+| `open.href`    | `string`                          | The concrete path, its parameters filled.                                                                                                          |
+| `open.method`  | `"get" \| "post"`                 | A link for GET; otherwise a POST form, with `_method` naming the verb HTML forms lack.                                                             |
+| `open.fields`  | `Record<string, string>`          |                                                                                                                                                    |
+| `open.primary` | `boolean`                         | The screen's one orange element (rule 3).                                                                                                          |
+| `open.context` | `string \| null`                  | Read after the label by a screen reader only, where the same label recurs on a page: "Diff" for which change, "Packet" for which fix (WCAG 2.4.4). |
+| `open.input`   | `ActionInput \| undefined`        | A field the person fills before posting (the add-site address); a live page shows it.                                                              |
+| `open.copy`    | `{ title: string; } \| undefined` | A read whose answer is a fix's packet: a live page copies it as a prompt, headed by `title`, instead of opening the JSON.                          |
 
 #### `SetupView`
 
@@ -450,29 +454,30 @@ From `apps/web/lib/v2/view`, read through the TypeScript compiler. The screens r
 
 #### `FixRowView`
 
-| Field            | Type                       | Note                                                                                                                                               |
-| ---------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `key`            | `string`                   |                                                                                                                                                    |
-| `number`         | `number`                   |                                                                                                                                                    |
-| `title`          | `string`                   |                                                                                                                                                    |
-| `isNew`          | `boolean`                  | First seen at the latest result.                                                                                                                   |
-| `newLabel`       | `string \| null`           |                                                                                                                                                    |
-| `diff`           | `string \| null`           | The recorded diff behind the fix, for a fix a change points to.                                                                                    |
-| `note`           | `string \| null`           | What happened to it: "marked done Wed; the re-check that day did not agree, …".                                                                    |
-| `section`        | `string`                   |                                                                                                                                                    |
-| `effect`         | `string`                   |                                                                                                                                                    |
-| `status`         | `string`                   |                                                                                                                                                    |
-| `pro`            | `boolean`                  | Outside the three Free shows (BUILD §3: the three largest open fixes).                                                                             |
-| `packet`         | `object`                   |                                                                                                                                                    |
-| `packet.label`   | `string`                   |                                                                                                                                                    |
-| `packet.route`   | `string`                   | The route pattern from ACCOUNT_ACTIONS, so a test can tie the button to its route.                                                                 |
-| `packet.href`    | `string`                   | The concrete path, its parameters filled.                                                                                                          |
-| `packet.method`  | `"get" \| "post"`          | A link for GET; otherwise a POST form, with `_method` naming the verb HTML forms lack.                                                             |
-| `packet.fields`  | `Record<string, string>`   |                                                                                                                                                    |
-| `packet.primary` | `boolean`                  | The screen's one orange element (rule 3).                                                                                                          |
-| `packet.context` | `string \| null`           | Read after the label by a screen reader only, where the same label recurs on a page: "Diff" for which change, "Packet" for which fix (WCAG 2.4.4). |
-| `packet.input`   | `ActionInput \| undefined` | A field the person fills before posting (the add-site address); a live page shows it.                                                              |
-| `markDone`       | `ActionView \| null`       | Mark done, for a fix still to do that the tier opens; a live page shows it.                                                                        |
+| Field            | Type                              | Note                                                                                                                                               |
+| ---------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key`            | `string`                          |                                                                                                                                                    |
+| `number`         | `number`                          |                                                                                                                                                    |
+| `title`          | `string`                          |                                                                                                                                                    |
+| `isNew`          | `boolean`                         | First seen at the latest result.                                                                                                                   |
+| `newLabel`       | `string \| null`                  |                                                                                                                                                    |
+| `diff`           | `string \| null`                  | The recorded diff behind the fix, for a fix a change points to.                                                                                    |
+| `note`           | `string \| null`                  | What happened to it: "marked done Wed; the re-check that day did not agree, …".                                                                    |
+| `section`        | `string`                          |                                                                                                                                                    |
+| `effect`         | `string`                          |                                                                                                                                                    |
+| `status`         | `string`                          |                                                                                                                                                    |
+| `pro`            | `boolean`                         | Outside the three Free shows (BUILD §3: the three largest open fixes).                                                                             |
+| `packet`         | `object`                          |                                                                                                                                                    |
+| `packet.label`   | `string`                          |                                                                                                                                                    |
+| `packet.route`   | `string`                          | The route pattern from ACCOUNT_ACTIONS, so a test can tie the button to its route.                                                                 |
+| `packet.href`    | `string`                          | The concrete path, its parameters filled.                                                                                                          |
+| `packet.method`  | `"get" \| "post"`                 | A link for GET; otherwise a POST form, with `_method` naming the verb HTML forms lack.                                                             |
+| `packet.fields`  | `Record<string, string>`          |                                                                                                                                                    |
+| `packet.primary` | `boolean`                         | The screen's one orange element (rule 3).                                                                                                          |
+| `packet.context` | `string \| null`                  | Read after the label by a screen reader only, where the same label recurs on a page: "Diff" for which change, "Packet" for which fix (WCAG 2.4.4). |
+| `packet.input`   | `ActionInput \| undefined`        | A field the person fills before posting (the add-site address); a live page shows it.                                                              |
+| `packet.copy`    | `{ title: string; } \| undefined` | A read whose answer is a fix's packet: a live page copies it as a prompt, headed by `title`, instead of opening the JSON.                          |
+| `markDone`       | `ActionView \| null`              | Mark done, for a fix still to do that the tier opens; a live page shows it.                                                                        |
 
 ### A grade in a table
 
@@ -601,6 +606,7 @@ What the brief adds that no locked screen has, marked `data-v2-addition` where i
 | dashboard       | Day 0 with no site: the header asks for the site, the sites card says a first check starts when one is added                                        | CC-26b brief, D8                                    |
 | dashboard       | On a live page, the add-site form’s address field                                                                                                   | CC-26b plan revision R13                            |
 | dashboard       | A sign-in with no account, or several with none chosen: a plain page that says so                                                                   | CC-26b plan revision R22                            |
+| dashboard       | On a live page, Email to my developer’s address field, and Copy fix copying the packet as a prompt with a status line                               | CC-26b follow-up (live fix actions)                 |
 | site            | A crawler row read aloud in full ("Googlebot: allowed by robots.txt at all six checks"), and each glyph cell’s verdict in words, for screen readers | CC-26 brief, scope 6 (accessibility); FACTS row 223 |
 | site            | A site whose first check has not ended: its state, the pages read so far and a link to the check                                                    | CC-26b brief, D8                                    |
 | site            | A Mark done control on each fix row still to do, on a live page                                                                                     | CC-26b plan revision R13                            |

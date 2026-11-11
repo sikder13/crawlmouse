@@ -7,6 +7,9 @@ import type { Addition } from '../copy-registry';
 import { weekdayTime } from '../format';
 import { noticeOf, type NoticeCode } from '../account/route';
 
+const NEXT_CHECK = 'the next check confirms the fix or reopens it.';
+const capitalised = (t: string) => t[0]!.toUpperCase() + t.slice(1);
+
 /** `at` is the next-allowed time in the account's zone ("Tue 13:30"), or null when none was sent. */
 export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   capped: (at) =>
@@ -37,6 +40,24 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
     'The account changed while the trial was starting. Reload the page and try again.',
   trial_failed: () => 'The trial did not start. Nothing was changed; try again later.',
   trial_unavailable: () => 'Trials cannot be started right now. Try again later.',
+  not_markable: () => 'That fix cannot be marked done: it is already marked, or no longer open.',
+  // The mark stands in each of these; reopen is deferred, so none offers an undo (owner ruling Q4).
+  marked_done: () => 'Marked done. A re-check is queued; it confirms the fix or reopens it.',
+  marked_done_capped: (at) =>
+    `Marked done. This site has used its re-checks for the last 24 hours, so none was queued; ${NEXT_CHECK}${at ? ` A re-check can be asked from ${at}.` : ''}`,
+  marked_done_check_running: () =>
+    `Marked done. A check of this site was already running, so no re-check was queued; ask for one once it ends. ${capitalised(NEXT_CHECK)}`,
+  marked_done_capacity: () =>
+    `Marked done. Today’s checks are all taken, so no re-check was queued; ${NEXT_CHECK}`,
+  marked_done_site_paused: () =>
+    `Marked done. Checks of this site are paused, so no re-check was queued; ${NEXT_CHECK}`,
+  marked_done_not_checked: () => `Marked done. No re-check was queued; ${NEXT_CHECK}`,
+  // CC-28 sends the email from the recorded request: nothing here says it was sent.
+  email_requested: () =>
+    'Recorded. The fix will be emailed to that address; it has not been sent yet.',
+  invalid_email: () => 'That is not an email address, so nothing was recorded.',
+  rate_limited: (at) =>
+    `Too many emails were asked for in a short time, so nothing was recorded.${at ? ` Ask again from ${at}.` : ''}`,
   invalid: () => 'That request was not understood, so nothing was changed.',
 };
 
