@@ -1,4 +1,3 @@
-import '../../../styles/v2/tokens.css';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
@@ -9,13 +8,9 @@ import { deletionAccounts } from '@/lib/v2/account/deletion-plan';
 import { readSettingsPage } from '@/lib/v2/account/settings-pages';
 import { deleteStepView } from '@/lib/v2/view/settings';
 
-export const dynamic = 'force-dynamic';
-
-// A signed-in page: never a search result.
-export const metadata: Metadata = {
-  robots: { index: false, follow: false },
-  alternates: { canonical: null },
-};
+// Not indexed, not in the sitemap and rendered per request: the (account) layout says so for
+// every page in the group.
+export const metadata: Metadata = { title: 'Delete this account' };
 
 /**
  * Settings › Delete (spec 27 `deleteConfirm`): the owner re-types the primary site's hostname and

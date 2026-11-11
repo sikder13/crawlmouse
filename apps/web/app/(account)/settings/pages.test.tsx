@@ -10,10 +10,10 @@ import type { PGlite } from '@electric-sql/pglite';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { applyAllMigrations, freshDb } from '../../__tests__/helpers/pglite-migrations';
-import { postgrestOver } from '../../__tests__/helpers/postgrest-pglite';
-import { personalAccount, signUp } from '../../__tests__/helpers/v2-check-tables';
-import { pgliteCheckReader } from '../../lib/v2/pipeline/test-support/pglite';
+import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
+import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
+import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
+import { pgliteCheckReader } from '../../../lib/v2/pipeline/test-support/pglite';
 
 const h = vi.hoisted(() => ({
   db: null as unknown,

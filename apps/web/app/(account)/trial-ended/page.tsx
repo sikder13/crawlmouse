@@ -1,4 +1,3 @@
-import '../../styles/v2/tokens.css';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
@@ -7,13 +6,9 @@ import { checksPublicEnabled } from '@/lib/auth/flags';
 import { readSettingsPage } from '@/lib/v2/account/settings-pages';
 import { trialPage } from '@/lib/v2/view/trial-end';
 
-export const dynamic = 'force-dynamic';
-
-// A signed-in page: never a search result.
-export const metadata: Metadata = {
-  robots: { index: false, follow: false },
-  alternates: { canonical: null },
-};
+// Not indexed, not in the sitemap and rendered per request: the (account) layout says so for
+// every page in the group.
+export const metadata: Metadata = { title: 'Your trial' };
 
 /**
  * Trial ending (spec 27 `trialEnded`), one page for both states, for any member: before the end,
