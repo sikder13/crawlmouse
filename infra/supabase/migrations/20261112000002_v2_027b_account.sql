@@ -1043,10 +1043,11 @@ declare
   v_accounts uuid[];
   v_n bigint;
   v_planned bigint;
+  v_marked uuid[];
   v_applied jsonb := '{}';
 begin
   if p_require_due then
-    perform 1 from public.pending_erasures q
+    select q.accounts into v_marked from public.pending_erasures q
       where q.user_id = p_user and q.purge_after <= now() for update;
     if not found then
       raise exception 'erase_person_apply: no erasure of this person is due' using errcode = '55000';
@@ -1060,6 +1061,12 @@ begin
   v_user := (v_plan->>'userId')::uuid;
   v_emails := array(select jsonb_array_elements_text(v_plan->'emails'));
   v_accounts := array(select jsonb_array_elements_text(v_plan->'accounts')::uuid);
+  -- The purge erases only what its confirm marked, checked here under the queue row's lock, so an
+  -- account the person came to hold after the plan was read is not deleted with the others.
+  if p_require_due and not (v_accounts <@ v_marked) then
+    raise exception 'erase_person_apply: accounts_changed: the accounts to erase are not those the confirm marked'
+      using errcode = '55000';
+  end if;
 
   for r in select * from public.erase_rules() where kind = 'change' loop
     execute case when r.action is null
@@ -1320,11 +1327,16 @@ begin
   if not found or v.used_at is not null or v.revoked_at is not null or v.expires_at <= p_now then
     return jsonb_build_object('ok', false, 'code', 'invalid_link');
   end if;
+  -- One confirm per person at a time: two links (one per account the person holds) posted at once
+  -- would each pass the check below before either inserted the queue row. The lock is the
+  -- transaction's, so the second waits and then reads the first's row.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('account-deletion:' || v.user_id::text, 0));
   v_refusal := case
     -- A link from another account the person holds, after the first confirm marked them all.
     when exists (select 1 from public.pending_erasures q where q.user_id = v.user_id)
       then 'already_confirmed'
-    when public.email_change_live(v.user_id) then 'email_change_pending'
+    when public.email_change_live(v.user_id, p_now) then 'email_change_pending'
     else public.deletion_refusal(v.account_id, v.user_id) end;
   if v_refusal is not null then
     return jsonb_build_object('ok', false, 'code', v_refusal);
