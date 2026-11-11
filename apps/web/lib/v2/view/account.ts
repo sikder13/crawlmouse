@@ -9,6 +9,7 @@ import {
   type Check,
   type Fix,
   type FixtureDataset,
+  type Seat,
   type Site,
 } from '@crawlmouse/types/v2';
 import {
@@ -309,6 +310,32 @@ export function viewAt(d: AccountDataset, viewer: Viewer): AccountView {
     inFlight,
   };
 }
+
+/**
+ * The reader's seat: `seatId`'s, or, on a preview, which names none, the owner's. Null when the
+ * records hold no such seat.
+ */
+export function readerSeat(v: AccountView): Seat | null {
+  return v.d.seats.find((s) => (v.seatId ? s.id === v.seatId : s.role === 'owner')) ?? null;
+}
+
+/**
+ * The reader's role. A preview names no seat and reads as the owner, whether or not its fixture
+ * holds an owner seat (clean-site's stand-in account holds none); a live reader is their seat's.
+ */
+export function readerRole(v: AccountView): Seat['role'] | null {
+  return v.seatId === null ? 'owner' : (readerSeat(v)?.role ?? null);
+}
+
+/** Whether the reader may run the account's sites: add, edit and remove them (questions.md Q12). */
+export const runsSites = (v: AccountView): boolean => {
+  const role = readerRole(v);
+  return role === 'owner' || role === 'account_manager';
+};
+
+/** Whether the reader may add a site: runs sites, and from a seat that covers every client. */
+export const addsSites = (v: AccountView): boolean =>
+  runsSites(v) && (v.seatId === null || readerSeat(v)?.client_scope === 'all');
 
 /** The oldest site that is not another site's staging copy: the one Free keeps (ARCH-2 §3.2). */
 export function primarySite(v: AccountView): Site {

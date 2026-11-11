@@ -52,9 +52,9 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   marked_done_site_paused: () =>
     `Marked done. Checks of this site are paused, so no re-check was queued; ${NEXT_CHECK}`,
   marked_done_not_checked: () => `Marked done. No re-check was queued; ${NEXT_CHECK}`,
-  // CC-28 sends the email from the recorded request: nothing here says it was sent.
+  // Nothing in this tree sends it (CC-28's mailer will read the recorded request): the line says so.
   email_requested: () =>
-    'Recorded. The fix will be emailed to that address; it has not been sent yet.',
+    'Recorded. Nothing has been sent: the fix goes to that address once email sending is switched on.',
   invalid_email: () => 'That is not an email address, so nothing was recorded.',
   rate_limited: (at) =>
     `Too many emails were asked for in a short time, so nothing was recorded.${at ? ` Ask again from ${at}.` : ''}`,

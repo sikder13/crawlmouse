@@ -247,7 +247,8 @@ export interface EmailDeps extends FixDeps {
   send(event: EmailEvent): Promise<unknown>;
 }
 
-const EmailBody = z.strictObject({ email: z.email().max(254) });
+/** The email-developer body, `{email}` and nothing else; the live form posts it as rendered. */
+export const EmailBody = z.strictObject({ email: z.email().max(254) });
 
 /**
  * POST /api/fixes/[id]/email-developer `{email}` once membership is established: 402

@@ -35,6 +35,8 @@ import {
   firstRunNow,
   primarySite,
   primarySites,
+  addsSites,
+  readerRole,
   resultChecks,
   viewAt,
   type AccountDataset,
@@ -553,7 +555,15 @@ function changeRow(v: AccountView, site: Site, c: Change): ChangeRowView {
               { id: fix.id },
               {
                 context: `about: ${c.summary}`,
-                input: { name: 'email', type: 'email', ...COPY.developerField },
+                inputs: [
+                  {
+                    kind: 'text',
+                    name: 'email',
+                    type: 'email',
+                    ...COPY.developerField,
+                    required: true,
+                  },
+                ],
               },
             ),
           ]
@@ -721,27 +731,37 @@ function setup(v: AccountView, site: Site, firstRun: boolean, trial: boolean): S
   };
 }
 
-/** The add-site action: the slots left, or the plans when none is. */
-function addSiteAction(v: AccountView, primaryAction = false): ActionView {
+/**
+ * The add-site action: the slots left, or the plans when none is. None for a reader whose seat
+ * cannot add (not the owner or a manager, or scoped to some clients: questions.md Q12).
+ */
+function addSiteAction(v: AccountView, primaryAction = false): ActionView[] {
+  if (!addsSites(v)) return [];
   const slots = primarySites(v).length;
   const limit = v.account.limits.sites;
   const label = `Add a site · ${slots} of ${limit} on ${PLAN_NAMES[v.tier]}`;
-  return slots >= limit
-    ? action('pricing', label, {}, { context: '(see the plans with more sites)' })
-    : action(
-        'addSite',
-        label,
-        {},
-        {
-          primary: primaryAction,
-          input: { name: 'host', type: 'text', ...COPY.siteField },
-        },
-      );
+  return [
+    slots >= limit
+      ? action('pricing', label, {}, { context: '(see the plans with more sites)' })
+      : action(
+          'addSite',
+          label,
+          {},
+          {
+            primary: primaryAction,
+            inputs: [
+              { kind: 'text', name: 'url', type: 'text', ...COPY.siteField, required: true },
+            ],
+          },
+        ),
+  ];
 }
 
 /** The one-time offer of a Pro trial: a Free account that never had a trial (H5). */
 function startPro(v: AccountView): DashboardView['startPro'] {
-  return v.account.state === 'free' &&
+  // Owner only: the route refuses any other seat.
+  return readerRole(v) === 'owner' &&
+    v.account.state === 'free' &&
     !v.account.state_history.some((h) => h.state.endsWith('_trial'))
     ? {
         title: COPY.startProHeading,
@@ -774,7 +794,7 @@ function noSiteView(v: AccountView): DashboardView {
       ]
         .filter(Boolean)
         .join(' · '),
-      actions: [addSiteAction(v, true)],
+      actions: addSiteAction(v, true),
     },
     strip: null,
     changed: [],
@@ -845,7 +865,7 @@ export function dashboardView(d: AccountDataset, viewer: Viewer): DashboardView 
           .join(' · '),
         actions: first
           ? [
-              addSite,
+              ...addSite,
               openAudit('Open the audit'),
               action(
                 'packet',
@@ -855,8 +875,8 @@ export function dashboardView(d: AccountDataset, viewer: Viewer): DashboardView 
               ),
             ]
           : result
-            ? [addSite, openAudit('Open the audit', true)]
-            : [addSite],
+            ? [...addSite, openAudit('Open the audit', true)]
+            : addSite,
       }
     : {
         title: COPY.since(sinceName(v, prev!)),
@@ -870,7 +890,7 @@ export function dashboardView(d: AccountDataset, viewer: Viewer): DashboardView 
         ]
           .filter(Boolean)
           .join(' · '),
-        actions: [addSite, runCheck(true)],
+        actions: [...addSite, runCheck(true)],
       };
 
   const rows = v.d.sites.map((s): SiteRowView => {

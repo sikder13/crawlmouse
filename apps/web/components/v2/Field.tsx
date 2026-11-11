@@ -10,6 +10,8 @@ export interface FieldProps {
   type?: 'url' | 'email' | 'text' | 'search';
   name?: string;
   placeholder?: string;
+  /** What the field holds when the page opens. */
+  defaultValue?: string;
   autoComplete?: string;
   required?: boolean;
   size?: 'md' | 'lg';

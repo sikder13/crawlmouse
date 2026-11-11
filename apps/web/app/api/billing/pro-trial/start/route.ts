@@ -11,8 +11,8 @@ import { getClientIp } from '@/lib/client-ip';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { captureFor } from '@/lib/v2/account/events';
-import { ownedAccount, startProTrial } from '@/lib/v2/account/pro-trial';
-import { isId, notFound, readBody, refuse, refuseTo, respond } from '@/lib/v2/account/route';
+import { ownedAccount, startProTrial, trialAccountId } from '@/lib/v2/account/pro-trial';
+import { notFound, readBody, refuse, refuseTo, respond } from '@/lib/v2/account/route';
 
 /** The page the offer is on, where a form is sent back to when it is refused. */
 const BACK = '/dashboard';
@@ -36,8 +36,8 @@ export async function POST(req: Request) {
 
   const body = await readBody(req);
   if (!body) return refuseTo(req, BACK, 400, 'invalid');
-  const accountId = body.fields.accountId;
-  if (typeof accountId !== 'string' || !isId(accountId)) return notFound();
+  const accountId = trialAccountId(body.fields);
+  if (accountId === null) return notFound();
   const { data: role, error } = await sb.rpc('member_role', { p_account: accountId });
   if (error) throw new Error(`member_role failed: ${error.message}`);
   if (role === null) return notFound();

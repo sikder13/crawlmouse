@@ -124,6 +124,24 @@ const NOTICE_SET: ReadonlySet<string> = new Set(NOTICE_CODES);
 const BACK =
   /^\/(?:dashboard|sites\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
+/**
+ * The page a form was posted from, when it is one a form can go back to (the dashboard or a site
+ * page, on this request's own origin, read from `Referer`); otherwise `fallback`. Only the path is
+ * kept, so nothing else the header carries reaches the answer.
+ */
+export function backFrom(req: Request, fallback: string): string {
+  const referer = req.headers.get('referer');
+  if (!referer) return fallback;
+  try {
+    const from = new URL(referer);
+    return from.origin === new URL(req.url).origin && BACK.test(from.pathname)
+      ? from.pathname
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 const isFormRequest = (req: Request): boolean =>
   req.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ===
   'application/x-www-form-urlencoded';

@@ -38,6 +38,7 @@ vi.mock('@/lib/v2/pipeline/load', () => ({
 
 import { FirstCheckScreen } from '@/components/v2/screens/site/FirstCheckScreen';
 import { SiteScreen } from '@/components/v2/screens/site/SiteScreen';
+import { siteOfCaller } from '@/lib/v2/account/pages';
 import SitePage from './page';
 
 let ownerId: string;
@@ -138,6 +139,40 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
     expect(first.props.notice).toMatchObject({ code: 'site_paused' });
     expect(children(await open(kept, ownerId, { notice: 'whatever' })).props.notice).toBeNull();
     expect(children(await open(kept)).props.notice).toBeNull();
+  });
+
+  it('a site of a deleted account is a 404, though its seat and site rows remain', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const db = h.db as PGlite;
+    const userId = await signUp(db, `deleted-${randomUUID().slice(0, 8)}@example.com`);
+    const { accountId } = await personalAccount(db, userId);
+    const site = randomUUID();
+    await db.query(
+      `insert into public.sites (id, account_id, host) values ($1, $2, 'gone-account.example')`,
+      [site, accountId],
+    );
+    expect(children(await open(site, userId)).type).toBe(FirstCheckScreen);
+    await db.query(`update public.accounts set deleted_at = now() where id = $1`, [accountId]);
+    await expect(open(site, userId)).rejects.toMatchObject(notFoundError);
+  });
+
+  it('siteOfCaller itself refuses a deleted account, whatever the client lets it read', async () => {
+    // Row security already hides a deleted account's site from its member (is_member_for_site
+    // reads accounts.deleted_at). Read with a client that row security does not stop, the
+    // entitlement read is what refuses it.
+    const db = h.db as PGlite;
+    const userId = await signUp(db, `deleted2-${randomUUID().slice(0, 8)}@example.com`);
+    const { accountId } = await personalAccount(db, userId);
+    const site = randomUUID();
+    await db.query(
+      `insert into public.sites (id, account_id, host) values ($1, $2, 'gone2.example')`,
+      [site, accountId],
+    );
+    const unguarded = postgrestOver(db);
+    const now = new Date();
+    expect(await siteOfCaller(unguarded, userId, site, now)).not.toBeNull();
+    await db.query(`update public.accounts set deleted_at = now() where id = $1`, [accountId]);
+    expect(await siteOfCaller(unguarded, userId, site, now)).toBeNull();
   });
 
   it('the other account’s owner opens their own site and not this one', async () => {

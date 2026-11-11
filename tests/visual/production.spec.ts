@@ -123,7 +123,18 @@ test.describe('on the production build', () => {
  */
 const ACCOUNT_SCREEN =
   /\/screens\/(dashboard|site|alerts|reports|settings|trial-end|changes-log)(\/|\?|$)/;
-const ACCOUNT_PREVIEWS = PREVIEWS.filter((p) => ACCOUNT_SCREEN.test(p.path));
+/**
+ * A sign-in the viewer cannot place on one account (none, or several with no default) has no
+ * account to show a rail for, so its screen has none and is left out of the frame check by name.
+ * Its brand header is checked with every other page in a11y.spec.ts.
+ */
+const NO_ACCOUNT = new Set([
+  '/v2-preview/screens/dashboard/no-account',
+  '/v2-preview/screens/dashboard/ambiguous',
+]);
+const ACCOUNT_PREVIEWS = PREVIEWS.filter(
+  (p) => ACCOUNT_SCREEN.test(p.path) && !NO_ACCOUNT.has(p.path),
+);
 
 test.describe('the account frame on the production build', () => {
   test('finds the account previews it checks', () => {

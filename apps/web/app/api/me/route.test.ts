@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => {
   const log: string[] = [];
-  const state = { user: { id: 'u1' } as unknown };
+  const state = { user: { id: 'u1' } as unknown, seats: [{ id: 's1' }] as unknown[] };
   const update = vi.fn();
   return {
     log,
@@ -21,6 +21,14 @@ const h = vi.hoisted(() => {
     },
     admin: {
       from: (table: string) => ({
+        select: () => {
+          const q = {
+            eq: () => q,
+            then: (resolve: (v: unknown) => unknown) =>
+              Promise.resolve({ data: state.seats, error: null }).then(resolve),
+          };
+          return q;
+        },
         update: (values: unknown) => {
           const filters: unknown[] = [];
           const q = {
@@ -57,12 +65,13 @@ const json = (body: unknown, method: 'PATCH' | 'POST' = 'PATCH') =>
     headers: { origin: 'https://crawlmouse.com', 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
-const form = (body: string) =>
+const form = (body: string, referer?: string) =>
   new Request(URL_, {
     method: 'POST',
     headers: {
       origin: 'https://crawlmouse.com',
       'content-type': 'application/x-www-form-urlencoded',
+      ...(referer ? { referer } : {}),
     },
     body,
   });
@@ -70,6 +79,7 @@ const form = (body: string) =>
 beforeEach(() => {
   h.log.length = 0;
   h.state.user = { id: 'u1' };
+  h.state.seats = [{ id: 's1' }];
   h.update.mockClear();
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
 });
@@ -131,5 +141,41 @@ describe('PATCH /api/me', () => {
     const res = await POST(json({ theme: 'dark' }, 'POST'));
     expect(res.status).toBe(405);
     expect(h.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /api/me, round 1', () => {
+  const SITE = '6f1c2a8e-0000-4000-8000-000000000000';
+
+  it('404 no_seat for a caller with no active seat, and nothing saved', async () => {
+    h.state.seats = [];
+    const res = await PATCH(json({ theme: 'dark' }));
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ code: 'no_seat' });
+    expect(h.update).not.toHaveBeenCalled();
+  });
+
+  it('a form goes back to the site page it came from', async () => {
+    const res = await POST(
+      form('_method=PATCH&theme=dark', `https://crawlmouse.com/sites/${SITE}?notice=capped`),
+    );
+    expect([res.status, res.headers.get('location')]).toEqual([303, `/sites/${SITE}`]);
+  });
+
+  it('a refused form goes back there too', async () => {
+    const res = await POST(
+      form('_method=PATCH&theme=sepia', `https://crawlmouse.com/sites/${SITE}`),
+    );
+    expect(res.headers.get('location')).toBe(`/sites/${SITE}?notice=invalid`);
+  });
+
+  it.each([
+    ['another origin', 'https://evil.example/sites/6f1c2a8e-0000-4000-8000-000000000000'],
+    ['a page that is not one of the two', 'https://crawlmouse.com/settings'],
+    ['no referer', undefined],
+    ['nonsense', 'not a url'],
+  ])('%s: back to the dashboard', async (_name, referer) => {
+    const res = await POST(form('_method=PATCH&theme=dark', referer));
+    expect(res.headers.get('location')).toBe('/dashboard');
   });
 });
