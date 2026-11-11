@@ -45,9 +45,10 @@ export const REFUSAL_SENTENCES: Readonly<Record<string, string>> = {
   // Seats are managed in a later step (CC-31), so the sentence does not send the reader to a page.
   others_seated:
     'Other people are seated on this account, so it cannot be deleted while they are. Write to support@crawlmouse.com to remove their seats.',
-  // erase_person_refusals' code; deletion_refusal leaves it out today, since the confirm ends the plan.
+  // erase_person_refusals' code; deletion_refusal leaves it out today. True of any live status: the
+  // purge cancels whatever is still running when it erases the account.
   live_subscription:
-    'The account’s subscription is still running. Confirming the deletion sets it to end.',
+    'The account’s subscription is still running. It ends when the account is erased, if it has not ended before.',
   v1_subscription:
     'A subscription from the earlier plan is still running. Cancel it in the billing portal first.',
   // An emailed link
