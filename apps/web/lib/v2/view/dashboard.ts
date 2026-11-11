@@ -738,7 +738,14 @@ function startPro(v: AccountView): DashboardView['startPro'] {
     ? {
         title: COPY.startProHeading,
         body: COPY.startProBody(TRIAL_DAYS, GATES.pro.competitorsPerSite, GATES.pro.sites),
-        start: action('startTrial', COPY.startProTitle(TRIAL_DAYS)),
+        start: action(
+          'startTrial',
+          COPY.startProTitle(TRIAL_DAYS),
+          {},
+          {
+            fields: { accountId: v.account.id },
+          },
+        ),
       }
     : null;
 }
