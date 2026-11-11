@@ -83,6 +83,9 @@ const ANONYMOUS: Record<
   'api/reports/[slug]/mine': { status: 200, body: { owned: false } },
   'api/reports/[slug]/visibility': { status: 401, body: { error: 'auth_required' } },
   'api/reports/[slug]/white-label': { status: 401, body: { error: 'auth_required' } },
+  'api/sites': { status: 401, body: { error: 'auth_required' } },
+  'api/sites/[id]': { status: 401, body: { error: 'auth_required' } },
+  'api/sites/[id]/checks': { status: 401, body: { error: 'auth_required' } },
   'api/verify/check/[id]': { status: 401, body: { error: 'auth required' } },
   'api/verify/start': { status: 401, body: { error: 'auth required' } },
   billing: { status: 307, location: 'https://crawlmouse.com/login' },
@@ -94,6 +97,11 @@ const ID = '6f1c2a8e-0000-4000-8000-000000000000';
 beforeEach(() => {
   calls.length = 0;
   vi.stubEnv('V2_ACCOUNT_DOOR', '1');
+  // The CC-26b routes answer 404 with V2_CHECKS_PUBLIC unset, and the two that request a check
+  // answer 503 before the session with V2_PIPELINE unset.
+  vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+  vi.stubEnv('V2_PIPELINE', '1');
+  vi.stubEnv('CRAWL_PAUSED', '');
 });
 afterEach(() => vi.unstubAllEnvs());
 
