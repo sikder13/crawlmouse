@@ -7,20 +7,20 @@ route below answers 404.
 
 ## Decisions
 
-| #   | Decision                                                                                                                                                                                                    | Where it is in the code                                                 |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| D1  | One flag, `V2_CHECKS_PUBLIC`, gates the routes and pages here; `__tests__/v1-inventory.test.ts` lists them as flag-gated.                                                                                   | each route's first statement; `app/dashboard/page.tsx`'s one branch     |
-| D2  | The viewer: `loadViewer()` returns the caller's account, seat, tier and limits, read through the caller's own session.                                                                                      | `apps/web/lib/v2/account/viewer.ts`                                     |
-| D3  | Every route checks the caller's membership of the row's account through the caller's session before any service-role call; another account's row is 404; entitlement refusals are 402 with the gate's name. | `apps/web/lib/v2/account/route.ts`; `lib/security/route-policy.ts` rows |
-| D4  | Re-check: the per-site daily cap and the 2-minute debounce are enforced in one SQL function that records the request; capped is 429 with when the next is allowed; `CRAWL_PAUSED` is 503.                   | migration `20261112000001`, section A                                   |
-| D5  | Mark done writes `site_fixes` and its `fix_events` row in one transaction and requests a `fix_recheck`; the persist RPC keeps a mark made after the persisted check started.                                | migration `20261112000001`, section B                                   |
-| D6  | Sites: hosts canonicalised and private hosts refused; slots counted in SQL; weekly schedules, competitors and staging need a paid tier; remove sets `removed_at`.                                           | migration section A; `app/api/sites/**`                                 |
-| D7  | Trial start: the owner (`app/api/billing/pro-trial/start/route.test.ts`), decided by the state machine's `next()`, applied by `start_trial_with_ledger` and CC-03's dispatcher.                             | `app/api/billing/pro-trial/start/route.ts`                              |
-| D8  | `/dashboard` and `/sites/[id]` on real data, with the no-site and first-check-running states designed.                                                                                                      | `app/dashboard/page.tsx`, `app/sites/[id]/page.tsx`                     |
-| D9  | Fix packet (402 when not visible to the tier) and email-developer (validated, rate limited, an event; nothing sent here).                                                                                   | `app/api/fixes/**`                                                      |
-| D10 | `PATCH /api/me {theme}` writes the caller's own active seat rows (`lib/v2/account/theme.test.ts`).                                                                                                          | `app/api/me/route.ts`                                                   |
-| D11 | Server-side events: `site_added`, `check_started`, `fix_marked_done`, `fix_closed`, `trial_started`.                                                                                                        | `apps/web/lib/v2/account/events.ts`                                     |
-| D12 | Out of this step: scheduled checks and alerts (CC-28), settings and deletion (CC-27b), reports and exports, seats (CC-31), pricing (CC-29).                                                                 |                                                                         |
+| #   | Decision                                                                                                                                                                                                    | Where it is in the code                                                         |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| D1  | One flag, `V2_CHECKS_PUBLIC`, gates the routes and pages here; `__tests__/v1-inventory.test.ts` lists them as flag-gated.                                                                                   | each route's first statement; the rewrite in `middleware.ts` (`V2_REWRITES`)    |
+| D2  | The viewer: `loadViewer()` returns the caller's account, seat, tier and limits, read through the caller's own session.                                                                                      | `apps/web/lib/v2/account/viewer.ts`                                             |
+| D3  | Every route checks the caller's membership of the row's account through the caller's session before any service-role call; another account's row is 404; entitlement refusals are 402 with the gate's name. | `apps/web/lib/v2/account/route.ts`; `lib/security/route-policy.ts` rows         |
+| D4  | Re-check: the per-site daily cap and the 2-minute debounce are enforced in one SQL function that records the request; capped is 429 with when the next is allowed; `CRAWL_PAUSED` is 503.                   | migration `20261112000001`, section A                                           |
+| D5  | Mark done writes `site_fixes` and its `fix_events` row in one transaction and requests a `fix_recheck`; the persist RPC keeps a mark made after the persisted check started.                                | migration `20261112000001`, section B                                           |
+| D6  | Sites: hosts canonicalised and private hosts refused; slots counted in SQL; weekly schedules, competitors and staging need a paid tier; remove sets `removed_at`.                                           | migration section A; `app/api/sites/**`                                         |
+| D7  | Trial start: the owner (`app/api/billing/pro-trial/start/route.test.ts`), decided by the state machine's `next()`, applied by `start_trial_with_ledger` and CC-03's dispatcher.                             | `app/api/billing/pro-trial/start/route.ts`                                      |
+| D8  | `/dashboard` and `/sites/[id]` on real data, with the no-site and first-check-running states designed.                                                                                                      | `app/dashboard/v2/page.tsx` (reached by the rewrite), `app/sites/[id]/page.tsx` |
+| D9  | Fix packet (402 when not visible to the tier) and email-developer (validated, rate limited, an event; nothing sent here).                                                                                   | `app/api/fixes/**`                                                              |
+| D10 | `PATCH /api/me {theme}` writes the caller's own active seat rows (`lib/v2/account/theme.test.ts`).                                                                                                          | `app/api/me/route.ts`                                                           |
+| D11 | Server-side events: `site_added`, `check_started`, `fix_marked_done`, `fix_closed`, `trial_started`.                                                                                                        | `apps/web/lib/v2/account/events.ts`                                             |
+| D12 | Out of this step: scheduled checks and alerts (CC-28), settings and deletion (CC-27b), reports and exports, seats (CC-31), pricing (CC-29).                                                                 |                                                                                 |
 
 ## Owner rulings (2026-11-10)
 
@@ -59,3 +59,18 @@ v1's `app/dashboard/page.tsx` is main's file, pinned by its sha256 in
 - The account door's own slot count is still the TypeScript one, outside `add_site`.
 - `fix_closed` is sent from the persist step, which has no request and so no consent cookie to read.
 - The dataset loader reads the account's sites' checks with no per-site bound.
+- A check whose persist withheld a fix (it was marked after the build read it) leaves that fix
+  unmeasured by that check, so the next check's diff writes no `changes` row for it: the engine
+  writes a resolution row only for a fix the previous check measured
+  (`packages/engine/src/v2/diff/diff.ts`). The fix's status still moves.
+- `site_added` and `trial_started` are sent by the account door from the browser (the visitor's
+  PostHog person) and by these routes from the server (`account:<id>`); PostHog does not join the
+  two.
+
+## Deploy order
+
+The code goes out before the migration's apply, never the reverse: the persist step now sends what
+the build read (`read`), which only the new `persist_built_check` accepts. While `V2_PIPELINE` is
+on, a rollback of the code with the migration left applied, or a check whose build was stored before
+the deploy (its stored output has no `read`), fails its persist; the check is marked failed and a
+re-check runs it again. Production keeps `V2_PIPELINE` unset until the switch-on step.
