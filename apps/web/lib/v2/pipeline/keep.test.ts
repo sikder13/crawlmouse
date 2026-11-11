@@ -17,6 +17,7 @@ import {
   settleKeptCheck,
   type KeepDeps,
 } from './keep';
+import { checkRef } from './public';
 import { loadCheck } from './load';
 import { memoryEvidenceStore } from './test-support/memory-evidence';
 import { pgliteCheckReader } from './test-support/pglite';
@@ -511,7 +512,7 @@ describe('claimKeep', () => {
         {
           signal: 'keep-evidence-discard-failed',
           extra: {
-            checkId: check.checkId,
+            checkRef: checkRef(check.checkId),
             accountId: who.accountId,
             objects: String(STORED(check).length),
           },

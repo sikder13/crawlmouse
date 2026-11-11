@@ -63,7 +63,7 @@ export const START_COPY: Record<StartRefusal, string> = {
   captcha_required: 'One check that you are a person, then the audit starts.',
   captcha_failed: 'The check that you are a person did not pass. Try again.',
   domain_limit: 'This site has been audited several times in the last hour. Try again later.',
-  rate_limited: 'That was sent too many times in a row. Wait a few minutes, then try again.',
+  rate_limited: 'That was sent too many times in a row. Try again later.',
   paused: 'New audits are paused for the moment. Try again later.',
   unavailable: 'Audits are not running at the moment. Try again later.',
   capacity: "Today's audits are used up. Try again tomorrow.",

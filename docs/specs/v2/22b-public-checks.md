@@ -20,10 +20,16 @@ components/v2/screens/home/live-home.test.tsx __tests__/v1-inventory.test.ts`. A
 build of this branch was also compared with one of `origin/main`, flag unset: `/` is prerendered in
 both and links the same stylesheets.
 
-Two exceptions with the flag unset, both stated in the owner's rulings: the cookie banner writes the
-visitor's analytics decision to a `cm_consent` cookie beside localStorage (`lib/consent.ts`), and the
-middleware answers a cross-site POST to a new route 403 and a non-JSON one 415 before the route's
-own 404, as it does for the claim route (`vitest __tests__/security/json-body.test.ts`).
+Three things change with the flag unset:
+
+- The cookie banner writes the visitor's analytics decision to a `cm_consent` cookie beside
+  localStorage (`lib/consent.ts`; owner ruling Q6).
+- The Sentry scrubber, on the server and in the browser, replaces the id in an `/audit/{id}` or
+  `/audits/{id}` path, as it did for `/checks/{id}` (`vitest lib/auth/sentry-scrub.test.ts`). A v1
+  audit id is a capability too.
+- The middleware answers a cross-site POST to a new route 403 and a non-JSON one 415 before the
+  route's own 404, as it does for the claim route (`vitest __tests__/security/json-body.test.ts`).
+  This follows the plan review, not an owner ruling; it is listed for the owner in the pull request.
 
 ## Decisions
 
@@ -59,7 +65,8 @@ own 404, as it does for the claim route (`vitest __tests__/security/json-body.te
   fix today (`packages/engine/src/v2/grade/outcomes.ts`), so an open fix shows its title, effect,
   effort and evidence, and one line saying its steps are not written yet. No packet text is made
   up in the web app. **"The primary action is Keep":** the result's orange button is the locked
-  design's "Open the fix"; Keep is the bar below it.
+  design's "Open the fix"; Keep is the bar below it. Not ruled on; listed for the owner in the pull
+  request.
 - **D7, "the claim calls `requestCheck`".** Only when the kept site has no queued, running,
   deferred, finished or partial check, which is when the claimed check failed.
 - **D7, "a failed move".** A copy that fails or passes its 8-second budget does not refuse the
@@ -144,7 +151,8 @@ No event is replayed from a recording or estimated.
 lib/v2/pipeline/stream.budget.test.ts`, which prints the numbers): one batch result
   in memory at a time; a batch over 4 MiB gzipped or 16 MiB inflated is skipped and the stream
   carries steps and counts for it. Storage download time is not in the measurement.
-- The route polls every 1.5 s with one narrow read, closes itself at 240 s inside a 300 s function
+- The route polls every 1.5 s with two requests (the check with its site, and the batches after
+  the cursor), closes itself at 240 s inside a 300 s function
   limit, and resumes from `Last-Event-ID`; a cursor that does not parse answers 400. 120 opens an
   hour per address.
 - The capability is checked when the stream opens and again when the site's account changes.
@@ -180,9 +188,11 @@ db/rollback.test.ts db/check.test.ts`).
   unkept site, its checks' objects first, once it has a check and none that is unexpired at
   `now − 10 min`, without an expiry, or queued or running; the rest goes by the schema's cascades
   (`vitest lib/v2/pipeline/expire.test.ts -t cascade`). One site per delete statement, 50 sites a batch, 20 batches,
-  120 s; a site whose delete fails is counted as skipped, and what is left is reported.
+  120 s; a site whose delete fails is reported by id and counted as skipped, and what is left is
+  reported. An unkept site with no check is deleted once it is older than 24 hours and 10 minutes.
   Step two moves kept checks' objects that are still under `anon/`. An anonymous result is
-  therefore gone between about 24 and 48 hours after its request.
+  therefore gone between about 24 and 48 hours after its request, when a run reaches it: a run
+  deletes 1,000 sites at most, and the day's ceiling on starts is 5,000.
 
 ## Home (D10)
 
@@ -194,14 +204,14 @@ flag set or unset (`vitest middleware.test.ts`). `app/page.tsx` is main's file
 
 ## Events (D12)
 
-| Event            | Sent from                                                                        | Properties                                                                          |
-| ---------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `home_viewed`    | the v2 home, `track()`                                                           | —                                                                                   |
-| `check_started`  | `POST /api/checks`, server                                                       | `trigger`, `check_ref`                                                              |
-| `check_finished` | the stream route, server, after the response; at most once per check per UTC day | `trigger`, `status`, `pages`, `durationMs`, `check_ref`, read from the check's rows |
-| `result_viewed`  | the overview of a ready check, `track()`                                         | `variant`, `check_ref`                                                              |
-| `fix_opened`     | a fix page, `track()`                                                            | `type`, `free`, `check_ref`                                                         |
-| `keep_clicked`   | the Keep bar's submit, `track()`                                                 | `from`, `check_ref`                                                                 |
+| Event            | Sent from                                                                                              | Properties                                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `home_viewed`    | the v2 home, `track()`                                                                                 | —                                                                                                                                                   |
+| `check_started`  | `POST /api/checks`, server                                                                             | `trigger`, `check_ref`                                                                                                                              |
+| `check_finished` | the stream route, server, after the response; once per check per UTC day while the limiter can be read | `trigger`, `status`, `pages`, `durationMs`, `check_ref`, and for a graded check `seo` and `aiReadability` or `withheld`; read from the check's rows |
+| `result_viewed`  | the overview of a ready check, `track()`                                                               | `variant`, `check_ref`                                                                                                                              |
+| `fix_opened`     | a fix page, `track()`                                                                                  | `type`, `free`, `check_ref`                                                                                                                         |
+| `keep_clicked`   | the Keep bar's submit, `track()`                                                                       | `from`, `check_ref`                                                                                                                                 |
 
 Server events go through `captureServerEvent` (`lib/analytics-server.ts`): no person profile, no
 GeoIP lookup, a 2-second bound on the send, and nothing sent unless `serverCaptureAllowed` reads consent from the request's
@@ -229,3 +239,25 @@ which records the page URL as it does on v1's `/audit/[id]`.
   address with a zero 16-bit half (`packages/engine/src/ssrf-guard.ts`). The host rule here refuses
   an IP literal, so the way in is a DNS record, as on v1.
 - The v2 home emits the FAQ structured data and does not show the questions.
+- A run of the expiry deletes 1,000 sites at most; a day with more expired sites than that leaves
+  the rest for the next run. A site with very many rows may pass the database's statement timeout
+  and be skipped each day; it is reported by id.
+- After a Keep that did not commit, the claimer's account stays in `checks.copied_for` until the
+  row goes, and stray copies on a site another account kept are looked for during three days.
+- `check.finished` carries `accountId: null` for a check kept while it ran. Nothing reads the
+  event today; CC-28's listener must read the owner from the database.
+- `check_started` is not sent when the call that made the row failed to send its pipeline event
+  and a retry started the run.
+- The production wiring of the expiry function (`SERVICE_WIRING.expiry`, `lib/v2/pipeline/functions.ts`)
+  is run by no test.
+
+## Rulings recorded here
+
+- The views' dataset type, `ViewDataset`, is defined in `lib/v2/fixtures.ts` (Q3).
+- The result page of a kept site's re-check shows a changes door counted from that check's change
+  rows (Q10).
+- Two visitors' checks of one host can overlap; a per-host run guard belongs to the worker step (Q16).
+- `templateNoun` names a template whose label is its key, which every measured check has
+  (`lib/v2/format.ts`; rulings round 2, 0.3).
+- A challenge of one crawler is worded from that crawler's rows, with the control fetch beside it
+  (`lib/v2/view/segment/access.ts`; 0.4).

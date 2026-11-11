@@ -138,7 +138,7 @@ describe('/audit/[id]: the result of a measured check, read by a visitor', () =>
     const fix = fixesAsOf(one.dataset, one.dataset.checks[0]!)[0]!;
     expect(data.first).toMatchObject({ kind: 'fix', title: fix.title });
     expect(fix.packet).toBeNull();
-    expect(data.first.body).toMatch(/ The evidence is open, free\.$/);
+    expect(data.first.body).not.toMatch(/steps|open, free/i);
     expect(html(<CheckPage read={one} />)).not.toMatch(/The steps\b/);
   });
 

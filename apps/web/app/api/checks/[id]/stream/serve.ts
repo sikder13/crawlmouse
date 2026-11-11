@@ -27,6 +27,7 @@ import {
   readBatch,
   storedCrawlBatches,
   type Cursor,
+  type StoredBatch,
 } from '../../../../../lib/v2/pipeline/stream';
 import type { StreamSnapshot, StreamStore } from '../../../../../lib/v2/pipeline/stream-store';
 import type { CheckReader, EvidenceStore } from '../../../../../lib/v2/pipeline/types';
@@ -139,7 +140,7 @@ export async function serveStream(
             for (const batch of storedCrawlBatches(snapshot)) {
               if (batch.batch <= cursor.batch) continue;
               // One result in memory at a time: it is read, turned into events and dropped.
-              const result = await readBatch(deps.evidence, batch.resultPath!);
+              const result = await readStored(deps, batch.batch, batch.resultPath!);
               const out = batchEvents(cursor, { batch: batch.batch, result }, startedAtMs);
               send(out.events, out.cursor);
             }
@@ -159,8 +160,7 @@ export async function serveStream(
           snapshot = await deps.store.snapshot(checkId);
         }
       } catch {
-        // A read that failed (the snapshot, or a batch's object) ends this connection; the browser
-        // reconnects from its last id, which is before a batch whose read failed.
+        // A snapshot read that failed ends this connection; the browser reconnects from its last id.
       } finally {
         open = false;
         try {
@@ -184,8 +184,38 @@ export async function serveStream(
   });
 }
 
+/** How many times one connection tries to read a batch's object before it passes the batch over. */
+export const BATCH_READ_ATTEMPTS = 3;
+
 /**
- * `check_finished`: `finishedOnce` admits one capture for the check in its bucket's 24-hour window.
+ * A stored batch's result, read up to BATCH_READ_ATTEMPTS times with a poll's wait between tries.
+ * A read that still fails is logged by batch number and answered null, which the stream passes
+ * over as it does a result over its size bound: the steps, the counts and the end go on, and the
+ * screen says how many fetched pages its map does not show.
+ */
+async function readStored(
+  deps: Pick<StreamDeps, 'evidence' | 'sleep'>,
+  batch: number,
+  path: string,
+): Promise<StoredBatch['result']> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await readBatch(deps.evidence, path);
+    } catch {
+      if (attempt === BATCH_READ_ATTEMPTS) {
+        console.warn(
+          `[api/checks/stream] batch ${batch} was not read in ${BATCH_READ_ATTEMPTS} tries; passed over`,
+        );
+        return null;
+      }
+      await deps.sleep(POLL_MS);
+    }
+  }
+}
+
+/**
+ * `check_finished`: `finishedOnce` admits one capture for the check in its bucket's UTC day, and
+ * admits a second when the limiter cannot be read (it fails open).
  * What it carries is read from the check's rows (`facts`, `scores`) and from `readableCheck`'s
  * answer; the cursor, which the client sends, gives it nothing. The scores are read for a finished
  * or partial check.

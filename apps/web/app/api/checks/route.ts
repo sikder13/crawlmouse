@@ -1,4 +1,4 @@
-import { NextResponse, after } from 'next/server';
+import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { IdSchema } from '@crawlmouse/types/v2';
 import { checksPublicEnabled, pipelineEnabled } from '@/lib/auth/flags';
@@ -6,7 +6,7 @@ import { getClientIp } from '@/lib/client-ip';
 import { CRAWL_PAUSED_MESSAGE, isCrawlPaused } from '@/lib/crawl-pause';
 import { supabaseServer } from '@/lib/supabase/server';
 import { UNAVAILABLE_CODES } from '@/lib/v2/unavailable';
-import { capturePublicEvent } from './_lib/events';
+import { capturePublicEventAfterResponse } from './_lib/events';
 import { scrubbed, startPublicCheck } from './_lib/start';
 import { startDeps } from './_lib/start-deps';
 
@@ -70,7 +70,9 @@ export async function POST(req: Request) {
 
   if (outcome.created) {
     const { checkId } = outcome;
-    after(() => capturePublicEvent(req, 'check_started', checkId, { trigger: 'first_audit' }));
+    await capturePublicEventAfterResponse(req, 'check_started', checkId, {
+      trigger: 'first_audit',
+    });
   }
   return answer({ checkId: outcome.checkId }, 200);
 }

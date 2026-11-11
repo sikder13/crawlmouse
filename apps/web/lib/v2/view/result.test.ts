@@ -420,8 +420,8 @@ describe('the fix to do first', () => {
         d.fixes.find((f) => f.id === fix.id)!.packet = null;
       });
       expect(v.first).toMatchObject({ kind: 'fix', title: fix.title });
-      expect(v.first.body.endsWith(' The evidence is open, free.'), name).toBe(true);
-      expect(v.first.body).not.toMatch(/steps/i);
+      expect(v.first.body, name).not.toMatch(/steps|open, free/i);
+      expect(v.first.body.endsWith('.'), name).toBe(true);
     }
     expect(met).toBeGreaterThan(0);
   });
