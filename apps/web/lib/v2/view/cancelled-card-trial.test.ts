@@ -55,7 +55,7 @@ describe('Trial ending, a card trial set to cancel', () => {
   it('says the trial is cancelled and the card not charged, with no cancel to make', () => {
     const v = read();
     expect(v.banner.sub).toBe(
-      'The reminder goes out once, today, unless you turned it off. The trial is cancelled: it ends on Sat 7 Nov and the card ending 4242 is not charged.',
+      'The reminder is due once, on Wed 4 Nov. The trial is cancelled: it ends on Sat 7 Nov and the card ending 4242 is not charged.',
     );
     expect(v.banner.keep).toBeNull();
     expect(v.banner.end).toMatchObject({ label: 'Let it end on Sat 7 Nov', href: '/dashboard' });
