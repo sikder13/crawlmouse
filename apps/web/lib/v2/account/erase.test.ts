@@ -97,6 +97,16 @@ describe('erasePerson', () => {
     const blocked = ports(storageFirst);
     expect((await erasePerson(blocked.p, { userId: 'u1' })).ok).toBe(false);
     expect(blocked.calls).toEqual(['plan']);
+    // Storage objects listed, and a refusal that is not about them: it stops the erasure.
+    const otherOnly = ports(
+      plan({
+        storage: objects,
+        refusals: ['account a1: other people are seated on it'],
+        refusalCodes: ['others_seated'],
+      }),
+    );
+    expect((await erasePerson(otherOnly.p, { userId: 'u1' })).ok).toBe(false);
+    expect(otherOnly.calls).toEqual(['plan']);
     const onlyStorage = ports(
       plan({ storage: objects, refusals: [`1 ${STORAGE_REFUSAL}`], refusalCodes: ['storage'] }),
     );
