@@ -628,10 +628,10 @@
     },
     {
       "kind": "metadata",
-      "path": "app/audit/[id]/not-found.tsx",
+      "path": "app/audit/[id]/overview/not-found.tsx",
       "ruling": "keep",
-      "reason": "404 of /audit/[id] and its sub-pages (CC-22b): the site 404 page while V2_CHECKS_PUBLIC is off, and with it on the wording for an audit that does not exist or has expired",
-      "evidence": "apps/web/app/audit/[id]/not-found.tsx:13"
+      "reason": "404 of a v2 check's overview (CC-22b): the site 404 page while V2_CHECKS_PUBLIC is off, and with it on the wording for an audit that does not exist or has expired",
+      "evidence": "apps/web/app/audit/[id]/overview/not-found.tsx:17"
     },
     {
       "kind": "metadata",

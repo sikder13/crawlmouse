@@ -5,17 +5,13 @@ import { FREE_PAGE_CAP } from '@/lib/limits';
 import { AuditSurfaceView } from './AuditSurfaceView';
 import { asClientAuditV2 } from '@/lib/audit-v2';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
-import {
-  reduceActivity,
-  isStalled,
-  shouldShowStall,
-  type ActivityState,
-} from '@/lib/audit-activity';
+import { reduceActivity, isStalled, shouldShowStall, type ActivityState } from '@/lib/audit-activity';
 import type { CrawlActivityEvent } from '@crawlmouse/types';
 import { track } from '@/lib/analytics';
 import { auditCompletedProps } from '@/lib/audit-completed-event';
 import type { FindingGroup } from '@/lib/findings';
 import type { FailureCategory } from '@/lib/failure-classification';
+
 
 interface Snapshot {
   id: string;
@@ -31,12 +27,7 @@ interface Snapshot {
   orphanCount?: number;
   avgDepth?: number;
   failureCategory?: FailureCategory | null; // coarse failure bucket (server-classified); drives the failure copy
-  crawlHealth?: {
-    confidence: string;
-    coveragePct: number;
-    blockRate: number;
-    partial: boolean;
-  } | null; // §6/§10 (v2)
+  crawlHealth?: { confidence: string; coveragePct: number; blockRate: number; partial: boolean } | null; // §6/§10 (v2)
   /**
    * SPEC 5.1a §4 — the persisted refusal decision, emitted by the SSE route (`AUDIT_COLS` ->
    * `projectAuditForClient`). DECLARED HERE DELIBERATELY (gate 4, R1-NB6 / R3-NB3): it reached the
@@ -88,8 +79,7 @@ export function AuditView({ auditId, resultView }: { auditId: string; resultView
       onSnapshot: (payload) => setSnapshot(payload as Snapshot),
       onDone: () => setDone(true),
       onTerminalError: () => setDone(true),
-      onActivity: (payload) =>
-        setActivity((s) => reduceActivity(s, payload as CrawlActivityEvent[])),
+      onActivity: (payload) => setActivity((s) => reduceActivity(s, payload as CrawlActivityEvent[])),
     });
     return () => es.close();
   }, [auditId]);
@@ -118,6 +108,7 @@ export function AuditView({ auditId, resultView }: { auditId: string; resultView
     const v2 = asClientAuditV2(snapshot);
     if (v2 && v2.grade != null) track('grade_revealed', { grade: v2.grade });
   }, [done]);
+
 
   async function cancelAudit() {
     setCanceling(true);

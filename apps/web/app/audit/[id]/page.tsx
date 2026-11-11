@@ -44,6 +44,9 @@ export default async function AuditPage({
   // would otherwise 404 anonymous audits (user_id = null).
   const sb = supabaseAdmin();
   const { data: audit } = await sb.from('audits').select('id, url').eq('id', id).maybeSingle();
+  // Under the flag, an id that is neither is answered by the v2 overview's 404, which says the
+  // audit does not exist or has expired.
+  if (!audit && checksPublicEnabled()) redirect(`/audit/${id}/overview` as Route);
   if (!audit) notFound();
 
   return (

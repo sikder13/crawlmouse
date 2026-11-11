@@ -166,7 +166,7 @@ rows that matter here are reproduced below so this repository holds the basis of
 | metadata | `app/icon.tsx` | keep | favicon | apps/web/app/icon.tsx:1 |
 | metadata | `app/apple-icon.tsx` | keep | touch icon | apps/web/app/apple-icon.tsx:1 |
 | metadata | `app/not-found.tsx` | keep | site 404 page | apps/web/app/not-found.tsx:1 |
-| metadata | `app/audit/[id]/not-found.tsx` | keep | 404 of /audit/[id] and its sub-pages (CC-22b): the site 404 page while V2_CHECKS_PUBLIC is off, and with it on the wording for an audit that does not exist or has expired | apps/web/app/audit/[id]/not-found.tsx:13 |
+| metadata | `app/audit/[id]/overview/not-found.tsx` | keep | 404 of a v2 check's overview (CC-22b): the site 404 page while V2_CHECKS_PUBLIC is off, and with it on the wording for an audit that does not exist or has expired | apps/web/app/audit/[id]/overview/not-found.tsx:17 |
 | metadata | `app/global-error.tsx` | keep | root error boundary (reports to Sentry) | apps/web/app/global-error.tsx:1 |
 | metadata | `app/sitemap.ts` | keep | sitemap; outside this step's allowed paths (§13) | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/api/admin/takedown/process/route.ts` | keep | takedown processing; legal obligation | apps/web/lib/security/route-policy.ts:37 |

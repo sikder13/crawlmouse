@@ -135,9 +135,23 @@ describe('with V2_CHECKS_PUBLIC off', () => {
     expect(typeof node.type).not.toBe('function');
   });
 
-  it('the 404 page is the site’s own', async () => {
+  it('/audit/[id] is a plain 404 for an id no v1 audit has, with no redirect', async () => {
     flag(false);
-    const { default: AuditNotFound } = await import('./not-found');
+    const route = await import('./page');
+    const digest = await digestOf(() =>
+      route.default({ params: params('page.tsx'), searchParams: Promise.resolve({}) }),
+    );
+    expect(digest).toContain('404');
+    expect(digest).not.toContain('NEXT_REDIRECT');
+  });
+
+  it('there is no not-found file beside the v1 page, which would change its 404', () => {
+    expect(readdirSync(HERE)).not.toContain('not-found.tsx');
+  });
+
+  it('the overview’s 404 page is the site’s own', async () => {
+    flag(false);
+    const { default: AuditNotFound } = await import('./overview/not-found');
     const { default: RootNotFound } = await import('../../not-found');
     expect(renderToStaticMarkup(<AuditNotFound />)).toBe(renderToStaticMarkup(<RootNotFound />));
   });
@@ -171,13 +185,15 @@ describe('with V2_CHECKS_PUBLIC on', () => {
     );
   });
 
-  it('an id that reads no v2 check is looked up as a v1 audit, and is a 404 when it is neither', async () => {
+  it('an id that reads no v2 check is looked up as a v1 audit; one that is neither goes to the overview’s 404', async () => {
     flag(true);
     readAudit.mockResolvedValue(null);
     const route = await import('./page');
     const run = () =>
       route.default({ params: params('page.tsx'), searchParams: Promise.resolve({}) });
-    expect(await digestOf(run)).toContain('404');
+    const digest = await digestOf(run);
+    expect(digest).toContain('NEXT_REDIRECT');
+    expect(digest).toContain(`/audit/${ID}/overview;`);
     expect(v1Audit).toHaveBeenCalledTimes(1);
     v1Audit.mockReturnValue({ id: ID, url: 'https://example.com' });
     expect(await digestOf(run)).toBe('returned');
@@ -214,9 +230,9 @@ describe('with V2_CHECKS_PUBLIC on', () => {
     },
   );
 
-  it('the 404 page says the audit does not exist or has expired', async () => {
+  it('the overview’s 404 page says the audit does not exist or has expired', async () => {
     flag(true);
-    const { default: AuditNotFound } = await import('./not-found');
+    const { default: AuditNotFound } = await import('./overview/not-found');
     const markup = renderToStaticMarkup(<AuditNotFound />);
     expect(markup).toContain('This audit does not exist, or it has expired.');
     expect(markup).toContain('24 hours');
@@ -242,11 +258,12 @@ describe('what the v1 page and its 404 import', () => {
     ),
   ];
 
-  it.each(['page.tsx', 'not-found.tsx'])(
+  it.each(['page.tsx', 'overview/not-found.tsx'])(
     '%s reaches no v2 screen, by import or by import(), so the v1 page links no v2 stylesheet',
     (file) => {
       const modules = reached(file);
       expect(modules.length).toBeGreaterThan(3);
+      // `./_lib/…` from the route, `../_lib/…` from a folder under it.
       expect(modules.filter((m) => V2.test(m) && !NO_SCREEN.includes(m))).toEqual([]);
     },
   );
