@@ -341,11 +341,13 @@ describe('Who builds each account route', () => {
       .filter(([, a]) => a.owner === 'CC-27b')
       .map(([key]) => key)
       .sort();
+    // CC-27b D10 moved `reports` to wave 2, with the agency workspace.
     expect(cc27b).toEqual(
-      ['alertRules', 'changeLog', 'emailSettings', 'integrations', 'plan', 'reports'].sort(),
+      ['alertRules', 'changeLog', 'emailSettings', 'integrations', 'plan'].sort(),
     );
+    expect(ACCOUNT_ACTIONS.reports.owner).toBe('wave 2');
     expect(new Set(Object.values(ACCOUNT_ACTIONS).map((a) => a.owner))).toEqual(
-      new Set(['CC-26b', 'CC-27b', 'built']),
+      new Set(['CC-26b', 'CC-27b', 'wave 2', 'built']),
     );
   });
 });

@@ -10,7 +10,8 @@ export interface RouteSpec {
   /** The path, with `[id]`-style parameters, as ARCH-2 §5 names it. */
   route: string;
   /** Who builds the handler. */
-  owner: 'CC-26b' | 'CC-27b' | 'built';
+  /** `wave 2`: moved out of CC-27b to the agency workspace's step (CC-27b D10). */
+  owner: 'CC-26b' | 'CC-27b' | 'wave 2' | 'built';
   /** What the handler must check before acting (ARCH-2 §5, DECISION-LOG E6). */
   guard: string;
 }
@@ -116,7 +117,7 @@ export const ACCOUNT_ACTIONS = {
   reports: {
     verb: 'POST',
     route: '/api/reports',
-    owner: 'CC-27b',
+    owner: 'wave 2',
     guard: 'Signed-in member; exports need a paid tier.',
   },
   alertRules: {
