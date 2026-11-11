@@ -75,11 +75,8 @@ const EditBody = z
     const timed = b.schedule === 'weekly' || b.schedule === 'monthly';
     return timed === (b.dow !== undefined) && timed === (b.hour !== undefined);
   })
-  .transform(({ dow, hour, ...rest }) =>
-    rest.schedule === 'none'
-      ? rest
-      : { ...rest, ...(dow === undefined ? {} : { dow }), ...(hour === undefined ? {} : { hour }) },
-  );
+  // With none the day and hour are read (so one out of range is still refused) and then dropped.
+  .transform((b) => (b.schedule === 'none' ? { ...b, dow: undefined, hour: undefined } : b));
 
 export type EditBody = z.infer<typeof EditBody>;
 
