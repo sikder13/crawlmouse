@@ -16,8 +16,9 @@
  *   and arrays (never the SDK's `sdkProcessingMetadata`, which holds the live scope and client);
  *   drops `cookie`, `cookies`, `set-cookie`, `token_hash`, `post_login_next` and span cookie-header
  *   keys at any depth; and replaces a `token_hash` or `code` query value (URL-encoded or not), a
- *   `post_login_next=` value, a PostgREST `=eq.` filter value and a check id in a `/check/` or
- *   `/checks/` path wherever a string holds one.
+ *   `post_login_next=` value, a PostgREST `=eq.` filter value, a check id in a `/check/` or
+ *   `/checks/` path and an emailed account link's token in its `/account/…/` path wherever a string
+ *   holds one.
  */
 
 /**
@@ -46,6 +47,13 @@ const POSTGREST_FILTER = /(=(?:eq|neq|in|is)\.)[^&#\s"]*/gi;
 const CHECK_PATH =
   /((?:\/|%2F)checks?(?:\/|%2F))[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 /**
+ * An emailed account link's token in its path (`/account/delete/<token>`, and `restore`, `email`,
+ * `email-undo`; CC-27b), with the slashes plain or URL-encoded. The link's own GET is the one request
+ * that carries the token in a URL before it moves into a cookie (`lib/v2/account/link-cookie.ts`).
+ */
+const ACCOUNT_LINK_PATH =
+  /((?:\/|%2F)account(?:\/|%2F)(?:delete|restore|email|email-undo)(?:\/|%2F))[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/gi;
+/**
  * The SDK's own processing state, which holds the live scope and client: never part of what is
  * sent, and not ours to walk (a getter-only property on it throws when assigned).
  */
@@ -63,7 +71,8 @@ function scrub(value: unknown, seen: WeakSet<object>): unknown {
       .replace(SECRET_QUERY, '$1[Filtered]')
       .replace(NEXT_IN_STRING, '$1[Filtered]')
       .replace(POSTGREST_FILTER, '$1[Filtered]')
-      .replace(CHECK_PATH, '$1[Filtered]');
+      .replace(CHECK_PATH, '$1[Filtered]')
+      .replace(ACCOUNT_LINK_PATH, '$1[Filtered]');
   }
   if (value === null || typeof value !== 'object') return value;
   if (seen.has(value)) return value;
