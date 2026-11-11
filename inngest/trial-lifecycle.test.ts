@@ -77,12 +77,18 @@ describe('trialLifecycleFn config (CC-03 D9a)', () => {
     appPrefix: inngest.id,
   });
 
-  it('runs on trial.started, once per account, cancelled by the account’s trial.converted', () => {
+  it('runs on trial.started, once per account, cancelled by the account’s trial.converted or deletion', () => {
     expect(config).toMatchObject({
       id: `crawlmouse-${TRIAL_LIFECYCLE_FN_ID}`,
       triggers: [{ event: 'trial.started' }],
       idempotency: 'event.data.accountId',
-      cancel: [{ event: 'trial.converted', if: 'event.data.accountId == async.data.accountId' }],
+      cancel: [
+        { event: 'trial.converted', if: 'event.data.accountId == async.data.accountId' },
+        {
+          event: 'account.deletion_confirmed',
+          if: 'event.data.accountId == async.data.accountId',
+        },
+      ],
     });
     expect(TRIAL_LIFECYCLE_FN_ID).toBe('crawlmouse.trial.lifecycle');
   });

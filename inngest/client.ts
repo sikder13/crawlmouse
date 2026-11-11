@@ -54,9 +54,13 @@ type Events = {
           tokenIds: string[];
         };
   };
-  // CC-27b: a deletion was confirmed. deletionCancelFn ends the person's subscription through CC-03's
-  // cancel, and trialLifecycleFn stops (cancelOn). Names the person only.
-  'account.deletion_confirmed': { data: { userId: string } };
+  // CC-27b: a deletion was confirmed, one event per account it marked. deletionCancelFn ends the
+  // account's subscription through CC-03's cancel, and the account's trialLifecycleFn stops (cancelOn,
+  // matched on the account). Names the person and the account only.
+  'account.deletion_confirmed': { data: { userId: string; accountId: string } };
+  // CC-27b: a deletion was undone in its window. deletionResumeFn continues the subscriptions the
+  // deletion set to end (restore_account names them), and a deletionCancelFn still waiting stops.
+  'account.restored': { data: { userId: string; subscriptionIds: string[] } };
   // The v2 check pipeline (CC-20b, check.ts). Registered only when V2_PIPELINE=1.
   'check.requested': { data: CheckRequested };
   'check.finished': { data: CheckFinished };
