@@ -6,7 +6,9 @@ import { ActionControl } from '../account/ActionControl';
 import { CardHead } from '../account/parts';
 import field from '../../Field.module.css';
 import shared from '../account/AccountScreen.module.css';
+import { NoticeLine } from './NoticeLine';
 import { StoppedForm } from './StoppedForm';
+import type { Notice } from '../../../../lib/v2/copy/settings-notices';
 import styles from './SettingsScreen.module.css';
 
 /**
@@ -14,7 +16,14 @@ import styles from './SettingsScreen.module.css';
  * and the request for a confirmation link. No orange element: the page's one action is deleting,
  * which the Settings artboard draws as a quiet control, never as the screen's best action.
  */
-export function DeleteScreen({ data }: { data: DeleteStepView }) {
+export function DeleteScreen({
+  data,
+  notice = null,
+}: {
+  data: DeleteStepView;
+  /** What the form's last post did, on a live page (`settingsNotice`). */
+  notice?: Notice | null;
+}) {
   const { header, field: f, submit } = data;
   const hint = `${f.id}-hint`;
   return (
@@ -25,10 +34,12 @@ export function DeleteScreen({ data }: { data: DeleteStepView }) {
           <div className={shared.line}>{header.line}</div>
         </div>
       </header>
+      <NoticeLine notice={notice} />
       <Card as="section" className={shared.panel}>
         <CardHead title={data.cardTitle} sub={data.text} />
         {submit === null ? (
           <div className={styles.form}>
+            {data.blocked ? <p className={styles.hint}>{data.blocked}</p> : null}
             <div className={shared.actions}>
               <ActionControl action={data.back} variant="quiet" size="md" />
             </div>

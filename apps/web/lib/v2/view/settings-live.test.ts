@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ACCOUNT_VIEWERS } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
 import { fixture } from '../fixtures';
+import { REFUSAL_SENTENCES } from '../copy/settings-notices';
 import { deleteStepView, settingsView } from './settings';
 
 const WEB = join(__dirname, '../../..');
@@ -140,5 +141,21 @@ describe('what each role is offered (CC-27b review, item 5)', () => {
     expect(deleteStepView(home, ACCOUNT_VIEWERS.home(), { role: 'owner' }).submit).not.toBeNull();
     for (const role of ['account_manager', 'developer'] as const)
       expect(deleteStepView(home, ACCOUNT_VIEWERS.home(), { role }).submit).toBeNull();
+  });
+});
+
+describe('the delete step when the request would be refused (CC-27b review, item 6)', () => {
+  const home = fixture('bad-site');
+
+  it('says why, from the refusal sentences, and offers no form', () => {
+    const v = deleteStepView(home, ACCOUNT_VIEWERS.home(), { blocked: 'others_seated' });
+    expect(v.blocked).toBe(REFUSAL_SENTENCES.others_seated);
+    expect(v.submit).toBeNull();
+  });
+
+  it('with nothing in the way, the form', () => {
+    const v = deleteStepView(home, ACCOUNT_VIEWERS.home(), { blocked: null });
+    expect(v.blocked).toBeNull();
+    expect(v.submit).not.toBeNull();
   });
 });

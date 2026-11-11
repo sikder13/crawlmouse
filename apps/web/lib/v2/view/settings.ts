@@ -35,6 +35,7 @@ import {
 import { action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
+import { REFUSAL_SENTENCES, SETTINGS_NOTICES as NOTICES } from '../copy/settings-notices';
 import type { SeatRole } from '../account/profile';
 
 export const CC27B_ROUTES = {
@@ -523,7 +524,9 @@ export interface DeleteStepView {
   removes: string | null;
   /** The in-page guard: the primary site's hostname, typed again. */
   field: { id: string; label: string; name: string; expected: string; hint: string };
-  /** The request for the link; null for anyone but the owner. */
+  /** Why the request would be refused, when it would be; null otherwise. */
+  blocked: string | null;
+  /** The request for the link; null for anyone but the owner, and when it would be refused. */
   submit: ActionView | null;
   /** Back to Settings, deleting nothing. */
   back: ActionView;
@@ -540,7 +543,10 @@ export function deleteStepView(
   {
     removes = null,
     role = 'owner',
+    blocked = null,
   }: {
+    /** The code the request would be refused with (`account_deletion_blocked`), or null. */
+    blocked?: string | null;
     /** Each account the erasure plan names, by its primary site's host (null for none). */
     removes?: readonly { host: string | null }[] | null;
     /** The reader's seat role: the request is the owner's alone. A preview reads as the owner. */
@@ -568,7 +574,16 @@ export function deleteStepView(
       expected,
       hint: COPY.retypeHint,
     },
-    submit: role === 'owner' ? routeAction('deleteAccount', COPY.sendDeleteLink) : null,
+    blocked:
+      blocked === null
+        ? null
+        : Object.hasOwn(REFUSAL_SENTENCES, blocked)
+          ? REFUSAL_SENTENCES[blocked]!
+          : NOTICES.unknown,
+    submit:
+      role === 'owner' && blocked === null
+        ? routeAction('deleteAccount', COPY.sendDeleteLink)
+        : null,
     back: action('emailSettings', COPY.keepAccount),
   };
 }

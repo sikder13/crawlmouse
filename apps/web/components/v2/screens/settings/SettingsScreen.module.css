@@ -103,3 +103,18 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* What the last form did (NoticeLine). */
+.notice {
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--v2-line);
+  border-radius: 6px;
+  background: var(--v2-okbg);
+  font-size: var(--v2-text-small);
+}
+
+.noticeError {
+  border-color: var(--v2-badline);
+  background: var(--v2-badbg);
+}
