@@ -386,6 +386,13 @@ describe('the money on the delete step, by the subscription’s state (fix round
     expect(page).toContain(text(REFUND_POLICY));
   });
 
+  it('/settings says the same in its danger zone for a plan whose payments are overdue', async () => {
+    as(pastDue);
+    const page = renderToStaticMarkup(screen(await SettingsPage(q())));
+    expect(page).toContain(text(DELETE_COPY.moneyNotCollected));
+    expect(page).not.toContain(text(DELETE_COPY.moneyEnds));
+  });
+
   it('a trialing plan: set to end at the end of the period', async () => {
     const page = await html(cancelling);
     expect(page).toContain(text(DELETE_COPY.moneyEnds));

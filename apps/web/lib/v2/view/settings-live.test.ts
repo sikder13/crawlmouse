@@ -11,6 +11,7 @@ import { fixture } from '../fixtures';
 import { DELETE_COPY, REFUND_POLICY } from '../copy/deletion';
 import { REFUSAL_SENTENCES } from '../copy/settings-notices';
 import { deleteStepView, settingsView } from './settings';
+import { trialEndView, trialEndViewer } from './trial-end';
 
 const WEB = join(__dirname, '../../..');
 
@@ -212,5 +213,24 @@ describe('the money sentence by the subscription’s state (fix round 2, item 5)
   it('a subscription already over, or none: nothing about money', () => {
     for (const status of ['canceled', 'incomplete_expired', null])
       for (const t of text(status)) expect(t).not.toContain('refund');
+  });
+});
+
+describe('the rail on Settings, Settings › Plan and Trial ending, for each role (round-3 test review, S1)', () => {
+  const home = fixture('bad-site');
+  const BAD = ACCOUNT_VIEWERS.home().accountId;
+
+  it('no role is offered Keep or Billing from these pages’ trial card: the page carries the plan', () => {
+    for (const role of ['owner', 'account_manager', 'developer'] as const) {
+      const cards = [
+        settingsView(home, ACCOUNT_VIEWERS.home(), { role }).shell.trial,
+        trialEndView(home, trialEndViewer(home, BAD), { role }).shell.trial,
+      ];
+      for (const card of cards) {
+        expect(card).not.toBeNull();
+        expect(card!.keep).toBeNull();
+        expect(card!.billing).toBeNull();
+      }
+    }
   });
 });

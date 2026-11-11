@@ -47,13 +47,13 @@ function sqlBody(sql: string, name: string): string {
 
 /**
  * The codes a SQL body names in two forms: a refusal row of `erase_person_refusals`
- * (`select <n>, <key>, '<code>'`), and a literal `'<code>'` after a `then` or an `else`. A code a
- * body names in any other form is not read.
+ * (`select <n>, <key>, '<code>'`, on one line or across lines), and a literal `'<code>'` after a
+ * `then` or an `else`. A code a body names in any other form is not read.
  */
 function sqlCodesIn(body: string): string[] {
   const out = new Set<string>();
   for (const re of [
-    /select \d+(?: as o)?, [^,]+?(?: as k)?, '([a-z][a-z0-9_]*)'/g,
+    /select\s+\d+(?:\s+as\s+o)?,\s+[^,]+?(?:\s+as\s+k)?,\s+'([a-z][a-z0-9_]*)'/g,
     /\b(?:then|else) '([a-z][a-z0-9_]*)'/g,
   ])
     for (const m of body.matchAll(re)) out.add(m[1]!);
@@ -64,6 +64,20 @@ const sqlCodes = (() => {
   const sql = read(MIGRATION);
   return [...new Set(SQL_FUNCTIONS.flatMap((f) => sqlCodesIn(sqlBody(sql, f))))].sort();
 })();
+
+describe('sqlCodesIn', () => {
+  it('reads a refusal row on one line, one written across lines, and a then/else literal', () => {
+    const body = [
+      "select 1 as o, s.account_id::text as k, 'one_line' as code, 'm' as message",
+      'union all',
+      'select 3,',
+      "       sb.id, 'two_lines',",
+      "       'subscription ' || sb.id",
+      "select case when x then 'from_then' else 'from_else' end",
+    ].join('\n');
+    expect(sqlCodesIn(body).sort()).toEqual(['from_else', 'from_then', 'one_line', 'two_lines']);
+  });
+});
 
 describe('the refusal sentences', () => {
   const codes = [...new Set([...SOURCES.flatMap((p) => codesIn(read(p))), ...sqlCodes])].sort();
