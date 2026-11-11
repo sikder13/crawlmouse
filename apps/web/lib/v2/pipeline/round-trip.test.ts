@@ -115,7 +115,7 @@ describe('persisting is idempotent (D5)', () => {
     const after = await counts();
     expect(after.page_results).toBe(built.page_results.length); // anti-vacuity
     const second = await persistBuiltCheck(pglitePersistDb(db), input);
-    expect(second).toEqual({ written: false, counts: {} });
+    expect(second).toEqual({ written: false, counts: {}, verified: [] });
     expect(await counts()).toEqual(after);
   });
 });
