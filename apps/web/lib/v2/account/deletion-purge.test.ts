@@ -255,6 +255,24 @@ describe('the purge', () => {
     expect(await queued(d.userId)).toBe(0);
   });
 
+  it('the orphan path erases a marked account whose other seats are not active (R3 test-quality 2)', async () => {
+    const d = await deleted();
+    const gone = await signUp(db, `removed-${serial}@example.com`);
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at, removed_at)
+       values ($1, $2, 'removed@example.com', 'developer', 'removed', now(), now()),
+              ($1, null, 'invited@example.com', 'developer', 'invited', null, null)`,
+      [d.accountId, gone],
+    );
+    await db.query(`delete from auth.users where id = $1`, [d.userId]);
+    const { steps } = purgeOver([]);
+    expect((await steps.purgeOne({ userId: d.userId, accounts: [d.accountId] })).outcome).toBe(
+      'purged',
+    );
+    expect(await n(`select count(*) from public.accounts where id = $1`, [d.accountId])).toBe(0);
+    expect(await queued(d.userId)).toBe(0);
+  });
+
   it('the orphan path keeps a marked account another active member is on (R2 item 7)', async () => {
     const d = await deleted();
     const member = await signUp(db, `stays-${serial}@example.com`);
