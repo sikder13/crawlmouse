@@ -88,3 +88,12 @@ No page here shares a path with a v1 page, so `V2_REWRITES` gains no row.
 - If Inngest refuses `account.deletion_confirmed` three times in the confirm's request, the deletion still stands
   and Sentry is told (user id only), but no `deletionCancelFn` runs: an `active` plan is not set to end during the
   window, and can renew in it. The purge cancels it at once, with no proration, before it erases.
+- A `past_due`, `unpaid` or `paused` subscription is not ended at confirm (a restore could not bring it back), so
+  Stripe's payment retries can still charge it during the window; the purge cancels it at once, with no proration.
+- No seat can be added in this tree, so an account marked for deletion gains no member during its window. CC-31's
+  invitations must refuse a marked account; the purge's check that it erases only marked accounts (`accounts_changed`)
+  assumes so.
+- `PUT /api/alert-rules` sends a refused form back to `/alerts?error=<code>`; there is no live Alerts page yet, and
+  CC-28's must read the code as Settings does (`lib/v2/copy/settings-notices.ts`).
+- `PATCH /api/account`: when the owner's email change is accepted and the profile write after it then fails, the
+  answer is a 500 while the change's links are already created.
