@@ -12,7 +12,8 @@
  *
  * Limits. A poll every POLL_MS; the stream closes itself STREAM_CLOSE_MS after it opened, before
  * the route's `maxDuration`, and the browser reconnects; STREAM_OPENS_PER_IP_PER_HOUR opens an hour
- * for one address (../_lib/limit-keys.ts); one batch result in memory at a time (`readBatch`'s bounds).
+ * for one address, which is also what bounds the streams one address holds open at once
+ * (../_lib/limit-keys.ts); one batch result in memory at a time (`readBatch`'s bounds).
  */
 import { isExpired, readableCheck, type Viewer } from '../../../../../lib/v2/pipeline/public';
 import {

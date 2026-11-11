@@ -14,6 +14,14 @@ import { checkRef } from '../../../../../lib/v2/pipeline/public';
  * Stream opens an address may make in an hour. One tab reconnects every STREAM_CLOSE_MS (240 s),
  * 15 times an hour; this leaves room for eight tabs, or four on a connection that drops as often
  * again.
+ *
+ * This count of opens is also the bound on streams held open at once: there is no count of open
+ * streams, by address or by check. One address can have 120 open together, each for up to 240 s
+ * (stream/serve.ts, STREAM_CLOSE_MS): 120 × 240 s is 8 hours of function time in an hour, with two
+ * PostgREST requests a poll for each stream. An open with no `Last-Event-ID` reads each stored
+ * batch again, about a second of inflating and parsing for the heaviest check measured
+ * (lib/v2/pipeline/stream.budget.test.ts), and counts as one open like any other. The bucket fails
+ * open (limits.ts).
  */
 export const STREAM_OPENS_PER_IP_PER_HOUR = 120;
 
