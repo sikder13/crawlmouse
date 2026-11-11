@@ -66,9 +66,11 @@ describe('workflow concurrency', () => {
     });
   });
 
-  it('never cancels a production database run', () => {
-    for (const file of ['db-apply-prod.yml', 'db-rollback-prod.yml']) {
-      expect(EXPECTED[file]!.cancel).toBe(false);
-    }
+  // Read from the files, not from the table above: a production database run is never cancelled.
+  it.each(['db-apply-prod.yml', 'db-rollback-prod.yml'])('%s never cancels a run', (file) => {
+    const wf = parse(readFileSync(join(WORKFLOWS, file), 'utf8')) as {
+      concurrency?: { 'cancel-in-progress'?: unknown };
+    };
+    expect(wf.concurrency?.['cancel-in-progress']).toBe(false);
   });
 });

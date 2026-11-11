@@ -833,7 +833,7 @@ describe('migrations-append-only, the commit it compares with', () => {
     );
     chmodSync(join(dir, 'git'), 0o755);
     const r = spawnSync('bash', ['-e', '-c', check?.run ?? 'exit 99'], {
-      env: { PATH: `${dir}:/usr/bin:/bin`, ...env },
+      env: { NODE_ENV: 'test', PATH: `${dir}:/usr/bin:/bin`, ...env },
       encoding: 'utf8',
     });
     const diff = readFileSync(log, 'utf8')
