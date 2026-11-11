@@ -12,6 +12,8 @@ export type RecheckOutcome =
   | { queued: false; reason: 'capped'; nextAllowedAt: string }
   /** This bucket's check has already started, so it cannot take this request (plan revision R6). */
   | { queued: false; reason: 'check_running'; checkId: string }
+  /** The day's `global:audits:day` ceiling is reached (owner ruling: the global ceiling). */
+  | { queued: false; reason: 'capacity' }
   | { queued: false; reason: 'removed' | 'paused' };
 
 export interface RecheckRequest {
