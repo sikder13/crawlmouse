@@ -78,7 +78,7 @@ jobs:
           set -a
           . ./.env.ci
           set +a
-          PERF_SAMPLES_DIR="$GITHUB_WORKSPACE/perf-samples" \
+          PERF_SAMPLES_DIR="$GITHUB_WORKSPACE/perf-samples" PERF_PROBE="$GITHUB_WORKSPACE/perf-samples/probe.json" \
             pnpm exec playwright test -c ../../tests/visual/playwright.config.ts perf.spec.ts --workers=1
       - name: Upload the samples
         if: ${{ !cancelled() }}

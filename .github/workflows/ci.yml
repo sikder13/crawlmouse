@@ -564,6 +564,7 @@ jobs:
           set -a
           . ./.env.ci
           set +a
+          export PERF_PROBE="$RUNNER_TEMP/probe.json"
           ../../packages/timing/scripts/perf-retry.sh "$RUNNER_TEMP/probe.json" -- \
             pnpm exec playwright test -c ../../tests/visual/playwright.config.ts perf.spec.ts --workers=1
       - name: Production checks, on next start
