@@ -6,10 +6,22 @@ export const BUDGET = {
   /** A main-thread task longer than this is a stall. */
   stallMs: 100,
   layoutShift: 0.001,
+  /** The main thread's mean busy time per 16.7 ms slice of a crawl window. */
+  meanWorkMs: 2.5,
+  /** The 95th percentile of the same: the bursts. */
+  p95WorkMs: 10,
+  /** A frame interval longer than this is a stall, at any refresh rate. */
+  maxFrameMs: 100,
+};
+
+/**
+ * Frame-interval readings printed and recorded for the nightly trend, not judged: they move with
+ * the refresh rate the runner manages (docs/specs/v2/ci-cost.md, D3).
+ */
+export const ADVISORY = {
   p95FrameMs: 17.5,
   slowFrameMs: 34,
   slowShare: 0.01,
-  maxFrameMs: 100,
 };
 
 /** How long each crawl-screen window plays. */

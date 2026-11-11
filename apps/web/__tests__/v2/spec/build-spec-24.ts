@@ -188,7 +188,7 @@ function budgetSection(): string {
       [
         [
           `The crawl screen, three windows of ${WINDOW_MS / 1000} s`,
-          `no task over ${BUDGET.stallMs} ms; layout shift at most ${BUDGET.layoutShift}; 95th percentile frame at most ${BUDGET.p95FrameMs} ms; at most ${BUDGET.slowShare * 100}% of frames over ${BUDGET.slowFrameMs} ms; none over ${BUDGET.maxFrameMs} ms`,
+          `no task over ${BUDGET.stallMs} ms; layout shift at most ${BUDGET.layoutShift}; the main thread busy at most ${BUDGET.meanWorkMs} ms a 16.7 ms slice on average, and at most ${BUDGET.p95WorkMs} ms in 95% of them; no frame over ${BUDGET.maxFrameMs} ms`,
         ],
         [
           `The explorer, ${code(EXPLORER.path)}, ${EXPLORER.ms / 1000} s, a step down the list every ${EXPLORER.stepMs} ms`,

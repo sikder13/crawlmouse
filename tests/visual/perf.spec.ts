@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { busyPerSlice, quantile } from '../../packages/timing/src/busy';
 import { recordSample } from '../../packages/timing/src/samples';
 import { fmt, median } from '../../packages/timing/src/stats';
-import { BUDGET, EXPLORER, RUNS, WINDOW_MS } from './budgets';
+import { ADVISORY, BUDGET, EXPLORER, RUNS, WINDOW_MS } from './budgets';
 import { test, expect, type Browser, type Page, type TestInfo } from './pw';
 
 /**
@@ -41,11 +42,20 @@ import { test, expect, type Browser, type Page, type TestInfo } from './pw';
  *   page only before the first report).
  * - Layout shift within a window: at most 0.001, zero within rounding. The whole replay, end
  *   included, is measured by motion.spec.ts ("layout shift over a whole replay").
- * - Frames: the 95th percentile interval at most 17.5 ms (fewer than 5% of intervals miss a vsync
- *   at 60 Hz; `missedShare` is the margin), at most 1% of intervals over 34 ms, and none over 100
- *   ms, a stall a reader sees. These two were advisory while the spec ran on React's development
- *   build, where the crawl window crossed them with no regression (runs 40933573326 and
- *   40933566313 at 00fae50); on the production build they fail again.
+ * - Work per frame: the main thread's busy time in each 16.7 ms slice of the traced window (one
+ *   60 Hz frame; packages/timing/src/busy.ts). Its mean is at most BUDGET.meanWorkMs, and its 95th
+ *   percentile, the bursts, at most BUDGET.p95WorkMs. The slices are fixed in time, so the reading
+ *   is what the page did, whatever refresh rate the runner manages. The mean is the one judged
+ *   closely: a map that does twice its work moves it by about 40% (the map is part of the page's
+ *   work), while the 95th percentile, near the slice's own length, moves less. Work off the main
+ *   thread (the map's layouts in their Worker, raster) is not in it. Until CC-COST the budget was
+ *   the 95th percentile interval between frames, at most 17.5 ms: a runner that dropped to 30 fps
+ *   read 33.3 ms in all five runs with nothing in the page changed, and failed (the run of
+ *   b23d4ca6), so the budget measured the machine. docs/specs/v2/ci-cost.md, D3, has the
+ *   measurements behind the limit.
+ * - Frames: none over 100 ms, a stall a reader sees, at any refresh rate. The 95th percentile
+ *   interval and the share over 34 ms are printed and recorded for the nightly trend, not judged:
+ *   both move with the refresh rate.
  * - Median of five: a window is measured five times and each budget is judged on the median of its
  *   five readings, the rule docs/ops/ci-timing.md sets for every timing check. Each run's numbers
  *   and the medians are printed, and with PERF_SAMPLES_DIR set the samples are written there for
@@ -96,6 +106,13 @@ const WINDOWS = [
  */
 const INVALID = 'MEASUREMENT INVALID';
 
+/**
+ * The fewest frames a second an untraced pass must draw to count as having measured anything: a
+ * runner at 30 fps measures as well as one at 60. (It was 50 until CC-COST, which a runner that
+ * dropped to 30 fps failed as invalid with the page unchanged.)
+ */
+const MIN_FPS = 20;
+
 /** What the trace records: `toplevel` holds `RunTask`, `loading` holds `LayoutShift`. */
 const CATEGORIES = [
   'devtools.timeline',
@@ -127,6 +144,7 @@ interface TraceEvent {
   ph: string;
   pid: number;
   tid: number;
+  ts?: number;
   dur?: number;
   args?: { name?: string; data?: { score?: number; had_recent_input?: boolean } };
 }
@@ -147,8 +165,20 @@ function fromTrace(path: string) {
   const shift = events
     .filter((e) => e.name === 'LayoutShift' && !e.args?.data?.had_recent_input)
     .reduce((sum, e) => sum + (e.args?.data?.score ?? 0), 0);
+  const run = events.filter((e) => e.name === 'RunTask' && e.ph === 'X' && onMain(e));
   const tasks = events.filter((e) => e.name === 'RunTask' && onMain(e)).length;
-  return { long, shift, tasks, mainThreads: mains.size };
+  // The window is the span the main thread's tasks cover.
+  // (A reduce, not Math.min(...): a trace holds tens of thousands of tasks.)
+  const from = run.reduce((m, e) => Math.min(m, e.ts ?? Infinity), Infinity);
+  const to = run.reduce((m, e) => Math.max(m, (e.ts ?? 0) + (e.dur ?? 0)), -Infinity);
+  const busy = run.length
+    ? busyPerSlice(
+        run.map((e) => ({ ts: e.ts ?? 0, dur: e.dur ?? 0 })),
+        from,
+        to,
+      )
+    : [];
+  return { long, shift, tasks, mainThreads: mains.size, busy };
 }
 
 test.describe('crawl screen performance', () => {
@@ -177,7 +207,7 @@ test.describe('crawl screen performance', () => {
     await browser.stopTracing();
     await context.close();
     const trace = fromTrace(tracePath);
-    console.log(`[perf] control: ${JSON.stringify(trace)}`);
+    console.log(`[perf] control: ${JSON.stringify({ ...trace, busy: undefined })}`);
     expect(trace.long.length).toBeGreaterThanOrEqual(1);
     expect(trace.long.some((ms) => ms > BUDGET.stallMs)).toBe(true);
     expect(trace.shift).toBeGreaterThan(BUDGET.layoutShift);
@@ -206,9 +236,11 @@ test.describe('crawl screen performance', () => {
           { metric: 'longestTaskMs', unit: 'ms', limit: BUDGET.stallMs },
           { metric: 'longTasks', unit: 'tasks', limit: w.longTasks },
           { metric: 'layoutShift', unit: 'score', limit: BUDGET.layoutShift },
-          { metric: 'p95FrameMs', unit: 'ms', limit: BUDGET.p95FrameMs },
-          { metric: 'slowShare', unit: 'share', limit: BUDGET.slowShare },
+          { metric: 'meanWorkMs', unit: 'ms', limit: BUDGET.meanWorkMs },
+          { metric: 'p95WorkMs', unit: 'ms', limit: BUDGET.p95WorkMs },
           { metric: 'maxFrameMs', unit: 'ms', limit: BUDGET.maxFrameMs },
+          { metric: 'p95FrameMs', unit: 'ms', limit: ADVISORY.p95FrameMs, advisory: true },
+          { metric: 'slowShare', unit: 'share', limit: ADVISORY.slowShare, advisory: true },
         ],
       );
       expect(
@@ -256,11 +288,15 @@ test.describe('crawl screen performance', () => {
   });
 });
 
-/** A budget judged on the median of a metric across the runs: at most `limit`. */
+/**
+ * A budget judged on the median of a metric across the runs: at most `limit`. An advisory one is
+ * printed and recorded with its limit, and never fails the test.
+ */
 interface Budgeted {
   metric: string;
   unit: string;
   limit: number;
+  advisory?: boolean;
 }
 
 /**
@@ -283,7 +319,7 @@ function judge(name: string, rows: Record<string, unknown>[], budgets: Budgeted[
       pass,
       samples,
     });
-    if (!pass) {
+    if (!pass && !b.advisory) {
       missed.push(
         `${b.metric}: median ${fmt(mid)} > ${fmt(b.limit)} (runs ${samples.map(fmt).join(', ')})`,
       );
@@ -371,7 +407,9 @@ async function measureExplorer(browser: Browser, testInfo: TestInfo, run: number
       ? null
       : `run ${run + 1}: the selection moved ${measured.moved.join(' and ')} steps, not ${EXPLORER.minSteps}`,
     trace.tasks > 0 ? null : `run ${run + 1}: the trace holds no main-thread task`,
-    measured.frames > EXPLORER.ms / 20 ? null : `run ${run + 1}: only ${measured.frames} frames`,
+    measured.frames > (EXPLORER.ms / 1000) * MIN_FPS
+      ? null
+      : `run ${run + 1}: only ${measured.frames} frames`,
   ].filter((x): x is string => x !== null);
   return { measured, broken };
 }
@@ -425,6 +463,11 @@ async function measure(
 
   const measured = {
     tasks: trace.tasks,
+    workMs: Math.round(trace.busy.reduce((a, b) => a + b, 0)),
+    meanWorkMs: trace.busy.length
+      ? Number((trace.busy.reduce((a, b) => a + b, 0) / trace.busy.length).toFixed(3))
+      : 0,
+    p95WorkMs: trace.busy.length ? Number(quantile(trace.busy, 0.95).toFixed(2)) : 0,
     longTasks: trace.long.length,
     longTasksMs: trace.long,
     longestTaskMs: Math.max(0, ...trace.long),
@@ -434,18 +477,19 @@ async function measure(
     // Intervals fall on the display's 16.7 ms grid, so the 95th percentile reads about 16.8 or
     // 33.3; this share is the margin behind it.
     missedShare: Number(
-      (gaps.filter((g) => g > BUDGET.p95FrameMs).length / gaps.length).toFixed(4),
+      (gaps.filter((g) => g > ADVISORY.p95FrameMs).length / gaps.length).toFixed(4),
     ),
-    slowFrames: gaps.filter((g) => g > BUDGET.slowFrameMs).length,
-    // Unrounded: the budget is a share of the intervals, and rounding would move its edge.
-    slowShare: gaps.filter((g) => g > BUDGET.slowFrameMs).length / gaps.length,
+    slowFrames: gaps.filter((g) => g > ADVISORY.slowFrameMs).length,
+    slowShare: gaps.filter((g) => g > ADVISORY.slowFrameMs).length / gaps.length,
     maxFrameMs: Number((gaps.at(-1) ?? 0).toFixed(2)),
   };
   // What says this run measured anything; it must hold on every run.
   const broken = [
     trace.mainThreads > 0 ? null : `run ${run + 1}: the trace holds no main thread`,
     trace.tasks > 0 ? null : `run ${run + 1}: the trace holds no main-thread task`,
-    measured.frames > WINDOW_MS / 20 ? null : `run ${run + 1}: only ${measured.frames} frames`,
+    measured.frames > (WINDOW_MS / 1000) * MIN_FPS
+      ? null
+      : `run ${run + 1}: only ${measured.frames} frames`,
   ].filter((x): x is string => x !== null);
   return { measured, broken, before, after };
 }

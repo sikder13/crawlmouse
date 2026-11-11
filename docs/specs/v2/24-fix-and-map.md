@@ -99,10 +99,10 @@ From `apps/web/components/v2/screens/map/keys.ts`. The focus sits on a listbox o
 
 From `tests/visual/budgets.ts`, which `tests/visual/perf.spec.ts` reads. CI runs it on `next start` after `next build` (VISUAL_SERVER=start, VISUAL_PERF=1, one worker). Each window is measured 5 times and each budget is judged on the median of its 5 readings (`docs/ops/ci-timing.md`).
 
-| Window                                                                                | Budget                                                                                                                                    |
-| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| The crawl screen, three windows of 12 s                                               | no task over 100 ms; layout shift at most 0.001; 95th percentile frame at most 17.5 ms; at most 1% of frames over 34 ms; none over 100 ms |
-| The explorer, `/v2-preview/screens/map/large`, 2 s, a step down the list every 100 ms | no task over 50 ms in the trace, and no frame over 50 ms                                                                                  |
+| Window                                                                                | Budget                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The crawl screen, three windows of 12 s                                               | no task over 100 ms; layout shift at most 0.001; the main thread busy at most 2.5 ms a 16.7 ms slice on average, and at most 10 ms in 95% of them; no frame over 100 ms |
+| The explorer, `/v2-preview/screens/map/large`, 2 s, a step down the list every 100 ms | no task over 50 ms in the trace, and no frame over 50 ms                                                                                                                |
 
 ## View models
 
