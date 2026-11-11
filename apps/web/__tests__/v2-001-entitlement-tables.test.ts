@@ -39,7 +39,10 @@ const POSTURE: Record<
 > = {
   accounts: {
     policies: ['accounts_member_read'],
-    authenticatedSelect: { columnsWithout: ['stripe_customer_id'] },
+    // 027b's deletion mark is read by the membership functions and the purge, never by a client.
+    authenticatedSelect: {
+      columnsWithout: ['stripe_customer_id', 'deletion_confirmed_at', 'purge_after'],
+    },
   },
   subscriptions: {
     policies: ['subscriptions_member_read'],
