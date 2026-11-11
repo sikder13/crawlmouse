@@ -1357,8 +1357,9 @@ as $$
   select exists (select 1 from public.pending_erasures q where q.user_id = p_user);
 $$;
 
--- The purge's work: the people whose window has ended by p_now and by the database's clock, the
--- longest waiting first. A restore refuses once either clock has passed the window's end
+-- The purge's work: the people whose window has ended by p_now and by the database's clock; those
+-- not yet attempted first, then the least recently attempted, so people a refusal keeps in the queue
+-- cannot hold the others back. A restore refuses once either clock has passed the window's end
 -- (restore_account), and a person is due only once both have, so a restore cannot succeed for someone
 -- the purge has started on (it removes Storage objects before its apply takes the queue row's lock).
 create or replace function public.due_erasures(p_now timestamptz, p_limit integer)
@@ -1370,7 +1371,7 @@ set search_path = pg_catalog, public, pg_temp
 as $$
   select q.user_id, q.accounts, q.purge_after, q.attempts from public.pending_erasures q
    where q.purge_after <= least(p_now, now())
-   order by q.purge_after, q.user_id
+   order by q.last_attempt_at nulls first, q.purge_after, q.user_id
    limit greatest(p_limit, 0);
 $$;
 

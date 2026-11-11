@@ -416,6 +416,30 @@ describe('read_deletion_link', () => {
 });
 
 describe('the purge’s queue', () => {
+  it('a person not yet attempted comes before 51 refused ones waiting longer', async () => {
+    const refused = Array.from({ length: 51 }, () => crypto.randomUUID());
+    for (const id of refused) {
+      await db.query(
+        `insert into public.pending_erasures (user_id, accounts, confirmed_at, purge_after, attempts, last_attempt_at)
+         values ($1, array[gen_random_uuid()], now() - interval '30 days', now() - interval '23 days', 3, now())`,
+        [id],
+      );
+    }
+    const fresh = crypto.randomUUID();
+    await db.query(
+      `insert into public.pending_erasures (user_id, accounts, confirmed_at, purge_after)
+       values ($1, array[gen_random_uuid()], now() - interval '8 days', now() - interval '1 day')`,
+      [fresh],
+    );
+    const { rows } = await db.query<{ user_id: string }>(
+      `select user_id from public.due_erasures(now(), 50)`,
+    );
+    expect(rows.map((r) => r.user_id)).toContain(fresh);
+    await db.query(`delete from public.pending_erasures where user_id = any($1)`, [
+      [...refused, fresh],
+    ]);
+  });
+
   it('erase_person_apply refuses inside the window, runs after it, and finish_erasure waits for the Auth user', async () => {
     const o = await owner();
     const { confirm: raw, restore: restoreRaw } = await request(o);
