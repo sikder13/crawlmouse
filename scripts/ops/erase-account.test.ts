@@ -639,6 +639,20 @@ describe('erase-account (B-F2)', () => {
     await bare.close();
   }, 300_000);
 
+  it('refuses an address that names more than one user, and changes nothing', async () => {
+    const tag = `twice-${++serial}@example.com`;
+    await pglite.query(`insert into auth.users (id, email) values (gen_random_uuid(), $1)`, [tag]);
+    await pglite.query(`insert into auth.users (id, email) values (gen_random_uuid(), $1)`, [
+      tag.toUpperCase(),
+    ]);
+    const before = await everything();
+    await expect(planErasure(db(), { email: tag })).rejects.toThrow(
+      /the address names 2 users; erase by user id/,
+    );
+    await expect(executeErasure(db(), { email: tag }, sqlDelete)).rejects.toThrow(/names 2 users/);
+    expect(await everything()).toBe(before);
+  }, 120_000);
+
   it('takes exactly one of --email and --user-id, and an id that names a user', async () => {
     await expect(planErasure(db(), {})).rejects.toThrow(/exactly one/);
     await expect(planErasure(db(), { email: 'a@b.c', userId: randomUUID() })).rejects.toThrow(
