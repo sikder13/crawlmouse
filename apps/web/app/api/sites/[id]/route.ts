@@ -77,9 +77,9 @@ async function change(req: Request, { params }: Context, method: 'PATCH' | 'DELE
     entitlement,
   );
   if (!decision.ok) {
-    if (decision.status === 402) return refuse(402, decision.error, { gate: decision.gate });
-    if (decision.status === 409) return refuse(409, decision.error);
-    return refuse(decision.status, decision.error, { field: decision.field });
+    if (decision.status === 402) return refuse(402, decision.code, { gate: decision.gate });
+    if (decision.status === 409) return refuse(409, decision.code);
+    return refuse(decision.status, decision.code, { field: decision.field });
   }
   const edited = await editSite(supabaseAdmin(), id, decision.patch);
   switch (edited.outcome) {

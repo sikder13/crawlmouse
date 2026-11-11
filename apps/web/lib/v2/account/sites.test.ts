@@ -26,7 +26,7 @@ describe('admittedHost', () => {
     for (const address of ['10.0.0.7', '127.0.0.1', '169.254.169.254', '192.168.1.1', '::1']) {
       expect(await admittedHost('example.com', engineWith([address])), address).toEqual({
         ok: false,
-        error: 'host_refused',
+        code: 'host_refused',
       });
     }
   });
@@ -43,7 +43,7 @@ describe('admittedHost', () => {
     ]) {
       expect(await admittedHost(raw, validate), String(raw)).toEqual({
         ok: false,
-        error: 'invalid_host',
+        code: 'invalid_host',
       });
     }
     expect(validate).not.toHaveBeenCalled();
@@ -113,7 +113,7 @@ describe('decideEdit', () => {
     expect(await decideEdit(weekly, SITE, entitlement('free'), PUBLIC)).toEqual({
       ok: false,
       status: 402,
-      error: 'upgrade_required',
+      code: 'upgrade_required',
       gate: 'schedule',
     });
     expect(await decideEdit(weekly, SITE, entitlement('pro'), PUBLIC)).toEqual({
@@ -166,10 +166,10 @@ describe('decideEdit', () => {
     ).toEqual({ ok: true, patch: { competitor_hosts: ['a.example'] } });
     expect(
       await decideEdit({ competitorHosts: ['Shop.example'] }, SITE, entitlement('pro'), PUBLIC),
-    ).toEqual({ ok: false, status: 400, error: 'invalid_host', field: 'competitorHosts' });
+    ).toEqual({ ok: false, status: 400, code: 'invalid_host', field: 'competitorHosts' });
     expect(
       await decideEdit({ competitorHosts: ['not a host'] }, SITE, entitlement('pro'), PUBLIC),
-    ).toEqual({ ok: false, status: 400, error: 'invalid_host', field: 'competitorHosts' });
+    ).toEqual({ ok: false, status: 400, code: 'invalid_host', field: 'competitorHosts' });
     expect(
       await decideEdit(
         { competitorHosts: ['a.example'] },
@@ -177,7 +177,7 @@ describe('decideEdit', () => {
         entitlement('pro'),
         engineWith(['10.1.2.3']),
       ),
-    ).toEqual({ ok: false, status: 422, error: 'host_refused', field: 'competitorHosts' });
+    ).toEqual({ ok: false, status: 422, code: 'host_refused', field: 'competitorHosts' });
   });
 
   it('a staging URL needs staging in the plan, is admitted by the engine, and can be cleared', async () => {
@@ -185,7 +185,7 @@ describe('decideEdit', () => {
     expect(await decideEdit(staging, SITE, entitlement('free'), PUBLIC)).toEqual({
       ok: false,
       status: 402,
-      error: 'upgrade_required',
+      code: 'upgrade_required',
       gate: 'stagingAndDeployHooks',
     });
     expect(await decideEdit(staging, SITE, entitlement('pro'), PUBLIC)).toEqual({
@@ -194,10 +194,10 @@ describe('decideEdit', () => {
     });
     expect(
       await decideEdit(staging, SITE, entitlement('pro'), engineWith(['192.168.0.9'])),
-    ).toEqual({ ok: false, status: 422, error: 'host_refused', field: 'stagingUrl' });
+    ).toEqual({ ok: false, status: 422, code: 'host_refused', field: 'stagingUrl' });
     expect(
       await decideEdit({ stagingUrl: 'shop.example' }, SITE, entitlement('pro'), PUBLIC),
-    ).toEqual({ ok: false, status: 400, error: 'invalid_host', field: 'stagingUrl' });
+    ).toEqual({ ok: false, status: 400, code: 'invalid_host', field: 'stagingUrl' });
     expect(await decideEdit({ stagingUrl: null }, SITE, entitlement('free'), PUBLIC)).toEqual({
       ok: true,
       patch: { staging_host: null },
@@ -210,7 +210,7 @@ describe('decideEdit', () => {
       expect(await decideEdit(body, staging, entitlement('agency'), PUBLIC)).toEqual({
         ok: false,
         status: 409,
-        error: 'staging_site',
+        code: 'staging_site',
       });
     }
   });

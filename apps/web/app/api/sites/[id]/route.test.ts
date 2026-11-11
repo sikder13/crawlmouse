@@ -120,7 +120,7 @@ describe('/api/sites/[id] guards', () => {
       await del(s.id),
       await send(POST, 'POST', s.id, { _method: 'DELETE' }, true),
     ]) {
-      expect([res.status, await res.json()]).toEqual([404, { error: 'not_found' }]);
+      expect([res.status, await res.json()]).toEqual([404, { code: 'not_found' }]);
     }
     expect(h.log).toEqual([]);
     expect((await siteRow(s.id)).removed_at).toBeNull();
@@ -128,7 +128,7 @@ describe('/api/sites/[id] guards', () => {
 
   it('signed out: 401, and no service-role client', async () => {
     for (const res of [await patch(randomUUID(), { schedule: 'none' }), await del(randomUUID())]) {
-      expect([res.status, await res.json()]).toEqual([401, { error: 'auth_required' }]);
+      expect([res.status, await res.json()]).toEqual([401, { code: 'auth_required' }]);
     }
     expect(h.log).not.toContain('supabaseAdmin');
   });
@@ -139,7 +139,7 @@ describe('/api/sites/[id] guards', () => {
     as(await person(h.db, 'stranger'));
     for (const id of [s.id, 'nope', randomUUID()]) {
       for (const res of [await patch(id, { schedule: 'none' }), await del(id)]) {
-        expect([res.status, await res.json()], id).toEqual([404, { error: 'not_found' }]);
+        expect([res.status, await res.json()], id).toEqual([404, { code: 'not_found' }]);
       }
     }
     expect(h.log).not.toContain('supabaseAdmin');
@@ -154,7 +154,7 @@ describe('/api/sites/[id] guards', () => {
     await addSeat(h.db, owner.accountId, dev, 'developer');
     as(dev);
     for (const res of [await patch(s.id, { competitorHosts: ['a.example'] }), await del(s.id)]) {
-      expect([res.status, await res.json()]).toEqual([403, { error: 'role_refused' }]);
+      expect([res.status, await res.json()]).toEqual([403, { code: 'role_refused' }]);
     }
     expect(await siteRow(s.id)).toMatchObject({ competitor_hosts: [], removed_at: null });
     expect(h.log).not.toContain('supabaseAdmin');
@@ -211,7 +211,7 @@ describe('PATCH /api/sites/[id]', () => {
       const res = await patch(s.id, body);
       expect([res.status, await res.json()], gate).toEqual([
         402,
-        { error: 'upgrade_required', gate },
+        { code: 'upgrade_required', gate },
       ]);
     }
     expect(await siteRow(s.id)).toMatchObject({ schedule_cadence: null, competitor_hosts: [] });
@@ -247,7 +247,7 @@ describe('PATCH /api/sites/[id]', () => {
     const over = await patch(s.id, { competitorHosts: ['a.example', 'b.example'] });
     expect([over.status, await over.json()]).toEqual([
       402,
-      { error: 'upgrade_required', gate: 'competitorsPerSite' },
+      { code: 'upgrade_required', gate: 'competitorsPerSite' },
     ]);
     expect((await siteRow(s.id)).competitor_hosts).toEqual(['rival.example']);
   });
@@ -276,7 +276,7 @@ describe('PATCH /api/sites/[id]', () => {
       [{ stagingUrl: 'private.example' }, 'stagingUrl'],
     ] as const) {
       const res = await patch(s.id, body);
-      expect([res.status, await res.json()]).toEqual([422, { error: 'host_refused', field }]);
+      expect([res.status, await res.json()]).toEqual([422, { code: 'host_refused', field }]);
     }
     expect(h.log).toContain('admit private.example');
     expect((await siteRow(s.id)).competitor_hosts).toEqual([]);
@@ -292,7 +292,7 @@ describe('PATCH /api/sites/[id]', () => {
     const res = await patch(s.id, { stagingUrl: other.host });
     expect([res.status, await res.json()]).toEqual([
       409,
-      { error: 'site_exists', field: 'stagingUrl' },
+      { code: 'site_exists', field: 'stagingUrl' },
     ]);
   });
 
@@ -303,7 +303,7 @@ describe('PATCH /api/sites/[id]', () => {
     const child = await keptSite(h.db, p.accountId, { staging_of_site_id: s.id });
     as(p);
     const res = await patch(child.id, { competitorHosts: ['a.example'] });
-    expect([res.status, await res.json()]).toEqual([409, { error: 'staging_site' }]);
+    expect([res.status, await res.json()]).toEqual([409, { code: 'staging_site' }]);
   });
 
   it('a body that is not the edit body is 400', async () => {

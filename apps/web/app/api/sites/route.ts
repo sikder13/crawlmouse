@@ -3,8 +3,15 @@ import { scheduleFor } from '@/lib/auth/schedule';
 import { isCrawlPaused } from '@/lib/crawl-pause';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
-import { captureFor } from '@/lib/v2/account/events';
-import { notFound, paywall, readBody, refuse, respond } from '@/lib/v2/account/route';
+import { captureFor, checkStarted } from '@/lib/v2/account/events';
+import {
+  notFound,
+  paywall,
+  readBody,
+  refuse,
+  respond,
+  serviceRefusal,
+} from '@/lib/v2/account/route';
 import { admittedHost, parseAddBody, tooSoon } from '@/lib/v2/account/sites';
 import { supabaseAddSite } from '@/lib/v2/account/sites-store';
 import { loadViewer } from '@/lib/v2/account/viewer';
@@ -15,16 +22,18 @@ export const dynamic = 'force-dynamic';
 /**
  * Add a site to the account the caller acts in (CC-26b D6, ARCH-2 §5 "First-run dashboard"):
  * `{url}`. A 404 with V2_CHECKS_PUBLIC unset; 503 while crawls are paused or the pipeline is off,
- * since adding a site requests its first audit. The caller's seat on the account must be the owner's
- * or an account manager's, and unscoped, so a manager scoped to some clients cannot add a site they
- * would not then see (questions.md Q12). The host is canonicalised and admitted by the engine's SSRF
- * guard; the slot count, the per-day bound on first audits and the insert are one SQL transaction
- * (`add_site`). A form is answered with a 303 to the new site's page, JSON with its ids.
+ * since adding a site requests its first audit, and 503 `capacity` when the day's
+ * `global:audits:day` ceiling is reached, with nothing written. The caller's seat on the account
+ * must be the owner's or an account manager's, and unscoped, so a manager scoped to some clients
+ * cannot add a site they would not then see (questions.md Q12). The host is canonicalised and
+ * admitted by the engine's SSRF guard. The slot count, the per-day bound on first audits, the
+ * ceiling, v1's per-domain hourly bucket (Free only, as v1 counts it) and the insert are one SQL
+ * transaction (`add_site`). A form is answered with a 303 to the new site's page, JSON with its ids.
  */
 export async function POST(req: Request) {
   if (!checksPublicEnabled()) return notFound();
-  if (isCrawlPaused()) return refuse(503, 'crawl_paused');
-  if (!pipelineEnabled()) return refuse(503, 'pipeline_off');
+  if (isCrawlPaused()) return serviceRefusal('paused');
+  if (!pipelineEnabled()) return serviceRefusal('unavailable');
 
   const sb = await supabaseServer();
   const {
@@ -51,7 +60,7 @@ export async function POST(req: Request) {
   const input = body && parseAddBody(body.fields);
   if (!body || !input) return refuse(400, 'invalid');
   const admitted = await admittedHost(input.url);
-  if (!admitted.ok) return refuse(admitted.error === 'invalid_host' ? 400 : 422, admitted.error);
+  if (!admitted.ok) return refuse(admitted.code === 'invalid_host' ? 400 : 422, admitted.code);
 
   // The schedule is the door's rule (lib/auth/schedule.ts): a Free account's first site is checked
   // monthly. Whether this is the first is read here; add_site counts the slots under its lock.
@@ -70,13 +79,15 @@ export async function POST(req: Request) {
     host: admitted.host,
     schedule: scheduleFor(tier, (live.data ?? []).length === 0, now, account.timezone),
     limit: limits.sites,
+    // v1's per-domain hourly bucket leaves paid tiers out (app/api/audits/start/route.ts).
+    perDomain: tier === 'free',
     requestedByUserId: user.id,
   });
   switch (added.outcome) {
     case 'created': {
       const capture = captureFor(req);
       await capture('site_added', account.id, { n: added.n });
-      await capture('check_started', account.id, { trigger: 'first_audit' });
+      await capture('check_started', account.id, checkStarted('first_audit', added.checkId));
       return body.kind === 'form'
         ? respond('form', `/sites/${added.siteId}`)
         : Response.json({ siteId: added.siteId, checkId: added.checkId }, { status: 201 });
@@ -87,5 +98,9 @@ export async function POST(req: Request) {
       return paywall('sites');
     case 'adds_capped':
       return tooSoon('adds_capped', added.nextAllowedAt);
+    case 'domain_capped':
+      return tooSoon('domain_capped', added.nextAllowedAt);
+    case 'capacity':
+      return serviceRefusal('capacity');
   }
 }

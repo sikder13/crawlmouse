@@ -2,8 +2,8 @@ import { checksPublicEnabled, pipelineEnabled } from '@/lib/auth/flags';
 import { isCrawlPaused } from '@/lib/crawl-pause';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
-import { captureFor } from '@/lib/v2/account/events';
-import { isId, notFound, readBody, refuse, respond } from '@/lib/v2/account/route';
+import { captureFor, checkStarted } from '@/lib/v2/account/events';
+import { isId, notFound, readBody, refuse, respond, serviceRefusal } from '@/lib/v2/account/route';
 import { readSite, tooSoon } from '@/lib/v2/account/sites';
 import { supabaseRequestRecheck } from '@/lib/v2/account/sites-store';
 import { readEntitlement } from '@/lib/v2/account/viewer';
@@ -17,13 +17,14 @@ export const dynamic = 'force-dynamic';
  * (questions.md Q12); a site of another account, a malformed id and a removed site are the same 404.
  * The cap is the site's own account's (`manualChecksPerSiteDay`), and it is enforced in the statement
  * that records the request (`request_capped_check`), so two concurrent posts cannot both pass it; a
- * capped request is 429 with Retry-After. A repeat inside the 2-minute bucket finds the queued check
- * and is answered with it, `created: false`.
+ * capped request is 429 with Retry-After. A request over the day's `global:audits:day` ceiling,
+ * counted in the same statement, is 503 `capacity`. A repeat inside the 2-minute bucket finds the
+ * queued check and is answered with it, `created: false`.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!checksPublicEnabled()) return notFound();
-  if (isCrawlPaused()) return refuse(503, 'crawl_paused');
-  if (!pipelineEnabled()) return refuse(503, 'pipeline_off');
+  if (isCrawlPaused()) return serviceRefusal('paused');
+  if (!pipelineEnabled()) return serviceRefusal('unavailable');
 
   const sb = await supabaseServer();
   const {
@@ -56,7 +57,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   });
   if (outcome.queued) {
     if (outcome.created) {
-      await captureFor(req)('check_started', site.account_id, { trigger: 'manual' });
+      await captureFor(req)(
+        'check_started',
+        site.account_id,
+        checkStarted('manual', outcome.checkId),
+      );
     }
     return body?.kind === 'form'
       ? respond('form', `/sites/${id}`)
@@ -67,6 +72,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return tooSoon('capped', outcome.nextAllowedAt);
     case 'check_running':
       return refuse(409, 'check_running', { checkId: outcome.checkId });
+    case 'capacity':
+      return serviceRefusal('capacity');
     case 'removed':
       return notFound();
     case 'paused':

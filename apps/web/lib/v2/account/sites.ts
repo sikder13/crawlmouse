@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { admitSiteHost } from '../../auth/admit-site';
 import { hostFromSiteInput } from '../../auth/site-host';
 import type { TierGates } from '../../entitlement-v2';
+import { refuse } from './route';
 import type { Entitlement } from './viewer-read';
 import type { SitePatch } from './sites-store';
 
@@ -18,15 +19,15 @@ type Validate = Parameters<typeof admitSiteHost>[1];
 
 export type Admitted =
   | { ok: true; host: string }
-  | { ok: false; error: 'invalid_host' | 'host_refused' };
+  | { ok: false; code: 'invalid_host' | 'host_refused' };
 
 /** A typed site as the host the engine admits: the shape first, so a malformed one is never looked up. */
 export async function admittedHost(raw: unknown, validate?: Validate): Promise<Admitted> {
   const host = typeof raw === 'string' ? hostFromSiteInput(raw) : null;
-  if (host === null) return { ok: false, error: 'invalid_host' };
+  if (host === null) return { ok: false, code: 'invalid_host' };
   return (await admitSiteHost(host, validate))
     ? { ok: true, host }
-    : { ok: false, error: 'host_refused' };
+    : { ok: false, code: 'host_refused' };
 }
 
 /** What a person may type for one URL. */
@@ -74,26 +75,26 @@ export function parseEditBody(fields: unknown): EditBody | null {
 
 export type EditDecision =
   | { ok: true; patch: SitePatch }
-  | { ok: false; status: 402; error: 'upgrade_required'; gate: keyof TierGates }
+  | { ok: false; status: 402; code: 'upgrade_required'; gate: keyof TierGates }
   | {
       ok: false;
       status: 400 | 422;
-      error: 'invalid_host' | 'host_refused';
+      code: 'invalid_host' | 'host_refused';
       field: 'competitorHosts' | 'stagingUrl';
     }
-  | { ok: false; status: 409; error: 'staging_site' };
+  | { ok: false; status: 409; code: 'staging_site' };
 
 const upgrade = (gate: keyof TierGates): EditDecision => ({
   ok: false,
   status: 402,
-  error: 'upgrade_required',
+  code: 'upgrade_required',
   gate,
 });
 
 const badHost = (
-  error: 'invalid_host' | 'host_refused',
+  code: 'invalid_host' | 'host_refused',
   field: 'competitorHosts' | 'stagingUrl',
-): EditDecision => ({ ok: false, status: error === 'invalid_host' ? 400 : 422, error, field });
+): EditDecision => ({ ok: false, status: code === 'invalid_host' ? 400 : 422, code, field });
 
 /**
  * The patch an edit body makes, or the refusal. The tier's rules come before any DNS lookup, so a
@@ -110,7 +111,7 @@ export async function decideEdit(
 ): Promise<EditDecision> {
   const { gates, limits } = entitlement;
   if (site.isStaging && (body.competitorHosts !== undefined || body.stagingUrl !== undefined)) {
-    return { ok: false, status: 409, error: 'staging_site' };
+    return { ok: false, status: 409, code: 'staging_site' };
   }
   const patch: SitePatch = {};
 
@@ -132,7 +133,7 @@ export async function decideEdit(
     if (hosts.length > limits.competitorsPerSite) return upgrade('competitorsPerSite');
     for (const host of hosts) {
       const admitted = await admittedHost(host, validate);
-      if (!admitted.ok) return badHost(admitted.error, 'competitorHosts');
+      if (!admitted.ok) return badHost(admitted.code, 'competitorHosts');
     }
     patch.competitor_hosts = hosts;
   }
@@ -145,7 +146,7 @@ export async function decideEdit(
       const host = hostFromSiteInput(body.stagingUrl);
       if (host === null || host === site.host) return badHost('invalid_host', 'stagingUrl');
       const admitted = await admittedHost(host, validate);
-      if (!admitted.ok) return badHost(admitted.error, 'stagingUrl');
+      if (!admitted.ok) return badHost(admitted.code, 'stagingUrl');
       patch.staging_host = host;
     }
   }
@@ -178,11 +179,8 @@ export async function readSite(session: SupabaseClient, siteId: string): Promise
   return data === null ? null : SiteRow.parse(data);
 }
 
-/** A 429 for a request over a per-day bound, with when the next one is allowed. */
-export function tooSoon(error: string, nextAllowedAt: string, now = Date.now()): Response {
+/** A 429 for a request over a bound, with when the next one is allowed (as `Retry-After` too). */
+export function tooSoon(code: string, nextAllowedAt: string, now = Date.now()): Response {
   const seconds = Math.max(1, Math.ceil((Date.parse(nextAllowedAt) - now) / 1000));
-  return Response.json(
-    { error, nextAllowedAt },
-    { status: 429, headers: { 'retry-after': String(seconds) } },
-  );
+  return refuse(429, code, { nextAllowedAt }, { 'retry-after': String(seconds) });
 }

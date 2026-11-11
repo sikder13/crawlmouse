@@ -22,6 +22,7 @@ import { personalAccount, signUp } from './helpers/v2-check-tables';
 const MIGRATION = '20261112000001_v2_026b_sites_fixes.sql';
 const ROLLBACK = '20261112000001_v2_026b_sites_fixes.revert.sql';
 const FUNCTIONS = ['add_site', 'edit_site', 'remove_site', 'request_capped_check'];
+const HELPERS = ['take_rate_slot'];
 
 let db: PGlite;
 beforeAll(async () => {
@@ -107,12 +108,40 @@ const checksOf = async (siteId: string) =>
 
 const plusDay = (d: Date) => new Date(d.getTime() + 24 * 3600 * 1000).toISOString();
 
+interface Slot {
+  bucket: string;
+  window_start: string;
+  limit: number;
+}
+
+/** A rate-limit slot in a bucket of its own, so one case's count never reaches another's. */
+const slot = (limit = 1000, bucket = `test:${randomUUID()}`): Slot => ({
+  bucket,
+  window_start: '2026-11-10T00:00:00.000Z',
+  limit,
+});
+
+const countOf = async (s: Slot) =>
+  (
+    await db.query<{ request_count: number }>(
+      `select request_count from public.rate_limits where bucket_key = $1 and window_start = $2`,
+      [s.bucket, s.window_start],
+    )
+  ).rows[0]?.request_count ?? 0;
+
+/** Fills a bucket to `n` starts, as earlier requests would have. */
+const fill = (s: Slot, n: number) =>
+  db.query(
+    `insert into public.rate_limits (bucket_key, window_start, request_count) values ($1, $2, $3)`,
+    [s.bucket, s.window_start, n],
+  );
+
 describe('request_capped_check', () => {
   it('records a re-check below the cap as a queued check, exactly as given', async () => {
     const { accountId } = await account();
     const s = await site(accountId);
     const r = row(s);
-    expect(await call('request_capped_check', [r, 2])).toEqual({ outcome: 'created' });
+    expect(await call('request_capped_check', [r, 2, slot()])).toEqual({ outcome: 'created' });
     const { rows } = await db.query<Record<string, unknown>>(
       `select id, site_id, status, trigger, grade_version, queued_at, heartbeat_at, expires_at
          from public.checks where id = $1`,
@@ -134,7 +163,7 @@ describe('request_capped_check', () => {
     const oldest = await pastCheck(s, 'manual', 5);
     await pastCheck(s, 'fix_recheck', 1);
     const r = row(s);
-    expect(await call('request_capped_check', [r, 2])).toEqual({
+    expect(await call('request_capped_check', [r, 2, slot()])).toEqual({
       outcome: 'capped',
       next_allowed_at: plusDay(oldest),
     });
@@ -151,8 +180,8 @@ describe('request_capped_check', () => {
     await pastCheck(other, 'manual', 1);
     await pastCheck(other, 'manual', 1);
     await pastCheck(s, 'manual', 2);
-    expect((await call('request_capped_check', [row(s), 2])).outcome).toBe('created');
-    expect((await call('request_capped_check', [row(s), 2])).outcome).toBe('capped');
+    expect((await call('request_capped_check', [row(s), 2, slot()])).outcome).toBe('created');
+    expect((await call('request_capped_check', [row(s), 2, slot()])).outcome).toBe('capped');
   });
 
   it('over a lowered cap, the next is allowed when enough counted checks have left the window', async () => {
@@ -162,7 +191,7 @@ describe('request_capped_check', () => {
     const second = await pastCheck(s, 'manual', 10);
     await pastCheck(s, 'manual', 1);
     // Three counted at a cap of two: the oldest two must leave before one more fits.
-    expect(await call('request_capped_check', [row(s), 2])).toEqual({
+    expect(await call('request_capped_check', [row(s), 2, slot()])).toEqual({
       outcome: 'capped',
       next_allowed_at: plusDay(second),
     });
@@ -172,13 +201,13 @@ describe('request_capped_check', () => {
     const { accountId } = await account();
     const s = await site(accountId);
     const r = row(s);
-    expect((await call('request_capped_check', [r, 2])).outcome).toBe('created');
-    expect(await call('request_capped_check', [r, 2])).toEqual({
+    expect((await call('request_capped_check', [r, 2, slot()])).outcome).toBe('created');
+    expect(await call('request_capped_check', [r, 2, slot()])).toEqual({
       outcome: 'exists',
       status: 'queued',
     });
     expect(await checksOf(s)).toHaveLength(1);
-    expect((await call('request_capped_check', [row(s), 2])).outcome).toBe('created');
+    expect((await call('request_capped_check', [row(s), 2, slot()])).outcome).toBe('created');
   });
 
   it('at the cap, the retry of the cap-th request is exists, not capped', async () => {
@@ -186,21 +215,21 @@ describe('request_capped_check', () => {
     const s = await site(accountId);
     await pastCheck(s, 'manual', 3);
     const capth = row(s);
-    expect((await call('request_capped_check', [capth, 2])).outcome).toBe('created');
-    expect(await call('request_capped_check', [capth, 2])).toEqual({
+    expect((await call('request_capped_check', [capth, 2, slot()])).outcome).toBe('created');
+    expect(await call('request_capped_check', [capth, 2, slot()])).toEqual({
       outcome: 'exists',
       status: 'queued',
     });
-    expect((await call('request_capped_check', [row(s), 2])).outcome).toBe('capped');
+    expect((await call('request_capped_check', [row(s), 2, slot()])).outcome).toBe('capped');
   });
 
   it('exists reports a bucket check that has started', async () => {
     const { accountId } = await account();
     const s = await site(accountId);
     const r = row(s);
-    await call('request_capped_check', [r, 2]);
+    await call('request_capped_check', [r, 2, slot()]);
     await db.query(`select public.claim_check($1, 'run-1', '{"phase":"crawl"}'::jsonb)`, [r.id]);
-    expect(await call('request_capped_check', [r, 2])).toEqual({
+    expect(await call('request_capped_check', [r, 2, slot()])).toEqual({
       outcome: 'exists',
       status: 'running',
     });
@@ -210,8 +239,10 @@ describe('request_capped_check', () => {
     const { accountId } = await account();
     const removed = await site(accountId, { removed_at: new Date().toISOString() });
     const paused = await site(accountId, { paused_reason: 'over_limit' });
-    expect(await call('request_capped_check', [row(removed), 2])).toEqual({ outcome: 'removed' });
-    expect(await call('request_capped_check', [row(paused), 2])).toEqual({
+    expect(await call('request_capped_check', [row(removed), 2, slot()])).toEqual({
+      outcome: 'removed',
+    });
+    expect(await call('request_capped_check', [row(paused), 2, slot()])).toEqual({
       outcome: 'paused',
       paused_reason: 'over_limit',
     });
@@ -230,20 +261,74 @@ describe('request_capped_check', () => {
       { ...row(s), trigger: null },
     ];
     for (const b of bad) {
-      await expect(call('request_capped_check', [b, 2]), JSON.stringify(b)).rejects.toMatchObject({
+      await expect(
+        call('request_capped_check', [b, 2, slot()]),
+        JSON.stringify(b),
+      ).rejects.toMatchObject({
         code: '22023',
       });
     }
-    await expect(call('request_capped_check', [row(s), 0])).rejects.toMatchObject({
+    await expect(call('request_capped_check', [row(s), 0, slot()])).rejects.toMatchObject({
       code: '22023',
     });
+    expect(await checksOf(s)).toEqual([]);
+  });
+
+  it('a created re-check takes one slot of the daily ceiling; a refused one takes none', async () => {
+    const { accountId } = await account();
+    const s = await site(accountId);
+    const g = slot();
+    const r = row(s);
+    expect(await call('request_capped_check', [r, 1, g])).toEqual({ outcome: 'created' });
+    expect(await countOf(g)).toBe(1);
+    expect((await call('request_capped_check', [r, 1, g])).outcome).toBe('exists');
+    expect((await call('request_capped_check', [row(s), 1, g])).outcome).toBe('capped');
+    const removed = await site(accountId, { removed_at: new Date().toISOString() });
+    const paused = await site(accountId, { paused_reason: 'user' });
+    expect((await call('request_capped_check', [row(removed), 1, g])).outcome).toBe('removed');
+    expect((await call('request_capped_check', [row(paused), 1, g])).outcome).toBe('paused');
+    expect(await countOf(g)).toBe(1);
+  });
+
+  it('at the daily ceiling: capacity, no row, and the count is left as it was', async () => {
+    const { accountId } = await account();
+    const s = await site(accountId);
+    const g = slot(3);
+    await fill(g, 3);
+    const r = row(s);
+    expect(await call('request_capped_check', [r, 2, g])).toEqual({ outcome: 'capacity' });
+    expect(await checksOf(s)).toEqual([]);
+    expect(await countOf(g)).toBe(3);
+    // One slot left: the request takes it.
+    await db.query(`update public.rate_limits set request_count = 2 where bucket_key = $1`, [
+      g.bucket,
+    ]);
+    expect(await call('request_capped_check', [r, 2, g])).toEqual({ outcome: 'created' });
+    expect(await countOf(g)).toBe(3);
+  });
+
+  it('refuses a slot that is not {bucket, window_start, limit}', async () => {
+    const { accountId } = await account();
+    const s = await site(accountId);
+    for (const g of [
+      null,
+      { bucket: 'x', window_start: '2026-11-10T00:00:00Z' },
+      { ...slot(), extra: 1 },
+      { ...slot(), limit: 0 },
+      { ...slot(), limit: '5' },
+    ]) {
+      await expect(
+        call('request_capped_check', [row(s), 2, g]),
+        JSON.stringify(g),
+      ).rejects.toMatchObject({ code: '22023' });
+    }
     expect(await checksOf(s)).toEqual([]);
   });
 
   it('refuses a site no account keeps', async () => {
     const id = randomUUID();
     await db.query(`insert into public.sites (id, host) values ($1, $2)`, [id, `${id}.example`]);
-    await expect(call('request_capped_check', [row(id), 2])).rejects.toMatchObject({
+    await expect(call('request_capped_check', [row(id), 2, slot()])).rejects.toMatchObject({
       code: 'P0002',
     });
   });
@@ -262,8 +347,13 @@ function newSite(accountId: string, seatId: string, host = `${randomUUID().slice
   };
 }
 
-const add = (s: ReturnType<typeof newSite>, limit: number, check = row(s.id, 'first_audit')) =>
-  call('add_site', [s, check, limit]);
+const add = (
+  s: ReturnType<typeof newSite>,
+  limit: number,
+  check = row(s.id, 'first_audit'),
+  global = slot(),
+  domain: Slot | null = null,
+) => call('add_site', [s, check, limit, global, domain]);
 
 const liveSites = async (accountId: string) =>
   (
@@ -357,6 +447,44 @@ describe('add_site', () => {
     expect((await add(newSite(accountId, seatId), 1)).outcome).toBe('created');
   });
 
+  it('a created site takes one slot of its domain bucket and of the daily ceiling; a refusal takes none', async () => {
+    const { accountId, seatId } = await account();
+    const g = slot();
+    const d = slot(5);
+    const first = newSite(accountId, seatId);
+    expect((await add(first, 1, undefined, g, d)).outcome).toBe('created');
+    expect([await countOf(g), await countOf(d)]).toEqual([1, 1]);
+    expect((await add(newSite(accountId, seatId, first.host), 1, undefined, g, d)).outcome).toBe(
+      'exists',
+    );
+    expect((await add(newSite(accountId, seatId), 1, undefined, g, d)).outcome).toBe('full');
+    expect([await countOf(g), await countOf(d)]).toEqual([1, 1]);
+  });
+
+  it('a full domain bucket is domain_capped: nothing written, the ceiling not counted', async () => {
+    const { accountId, seatId } = await account();
+    const g = slot();
+    const d = slot(5);
+    await fill(d, 5);
+    const s = newSite(accountId, seatId);
+    expect(await add(s, 1, undefined, g, d)).toEqual({ outcome: 'domain_capped' });
+    expect(await liveSites(accountId)).toEqual([]);
+    expect(await checksOf(s.id)).toEqual([]);
+    expect([await countOf(g), await countOf(d)]).toEqual([0, 5]);
+  });
+
+  it('at the daily ceiling: capacity, nothing written, the domain bucket left as it was', async () => {
+    const { accountId, seatId } = await account();
+    const g = slot(10);
+    await fill(g, 10);
+    const d = slot(5);
+    const s = newSite(accountId, seatId);
+    expect(await add(s, 1, undefined, g, d)).toEqual({ outcome: 'capacity' });
+    expect(await liveSites(accountId)).toEqual([]);
+    expect(await checksOf(s.id)).toEqual([]);
+    expect([await countOf(g), await countOf(d)]).toEqual([10, 0]);
+  });
+
   it('refuses rows that are not what the route writes', async () => {
     const { accountId, seatId } = await account();
     const s = newSite(accountId, seatId);
@@ -367,7 +495,9 @@ describe('add_site', () => {
       [s, { ...row(s.id, 'first_audit'), status: 'running' }],
     ];
     for (const [a, b] of cases) {
-      await expect(call('add_site', [a, b, 1])).rejects.toMatchObject({ code: '22023' });
+      await expect(call('add_site', [a, b, 1, slot(), null])).rejects.toMatchObject({
+        code: '22023',
+      });
     }
     expect(await liveSites(accountId)).toEqual([]);
   });
@@ -507,7 +637,7 @@ describe('remove_site', () => {
     const child = await site(accountId, { staging_of_site_id: s });
     await pastCheck(s, 'manual', 30);
     const queued = row(s);
-    await call('request_capped_check', [queued, 2]);
+    await call('request_capped_check', [queued, 2, slot()]);
     expect(await call('remove_site', [s])).toEqual({ outcome: 'removed', sites: 2 });
     expect(await liveSites(accountId)).not.toEqual(expect.arrayContaining([s, child]));
     const checks = await checksOf(s);
@@ -576,12 +706,34 @@ function sectionA(text: string): string {
   return text.slice(start, end);
 }
 
+describe('take_rate_slot', () => {
+  it('is security definer, owned by postgres, and no client role may execute it, service_role included', async () => {
+    const { rows } = await db.query<Record<string, unknown>>(
+      `select pg_get_userbyid(p.proowner) as owner, p.prosecdef as definer, p.proconfig as config,
+              has_function_privilege('anon', p.oid, 'execute') as anon,
+              has_function_privilege('authenticated', p.oid, 'execute') as authenticated,
+              has_function_privilege('service_role', p.oid, 'execute') as service
+         from pg_proc p where p.oid = 'public.take_rate_slot(jsonb)'::regprocedure`,
+    );
+    expect(rows).toEqual([
+      {
+        owner: 'postgres',
+        definer: true,
+        config: ['search_path=pg_catalog, pg_temp'],
+        anon: false,
+        authenticated: false,
+        service: false,
+      },
+    ]);
+  });
+});
+
 describe('the section applies twice and its revert removes it', () => {
   it('the migration file applied again leaves the functions as they were', async () => {
     const before = await definitions(db);
     await db.exec(readMigration(MIGRATION));
     expect(await definitions(db)).toEqual(before);
-    expect(before.map((d) => d.proname)).toEqual(FUNCTIONS);
+    expect(before.map((d) => d.proname)).toEqual([...FUNCTIONS, ...HELPERS].sort());
   });
 
   it('the revert section drops each function, twice, and the migration re-applies', async () => {
@@ -589,7 +741,7 @@ describe('the section applies twice and its revert removes it', () => {
     try {
       await applyAllMigrations(own);
       const before = await definitions(own);
-      expect(before.map((d) => d.proname)).toEqual(FUNCTIONS);
+      expect(before.map((d) => d.proname)).toEqual([...FUNCTIONS, ...HELPERS].sort());
       const revert = sectionA(readRollback(ROLLBACK));
       await own.exec(revert);
       expect(await definitions(own)).toEqual([]);
@@ -608,7 +760,7 @@ async function definitions(d: PGlite) {
     await d.query<{ proname: string; def: string }>(
       `select p.proname, pg_get_functiondef(p.oid) as def from pg_proc p
         where p.pronamespace = 'public'::regnamespace and p.proname = any($1) order by p.proname`,
-      [FUNCTIONS],
+      [[...FUNCTIONS, ...HELPERS]],
     )
   ).rows;
 }

@@ -10,10 +10,22 @@ import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-m
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
 import { checkIdOfKey } from '../pipeline/ids';
 import { homepageOf } from '../pipeline/request';
-import { editSite, removeSite, supabaseAddSite, supabaseRequestRecheck } from './sites-store';
+import { checkRateLimit } from '../../rate-limit';
+import { GLOBAL_AUDITS_BUCKET, GLOBAL_AUDITS_PER_DAY } from '../../limits';
+import { MAX_RATE_LIMIT_WINDOW_MS } from '../../rate-limit-window';
+import {
+  domainSlot,
+  editSite,
+  globalSlot,
+  removeSite,
+  supabaseAddSite,
+  supabaseRequestRecheck,
+} from './sites-store';
 import { adminOver } from './sites-test-support';
 
 vi.mock('server-only', () => ({}));
+// checkRateLimit's own client, over the same database.
+vi.mock('../../supabase/admin', () => ({ supabaseAdmin: () => adminOver(db) }));
 
 let db: PGlite;
 beforeAll(async () => {
@@ -206,6 +218,7 @@ describe('supabaseAddSite', () => {
       host: 'added.example',
       schedule,
       limit: 1,
+      perDomain: false,
       requestedByUserId: a.userId,
     });
     expect(r).toEqual({
@@ -261,6 +274,7 @@ describe('supabaseAddSite', () => {
       host: 'plain.example',
       schedule: null,
       limit: 1,
+      perDomain: false,
       requestedByUserId: a.userId,
     })) as { siteId: string };
     const { rows } = await db.query(
@@ -286,6 +300,7 @@ describe('supabaseAddSite', () => {
         host,
         schedule: null,
         limit,
+        perDomain: false,
         requestedByUserId: a.userId,
       });
     expect(await add('more.example', 1)).toEqual({ outcome: 'full' });
@@ -326,5 +341,141 @@ describe('editSite and removeSite', () => {
 
   it('throws on a database error rather than answering', async () => {
     await expect(removeSite(adminOver(db), randomUUID())).rejects.toThrow(/remove_site/);
+  });
+});
+
+/** The day's count in a bucket's current window, or 0. */
+async function countIn(bucket: string, windowStart: string): Promise<number> {
+  const { rows } = await db.query<{ request_count: number }>(
+    `select request_count from public.rate_limits where bucket_key = $1 and window_start = $2`,
+    [bucket, windowStart],
+  );
+  return rows[0]?.request_count ?? 0;
+}
+
+describe('the daily ceiling and the per-domain bucket', () => {
+  it('the SQL path and checkRateLimit count into the same global:audits:day row', async () => {
+    const g = globalSlot(Date.now());
+    expect(g).toMatchObject({ bucket: GLOBAL_AUDITS_BUCKET, limit: GLOBAL_AUDITS_PER_DAY });
+    const before = await countIn(g.bucket, g.window_start);
+    await checkRateLimit(GLOBAL_AUDITS_BUCKET, GLOBAL_AUDITS_PER_DAY, MAX_RATE_LIMIT_WINDOW_MS, {
+      failClosed: true,
+    });
+    const a = await account();
+    const s = await site(a.accountId);
+    await supabaseRequestRecheck(
+      adminOver(db),
+      async () => undefined,
+    )({
+      siteId: s.id,
+      trigger: 'manual',
+      cap: 2,
+      requestedByUserId: a.userId,
+    });
+    expect(await countIn(g.bucket, g.window_start)).toBe(before + 2);
+    const { rows } = await db.query(`select 1 from public.rate_limits where bucket_key = $1`, [
+      g.bucket,
+    ]);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('the SQL path and checkRateLimit count into the same per-domain row', async () => {
+    const d = domainSlot('www.Shared.example', Date.now());
+    expect(d.bucket).toBe('domain:shared.example');
+    await checkRateLimit('domain:shared.example', 5, 60 * 60 * 1000);
+    const a = await account();
+    await supabaseAddSite(
+      adminOver(db),
+      async () => undefined,
+    )({
+      accountId: a.accountId,
+      ownerSeatId: a.seatId,
+      host: 'shared.example',
+      schedule: null,
+      limit: 1,
+      perDomain: true,
+      requestedByUserId: a.userId,
+    });
+    expect(await countIn(d.bucket, d.window_start)).toBe(2);
+  });
+
+  it('over the ceiling a re-check is capacity and an add is capacity; nothing written or sent', async () => {
+    const g = globalSlot(Date.now());
+    const before = await countIn(g.bucket, g.window_start);
+    await db.query(
+      `insert into public.rate_limits (bucket_key, window_start, request_count) values ($1, $2, $3)
+       on conflict (bucket_key, window_start) do update set request_count = excluded.request_count`,
+      [g.bucket, g.window_start, GLOBAL_AUDITS_PER_DAY],
+    );
+    try {
+      const a = await account();
+      const s = await site(a.accountId);
+      const send = vi.fn(async () => undefined);
+      expect(
+        await supabaseRequestRecheck(
+          adminOver(db),
+          send,
+        )({
+          siteId: s.id,
+          trigger: 'fix_recheck',
+          cap: 10,
+          requestedByUserId: a.userId,
+        }),
+      ).toEqual({ queued: false, reason: 'capacity' });
+      const b = await account();
+      expect(
+        await supabaseAddSite(
+          adminOver(db),
+          send,
+        )({
+          accountId: b.accountId,
+          ownerSeatId: b.seatId,
+          host: 'late.example',
+          schedule: null,
+          limit: 1,
+          perDomain: true,
+          requestedByUserId: b.userId,
+        }),
+      ).toEqual({ outcome: 'capacity' });
+      expect(send).not.toHaveBeenCalled();
+      expect(await statuses(s.id)).toEqual([]);
+      expect(await countIn(g.bucket, g.window_start)).toBe(GLOBAL_AUDITS_PER_DAY);
+      const d = domainSlot('late.example', Date.now());
+      expect(await countIn(d.bucket, d.window_start)).toBe(0);
+    } finally {
+      await db.query(
+        `update public.rate_limits set request_count = $3 where bucket_key = $1 and window_start = $2`,
+        [g.bucket, g.window_start, before],
+      );
+    }
+  });
+
+  it('a full domain bucket is domain_capped until its hour ends; a paid add is not counted in it', async () => {
+    const d = domainSlot('busy.example', Date.now());
+    await db.query(
+      `insert into public.rate_limits (bucket_key, window_start, request_count) values ($1, $2, 5)`,
+      [d.bucket, d.window_start],
+    );
+    const add = async (perDomain: boolean) => {
+      const a = await account();
+      return supabaseAddSite(
+        adminOver(db),
+        async () => undefined,
+      )({
+        accountId: a.accountId,
+        ownerSeatId: a.seatId,
+        host: 'busy.example',
+        schedule: null,
+        limit: 1,
+        perDomain,
+        requestedByUserId: a.userId,
+      });
+    };
+    expect(await add(true)).toEqual({
+      outcome: 'domain_capped',
+      nextAllowedAt: new Date(Date.parse(d.window_start) + 3600_000).toISOString(),
+    });
+    expect((await add(false)).outcome).toBe('created');
+    expect(await countIn(d.bucket, d.window_start)).toBe(5);
   });
 });

@@ -11,6 +11,8 @@ import {
   sessionOver,
   type Person,
 } from '@/lib/v2/account/sites-test-support';
+import { globalSlot } from '@/lib/v2/account/sites-store';
+import { GLOBAL_AUDITS_PER_DAY } from '@/lib/limits';
 
 // POST /api/sites/[id]/checks, the re-check (CC-26b D4). The session and service-role clients are the
 // PostgREST stand-in over PGlite with every migration applied, so membership, row security and
@@ -38,8 +40,12 @@ vi.mock('@/lib/supabase/admin', () => ({
   },
 }));
 vi.mock('../../../../../../../inngest/client', () => ({ inngest: { send: h.send } }));
-vi.mock('@/lib/v2/account/events', () => ({ captureFor: () => h.capture }));
+vi.mock('@/lib/v2/account/events', async (original) => ({
+  ...(await original<typeof import('@/lib/v2/account/events')>()),
+  captureFor: () => h.capture,
+}));
 
+import { checkStarted } from '@/lib/v2/account/events';
 import { POST } from './route';
 
 beforeAll(async () => {
@@ -123,17 +129,17 @@ describe('POST /api/sites/[id]/checks', () => {
     as(p);
     vi.stubEnv('CRAWL_PAUSED', '1');
     const paused = await recheck(s.id);
-    expect([paused.status, await paused.json()]).toEqual([503, { error: 'crawl_paused' }]);
+    expect([paused.status, await paused.json()]).toEqual([503, { code: 'paused' }]);
     vi.stubEnv('CRAWL_PAUSED', '');
     vi.stubEnv('V2_PIPELINE', '');
     const off = await recheck(s.id);
-    expect([off.status, await off.json()]).toEqual([503, { error: 'pipeline_off' }]);
+    expect([off.status, await off.json()]).toEqual([503, { code: 'unavailable' }]);
     expect(h.log).toEqual([]);
   });
 
   it('signed out: 401, and no service-role client', async () => {
     const res = await recheck(randomUUID());
-    expect([res.status, await res.json()]).toEqual([401, { error: 'auth_required' }]);
+    expect([res.status, await res.json()]).toEqual([401, { code: 'auth_required' }]);
     expect(h.log).toEqual(['supabaseServer']);
   });
 
@@ -143,7 +149,7 @@ describe('POST /api/sites/[id]/checks', () => {
     as(await person(h.db, 'stranger'));
     for (const id of [s.id, 'not-an-id', randomUUID(), s.id.toUpperCase()]) {
       const res = await recheck(id);
-      expect([res.status, await res.json()], id).toEqual([404, { error: 'not_found' }]);
+      expect([res.status, await res.json()], id).toEqual([404, { code: 'not_found' }]);
     }
     expect(h.log).not.toContain('supabaseAdmin');
     expect(await queued(s.id)).toEqual([]);
@@ -160,7 +166,9 @@ describe('POST /api/sites/[id]/checks', () => {
     expect(body).toEqual({ checkId: expect.any(String), created: true });
     expect(await queued(s.id)).toEqual([{ id: body.checkId, trigger: 'manual' }]);
     expect(h.send).toHaveBeenCalledTimes(1);
-    expect(h.capture.mock.calls).toEqual([['check_started', p.accountId, { trigger: 'manual' }]]);
+    expect(h.capture.mock.calls).toEqual([
+      ['check_started', p.accountId, checkStarted('manual', body.checkId)],
+    ]);
 
     const again = await recheck(s.id);
     expect(await again.json()).toEqual({ checkId: body.checkId, created: false });
@@ -193,7 +201,7 @@ describe('POST /api/sites/[id]/checks', () => {
     as(p);
     const res = await recheck(s.id);
     expect(res.status).toBe(429);
-    expect(await res.json()).toEqual({ error: 'capped', nextAllowedAt: expect.any(String) });
+    expect(await res.json()).toEqual({ code: 'capped', nextAllowedAt: expect.any(String) });
     const retry = Number(res.headers.get('retry-after'));
     expect(retry).toBeGreaterThan(20.9 * 3600);
     expect(retry).toBeLessThanOrEqual(21 * 3600);
@@ -241,11 +249,11 @@ describe('POST /api/sites/[id]/checks', () => {
     const paused = await keptSite(h.db, p.accountId, { paused_reason: 'trial_ended' });
     as(p);
     const r = await recheck(removed.id);
-    expect([r.status, await r.json()]).toEqual([404, { error: 'not_found' }]);
+    expect([r.status, await r.json()]).toEqual([404, { code: 'not_found' }]);
     const q = await recheck(paused.id);
     expect([q.status, await q.json()]).toEqual([
       409,
-      { error: 'site_paused', pausedReason: 'trial_ended' },
+      { code: 'site_paused', pausedReason: 'trial_ended' },
     ]);
     expect(h.send).not.toHaveBeenCalled();
     expect(await queued(paused.id)).toEqual([]);
@@ -265,8 +273,39 @@ describe('POST /api/sites/[id]/checks', () => {
     const res = await recheck(s.id);
     expect([res.status, await res.json()]).toEqual([
       409,
-      { error: 'check_running', checkId: first.checkId },
+      { code: 'check_running', checkId: first.checkId },
     ]);
+    expect(h.send).not.toHaveBeenCalled();
+    expect(h.capture).not.toHaveBeenCalled();
+  });
+  it('at the day’s global:audits:day ceiling: 503 capacity, nothing queued or sent, the count unchanged', async () => {
+    const p = await person(h.db, 'ceiling');
+    const s = await keptSite(h.db, p.accountId);
+    as(p);
+    const g = globalSlot(Date.now());
+    const read = async () =>
+      (
+        await h.db.query<{ request_count: number }>(
+          `select request_count from public.rate_limits where bucket_key = $1 and window_start = $2`,
+          [g.bucket, g.window_start],
+        )
+      ).rows[0]?.request_count ?? 0;
+    const before = await read();
+    const put = (n: number) =>
+      h.db.query(
+        `insert into public.rate_limits (bucket_key, window_start, request_count) values ($1, $2, $3)
+         on conflict (bucket_key, window_start) do update set request_count = excluded.request_count`,
+        [g.bucket, g.window_start, n],
+      );
+    await put(GLOBAL_AUDITS_PER_DAY);
+    try {
+      const res = await recheck(s.id);
+      expect([res.status, await res.json()]).toEqual([503, { code: 'capacity' }]);
+      expect(await read()).toBe(GLOBAL_AUDITS_PER_DAY);
+    } finally {
+      await put(before);
+    }
+    expect(await queued(s.id)).toEqual([]);
     expect(h.send).not.toHaveBeenCalled();
     expect(h.capture).not.toHaveBeenCalled();
   });

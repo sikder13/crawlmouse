@@ -13,6 +13,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { inngest } from '../../../../../inngest/client';
 import type { SiteSchedule } from '../../auth/schedule';
+import { normalizeDomain } from '../../domain';
+import { DOMAIN_AUDITS_PER_HOUR, GLOBAL_AUDITS_BUCKET, GLOBAL_AUDITS_PER_DAY } from '../../limits';
+import { MAX_RATE_LIMIT_WINDOW_MS, rateLimitWindowStart } from '../../rate-limit-window';
 import { requestCheck, type RequestDeps } from '../pipeline/request';
 import { supabasePipelineStore, type QueuedCheck } from '../pipeline/store';
 import type { RecheckOutcome, RequestRecheck } from './recheck';
@@ -29,12 +32,40 @@ async function call<T>(admin: SupabaseClient, fn: string, args: object, schema: 
 
 const Iso = z.iso.datetime();
 
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * A `rate_limits` slot as migration 20261112000001's take_rate_slot takes it: the bucket, the window
+ * start `checkRateLimit` would compute for it now, and its limit, so the SQL and `checkRateLimit`
+ * count into the same row.
+ */
+interface Slot {
+  bucket: string;
+  window_start: string;
+  limit: number;
+}
+
+const slotOf = (bucket: string, limit: number, windowMs: number, nowMs: number): Slot => ({
+  bucket,
+  window_start: rateLimitWindowStart(nowMs, windowMs).toISOString(),
+  limit,
+});
+
+/** The platform's daily ceiling on check starts (`global:audits:day`), shared with v1's audits. */
+export const globalSlot = (nowMs: number): Slot =>
+  slotOf(GLOBAL_AUDITS_BUCKET, GLOBAL_AUDITS_PER_DAY, MAX_RATE_LIMIT_WINDOW_MS, nowMs);
+
+/** v1's per-domain hourly bucket (app/api/audits/start/route.ts), for a site's first audit. */
+export const domainSlot = (host: string, nowMs: number): Slot =>
+  slotOf(`domain:${normalizeDomain(host)}`, DOMAIN_AUDITS_PER_HOUR, HOUR_MS, nowMs);
+
 // ─── re-check ────────────────────────────────────────────────────────────────────────────────────
 
 const CappedAnswer = z.discriminatedUnion('outcome', [
   z.strictObject({ outcome: z.literal('created') }),
   z.strictObject({ outcome: z.literal('exists'), status: z.string() }),
   z.strictObject({ outcome: z.literal('capped'), next_allowed_at: Iso }),
+  z.strictObject({ outcome: z.literal('capacity') }),
   z.strictObject({ outcome: z.literal('removed') }),
   z.strictObject({ outcome: z.literal('paused'), paused_reason: z.string() }),
 ]);
@@ -66,7 +97,7 @@ export function supabaseRequestRecheck(
           const a = await call(
             admin,
             'request_capped_check',
-            { p_row: row, p_cap: req.cap },
+            { p_row: row, p_cap: req.cap, p_global: globalSlot(Date.now()) },
             CappedAnswer,
           );
           switch (a.outcome) {
@@ -81,6 +112,7 @@ export function supabaseRequestRecheck(
                 reason: 'capped',
                 nextAllowedAt: a.next_allowed_at,
               });
+            case 'capacity':
             case 'removed':
             case 'paused':
               throw new NotQueued({ queued: false, reason: a.outcome });
@@ -116,6 +148,8 @@ export interface NewSite {
   schedule: SiteSchedule | null;
   /** The account's site limit now (`limits.sites`), which also bounds first audits a day. */
   limit: number;
+  /** Counts the first audit in v1's per-domain hourly bucket; v1 leaves paid tiers out of it. */
+  perDomain: boolean;
   requestedByUserId: string;
 }
 
@@ -123,7 +157,9 @@ export type AddSiteOutcome =
   | { outcome: 'created'; siteId: string; checkId: string; n: number }
   | { outcome: 'exists'; siteId: string }
   | { outcome: 'full' }
-  | { outcome: 'adds_capped'; nextAllowedAt: string };
+  | { outcome: 'adds_capped'; nextAllowedAt: string }
+  | { outcome: 'domain_capped'; nextAllowedAt: string }
+  | { outcome: 'capacity' };
 
 const AddAnswer = z.discriminatedUnion('outcome', [
   z.strictObject({
@@ -135,6 +171,7 @@ const AddAnswer = z.discriminatedUnion('outcome', [
   z.strictObject({ outcome: z.literal('exists'), site_id: z.string() }),
   z.strictObject({ outcome: z.literal('full') }),
   z.strictObject({ outcome: z.literal('adds_capped'), next_allowed_at: Iso }),
+  z.strictObject({ outcome: z.enum(['domain_capped', 'capacity']) }),
 ]);
 
 class NotAdded extends Error {
@@ -176,10 +213,18 @@ export function supabaseAddSite(
           next_check_at: null,
         }),
         insertQueued: async (check) => {
+          const nowMs = Date.now();
+          const domain = site.perDomain ? domainSlot(site.host, nowMs) : null;
           const a = await call(
             admin,
             'add_site',
-            { p_site: row, p_check: check, p_limit: site.limit },
+            {
+              p_site: row,
+              p_check: check,
+              p_limit: site.limit,
+              p_global: globalSlot(nowMs),
+              p_domain: domain,
+            },
             AddAnswer,
           );
           switch (a.outcome) {
@@ -192,6 +237,13 @@ export function supabaseAddSite(
               throw new NotAdded({ outcome: 'full' });
             case 'adds_capped':
               throw new NotAdded({ outcome: 'adds_capped', nextAllowedAt: a.next_allowed_at });
+            case 'domain_capped':
+              throw new NotAdded({
+                outcome: 'domain_capped',
+                nextAllowedAt: new Date(Date.parse(domain!.window_start) + HOUR_MS).toISOString(),
+              });
+            case 'capacity':
+              throw new NotAdded({ outcome: 'capacity' });
           }
         },
       },

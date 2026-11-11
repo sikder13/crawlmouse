@@ -10,6 +10,8 @@ import {
   sessionOver,
   type Person,
 } from '@/lib/v2/account/sites-test-support';
+import { domainSlot, globalSlot } from '@/lib/v2/account/sites-store';
+import { GLOBAL_AUDITS_PER_DAY } from '@/lib/limits';
 
 // POST /api/sites (CC-26b D6). The session and service-role clients are the PostgREST stand-in over
 // PGlite with every migration applied, so membership, row security and migration 20261112000001's
@@ -51,8 +53,12 @@ vi.mock('@/lib/auth/admit-site', () => ({
     return !h.refused.has(host);
   },
 }));
-vi.mock('@/lib/v2/account/events', () => ({ captureFor: () => h.capture }));
+vi.mock('@/lib/v2/account/events', async (original) => ({
+  ...(await original<typeof import('@/lib/v2/account/events')>()),
+  captureFor: () => h.capture,
+}));
 
+import { checkStarted } from '@/lib/v2/account/events';
 import { POST } from './route';
 
 beforeAll(async () => {
@@ -106,13 +112,30 @@ const sitesOf = async (accountId: string) =>
 const setDefault = (p: Person, accountId: string) =>
   h.db.query(`update public.users set default_account_id = $2 where id = $1`, [p.id, accountId]);
 
+/** Sets a bucket's count in its current window; returns a restore. */
+async function setCount(slot: { bucket: string; window_start: string }, n: number) {
+  const { rows } = await h.db.query<{ request_count: number }>(
+    `select request_count from public.rate_limits where bucket_key = $1 and window_start = $2`,
+    [slot.bucket, slot.window_start],
+  );
+  const before = rows[0]?.request_count ?? 0;
+  const put = (v: number) =>
+    h.db.query(
+      `insert into public.rate_limits (bucket_key, window_start, request_count) values ($1, $2, $3)
+       on conflict (bucket_key, window_start) do update set request_count = excluded.request_count`,
+      [slot.bucket, slot.window_start, v],
+    );
+  await put(n);
+  return () => put(before);
+}
+
 describe('POST /api/sites', () => {
   it('with V2_CHECKS_PUBLIC unset: 404 before anything else runs', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
     as(await person(h.db, 'off'));
     const res = await POST(json({ url: 'example.com' }));
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: 'not_found' });
+    expect(await res.json()).toEqual({ code: 'not_found' });
     expect(h.log).toEqual([]);
   });
 
@@ -121,7 +144,7 @@ describe('POST /api/sites', () => {
     as(await person(h.db, 'paused'));
     const res = await POST(json({ url: 'example.com' }));
     expect(res.status).toBe(503);
-    expect(await res.json()).toEqual({ error: 'crawl_paused' });
+    expect(await res.json()).toEqual({ code: 'paused' });
     expect(h.log).toEqual([]);
   });
 
@@ -130,14 +153,14 @@ describe('POST /api/sites', () => {
     as(await person(h.db, 'nopipe'));
     const res = await POST(json({ url: 'example.com' }));
     expect(res.status).toBe(503);
-    expect(await res.json()).toEqual({ error: 'pipeline_off' });
+    expect(await res.json()).toEqual({ code: 'unavailable' });
     expect(h.log).toEqual([]);
   });
 
   it('signed out: 401, and no service-role client', async () => {
     const res = await POST(json({ url: 'example.com' }));
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: 'auth_required' });
+    expect(await res.json()).toEqual({ code: 'auth_required' });
     expect(h.log).toEqual(['supabaseServer']);
   });
 
@@ -163,7 +186,7 @@ describe('POST /api/sites', () => {
     });
     expect(h.capture.mock.calls).toEqual([
       ['site_added', p.accountId, { n: 1 }],
-      ['check_started', p.accountId, { trigger: 'first_audit' }],
+      ['check_started', p.accountId, checkStarted('first_audit', body.checkId)],
     ]);
   });
 
@@ -179,7 +202,7 @@ describe('POST /api/sites', () => {
     as(p);
     const res = await POST(json({ url: 'private.example' }));
     expect(res.status).toBe(422);
-    expect(await res.json()).toEqual({ error: 'host_refused' });
+    expect(await res.json()).toEqual({ code: 'host_refused' });
     expect(h.log).toContain('admit private.example');
     expect(await sitesOf(p.accountId)).toEqual([]);
     expect(h.send).not.toHaveBeenCalled();
@@ -208,7 +231,7 @@ describe('POST /api/sites', () => {
     as(p);
     const res = await POST(json({ url: 'second.example' }));
     expect(res.status).toBe(402);
-    expect(await res.json()).toEqual({ error: 'upgrade_required', gate: 'sites' });
+    expect(await res.json()).toEqual({ code: 'upgrade_required', gate: 'sites' });
     expect(h.send).not.toHaveBeenCalled();
     expect(h.capture).not.toHaveBeenCalled();
   });
@@ -220,7 +243,7 @@ describe('POST /api/sites', () => {
     as(p);
     const res = await POST(json({ url: kept.host }));
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: 'site_exists', siteId: kept.id });
+    expect(await res.json()).toEqual({ code: 'site_exists', siteId: kept.id });
   });
 
   it('add, remove, add again on Free inside a day is 429 with Retry-After (Q14)', async () => {
@@ -232,8 +255,8 @@ describe('POST /api/sites', () => {
     h.capture.mockClear();
     const res = await POST(json({ url: 'two.example' }));
     expect(res.status).toBe(429);
-    const body = (await res.json()) as { error: string; nextAllowedAt: string };
-    expect(body).toEqual({ error: 'adds_capped', nextAllowedAt: expect.any(String) });
+    const body = (await res.json()) as { code: string; nextAllowedAt: string };
+    expect(body).toEqual({ code: 'adds_capped', nextAllowedAt: expect.any(String) });
     const retry = Number(res.headers.get('retry-after'));
     expect(retry).toBeGreaterThan(23 * 3600);
     expect(retry).toBeLessThanOrEqual(24 * 3600);
@@ -250,7 +273,7 @@ describe('POST /api/sites', () => {
     as(dev);
     const res = await POST(json({ url: 'dev.example' }));
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: 'role_refused' });
+    expect(await res.json()).toEqual({ code: 'role_refused' });
     expect(await sitesOf(owner.accountId)).toEqual([]);
     expect(h.send).not.toHaveBeenCalled();
   });
@@ -265,7 +288,7 @@ describe('POST /api/sites', () => {
     as(scoped);
     const refused = await POST(json({ url: 'scoped.example' }));
     expect(refused.status).toBe(403);
-    expect(await refused.json()).toEqual({ error: 'scoped_seat' });
+    expect(await refused.json()).toEqual({ code: 'scoped_seat' });
 
     const manager = await person(h.db, 'manager');
     await addSeat(h.db, owner.accountId, manager, 'account_manager');
@@ -289,7 +312,43 @@ describe('POST /api/sites', () => {
     as(u);
     const res = await POST(json({ url: 'which.example' }));
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: 'account_ambiguous' });
+    expect(await res.json()).toEqual({ code: 'account_ambiguous' });
     expect(h.log.filter((l) => l.startsWith('admin.rpc'))).toEqual([]);
+  });
+  it('at the day’s global:audits:day ceiling: 503 capacity, nothing written, nothing sent', async () => {
+    const p = await person(h.db, 'ceiling');
+    as(p);
+    const restore = await setCount(globalSlot(Date.now()), GLOBAL_AUDITS_PER_DAY);
+    try {
+      const res = await POST(json({ url: 'ceiling.example' }));
+      expect([res.status, await res.json()]).toEqual([503, { code: 'capacity' }]);
+    } finally {
+      await restore();
+    }
+    expect(await sitesOf(p.accountId)).toEqual([]);
+    expect(h.send).not.toHaveBeenCalled();
+    expect(h.capture).not.toHaveBeenCalled();
+  });
+
+  it('Free: a host whose v1 per-domain bucket is full this hour is 429; a Pro add is not held by it', async () => {
+    const restore = await setCount(domainSlot('popular.example', Date.now()), 5);
+    try {
+      const free = await person(h.db, 'free-domain');
+      as(free);
+      const res = await POST(json({ url: 'www.popular.example' }));
+      expect(res.status).toBe(429);
+      expect(await res.json()).toEqual({
+        code: 'domain_capped',
+        nextAllowedAt: expect.any(String),
+      });
+      expect(Number(res.headers.get('retry-after'))).toBeLessThanOrEqual(3600);
+      expect(await sitesOf(free.accountId)).toEqual([]);
+      const pro = await person(h.db, 'pro-domain');
+      await makePaid(h.db, pro.accountId, 'pro');
+      as(pro);
+      expect((await POST(json({ url: 'popular.example' }))).status).toBe(201);
+    } finally {
+      await restore();
+    }
   });
 });

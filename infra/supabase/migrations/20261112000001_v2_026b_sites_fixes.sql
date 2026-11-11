@@ -8,27 +8,63 @@
 -- The revert is infra/supabase/rollbacks/20261112000001_v2_026b_sites_fixes.revert.sql.
 
 -- ═══ A: sites and re-checks (D4, D6) ══════════════════════════════════════════════════════════════
--- Four functions, each security definer and granted to service_role only. Each locks its row in a
--- statement of its own and reads what it decides on in later statements: under READ COMMITTED a
--- later statement takes a fresh snapshot, so a call that waited on the lock sees what the holder
--- committed. The races are tested on a real Postgres by scripts/db/sites-race.test.ts; the rest by
+-- Four functions granted to service_role only, and their helper take_rate_slot, which no client
+-- role may execute; all five are security definer. Each of the four locks its row in a statement of
+-- its own and reads what it decides on in later statements: under READ COMMITTED a later statement
+-- takes a fresh snapshot, so a call that waited on the lock sees what the holder committed. The races are tested on a real Postgres by scripts/db/sites-race.test.ts; the rest by
 -- apps/web/__tests__/v2-026b-sites.test.ts.
+
+-- ─── take_rate_slot ───────────────────────────────────────────────────────────────────────────────
+-- Counts one start against a rate_limits bucket with the platform's own increment_rate_limit, and
+-- says whether the count is still within the limit. p_slot: exactly {bucket, window_start, limit},
+-- as the caller computes them for checkRateLimit (apps/web/lib/rate-limit.ts), so this path and
+-- checkRateLimit count into the same row; limit 1 or more. Anything else raises 22023. The caller
+-- takes a slot inside a block that it rolls back when the slot is refused, so a refused start
+-- leaves the count as it was.
+
+create or replace function public.take_rate_slot(p_slot jsonb)
+returns boolean
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_keys constant text[] := array['bucket', 'window_start', 'limit'];
+  v_given text[];
+begin
+  if pg_catalog.jsonb_typeof(p_slot) is distinct from 'object' then
+    raise exception 'take_rate_slot: p_slot is not an object' using errcode = '22023';
+  end if;
+  v_given := array(select pg_catalog.jsonb_object_keys(p_slot));
+  if not (v_given @> v_keys and v_given <@ v_keys)
+     or pg_catalog.jsonb_typeof(p_slot -> 'bucket') is distinct from 'string'
+     or pg_catalog.jsonb_typeof(p_slot -> 'limit') is distinct from 'number'
+     or (p_slot ->> 'limit')::integer < 1 then
+    raise exception 'take_rate_slot: p_slot is not {bucket, window_start, limit}' using errcode = '22023';
+  end if;
+  return public.increment_rate_limit(p_slot ->> 'bucket', (p_slot ->> 'window_start')::timestamptz)
+         <= (p_slot ->> 'limit')::integer;
+end;
+$$;
 
 -- ─── request_capped_check ─────────────────────────────────────────────────────────────────────────
 -- A member's re-check of a kept site (trigger manual or fix_recheck), written only while the site's
 -- re-checks in the last 24 hours are fewer than p_cap. In order: lock the site row; answer exists,
 -- with the check's status, when p_row's id is already a check (a repeat inside its 2-minute bucket,
 -- or a retry after a send that failed), counting nothing; refuse a removed site, then a paused one;
--- count the site's manual and fix_recheck checks queued in the last 24 hours; insert p_row as a
--- queued check, or answer capped with the time enough counted checks will have left the window for
--- one more to fit.
+-- count the site's manual and fix_recheck checks queued in the last 24 hours, and answer capped,
+-- with the time enough counted checks will have left the window for one more to fit, at p_cap; then
+-- take a slot of the platform's daily ceiling (p_global, see take_rate_slot) and insert p_row as a
+-- queued check, or, over the ceiling, roll the slot back and answer capacity.
 -- p_row: exactly the row requestCheck passes to insertQueued (apps/web/lib/v2/pipeline/request.ts):
 -- the keys id, site_id, trigger, grade_version, queued_at, heartbeat_at and expires_at, with trigger
 -- manual or fix_recheck. Any other shape, or a p_cap below 1, raises 22023 before the lock.
 -- Returns {"outcome": "created"} | {"outcome": "exists", "status"} | {"outcome": "capped",
--- "next_allowed_at"} | {"outcome": "removed"} | {"outcome": "paused", "paused_reason"}.
+-- "next_allowed_at"} | {"outcome": "capacity"} | {"outcome": "removed"} | {"outcome": "paused",
+-- "paused_reason"}.
 
-create or replace function public.request_capped_check(p_row jsonb, p_cap integer)
+create or replace function public.request_capped_check(p_row jsonb, p_cap integer, p_global jsonb)
 returns jsonb
 language plpgsql
 volatile
@@ -108,11 +144,18 @@ begin
       pg_catalog.to_char(v_next at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
   end if;
 
-  insert into public.checks (id, site_id, status, trigger, grade_version, queued_at, heartbeat_at,
-                             expires_at)
-  select r.id, r.site_id, 'queued', r.trigger, r.grade_version, r.queued_at, r.heartbeat_at,
-         r.expires_at
-    from pg_catalog.jsonb_populate_record(null::public.checks, p_row) r;
+  begin
+    if not public.take_rate_slot(p_global) then
+      raise exception 'request_capped_check: the daily ceiling is reached' using errcode = 'CMCAP';
+    end if;
+    insert into public.checks (id, site_id, status, trigger, grade_version, queued_at, heartbeat_at,
+                               expires_at)
+    select r.id, r.site_id, 'queued', r.trigger, r.grade_version, r.queued_at, r.heartbeat_at,
+           r.expires_at
+      from pg_catalog.jsonb_populate_record(null::public.checks, p_row) r;
+  exception when sqlstate 'CMCAP' then
+    return pg_catalog.jsonb_build_object('outcome', 'capacity');
+  end;
   return pg_catalog.jsonb_build_object('outcome', 'created');
 end;
 $$;
@@ -123,16 +166,20 @@ $$;
 -- its live primary sites (staging_of_site_id null, removed_at null) number p_limit or more; answer
 -- adds_capped when first_audit checks of its sites, removed ones included, queued in the last 24
 -- hours number p_limit or more (questions.md Q14: adding, removing and adding again is not an
--- unbounded crawl), with the time one more fits; otherwise insert the site, then the check.
+-- unbounded crawl), with the time one more fits; then, in a block rolled back on a refusal, take a
+-- slot of p_domain when one is given (the per-domain hourly bucket) and of p_global (the platform's
+-- daily ceiling), answering domain_capped or capacity over either, and insert the site, then the
+-- check. p_global and p_domain are slots as take_rate_slot takes them; p_domain may be null.
 -- p_site: exactly the keys id, account_id, host, owner_seat_id, schedule_cadence,
 -- schedule_iso_weekday and schedule_hour_local. p_check: the row requestCheck passes to insertQueued
 -- (as for request_capped_check) with trigger first_audit and site_id p_site's id. Any other shape,
 -- or a p_limit below 0, raises 22023 before the lock.
 -- Returns {"outcome": "created", "site_id", "check_id", "n"} (n: live primary sites after the add)
 -- | {"outcome": "exists", "site_id"} | {"outcome": "full"} | {"outcome": "adds_capped",
--- "next_allowed_at"}.
+-- "next_allowed_at"} | {"outcome": "domain_capped"} | {"outcome": "capacity"}.
 
-create or replace function public.add_site(p_site jsonb, p_check jsonb, p_limit integer)
+create or replace function public.add_site(p_site jsonb, p_check jsonb, p_limit integer,
+                                           p_global jsonb, p_domain jsonb)
 returns jsonb
 language plpgsql
 volatile
@@ -214,16 +261,29 @@ begin
       pg_catalog.to_char(v_next at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
   end if;
 
-  insert into public.sites (id, account_id, host, owner_seat_id, schedule_cadence,
-                            schedule_iso_weekday, schedule_hour_local)
-  select r.id, r.account_id, r.host, r.owner_seat_id, r.schedule_cadence, r.schedule_iso_weekday,
-         r.schedule_hour_local
-    from pg_catalog.jsonb_populate_record(null::public.sites, p_site) r;
-  insert into public.checks (id, site_id, status, trigger, grade_version, queued_at, heartbeat_at,
-                             expires_at)
-  select r.id, r.site_id, 'queued', r.trigger, r.grade_version, r.queued_at, r.heartbeat_at,
-         r.expires_at
-    from pg_catalog.jsonb_populate_record(null::public.checks, p_check) r;
+  begin
+    if p_domain is not null and not public.take_rate_slot(p_domain) then
+      raise exception 'add_site: the domain''s hourly bucket is full' using errcode = 'CMDOM';
+    end if;
+    if not public.take_rate_slot(p_global) then
+      raise exception 'add_site: the daily ceiling is reached' using errcode = 'CMCAP';
+    end if;
+    insert into public.sites (id, account_id, host, owner_seat_id, schedule_cadence,
+                              schedule_iso_weekday, schedule_hour_local)
+    select r.id, r.account_id, r.host, r.owner_seat_id, r.schedule_cadence, r.schedule_iso_weekday,
+           r.schedule_hour_local
+      from pg_catalog.jsonb_populate_record(null::public.sites, p_site) r;
+    insert into public.checks (id, site_id, status, trigger, grade_version, queued_at, heartbeat_at,
+                               expires_at)
+    select r.id, r.site_id, 'queued', r.trigger, r.grade_version, r.queued_at, r.heartbeat_at,
+           r.expires_at
+      from pg_catalog.jsonb_populate_record(null::public.checks, p_check) r;
+  exception
+    when sqlstate 'CMDOM' then
+      return pg_catalog.jsonb_build_object('outcome', 'domain_capped');
+    when sqlstate 'CMCAP' then
+      return pg_catalog.jsonb_build_object('outcome', 'capacity');
+  end;
   return pg_catalog.jsonb_build_object('outcome', 'created', 'site_id', p_site ->> 'id',
                                        'check_id', p_check ->> 'id', 'n', v_live + 1);
 end;
@@ -373,15 +433,18 @@ begin
 end;
 $$;
 
-alter function public.request_capped_check(jsonb, integer) owner to postgres;
-alter function public.add_site(jsonb, jsonb, integer) owner to postgres;
+alter function public.take_rate_slot(jsonb) owner to postgres;
+alter function public.request_capped_check(jsonb, integer, jsonb) owner to postgres;
+alter function public.add_site(jsonb, jsonb, integer, jsonb, jsonb) owner to postgres;
 alter function public.edit_site(uuid, jsonb) owner to postgres;
 alter function public.remove_site(uuid) owner to postgres;
-revoke all on function public.request_capped_check(jsonb, integer), public.add_site(jsonb, jsonb, integer),
-  public.edit_site(uuid, jsonb), public.remove_site(uuid)
+revoke all on function public.take_rate_slot(jsonb), public.request_capped_check(jsonb, integer, jsonb),
+  public.add_site(jsonb, jsonb, integer, jsonb, jsonb), public.edit_site(uuid, jsonb),
+  public.remove_site(uuid)
   from public, anon, authenticated, service_role;
-grant execute on function public.request_capped_check(jsonb, integer),
-  public.add_site(jsonb, jsonb, integer), public.edit_site(uuid, jsonb), public.remove_site(uuid)
+grant execute on function public.request_capped_check(jsonb, integer, jsonb),
+  public.add_site(jsonb, jsonb, integer, jsonb, jsonb), public.edit_site(uuid, jsonb),
+  public.remove_site(uuid)
   to service_role;
 
 -- ═══ end A ════════════════════════════════════════════════════════════════════════════════════════

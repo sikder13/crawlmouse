@@ -30,6 +30,8 @@ const SITE_LOCK = '   where s.id = v_site and s.account_id is not null\n     for
 /** add_site's lock on the account row. */
 const ACCOUNT_LOCK =
   '  perform 1 from public.accounts a where a.id = v_account and a.deleted_at is null for update;\n';
+/** take_rate_slot's comparison with the slot's limit. */
+const SLOT_CHECK = "         <= (p_slot ->> 'limit')::integer;\n";
 /** How long to watch for B waiting. */
 const WAIT_WATCH_MS = 2000;
 
@@ -138,15 +140,29 @@ async function race(sql: Sql, a: Call, b: Call) {
   }
 }
 
+interface Slot {
+  bucket: string;
+  window_start: string;
+  limit: number;
+}
+
+/** A slot of the daily ceiling in a bucket of its own; `limit` defaults to more than a race uses. */
+const slot = (limit = 1000): Slot => ({
+  bucket: `race:${randomUUID()}`,
+  window_start: '2026-11-10T00:00:00.000Z',
+  limit,
+});
+
 const recheck =
-  (r: ReturnType<typeof row>, cap: number): Call =>
+  (r: ReturnType<typeof row>, cap: number, global: Slot = slot()): Call =>
   async (t) => {
-    const [x] = await t`select public.request_capped_check(${t.json(r as never)}, ${cap}) as r`;
+    const [x] = await t`select public.request_capped_check(${t.json(r as never)}, ${cap},
+                                                           ${t.json(global as never)}) as r`;
     return (x!.r as { outcome: string }).outcome;
   };
 
 const addSite =
-  (accountId: string, seatId: string, limit: number): Call =>
+  (accountId: string, seatId: string, limit: number, global: Slot = slot()): Call =>
   async (t) => {
     const s = {
       id: randomUUID(),
@@ -159,7 +175,7 @@ const addSite =
     };
     const [x] = await t`select public.add_site(${t.json(s as never)},
                                                ${t.json(row(s.id, 'first_audit') as never)},
-                                               ${limit}) as r`;
+                                               ${limit}, ${t.json(global as never)}, null) as r`;
     return (x!.r as { outcome: string }).outcome;
   };
 
@@ -171,11 +187,13 @@ describe.skipIf(!URL_ENV)('section A under two real transactions', () => {
     real: `sites_race_${suffix}`,
     siteUnlocked: `sites_race_site_unlocked_${suffix}`,
     accountUnlocked: `sites_race_account_unlocked_${suffix}`,
+    unceiled: `sites_race_unceiled_${suffix}`,
   };
   let admin: Sql;
   let real: Sql;
   let siteUnlocked: Sql;
   let accountUnlocked: Sql;
+  let unceiled: Sql;
 
   beforeAll(async () => {
     admin = postgres(URL_ENV!, { max: 1, onnotice: () => {} });
@@ -193,12 +211,18 @@ describe.skipIf(!URL_ENV)('section A under two real transactions', () => {
         '  perform 1 from public.accounts a where a.id = v_account and a.deleted_at is null;\n',
       ),
     );
-  }, 180_000);
+    unceiled = await migrated(
+      admin,
+      names.unceiled,
+      without(SLOT_CHECK, '         <= 2147483647;\n'),
+    );
+  }, 240_000);
 
   afterAll(async () => {
     await real?.end({ timeout: 5 });
     await siteUnlocked?.end({ timeout: 5 });
     await accountUnlocked?.end({ timeout: 5 });
+    await unceiled?.end({ timeout: 5 });
     for (const n of Object.values(names))
       await admin?.unsafe(`drop database if exists ${n} with (force)`);
     await admin?.end({ timeout: 5 });
@@ -256,5 +280,41 @@ describe.skipIf(!URL_ENV)('section A under two real transactions', () => {
     expect(r.waited).toBe(false);
     expect([r.a, r.b]).toEqual(['created', 'created']);
     expect(r.live).toBe(3);
+  });
+  /** Two starts, each of its own account and site, with one slot of the daily ceiling left. */
+  async function ceilingRace(sql: Sql, kind: 'recheck' | 'add') {
+    const g = slot(4);
+    await sql`insert into public.rate_limits (bucket_key, window_start, request_count)
+              values (${g.bucket}, ${g.window_start}, 3)`;
+    const call = async () => {
+      const { accountId, seatId } = await account(sql);
+      if (kind === 'add') return addSite(accountId, seatId, 1, g);
+      return recheck(row(await site(sql, accountId), 'manual'), 2, g);
+    };
+    const r = await race(sql, await call(), await call());
+    const n = await count(
+      sql`select request_count as n from public.rate_limits where bucket_key = ${g.bucket}`,
+    );
+    return { ...r, slotsUsed: n };
+  }
+
+  it('one slot of the daily ceiling left, two re-checks: the second waits, then is capacity; one used', async () => {
+    const r = await ceilingRace(real, 'recheck');
+    expect(r.waited, 'B waited on the bucket row while A held it').toBe(true);
+    expect([r.a, r.b]).toEqual(['created', 'capacity']);
+    expect(r.slotsUsed).toBe(4);
+  });
+
+  it('one slot of the daily ceiling left, two adds: the second waits, then is capacity; one used', async () => {
+    const r = await ceilingRace(real, 'add');
+    expect(r.waited).toBe(true);
+    expect([r.a, r.b]).toEqual(['created', 'capacity']);
+    expect(r.slotsUsed).toBe(4);
+  });
+
+  it('mutation check: without the ceiling comparison, both re-checks pass it', async () => {
+    const r = await ceilingRace(unceiled, 'recheck');
+    expect([r.a, r.b]).toEqual(['created', 'created']);
+    expect(r.slotsUsed).toBe(5);
   });
 });
