@@ -90,8 +90,8 @@ export const PLATFORM_SHIM = `
     for each statement execute function storage.protect_delete();
 
   -- SUPABASE VAULT AND AUTH SESSION STAND-INS (027b). Vault is installed on ezspnfeyzwsisymytssm
-  -- (supabase_vault 0.3.1, measured 2026-11-10); 027b keeps Slack webhook URLs and unsent link tokens
-  -- in it. Modelled: vault.secrets, vault.create_secret, vault.update_secret and the
+  -- (supabase_vault 0.3.1, measured 2026-11-10); 027b keeps the account's Slack webhook URL in
+  -- it. Modelled: vault.secrets, vault.create_secret, vault.update_secret and the
   -- decrypted_secrets view, with no client role holding anything on them. The secret is stored as
   -- given (no encryption): the tests read what 027b writes and who may read it, not the cipher.
   -- auth.sessions and auth.refresh_tokens carry only the columns end_user_sessions touches. What this
