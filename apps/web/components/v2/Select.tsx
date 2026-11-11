@@ -14,30 +14,14 @@ export interface SelectProps {
   name: string;
   options: readonly SelectOption[];
   defaultValue?: string;
-  /** A disabled select is not sent with its form. */
-  disabled?: boolean;
-  /** Told the chosen value, for a form whose other fields follow it. */
-  onChange?: (value: string) => void;
   /** The id of a form the select belongs to when it sits outside it. */
   form?: string;
 }
 
 /** A labelled native select: the browser gives it its keyboard, its list and its form value. */
-export function Select({
-  id,
-  label,
-  hideLabel = false,
-  options,
-  onChange,
-  ...select
-}: SelectProps) {
+export function Select({ id, label, hideLabel = false, options, ...select }: SelectProps) {
   const control = (
-    <select
-      id={id}
-      className={styles.select}
-      {...select}
-      onChange={onChange ? (e) => onChange(e.target.value) : undefined}
-    >
+    <select id={id} className={styles.select} {...select}>
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}

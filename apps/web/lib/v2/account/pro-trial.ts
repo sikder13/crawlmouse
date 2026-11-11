@@ -58,10 +58,6 @@ const AccountRow = z.object({
   timezone: z.string(),
 });
 
-/**
- * The account as the door's decision reads it, through the caller's own client, with the caller's
- * active owner seat on it; null when either is not there.
- */
 /** The trial-start body's account id: `accountId`, a table id, and no other field; else null. */
 export function trialAccountId(fields: Readonly<Record<string, unknown>>): string | null {
   const { accountId, ...rest } = fields;
@@ -70,6 +66,10 @@ export function trialAccountId(fields: Readonly<Record<string, unknown>>): strin
     : null;
 }
 
+/**
+ * The account as the door's decision reads it, through the caller's own client, with the caller's
+ * active owner seat on it; null when either is not there.
+ */
 export async function ownedAccount(
   session: SupabaseClient,
   accountId: string,

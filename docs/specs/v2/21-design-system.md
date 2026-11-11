@@ -289,17 +289,15 @@ The page frame: canvas colours, the header with the brand, and the footer.
 
 A labelled native select: the browser gives it its keyboard, its list and its form value.
 
-| Prop           | Type                                     | Required | Note                                                            |
-| -------------- | ---------------------------------------- | -------- | --------------------------------------------------------------- |
-| `id`           | `string`                                 | yes      |                                                                 |
-| `label`        | `string`                                 | yes      |                                                                 |
-| `hideLabel`    | `boolean \| undefined`                   | no       | The label is hidden visually and stays for screen readers.      |
-| `name`         | `string`                                 | yes      |                                                                 |
-| `options`      | `readonly SelectOption[]`                | yes      |                                                                 |
-| `defaultValue` | `string \| undefined`                    | no       |                                                                 |
-| `disabled`     | `boolean \| undefined`                   | no       | A disabled select is not sent with its form.                    |
-| `onChange`     | `((value: string) => void) \| undefined` | no       | Told the chosen value, for a form whose other fields follow it. |
-| `form`         | `string \| undefined`                    | no       | The id of a form the select belongs to when it sits outside it. |
+| Prop           | Type                      | Required | Note                                                            |
+| -------------- | ------------------------- | -------- | --------------------------------------------------------------- |
+| `id`           | `string`                  | yes      |                                                                 |
+| `label`        | `string`                  | yes      |                                                                 |
+| `hideLabel`    | `boolean \| undefined`    | no       | The label is hidden visually and stays for screen readers.      |
+| `name`         | `string`                  | yes      |                                                                 |
+| `options`      | `readonly SelectOption[]` | yes      |                                                                 |
+| `defaultValue` | `string \| undefined`     | no       |                                                                 |
+| `form`         | `string \| undefined`     | no       | The id of a form the select belongs to when it sits outside it. |
 
 ### SiteFooter
 

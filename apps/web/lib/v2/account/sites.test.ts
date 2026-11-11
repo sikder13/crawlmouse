@@ -79,12 +79,18 @@ describe('parseEditBody', () => {
     expect(parseEditBody({ schedule: 'none' })).toEqual({ schedule: 'none' });
   });
 
+  it('a schedule of none ignores a day and hour sent beside it (a form without script sends both)', () => {
+    expect(parseEditBody({ schedule: 'none', dow: '2', hour: '06' })).toEqual({ schedule: 'none' });
+    expect(parseEditBody({ schedule: 'none', dow: 2 })).toEqual({ schedule: 'none' });
+    // Still read, so a day or hour out of range is refused with none too.
+    expect(parseEditBody({ schedule: 'none', dow: 9, hour: 3 })).toBeNull();
+  });
+
   it('refuses anything else', () => {
     for (const body of [
       {},
       { schedule: 'weekly' },
       { schedule: 'weekly', dow: 2 },
-      { schedule: 'none', dow: 2, hour: 3 },
       { dow: 2, hour: 3 },
       { schedule: 'daily', dow: 2, hour: 3 },
       { schedule: 'on_deploy' },

@@ -26,7 +26,7 @@ describe('noticeLine', () => {
     ['check_running', 'A check of this site is already running. Ask for another once it ends.'],
     [
       'recently_checked',
-      'This site was checked moments ago, so no new check was started. Ask again from Tue 13:30.',
+      'A check of this site was asked for in the last few minutes, so no new one was started. Ask again from Tue 13:30.',
     ],
     ['confirm_required', 'The site was not removed: tick the box to confirm, then remove it.'],
     ['site_paused', 'Checks of this site are paused, so it was not checked.'],
@@ -63,7 +63,7 @@ describe('noticeLine', () => {
     ],
     [
       'marked_done_recently_checked',
-      'Marked done. This site was checked moments ago, so no re-check was queued; the next check confirms the fix or reopens it. A re-check can be asked from Tue 13:30.',
+      'Marked done. A check of this site was asked for in the last few minutes, so no re-check was queued; the next check confirms the fix or reopens it. A re-check can be asked from Tue 13:30.',
     ],
     [
       'marked_done_capacity',
@@ -105,6 +105,13 @@ describe('noticeLine', () => {
     expect(noticeLine({ notice: 'marked_done_capped' }, ZONE)!.text).toBe(
       'Marked done. This site has used its re-checks for the last 24 hours, so none was queued; the next check confirms the fix or reopens it.',
     );
+  });
+
+  it('neither recently-checked line claims a check ran or succeeded (its check may have failed)', () => {
+    for (const code of ['recently_checked', 'marked_done_recently_checked'] as const)
+      expect(noticeLine({ notice: code, next: NEXT }, ZONE)!.text).not.toMatch(
+        /\bwas checked\b|succeeded|passed/,
+      );
   });
 
   it('the time is in the account’s zone', () => {

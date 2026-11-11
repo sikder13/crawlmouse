@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, type FocusEvent, type FormEvent } from 'react';
+import { useId, type FocusEvent, type FormEvent } from 'react';
 import { Button, type ButtonSize, type ButtonVariant } from '../../Button';
 import { Field } from '../../Field';
 import { Select } from '../../Select';
@@ -82,16 +82,8 @@ export function ActionControl({
   );
 }
 
-/**
- * An action's fields on a live page. A select with `while` is disabled, and so not sent, unless the
- * select it names holds one of its values.
- */
+/** An action's fields on a live page. */
 function Inputs({ inputs, prefix }: { inputs: readonly ActionInput[]; prefix: string }) {
-  const [chosen, setChosen] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      inputs.flatMap((i) => (i.kind === 'select' ? [[i.name, i.value] as const] : [])),
-    ),
-  );
   return (
     <>
       {inputs.map((i) => {
@@ -120,8 +112,6 @@ function Inputs({ inputs, prefix }: { inputs: readonly ActionInput[]; prefix: st
               name={i.name}
               options={i.options}
               defaultValue={i.value}
-              disabled={i.while ? !i.while.values.includes(chosen[i.while.name] ?? '') : false}
-              onChange={(value) => setChosen((c) => ({ ...c, [i.name]: value }))}
             />
           );
         return (

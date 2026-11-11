@@ -12,6 +12,7 @@ import { LiveActions } from '../../components/v2/screens/account/LiveActions';
 import { fixture } from '../../lib/v2/fixtures';
 import { action } from '../../lib/v2/view/account-actions';
 import { dashboardPreview } from '../../app/(v2-preview)/v2-preview/_preview/accounts';
+import { parseEditBody } from '../../lib/v2/account/sites';
 import { packetPrompt } from '../../lib/v2/view/segment/fixes';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -158,7 +159,7 @@ describe('a site’s settings forms on a live page', () => {
       (m) => m.sitePreview('home').settings.rows,
     );
 
-  it('the schedule form sends its day and hour only with a timed schedule', async () => {
+  it('the schedule form, without script, posts what the route reads for every cadence', async () => {
     const schedule = (await rows()).find((r) => r.label === 'Schedule')!.action!;
     render(
       <LiveActions>
@@ -166,15 +167,17 @@ describe('a site’s settings forms on a live page', () => {
       </LiveActions>,
     );
     const form = host.querySelector('form')!;
-    const sent = () => [...new FormData(form).keys()];
-    expect(sent()).toEqual(['_method', 'schedule', 'dow', 'hour']);
     const cadence = form.querySelector('select[name="schedule"]') as HTMLSelectElement;
-    act(() => {
-      cadence.value = 'none';
-      cadence.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    expect(sent()).toEqual(['_method', 'schedule']);
-    expect(new FormData(form).get('schedule')).toBe('none');
+    // A person picks each cadence in turn, "none" first, as a page without script lets them.
+    for (const value of ['none', 'monthly', 'weekly']) {
+      cadence.value = value;
+      const fields = Object.fromEntries(new FormData(form)) as Record<string, string>;
+      expect(Object.keys(fields)).toEqual(['_method', 'schedule', 'dow', 'hour']);
+      const { _method, ...rest } = fields;
+      expect(_method).toBe('PATCH');
+      expect(parseEditBody(rest), value).toMatchObject({ schedule: value });
+    }
+    expect(form.querySelectorAll('select:disabled')).toHaveLength(0);
   });
 
   it('remove asks for a ticked confirmation, posted as confirm=remove', async () => {

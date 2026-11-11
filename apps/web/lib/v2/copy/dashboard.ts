@@ -56,6 +56,10 @@ export const DASHBOARD_COPY = {
   sitesFirstRun: (free: string) => `Checked weekly for ${TRIAL_DAYS} days, then ${free} on Free`,
   /** Day 0 with no site yet: the account exists, nothing is watched. */
   noSiteTitle: 'Add the site to watch',
+  /** Day 0 for a seat that cannot add a site (a developer, or a manager scoped to some clients). */
+  noSiteSeatTitle: 'No site here yet',
+  noSiteSeatNote:
+    'Sites are added by the account’s owner, or by a manager whose seat covers every client. When a site you can see is added, its first check and its results appear here.',
   noSiteNote:
     'Adding a site starts its first check. Its grades, crawlers and fixes appear here when that check ends.',
   /** The email-a-developer form's one field, on a live page. */
@@ -75,8 +79,9 @@ export const DASHBOARD_COPY = {
   noAccountBody:
     'This sign-in is not a member of any account. If you were invited, open the invitation link from its email.',
   ambiguousTitle: 'More than one account',
-  ambiguousBody:
-    'This sign-in is a member of more than one account and none is set as the one to open. Ask the owner of the account you want, or write to support.',
+  /** `support` is the footer's address (SUPPORT_EMAIL in components/v2/footer-links.ts). */
+  ambiguousBody: (support: string) =>
+    `This sign-in is a member of more than one account and none is set as the one to open. Ask the owner of the account you want, or write to ${support}.`,
 };
 
 /** The Pro set-up items (FACTS l.57), each as an offer and as done. */
@@ -548,6 +553,11 @@ export const DASHBOARD_ADDITIONS: Addition[] = [
     screen: 'dashboard',
     what: 'Day 0 with no site: the header asks for the site, the sites card says a first check starts when one is added',
     source: 'CC-26b brief, D8',
+  },
+  {
+    screen: 'dashboard',
+    what: 'Day 0 with no site, for a seat that cannot add one: who adds sites, with no add control',
+    source: 'CC-26b review round 2 (pages, minor 1)',
   },
   {
     screen: 'dashboard',

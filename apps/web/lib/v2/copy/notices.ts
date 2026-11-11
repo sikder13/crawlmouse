@@ -23,7 +23,8 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   capacity: () => 'Today’s checks are all taken, so nothing was started. Try again later.',
   check_running: () => 'A check of this site is already running. Ask for another once it ends.',
   recently_checked: (at) =>
-    `This site was checked moments ago, so no new check was started.${at ? ` Ask again from ${at}.` : ''}`,
+    // The bucket's check may have finished, failed or been deferred: the line names the request only.
+    `A check of this site was asked for in the last few minutes, so no new one was started.${at ? ` Ask again from ${at}.` : ''}`,
   site_paused: () => 'Checks of this site are paused, so it was not checked.',
   site_exists: () => 'That site is already on this account.',
   upgrade_required: () => 'That needs a paid plan.',
@@ -51,7 +52,7 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   marked_done_check_running: () =>
     `Marked done. A check of this site was already running, so no re-check was queued; ask for one once it ends. ${capitalised(NEXT_CHECK)}`,
   marked_done_recently_checked: (at) =>
-    `Marked done. This site was checked moments ago, so no re-check was queued; ${NEXT_CHECK}${at ? ` A re-check can be asked from ${at}.` : ''}`,
+    `Marked done. A check of this site was asked for in the last few minutes, so no re-check was queued; ${NEXT_CHECK}${at ? ` A re-check can be asked from ${at}.` : ''}`,
   marked_done_capacity: () =>
     `Marked done. Today’s checks are all taken, so no re-check was queued; ${NEXT_CHECK}`,
   marked_done_site_paused: () =>
