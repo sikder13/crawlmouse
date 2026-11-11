@@ -49,16 +49,10 @@ type Events = {
   'check.failed': { data: CheckFailed };
   'check.cancel.requested': { data: CheckCancelRequested };
   // CC-26b: a member asked for a fix's packet to be emailed to a developer
-  // (POST /api/fixes/[id]/email-developer). CC-28's mailer sends it; nothing in CC-26b does.
-  'fix.email_developer_requested': {
-    data: {
-      fixId: string;
-      siteId: string;
-      accountId: string;
-      requestedBySeatId: string;
-      to: string;
-    };
-  };
+  // (POST /api/fixes/[id]/email-developer). The request, address included, is a
+  // fix_email_requests row; the event names only that row, so no address sits in Inngest's event
+  // history. CC-28's mailer reads the row and sends; nothing in CC-26b does.
+  'fix.email_developer_requested': { data: { requestId: string } };
 };
 
 export const inngest = new Inngest({
