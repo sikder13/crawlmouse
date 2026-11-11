@@ -5,6 +5,7 @@ import { isApiPath, isStateChanging, policyForPath } from '@/lib/security/route-
 import { isCrossSite, isJsonBody, isSameOrigin } from '@/lib/security/same-origin';
 import { updateSession } from '@/lib/supabase/middleware';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { isRewriteTarget, rewriteOf } from '@/lib/v2/rewrites';
 
 /**
  * API requests: a state change to a route the registry guards (lib/security/route-policy.ts) is
@@ -60,7 +61,9 @@ export async function handleEdge(
 ): Promise<NextResponse> {
   if (isApiPath(req.nextUrl.pathname)) return guardApi(req, report);
 
-  const res = v2Dashboard(req, await refresh(req));
+  // A rewrite target has no address of its own (lib/v2/rewrites.ts).
+  if (isRewriteTarget(req.nextUrl.pathname)) return new NextResponse(null, { status: 404 });
+  const res = v2Rewrite(req, await refresh(req));
 
   // The embed badge is a widget, never a page to index. Report pages (/r/) get no header: each one's
   // robots meta decides (app/r/[slug]/page.tsx generateMetadata), so a claimed report can be indexed.
@@ -85,20 +88,18 @@ export async function handleEdge(
   return res;
 }
 
-const DASHBOARD = /^\/dashboard\/?$/;
-
 /**
- * With V2_CHECKS_PUBLIC on, `/dashboard` is served by `app/dashboard/v2/page.tsx` (CC-26b D1, D8). A
- * rewrite rather than a branch in v1's page, because a page's stylesheets are those of every module
- * it imports, dynamically or not: v1's page stays byte-for-byte main's and loads none of v2's CSS.
- * The rewrite carries what the session refresh put on its response (the rotated auth cookies and the
- * no-store headers that must ride with them) and the request headers the refresh updated, so the
+ * With V2_CHECKS_PUBLIC on, a path in `V2_REWRITES` is served by its v2 page. The rewrite carries
+ * what the session refresh put on its response (the rotated auth cookies and the no-store headers
+ * that must ride with them), the request headers the refresh updated, and the query string, so the
  * page reads the refreshed session as a v1 page would.
  */
-function v2Dashboard(req: NextRequest, refreshed: NextResponse): NextResponse {
-  if (!checksPublicEnabled() || !DASHBOARD.test(req.nextUrl.pathname)) return refreshed;
-  const url = new URL(`/dashboard/v2${req.nextUrl.search}`, req.url);
-  const res = NextResponse.rewrite(url, { request: { headers: req.headers } });
+function v2Rewrite(req: NextRequest, refreshed: NextResponse): NextResponse {
+  const rewrite = checksPublicEnabled() ? rewriteOf(req.nextUrl.pathname) : null;
+  if (rewrite === null) return refreshed;
+  const res = NextResponse.rewrite(new URL(`${rewrite.to}${req.nextUrl.search}`, req.url), {
+    request: { headers: req.headers },
+  });
   for (const cookie of refreshed.cookies.getAll()) res.cookies.set(cookie);
   for (const name of ['cache-control', 'expires', 'pragma']) {
     const value = refreshed.headers.get(name);

@@ -43,9 +43,12 @@ route below answers 404.
 | Ceiling  | A check start in these two functions takes a `global:audits:day` slot inside the SQL, after the function's own caps pass; a refusal rolls the slot back (`scripts/db/sites-race.test.ts`). | `request_capped_check`, `add_site`                                         |
 
 The dashboard is served by a rewrite, not a branch in v1's page: a page's stylesheets are those of
-the modules it imports, dynamic imports included (measured: `evidence-r14-css.md` in the step notes). With `V2_CHECKS_PUBLIC` on, `middleware.ts` rewrites
-`/dashboard` to `app/dashboard/v2/page.tsx`; v1's `app/dashboard/page.tsx` is main's file, pinned by
-its sha256 in `app/dashboard/v2/page.test.tsx`.
+the modules it imports, dynamic imports included (measured: `evidence-r14-css.md` in the step notes).
+With `V2_CHECKS_PUBLIC` on, `middleware.ts` rewrites `/dashboard` to `app/dashboard/v2/page.tsx`
+through the one table of v2 rewrites, `V2_REWRITES` (`apps/web/lib/v2/rewrites.ts`, owner ruling
+Q17); a request for a target at its own address is a 404, flag on or off (`middleware.test.ts`).
+v1's `app/dashboard/page.tsx` is main's file, pinned by its sha256 in
+`app/dashboard/v2/page.test.tsx`.
 
 ## Known gaps
 

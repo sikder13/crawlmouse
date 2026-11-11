@@ -83,7 +83,7 @@ describe('handleEdge', () => {
   });
 });
 
-describe('the v2 dashboard rewrite (CC-26b D1)', () => {
+describe('the v2 rewrites (owner ruling Q17)', () => {
   const at = (path: string) => new NextRequest(new Request(`https://crawlmouse.com${path}`));
   const rewriteOf = (res: NextResponse) => res.headers.get('x-middleware-rewrite');
 
@@ -125,14 +125,33 @@ describe('the v2 dashboard rewrite (CC-26b D1)', () => {
   it.each([
     ['the flag unset', '', '/dashboard'],
     ['the flag not 1', 'true', '/dashboard'],
-    ['another page', '1', '/dashboard/x'],
+    ['another page', '1', '/dashboards'],
     ['the home page', '1', '/'],
   ])('no rewrite with %s', async (_name, flag, path) => {
     vi.stubEnv('V2_CHECKS_PUBLIC', flag);
     const res = await handleEdge(at(path), rotated);
     expect(rewriteOf(res)).toBeNull();
+    expect(res.status).toBe(200);
     expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
   });
+
+  it.each([
+    ['1', '/dashboard/v2'],
+    ['1', '/dashboard/v2/'],
+    ['1', '/dashboard/v2/anything'],
+    ['', '/dashboard/v2'],
+    ['', '/dashboard/v2?upgraded=1'],
+  ])(
+    'with V2_CHECKS_PUBLIC=%j, a direct request for %s is a 404 and is not refreshed',
+    async (flag, path) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+      const refresh = vi.fn(rotated);
+      const res = await handleEdge(at(path), refresh);
+      expect(res.status).toBe(404);
+      expect(rewriteOf(res)).toBeNull();
+      expect(refresh).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('middleware (exported entrypoint)', () => {
