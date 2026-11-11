@@ -97,14 +97,40 @@ export async function readViewer(
   if (seat === null) return { kind: 'ambiguous', userId: user.id };
   if (seat === undefined) return { kind: 'no_account', userId: user.id };
 
-  const account = await deps.session
+  const entitlement = await readEntitlement(deps.session, seat.account_id, deps.now());
+  if (entitlement === null) return { kind: 'no_account', userId: user.id };
+  return {
+    kind: 'viewer',
+    viewer: {
+      userId: user.id,
+      email: user.email,
+      seat: { id: seat.id, role: seat.role, theme: seat.theme },
+      ...entitlement,
+    },
+  };
+}
+
+export type Entitlement = Pick<AccountViewer, 'account' | 'tier' | 'gates' | 'limits'>;
+
+/**
+ * An account's tier, gates and limits at `now`, read with the caller's own client, so it is null for
+ * an account the caller does not sit on (or a deleted one). A route that acts on a row reads the
+ * row's own account here once the caller's membership of it is established: the viewer's account is
+ * the one they act in by default, which need not be the row's.
+ */
+export async function readEntitlement(
+  session: SupabaseClient,
+  accountId: string,
+  now: Date,
+): Promise<Entitlement | null> {
+  const account = await session
     .from('accounts')
     .select(ACCOUNT_COLUMNS)
-    .eq('id', seat.account_id)
+    .eq('id', accountId)
     .is('deleted_at', null)
     .maybeSingle();
   if (account.error) failed('accounts read', account.error);
-  if (account.data === null) return { kind: 'no_account', userId: user.id };
+  if (account.data === null) return null;
   const row = AccountRow.parse(account.data);
 
   const clock = {
@@ -115,33 +141,27 @@ export async function readViewer(
     trialVariant: row.trial_variant,
     trialEndsAt: row.trial_ends_at,
   };
-  const tier = effectiveTier(clock, deps.now());
+  const tier = effectiveTier(clock, now);
   // The stored limits are the plan's with its extras; once the clock has moved the account to
   // another tier than the stored one, that tier's own limits apply.
   const stored = tier === row.tier;
   return {
-    kind: 'viewer',
-    viewer: {
-      userId: user.id,
-      email: user.email,
-      seat: { id: seat.id, role: seat.role, theme: seat.theme },
-      account: {
-        id: row.id,
-        kind: row.kind,
-        name: row.name,
-        state: row.state,
-        timezone: row.timezone,
-        trialEndsAt: row.trial_ends_at,
-        trialUsedAt: row.trial_used_at,
-        stateHistory: row.state_history,
-      },
-      tier,
-      gates: GATES[tier],
-      limits: {
-        sites: siteLimitAt({ ...clock, siteLimit: row.site_limit }, deps.now()),
-        seats: stored ? row.seat_limit : GATES[tier].seats,
-        competitorsPerSite: stored ? row.competitor_limit : GATES[tier].competitorsPerSite,
-      },
+    account: {
+      id: row.id,
+      kind: row.kind,
+      name: row.name,
+      state: row.state,
+      timezone: row.timezone,
+      trialEndsAt: row.trial_ends_at,
+      trialUsedAt: row.trial_used_at,
+      stateHistory: row.state_history,
+    },
+    tier,
+    gates: GATES[tier],
+    limits: {
+      sites: siteLimitAt({ ...clock, siteLimit: row.site_limit }, now),
+      seats: stored ? row.seat_limit : GATES[tier].seats,
+      competitorsPerSite: stored ? row.competitor_limit : GATES[tier].competitorsPerSite,
     },
   };
 }

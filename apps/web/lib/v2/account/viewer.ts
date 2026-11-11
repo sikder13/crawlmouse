@@ -17,7 +17,13 @@ import { supabaseAdmin } from '../../supabase/admin';
 import { supabaseServer } from '../../supabase/server';
 import { readViewer, type ViewerResult } from './viewer-read';
 
-export { readViewer, type AccountViewer, type ViewerResult } from './viewer-read';
+export {
+  readEntitlement,
+  readViewer,
+  type AccountViewer,
+  type Entitlement,
+  type ViewerResult,
+} from './viewer-read';
 
 /** The viewer of this request, from its session cookie. */
 export async function loadViewer(): Promise<ViewerResult> {

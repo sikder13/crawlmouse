@@ -10,7 +10,7 @@ import { GATES } from '../../entitlement-v2';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
-import { readViewer, type ViewerResult } from './viewer-read';
+import { readEntitlement, readViewer, type ViewerResult } from './viewer-read';
 
 let db: PGlite;
 const NOW = new Date('2026-11-10T12:00:00.000Z');
@@ -185,5 +185,57 @@ describe('readViewer', () => {
     const { accountId } = await personalAccount(db, owner.userId);
     await db.query(`update public.accounts set deleted_at = now() where id = $1`, [accountId]);
     expect(await read(owner)).toEqual({ kind: 'no_account', userId: owner.userId });
+  });
+  it('with two seats, a forged default naming neither account is not followed', async () => {
+    const a = await person('two');
+    const b = await person('other');
+    const c = await person('victim');
+    const mine = await personalAccount(db, a.userId);
+    const other = await personalAccount(db, b.userId);
+    const victim = await personalAccount(db, c.userId);
+    await addSeat(other.accountId, a, 'developer');
+    await db.query(`update public.users set default_account_id = $1 where id = $2`, [
+      victim.accountId,
+      a.userId,
+    ]);
+    const r = await read(a);
+    expect(r).toEqual({ kind: 'ambiguous', userId: a.userId });
+    const seen = strings(r);
+    expect(seen).not.toContain(victim.accountId);
+    expect(seen).not.toContain(mine.accountId);
+  });
+});
+
+describe('readEntitlement', () => {
+  it("reads each account a user sits on at that account's own tier", async () => {
+    const u = await person('both');
+    const p = await person('pro-owner');
+    const free = await personalAccount(db, u.userId);
+    const pro = await personalAccount(db, p.userId);
+    await db.query(
+      `update public.accounts set state = 'pro', tier = 'pro', site_limit = 5, seat_limit = 2,
+         competitor_limit = 1, current_subscription_id = 'sub_026b',
+         state_history = state_history || jsonb_build_array(jsonb_build_object('state', 'pro', 'since', now()::text))
+       where id = $1`,
+      [pro.accountId],
+    );
+    await addSeat(pro.accountId, u, 'developer');
+    const session = postgrestOver(db, { as: { userId: u.userId } });
+    const onFree = await readEntitlement(session, free.accountId, NOW);
+    const onPro = await readEntitlement(session, pro.accountId, NOW);
+    expect(onFree?.tier).toBe('free');
+    expect(onFree?.gates).toBe(GATES.free);
+    expect(onPro?.tier).toBe('pro');
+    expect(onPro?.gates).toBe(GATES.pro);
+    expect(onPro?.limits).toEqual({ sites: 5, seats: 2, competitorsPerSite: 1 });
+  });
+
+  it('is null for an account the caller does not sit on', async () => {
+    const u = await person('outsider');
+    const o = await person('insider');
+    await personalAccount(db, u.userId);
+    const theirs = await personalAccount(db, o.userId);
+    const session = postgrestOver(db, { as: { userId: u.userId } });
+    expect(await readEntitlement(session, theirs.accountId, NOW)).toBeNull();
   });
 });
