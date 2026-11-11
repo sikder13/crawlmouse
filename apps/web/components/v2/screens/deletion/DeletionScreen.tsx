@@ -36,7 +36,7 @@ export function DeletionScreen({ flow, view }: { flow: DeletionFlow; view: Delet
                 <ul className={styles.cardBody}>
                   {view.accounts.map((a) => {
                     // What happens to this account's plan, by its state (`deletionMoney`); nothing
-                    // for an account with no plan, or one that has ended.
+                    // for an account with no plan, or with a plan in any state it does not name.
                     const money = flow === 'deleteConfirm' ? deletionMoney(a.subscription) : null;
                     return (
                       <li key={a.id} data-account={a.id}>
