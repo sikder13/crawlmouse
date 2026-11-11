@@ -197,12 +197,21 @@ describe('expireUnkept', () => {
         throw new Error('canceling statement due to statement timeout');
       },
     };
-    expect(await expireUnkept(depsOf({ store: stopped }))).toEqual({
+    const reported: [string, Record<string, unknown>][] = [];
+    const deps = depsOf({ store: stopped });
+    deps.keep.report = (signal, extra) => void reported.push([signal, extra ?? {}]);
+    expect(await expireUnkept(deps)).toEqual({
       sites: 0,
       checks: 0,
       skipped: 1,
       left: 0,
     });
+    expect(reported).toEqual([
+      [
+        'expiry-site-skipped',
+        { siteId: check.siteId, error: 'canceling statement due to statement timeout' },
+      ],
+    ]);
     expect([...memory.objects.keys()]).toEqual([]);
     expect(await exists('checks', check.checkId)).toBe(1);
 

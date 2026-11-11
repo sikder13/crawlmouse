@@ -67,7 +67,7 @@ export interface ExpireOutput {
   sites: number;
   /** Their checks. */
   checks: number;
-  /** Sites left in place: their objects could not be removed, or their delete failed. */
+  /** Sites left in place: their objects could not be removed, or their delete failed. Each is reported. */
   skipped: number;
   /** Sites past keeping that this run did not reach. */
   left: number;
@@ -109,8 +109,13 @@ export async function expireUnkept(deps: ExpireDeps): Promise<ExpireOutput> {
           out.sites++;
           out.checks += site.checks.length;
         }
-      } catch {
+      } catch (cause) {
         out.skipped++;
+        // Named, so a site that is skipped run after run can be found: it outlives its 24 hours.
+        deps.keep.report('expiry-site-skipped', {
+          siteId: site.siteId,
+          error: cause instanceof Error ? cause.message.slice(0, 200) : 'not an Error',
+        });
       }
     }
     after = page.rows.at(-1)!.siteId;
