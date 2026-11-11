@@ -35,6 +35,11 @@ import {
   inputOf,
   type SiteShape,
 } from '../../../../lib/v2/view/test-support/generated-check';
+import {
+  AuditEvent,
+  AuditPageProvider,
+  type AuditPage,
+} from '../../../../components/v2/screens/result/AuditPage';
 import { LiveCrawl } from '../_crawl/LiveCrawl';
 import { CheckPage, noticeOf, resultOf } from './CheckPage';
 import { FAILURE_COPY } from './failure-copy';
@@ -653,6 +658,54 @@ describe('nothing internal goes on the wire for a kept check (D3)', () => {
     expect(source).toContain(account.id);
     expect(source).toContain('client@customer.example');
     await kept.close();
+  });
+
+  type Provider = ReactElement<{ page: AuditPage; children: unknown }>;
+  const pageOf = (node: unknown) => {
+    const el = node as Provider;
+    expect(el.type).toBe(AuditPageProvider);
+    return el.props.page;
+  };
+
+  it('each page tells its screens which page it is, which is what keep_clicked reports as `from`', () => {
+    const fix = fixesAsOf(one.dataset, one.dataset.checks[0]!)[0]!;
+    const from = {
+      result: pageOf(CheckPage({ read: one })),
+      segment: pageOf(SegmentBody({ read: one, segment: 'access' })),
+      fix: pageOf(FixBody({ read: one, found: fixOf(one, fix.id)! })),
+      map: pageOf(MapBody({ read: one, scope: 'hubs' })),
+    };
+    for (const [name, page] of Object.entries(from)) {
+      expect(page, name).toEqual({
+        checkId: FIRST,
+        checkRef: checkRef(FIRST),
+        from: name,
+        links: {},
+      });
+    }
+  });
+
+  it('a fix page sends fix_opened with the fix’s type and whether it is one of the Free three', () => {
+    const live = fixesAsOf(one.dataset, one.dataset.checks[0]!);
+    const sent = (fixId: string) => {
+      const body = FixBody({ read: one, found: fixOf(one, fixId)! }) as Provider;
+      const [event] = body.props.children as ReactElement<{ event: string; props: object }>[];
+      expect(event!.type).toBe(AuditEvent);
+      return event!.props;
+    };
+    const free = live[0]!;
+    const locked = live[FREE_FIXES]!;
+    expect(sent(free.id)).toEqual({
+      event: 'fix_opened',
+      props: { type: free.type, free: true, check_ref: checkRef(FIRST) },
+    });
+    expect(sent(locked.id)).toEqual({
+      event: 'fix_opened',
+      props: { type: locked.type, free: false, check_ref: checkRef(FIRST) },
+    });
+    // The two differ in what they send, so swapping `type` and `free` or dropping one is seen.
+    expect(typeof free.type).toBe('string');
+    expect(JSON.stringify([sent(free.id), sent(locked.id)])).not.toContain(FIRST);
   });
 
   it('events name the check by a reference that is not its id', () => {
