@@ -11,17 +11,21 @@ export type Theme = z.infer<typeof ThemeSchema>;
 
 /**
  * Sets `theme` on every active seat of `userId`, and only those: the one person's choice applies
- * on each account they sit on.
+ * on each account they sit on. `no_seat`, with nothing written, when they have no active seat.
  */
 export async function saveTheme(
   admin: SupabaseClient,
   userId: string,
   theme: Theme,
-): Promise<void> {
+): Promise<'saved' | 'no_seat'> {
+  const seats = await admin.from('seats').select('id').eq('user_id', userId).eq('status', 'active');
+  if (seats.error) throw new Error(`theme: seats read failed: ${seats.error.message}`);
+  if ((seats.data ?? []).length === 0) return 'no_seat';
   const { error } = await admin
     .from('seats')
     .update({ theme })
     .eq('user_id', userId)
     .eq('status', 'active');
   if (error) throw new Error(`theme: seats update failed: ${error.message}`);
+  return 'saved';
 }

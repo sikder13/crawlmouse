@@ -27,7 +27,7 @@ export const SITE_COPY = {
     deferred: (until: string) => `First check waiting until ${until}`,
     failed: 'First check failed',
     none: 'Not checked yet',
-    pagesRead: (n: string) => `${n} pages read so far`,
+    pagesRead: (n: number, shown: string) => `${shown} ${plural(n, 'page', 'pages')} read so far`,
     body: 'Grades, crawlers and fixes appear here when the first check ends.',
     failedBody: 'The first check ended without a result. Run it again to grade the site.',
     noneBody: 'No check has been asked for yet. Run one to grade the site.',
@@ -39,6 +39,15 @@ export const SITE_COPY = {
    */
   markedDoneNote: (day: string) =>
     `marked done ${day}; the next check confirms the fix or reopens it`,
+  /** The site settings' fields, on a live page. */
+  fields: {
+    cadence: 'How often',
+    weekday: 'Day',
+    hour: 'Hour, in the account’s zone',
+    competitors: { label: 'Competitor sites', placeholder: 'competitor.example, another.example' },
+    staging: { label: 'Staging URL (empty for none)', placeholder: 'staging.example.com' },
+    removeConfirm: 'Yes, remove this site',
+  },
   /** The fix row's control on a live page. */
   markDone: 'Mark done',
 };

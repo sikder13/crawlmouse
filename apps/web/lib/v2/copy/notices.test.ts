@@ -79,7 +79,7 @@ describe('noticeLine', () => {
     ],
     [
       'email_requested',
-      'Recorded. The fix will be emailed to that address; it has not been sent yet.',
+      'Recorded. Nothing has been sent: the fix goes to that address once email sending is switched on.',
     ],
     ['invalid_email', 'That is not an email address, so nothing was recorded.'],
     [

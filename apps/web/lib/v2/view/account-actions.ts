@@ -151,8 +151,11 @@ export interface ActionView {
    * for which change, "Packet" for which fix (WCAG 2.4.4).
    */
   context: string | null;
-  /** A field the person fills before posting (the add-site address); a live page shows it. */
-  input?: ActionInput;
+  /**
+   * The fields the person fills before posting (the add-site address, a site's schedule); a live
+   * page shows them, a preview does not.
+   */
+  inputs?: readonly ActionInput[];
   /**
    * A read whose answer is a fix's packet and its prompt: a live page copies the prompt instead of
    * opening the JSON.
@@ -160,12 +163,30 @@ export interface ActionView {
   copy?: true;
 }
 
-export interface ActionInput {
-  name: string;
-  label: string;
-  type: 'text' | 'url' | 'email';
-  placeholder: string;
-}
+export type ActionInput =
+  | {
+      kind: 'text';
+      name: string;
+      label: string;
+      type: 'text' | 'url' | 'email';
+      placeholder: string;
+      /** What the field holds when the page opens (a site's competitors as they stand). */
+      value?: string;
+      required: boolean;
+    }
+  | {
+      kind: 'select';
+      name: string;
+      label: string;
+      options: readonly { value: string; label: string }[];
+      value: string;
+      /**
+       * Posted only while the select named `name` holds one of `values`: a disabled control is not
+       * sent (the schedule's weekday and hour, with no schedule chosen).
+       */
+      while?: { name: string; values: readonly string[] };
+    }
+  | { kind: 'checkbox'; name: string; label: string; value: string; required: true };
 
 /** An action, its route's parameters filled from `params`. */
 export function action(
@@ -177,14 +198,14 @@ export function action(
     query = '',
     fields = {},
     context = null,
-    input,
+    inputs,
     copy,
   }: {
     primary?: boolean;
     query?: string;
     fields?: Record<string, string>;
     context?: string | null;
-    input?: ActionInput;
+    inputs?: readonly ActionInput[];
     copy?: true;
   } = {},
 ): ActionView {
@@ -203,7 +224,7 @@ export function action(
       spec.verb === 'GET' || spec.verb === 'POST' ? fields : { _method: spec.verb, ...fields },
     primary,
     context,
-    ...(input ? { input } : {}),
+    ...(inputs ? { inputs } : {}),
     ...(copy ? { copy } : {}),
   };
 }

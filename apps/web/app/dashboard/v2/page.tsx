@@ -7,6 +7,7 @@ import { DashboardScreen } from '@/components/v2/screens/dashboard/DashboardScre
 import { supabaseServer } from '@/lib/supabase/server';
 import { readAccount } from '@/lib/v2/account/pages';
 import { loadViewer } from '@/lib/v2/account/viewer';
+import { reachedByRewrite } from '@/lib/v2/rewrite-target';
 import { dashboardView } from '@/lib/v2/view/dashboard';
 import { noticeLine } from '@/lib/v2/copy/notices';
 
@@ -30,6 +31,8 @@ export default async function V2Dashboard({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   if (!checksPublicEnabled()) return notFound();
+  // Only through the middleware's rewrite of /dashboard: the page has no address of its own.
+  if (!(await reachedByRewrite())) return notFound();
   const r = await loadViewer();
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;

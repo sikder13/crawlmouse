@@ -11,25 +11,17 @@ import { ActionControl } from '../../components/v2/screens/account/ActionControl
 import { LiveActions } from '../../components/v2/screens/account/LiveActions';
 import { fixture } from '../../lib/v2/fixtures';
 import { action } from '../../lib/v2/view/account-actions';
+import { dashboardPreview } from '../../app/(v2-preview)/v2-preview/_preview/accounts';
 import { packetPrompt } from '../../lib/v2/view/segment/fixes';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const fix = fixture('bad-site').fixes.find((f) => f.packet !== null)!;
 const copyFix = action('copyFix', 'Copy fix', { id: fix.id }, { copy: true });
-const email = action(
-  'emailDeveloper',
-  'Email to my developer',
-  { id: fix.id },
-  {
-    input: {
-      name: 'email',
-      type: 'email',
-      label: 'Developer’s email',
-      placeholder: 'dev@example.com',
-    },
-  },
-);
+// The dashboard's own action, as its change rows render it.
+const email = dashboardPreview('home')
+  .changed.flatMap((c) => c.actions)
+  .find((a) => a.route === '/api/fixes/[id]/email-developer')!;
 
 let root: Root | null = null;
 let host: HTMLDivElement;
@@ -150,13 +142,74 @@ describe('Email to my developer on a live page', () => {
     const input = host.querySelector('input[name="email"]') as HTMLInputElement;
     expect(input.type).toBe('email');
     expect(input.required).toBe(true);
-    expect(host.querySelector('form')!.getAttribute('action')).toBe(
-      `/api/fixes/${fix.id}/email-developer`,
-    );
+    expect(host.querySelector('form')!.getAttribute('action')).toBe(email.href);
   });
 
   it('a preview shows no field', () => {
     render(<ActionControl action={email} />);
     expect(host.querySelector('input[name="email"]')).toBeNull();
+  });
+});
+
+describe('a site’s settings forms on a live page', () => {
+  // Imported here so the site preview's records are read once.
+  const rows = () =>
+    import('../../app/(v2-preview)/v2-preview/_preview/accounts').then(
+      (m) => m.sitePreview('home').settings.rows,
+    );
+
+  it('the schedule form sends its day and hour only with a timed schedule', async () => {
+    const schedule = (await rows()).find((r) => r.label === 'Schedule')!.action!;
+    render(
+      <LiveActions>
+        <ActionControl action={schedule} />
+      </LiveActions>,
+    );
+    const form = host.querySelector('form')!;
+    const sent = () => [...new FormData(form).keys()];
+    expect(sent()).toEqual(['_method', 'schedule', 'dow', 'hour']);
+    const cadence = form.querySelector('select[name="schedule"]') as HTMLSelectElement;
+    act(() => {
+      cadence.value = 'none';
+      cadence.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(sent()).toEqual(['_method', 'schedule']);
+    expect(new FormData(form).get('schedule')).toBe('none');
+  });
+
+  it('remove asks for a ticked confirmation, posted as confirm=remove', async () => {
+    const remove = (await rows()).find((r) => r.label === 'Remove this site')!.action!;
+    render(
+      <LiveActions>
+        <ActionControl action={remove} />
+      </LiveActions>,
+    );
+    const box = host.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    expect(box.required).toBe(true);
+    expect([box.name, box.value]).toEqual(['confirm', 'remove']);
+    expect(host.querySelector('label')!.textContent).toContain('Yes, remove this site');
+  });
+
+  it('a preview renders none of these fields', async () => {
+    const schedule = (await rows()).find((r) => r.label === 'Schedule')!.action!;
+    render(<ActionControl action={schedule} />);
+    expect(host.querySelectorAll('select, input:not([type="hidden"])')).toHaveLength(0);
+  });
+});
+
+describe('the notice line', () => {
+  it('takes focus when the page opens with it, so it is read out', async () => {
+    const { Notice } = await import('../../components/v2/screens/account/Notice');
+    render(<Notice notice={{ code: 'capped', text: 'This site has used its re-checks.' }} />);
+    const p = host.querySelector('[data-v2-notice="capped"]');
+    expect(p).not.toBeNull();
+    expect(document.activeElement).toBe(p);
+  });
+
+  it('with no notice nothing is drawn and focus stays where it was', async () => {
+    const { Notice } = await import('../../components/v2/screens/account/Notice');
+    render(<Notice notice={null} />);
+    expect(host.innerHTML).toBe('');
+    expect(document.activeElement).toBe(document.body);
   });
 });

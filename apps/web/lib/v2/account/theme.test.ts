@@ -67,6 +67,26 @@ describe('saveTheme', () => {
   });
 });
 
+describe('saveTheme for a caller with no active seat', () => {
+  it('answers no_seat and writes nothing', async () => {
+    const owner = await signUp(db, `own2-${randomUUID().slice(0, 8)}@example.com`);
+    const acct = await personalAccount(db, owner);
+    // A user with only a removed seat: their own personal account's seat is removed too.
+    const me = await signUp(db, `gone-${randomUUID().slice(0, 8)}@example.com`);
+    await db.query(
+      `update public.seats set status = 'removed', removed_at = now() where user_id = $1`,
+      [me],
+    );
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at, removed_at)
+       values ($1, $2, 'gone@example.com', 'developer', 'removed', now(), now())`,
+      [acct.accountId, me],
+    );
+    expect(await saveTheme(postgrestOver(db), me, 'dark')).toBe('no_seat');
+    expect((await themes(me)).every((r) => r.theme === 'system')).toBe(true);
+  });
+});
+
 describe('ThemeBody', () => {
   it('takes {theme} and nothing else', () => {
     expect(ThemeBody.safeParse({ theme: 'system' }).success).toBe(true);

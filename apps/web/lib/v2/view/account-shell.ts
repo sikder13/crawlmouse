@@ -10,7 +10,14 @@ import { GATES, type Tier } from '../../entitlement-v2';
 import { ACCOUNT_COPY as COPY } from '../copy/account';
 import { calendarDays, dayDate, daysBefore, hourMinute } from '../format';
 import { plural } from '../words';
-import { PLAN_NAMES, primarySite, primarySites, resultChecks, type AccountView } from './account';
+import {
+  PLAN_NAMES,
+  primarySite,
+  primarySites,
+  readerSeat,
+  resultChecks,
+  type AccountView,
+} from './account';
 import { ACCOUNT_NAV, action, type ActionView } from './account-actions';
 
 export interface NavItemView {
@@ -139,8 +146,7 @@ export function accountShellView(
   { plan = 'rail' }: { plan?: PlanPlace } = {},
 ): ShellView {
   const fresh = newChanges(v).length;
-  // The reader's own seat; a preview names none and reads as the owner.
-  const seat = v.d.seats.find((s) => (v.seatId ? s.id === v.seatId : s.role === 'owner'));
+  const seat = readerSeat(v);
   return {
     nav: ACCOUNT_NAV.map((n) => ({
       ...n,

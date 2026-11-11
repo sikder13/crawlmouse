@@ -10,7 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { decideTrial, type FirstLoginDeps, type TrialOutcome } from '../../auth/first-login';
 import type { MemberAccount } from '../../auth/door-store';
-import type { NoticeCode } from './route';
+import { isId, type NoticeCode } from './route';
 
 type TrialRefusal = NoticeCode | 'not_found';
 
@@ -62,6 +62,14 @@ const AccountRow = z.object({
  * The account as the door's decision reads it, through the caller's own client, with the caller's
  * active owner seat on it; null when either is not there.
  */
+/** The trial-start body's account id: `accountId`, a table id, and no other field; else null. */
+export function trialAccountId(fields: Readonly<Record<string, unknown>>): string | null {
+  const { accountId, ...rest } = fields;
+  return typeof accountId === 'string' && isId(accountId) && Object.keys(rest).length === 0
+    ? accountId
+    : null;
+}
+
 export async function ownedAccount(
   session: SupabaseClient,
   accountId: string,

@@ -1,7 +1,15 @@
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
-import { meantMethod, notFound, readBody, refuse, refuseTo, respond } from '@/lib/v2/account/route';
+import {
+  backFrom,
+  meantMethod,
+  notFound,
+  readBody,
+  refuse,
+  refuseTo,
+  respond,
+} from '@/lib/v2/account/route';
 import { saveTheme, ThemeBody } from '@/lib/v2/account/theme';
 
 export const runtime = 'nodejs';
@@ -19,17 +27,18 @@ async function update(req: Request): Promise<Response> {
   } = await sb.auth.getUser();
   if (!user) return refuse(401, 'auth_required');
 
+  // A form goes back to the page its theme control was on.
+  const back = backFrom(req, '/dashboard');
   const body = await readBody(req);
-  if (!body) return refuseTo(req, '/dashboard', 400, 'invalid');
+  if (!body) return refuseTo(req, back, 400, 'invalid');
   const { method, fields } = meantMethod(req, body);
   if (method !== 'PATCH') return refuse(405, 'method_not_allowed');
   const parsed = ThemeBody.safeParse(fields);
-  if (!parsed.success) return refuseTo(req, '/dashboard', 400, 'invalid');
+  if (!parsed.success) return refuseTo(req, back, 400, 'invalid');
 
-  await saveTheme(supabaseAdmin(), user.id, parsed.data.theme);
-  return body.kind === 'form'
-    ? respond('form', '/dashboard')
-    : Response.json({ theme: parsed.data.theme });
+  const saved = await saveTheme(supabaseAdmin(), user.id, parsed.data.theme);
+  if (saved === 'no_seat') return refuse(404, 'no_seat');
+  return body.kind === 'form' ? respond('form', back) : Response.json({ theme: parsed.data.theme });
 }
 
 export async function PATCH(req: Request) {

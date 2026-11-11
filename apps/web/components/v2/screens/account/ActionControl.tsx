@@ -1,10 +1,11 @@
 'use client';
 
-import { useId, type FocusEvent, type FormEvent } from 'react';
+import { useId, useState, type FocusEvent, type FormEvent } from 'react';
 import { Button, type ButtonSize, type ButtonVariant } from '../../Button';
 import { Field } from '../../Field';
+import { Select } from '../../Select';
 import { VisuallyHidden } from '../../VisuallyHidden';
-import type { ActionView } from '../../../../lib/v2/view/account-actions';
+import type { ActionInput, ActionView } from '../../../../lib/v2/view/account-actions';
 import styles from './AccountScreen.module.css';
 import { CopyPacket } from './CopyPacket';
 import { useLive } from './LiveActions';
@@ -72,21 +73,64 @@ export function ActionControl({
       {Object.entries(action.fields).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
-      {live && action.input ? (
-        <Field
-          id={inputId}
-          label={action.input.label}
-          hideLabel
-          type={action.input.type}
-          name={action.input.name}
-          placeholder={action.input.placeholder}
-          required
-        />
-      ) : null}
+      {live && action.inputs ? <Inputs inputs={action.inputs} prefix={inputId} /> : null}
       <Button type="submit" variant={v} size={size}>
         {action.label}
         {action.context ? <VisuallyHidden>{` ${action.context}`}</VisuallyHidden> : null}
       </Button>
     </form>
+  );
+}
+
+/**
+ * An action's fields on a live page. A select with `while` is disabled, and so not sent, unless the
+ * select it names holds one of its values.
+ */
+function Inputs({ inputs, prefix }: { inputs: readonly ActionInput[]; prefix: string }) {
+  const [chosen, setChosen] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      inputs.flatMap((i) => (i.kind === 'select' ? [[i.name, i.value] as const] : [])),
+    ),
+  );
+  return (
+    <>
+      {inputs.map((i) => {
+        const id = `${prefix}-${i.name}`;
+        if (i.kind === 'text')
+          return (
+            <Field
+              key={i.name}
+              id={id}
+              label={i.label}
+              hideLabel
+              type={i.type}
+              name={i.name}
+              placeholder={i.placeholder}
+              defaultValue={i.value}
+              required={i.required}
+            />
+          );
+        if (i.kind === 'select')
+          return (
+            <Select
+              key={i.name}
+              id={id}
+              label={i.label}
+              hideLabel
+              name={i.name}
+              options={i.options}
+              defaultValue={i.value}
+              disabled={i.while ? !i.while.values.includes(chosen[i.while.name] ?? '') : false}
+              onChange={(value) => setChosen((c) => ({ ...c, [i.name]: value }))}
+            />
+          );
+        return (
+          <label key={i.name} htmlFor={id}>
+            <input id={id} type="checkbox" name={i.name} value={i.value} required={i.required} />{' '}
+            {i.label}
+          </label>
+        );
+      })}
+    </>
   );
 }
