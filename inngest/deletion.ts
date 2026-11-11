@@ -7,8 +7,7 @@
  *   subscription through CC-03's cancel, recording first whether this deletion set it to end. A
  *   restore that came first leaves nothing to cancel (the step reads the queue row under its lock).
  * - deletionResumeFn, on `account.restored`: continues the subscriptions the deletion set to end.
- * - purgeDeletedAccountsFn, daily: erases each person whose seven days have passed, then removes the
- *   secrets of links that can no longer be used.
+ * - purgeDeletedAccountsFn, daily: erases each person whose seven days have passed.
  *
  * The cancel and the resume of one person run one at a time (a shared concurrency key), each in a
  * single step, so a resume cannot be overtaken by the cancel it undoes.
@@ -59,8 +58,6 @@ export interface Purge {
   purgeOne(person: DuePerson): Promise<PurgeOutcome>;
   /** Counts a purge of the person that did not finish, and reports it (user id only). */
   failed(userId: string, why: string): Promise<void>;
-  /** Removes the secrets of links that can no longer be used (`sweep_account_links`). */
-  sweepLinks(): Promise<number>;
 }
 
 export function createDeletionCancelFn(billing: () => DeletionBilling) {
@@ -115,13 +112,12 @@ export function createPurgeDeletedAccountsFn(purge: () => Purge) {
           );
         }
       }
-      const links = await step.run('sweep-links', () => purge().sweepLinks());
       if (failed.length > 0) {
         throw new NonRetriableError(
           `purge: ${failed.length} of ${due.length} people failed: ${failed.join(', ')}`,
         );
       }
-      return { due: due.length, purged: purged.length, refused: refused.length, links };
+      return { due: due.length, purged: purged.length, refused: refused.length };
     },
   );
 }

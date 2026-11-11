@@ -16,7 +16,7 @@
 import type { Tier } from '../../entitlement-v2';
 import type { CaptureAccountEvent } from './account-events';
 import { accountEmail, type SendEmails } from './emails';
-import { hashToken, newToken } from './tokens';
+import { hashToken } from './tokens';
 
 /** A service-role RPC: the function's JSON answer, or a throw. */
 export type Rpc = <T>(fn: string, args: Record<string, unknown>) => Promise<T>;
@@ -90,23 +90,14 @@ export async function requestAccountDeletion(
       (await ports.rateLimit(`account:delete:ip:${input.ip}`, DELETE_REQUESTS_PER_IP)));
   if (!allowed) return { ok: false, status: 429, code: 'rate_limited' };
 
-  const confirm = newToken();
-  const restore = newToken();
-  const r = await ports.rpc<
-    Refused | { ok: true; confirmTokenId: string; restoreTokenId: string; tier: Tier }
-  >('request_account_deletion', {
-    p_account: input.accountId,
-    p_user: input.userId,
-    p_hostname: input.hostname,
-    p_confirm_hash: hashToken(confirm),
-    p_confirm_raw: confirm,
-    p_restore_hash: hashToken(restore),
-    p_restore_raw: restore,
-  });
+  // The links' rows hold no token until CC-28's mailer issues them (owner ruling Q5): the email names
+  // the confirmation row, and issuing it issues the restore row paired with it.
+  const r = await ports.rpc<Refused | { ok: true; confirmTokenId: string; tier: Tier }>(
+    'request_account_deletion',
+    { p_account: input.accountId, p_user: input.userId, p_hostname: input.hostname },
+  );
   if (!r.ok) return refusal(r.code);
-  await ports.sendEmails([
-    accountEmail(input.accountId, 'account_delete', [r.confirmTokenId, r.restoreTokenId]),
-  ]);
+  await ports.sendEmails([accountEmail(input.accountId, 'account_delete', r.confirmTokenId)]);
   await ports.capture('account_deletion_requested', input.accountId, { tier: r.tier });
   return { ok: true };
 }

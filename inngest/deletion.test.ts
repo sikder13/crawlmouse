@@ -110,18 +110,17 @@ describe('purgeDeletedAccountsFn', () => {
           : { outcome: 'purged' as const, counts: { 'accounts deleted': 1 } },
       ),
       failed: vi.fn(async () => {}),
-      sweepLinks: vi.fn(async () => 4),
       ...over,
     };
   }
 
-  it('asks for the people due at its time, purges each in its own step, then sweeps the links', async () => {
+  it('asks for the people due at its time, and purges each in its own step', async () => {
     const p = fakePurge();
     const { step, ran } = steps();
     const out = await handler(createPurgeDeletedAccountsFn(() => p))({ step });
     expect(p.due).toHaveBeenCalledWith(new Date(NOW), PURGE_LIMIT);
-    expect(ran).toEqual(['now', 'due', 'purge-u1', 'purge-u2', 'purge-u3', 'sweep-links']);
-    expect(out).toEqual({ due: 3, purged: 2, refused: 1, links: 4 });
+    expect(ran).toEqual(['now', 'due', 'purge-u1', 'purge-u2', 'purge-u3']);
+    expect(out).toEqual({ due: 3, purged: 2, refused: 1 });
     expect(p.failed).not.toHaveBeenCalled();
   });
 
@@ -137,14 +136,6 @@ describe('purgeDeletedAccountsFn', () => {
       NonRetriableError,
     );
     expect(p.failed).toHaveBeenCalledWith('u1', 'Auth admin delete failed: 503');
-    expect(ran).toEqual([
-      'now',
-      'due',
-      'purge-u1',
-      'failed-u1',
-      'purge-u2',
-      'purge-u3',
-      'sweep-links',
-    ]);
+    expect(ran).toEqual(['now', 'due', 'purge-u1', 'failed-u1', 'purge-u2', 'purge-u3']);
   });
 });

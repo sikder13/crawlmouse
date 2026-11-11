@@ -97,16 +97,13 @@ async function owner() {
   return { userId, accountId, host: `dm-${serial}.example` };
 }
 
-/** The raw tokens of the deletion email: the mailer's one read of each link. */
+/** The raw tokens of the deletion email, as CC-28's mailer issues them from the one row it names. */
 async function links(email: AccountEmailEvent) {
-  const out: Record<string, string> = {};
-  for (const id of email.data.tokenIds) {
-    const { rows } = await db.query<{ kind: string; token: string }>(
-      `select kind, token from public.take_account_link($1)`,
-      [id],
-    );
-    out[rows[0]!.kind] = rows[0]!.token;
-  }
+  const { rows } = await db.query<{ kind: string; token: string }>(
+    `select kind, token from public.issue_account_link($1)`,
+    [email.data.tokenId],
+  );
+  const out = Object.fromEntries(rows.map((r) => [r.kind, r.token]));
   return out as { delete_confirm: string; delete_restore: string };
 }
 
@@ -119,7 +116,7 @@ const marked = async (accountId: string) =>
   ).rows[0]!.n === 1;
 
 describe('requestAccountDeletion', () => {
-  it('emails both links as one account_delete, naming the token rows only, and records the event', async () => {
+  it('emails one account_delete naming the confirmation row only, which issues both links, and records the event', async () => {
     const o = await owner();
     const rec = recorder();
     expect(
@@ -135,7 +132,11 @@ describe('requestAccountDeletion', () => {
       accountId: o.accountId,
       template: 'account_delete',
     });
-    expect(rec.emails[0]!.data.tokenIds).toHaveLength(2);
+    const confirmRow = await db.query<{ id: string }>(
+      `select id from public.account_tokens where user_id = $1 and kind = 'delete_confirm'`,
+      [o.userId],
+    );
+    expect(rec.emails[0]!.data.tokenId).toBe(confirmRow.rows[0]!.id);
     expect(JSON.stringify(rec.emails)).not.toMatch(/@|[A-Za-z0-9_-]{43}/);
     expect(rec.captured).toEqual([['account_deletion_requested', o.accountId, { tier: 'free' }]]);
     const l = await links(rec.emails[0]!);

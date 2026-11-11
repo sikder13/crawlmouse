@@ -6,7 +6,7 @@ import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-m
 import { FIX_EMAIL_REQUESTS } from '../../../__tests__/helpers/v2-027b-standins';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
 import type { CancelAccounts, CancelStripe } from '../../billing/cancel';
-import { hashToken, newToken } from './tokens';
+import { hashToken } from './tokens';
 import { purgePorts } from './deletion-ports';
 import { deletionBilling, purge } from './deletion-purge';
 
@@ -153,16 +153,16 @@ async function deleted({ due = true } = {}) {
   await db.query(`insert into storage.objects (bucket_id, name) values ('report-logos', $1)`, [
     `logo-${serial}.png`,
   ]);
-  const [confirm, restore] = [newToken(), newToken()];
-  await db.query(`select public.request_account_deletion($1, $2, $3, $4, $5, $6, $7)`, [
-    accountId,
-    userId,
-    email,
-    hashToken(confirm),
-    confirm,
-    hashToken(restore),
-    restore,
-  ]);
+  const { rows: requested } = await db.query<{ r: { confirmTokenId: string } }>(
+    `select public.request_account_deletion($1, $2, $3) as r`,
+    [accountId, userId, email],
+  );
+  const { rows: issued } = await db.query<{ kind: string; token: string }>(
+    `select kind, token from public.issue_account_link($1)`,
+    [requested[0]!.r.confirmTokenId],
+  );
+  const token = (kind: string) => issued.find((r) => r.kind === kind)!.token;
+  const [confirm, restore] = [token('delete_confirm'), token('delete_restore')];
   await db.query(`select public.confirm_account_deletion($1, now())`, [hashToken(confirm)]);
   if (due) {
     await db.query(

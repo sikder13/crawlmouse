@@ -99,7 +99,6 @@ export function purge(ports: PurgePorts): Purge {
       console.error(`[purge] ${userId}: ${why}`);
       ports.report('account.purge_failed', userId);
     },
-    sweepLinks: () => ports.rpc<number>('sweep_account_links', {}),
   };
 }
 

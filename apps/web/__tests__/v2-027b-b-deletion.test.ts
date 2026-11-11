@@ -50,14 +50,23 @@ async function json<T = Record<string, unknown>>(sql: string, params: unknown[])
   return rows[0]!.r;
 }
 
-async function request(o: Owner, hostname = o.host) {
-  const confirm = newToken();
-  const restore = newToken();
-  const r = await json<{ ok: boolean; code?: string; confirmTokenId?: string }>(
-    `select public.request_account_deletion($1, $2, $3, $4, $5, $6, $7) as r`,
-    [o.accountId, o.userId, hostname, hashToken(confirm), confirm, hashToken(restore), restore],
+/** The mailer's issue of the deletion email's links: the confirmation row and its paired restore row. */
+async function issue(confirmTokenId: string) {
+  const { rows } = await db.query<{ kind: string; token: string; recipient: string }>(
+    `select * from public.issue_account_link($1)`,
+    [confirmTokenId],
   );
-  return { r, confirm, restore };
+  const by = (kind: string) => rows.find((r) => r.kind === kind)?.token ?? '';
+  return { confirm: by('delete_confirm'), restore: by('delete_restore'), rows };
+}
+
+/** A request, and (when it is accepted) the two links as the mailer issues them. */
+async function request(o: Owner, hostname = o.host) {
+  const r = await json<{ ok: boolean; code?: string; confirmTokenId?: string }>(
+    `select public.request_account_deletion($1, $2, $3) as r`,
+    [o.accountId, o.userId, hostname],
+  );
+  return { r, ...(r.ok ? await issue(r.confirmTokenId!) : { confirm: '', restore: '' }) };
 }
 
 const confirm = (raw: string, now = 'now()') =>
@@ -117,8 +126,8 @@ describe('request_account_deletion', () => {
   it('refuses while an email change is in flight, with others seated, and with a v1 plan', async () => {
     const o = await owner();
     await db.query(
-      `insert into public.account_tokens (account_id, user_id, kind, token_hash, new_email, old_email, expires_at)
-       values ($1, $2, 'email_change_undo', $3, 'new@example.com', $4, now() + interval '7 days')`,
+      `insert into public.account_tokens (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, expires_at)
+       values ($1, $2, 'email_change_undo', $3, now(), 'new@example.com', $4, now() + interval '7 days')`,
       [o.accountId, o.userId, 'e'.repeat(60) + String(1000 + serial), o.email],
     );
     expect((await request(o)).r.code).toBe('email_change_pending');
@@ -146,20 +155,49 @@ describe('request_account_deletion', () => {
     const o = await owner();
     const stranger = await owner();
     await expect(
-      db.query(`select public.request_account_deletion($1, $2, $3, $4, $5, $6, $7)`, [
+      db.query(`select public.request_account_deletion($1, $2, $3)`, [
         o.accountId,
         stranger.userId,
         o.host,
-        hashToken('A'.repeat(43)),
-        'A'.repeat(43),
-        hashToken('B'.repeat(43)),
-        'B'.repeat(43),
       ]),
     ).rejects.toThrow(/not the owner/);
   });
 });
 
 describe('confirm_account_deletion', () => {
+  it('a row the mailer never issued holds nothing that confirms or restores, and cannot be consumed', async () => {
+    const o = await owner();
+    const r = await json<{ ok: boolean; confirmTokenId: string }>(
+      `select public.request_account_deletion($1, $2, $3) as r`,
+      [o.accountId, o.userId, o.host],
+    );
+    const { rows } = await db.query<Record<string, unknown>>(
+      `select token_hash, issued_at, paired_with = $2 as paired, kind
+         from public.account_tokens where user_id = $1 order by kind`,
+      [o.userId, r.confirmTokenId],
+    );
+    expect(rows).toEqual([
+      { token_hash: null, issued_at: null, paired: null, kind: 'delete_confirm' },
+      { token_hash: null, issued_at: null, paired: true, kind: 'delete_restore' },
+    ]);
+    // The only values such a row could be matched by: an absent hash, and any token at all.
+    for (const hash of ['', hashToken(newToken())]) {
+      expect(
+        (
+          await json<{ code: string }>(`select public.confirm_account_deletion($1, now()) as r`, [
+            hash,
+          ])
+        ).code,
+      ).toBe('invalid_link');
+    }
+    expect(await marked(o.accountId)).toBe(0);
+    // Issued once, it works; issued again (a retried send), the first token stops matching.
+    const first = await issue(r.confirmTokenId);
+    const second = await issue(r.confirmTokenId);
+    expect((await confirm(first.confirm)).code).toBe('invalid_link');
+    expect((await confirm(second.confirm)).ok).toBe(true);
+  });
+
   it('marks every account the person alone holds, queues them for seven days, ends their sessions, and keeps the Auth user', async () => {
     const o = await owner();
     // A second account the person alone holds, and one they share (not marked).

@@ -718,14 +718,15 @@ as $$
 $$;
 
 -- The owner asks to delete the account (deletes nothing). Refuses with {ok: false, code}:
--- `hostname_mismatch`, `email_change_pending`, `others_seated`, `v1_subscription`. Otherwise issues the
--- confirmation link (24 hours) and the restore link (the 24 hours plus the 7-day window; restore_account
--- also requires the window), revoking any earlier pair, records `delete_requested`, and returns
--- {ok: true, confirmTokenId, restoreTokenId, tier}. The route has checked that p_user is the account's owner
--- through the caller's own session; this checks it again under the account's row lock.
+-- `hostname_mismatch`, `email_change_pending`, `others_seated`, `v1_subscription`. Otherwise creates
+-- the confirmation link's row (24 hours) and the restore link's row (the 24 hours plus the 7-day
+-- window; restore_account also requires the window) paired with it, both with no token until the
+-- mailer's issue_account_link on the confirmation row issues the two, revoking any earlier pair;
+-- records `delete_requested`; and returns {ok: true, confirmTokenId, tier}. The route has checked
+-- that p_user is the account's owner through the caller's own session; this checks it again under the
+-- account's row lock.
 create or replace function public.request_account_deletion(
-  p_account uuid, p_user uuid, p_hostname text,
-  p_confirm_hash text, p_confirm_raw text, p_restore_hash text, p_restore_raw text)
+  p_account uuid, p_user uuid, p_hostname text)
 returns jsonb
 language plpgsql
 security definer
@@ -753,13 +754,13 @@ begin
   if v_refusal is not null then
     return jsonb_build_object('ok', false, 'code', v_refusal);
   end if;
-  v_confirm := public.issue_account_token(p_account, p_user, 'delete_confirm', p_confirm_hash,
-                                          p_confirm_raw, now() + interval '24 hours');
-  v_restore := public.issue_account_token(p_account, p_user, 'delete_restore', p_restore_hash,
-                                          p_restore_raw, now() + interval '8 days');
+  v_confirm := public.create_account_token(p_account, p_user, 'delete_confirm',
+                                           now() + interval '24 hours');
+  v_restore := public.create_account_token(p_account, p_user, 'delete_restore',
+                                           now() + interval '8 days', p_paired_with => v_confirm);
   insert into public.account_events (account_id, kind, actor_user_id)
   values (p_account, 'delete_requested', p_user);
-  return jsonb_build_object('ok', true, 'confirmTokenId', v_confirm, 'restoreTokenId', v_restore,
+  return jsonb_build_object('ok', true, 'confirmTokenId', v_confirm,
                             'tier', (select a.tier from public.accounts a where a.id = p_account));
 end;
 $$;
@@ -785,7 +786,8 @@ begin
   if p_kind not in ('delete_confirm', 'delete_restore') then
     raise exception 'read_deletion_link: not a deletion link kind' using errcode = '22023';
   end if;
-  select * into v from public.account_tokens t where t.token_hash = p_hash and t.kind = p_kind;
+  select * into v from public.account_tokens t
+   where t.token_hash = p_hash and t.kind = p_kind and t.issued_at is not null;
   if not found or v.used_at is not null or v.revoked_at is not null or v.expires_at <= p_now then
     return jsonb_build_object('ok', false, 'code', 'invalid_link');
   end if;
@@ -810,7 +812,7 @@ begin
 end;
 $$;
 
--- The confirmation link's POST, in one transaction (plan-revision R4): consumes the token (by kind),
+-- The confirmation link's POST, in one transaction (plan-revision R4): consumes the token (an issued one, by hash and kind),
 -- refuses as request_account_deletion does (the token stays usable: the person can resolve it and
 -- press again), marks every account the person alone holds, queues the person in pending_erasures
 -- with the window's end, ends every session, revokes any email change in flight, and records
@@ -831,7 +833,7 @@ declare
   v_purge timestamptz := p_now + interval '7 days';
 begin
   select * into v from public.account_tokens t
-   where t.token_hash = p_hash and t.kind = 'delete_confirm' for update;
+   where t.token_hash = p_hash and t.kind = 'delete_confirm' and t.issued_at is not null for update;
   if not found or v.used_at is not null or v.revoked_at is not null or v.expires_at <= p_now then
     return jsonb_build_object('ok', false, 'code', 'invalid_link');
   end if;
@@ -858,7 +860,7 @@ begin
 end;
 $$;
 
--- The restore link's POST, in one transaction: consumes the token (by kind) only while the person's
+-- The restore link's POST, in one transaction: consumes the token (an issued one, by hash and kind) only while the person's
 -- pending_erasures row, locked as erase_person_apply locks it, is inside its window; clears the
 -- accounts' marks and the queue row, records `delete_restored`, and returns {ok: true, userId,
 -- accountId, tier, accounts, resume}: `resume` names the subscriptions this deletion set to end, which the caller asks
@@ -875,7 +877,7 @@ declare
   v_resume text[];
 begin
   select * into v from public.account_tokens t
-   where t.token_hash = p_hash and t.kind = 'delete_restore' for update;
+   where t.token_hash = p_hash and t.kind = 'delete_restore' and t.issued_at is not null for update;
   if not found or v.used_at is not null or v.revoked_at is not null or v.expires_at <= p_now then
     return jsonb_build_object('ok', false, 'code', 'invalid_link');
   end if;
@@ -974,7 +976,7 @@ $$;
 revoke all on function public.deletion_hostname(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.deletion_refusal(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.email_change_live(uuid) from public, anon, authenticated, service_role;
-revoke all on function public.request_account_deletion(uuid, uuid, text, text, text, text, text)
+revoke all on function public.request_account_deletion(uuid, uuid, text)
   from public, anon, authenticated;
 revoke all on function public.read_deletion_link(text, text, timestamptz) from public, anon, authenticated;
 revoke all on function public.confirm_account_deletion(text, timestamptz) from public, anon, authenticated;
@@ -984,7 +986,7 @@ revoke all on function public.due_erasures(timestamptz, integer) from public, an
 revoke all on function public.record_erasure_attempt(uuid) from public, anon, authenticated;
 revoke all on function public.finish_erasure(uuid) from public, anon, authenticated;
 grant execute on function public.deletion_hostname(uuid, uuid) to service_role;
-grant execute on function public.request_account_deletion(uuid, uuid, text, text, text, text, text)
+grant execute on function public.request_account_deletion(uuid, uuid, text)
   to service_role;
 grant execute on function public.read_deletion_link(text, text, timestamptz) to service_role;
 grant execute on function public.confirm_account_deletion(text, timestamptz) to service_role;
