@@ -1,4 +1,5 @@
-import { gzipSync } from 'node:zlib';
+import { randomBytes } from 'node:crypto';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
@@ -12,6 +13,7 @@ import {
 import { gzipJson } from './evidence';
 import {
   BATCH_GZIP_BYTES,
+  BATCH_RAW_BYTES,
   START,
   batchEvents,
   checkEvents,
@@ -537,13 +539,26 @@ describe('readBatch', () => {
     expect(await readBatch(evidence, PATH)).toBeNull();
   });
 
-  it('passes over an object larger than the gzipped bound without inflating it', async () => {
-    const big = new Uint8Array(BATCH_GZIP_BYTES + 1);
-    expect(await readBatch({ get: async () => big }, PATH)).toBeNull();
-    // The same result one byte inside the bound is read: the bound is what refused it.
-    const gz = gzipJson(result);
-    expect(gz.byteLength).toBeLessThan(BATCH_GZIP_BYTES);
-    expect(await readBatch({ get: async () => gz }, PATH)).not.toBeNull();
+  it('passes over a contract result whose object is larger than the gzipped bound', async () => {
+    // 100 rows of served text that does not compress: a valid result, about 4.8 MiB gzipped and
+    // 6.4 MiB inflated, so the gzipped bound is the one it is over.
+    const noisy = (pages: number) =>
+      gzipJson(
+        crawlResult(
+          Array.from({ length: pages }, (_, i) => ({
+            ...row({ path: `/n/${i}`, at: i }),
+            raw_text: randomBytes(48 * 1024).toString('base64'),
+          })),
+          [],
+        ),
+      );
+    const over = noisy(100);
+    expect(over.byteLength).toBeGreaterThan(BATCH_GZIP_BYTES);
+    expect(gunzipSync(over).byteLength).toBeLessThan(BATCH_RAW_BYTES);
+    expect(await readBatch({ get: async () => over }, PATH)).toBeNull();
+    const under = noisy(50);
+    expect(under.byteLength).toBeLessThan(BATCH_GZIP_BYTES);
+    expect((await readBatch({ get: async () => under }, PATH))?.pages).toHaveLength(50);
   });
 
   it('passes over an object that inflates past the raw bound', async () => {
