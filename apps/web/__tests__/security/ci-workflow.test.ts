@@ -62,13 +62,26 @@ function needs(name: string): string[] {
 }
 
 describe('ci.yml triggers', () => {
-  it('runs on pushes to every branch and on nothing else', () => {
-    expect(ci.on).toEqual({ push: { branches: ['**'] } });
+  it('runs on pushes to every branch, a dispatch with a boolean visual input, and nightly', () => {
+    expect(ci.on).toEqual({
+      push: { branches: ['**'] },
+      workflow_dispatch: {
+        inputs: {
+          visual: {
+            description:
+              'Run the visual set (the shards, security-browser, ZAP) as if a pull request were open',
+            type: 'boolean',
+            default: false,
+          },
+        },
+      },
+      schedule: [{ cron: '0 3 * * *' }],
+    });
   });
 
-  it('keys its concurrency group on the ref, with one group per commit on main', () => {
+  it('keys its concurrency group on the ref, with one group per run on main', () => {
     expect(ci.concurrency.group).toBe(
-      "ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}",
+      "ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}",
     );
   });
 
@@ -78,8 +91,10 @@ describe('ci.yml triggers', () => {
 });
 
 describe('codeql', () => {
-  it('runs only while the repository is public', () => {
-    expect(job('codeql').if).toBe('${{ !github.event.repository.private }}');
+  it('runs only while the repository is public, and not on the nightly run', () => {
+    expect(job('codeql').if).toBe(
+      "${{ github.event_name != 'schedule' && !github.event.repository.private }}",
+    );
   });
 
   it('uploads its results from every run', () => {
@@ -98,8 +113,18 @@ describe('the changes job and the jobs it gates', () => {
     expect(checkout?.with).toEqual({ 'fetch-depth': 0, 'persist-credentials': false });
   });
 
-  it('outputs visual from its decide step, and runs changes.mjs on the merge-base diff', () => {
-    expect(job('changes').outputs).toEqual({ visual: '${{ steps.decide.outputs.visual }}' });
+  it('may read pull requests, and nothing else beyond the contents', () => {
+    expect((job('changes') as { permissions?: unknown }).permissions).toEqual({
+      contents: 'read',
+      'pull-requests': 'read',
+    });
+  });
+
+  it('outputs gate and visual from its decide step, and runs changes.mjs on the merge-base diff', () => {
+    expect(job('changes').outputs).toEqual({
+      gate: '${{ steps.decide.outputs.gate }}',
+      visual: '${{ steps.decide.outputs.visual }}',
+    });
     const decide = (job('changes').steps ?? []).find((s) => (s as { id?: string }).id === 'decide');
     expect(decide?.run).toContain('git merge-base origin/main HEAD');
     expect(decide?.run).toContain('--no-renames');
@@ -122,6 +147,16 @@ describe('the changes job and the jobs it gates', () => {
   it('the required visual check needs both, and always runs', () => {
     expect(needs('visual')).toEqual(['changes', 'visual-shard']);
     expect(job('visual').if).toBe('${{ always() }}');
+  });
+
+  // The ruleset requires a check named exactly `visual`. On a push the gate defers, the job takes
+  // another name, so no check named `visual` exists on that commit and the requirement stays unmet.
+  // Only an explicit `deferred` renames it: a changes job that failed leaves the name `visual`, and
+  // the rule below fails it.
+  it('is named visual unless the gate deferred the visual set', () => {
+    expect((job('visual') as { name?: string }).name).toBe(
+      "${{ needs.changes.outputs.gate == 'deferred' && 'visual (deferred: no open pull request)' || 'visual' }}",
+    );
   });
 });
 
@@ -165,17 +200,25 @@ describe('the build artifact security-browser and zap-baseline start', () => {
 describe('the rule the required visual check applies', () => {
   const [step] = job('visual').steps ?? [];
 
-  it('reads the three results through env', () => {
+  it('reads the three results and the gate through env', () => {
     expect(step?.env).toEqual({
       SHARDS: '${{ needs.visual-shard.result }}',
       CHANGES: '${{ needs.changes.result }}',
       VISUAL: '${{ needs.changes.outputs.visual }}',
+      GATE: '${{ needs.changes.outputs.gate }}',
     });
   });
 
-  function rule(SHARDS: string, CHANGES: string, VISUAL: string) {
+  function rule(SHARDS: string, CHANGES: string, VISUAL: string, GATE = 'open') {
     return spawnSync('bash', ['-c', step?.run ?? 'exit 99'], {
-      env: { NODE_ENV: 'test', PATH: process.env.PATH ?? '/usr/bin:/bin', SHARDS, CHANGES, VISUAL },
+      env: {
+        NODE_ENV: 'test',
+        PATH: process.env.PATH ?? '/usr/bin:/bin',
+        SHARDS,
+        CHANGES,
+        VISUAL,
+        GATE,
+      },
       encoding: 'utf8',
     });
   }
@@ -225,6 +268,23 @@ describe('the rule the required visual check applies', () => {
     expect(r.status).not.toBeNull();
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/^::error::/m);
+  });
+
+  // The gate changes the job's name (above), never its verdict: the name is what keeps a deferred
+  // push from satisfying the ruleset.
+  it.each(cases)(
+    'gives one verdict under every gate: shards=%s changes=%s visual=%j',
+    (s, c, v) => {
+      const verdicts = ['open', 'deferred', ''].map((g) => rule(s, c, v, g).status);
+      expect(verdicts.every((x) => x !== null)).toBe(true);
+      expect(new Set(verdicts).size).toBe(1);
+    },
+  );
+
+  it('says why the shards did not run when the gate deferred them', () => {
+    const r = rule('skipped', 'success', 'false', 'deferred');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('no open pull request');
   });
 });
 
@@ -350,10 +410,41 @@ describe('changes.mjs', () => {
 describe("the changes job's decide step", () => {
   const decide = (job('changes').steps ?? []).find((s) => (s as { id?: string }).id === 'decide');
 
-  function run(opts: { ref: string; mergeBaseFails?: boolean; diff?: string[] }) {
+  it('reads the event, the dispatch input and the branch through env', () => {
+    expect(decide?.env).toEqual({
+      REF: '${{ github.ref }}',
+      EVENT: '${{ github.event_name }}',
+      DISPATCH_VISUAL: '${{ inputs.visual }}',
+      BRANCH: '${{ github.ref_name }}',
+      OWNER: '${{ github.repository_owner }}',
+      REPO: '${{ github.repository }}',
+      GH_TOKEN: '${{ github.token }}',
+    });
+  });
+
+  function run(opts: {
+    ref: string;
+    mergeBaseFails?: boolean;
+    diff?: string[];
+    event?: string;
+    dispatchVisual?: string;
+    /** What the stub `gh` prints for the open pull requests, or 'fail' to exit 1. */
+    openPrs?: string;
+  }) {
     const dir = mkdtempSync(join(tmpdir(), 'ci-changes-'));
     const bin = join(dir, 'bin');
     spawnSync('mkdir', ['-p', bin]);
+    const ghLog = join(dir, 'gh.log');
+    writeFileSync(
+      join(bin, 'gh'),
+      [
+        '#!/usr/bin/env bash',
+        `{ printf '%s\\037' "$@"; printf '\\n'; } >> '${ghLog}'`,
+        opts.openPrs === 'fail' ? 'exit 1' : `printf '%s\\n' '${opts.openPrs ?? '0'}'`,
+        '',
+      ].join('\n'),
+    );
+    chmodSync(join(bin, 'gh'), 0o755);
     const log = join(dir, 'git.log');
     writeFileSync(join(dir, 'diff'), (opts.diff ?? []).map((f) => `${f}\0`).join(''));
     writeFileSync(
@@ -381,49 +472,123 @@ describe("the changes job's decide step", () => {
         NODE_ENV: 'test',
         PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
         REF: opts.ref,
+        EVENT: opts.event ?? 'push',
+        DISPATCH_VISUAL: opts.dispatchVisual ?? '',
+        BRANCH: opts.ref.replace(/^refs\/heads\//, ''),
+        OWNER: 'owner',
+        REPO: 'owner/repo',
         GITHUB_OUTPUT: output,
         RUNNER_TEMP: dir,
       },
       encoding: 'utf8',
     });
-    const calls = existsSync(log)
-      ? readFileSync(log, 'utf8')
-          .split('\n')
-          .filter((line) => line !== '')
-          .map((line) => line.split('\x1f').slice(0, -1))
-      : [];
-    return { r, output: readFileSync(output, 'utf8'), calls };
+    const read = (file: string) =>
+      existsSync(file)
+        ? readFileSync(file, 'utf8')
+            .split('\n')
+            .filter((line) => line !== '')
+            .map((line) => line.split('\x1f').slice(0, -1))
+        : [];
+    return { r, output: readFileSync(output, 'utf8'), calls: read(log), gh: read(ghLog) };
   }
 
-  it('on main, outputs visual=true without asking git anything', () => {
-    const { r, output, calls } = run({ ref: 'refs/heads/main' });
+  const OPEN_PR = { openPrs: '1' };
+
+  it('on main, opens the gate with visual=true without asking git or GitHub anything', () => {
+    for (const event of ['push', 'workflow_dispatch', 'schedule']) {
+      const { r, output, calls, gh } = run({ ref: 'refs/heads/main', event });
+      expect(r.status, r.stdout + r.stderr).toBe(0);
+      expect(output).toBe('gate=open\nvisual=true\n');
+      expect(calls).toEqual([]);
+      expect(gh).toEqual([]);
+    }
+  });
+
+  it('asks GitHub for open pull requests whose head is this branch', () => {
+    const { gh } = run({ ref: 'refs/heads/build/x', diff: ['docs/a.md'], ...OPEN_PR });
+    expect(gh).toEqual([
+      [
+        'api',
+        '-X',
+        'GET',
+        'repos/owner/repo/pulls',
+        '-f',
+        'state=open',
+        '-f',
+        'head=owner:build/x',
+        '--jq',
+        'length',
+      ],
+    ]);
+  });
+
+  it('on a push with no open pull request, defers: visual=false, and diffs nothing', () => {
+    const { r, output, calls } = run({ ref: 'refs/heads/x', diff: ['apps/web/lib/x.ts'] });
     expect(r.status, r.stdout + r.stderr).toBe(0);
-    expect(output).toBe('visual=true\n');
+    expect(output).toBe('gate=deferred\nvisual=false\n');
     expect(calls).toEqual([]);
   });
 
+  it('on a dispatch with visual false and no open pull request, defers as a push does', () => {
+    const { output } = run({
+      ref: 'refs/heads/x',
+      event: 'workflow_dispatch',
+      dispatchVisual: 'false',
+      diff: ['apps/web/lib/x.ts'],
+    });
+    expect(output).toBe('gate=deferred\nvisual=false\n');
+  });
+
+  it('on a dispatch with visual true, opens the gate without asking GitHub', () => {
+    const { output, gh } = run({
+      ref: 'refs/heads/x',
+      event: 'workflow_dispatch',
+      dispatchVisual: 'true',
+      diff: ['apps/web/lib/x.ts'],
+    });
+    expect(output).toBe('gate=open\nvisual=true\n');
+    expect(gh).toEqual([]);
+  });
+
+  it('opens the gate with a warning when GitHub cannot be asked, or answers nonsense', () => {
+    for (const openPrs of ['fail', '', 'null', '1 2']) {
+      const { r, output } = run({ ref: 'refs/heads/x', diff: ['apps/web/lib/x.ts'], openPrs });
+      expect(r.status, r.stdout + r.stderr).toBe(0);
+      expect(output, openPrs).toBe('gate=open\nvisual=true\n');
+      expect(r.stdout, openPrs).toMatch(/^::warning::/m);
+    }
+  });
+
   it('when merge-base fails, outputs visual=true with a warning and diffs nothing', () => {
-    const { r, output, calls } = run({ ref: 'refs/heads/x', mergeBaseFails: true });
+    const { r, output, calls } = run({ ref: 'refs/heads/x', mergeBaseFails: true, ...OPEN_PR });
     expect(r.status, r.stdout + r.stderr).toBe(0);
-    expect(output).toBe('visual=true\n');
+    expect(output).toBe('gate=open\nvisual=true\n');
     expect(r.stdout).toMatch(/^::warning::/m);
     expect(calls).toEqual([['merge-base', 'origin/main', 'HEAD']]);
   });
 
-  it('on a docs-only branch, outputs visual=false', () => {
-    const { r, output } = run({ ref: 'refs/heads/x', diff: ['docs/a.md', 'README.md'] });
+  it('with an open pull request on a docs-only branch, outputs visual=false', () => {
+    const { r, output } = run({
+      ref: 'refs/heads/x',
+      diff: ['docs/a.md', 'README.md'],
+      ...OPEN_PR,
+    });
     expect(r.status, r.stdout + r.stderr).toBe(0);
-    expect(output).toBe('visual=false\n');
+    expect(output).toBe('gate=open\nvisual=false\n');
   });
 
-  it('on a branch that changes rendering, outputs visual=true', () => {
-    const { r, output } = run({ ref: 'refs/heads/x', diff: ['docs/a.md', 'apps/web/lib/x.ts'] });
+  it('with an open pull request on a branch that changes rendering, outputs visual=true', () => {
+    const { r, output } = run({
+      ref: 'refs/heads/x',
+      diff: ['docs/a.md', 'apps/web/lib/x.ts'],
+      ...OPEN_PR,
+    });
     expect(r.status, r.stdout + r.stderr).toBe(0);
-    expect(output).toBe('visual=true\n');
+    expect(output).toBe('gate=open\nvisual=true\n');
   });
 
   it('diffs the whole branch against the merge-base, NUL-separated, with renames split', () => {
-    const { calls } = run({ ref: 'refs/heads/x', diff: ['docs/a.md'] });
+    const { calls } = run({ ref: 'refs/heads/x', diff: ['docs/a.md'], ...OPEN_PR });
     expect(calls).toEqual([
       ['merge-base', 'origin/main', 'HEAD'],
       [
@@ -614,5 +779,130 @@ describe('the import closure of what the gated jobs render and serve', () => {
 
   it('contains no file on the skip list', () => {
     expect(inRepo.filter((f) => skippable(f))).toEqual([]);
+  });
+});
+
+// A pull request opened, reopened or marked ready starts one full CI run on its head branch, with
+// the visual set: ci-pr.yml dispatches ci.yml there (a dispatch sent with the workflow's own token
+// starts a run). The dispatched run is an ordinary run of every job, so no required check gets a
+// skipped twin on the head commit (docs/specs/v2/ci-cost.md, D1).
+describe('ci-pr.yml', () => {
+  const PR_FILE = join(REPO, '.github/workflows/ci-pr.yml');
+  const pr = parse(readFileSync(PR_FILE, 'utf8')) as {
+    on: unknown;
+    permissions: unknown;
+    jobs: Record<string, Job & { permissions?: unknown; 'runs-on'?: string }>;
+  };
+
+  it('runs only when a pull request is opened, reopened or marked ready', () => {
+    expect(pr.on).toEqual({ pull_request: { types: ['opened', 'reopened', 'ready_for_review'] } });
+  });
+
+  it('has one job, which alone may write Actions, for heads in this repository', () => {
+    expect(pr.permissions).toEqual({});
+    expect(Object.keys(pr.jobs)).toEqual(['dispatch']);
+    expect(pr.jobs.dispatch!.permissions).toEqual({ actions: 'write' });
+    expect(pr.jobs.dispatch!.if).toBe(
+      'github.event.pull_request.head.repo.full_name == github.repository',
+    );
+  });
+
+  it('dispatches ci.yml on the head branch with visual=true', () => {
+    const [step] = pr.jobs.dispatch!.steps ?? [];
+    expect(pr.jobs.dispatch!.steps).toHaveLength(1);
+    expect(step?.env).toEqual({
+      GH_TOKEN: '${{ github.token }}',
+      REPO: '${{ github.repository }}',
+      HEAD_REF: '${{ github.event.pull_request.head.ref }}',
+    });
+    const dir = mkdtempSync(join(tmpdir(), 'ci-pr-'));
+    const log = join(dir, 'gh.log');
+    writeFileSync(
+      join(dir, 'gh'),
+      `#!/usr/bin/env bash\n{ printf '%s\\037' "$@"; printf '\\n'; } >> '${log}'\n`,
+    );
+    chmodSync(join(dir, 'gh'), 0o755);
+    const r = spawnSync('bash', ['-e', '-c', step?.run ?? 'exit 99'], {
+      env: {
+        PATH: `${dir}:/usr/bin:/bin`,
+        REPO: 'owner/repo',
+        HEAD_REF: 'build/a branch',
+        GH_TOKEN: 't',
+      },
+      encoding: 'utf8',
+    });
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    const calls = readFileSync(log, 'utf8')
+      .split('\n')
+      .filter((l) => l !== '')
+      .map((l) => l.split('\x1f').slice(0, -1));
+    expect(calls).toEqual([
+      [
+        'workflow',
+        'run',
+        'ci.yml',
+        '--repo',
+        'owner/repo',
+        '--ref',
+        'build/a branch',
+        '-f',
+        'visual=true',
+      ],
+    ]);
+  });
+});
+
+// migrations-append-only on main compares with the push's `before`; a dispatched or scheduled run on
+// main has none, so it compares with the first parent.
+describe('migrations-append-only, the commit it compares with', () => {
+  const [, check] = job('migrations-append-only').steps ?? [];
+
+  it('reads the event through env', () => {
+    expect(check?.env).toEqual({
+      PUSH_BEFORE: '${{ github.event.before }}',
+      REF: '${{ github.ref }}',
+      EVENT: '${{ github.event_name }}',
+    });
+  });
+
+  function base(env: { REF: string; EVENT: string; PUSH_BEFORE: string }) {
+    const dir = mkdtempSync(join(tmpdir(), 'ci-mig-'));
+    const log = join(dir, 'git.log');
+    writeFileSync(
+      join(dir, 'git'),
+      [
+        '#!/usr/bin/env bash',
+        `{ printf '%s\\037' "$@"; printf '\\n'; } >> '${log}'`,
+        'case "$1" in',
+        '  merge-base) echo mergebase ;;',
+        '  rev-parse) echo parent ;;',
+        '  cat-file) exit 0 ;;',
+        '  diff) exit 0 ;;',
+        'esac',
+        '',
+      ].join('\n'),
+    );
+    chmodSync(join(dir, 'git'), 0o755);
+    const r = spawnSync('bash', ['-e', '-c', check?.run ?? 'exit 99'], {
+      env: { PATH: `${dir}:/usr/bin:/bin`, ...env },
+      encoding: 'utf8',
+    });
+    const diff = readFileSync(log, 'utf8')
+      .split('\n')
+      .map((l) => l.split('\x1f'))
+      .find((a) => a[0] === 'diff');
+    return { r, against: diff?.[3] };
+  }
+
+  it.each([
+    [{ REF: 'refs/heads/main', EVENT: 'push', PUSH_BEFORE: 'before' }, 'before'],
+    [{ REF: 'refs/heads/main', EVENT: 'schedule', PUSH_BEFORE: '' }, 'parent'],
+    [{ REF: 'refs/heads/main', EVENT: 'workflow_dispatch', PUSH_BEFORE: '' }, 'parent'],
+    [{ REF: 'refs/heads/x', EVENT: 'push', PUSH_BEFORE: 'before' }, 'mergebase'],
+    [{ REF: 'refs/heads/x', EVENT: 'workflow_dispatch', PUSH_BEFORE: '' }, 'mergebase'],
+  ])('%j compares with %s', (env, want) => {
+    const { r, against } = base(env);
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(against).toBe(want);
   });
 });
