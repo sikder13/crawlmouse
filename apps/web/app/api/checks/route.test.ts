@@ -126,7 +126,9 @@ beforeEach(async () => {
   }
   // The first call applies each migration to the template database; later calls clone it.
 }, 120_000);
-afterEach(() => {
+afterEach(async () => {
+  // Closed here: a PGlite holds its memory outside the JS heap until it is closed.
+  await db?.close();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();

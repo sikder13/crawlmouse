@@ -2,7 +2,7 @@ import net from 'node:net';
 import type { PGlite } from '@electric-sql/pglite';
 import { validateUrlOrThrow, type DnsResolver } from '@crawlmouse/engine';
 import fc from 'fast-check';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { postgrestOver } from '../../../../__tests__/helpers/postgrest-pglite';
 import { accountOf, doorDb, signUp } from '../../../../__tests__/v2/_lib/door-pglite';
 import { admitSiteHost } from '../../../../lib/auth/admit-site';
@@ -125,6 +125,11 @@ async function spend(db: PGlite, key: string, windowMs: number, count: number) {
 }
 
 let db: PGlite;
+// Each test's database is closed when the test ends: a PGlite holds its memory outside the JS
+// heap until then, and this file makes one per test.
+afterEach(async () => {
+  await db?.close();
+});
 beforeEach(async () => {
   db = await doorDb();
   admin.client = postgrestOver(db);
@@ -723,6 +728,9 @@ describe('hosts that are not public', () => {
     let shared: PGlite;
     beforeAll(async () => {
       shared = await doorDb();
+    });
+    afterAll(async () => {
+      await shared?.close();
     });
 
     it('a name resolving to it is refused and no site, check or bucket row is written', async () => {

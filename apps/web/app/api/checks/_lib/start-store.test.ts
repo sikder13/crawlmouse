@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { postgrestOver } from '../../../../__tests__/helpers/postgrest-pglite';
 import { count, doorDb, signUp, accountOf } from '../../../../__tests__/v2/_lib/door-pglite';
 import { sqlStartStore } from './start-store-sql';
@@ -28,6 +28,10 @@ describe.each<[string, (db: PGlite) => StartStore]>([
     store = make(db);
     // The first call applies each migration to the template database; later calls clone it.
   }, 120_000);
+  // Closed when the test ends: a PGlite holds its memory outside the JS heap until then.
+  afterEach(async () => {
+    await db?.close();
+  });
 
   it('inserts a site no account keeps, under the id it is given', async () => {
     await store.insertUnkeptSite(SITE, 'example.com');
