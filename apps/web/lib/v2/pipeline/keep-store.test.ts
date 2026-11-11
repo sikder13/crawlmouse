@@ -5,7 +5,7 @@
  * states what the rows it wrote should give, so a wrong answer from both is still a failure.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { accountOf, anonymousCheck, doorDb, signUp } from '../../../__tests__/v2/_lib/door-pglite';
 import { LIVE_OR_GRADED, supabaseKeepStore, type KeepStore } from './keep-store';
 import { postgrestWithCatalog } from './test-support/postgrest-catalog';
@@ -23,9 +23,13 @@ describe.each<[string, (db: PGlite) => KeepStore]>([
   let db: PGlite;
   let store: KeepStore;
   let n = 0;
+  // The first call migrates the file's template database.
   beforeEach(async () => {
     db = await doorDb();
     store = make(db);
+  }, 120_000);
+  afterEach(async () => {
+    await db?.close();
   });
 
   async function keeper(): Promise<{ accountId: string; ownerSeatId: string }> {
@@ -223,19 +227,22 @@ describe.each<[string, (db: PGlite) => KeepStore]>([
 });
 
 describe('the stand-in refuses what PostgREST refuses', () => {
-  it('an argument name the function does not declare is PGRST202, and the store throws', async () => {
+  it('an argument name the function does not declare, or one left out, is PGRST202', async () => {
     const db = await doorDb();
-    const sb = postgrestWithCatalog(db);
-    expect(await sb.rpc('note_check_copy', { p_check: NO_CHECK, p_acct: NO_CHECK })).toMatchObject({
-      data: null,
-      error: { code: 'PGRST202' },
-    });
-    expect(await sb.rpc('note_check_copy', { p_check: NO_CHECK })).toMatchObject({
-      error: { code: 'PGRST202' },
-    });
-    expect(await sb.rpc('note_check_copy', { p_check: NO_CHECK, p_account: NO_CHECK })).toEqual({
-      data: false,
-      error: null,
-    });
-  });
+    try {
+      const sb = postgrestWithCatalog(db);
+      expect(
+        await sb.rpc('note_check_copy', { p_check: NO_CHECK, p_acct: NO_CHECK }),
+      ).toMatchObject({ data: null, error: { code: 'PGRST202' } });
+      expect(await sb.rpc('note_check_copy', { p_check: NO_CHECK })).toMatchObject({
+        error: { code: 'PGRST202' },
+      });
+      expect(await sb.rpc('note_check_copy', { p_check: NO_CHECK, p_account: NO_CHECK })).toEqual({
+        data: false,
+        error: null,
+      });
+    } finally {
+      await db.close();
+    }
+  }, 120_000);
 });

@@ -5,7 +5,7 @@
  * the rows it wrote should give.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   accountOf,
   anonymousCheck,
@@ -32,9 +32,13 @@ describe.each<[string, (db: PGlite) => ExpireStore]>([
   let db: PGlite;
   let store: ExpireStore;
   let n = 0;
+  // The first call migrates the file's template database.
   beforeEach(async () => {
     db = await doorDb();
     store = make(db);
+  }, 120_000);
+  afterEach(async () => {
+    await db?.close();
   });
 
   const accountId = async () => (await accountOf(db, await signUp(db, `x-${++n}@example.com`))).id;
