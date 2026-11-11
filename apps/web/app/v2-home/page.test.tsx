@@ -1,6 +1,7 @@
 /**
  * The v2 home's route (CC-22b D10): a 404 when the flag is off, and with it on the Home screen
- * with the three structured-data blocks v1's home emits and no metadata of its own.
+ * with two structured-data blocks, WebSite and SoftwareApplication, and no metadata of its own.
+ * It does not emit v1's FAQPage block: the v2 home shows no FAQ (owner ruling, round 3).
  */
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -36,12 +37,13 @@ describe('app/v2-home', () => {
     expect(digest).toContain('404');
   }, 60_000);
 
-  it('with the flag on is the v2 home with v1’s three structured-data blocks, and exports no metadata', async () => {
+  it('with the flag on is the v2 home with WebSite and SoftwareApplication structured data, no FAQPage, and exports no metadata', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
     const route = await import('./page');
     expect(Object.keys(route)).toEqual(['default']);
     const markup = renderToStaticMarkup(route.default() as ReactElement);
-    expect(ldTypes(markup)).toEqual(['WebSite', 'SoftwareApplication', 'FAQPage']);
+    expect(ldTypes(markup)).toEqual(['WebSite', 'SoftwareApplication']);
+    expect(markup).not.toContain('FAQPage');
     expect(markup).toContain('data-event="home_viewed"');
     expect(markup.match(/<h1/g)).toHaveLength(1);
     expect(markup).not.toContain('href="#"');
