@@ -3,7 +3,7 @@
  * home's module imports no v2 module, statically or through `import()`, because a production
  * build links a v2 screen's stylesheets on each page whose module can reach it.
  */
-import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -59,11 +59,12 @@ describe('app/page.tsx', () => {
     expect(reached.filter((m) => /components\/v2|styles\/v2|lib\/v2/.test(m))).toEqual([]);
   });
 
+  // main's file, pinned by content so the test needs no git ref (a shallow CI checkout has no origin/main).
+  // The pin was taken at origin/main 607bb19a; when main's home changes, recompute it with
+  //   git show origin/main:apps/web/app/page.tsx | sha256sum
+  const MAIN_SHA256 = 'c987aca3369ee19b6d83c252f120abcca1fe300d5f41e9b5b01e78cfc28b2966';
+
   it('is the file main has', () => {
-    const main = execFileSync('git', ['show', 'origin/main:apps/web/app/page.tsx'], {
-      cwd: WEB,
-      encoding: 'utf8',
-    });
-    expect(source).toBe(main);
+    expect(createHash('sha256').update(source).digest('hex')).toBe(MAIN_SHA256);
   });
 });
