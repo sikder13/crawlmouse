@@ -64,6 +64,7 @@ beforeAll(async () => {
     built,
     vantage: pageVantage(crawl),
     map_path: `anon/${built.check.site_id}/${built.check.id}/map.json.gz`,
+    read: [],
   };
   base = await freshDb();
   await applyAllMigrations(base);
@@ -213,6 +214,7 @@ describe('the persist step’s input writes what the build in memory writes', ()
         built: stored.built,
         vantage: new Map(stored.vantage),
         map_path: input.map_path,
+        read: input.read,
       });
       const fromMemory = await written(db);
       expect(await written(other)).toEqual(fromMemory);
