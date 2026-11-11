@@ -16,6 +16,7 @@
 import type { Tier } from '../../entitlement-v2';
 import type { CaptureAccountEvent } from './account-events';
 import { accountEmail, type SendEmails } from './emails';
+import { ipHash } from './rate-keys';
 import { hashToken } from './tokens';
 
 /** A service-role RPC: the function's JSON answer, or a throw. */
@@ -84,11 +85,13 @@ export async function requestAccountDeletion(
   ports: DeletionPorts,
   input: DeletionRequest,
 ): Promise<DeletionAnswer> {
-  // Bucket keys end with `:<user id>`, so the erasure's rate-limit rule removes them with the person.
+  // The person's bucket ends with `:<user id>`, so the erasure's rate-limit rule removes it with the
+  // person. The address's bucket ends with the address's sha256 (`ipHash`, as the email change's does):
+  // the erasure cannot tie it to anyone, and `prune_rate_limits` deletes it 25 hours after its window.
   const allowed =
     (await ports.rateLimit(`account:delete:user:${input.userId}`, DELETE_REQUESTS_PER_USER)) &&
     (input.ip === null ||
-      (await ports.rateLimit(`account:delete:ip:${input.ip}`, DELETE_REQUESTS_PER_IP)));
+      (await ports.rateLimit(`account:delete:ip:${ipHash(input.ip)}`, DELETE_REQUESTS_PER_IP)));
   if (!allowed) return { ok: false, status: 429, code: 'rate_limited' };
 
   // The links' rows hold no token until CC-28's mailer issues them (owner ruling Q5): the email names

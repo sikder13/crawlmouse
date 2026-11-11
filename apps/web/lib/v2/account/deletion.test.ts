@@ -191,7 +191,8 @@ describe('requestAccountDeletion', () => {
     expect(buckets).toEqual([
       `account:delete:user:${o.userId}#3`,
       `account:delete:user:${o.userId}#3`,
-      'account:delete:ip:198.51.100.4#10',
+      // The address as its sha256, computed here independently of ipHash (S4).
+      'account:delete:ip:14915055e8377734244f0890e1cf35857cc5059c83bf28422dad0d81a0112c89#10',
     ]);
   });
 });
