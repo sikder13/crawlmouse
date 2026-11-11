@@ -5,8 +5,40 @@
 -- search_path 20261108000002 set.
 
 -- ─── C ────────────────────────────────────────────────────────────────────────────────────────────
+-- The stored Slack URLs are Vault secrets the table names; they go with it, so a revert leaves none
+-- behind and every account has to save its URL again after a re-apply.
+do $$ begin
+  if to_regclass('public.account_slack_destinations') is not null then
+    delete from vault.secrets s using public.account_slack_destinations d where s.id = d.vault_secret_id;
+  end if;
+end $$;
+drop function if exists public.account_slack_last4(uuid);
+drop function if exists public.clear_account_slack_webhook(uuid);
+drop function if exists public.set_account_slack_webhook(uuid, text);
+drop table if exists public.account_slack_destinations;
+-- Its trigger went with the table.
+drop function if exists public.account_slack_destinations_drop_secret();
 
 -- ─── B ────────────────────────────────────────────────────────────────────────────────────────────
+drop function if exists public.finish_erasure(uuid);
+drop function if exists public.record_erasure_attempt(uuid);
+drop function if exists public.due_erasures(timestamptz, integer);
+drop function if exists public.record_deletion_cancel(uuid, uuid, text, boolean);
+drop function if exists public.restore_account(text, timestamptz);
+drop function if exists public.confirm_account_deletion(text, timestamptz);
+drop function if exists public.read_deletion_link(text, text, timestamptz);
+drop function if exists public.request_account_deletion(uuid, uuid, text);
+drop function if exists public.email_change_live(uuid);
+drop function if exists public.deletion_refusal(uuid, uuid);
+drop function if exists public.deletion_hostname(uuid, uuid);
+drop table if exists public.deletion_cancellations;
+drop function if exists public.erase_auth_audit_log(uuid, text[]);
+drop function if exists public.erase_person_apply(uuid, text, jsonb, boolean);
+drop function if exists public.erase_person_plan(uuid, text);
+drop function if exists public.erase_person_counts(uuid, text[], uuid[]);
+drop function if exists public.erase_person_refusals(uuid, uuid[]);
+drop function if exists public.erase_person_accounts(uuid);
+drop function if exists public.erase_rules();
 
 -- ─── A ────────────────────────────────────────────────────────────────────────────────────────────
 drop function if exists public.undo_email_change(text, timestamptz, boolean);

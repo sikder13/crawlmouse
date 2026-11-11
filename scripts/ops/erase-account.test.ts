@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedWorld } from '../../apps/web/__tests__/helpers/v2-check-tables';
+import { FIX_EMAIL_REQUESTS } from '../../apps/web/__tests__/helpers/v2-027b-standins';
 import { migratedDb, pgliteDb } from '../db/test-support';
 import {
   REDACTED_EMAIL,
@@ -31,6 +32,7 @@ beforeAll(async () => {
   await pglite.exec(`create table auth.audit_log_entries (
     instance_id uuid, id uuid primary key, payload json, created_at timestamptz,
     ip_address varchar(64) not null default '')`);
+  await pglite.exec(FIX_EMAIL_REQUESTS);
 }, 300_000);
 
 /** The Storage API's delete, as the runbook does it (§4): the objects the plan lists. */
@@ -271,8 +273,14 @@ describe('erase-account (B-F2)', () => {
     const recording = db();
     const plan = await planErasure(recording, { email: `  ${p.email.toUpperCase()} ` });
     expect(await everything()).toBe(before);
-    // It sent no write: no delete, update or insert, and no row lock.
-    expect(recording.executed.length).toBeGreaterThan(10);
+    // It sent no write: no delete, update or insert, and no row lock; and the plan function it calls
+    // is stable, so Postgres refuses a write inside it.
+    expect(recording.executed).toEqual([expect.stringMatching(/public\.erase_person_plan\(/)]);
+    expect(
+      await n(
+        `select count(*) from pg_proc where proname = 'erase_person_plan' and provolatile = 's'`,
+      ),
+    ).toBe(1);
     for (const sql of recording.executed) {
       expect(sql).not.toMatch(/\b(delete\s+from|update\s+public\.|insert\s+into|for\s+update)\b/i);
     }
@@ -301,13 +309,16 @@ describe('erase-account (B-F2)', () => {
       'share_links.created_by nulled': 0,
       'api_keys.created_by nulled': 0,
       'audits.notify_email nulled': 2,
+      'checks.notify_email nulled': 0,
       'email_events deleted': 1,
       'waitlist deleted': 1,
       'takedown_requests redacted (closed)': 1,
       'rate_limits deleted': 4,
+      'users.previous_emails pruned': 0,
       'seats deleted (invitations in other accounts)': 1,
       'reports.recipient_email nulled': 1,
       'sites.client_contact_email nulled': 1,
+      'fix_email_requests deleted': 0,
       'accounts deleted': 1,
       'sites deleted': 2,
       'checks deleted': 2,
@@ -501,6 +512,12 @@ describe('erase-account (B-F2)', () => {
       }),
     ).rejects.toThrow(/HTTP 503/);
     expect(await n(`select count(*) from auth.users where id = $1`, [p.id])).toBe(1);
+    // The transaction already cleared the Auth audit log, before the Auth call that failed.
+    expect(
+      await n(`select count(*) from auth.audit_log_entries where payload->>'actor_id' = $1`, [
+        p.id,
+      ]),
+    ).toBe(0);
     expect(await n(`select count(*) from public.accounts where id = $1`, [p.world.accountId])).toBe(
       0,
     );
@@ -619,6 +636,7 @@ describe('erase-account (B-F2)', () => {
 
   it('works where Supabase Auth keeps no audit log table', async () => {
     const bare = await migratedDb();
+    await bare.exec(FIX_EMAIL_REQUESTS);
     const email = `bare-${++serial}@example.com`;
     await bare.query(`insert into auth.users (id, email) values (gen_random_uuid(), $1)`, [email]);
     const plan = await planErasure(pgliteDb(bare), { email });
@@ -626,6 +644,20 @@ describe('erase-account (B-F2)', () => {
     expect(plan.counts).toMatchObject({ 'users deleted': 1 });
     await bare.close();
   }, 300_000);
+
+  it('refuses an address that names more than one user, and changes nothing', async () => {
+    const tag = `twice-${++serial}@example.com`;
+    await pglite.query(`insert into auth.users (id, email) values (gen_random_uuid(), $1)`, [tag]);
+    await pglite.query(`insert into auth.users (id, email) values (gen_random_uuid(), $1)`, [
+      tag.toUpperCase(),
+    ]);
+    const before = await everything();
+    await expect(planErasure(db(), { email: tag })).rejects.toThrow(
+      /the address names 2 users; erase by user id/,
+    );
+    await expect(executeErasure(db(), { email: tag }, sqlDelete)).rejects.toThrow(/names 2 users/);
+    expect(await everything()).toBe(before);
+  }, 120_000);
 
   it('takes exactly one of --email and --user-id, and an id that names a user', async () => {
     await expect(planErasure(db(), {})).rejects.toThrow(/exactly one/);
@@ -636,6 +668,168 @@ describe('erase-account (B-F2)', () => {
       /no user has that id/,
     );
   });
+});
+
+describe('the rules 027b adds (D5)', () => {
+  /** A person alone on their account, with no Storage objects, and a bystander's account. */
+  async function plain() {
+    const tag = `n${++serial}`;
+    const world = await seedWorld(pglite, tag);
+    await pglite.query(`delete from public.seats where id = $1`, [world.scopedSeatId]);
+    const bystander = await seedWorld(pglite, `${tag}b`);
+    const email = (
+      await pglite.query<{ email: string }>(`select email from auth.users where id = $1`, [
+        world.ownerId,
+      ])
+    ).rows[0]!.email;
+    const checkOf = async (accountId: string) =>
+      (
+        await pglite.query<{ id: string }>(
+          `select c.id from public.checks c join public.sites s on s.id = c.site_id
+            where s.account_id = $1 order by c.id limit 1`,
+          [accountId],
+        )
+      ).rows[0]!.id;
+    return { world, bystander, email, id: world.ownerId, checkOf };
+  }
+  const erase = async (target: { email?: string; userId?: string }) => {
+    await removeObjects((await planErasure(db(), target)).storage);
+    return executeErasure(db(), target, sqlDelete);
+  };
+
+  it('finds an address in users.previous_emails, and prunes it from anyone else who lists it', async () => {
+    const p = await plain();
+    const old = `old-${p.email}`;
+    await pglite.query(`update public.users set previous_emails = array[$2] where id = $1`, [
+      p.id,
+      old.toUpperCase(),
+    ]);
+    await pglite.query(`insert into public.waitlist (email, source) values ($1, 'developers')`, [
+      old,
+    ]);
+    const plan = await planErasure(db(), { userId: p.id });
+    expect(plan.emails).toEqual([p.email, old]);
+    expect(plan.counts['waitlist deleted']).toBe(1);
+    await erase({ userId: p.id });
+    expect(await n(`select count(*) from public.waitlist where email = $1`, [old])).toBe(0);
+
+    // Erasing an address by itself removes it from the list of the user who once held it.
+    const q = await plain();
+    const other = await plain();
+    const gone = `gone-${q.email}`;
+    await pglite.query(
+      `update public.users set previous_emails = array[$2, 'kept@example.com'] where id = $1`,
+      [other.id, gone],
+    );
+    const byAddress = await planErasure(db(), { email: gone });
+    expect(byAddress.userId).toBeNull();
+    expect(byAddress.counts['users.previous_emails pruned']).toBe(1);
+    await executeErasure(db(), { email: gone }, sqlDelete);
+    expect(
+      (
+        await pglite.query<{ p: string[] }>(
+          `select previous_emails p from public.users where id = $1`,
+          [other.id],
+        )
+      ).rows[0]!.p,
+    ).toEqual(['kept@example.com']);
+  }, 120_000);
+
+  it('nulls checks.notify_email outside the person’s accounts, and every one with no user', async () => {
+    const p = await plain();
+    const theirs = await p.checkOf(p.world.accountId);
+    const elsewhere = await p.checkOf(p.bystander.accountId);
+    await pglite.query(`update public.checks set notify_email = $2 where id = $1`, [
+      theirs,
+      p.email,
+    ]);
+    await pglite.query(`update public.checks set notify_email = $2 where id = $1`, [
+      elsewhere,
+      p.email.toUpperCase(),
+    ]);
+    const plan = await planErasure(db(), { userId: p.id });
+    // Their own check goes with their account; the other is nulled.
+    expect(plan.counts['checks.notify_email nulled']).toBe(1);
+    const { after } = await erase({ userId: p.id });
+    expect(after.counts['checks.notify_email nulled']).toBe(0);
+    expect(await n(`select count(*) from public.checks where id = $1`, [theirs])).toBe(0);
+    expect(
+      await n(`select count(*) from public.checks where id = $1 and notify_email is null`, [
+        elsewhere,
+      ]),
+    ).toBe(1);
+
+    // With no user, every check holding the address: an anonymous visitor's address on two accounts.
+    const q = await plain();
+    const visitor = `visitor-${++serial}@example.com`;
+    for (const accountId of [q.world.accountId, q.bystander.accountId]) {
+      await pglite.query(`update public.checks set notify_email = $2 where id = $1`, [
+        await q.checkOf(accountId),
+        visitor,
+      ]);
+    }
+    expect((await planErasure(db(), { email: visitor })).counts['checks.notify_email nulled']).toBe(
+      2,
+    );
+    await executeErasure(db(), { email: visitor }, sqlDelete);
+    expect(await n(`select count(*) from public.checks where notify_email = $1`, [visitor])).toBe(
+      0,
+    );
+  }, 120_000);
+
+  it('deletes fix_email_requests the person asked for or that name them, outside their accounts', async () => {
+    const p = await plain();
+    // The person is a developer on the bystander's account too.
+    const { rows } = await pglite.query<{ id: string }>(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, $3, 'developer', 'active', now()) returning id`,
+      [p.bystander.accountId, p.id, p.email],
+    );
+    const seat = rows[0]!.id;
+    const fixOf = async (accountId: string) =>
+      (
+        await pglite.query<{ id: string }>(
+          `select f.id from public.site_fixes f join public.sites s on s.id = f.site_id
+            where s.account_id = $1 order by f.id limit 1`,
+          [accountId],
+        )
+      ).rows[0]!.id;
+    const request = async (accountId: string, by: string | null, to: string) =>
+      (
+        await pglite.query<{ id: string }>(
+          `insert into public.fix_email_requests (fix_id, account_id, requested_by_seat_id, to_email)
+           values ($1, $2, $3, $4) returning id`,
+          [await fixOf(accountId), accountId, by, to],
+        )
+      ).rows[0]!.id;
+    const asked = await request(p.bystander.accountId, seat, 'dev@agency.example');
+    const named = await request(p.bystander.accountId, p.bystander.ownerSeatId, p.email);
+    const unrelated = await request(
+      p.bystander.accountId,
+      p.bystander.ownerSeatId,
+      'dev@agency.example',
+    );
+    const own = await request(p.world.accountId, p.world.ownerSeatId, 'dev@agency.example');
+
+    const plan = await planErasure(db(), { userId: p.id });
+    expect(plan.counts['fix_email_requests deleted']).toBe(2);
+    const { after } = await erase({ userId: p.id });
+    expect(after.counts['fix_email_requests deleted']).toBe(0);
+    const left = async (id: string) =>
+      n(`select count(*) from public.fix_email_requests where id = $1`, [id]);
+    expect([await left(asked), await left(named), await left(unrelated), await left(own)]).toEqual([
+      0, 0, 1, 0,
+    ]);
+
+    // By address alone, with no user: the request addressed to it.
+    const visitor = `fixme-${++serial}@example.com`;
+    const addressed = await request(p.bystander.accountId, null, visitor);
+    expect((await planErasure(db(), { email: visitor })).counts['fix_email_requests deleted']).toBe(
+      1,
+    );
+    await executeErasure(db(), { email: visitor }, sqlDelete);
+    expect(await left(addressed)).toBe(0);
+  }, 120_000);
 });
 
 describe('sameProject', () => {

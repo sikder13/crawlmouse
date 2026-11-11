@@ -171,9 +171,13 @@ describe('the finders see what they claim to see', () => {
       isFlagGated(join(WEB, p)),
     );
     expect(hidden).toEqual([
+      'app/api/account/delete/confirm/route.ts',
       'app/api/account/email/confirm/route.ts',
       'app/api/account/email/route.ts',
       'app/api/account/email/undo/route.ts',
+      'app/api/account/restore/route.ts',
+      'app/api/account/route.ts',
+      'app/api/alert-rules/route.ts',
       'app/api/billing/agency-trial/route.ts',
       'app/api/billing/cancel/route.ts',
       'app/api/checks/[id]/claim/route.ts',

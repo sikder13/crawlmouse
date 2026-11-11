@@ -33,6 +33,12 @@ export interface RoutePolicy {
 }
 
 export const ROUTE_POLICIES: readonly RoutePolicy[] = [
+  {
+    route: 'api/account',
+    methods: ['DELETE', 'PATCH', 'POST'],
+    class: 'member',
+    origin: 'strict',
+  },
   { route: 'api/account/email', methods: ['POST'], class: 'member', origin: 'strict' },
   {
     route: 'api/account/email/confirm',
@@ -58,6 +64,7 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     verifier: 'timingSafeEqual',
     origin: 'any',
   },
+  { route: 'api/alert-rules', methods: ['POST', 'PUT'], class: 'member', origin: 'strict' },
   {
     route: 'api/audits/[id]/cancel',
     methods: ['POST'],
@@ -250,6 +257,36 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     class: 'public',
     reason: 'a static text file for crawlers',
     origin: 'any',
+  },
+  // CC-27b workstream B: the deletion's links (D4). The token in the link, then in its cookie, is the
+  // credential; the person may not be able to sign in (a confirmed deletion bans them).
+  {
+    route: '(account)/account/delete/[token]',
+    methods: ['GET'],
+    class: 'public',
+    reason: 'an emailed link: moves its token into a cookie and redirects; changes nothing',
+    origin: 'any',
+  },
+  {
+    route: '(account)/account/restore/[token]',
+    methods: ['GET'],
+    class: 'public',
+    reason: 'an emailed link: moves its token into a cookie and redirects; changes nothing',
+    origin: 'any',
+  },
+  {
+    route: 'api/account/delete/confirm',
+    methods: ['POST'],
+    class: 'public',
+    reason: "the confirmation link's token, from its HttpOnly cookie, is the credential (D4)",
+    origin: 'strict',
+  },
+  {
+    route: 'api/account/restore',
+    methods: ['POST'],
+    class: 'public',
+    reason: "the restore link's token, from its HttpOnly cookie, is the credential (D4)",
+    origin: 'strict',
   },
 ];
 
