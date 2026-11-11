@@ -105,6 +105,22 @@ describe('loadSettingsDataset as the owner', () => {
   });
 });
 
+describe('a removed site', () => {
+  it('is not read: the account’s live sites only', async () => {
+    const userId = await signUp(db, `removed-${randomUUID().slice(0, 8)}@example.com`);
+    const { accountId } = await personalAccount(db, userId);
+    await db.query(
+      `insert into public.sites (account_id, host, removed_at) values ($1, 'gone.example', now())`,
+      [accountId],
+    );
+    await db.query(`insert into public.sites (account_id, host) values ($1, 'kept.example')`, [
+      accountId,
+    ]);
+    const { d } = await load(userId, accountId);
+    expect(d.sites.map((s) => s.host)).toEqual(['kept.example']);
+  });
+});
+
 describe('an account with no site', () => {
   it('reads an empty site list, and the plan card still answers', async () => {
     const userId = await signUp(db, `empty-${randomUUID().slice(0, 8)}@example.com`);

@@ -76,6 +76,30 @@ describe('which state the page shows', () => {
     expect(p?.kind).toBe('before');
   });
 
+  it('a trial, then Pro, then Free is not “the trial ended”: the state before Free was Pro', () => {
+    const d = fixture('bad-site');
+    const PAID = '2026-11-08T02:41:00.000Z';
+    const FREE = '2026-12-08T02:41:00.000Z';
+    const lapsed = {
+      ...d,
+      accounts: d.accounts.map((a) =>
+        a.id === BAD
+          ? {
+              ...a,
+              state: 'free' as const,
+              trial_ends_at: null,
+              state_history: [
+                ...a.state_history,
+                { state: 'pro' as const, since: PAID },
+                { state: 'free' as const, since: FREE },
+              ],
+            }
+          : a,
+      ),
+    };
+    expect(trialPage(lapsed, { accountId: BAD, now: '2026-12-09T15:00:00.000Z' })).toBeNull();
+  });
+
   it('an account that never had a trial, or that went on to pay, has no trial page', () => {
     expect(trialPage(fixture('clean-site'), ACCOUNT_VIEWERS.clean())).toBeNull();
     const d = ended();
