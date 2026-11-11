@@ -1,5 +1,6 @@
-import '../../styles/v2/tokens.css';
-import { redirect } from 'next/navigation';
+import '../../../styles/v2/tokens.css';
+import { notFound, redirect } from 'next/navigation';
+import { checksPublicEnabled } from '@/lib/auth/flags';
 import { AccountStateScreen } from '@/components/v2/screens/account/AccountStateScreen';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { DashboardScreen } from '@/components/v2/screens/dashboard/DashboardScreen';
@@ -8,11 +9,19 @@ import { readAccount } from '@/lib/v2/account/pages';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { dashboardView } from '@/lib/v2/view/dashboard';
 
+// Signed-in application surface, as v1's /dashboard: never a search result.
+export const metadata = {
+  robots: { index: false, follow: true },
+  alternates: { canonical: '/dashboard' },
+};
+
 /**
- * The v2 dashboard (CC-26b D8), which `page.tsx` imports only while V2_CHECKS_PUBLIC is on, so
- * neither this module nor its stylesheets are in the v1 page's graph.
+ * The v2 dashboard (CC-26b D8). With V2_CHECKS_PUBLIC on, the middleware rewrites `/dashboard` here;
+ * v1's `app/dashboard/page.tsx` imports nothing of it, so neither this page nor its stylesheets are
+ * in v1's graph. With the flag off it is a 404, reached or not.
  */
 export default async function V2Dashboard() {
+  if (!checksPublicEnabled()) return notFound();
   const r = await loadViewer();
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;

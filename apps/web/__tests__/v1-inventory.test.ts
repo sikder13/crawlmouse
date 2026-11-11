@@ -171,6 +171,7 @@ describe('the finders see what they claim to see', () => {
       isFlagGated(join(WEB, p)),
     );
     expect(hidden).toEqual([
+      'app/dashboard/v2/page.tsx',
       'app/sites/[id]/page.tsx',
       'app/api/billing/agency-trial/route.ts',
       'app/api/billing/cancel/route.ts',
