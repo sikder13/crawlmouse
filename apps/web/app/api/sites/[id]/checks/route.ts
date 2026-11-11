@@ -83,6 +83,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return tooSoonTo(req, back, 'capped', outcome.nextAllowedAt);
     case 'check_running':
       return refuseTo(req, back, 409, 'check_running', { checkId: outcome.checkId });
+    case 'recently_checked':
+      return tooSoonTo(req, back, 'recently_checked', outcome.nextAllowedAt);
     case 'capacity':
       return refuseTo(req, back, 503, 'capacity');
     case 'removed':

@@ -24,6 +24,11 @@ describe('noticeLine', () => {
     ['unavailable', 'Checks are not running yet, so nothing was started.'],
     ['capacity', 'Today’s checks are all taken, so nothing was started. Try again later.'],
     ['check_running', 'A check of this site is already running. Ask for another once it ends.'],
+    [
+      'recently_checked',
+      'This site was checked moments ago, so no new check was started. Ask again from Tue 13:30.',
+    ],
+    ['confirm_required', 'The site was not removed: tick the box to confirm, then remove it.'],
     ['site_paused', 'Checks of this site are paused, so it was not checked.'],
     ['site_exists', 'That site is already on this account.'],
     ['upgrade_required', 'That needs a paid plan.'],
@@ -55,6 +60,10 @@ describe('noticeLine', () => {
     [
       'marked_done_check_running',
       'Marked done. A check of this site was already running, so no re-check was queued; ask for one once it ends. The next check confirms the fix or reopens it.',
+    ],
+    [
+      'marked_done_recently_checked',
+      'Marked done. This site was checked moments ago, so no re-check was queued; the next check confirms the fix or reopens it. A re-check can be asked from Tue 13:30.',
     ],
     [
       'marked_done_capacity',

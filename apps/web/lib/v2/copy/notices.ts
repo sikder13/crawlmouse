@@ -22,6 +22,8 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   unavailable: () => 'Checks are not running yet, so nothing was started.',
   capacity: () => 'Today’s checks are all taken, so nothing was started. Try again later.',
   check_running: () => 'A check of this site is already running. Ask for another once it ends.',
+  recently_checked: (at) =>
+    `This site was checked moments ago, so no new check was started.${at ? ` Ask again from ${at}.` : ''}`,
   site_paused: () => 'Checks of this site are paused, so it was not checked.',
   site_exists: () => 'That site is already on this account.',
   upgrade_required: () => 'That needs a paid plan.',
@@ -31,6 +33,7 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   role_refused: () => 'Your seat cannot do that. The account’s owner or a manager can.',
   scoped_seat: () => 'Your seat covers only some clients, so it cannot add a site.',
   no_account: () => 'This sign-in is not a member of any account.',
+  confirm_required: () => 'The site was not removed: tick the box to confirm, then remove it.',
   account_ambiguous: () =>
     'This sign-in is a member of more than one account and none is set as the one to open.',
   not_owner: () => 'Only the account’s owner can start the trial.',
@@ -47,6 +50,8 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
     `Marked done. This site has used its re-checks for the last 24 hours, so none was queued; ${NEXT_CHECK}${at ? ` A re-check can be asked from ${at}.` : ''}`,
   marked_done_check_running: () =>
     `Marked done. A check of this site was already running, so no re-check was queued; ask for one once it ends. ${capitalised(NEXT_CHECK)}`,
+  marked_done_recently_checked: (at) =>
+    `Marked done. This site was checked moments ago, so no re-check was queued; ${NEXT_CHECK}${at ? ` A re-check can be asked from ${at}.` : ''}`,
   marked_done_capacity: () =>
     `Marked done. Today’s checks are all taken, so no re-check was queued; ${NEXT_CHECK}`,
   marked_done_site_paused: () =>
