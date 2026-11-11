@@ -26,6 +26,11 @@ export const TRIAL_END_COPY = {
   /** A trial with a card on file becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
   card: (last4: string, date: string) =>
     `The card ending ${last4} is charged on ${date} unless you cancel.`,
+  /** A card trial set to cancel at its end: not charged (CC-27b review, item 1). */
+  cardCancelled: (last4: string, date: string) =>
+    `The trial is cancelled: it ends on ${date} and the card ending ${last4} is not charged.`,
+  cancelledKeepText: (last4: string, date: string) =>
+    `The trial ends on ${date} and the card ending ${last4} is not charged.`,
   keepNoCard: (plan: string, price: number) => `Keep ${plan}, $${price} a month · add a card`,
   letItEnd: (date: string) => `Let it end on ${date}`,
   cancelBefore: (date: string) => `Cancel before ${date}`,

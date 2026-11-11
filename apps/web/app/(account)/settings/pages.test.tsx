@@ -51,6 +51,7 @@ let owner: Person; // a Free account with one site
 let empty: Person; // a Free account with no site
 let trialing: Person; // a no-card Pro trial with one site
 let ended: Person; // back on Free after a Pro trial, one site
+let cancelling: Person; // a Pro trial with a card, its subscription set to cancel at the trial's end
 let manager: { id: string; email: string };
 let developer: { id: string; email: string };
 
@@ -114,6 +115,25 @@ beforeAll(async () => {
                 'since', (state_history->0->>'since')::timestamptz + interval '2 milliseconds'))
       where id = $1`,
     [ended.accountId],
+  );
+  cancelling = await person('cancelling');
+  await host(cancelling, 'cancelling-site.example');
+  await db.query(
+    `insert into public.subscriptions (id, account_id, status, plan, interval, current_period_end, trial_end,
+                                       cancel_at_period_end)
+     values ('sub_cancelling_trial', $1, 'trialing', 'pro', 'month', now() + interval '5 days',
+             now() + interval '5 days', true)`,
+    [cancelling.accountId],
+  );
+  await db.query(
+    `update public.accounts
+        set state = 'pro_trial', tier = 'pro', trial_variant = 'card_required', card_last4 = '4242',
+            current_subscription_id = 'sub_cancelling_trial',
+            trial_ends_at = now() + interval '5 days', trial_used_at = now(),
+            state_history = state_history || jsonb_build_array(jsonb_build_object('state', 'pro_trial',
+              'since', (state_history->0->>'since')::timestamptz + interval '1 millisecond'))
+      where id = $1`,
+    [cancelling.accountId],
   );
   manager = await seat(owner.accountId, 'account_manager');
   developer = await seat(owner.accountId, 'developer');
@@ -236,5 +256,25 @@ describe('/trial-ended', () => {
     await expect(TrialEndedPage()).rejects.toMatchObject(redirectTo('/settings/plan'));
     as(manager);
     await expect(TrialEndedPage()).rejects.toMatchObject(redirectTo('/dashboard'));
+  });
+});
+
+describe('a trial with a card whose subscription is set to cancel at its end', () => {
+  const CHARGE = /charged (then|on)|unless you cancel|Cancel before/;
+
+  it('/settings says the card is not charged, and offers no cancel', async () => {
+    as(cancelling);
+    const html = renderToStaticMarkup(screen(await SettingsPage()));
+    expect(html).toContain('The card ending 4242 is not charged.');
+    expect(html).not.toMatch(CHARGE);
+    expect(html).not.toContain('action="/api/billing/cancel"');
+  });
+
+  it('/trial-ended says the trial is cancelled and the card not charged', async () => {
+    as(cancelling);
+    const html = renderToStaticMarkup(screen(await TrialEndedPage()));
+    expect(html).toContain('The trial is cancelled: it ends on');
+    expect(html).not.toMatch(CHARGE);
+    expect(html).not.toContain('href="/settings/plan"');
   });
 });

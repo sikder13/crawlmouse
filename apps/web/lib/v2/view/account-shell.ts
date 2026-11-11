@@ -77,7 +77,11 @@ export const isFirstRun = (v: AccountView) =>
  */
 export type PlanPlace = 'rail' | 'page';
 
-function trialCard(v: AccountView, plan: PlanPlace): TrialCardView | null {
+function trialCard(
+  v: AccountView,
+  plan: PlanPlace,
+  billingEnd: string | null,
+): TrialCardView | null {
   const a = v.account;
   if (a.state !== 'pro_trial' && a.state !== 'agency_trial') return null;
   const zone = a.timezone;
@@ -98,7 +102,9 @@ function trialCard(v: AccountView, plan: PlanPlace): TrialCardView | null {
       note:
         a.card_last4 === null
           ? `${COPY.noCard} ${COPY.nothingCharged}`
-          : COPY.cardCharged(a.card_last4, dayDate(end, zone)),
+          : billingEnd !== null
+            ? COPY.cardNotCharged(a.card_last4, dayDate(end, zone))
+            : COPY.cardCharged(a.card_last4, dayDate(end, zone)),
       billing: null,
       keep: null,
     };
@@ -136,7 +142,14 @@ function trialCard(v: AccountView, plan: PlanPlace): TrialCardView | null {
 export function accountShellView(
   v: AccountView,
   current: (typeof ACCOUNT_NAV)[number]['label'] | null,
-  { plan = 'rail' }: { plan?: PlanPlace } = {},
+  {
+    plan = 'rail',
+    billingEnd = null,
+  }: {
+    plan?: PlanPlace;
+    /** A subscription set to cancel at its period's end: a card trial's card is then not charged. */
+    billingEnd?: string | null;
+  } = {},
 ): ShellView {
   const fresh = newChanges(v).length;
   const seat = v.d.seats.find((s) => s.role === 'owner');
@@ -152,7 +165,7 @@ export function accountShellView(
       current: n.label === current,
       fresh: n.label === 'Changes' && fresh > 0,
     })),
-    trial: trialCard(v, plan),
+    trial: trialCard(v, plan, billingEnd),
     theme: seat?.theme ?? 'system',
     themeAction: action('theme', 'Theme'),
   };

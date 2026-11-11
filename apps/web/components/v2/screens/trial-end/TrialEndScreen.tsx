@@ -72,7 +72,7 @@ export function TrialEndScreen({ data }: { data: TrialEndView }) {
           </div>
           <div className={shared.actions}>
             {banner.keep ? <ActionControl action={banner.keep} size="md" /> : null}
-            <ActionControl action={banner.end} variant="quiet" size="md" />
+            {banner.end ? <ActionControl action={banner.end} variant="quiet" size="md" /> : null}
           </div>
         </div>
         <div className={styles.lists}>
@@ -146,7 +146,7 @@ export function TrialEndedScreen({ data }: { data: TrialEndedView }) {
             <div className={styles.bannerSub}>{banner.sub}</div>
           </div>
           <div className={shared.actions}>
-            <ActionControl action={banner.keep} size="md" />
+            {banner.keep ? <ActionControl action={banner.keep} size="md" /> : null}
           </div>
         </div>
         <div className={styles.lists}>

@@ -119,6 +119,11 @@ export const SETTINGS_COPY = {
   /** A paid plan set to end at its period's end is shown until then (spec 27 "Cancel"). */
   cancelling: (plan: string, date: string) =>
     `${plan} until ${date}, then Free. Nothing more is charged.`,
+  /** A trial with a card set to cancel at its end: the card is not charged. */
+  trialCancelling: (plan: string, date: string, last4: string) =>
+    `${plan} trial until ${date}, then Free. The card ending ${last4} is not charged.`,
+  trialCancelled: (date: string) =>
+    `Cancelled; the trial ends ${date} and the card is not charged.`,
   cancelled: (date: string, days: number) =>
     `Cancelled; it takes effect ${date}. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
   cancelFree: 'Nothing to cancel on Free.',

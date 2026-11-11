@@ -348,7 +348,7 @@ export function settingsView(
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
-    shell: accountShellView(v, 'Settings', { plan: 'page' }),
+    shell: accountShellView(v, 'Settings', { plan: 'page', billingEnd }),
     header: {
       title: COPY.title,
       line: [a.email, trial ? COPY.trialLeft(plan, days!) : plan].join(' · '),
@@ -391,19 +391,23 @@ export function settingsView(
       title: COPY.planTitle,
       name: trial ? COPY.trialName(plan) : plan,
       left: days === null ? null : COPY.daysLeft(days),
-      note: trial
-        ? `${COPY.ends(date(a.trial_ends_at!))} ${
-            card === null ? COPY.noCardTerms(plan) : COPY.cardTerms(card)
-          }`
-        : pastDue
-          ? v.tier === 'free'
-            ? COPY.pastDueEnded(date(pastDueSince), date(graceEnds))
-            : COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
-          : ending !== null
-            ? COPY.cancelling(plan, date(ending))
-            : paid
-              ? null
-              : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
+      // A plan set to end is said first: a card trial set to cancel is not charged.
+      note:
+        cardTrial && ending !== null
+          ? COPY.trialCancelling(plan, date(ending), card)
+          : trial
+            ? `${COPY.ends(date(a.trial_ends_at!))} ${
+                card === null ? COPY.noCardTerms(plan) : COPY.cardTerms(card)
+              }`
+            : pastDue
+              ? v.tier === 'free'
+                ? COPY.pastDueEnded(date(pastDueSince), date(graceEnds))
+                : COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
+              : ending !== null
+                ? COPY.cancelling(plan, date(ending))
+                : paid
+                  ? null
+                  : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
       usageLabel: COPY.tables.usage,
       usage: [
         [COPY.sitesUsed, COPY.of(primarySites(v).length, a.limits.sites)],
@@ -425,39 +429,41 @@ export function settingsView(
       compare: action('pricing', COPY.compare),
       termsLabel: COPY.tables.terms,
       terms: [
-        cardTrial
-          ? {
-              label: COPY.cancel,
-              text: COPY.cancelCardTrial(
-                date(a.trial_ends_at!),
-                CANCEL_CLICKS,
-                EVIDENCE_CONDENSED_AFTER_DAYS,
-              ),
-              action: cancel,
-            }
-          : trial
+        cardTrial && ending !== null
+          ? { label: COPY.cancel, text: COPY.trialCancelled(date(ending)), action: null }
+          : cardTrial
             ? {
                 label: COPY.cancel,
-                text: COPY.cancelTrial(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
-                action: null,
+                text: COPY.cancelCardTrial(
+                  date(a.trial_ends_at!),
+                  CANCEL_CLICKS,
+                  EVIDENCE_CONDENSED_AFTER_DAYS,
+                ),
+                action: cancel,
               }
-            : ending !== null
+            : trial
               ? {
                   label: COPY.cancel,
-                  text: COPY.cancelled(date(ending), EVIDENCE_CONDENSED_AFTER_DAYS),
+                  text: COPY.cancelTrial(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
                   action: null,
                 }
-              : paid
+              : ending !== null
                 ? {
                     label: COPY.cancel,
-                    text: COPY.cancelPaid(
-                      CANCEL_CLICKS,
-                      EVIDENCE_CONDENSED_AFTER_DAYS,
-                      a.billing_period_months === 12 ? 'year' : 'month',
-                    ),
-                    action: cancel,
+                    text: COPY.cancelled(date(ending), EVIDENCE_CONDENSED_AFTER_DAYS),
+                    action: null,
                   }
-                : { label: COPY.cancel, text: COPY.cancelFree, action: null },
+                : paid
+                  ? {
+                      label: COPY.cancel,
+                      text: COPY.cancelPaid(
+                        CANCEL_CLICKS,
+                        EVIDENCE_CONDENSED_AFTER_DAYS,
+                        a.billing_period_months === 12 ? 'year' : 'month',
+                      ),
+                      action: cancel,
+                    }
+                  : { label: COPY.cancel, text: COPY.cancelFree, action: null },
         // A card on file means a Stripe customer, whose receipts the portal lists.
         card === null
           ? { label: COPY.receipts, text: COPY.noReceipts, action: null }
