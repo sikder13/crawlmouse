@@ -74,7 +74,8 @@ export interface DoorStore {
 /** What a first-audit request did, each with the case that produces it. */
 export const FIRST_AUDIT_OUTCOMES = {
   requested: 'a first audit of the site was requested',
-  has_check: 'the site already has a check that is queued, running, deferred, finished or partial',
+  has_check:
+    'the site has a check that is queued, running, deferred, finished or partial, or its first audit was requested before',
   paused: 'CRAWL_PAUSED is set',
   capacity: 'the daily ceiling `global:audits:day` is reached, or could not be read',
   domain_limit: 'the host’s hourly bucket is used up',
