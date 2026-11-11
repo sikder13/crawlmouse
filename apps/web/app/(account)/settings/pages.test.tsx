@@ -381,15 +381,15 @@ describe('the money on the delete step, by the subscription’s state (fix round
 
   it('a plan whose payment failed: cancelled when the account is erased, not set to end', async () => {
     const page = await html(pastDue);
-    expect(page).toContain(text(DELETE_COPY.moneyPaymentFailed));
-    expect(page).not.toContain(text(DELETE_COPY.money[0]));
+    expect(page).toContain(text(DELETE_COPY.moneyNotCollected));
+    expect(page).not.toContain(text(DELETE_COPY.moneyEnds));
     expect(page).toContain(text(REFUND_POLICY));
   });
 
   it('a trialing plan: set to end at the end of the period', async () => {
     const page = await html(cancelling);
-    expect(page).toContain(text(DELETE_COPY.money[0]));
-    expect(page).not.toContain(text(DELETE_COPY.moneyPaymentFailed));
+    expect(page).toContain(text(DELETE_COPY.moneyEnds));
+    expect(page).not.toContain(text(DELETE_COPY.moneyNotCollected));
   });
 
   it('no subscription: nothing about money', async () => {

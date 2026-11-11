@@ -74,7 +74,7 @@ describe('deleting an account with a paid plan: the money (owner ruling Q7)', ()
   const ch = fixture('challenged-site');
   const viewer = { accountId: ACCOUNT_VIEWERS.withheld().accountId, now: '2026-10-31T12:00:00Z' };
   const MONEY =
-    'A paid plan is set to end at the end of the period you have paid for. If that comes after the seven days, the plan is cancelled when the account is erased. We don’t refund partial periods except where the law requires it.';
+    'A plan, or a trial with a card, is set to end when its current period ends, and nothing more is charged. If that comes after the seven days, it is cancelled when the account is erased. We don’t refund partial periods except where the law requires it.';
   const terms = readFileSync(join(WEB, 'app/terms/page.tsx'), 'utf8')
     .replace(/&rsquo;/g, '’')
     .replace(/\s+/g, ' ');
@@ -204,8 +204,8 @@ describe('the money sentence by the subscription’s state (fix round 2, item 5)
   it('past due, unpaid or paused: not set to end, cancelled at once when the account is erased', () => {
     for (const status of ['past_due', 'unpaid', 'paused'])
       for (const t of text(status)) {
-        expect(t.endsWith(` ${DELETE_COPY.moneyPaymentFailed} ${REFUND_POLICY}`)).toBe(true);
-        expect(t).not.toContain(DELETE_COPY.money[0]);
+        expect(t.endsWith(` ${DELETE_COPY.moneyNotCollected} ${REFUND_POLICY}`)).toBe(true);
+        expect(t).not.toContain(DELETE_COPY.moneyEnds);
       }
   });
 

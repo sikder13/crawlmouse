@@ -35,6 +35,7 @@ import {
 import { action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
+import { DELETE_COPY, deletionMoney } from '../copy/deletion';
 import { REFUSAL_SENTENCES, SETTINGS_NOTICES as NOTICES } from '../copy/settings-notices';
 import type { SeatRole } from '../account/profile';
 
@@ -500,32 +501,20 @@ export function settingsView(
 }
 
 /**
- * What deleting removes, and what happens to the money, by the state of the subscription mirror
- * (owner ruling Q7, fix round 2): `active` or `trialing` is set to end at the end of the paid period
- * at the confirm; `past_due`, `unpaid` or `paused` is not, and the purge cancels it at once; any other
- * state, or none, has nothing to say. Each with what the published refund policy (Terms §8) says.
- * `undefined` is a preview, which has no mirror: it is read from the tier and the billing period.
+ * What deleting removes, and what happens to the money: `deletionMoney` (copy/deletion.ts) for the
+ * subscription mirror's status, the mapping the confirmation page reads too. `undefined` is a
+ * preview, which has no mirror: a billed paid tier gets the period-end lines.
  */
 function deleteText(v: ReturnType<typeof viewAt>, status: string | null | undefined): string {
   const text = COPY.deleteText(v.d.sites.length, DELETE_GRACE_DAYS);
-  const billed: 'ends' | 'failed' | null =
+  const money =
     status === undefined
       ? v.tier !== 'free' && v.account.billing_period_months !== null
-        ? 'ends'
+        ? DELETE_COPY.money
         : null
-      : status !== null && Object.hasOwn(SUBSCRIPTION_MONEY, status)
-        ? SUBSCRIPTION_MONEY[status]!
-        : null;
-  return billed === null ? text : `${text} ${COPY.deleteMoney[billed]}`;
+      : deletionMoney(status);
+  return money === null ? text : `${text} ${money.join(' ')}`;
 }
-
-const SUBSCRIPTION_MONEY: Readonly<Record<string, 'ends' | 'failed'>> = {
-  active: 'ends',
-  trialing: 'ends',
-  past_due: 'failed',
-  unpaid: 'failed',
-  paused: 'failed',
-};
 
 // ── Deleting the account: the confirmation step ─────────────────────────────────────────────
 
