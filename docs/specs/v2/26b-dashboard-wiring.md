@@ -69,8 +69,8 @@ v1's `app/dashboard/page.tsx` is main's file, pinned by its sha256 in
 
 ## Deploy order
 
-The code goes out before the migration's apply, never the reverse: the persist step now sends what
-the build read (`read`), which only the new `persist_built_check` accepts. While `V2_PIPELINE` is
-on, a rollback of the code with the migration left applied, or a check whose build was stored before
-the deploy (its stored output has no `read`), fails its persist; the check is marked failed and a
-re-check runs it again. Production keeps `V2_PIPELINE` unset until the switch-on step.
+The code goes out before the migration's apply, never the reverse: the new `persist_built_check`
+requires the `read` list that only the new persist step sends (the reviewers' deploy-safety report,
+round 1, measured the forward order safe). While `V2_PIPELINE` is on, a rollback of the code with the
+migration left applied, or a check whose build was stored before the deploy (its stored output has no
+`read`), fails its persist step. Production keeps `V2_PIPELINE` unset until the switch-on step.
