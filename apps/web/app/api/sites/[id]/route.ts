@@ -1,7 +1,15 @@
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
-import { isId, meantMethod, notFound, readBody, refuse, respond } from '@/lib/v2/account/route';
+import {
+  isId,
+  meantMethod,
+  notFound,
+  readBody,
+  refuse,
+  refuseTo,
+  respond,
+} from '@/lib/v2/account/route';
 import { decideEdit, parseEditBody, readSite } from '@/lib/v2/account/sites';
 import { editSite, removeSite } from '@/lib/v2/account/sites-store';
 import { readEntitlement } from '@/lib/v2/account/viewer';
@@ -45,6 +53,7 @@ async function change(req: Request, { params }: Context, method: 'PATCH' | 'DELE
 
   const { id } = await params;
   if (!isId(id)) return notFound();
+  const back = `/sites/${id}`;
   const { data: member, error: memberError } = await sb.rpc('is_member_for_site', { p_site: id });
   if (memberError) throw new Error(`is_member_for_site failed: ${memberError.message}`);
   if (member !== true) return notFound();
@@ -54,7 +63,8 @@ async function change(req: Request, { params }: Context, method: 'PATCH' | 'DELE
     p_account: site.account_id,
   });
   if (roleError) throw new Error(`member_role failed: ${roleError.message}`);
-  if (role !== 'owner' && role !== 'account_manager') return refuse(403, 'role_refused');
+  if (role !== 'owner' && role !== 'account_manager')
+    return refuseTo(req, back, 403, 'role_refused');
   const entitlement = await readEntitlement(sb, site.account_id, new Date());
   if (entitlement === null) return notFound();
 
@@ -67,19 +77,20 @@ async function change(req: Request, { params }: Context, method: 'PATCH' | 'DELE
     return body?.kind === 'form' ? respond('form', '/dashboard') : Response.json({ removed: true });
   }
   if (verb !== 'PATCH') return refuse(405, 'method_not_allowed');
-  if (body === null || meant === null) return refuse(400, 'invalid');
+  if (body === null || meant === null) return refuseTo(req, back, 400, 'invalid');
 
   const edit = parseEditBody(meant.fields);
-  if (edit === null) return refuse(400, 'invalid');
+  if (edit === null) return refuseTo(req, back, 400, 'invalid');
   const decision = await decideEdit(
     edit,
     { host: site.host, isStaging: site.staging_of_site_id !== null },
     entitlement,
   );
   if (!decision.ok) {
-    if (decision.status === 402) return refuse(402, decision.code, { gate: decision.gate });
-    if (decision.status === 409) return refuse(409, decision.code);
-    return refuse(decision.status, decision.code, { field: decision.field });
+    if (decision.status === 402)
+      return refuseTo(req, back, 402, decision.code, { gate: decision.gate });
+    if (decision.status === 409) return refuseTo(req, back, 409, decision.code);
+    return refuseTo(req, back, decision.status, decision.code, { field: decision.field });
   }
   const edited = await editSite(supabaseAdmin(), id, decision.patch);
   switch (edited.outcome) {
@@ -90,8 +101,8 @@ async function change(req: Request, { params }: Context, method: 'PATCH' | 'DELE
     case 'removed':
       return notFound();
     case 'is_staging':
-      return refuse(409, 'staging_site');
+      return refuseTo(req, back, 409, 'staging_site');
     case 'exists':
-      return refuse(409, 'site_exists', { field: 'stagingUrl' });
+      return refuseTo(req, back, 409, 'site_exists', { field: 'stagingUrl' });
   }
 }

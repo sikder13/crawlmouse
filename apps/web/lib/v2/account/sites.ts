@@ -10,7 +10,6 @@ import { z } from 'zod';
 import { admitSiteHost } from '../../auth/admit-site';
 import { hostFromSiteInput } from '../../auth/site-host';
 import type { TierGates } from '../../entitlement-v2';
-import { refuse } from './route';
 import type { Entitlement } from './viewer-read';
 import type { SitePatch } from './sites-store';
 
@@ -177,10 +176,4 @@ export async function readSite(session: SupabaseClient, siteId: string): Promise
     .maybeSingle();
   if (error) throw new Error(`sites read failed: ${error.message}`);
   return data === null ? null : SiteRow.parse(data);
-}
-
-/** A 429 for a request over a bound, with when the next one is allowed (as `Retry-After` too). */
-export function tooSoon(code: string, nextAllowedAt: string, now = Date.now()): Response {
-  const seconds = Math.max(1, Math.ceil((Date.parse(nextAllowedAt) - now) / 1000));
-  return refuse(429, code, { nextAllowedAt }, { 'retry-after': String(seconds) });
 }

@@ -40,7 +40,7 @@ describe('v1 /dashboard', () => {
 describe('/dashboard/v2', () => {
   it.each(['', 'true'])('is a 404 with V2_CHECKS_PUBLIC=%j, before any read', async (flag) => {
     vi.stubEnv('V2_CHECKS_PUBLIC', flag);
-    await expect(V2Dashboard()).rejects.toMatchObject({
+    await expect(V2Dashboard({ searchParams: Promise.resolve({}) })).rejects.toMatchObject({
       digest: expect.stringContaining('NEXT_HTTP_ERROR_FALLBACK;404'),
     });
     expect(h.viewerRead).toBe(0);
@@ -48,7 +48,7 @@ describe('/dashboard/v2', () => {
 
   it('with the flag on, reads the viewer: signed out goes to /login', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
-    await expect(V2Dashboard()).rejects.toMatchObject({
+    await expect(V2Dashboard({ searchParams: Promise.resolve({}) })).rejects.toMatchObject({
       digest: expect.stringContaining('/login'),
     });
     expect(h.viewerRead).toBe(1);

@@ -10,6 +10,7 @@ import { TAGGED_UA_LINE } from '../../../../lib/v2/copy/site';
 import type { DashboardView } from '../../../../lib/v2/view/dashboard';
 import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
+import { Notice, type NoticeView } from '../account/Notice';
 import { CardHead, GradeText } from '../account/parts';
 import { spokenRun, verdictCell } from '../account/verdict-cells';
 import shared from '../account/AccountScreen.module.css';
@@ -363,10 +364,17 @@ function Setup({ setup }: { setup: NonNullable<DashboardView['setup']> }) {
  * model. On the first run, the site, the fixes to start with and what is worth setting up; after
  * it, what changed since the check before, the primary site's history and every site.
  */
-export function DashboardScreen({ data }: Props) {
+export function DashboardScreen({
+  data,
+  notice,
+}: Props & {
+  /** A refused form's notice, on a live page. */
+  notice?: NoticeView | null;
+}) {
   return (
     <AccountFrame shell={data.shell}>
       <Header data={data} />
+      <Notice notice={notice} />
       {data.startPro ? (
         <Card as="section" className={styles.startPro} data-v2-addition="">
           <CardHead title={data.startPro.title} />

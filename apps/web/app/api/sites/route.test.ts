@@ -217,11 +217,26 @@ describe('POST /api/sites', () => {
       json({ url: '10.0.0.1' }),
       json({ url: 'a.example', accountId: 'x' }),
       json({}),
-      post('url=a.example&url=b.example', 'application/x-www-form-urlencoded'),
       post('nope', 'text/plain'),
     ]) {
       expect((await POST(req)).status).toBe(400);
     }
+    // A form is sent back to the dashboard with the notice instead.
+    const form = await POST(
+      post('url=a.example&url=b.example', 'application/x-www-form-urlencoded'),
+    );
+    expect(form.status).toBe(303);
+    expect(form.headers.get('location')).toBe('/dashboard?notice=invalid');
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
+  it('a refused form goes back to the dashboard with its notice; JSON keeps the body', async () => {
+    const p = await person(h.db, 'fullform');
+    await keptSite(h.db, p.accountId);
+    as(p);
+    const res = await POST(post('url=second.example', 'application/x-www-form-urlencoded'));
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/dashboard?notice=upgrade_required');
     expect(h.send).not.toHaveBeenCalled();
   });
 
