@@ -172,9 +172,15 @@ describe('POST /api/fixes/[id]/email-developer', () => {
     // The address is in the row, never in the event.
     expect(JSON.stringify(h.sent).toLowerCase()).not.toContain('agency.example');
     expect(h.limits).toEqual([
-      [`fix-email:user:${fw.w.scopedUserId}`, 5, 3_600_000, { failClosed: true }],
       [`fix-email:fix:${fw.ranked[0]}`, 3, 86_400_000, { failClosed: true }],
+      [`fix-email:user:${fw.w.scopedUserId}`, 5, 3_600_000, { failClosed: true }],
     ]);
+  });
+
+  it('a request the per-fix limit refuses spends none of the caller’s hourly sends', async () => {
+    h.limited.add('fix-email:fix');
+    expect((await post(fw.ranked[2]!, json('dev@agency.example'))).status).toBe(429);
+    expect(h.limits.map(([key]) => key)).toEqual([`fix-email:fix:${fw.ranked[2]}`]);
   });
 
   it.each(['fix-email:user', 'fix-email:fix'])(

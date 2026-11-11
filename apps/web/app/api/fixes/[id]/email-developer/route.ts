@@ -11,6 +11,12 @@ import { inngest } from '../../../../../../../inngest/client';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/** The fix page's limits (questions.md Q8): 3 per fix per day, 5 per user per hour, failing closed. */
+const PER_FIX_DAY = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PER_USER_HOUR = 5;
+const HOUR_MS = 60 * 60 * 1000;
+
 /**
  * Asks for a fix's packet to be emailed to a developer (CC-26b D9): a 404 with V2_CHECKS_PUBLIC
  * unset, for a fix that is not the caller's, and for no such fix. The limits run after the
@@ -35,7 +41,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       store: supabaseFixesStore(supabaseAdmin()),
       capture: captureFor(req),
       now: () => new Date(),
-      rateLimit: checkRateLimit,
+      limits: {
+        perFix: () =>
+          checkRateLimit(`fix-email:fix:${id}`, PER_FIX_DAY, DAY_MS, { failClosed: true }),
+        perUser: () =>
+          checkRateLimit(`fix-email:user:${user.id}`, PER_USER_HOUR, HOUR_MS, { failClosed: true }),
+      },
       send: (event) => inngest.send(event),
     },
     { fixId: id, userId: user.id },
