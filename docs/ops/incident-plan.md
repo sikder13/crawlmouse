@@ -48,7 +48,9 @@ command says where to run it. Commands that need a credential read it without ec
      An instant rollback serves the old build with the old build's environment.
 
    - _The last migration is the problem_: run its rollback through the pipeline. From the repository
-     root with `gh` signed in, then approve the `production` environment in GitHub:
+     root with `gh` signed in, then approve the `production` environment in GitHub (its required
+     reviewer is enforced while the repository is public; once it is private the dispatch alone
+     starts the job, `docs/specs/v2/repo-private.md` D1):
 
      ```bash
      gh workflow run db-rollback-prod.yml -f file=<version>_<name>.revert.sql
