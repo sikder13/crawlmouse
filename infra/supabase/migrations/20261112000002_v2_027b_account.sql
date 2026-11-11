@@ -399,15 +399,8 @@ begin
                    and k.used_at is null and k.revoked_at is null and k.expires_at > p_now) then
     raise exception 'request_email_change: the person''s deletion is under way' using errcode = 'CMA07';
   end if;
-  if exists (
-       select 1 from public.account_tokens k
-        where k.user_id = p_user and k.used_at is null and k.revoked_at is null
-          and k.expires_at > p_now
-          and (k.kind = 'email_change'
-               or (k.kind = 'email_change_undo' and exists (
-                     select 1 from public.account_tokens c
-                      where c.account_id = k.account_id and c.kind = 'email_change'
-                        and c.created_at = k.created_at and c.used_at is not null)))) then
+  -- The one definition of "in flight", which a deletion's request and confirm also ask (section B).
+  if public.email_change_live(p_user, p_now) then
     raise exception 'request_email_change: an email change is in flight' using errcode = 'CMA02';
   end if;
   -- What is left of the person's earlier requests cannot be used (the check above passed), on this
@@ -1170,18 +1163,27 @@ as $$
     case when p_account = any(public.erase_person_accounts(p_user)) then null else 'others_seated' end);
 $$;
 
--- An email change in flight for the person: its confirmation or its "this wasn't me" link is live. A
--- deletion waits for it, so the undo stays possible (plan-revision R6a).
-create or replace function public.email_change_live(p_user uuid)
+-- An email change in flight for the person, at p_now: a live confirmation link, or a live undo link
+-- whose change has applied (its partner confirmation link, created in the same transaction, was
+-- used). An undo link whose change was never confirmed and has expired is an abandoned request, and
+-- holds nothing. The one definition: request_email_change (CMA02, section A) and the deletion's
+-- request and confirm (a deletion waits for the change, so its undo stays possible, R6a) ask it.
+create or replace function public.email_change_live(p_user uuid, p_now timestamptz default now())
 returns boolean
 language sql
 stable
 security definer
 set search_path = pg_catalog, public, pg_temp
 as $$
-  select exists (select 1 from public.account_tokens t
-                  where t.user_id = p_user and t.kind in ('email_change', 'email_change_undo')
-                    and t.used_at is null and t.revoked_at is null and t.expires_at > now());
+  select exists (
+    select 1 from public.account_tokens k
+     where k.user_id = p_user and k.used_at is null and k.revoked_at is null
+       and k.expires_at > p_now
+       and (k.kind = 'email_change'
+            or (k.kind = 'email_change_undo' and exists (
+                  select 1 from public.account_tokens c
+                   where c.account_id = k.account_id and c.kind = 'email_change'
+                     and c.created_at = k.created_at and c.used_at is not null))));
 $$;
 
 -- The owner asks to delete the account (deletes nothing). Refuses with {ok: false, code}:
@@ -1461,7 +1463,7 @@ $$;
 
 revoke all on function public.deletion_hostname(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.deletion_refusal(uuid, uuid) from public, anon, authenticated, service_role;
-revoke all on function public.email_change_live(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.email_change_live(uuid, timestamptz) from public, anon, authenticated, service_role;
 revoke all on function public.request_account_deletion(uuid, uuid, text)
   from public, anon, authenticated;
 revoke all on function public.read_deletion_link(text, text, timestamptz) from public, anon, authenticated;

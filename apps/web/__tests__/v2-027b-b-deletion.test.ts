@@ -86,6 +86,36 @@ const marked = (accountId: string) =>
     accountId,
   ]);
 
+/**
+ * One email change's two links, as request_email_change creates them (one transaction, so one
+ * created_at): `applied` marks the confirmation used; `abandoned` lets it expire unused.
+ */
+async function emailChange(
+  o: Owner,
+  state: 'pending' | 'applied' | 'abandoned',
+): Promise<{ change: string; undo: string }> {
+  const created = state === 'abandoned' ? `now() - interval '2 hours'` : 'now()';
+  const { rows } = await db.query<{ id: string; kind: string }>(
+    `insert into public.account_tokens
+       (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, created_at, expires_at, used_at)
+     values ($1, $2, 'email_change', $3, ${created}, 'new@example.com', $4, ${created},
+             ${created} + interval '1 hour', $6::timestamptz),
+            ($1, $2, 'email_change_undo', $5, ${created}, 'new@example.com', $4, ${created},
+             now() + interval '7 days', null)
+     returning id, kind`,
+    [
+      o.accountId,
+      o.userId,
+      hashToken(newToken()),
+      o.email,
+      hashToken(newToken()),
+      state === 'applied' ? new Date().toISOString() : null,
+    ],
+  );
+  const id = (kind: string) => rows.find((r) => r.kind === kind)!.id;
+  return { change: id('email_change'), undo: id('email_change_undo') };
+}
+
 describe('request_account_deletion', () => {
   it('takes the primary site’s host in any case, and the sign-in address when there is no site', async () => {
     const o = await owner();
@@ -125,11 +155,7 @@ describe('request_account_deletion', () => {
 
   it('refuses while an email change is in flight, with others seated, and with a v1 plan', async () => {
     const o = await owner();
-    await db.query(
-      `insert into public.account_tokens (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, expires_at)
-       values ($1, $2, 'email_change_undo', $3, now(), 'new@example.com', $4, now() + interval '7 days')`,
-      [o.accountId, o.userId, 'e'.repeat(60) + String(1000 + serial), o.email],
-    );
+    await emailChange(o, 'pending');
     expect((await request(o)).r.code).toBe('email_change_pending');
 
     const crowded = await owner();
@@ -181,16 +207,10 @@ describe('confirm_account_deletion', () => {
     ]);
   });
 
-  it('refuses while an email change is in flight, and leaves the change’s links alone', async () => {
+  it('refuses while an applied change’s undo link is live, and leaves the change’s links alone', async () => {
     const o = await owner();
     const { confirm: raw } = await request(o);
-    const undo = (
-      await db.query<{ id: string }>(
-        `insert into public.account_tokens (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, expires_at)
-         values ($1, $2, 'email_change_undo', $3, now(), 'new@example.com', $4, now() + interval '7 days') returning id`,
-        [o.accountId, o.userId, hashToken(newToken()), o.email],
-      )
-    ).rows[0]!.id;
+    const { undo } = await emailChange(o, 'applied');
     expect((await confirm(raw)).code).toBe('email_change_pending');
     expect(await marked(o.accountId)).toBe(0);
     expect(
@@ -199,6 +219,22 @@ describe('confirm_account_deletion', () => {
       ]),
     ).toBe(1);
     await db.query(`update public.account_tokens set used_at = now() where id = $1`, [undo]);
+    expect((await confirm(raw)).ok).toBe(true);
+  });
+
+  it('refuses when a change was started between the request and the confirm', async () => {
+    const o = await owner();
+    const { confirm: raw } = await request(o);
+    await emailChange(o, 'pending');
+    expect((await confirm(raw)).code).toBe('email_change_pending');
+    expect(await marked(o.accountId)).toBe(0);
+  });
+
+  it('an abandoned change (its confirmation expired unused) holds neither the request nor the confirm', async () => {
+    const o = await owner();
+    await emailChange(o, 'abandoned');
+    const { r, confirm: raw } = await request(o);
+    expect(r.ok).toBe(true);
     expect((await confirm(raw)).ok).toBe(true);
   });
 

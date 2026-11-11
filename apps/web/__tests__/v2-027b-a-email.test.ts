@@ -319,11 +319,10 @@ describe('no email change while the person’s deletion is under way (fix round 
   it('refuses while a live deletion link exists for the person (CMA07)', async () => {
     for (const kind of ['delete_confirm', 'delete_restore']) {
       const p = await person();
-      await db.query(`select public.create_account_token($1, $2, $3, now() + interval '1 hour')`, [
-        p.accountId,
-        p.userId,
-        kind,
-      ]);
+      await db.query(
+        `select public.create_account_token($1, $2, $3, now() + interval '1 hour', p_recipient => 'x@example.com')`,
+        [p.accountId, p.userId, kind],
+      );
       expect(await sqlstate(request(p, `during-${kind}@example.org`)), kind).toBe('CMA07');
     }
   });
@@ -331,7 +330,7 @@ describe('no email change while the person’s deletion is under way (fix round 
   it('allows it once the deletion link is used, revoked or expired', async () => {
     const p = await person();
     await db.query(
-      `select public.create_account_token($1, $2, 'delete_confirm', now() + interval '1 hour')`,
+      `select public.create_account_token($1, $2, 'delete_confirm', now() + interval '1 hour', p_recipient => 'x@example.com')`,
       [p.accountId, p.userId],
     );
     await db.query(

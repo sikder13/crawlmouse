@@ -29,7 +29,7 @@ drop function if exists public.restore_account(text, timestamptz);
 drop function if exists public.confirm_account_deletion(text, timestamptz);
 drop function if exists public.read_deletion_link(text, text, timestamptz);
 drop function if exists public.request_account_deletion(uuid, uuid, text);
-drop function if exists public.email_change_live(uuid);
+drop function if exists public.email_change_live(uuid, timestamptz);
 drop function if exists public.deletion_refusal(uuid, uuid);
 drop function if exists public.deletion_hostname(uuid, uuid);
 drop table if exists public.deletion_cancellations;
