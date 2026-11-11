@@ -828,7 +828,9 @@ begin
     select q.accounts, q.purge_after into v_accounts, v_purge
       from public.pending_erasures q where q.user_id = v.user_id;
     if not found then return jsonb_build_object('ok', false, 'code', 'not_confirmed'); end if;
-    if v_purge <= p_now then return jsonb_build_object('ok', false, 'code', 'window_closed'); end if;
+    if v_purge <= greatest(p_now, now()) then
+      return jsonb_build_object('ok', false, 'code', 'window_closed');
+    end if;
   end if;
   return jsonb_build_object(
     'ok', true,
@@ -912,7 +914,9 @@ begin
   end if;
   select * into q from public.pending_erasures e where e.user_id = v.user_id for update;
   if not found then return jsonb_build_object('ok', false, 'code', 'not_confirmed'); end if;
-  if q.purge_after <= p_now then return jsonb_build_object('ok', false, 'code', 'window_closed'); end if;
+  if q.purge_after <= greatest(p_now, now()) then
+    return jsonb_build_object('ok', false, 'code', 'window_closed');
+  end if;
 
   update public.account_tokens t set used_at = p_now where t.id = v.id;
   update public.accounts a set deletion_confirmed_at = null, purge_after = null
@@ -950,7 +954,10 @@ begin
 end;
 $$;
 
--- The purge's work: the people whose window has ended by p_now, the longest waiting first.
+-- The purge's work: the people whose window has ended by p_now and by the database's clock, the
+-- longest waiting first. A restore refuses once either clock has passed the window's end
+-- (restore_account), and a person is due only once both have, so a restore cannot succeed for someone
+-- the purge has started on (it removes Storage objects before its apply takes the queue row's lock).
 create or replace function public.due_erasures(p_now timestamptz, p_limit integer)
 returns table (user_id uuid, accounts uuid[], purge_after timestamptz, attempts integer)
 language sql
@@ -959,7 +966,7 @@ security definer
 set search_path = pg_catalog, public, pg_temp
 as $$
   select q.user_id, q.accounts, q.purge_after, q.attempts from public.pending_erasures q
-   where q.purge_after <= p_now
+   where q.purge_after <= least(p_now, now())
    order by q.purge_after, q.user_id
    limit greatest(p_limit, 0);
 $$;
@@ -975,8 +982,9 @@ as $$
    where q.user_id = p_user;
 $$;
 
--- The purge's last step: the queue row and the person's cancellation records go, once the Auth user is
--- gone. Raises while it is still there, so the row cannot go before the erasure is complete (R1).
+-- The purge's last step: the queue row and the person's cancellation records go, once the Auth user and
+-- the accounts the confirm marked are gone. Raises while either is still there, so the row cannot go
+-- before the erasure is complete (R1).
 create or replace function public.finish_erasure(p_user uuid)
 returns void
 language plpgsql
@@ -986,6 +994,10 @@ as $$
 begin
   if exists (select 1 from auth.users u where u.id = p_user) then
     raise exception 'finish_erasure: the Auth user is still there' using errcode = '55000';
+  end if;
+  if exists (select 1 from public.pending_erasures q join public.accounts a on a.id = any(q.accounts)
+              where q.user_id = p_user) then
+    raise exception 'finish_erasure: an account it marked is still there' using errcode = '55000';
   end if;
   delete from public.deletion_cancellations c where c.user_id = p_user;
   delete from public.pending_erasures q where q.user_id = p_user;
