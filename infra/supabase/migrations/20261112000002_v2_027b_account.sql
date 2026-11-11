@@ -1362,7 +1362,8 @@ begin
 end;
 $$;
 
--- The restore link's POST, in one transaction: consumes the token (an issued one, by hash and kind) only while the person's
+-- The restore link's POST, in one transaction (its paired confirmation link must be the one used, and
+-- the person's other unused confirmation links are revoked): consumes the token (an issued one, by hash and kind) only while the person's
 -- pending_erasures row, locked as erase_person_apply locks it, is inside its window; clears the
 -- accounts' marks and the queue row, records `delete_restored`, and returns {ok: true, userId,
 -- accountId, tier, accounts, resume}: `resume` names the subscriptions this deletion set to end, which the caller asks
@@ -1385,11 +1386,23 @@ begin
   end if;
   select * into q from public.pending_erasures e where e.user_id = v.user_id for update;
   if not found then return jsonb_build_object('ok', false, 'code', 'not_confirmed'); end if;
+  -- The link restores only the deletion it was sent with: its paired confirmation link must be the
+  -- one that was used. A restore link from a request never confirmed (another account's link
+  -- confirmed the erasure) is not one.
+  if not exists (select 1 from public.account_tokens c
+                  where c.id = v.paired_with and c.kind = 'delete_confirm' and c.used_at is not null) then
+    return jsonb_build_object('ok', false, 'code', 'invalid_link');
+  end if;
   if q.purge_after <= greatest(p_now, now()) then
     return jsonb_build_object('ok', false, 'code', 'window_closed');
   end if;
 
   update public.account_tokens t set used_at = p_now where t.id = v.id;
+  -- The person's other confirmation links (one per account they hold) stop working: a restore ends
+  -- this deletion, and a new one starts from a new request.
+  update public.account_tokens t set revoked_at = p_now
+   where t.user_id = v.user_id and t.kind = 'delete_confirm'
+     and t.used_at is null and t.revoked_at is null;
   update public.accounts a set deletion_confirmed_at = null, purge_after = null
    where a.id = any(q.accounts);
   delete from public.pending_erasures e where e.user_id = q.user_id;

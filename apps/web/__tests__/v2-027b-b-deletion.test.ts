@@ -612,6 +612,45 @@ describe('fix round 2', () => {
   });
 });
 
+describe('fix round 3: restore links and the person’s other links', () => {
+  /** A person alone on two accounts, X (personal, with a site) and Y, each with a requested deletion. */
+  async function twoRequests() {
+    const o = await owner();
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+       values ('agency', 'free', 'free', 1, 1, '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]')
+       returning id`,
+    );
+    const y = rows[0]!.id;
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'x@example.com', 'owner', 'active', now())`,
+      [y, o.userId],
+    );
+    const x = await request(o);
+    const yLinks = await request({ ...o, accountId: y }, o.email);
+    return { o, y, x, yLinks };
+  }
+
+  it('a restore revokes the person’s other confirmation links (item 2)', async () => {
+    const { o, x, yLinks } = await twoRequests();
+    expect((await confirm(x.confirm)).ok).toBe(true);
+    expect((await restore(x.restore)).ok).toBe(true);
+    expect((await confirm(yLinks.confirm)).code).toBe('invalid_link');
+    expect(await marked(o.accountId)).toBe(0);
+  });
+
+  it('a restore link works only for the deletion it was sent with (item 3)', async () => {
+    const { o, x, yLinks } = await twoRequests();
+    // Confirmed through Y's link; X's request was never confirmed.
+    expect((await confirm(yLinks.confirm)).ok).toBe(true);
+    expect((await restore(x.restore)).code).toBe('invalid_link');
+    expect(await marked(o.accountId)).toBe(1);
+    expect((await restore(yLinks.restore)).ok).toBe(true);
+    expect(await marked(o.accountId)).toBe(0);
+  });
+});
+
 describe('read_deletion_link', () => {
   it('names each account’s subscription status, from the plan the account follows (R3 item 1)', async () => {
     const o = await owner();
