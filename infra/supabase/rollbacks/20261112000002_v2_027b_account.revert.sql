@@ -52,7 +52,7 @@ drop function if exists public.normalize_email(text);
 
 -- ─── Shared ───────────────────────────────────────────────────────────────────────────────────────
 drop function if exists public.issue_account_link(uuid);
-drop function if exists public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid);
+drop function if exists public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid, text);
 drop function if exists public.end_user_sessions(uuid, uuid);
 drop table if exists public.pending_erasures;
 alter table public.users drop column if exists previous_emails;

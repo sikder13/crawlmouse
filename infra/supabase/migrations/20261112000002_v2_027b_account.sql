@@ -107,6 +107,9 @@ create table if not exists public.account_tokens (
   -- email_change and email_change_undo only: the address moved to and the one moved from.
   new_email text,
   old_email text,
+  -- delete_confirm and delete_restore only: the sign-in address when the deletion was requested, where
+  -- both links go even if the address changes before the mailer sends.
+  recipient text,
   created_at timestamptz not null default now(),
   expires_at timestamptz not null,
   used_at timestamptz,
@@ -117,7 +120,9 @@ create table if not exists public.account_tokens (
   constraint account_tokens_emails check (
     (kind in ('email_change', 'email_change_undo')) = (new_email is not null and old_email is not null)),
   constraint account_tokens_expiry check (expires_at > created_at),
-  constraint account_tokens_pair check (paired_with is null or kind = 'delete_restore')
+  constraint account_tokens_pair check (paired_with is null or kind = 'delete_restore'),
+  constraint account_tokens_recipient check (
+    (kind in ('delete_confirm', 'delete_restore')) = (recipient is not null))
 );
 create index if not exists account_tokens_account_idx on public.account_tokens (account_id, kind);
 alter table public.account_tokens enable row level security;
@@ -195,7 +200,8 @@ grant execute on function public.end_user_sessions(uuid, uuid) to service_role;
 -- is refused while one is in flight, by request_email_change and account_tokens_one_live_email_link_uq).
 create or replace function public.create_account_token(
   p_account uuid, p_user uuid, p_kind text, p_expires_at timestamptz,
-  p_new_email text default null, p_old_email text default null, p_paired_with uuid default null)
+  p_new_email text default null, p_old_email text default null, p_paired_with uuid default null,
+  p_recipient text default null)
 returns uuid
 language plpgsql
 security definer
@@ -206,8 +212,9 @@ declare
 begin
   update public.account_tokens t set revoked_at = now()
    where t.account_id = p_account and t.kind = p_kind and t.used_at is null and t.revoked_at is null;
-  insert into public.account_tokens (account_id, user_id, kind, new_email, old_email, expires_at, paired_with)
-  values (p_account, p_user, p_kind, p_new_email, p_old_email, p_expires_at, p_paired_with)
+  insert into public.account_tokens
+    (account_id, user_id, kind, new_email, old_email, expires_at, paired_with, recipient)
+  values (p_account, p_user, p_kind, p_new_email, p_old_email, p_expires_at, p_paired_with, p_recipient)
   returning id into v_id;
   return v_id;
 end;
@@ -219,8 +226,9 @@ $$;
 -- one stops working because its hash is replaced.
 -- The token is 32 bytes from two gen_random_uuid() values (pg_catalog's; pgcrypto lives in a
 -- different schema on production and in the test sandbox): 244 random bits, base64url, 43 characters,
--- the shape apps/web/lib/v2/account/tokens.ts `isToken` accepts. The recipient is the new address
--- for an email_change, the old one for its undo, and the sign-in address otherwise.
+-- the shape apps/web/lib/v2/account/tokens.ts `isToken` accepts. The recipient is read from the row:
+-- the new address for an email_change, the old one for its undo, and for a deletion link the sign-in
+-- address request_account_deletion stored on it.
 create or replace function public.issue_account_link(p_token uuid)
 returns table (kind text, token text, recipient text)
 language plpgsql
@@ -253,17 +261,17 @@ begin
     recipient := case v.kind
                    when 'email_change' then v.new_email
                    when 'email_change_undo' then v.old_email
-                   else (select u.email from public.users u where u.id = v.user_id)
+                   else v.recipient
                  end;
     return next;
   end loop;
 end;
 $$;
 
-revoke all on function public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid)
+revoke all on function public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid, text)
   from public, anon, authenticated;
 revoke all on function public.issue_account_link(uuid) from public, anon, authenticated;
-grant execute on function public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid)
+grant execute on function public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid, text)
   to service_role;
 grant execute on function public.issue_account_link(uuid) to service_role;
 
@@ -1146,6 +1154,7 @@ set search_path = pg_catalog, public, pg_temp
 as $$
 declare
   v_refusal text;
+  v_recipient text;
   v_confirm uuid;
   v_restore uuid;
 begin
@@ -1166,10 +1175,12 @@ begin
   if v_refusal is not null then
     return jsonb_build_object('ok', false, 'code', v_refusal);
   end if;
+  select u.email into v_recipient from public.users u where u.id = p_user;
   v_confirm := public.create_account_token(p_account, p_user, 'delete_confirm',
-                                           now() + interval '24 hours');
+                                           now() + interval '24 hours', p_recipient => v_recipient);
   v_restore := public.create_account_token(p_account, p_user, 'delete_restore',
-                                           now() + interval '8 days', p_paired_with => v_confirm);
+                                           now() + interval '8 days', p_paired_with => v_confirm,
+                                           p_recipient => v_recipient);
   insert into public.account_events (account_id, kind, actor_user_id)
   values (p_account, 'delete_requested', p_user);
   return jsonb_build_object('ok', true, 'confirmTokenId', v_confirm,
@@ -1224,14 +1235,15 @@ begin
 end;
 $$;
 
--- The confirmation link's POST, in one transaction (plan-revision R4): consumes the token (an issued one, by hash and kind),
--- refuses as request_account_deletion does (the token stays usable: the person can resolve it and
--- press again), marks every account the person alone holds, queues the person in pending_erasures
--- with the window's end, ends every session, revokes any email change in flight, and records
--- `delete_confirmed` on each account. Returns {ok: true, userId, accountId, tier, accounts,
--- purgeAfter} (accountId and tier: the account the link was issued for) or
--- {ok: false, code} (`invalid_link`, `others_seated`, `v1_subscription`). Signing-in is stopped by the
--- caller's Auth ban; the subscription is ended by deletionCancelFn.
+-- The confirmation link's POST, in one transaction (plan-revision R4): consumes the token (an issued
+-- one, by hash and kind); refuses as request_account_deletion does, and while an email change is in
+-- flight (its "this wasn't me" link must stay usable), leaving the token usable so the person can
+-- press again once that is resolved; marks every account the person alone holds, queues the person in
+-- pending_erasures with the window's end, ends every session, and records `delete_confirmed` on each
+-- account. Returns {ok: true, userId, accountId, tier, accounts, purgeAfter} (accountId and tier: the
+-- account the link was issued for) or {ok: false, code} (`invalid_link`, `email_change_pending`,
+-- `others_seated`, `v1_subscription`). Signing-in is stopped by the caller's Auth ban; the
+-- subscription is ended by deletionCancelFn.
 create or replace function public.confirm_account_deletion(p_hash text, p_now timestamptz)
 returns jsonb
 language plpgsql
@@ -1249,7 +1261,8 @@ begin
   if not found or v.used_at is not null or v.revoked_at is not null or v.expires_at <= p_now then
     return jsonb_build_object('ok', false, 'code', 'invalid_link');
   end if;
-  v_refusal := public.deletion_refusal(v.account_id, v.user_id);
+  v_refusal := case when public.email_change_live(v.user_id) then 'email_change_pending'
+                    else public.deletion_refusal(v.account_id, v.user_id) end;
   if v_refusal is not null then
     return jsonb_build_object('ok', false, 'code', v_refusal);
   end if;
@@ -1261,9 +1274,6 @@ begin
   insert into public.pending_erasures (user_id, accounts, confirmed_at, purge_after)
   values (v.user_id, v_accounts, p_now, v_purge);
   perform public.end_user_sessions(v.user_id);
-  update public.account_tokens t set revoked_at = p_now
-   where t.user_id = v.user_id and t.kind in ('email_change', 'email_change_undo')
-     and t.used_at is null and t.revoked_at is null;
   insert into public.account_events (account_id, kind, actor_user_id)
   select a, 'delete_confirmed', v.user_id from unnest(v_accounts) a;
   return jsonb_build_object('ok', true, 'userId', v.user_id, 'accountId', v.account_id,

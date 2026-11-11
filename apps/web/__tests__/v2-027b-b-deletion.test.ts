@@ -165,6 +165,43 @@ describe('request_account_deletion', () => {
 });
 
 describe('confirm_account_deletion', () => {
+  it('sends both links to the sign-in address at the request, even after an email change in between', async () => {
+    const o = await owner();
+    const r = await json<{ ok: boolean; confirmTokenId: string }>(
+      `select public.request_account_deletion($1, $2, $3) as r`,
+      [o.accountId, o.userId, o.host],
+    );
+    // An email change confirmed after the request, before the mailer sends.
+    await db.query(`update auth.users set email = 'moved@example.net' where id = $1`, [o.userId]);
+    await db.query(`update public.users set email = 'moved@example.net' where id = $1`, [o.userId]);
+    const { rows } = await issue(r.confirmTokenId);
+    expect(rows.map((x) => [x.kind, x.recipient])).toEqual([
+      ['delete_confirm', o.email],
+      ['delete_restore', o.email],
+    ]);
+  });
+
+  it('refuses while an email change is in flight, and leaves the change’s links alone', async () => {
+    const o = await owner();
+    const { confirm: raw } = await request(o);
+    const undo = (
+      await db.query<{ id: string }>(
+        `insert into public.account_tokens (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, expires_at)
+         values ($1, $2, 'email_change_undo', $3, now(), 'new@example.com', $4, now() + interval '7 days') returning id`,
+        [o.accountId, o.userId, hashToken(newToken()), o.email],
+      )
+    ).rows[0]!.id;
+    expect((await confirm(raw)).code).toBe('email_change_pending');
+    expect(await marked(o.accountId)).toBe(0);
+    expect(
+      await n(`select count(*) from public.account_tokens where id = $1 and revoked_at is null`, [
+        undo,
+      ]),
+    ).toBe(1);
+    await db.query(`update public.account_tokens set used_at = now() where id = $1`, [undo]);
+    expect((await confirm(raw)).ok).toBe(true);
+  });
+
   it('a row the mailer never issued holds nothing that confirms or restores, and cannot be consumed', async () => {
     const o = await owner();
     const r = await json<{ ok: boolean; confirmTokenId: string }>(

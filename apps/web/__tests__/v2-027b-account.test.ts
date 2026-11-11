@@ -183,7 +183,9 @@ describe('a link is minted at send, never stored', () => {
     expires = `now() + interval '1 hour'`,
   ) =>
     db.query<{ id: string }>(
-      `select public.create_account_token($1, $2, $3, ${expires}, $4, $5) as id`,
+      // A deletion link carries the sign-in address as request_account_deletion stores it.
+      `select public.create_account_token($1, $2, $3, ${expires}, $4, $5, null,
+         case when $3 like 'delete%' then (select u.email from public.users u where u.id = $2) end) as id`,
       kind.startsWith('email')
         ? [o.accountId, o.userId, kind, 'new@example.com', 'old@example.com']
         : [o.accountId, o.userId, kind, null, null],
@@ -275,7 +277,8 @@ describe('a link is minted at send, never stored', () => {
     const confirm = (await create(o, 'delete_confirm')).rows[0]!.id;
     const restore = (
       await db.query<{ id: string }>(
-        `select public.create_account_token($1, $2, 'delete_restore', now() + interval '8 days', null, null, $3) as id`,
+        `select public.create_account_token($1, $2, 'delete_restore', now() + interval '8 days', null, null, $3,
+          (select u.email from public.users u where u.id = $2)) as id`,
         [o.accountId, o.userId, confirm],
       )
     ).rows[0]!.id;
@@ -291,7 +294,7 @@ describe('a link is minted at send, never stored', () => {
   it('grants the client roles nothing on the link functions', async () => {
     const { rows } = await db.query<{ role: string; what: string }>(
       `select r.role, f.what from (values ('anon'), ('authenticated')) r(role),
-         (values ('public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid)'),
+         (values ('public.create_account_token(uuid, uuid, text, timestamptz, text, text, uuid, text)'),
                  ('public.issue_account_link(uuid)')) f(what)
         where has_function_privilege(r.role, f.what, 'execute')`,
     );
