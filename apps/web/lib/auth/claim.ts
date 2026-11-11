@@ -9,17 +9,43 @@
  *
  * The write that decides the claim is one conditional update (`where account_id is null`); two
  * claims racing for one site cannot both take it. Two claims racing for two sites can pass the site
- * limit together: the limit has no database constraint (spec, known gaps). The Storage move of the
- * check's evidence objects is CC-20b's.
+ * limit together: the limit has no database constraint (spec, known gaps).
+ *
+ * With `keep` given (door-deps.ts gives it under V2_CHECKS_PUBLIC; CC-22b D7), the two writes are
+ * one transaction, `keep_check`, with the move of the check's evidence objects around it
+ * (lib/v2/pipeline/keep.ts): the host rule is read before anything is copied, and the database
+ * refuses a check that has expired on its own clock. With `firstAudit` given, a kept site whose
+ * claimed check failed gets a first audit; a failure there is reported and the claim stands.
+ * Without them the claim is the two writes below, as before CC-22b.
  */
 import { effectiveTier } from '../entitlement-v2';
-import type { DoorStore } from './door-store';
-import { scheduleFor } from './schedule';
+import type { DoorStore, FirstAudit, Report, TakeSiteResult } from './door-store';
+import { scheduleFor, type SiteSchedule } from './schedule';
 import { siteLimitAt } from './site-limit';
+
+export interface ClaimKeepInput {
+  checkId: string;
+  siteId: string;
+  accountId: string;
+  ownerSeatId: string;
+  schedule: SiteSchedule | null;
+}
+
+/** The claim's one-transaction commit and its evidence move, implemented by lib/v2/pipeline/keep.ts. */
+export interface ClaimKeep {
+  /** Whether the account keeps a site with that host: read before any object is copied. */
+  hostKept(accountId: string, host: string): Promise<boolean>;
+  /** 'expired' when the database's clock says the check has expired. */
+  keep(input: ClaimKeepInput): Promise<TakeSiteResult | 'expired'>;
+}
 
 export interface ClaimDeps {
   store: DoorStore;
   now: () => Date;
+  keep?: ClaimKeep;
+  firstAudit?: FirstAudit;
+  /** Where a failed first audit is reported; needed only with `firstAudit`. */
+  report?: Report;
 }
 
 /** Every way a claim is refused, with its HTTP status. The route answers with these; the spec lists them. */
@@ -73,20 +99,27 @@ export async function claimCheck(
     // claim tested the expiry before it took the site, so it is finished now, whatever the time.
     // This assumes the claim is the one writer that gives an account's site a check with an expiry.
     await store.clearExpiry(check.checkId);
-    return { ok: true, siteId: check.siteId };
+    return kept(deps, check, input.userId);
   }
 
   if (check.expiresAt !== null && check.expiresAt.getTime() <= now.getTime()) {
     return refuse('expired');
   }
-  const kept = await store.countActiveSites(member.accountId);
-  if (kept >= siteLimitAt(member, now)) return refuse('site_limit');
+  const sites = await store.countActiveSites(member.accountId);
+  if (sites >= siteLimitAt(member, now)) return refuse('site_limit');
 
-  const taken = await store.takeSite(check.siteId, {
+  const site = {
     accountId: member.accountId,
     ownerSeatId: member.ownerSeatId,
-    schedule: scheduleFor(effectiveTier(member, now), kept === 0, now, member.timezone),
-  });
+    schedule: scheduleFor(effectiveTier(member, now), sites === 0, now, member.timezone),
+  };
+  if (deps.keep && (await deps.keep.hostKept(member.accountId, check.host))) {
+    return refuse('host_kept');
+  }
+  const taken = deps.keep
+    ? await deps.keep.keep({ checkId: check.checkId, siteId: check.siteId, ...site })
+    : await store.takeSite(check.siteId, site);
+  if (taken === 'expired') return refuse('expired');
   if (taken === 'host_kept') return refuse('host_kept');
   if (taken === 'not_unowned') {
     // Another claim took the site between our read and our write: answer as if we had read after it.
@@ -95,6 +128,23 @@ export async function claimCheck(
       ? refuse('already_claimed')
       : refuse('not_found');
   }
-  await store.clearExpiry(check.checkId);
+  // `keep_check` cleared the expiry in the transaction that took the site.
+  if (!deps.keep) await store.clearExpiry(check.checkId);
+  return kept(deps, check, input.userId);
+}
+
+/** The claim's success, after the first audit a kept site with no usable check is owed. */
+async function kept(
+  deps: ClaimDeps,
+  check: { siteId: string; host: string },
+  userId: string,
+): Promise<ClaimResult> {
+  if (deps.firstAudit) {
+    try {
+      await deps.firstAudit({ siteId: check.siteId, host: check.host, userId });
+    } catch {
+      deps.report?.('first-audit-failed', { siteId: check.siteId });
+    }
+  }
   return { ok: true, siteId: check.siteId };
 }
