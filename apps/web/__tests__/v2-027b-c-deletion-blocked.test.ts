@@ -1,7 +1,6 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyAllMigrations, asRole, freshDb } from './helpers/pglite-migrations';
-import { FIX_EMAIL_REQUESTS } from './helpers/v2-027b-standins';
 import { personalAccount, signUp } from './helpers/v2-check-tables';
 
 /**
@@ -16,7 +15,6 @@ let db: PGlite;
 beforeAll(async () => {
   db = await freshDb();
   await applyAllMigrations(db);
-  await db.exec(FIX_EMAIL_REQUESTS);
 }, 300_000);
 afterAll(async () => db.close());
 

@@ -4,7 +4,6 @@ import { promisify } from 'node:util';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedWorld } from '../../apps/web/__tests__/helpers/v2-check-tables';
-import { FIX_EMAIL_REQUESTS } from '../../apps/web/__tests__/helpers/v2-027b-standins';
 import { migratedDb, pgliteDb } from '../db/test-support';
 import {
   REDACTED_EMAIL,
@@ -32,7 +31,6 @@ beforeAll(async () => {
   await pglite.exec(`create table auth.audit_log_entries (
     instance_id uuid, id uuid primary key, payload json, created_at timestamptz,
     ip_address varchar(64) not null default '')`);
-  await pglite.exec(FIX_EMAIL_REQUESTS);
 }, 300_000);
 
 /** The Storage API's delete, as the runbook does it (§4): the objects the plan lists. */
@@ -640,7 +638,6 @@ describe('erase-account (B-F2)', () => {
 
   it('works where Supabase Auth keeps no audit log table', async () => {
     const bare = await migratedDb();
-    await bare.exec(FIX_EMAIL_REQUESTS);
     const email = `bare-${++serial}@example.com`;
     await bare.query(`insert into auth.users (id, email) values (gen_random_uuid(), $1)`, [email]);
     const plan = await planErasure(pgliteDb(bare), { email });

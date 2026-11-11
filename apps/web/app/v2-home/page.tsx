@@ -5,8 +5,8 @@ import { JsonLd, softwareApplicationLd, websiteLd } from '@/lib/seo/jsonld';
 
 /**
  * The v2 home (CC-22b D10), which `/` is rewritten to while V2_CHECKS_PUBLIC is on
- * (`V2_REWRITES`, middleware.ts). The middleware answers a request for this path itself as not
- * found, so the page has one address, `/`.
+ * (`V2_REWRITES`, lib/v2/rewrites.ts, applied by middleware.ts). The middleware answers a request
+ * for this path, in any spelling it can read, as not found, so the page has one address, `/`.
  *
  * It exports no metadata: the root layout's title, description, canonical (`/`) and robots apply,
  * as they do to v1's home. The structured data is WebSite and SoftwareApplication; v1's FAQPage

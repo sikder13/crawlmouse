@@ -9,7 +9,6 @@ import type { PGlite } from '@electric-sql/pglite';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { FIX_EMAIL_REQUESTS } from '../../../__tests__/helpers/v2-027b-standins';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
@@ -93,7 +92,6 @@ beforeAll(async () => {
   await applyAllMigrations(db);
   h.db = db;
   // erase_person_plan reads CC-26b's fix_email_requests, not yet on this branch's migrations.
-  await db.exec(FIX_EMAIL_REQUESTS);
   owner = await person('owner');
   await host(owner, 'owner-site.example');
   empty = await person('empty');

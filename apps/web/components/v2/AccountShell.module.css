@@ -116,6 +116,13 @@
 }
 
 @media (max-width: 760px) {
+  /* The rail wraps onto its own line here; at the default (stretch) the two lines share the frame's
+     full height, so a short page grew a blank band under the rail. Lines take their content's
+     height instead. Above this width there is one line, and the rail keeps the page's height. */
+  .frame.frame {
+    align-content: flex-start;
+  }
+
   .rail {
     flex: 1 1 100%;
     border-right: 0;

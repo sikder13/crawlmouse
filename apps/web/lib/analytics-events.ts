@@ -58,9 +58,9 @@ export const FUNNEL_EVENTS = [
   'result_viewed',
   'fix_opened',
   'keep_clicked',
-  // CC-26b — the signed-in product (ARCH-2 §8). Sent from the server (lib/v2/account/events.ts):
-  // `check_started {trigger, check_ref}` (the entry above) when a re-check or a first check is queued, `fix_marked_done {type}`,
-  // and `fix_closed {type, checksToClose}` when a check verifies a fix.
+  // CC-26b — the signed-in product (ARCH-2 §8), sent from the server (lib/v2/account/events.ts):
+  // `fix_marked_done {type}` from mark done, and `fix_closed {type, checksToClose}` when a check
+  // verifies a fix. Its re-checks and first checks send CC-22b's `check_started {trigger, check_ref}`.
   'fix_marked_done',
   'fix_closed',
   // CC-27b — the account's identity and exit. Sent from the server (lib/v2/account/account-events.ts),

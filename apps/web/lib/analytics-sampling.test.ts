@@ -54,6 +54,8 @@ describe('FUNNEL_EVENTS list-drift lock', () => {
       'result_viewed',
       'fix_opened',
       'keep_clicked',
+      'fix_marked_done',
+      'fix_closed',
     ]) {
       expect(FUNNEL_EVENTS).toContain(e);
     }

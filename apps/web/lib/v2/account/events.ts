@@ -4,13 +4,13 @@
  * in `FUNNEL_EVENTS` (`SERVER_EVENTS` is checked against it by the compiler).
  *
  * What is sent: the distinct id is the account's id; no email, host, IP or header value is put in
- * properties; a check is named by its `check_ref`, never its id. The sender and the consent rule are
- * the product's one sender (`captureServerEvent`) and `serverCaptureAllowed`, which reads the
- * visitor's decision from the `cm_consent` cookie: nothing is sent when it says denied, or when there
- * is no decision and the region needs prior consent.
+ * properties; a check is named by its `check_ref`, never its id. They go through the product's one
+ * server sender, `captureServerEvent` (lib/analytics-server.ts), which reads the visitor's consent
+ * from the request's cookie header (`serverCaptureAllowed`) and drops a send that fails.
  */
 import type { FunnelEvent } from '../../analytics-events';
-import { captureServerEvent, checkRef, serverCaptureAllowed } from './server-capture-interim';
+import { captureServerEvent, type SendCapture } from '../../analytics-server';
+import { checkRef } from '../pipeline/public';
 
 /** The names, each required to be in `FUNNEL_EVENTS` by `satisfies`. */
 export const SERVER_EVENTS = [
@@ -31,8 +31,9 @@ export interface ServerEvents extends Record<ServerEventName, object> {
   trial_started: { kind: 'pro'; variant: 'no_card' };
 }
 
+/** A sender keyed by event, distinct id and properties, as a step with no request uses one. */
 export type Sender = (
-  event: string,
+  event: ServerEventName,
   distinctId: string,
   properties: Readonly<Record<string, unknown>>,
 ) => Promise<void>;
@@ -45,11 +46,19 @@ export interface Capture {
   ): Promise<void>;
 }
 
-/** The capture for one request: a no-op when its consent cookies do not allow server events. */
-export function captureFor(req: Request, send: Sender = captureServerEvent): Capture {
-  if (!serverCaptureAllowed(req.headers.get('cookie'))) return async () => undefined;
-  return (event, accountId, properties) => send(event, `account:${accountId}`, properties);
+/** The capture for one request: the product's sender, given the request's cookie header. */
+export function captureFor(req: Request, send?: SendCapture): Capture {
+  const cookie = req.headers.get('cookie');
+  return (event, accountId, properties) =>
+    captureServerEvent(cookie, { event, distinctId: `account:${accountId}`, properties }, send);
 }
+
+/**
+ * The sender for a step with no request (the persist step's `fix_closed`): there is no cookie header,
+ * so `serverCaptureAllowed` reads none (a known gap, docs/specs/v2/26b-dashboard-wiring.md).
+ */
+export const sendWithoutRequest: Sender = (event, distinctId, properties) =>
+  captureServerEvent(null, { event, distinctId, properties });
 
 /** `check_started`'s properties for a check: its trigger and its reference, not its id. */
 export const checkStarted = (

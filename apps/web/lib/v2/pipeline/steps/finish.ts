@@ -28,8 +28,8 @@ import {
 import type { CheckSteps } from '../../../../../../inngest/check';
 import { CheckFailure } from '../../../../../../inngest/check-events';
 import { getJson, putJson } from '../evidence';
-import { pageVantage, persistBuiltCheck } from '../persist';
-import type { PageVantage } from '../types';
+import { pageVantage, persistBuiltCheck, readOfFixes } from '../persist';
+import type { FixRead, PageVantage } from '../types';
 import type { StepDeps } from './deps';
 import {
   assembledSoFar,
@@ -46,6 +46,8 @@ interface StoredBuilt {
   /** `grades` holds Maps, which serialiseBuilt writes as objects; persistence does not read grades. */
   built: BuiltCheck;
   vantage: [string, PageVantage][];
+  /** What the build read of the site's fixes, for persist's watermark (CC-26b D5). */
+  read: FixRead[];
 }
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -134,6 +136,7 @@ export function finishSteps(
       const stored: StoredBuilt = {
         built: JSON.parse(serialiseBuilt(built)),
         vantage: [...vantage],
+        read: readOfFixes(fixes, events),
       };
       await putJson(deps.evidence, pathOf(event, 'built'), stored);
       return { status, pages: built.page_results.length, fixes: built.fixes.length };
@@ -145,6 +148,7 @@ export function finishSteps(
         built: stored.built,
         vantage: new Map(stored.vantage),
         map_path: pathOf(event, 'map'),
+        read: stored.read,
       });
       return { written: outcome.written };
     },

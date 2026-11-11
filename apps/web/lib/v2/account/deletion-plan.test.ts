@@ -5,7 +5,6 @@
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { FIX_EMAIL_REQUESTS } from '../../../__tests__/helpers/v2-027b-standins';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
@@ -17,7 +16,6 @@ beforeAll(async () => {
   db = await freshDb();
   await applyAllMigrations(db);
   // erase_person_plan reads CC-26b's fix_email_requests, not yet on this branch's migrations.
-  await db.exec(FIX_EMAIL_REQUESTS);
 }, 300_000);
 
 const site = (accountId: string, host: string, at: string) =>

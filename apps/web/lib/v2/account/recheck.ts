@@ -12,6 +12,11 @@ export type RecheckOutcome =
   | { queued: false; reason: 'capped'; nextAllowedAt: string }
   /** This bucket's check has already started, so it cannot take this request (plan revision R6). */
   | { queued: false; reason: 'check_running'; checkId: string }
+  /**
+   * This bucket's check has already ended (finished, failed or deferred): a request inside the same
+   * 2-minute bucket would name it again, so the next is allowed when the bucket ends.
+   */
+  | { queued: false; reason: 'recently_checked'; nextAllowedAt: string }
   /** The day's `global:audits:day` ceiling is reached (owner ruling: the global ceiling). */
   | { queued: false; reason: 'capacity' }
   | { queued: false; reason: 'removed' | 'paused' };

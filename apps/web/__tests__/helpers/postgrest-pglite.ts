@@ -8,8 +8,8 @@
  *
  * Modelled: `from(table)` with `select`, `insert`, `upsert` (`onConflict` required,
  * `ignoreDuplicates`) and `update`; the filters `eq`, `is`, `not(column, 'is' | 'eq', value)` and
- * `in`; `order`, `limit` and `maybeSingle` after a `select`; and `rpc(fn, args)` for a function that
- * returns one value. The builders carry no other method, so a call a port adds throws in its test
+ * `in`; `order`, `limit`, `range` and `maybeSingle` after a `select`; and `rpc(fn, args)` for a
+ * function that returns one value. `maxRows` caps every read as PostgREST's `db-max-rows` does. The builders carry no other method, so a call a port adds throws in its test
  * until it is modelled here.
  *
  * `log` receives each request as the calls that built it, when it is sent. `before` runs ahead of
@@ -27,6 +27,8 @@ export interface PostgrestOptions {
   log?: Call[][];
   before?: (request: readonly Call[]) => Promise<void>;
   as?: { userId: string };
+  /** The most rows one read returns, as PostgREST's `db-max-rows`; no cap when omitted. */
+  maxRows?: number;
 }
 
 export interface PostgrestError {
@@ -76,6 +78,8 @@ function rowObject(row: unknown): Record<string, unknown> {
 }
 
 export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): SupabaseClient {
+  const capped = (limit: number | null): number | null =>
+    options.maxRows === undefined ? limit : Math.min(limit ?? options.maxRows, options.maxRows);
   /** Sends one request; a database error is answered, anything else is thrown. */
   async function send(
     calls: Call[],
@@ -113,6 +117,7 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
     const where: string[] = [];
     const ordering: string[] = [];
     let limit: number | null = null;
+    let offset = 0;
     let single = false;
     let reads = false;
     let statement = '';
@@ -130,7 +135,8 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
       const sql = reads
         ? `select ${statement} from ${target}${whereSql()}` +
           (ordering.length > 0 ? ` order by ${ordering.join(', ')}` : '') +
-          (limit === null ? '' : ` limit ${limit}`)
+          (capped(limit) === null ? '' : ` limit ${capped(limit)}`) +
+          (offset === 0 ? '' : ` offset ${offset}`)
         : `${statement}${whereSql()}`;
       const r = await send(calls, sql, params);
       if ('error' in r) return { data: null, error: r.error };
@@ -190,6 +196,15 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
         readOnly('limit');
         if (!Number.isInteger(n) || n < 0) throw new Error('limit takes a whole number');
         limit = n;
+        return filters;
+      },
+      range(from: number, to: number) {
+        calls.push(['range', from, to]);
+        readOnly('range');
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < from)
+          throw new Error('range takes 0 <= from <= to');
+        offset = from;
+        limit = to - from + 1;
         return filters;
       },
       maybeSingle() {

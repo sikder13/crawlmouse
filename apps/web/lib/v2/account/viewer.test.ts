@@ -5,7 +5,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { GATES } from '../../entitlement-v2';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
@@ -14,6 +14,11 @@ import { readEntitlement, readViewer, type ViewerResult } from './viewer-read';
 
 let db: PGlite;
 const NOW = new Date('2026-11-10T12:00:00.000Z');
+
+// Closed when the file ends: a PGlite holds its memory outside the JS heap until then.
+afterAll(async () => {
+  await db?.close();
+});
 
 beforeAll(async () => {
   db = await freshDb();

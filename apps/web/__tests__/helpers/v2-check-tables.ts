@@ -426,6 +426,15 @@ export const ROWS = {
     chunk,
     rows: [],
   }),
+  fix_email_requests: (id: string, fixId: string, accountId: string, seatId: string): Row => ({
+    id,
+    fix_id: fixId,
+    account_id: accountId,
+    requested_by_seat_id: seatId,
+    to_email: 'dev@agency.example',
+    requested_at: T1,
+    sent_at: null,
+  }),
 } as const;
 
 /** A valid research.check_runs row (the ledger is not in `public`, so not in ROWS). */
@@ -490,6 +499,8 @@ export type NewTable = keyof typeof ROWS;
 export const TABLES_006B: readonly NewTable[] = ['check_ledger_links', 'usage_events'];
 /** The public tables 008 creates. */
 export const TABLES_008: readonly NewTable[] = ['crawl_batches', 'persist_chunks'];
+/** The public tables 026b creates. */
+export const TABLES_026B: readonly NewTable[] = ['fix_email_requests'];
 /** The public tables 027b creates. */
 export const TABLES_027B: readonly NewTable[] = [
   'account_tokens',
@@ -500,9 +511,15 @@ export const TABLES_027B: readonly NewTable[] = [
 ];
 /** The tables 003 creates. */
 export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
-  .filter((t) => !TABLES_006B.includes(t) && !TABLES_008.includes(t) && !TABLES_027B.includes(t))
+  .filter(
+    (t) =>
+      !TABLES_006B.includes(t) &&
+      !TABLES_008.includes(t) &&
+      !TABLES_026B.includes(t) &&
+      !TABLES_027B.includes(t),
+  )
   .sort();
-/** Every public table 003, 006b, 008 and 027b create. */
+/** Every public table 003, 006b, 008, 026b and 027b create. */
 export const ALL_NEW_TABLES = (Object.keys(ROWS) as NewTable[]).sort();
 
 /** Where a seeded row belongs: one of the account's two sites, or the account as a whole. */
@@ -541,6 +558,11 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.crawl_batches')::text as t`,
   );
   const with008 = batches[0]!.t !== null;
+  // Nor, migrated before 026b, fix_email_requests.
+  const { rows: requests } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.fix_email_requests')::text as t`,
+  );
+  const with026b = requests[0]!.t !== null;
   // Nor, migrated before 027b, the account tables.
   const { rows: tokens } = await db.query<{ t: string | null }>(
     `select to_regclass('public.account_tokens')::text as t`,
@@ -647,6 +669,15 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     }
     const fixId = randomUUID();
     await put('site_fixes', ROWS.site_fixes(fixId, siteId, checkId, ++k), { id: fixId }, scope);
+    if (with026b) {
+      const req = randomUUID();
+      await put(
+        'fix_email_requests',
+        ROWS.fix_email_requests(req, fixId, accountId, ownerSeatId),
+        { id: req },
+        scope,
+      );
+    }
     const ev = randomUUID();
     await put('fix_events', ROWS.fix_events(ev, fixId, checkId), { id: ev }, scope);
     const ch = randomUUID();

@@ -10,7 +10,14 @@ import { GATES, type Tier } from '../../entitlement-v2';
 import { ACCOUNT_COPY as COPY } from '../copy/account';
 import { calendarDays, dayDate, daysBefore, hourMinute } from '../format';
 import { plural } from '../words';
-import { PLAN_NAMES, primarySite, primarySites, resultChecks, type AccountView } from './account';
+import {
+  PLAN_NAMES,
+  primarySite,
+  primarySites,
+  readerSeat,
+  resultChecks,
+  type AccountView,
+} from './account';
 import type { SeatRole } from '../account/profile';
 import { ACCOUNT_NAV, action, type ActionView } from './account-actions';
 
@@ -162,7 +169,7 @@ export function accountShellView(
   } = {},
 ): ShellView {
   const fresh = newChanges(v).length;
-  const seat = v.d.seats.find((s) => s.role === 'owner');
+  const seat = readerSeat(v);
   return {
     nav: ACCOUNT_NAV.map((n) => ({
       ...n,

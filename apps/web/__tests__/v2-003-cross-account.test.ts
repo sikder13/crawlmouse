@@ -57,6 +57,8 @@ const READ_SCOPE: Record<string, ReadScope> = {
   check_ledger_links: 'none',
   // Members read counts through usage_counts() (v2-006b-data-foundations.test.ts), never a row.
   usage_events: 'none',
+  // 026b: the address a member asked a fix's packet be sent to; the service role writes and reads it.
+  fix_email_requests: 'none',
   // 027b: account settings, the deletion and its queue, the Slack destination. Service only.
   account_tokens: 'none',
   account_events: 'none',

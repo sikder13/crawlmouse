@@ -5,14 +5,21 @@
  * change-note preference (the field Settings shows) and its Slack integration; the rules are the
  * account's `alert_rules`. Every count a sentence states is the length of a list built here.
  */
-import { instant, type Change, type FixtureDataset, type Verdict } from '@crawlmouse/types/v2';
+import { instant, type Change, type Verdict } from '@crawlmouse/types/v2';
 import { ALERTS_SENDER } from '../../auth/constants';
 import { ALERTS_COPY as COPY, ALERT_PILLS, GRADE_SHORT } from '../copy/alerts';
 import { TRIAL_DAYS } from '../copy/account';
 import { ALERT_LABELS } from '../copy/site';
 import { findCheck } from '../fixtures';
 import { dayDate, dayMonth, hourMinute, weekday, weekdayTime } from '../format';
-import { primarySite, primarySites, resultChecks, viewAt, type Viewer } from './account';
+import {
+  primarySite,
+  primarySites,
+  resultChecks,
+  viewAt,
+  type AccountDataset,
+  type Viewer,
+} from './account';
 import { action, type ActionView } from './account-actions';
 import { accountShellView, type ShellView } from './account-shell';
 import { accountChanges } from './changes-log';
@@ -93,7 +100,7 @@ export interface AlertsView {
 
 const at = (ts: string) => instant(ts);
 
-export function alertsView(d: FixtureDataset, viewer: Viewer): AlertsView {
+export function alertsView(d: AccountDataset, viewer: Viewer): AlertsView {
   const v = viewAt(d, viewer);
   const zone = v.account.timezone;
   const when = (ts: string) => `${dayDate(ts, zone)} ${hourMinute(ts, zone)}`;

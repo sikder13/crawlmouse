@@ -78,14 +78,22 @@ const ANONYMOUS: Record<
   'api/billing/cancel': { status: 401, body: { error: 'auth_required' } },
   'api/billing/checkout': { status: 401, body: { error: 'auth_required' } },
   'api/billing/portal': { status: 401, body: { error: 'auth_required' } },
+  'api/billing/pro-trial/start': { status: 401, body: { code: 'auth_required' } },
   'api/billing/status': { status: 401, body: { pro: false } },
   'api/checks/[id]/claim': { status: 401, body: { code: 'auth_required' } },
+  'api/fixes/[id]/done': { status: 401, body: { code: 'auth_required' } },
+  'api/fixes/[id]/email-developer': { status: 401, body: { code: 'auth_required' } },
+  'api/fixes/[id]/packet': { status: 401, body: { code: 'auth_required' } },
+  'api/me': { status: 401, body: { code: 'auth_required' } },
   'api/reports/[slug]/claim': { status: 401, body: { error: 'auth_required' } },
   'api/reports/[slug]/logo': { status: 401, body: { error: 'auth_required' } },
   // The owner island's probe: a caller with no session gets the deny answer before any read.
   'api/reports/[slug]/mine': { status: 200, body: { owned: false } },
   'api/reports/[slug]/visibility': { status: 401, body: { error: 'auth_required' } },
   'api/reports/[slug]/white-label': { status: 401, body: { error: 'auth_required' } },
+  'api/sites': { status: 401, body: { code: 'auth_required' } },
+  'api/sites/[id]': { status: 401, body: { code: 'auth_required' } },
+  'api/sites/[id]/checks': { status: 401, body: { code: 'auth_required' } },
   'api/verify/check/[id]': { status: 401, body: { error: 'auth required' } },
   'api/verify/start': { status: 401, body: { error: 'auth required' } },
   billing: { status: 307, location: 'https://crawlmouse.com/login' },
@@ -97,8 +105,11 @@ const ID = '6f1c2a8e-0000-4000-8000-000000000000';
 beforeEach(() => {
   calls.length = 0;
   vi.stubEnv('V2_ACCOUNT_DOOR', '1');
-  // The CC-27b account routes answer 404 before reading the session while the flag is off.
+  // The CC-26b routes answer 404 with V2_CHECKS_PUBLIC unset (so do CC-27b's account routes), and
+  // the two that request a check answer 503 before the session with V2_PIPELINE unset.
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+  vi.stubEnv('V2_PIPELINE', '1');
+  vi.stubEnv('CRAWL_PAUSED', '');
 });
 afterEach(() => vi.unstubAllEnvs());
 

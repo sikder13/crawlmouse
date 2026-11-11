@@ -3,7 +3,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
-import { FIX_EMAIL_REQUESTS } from '../../../__tests__/helpers/v2-027b-standins';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
 import type { CancelAccounts, CancelStripe } from '../../billing/cancel';
 import { hashToken } from './tokens';
@@ -23,7 +22,6 @@ let db: PGlite;
 beforeAll(async () => {
   db = await freshDb();
   await applyAllMigrations(db);
-  await db.exec(FIX_EMAIL_REQUESTS);
 }, 300_000);
 afterAll(async () => db.close());
 

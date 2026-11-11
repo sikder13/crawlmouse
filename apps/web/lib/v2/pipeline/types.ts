@@ -52,12 +52,29 @@ export interface PersistInput {
   vantage: ReadonlyMap<string, PageVantage>;
   /** The stored map drawing's path in the `evidence` bucket (D10); null when none was drawn. */
   map_path: string | null;
+  /** What the build read of each fix (`readOfFixes`): persist withholds a fix that moved since. */
+  read: readonly FixRead[];
+}
+
+/** One fix the build read, and the last of its events the build read (null when it had none). */
+export interface FixRead {
+  fix_id: string;
+  last_event_id: string | null;
+}
+
+/** A fix this persist verified, as persist_built_check answers it (CC-26b Q6). */
+export interface VerifiedFix {
+  fix_id: string;
+  type: string;
+  checks_to_close: number;
 }
 
 export interface PersistOutcome {
   /** False when the check had been written already: the call changed nothing. */
   written: boolean;
   counts: Readonly<Record<string, number>>;
+  /** The verifications this call wrote; none when `written` is false. */
+  verified: readonly VerifiedFix[];
 }
 
 /** The bulk collections persistence stages in chunks before the final call (migration 008). */

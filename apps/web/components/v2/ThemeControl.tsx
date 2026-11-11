@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useLive } from './screens/account/LiveActions';
 import { THEME_CHOICES, type ThemeChoice } from './theme-choices';
 import styles from './ThemeControl.module.css';
 
@@ -32,11 +33,13 @@ function stored(): ThemeChoice | null {
 
 /**
  * System, Light or Dark (DESIGN-LOCK §2: three states, default System). The choice applies at once
- * and is kept in this browser; saving it to the account is the form's job, which a preview stops.
+ * and is kept in this browser. Under `LiveActions` it is also saved to the seat: sent as JSON with
+ * the page staying put, or, without script, by the form itself. A preview saves nothing.
  */
 export function ThemeControl({ initial, action }: ThemeControlProps) {
   const [choice, setChoice] = useState<ThemeChoice>(initial);
   const labelId = useId();
+  const live = useLive();
 
   // What it shows pressed is what the page wears: this browser's choice, else the seat's.
   useEffect(() => {
@@ -53,6 +56,14 @@ export function ThemeControl({ initial, action }: ThemeControlProps) {
     } catch {
       // private windows and blocked storage: the choice still applies to this page
     }
+    if (live) {
+      // A failed save leaves the choice applied here and kept in this browser.
+      void fetch(action, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ theme: next }),
+      }).catch(() => undefined);
+    }
   };
 
   return (
@@ -60,7 +71,7 @@ export function ThemeControl({ initial, action }: ThemeControlProps) {
       method="post"
       action={action}
       className={styles.control}
-      // Not wired to an account yet: the route is CC-26b's.
+      // With script the click saves (above); the form posts only where script does not run.
       onSubmit={(e: FormEvent) => e.preventDefault()}
     >
       <input type="hidden" name="_method" value="PATCH" />

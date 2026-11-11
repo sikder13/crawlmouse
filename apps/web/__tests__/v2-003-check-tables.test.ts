@@ -191,6 +191,12 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
     case 'persist_chunks':
       await needCheck();
       return ROWS.persist_chunks(check, 0);
+    case 'fix_email_requests': {
+      await needCheck();
+      const fix = randomUUID();
+      await insertRow(db, 'site_fixes', ROWS.site_fixes(fix, site, check, 7));
+      return ROWS.fix_email_requests(randomUUID(), fix, world.accountId, world.ownerSeatId);
+    }
     case 'account_tokens':
       return ROWS.account_tokens(randomUUID(), world.accountId, world.ownerId);
     case 'account_events':
@@ -293,6 +299,7 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   usage_events: null,
   crawl_batches: null,
   persist_chunks: null,
+  fix_email_requests: null,
   account_tokens: null,
   account_events: null,
   pending_erasures: null,
@@ -351,8 +358,9 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   };
   if (table === 'alert_rules') expectedTable.authenticated = 'd';
   if (table === 'page_results') expectedTable.crawl_worker = 'a';
-  // 008 grants service_role the four statements the pipeline runs, not every privilege.
-  if (table === 'crawl_batches' || table === 'persist_chunks') expectedTable.service_role = 'arwd';
+  // 008 grants service_role the four statements the pipeline runs, and 026b the same on its table.
+  if (['crawl_batches', 'persist_chunks', 'fix_email_requests'].includes(table))
+    expectedTable.service_role = 'arwd';
   // 027b keeps the Slack destination from service_role too: its functions are the only way in.
   if (table === 'account_slack_destinations') delete expectedTable.service_role;
   const actualTable = Object.fromEntries(tableAcl.map((a) => [a.grantee, sorted(a.privileges)]));

@@ -171,7 +171,6 @@ describe('the finders see what they claim to see', () => {
       isFlagGated(join(WEB, p)),
     );
     expect(hidden).toEqual([
-      // CC-22b: the audit's sub-pages, 404 while V2_CHECKS_PUBLIC is off.
       'app/audit/[id]/access/page.tsx',
       'app/audit/[id]/changes/page.tsx',
       'app/audit/[id]/content/page.tsx',
@@ -181,7 +180,8 @@ describe('the finders see what they claim to see', () => {
       'app/audit/[id]/overview/page.tsx',
       'app/audit/[id]/signals/page.tsx',
       'app/audit/[id]/structure/page.tsx',
-      // CC-22b: the v2 home, which `/` is rewritten to under the flag.
+      'app/dashboard/v2/page.tsx',
+      'app/sites/[id]/page.tsx',
       'app/v2-home/page.tsx',
       'app/api/account/delete/confirm/route.ts',
       'app/api/account/email/confirm/route.ts',
@@ -192,11 +192,19 @@ describe('the finders see what they claim to see', () => {
       'app/api/alert-rules/route.ts',
       'app/api/billing/agency-trial/route.ts',
       'app/api/billing/cancel/route.ts',
+      'app/api/billing/pro-trial/start/route.ts',
       'app/api/checks/[id]/cancel/route.ts',
       'app/api/checks/[id]/claim/route.ts',
       'app/api/checks/[id]/notify/route.ts',
       'app/api/checks/[id]/stream/route.ts',
       'app/api/checks/route.ts',
+      'app/api/fixes/[id]/done/route.ts',
+      'app/api/fixes/[id]/email-developer/route.ts',
+      'app/api/fixes/[id]/packet/route.ts',
+      'app/api/me/route.ts',
+      'app/api/sites/[id]/checks/route.ts',
+      'app/api/sites/[id]/route.ts',
+      'app/api/sites/route.ts',
       'app/api/webhooks/stripe-account/route.ts',
     ]);
   });

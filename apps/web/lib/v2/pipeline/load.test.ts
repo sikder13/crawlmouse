@@ -36,7 +36,12 @@ beforeAll(async () => {
 async function persisted(accountId: string | null = null): Promise<void> {
   const input = recordedBuild();
   await seedRunningCheck(db, { ...input.site, account_id: accountId }, input.check);
-  await persistBuiltCheck(pglitePersistDb(db), { built, vantage: vantage(), map_path: null });
+  await persistBuiltCheck(pglitePersistDb(db), {
+    built,
+    vantage: vantage(),
+    map_path: null,
+    read: [],
+  });
 }
 
 /** A reader that records which tables it was asked for. */
