@@ -9,8 +9,9 @@ import { createLiveSource } from './live-source';
 
 /**
  * The crawl screen of a real check: it follows `GET /api/checks/[id]/stream` and draws what the
- * stream says. Nothing is replayed or estimated: with the stream out of reach the screen keeps the
- * last state it was sent and says so.
+ * stream says. Nothing is replayed or estimated: while the server refuses the stream the screen
+ * keeps the last state it was sent and says so (LiveCrawl.dom.test.tsx, "a retry the server refuses
+ * again leaves the last counts on the screen").
  */
 export interface LiveCrawlProps {
   checkId: string;
@@ -52,11 +53,18 @@ export function LiveCrawl({ checkId, host, crawlers = NO_CRAWLERS }: LiveCrawlPr
     let stopped = false;
 
     const connect = () => {
-      // A new EventSource sends no Last-Event-ID, so the server starts from the beginning.
-      source.reset();
       const es = new EventSource(`/api/checks/${checkId}/stream`);
       stream = es;
-      es.onopen = () => setReachable(true);
+      // A new EventSource sends no Last-Event-ID, so once the server accepts it the run is sent
+      // from its beginning and the screen starts over. Until then, and when the server refuses,
+      // what is drawn stays. A later open of the same EventSource is the browser's own reconnect,
+      // which sends the last id.
+      let first = true;
+      es.onopen = () => {
+        if (first) source.reset();
+        first = false;
+        setReachable(true);
+      };
       es.onmessage = (e: MessageEvent<string>) => {
         refusals = 0;
         source.receive(e.data, e.lastEventId);

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { IdSchema } from '@crawlmouse/types/v2';
 import { checksPublicEnabled, pipelineEnabled } from '@/lib/auth/flags';
@@ -37,7 +37,8 @@ async function signedIn(): Promise<boolean> {
  * steps after the body has parsed, and their order, are `startPublicCheck`'s. A 404 with
  * V2_CHECKS_PUBLIC unset. With V2_PIPELINE unset no function would run a queued check, so the route
  * answers 503 and writes nothing. `check_started` is sent when this call queued the check, and not
- * for a request that was answered with a check already there.
+ * for a request that was answered with a check already there. The send is handed to `after`, which
+ * runs it once the response has gone, so the answer does not wait on PostHog.
  */
 export async function POST(req: Request) {
   if (!checksPublicEnabled()) return NextResponse.json({ code: 'not_found' }, { status: 404 });
@@ -68,7 +69,8 @@ export async function POST(req: Request) {
   if (!outcome.ok) return answer(outcome.body, outcome.status);
 
   if (outcome.created) {
-    await capturePublicEvent(req, 'check_started', outcome.checkId, { trigger: 'first_audit' });
+    const { checkId } = outcome;
+    after(() => capturePublicEvent(req, 'check_started', checkId, { trigger: 'first_audit' }));
   }
   return answer({ checkId: outcome.checkId }, 200);
 }

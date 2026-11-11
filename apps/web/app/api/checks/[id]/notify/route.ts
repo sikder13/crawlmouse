@@ -1,5 +1,6 @@
 import { supabaseServer } from '@/lib/supabase/server';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import type { Viewer } from '@/lib/v2/pipeline/public';
 import { checkRouteDeps } from '../_lib/deps';
 import { notify } from './notify';
 
@@ -13,7 +14,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const {
     data: { user },
   } = await sb.auth.getUser();
+  const viewer: Viewer = { userId: user?.id ?? null };
   const { id } = await params;
   const body: unknown = await req.json().catch(() => null);
-  return notify(req, body, id, { userId: user?.id ?? null }, checkRouteDeps(sb));
+  return notify(req, body, id, viewer, checkRouteDeps(sb, viewer));
 }

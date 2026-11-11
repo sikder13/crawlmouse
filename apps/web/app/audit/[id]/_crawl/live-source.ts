@@ -27,7 +27,7 @@ export interface LiveSource {
   receive(data: string, lastEventId: string): void;
   /** The connection was cut: the events of a group whose id has not arrived are forgotten. */
   interrupted(): void;
-  /** A connection opened without a last event id: the server starts from the check's beginning. */
+  /** A new connection was accepted, with no last event id: the server starts from the check's beginning. */
   reset(): void;
   /** Advances the elapsed time to the clock's, while the check has not ended. */
   tick(): void;

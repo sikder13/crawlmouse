@@ -15,7 +15,7 @@ import { sqlStartStore } from './start-store-sql';
 const admin = vi.hoisted(() => ({ client: null as unknown }));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => admin.client }));
-import { startLimits } from './start-limits';
+import { START_REPLAYS_PER_IP_PER_HOUR, startLimits } from './start-limits';
 
 const REQUEST = '0b9d3c52-7c1e-4f0a-9a44-1f2e3d4c5b6a';
 // stableId('public_check' | 'public_site', REQUEST, 'example.com'), computed outside this codebase:
@@ -76,6 +76,7 @@ function traced(deps: StartDeps, trace: string[]): StartDeps {
       global: named('global', deps.limits.global),
       ip: named('ip', deps.limits.ip),
       domain: named('domain', deps.limits.domain),
+      replay: named('replay', deps.limits.replay),
     },
     signedIn: named('signedIn', deps.signedIn),
     verifyTurnstile: named('turnstile', deps.verifyTurnstile),
@@ -94,6 +95,7 @@ const OPEN: StartLimits = {
   global: async () => true,
   ip: async () => ({ allowed: true, resetAt: new Date(NOON + DAY_MS) }),
   domain: async () => true,
+  replay: async () => true,
 };
 
 const rowsOf = async (db: PGlite) => {
@@ -130,7 +132,8 @@ beforeEach(async () => {
   dns.set('example.com', [PUBLIC_ADDRESS]);
   dns.set('www.example.com', [PUBLIC_ADDRESS]);
   dns.set('other.example', ['198.51.100.7']);
-});
+  // The first call of `doorDb` applies each migration to the template database; later calls clone it.
+}, 120_000);
 
 describe('a first start', () => {
   it('makes one unkept site and one queued check under the derived ids, and sends one event', async () => {
@@ -406,20 +409,24 @@ describe('the limits, counted in the database', () => {
 describe('a start that is sent again', () => {
   const EVENT = `check:anon:${CHECK}`;
 
-  it('while the check is queued: the same check, the same event id again, one row, no bucket counted', async () => {
+  const REPLAYS = `start-replay:ip:${IP}`;
+  const withReplays = (counted: string[], n: number) => [...counted, `${REPLAYS}=${n}`].sort();
+
+  it('while the check is queued: the same check, the same event id again, one row, one replay counted', async () => {
     const h = harness(db);
     const first = await h.start();
     const counted = await buckets(db);
     const again = await h.start();
     expect(first).toEqual({ ok: true, checkId: CHECK, created: true });
     expect(again).toEqual({ ok: true, checkId: CHECK, created: false });
-    expect(await rowsOf(db)).toEqual({ sites: 1, checks: 1, rateLimits: 3 });
-    expect(await buckets(db)).toEqual(counted);
+    expect(await rowsOf(db)).toEqual({ sites: 1, checks: 1, rateLimits: 4 });
+    expect(counted.join(' ')).not.toContain('start-replay');
+    expect(await buckets(db)).toEqual(withReplays(counted, 1));
     expect(h.sent.map((e) => e.id)).toEqual([EVENT, EVENT]);
     expect(h.sent[1]).toEqual(h.sent[0]);
   });
 
-  it('while the check is queued: asks no limit, and calls the pipeline for the event', async () => {
+  it('while the check is queued: asks the replay limit alone, then calls the pipeline for the event', async () => {
     const h = harness(db);
     await h.start();
     const trace: string[] = [];
@@ -428,10 +435,71 @@ describe('a start that is sent again', () => {
       requestId: REQUEST.toUpperCase(),
       ip: IP,
     });
-    expect(trace).toEqual(['admit', 'derived', 'requestSite', 'insertQueued', 'send']);
+    expect(trace).toEqual(['admit', 'derived', 'replay', 'requestSite', 'insertQueued', 'send']);
   });
 
-  it('after a send that failed: the retry sends the event once, with no second row or bucket count', async () => {
+  it('replay 31 of an hour from one address: 429 before the pipeline is called, for a queued check and an ended one', async () => {
+    const h = harness(db);
+    await h.start();
+    await spend(db, REPLAYS, 3_600_000, START_REPLAYS_PER_IP_PER_HOUR - 1);
+    const trace: string[] = [];
+    const again = () =>
+      startPublicCheck(traced(h.deps, trace), {
+        url: 'https://example.com/',
+        requestId: REQUEST,
+        ip: IP,
+      });
+    expect(await again()).toEqual({ ok: true, checkId: CHECK, created: false });
+    expect(h.sent).toHaveLength(2);
+    trace.length = 0;
+
+    const refused = {
+      ok: false,
+      status: 429,
+      body: { code: 'rate_limited', error: 'Too many repeats of this request. Try again later.' },
+    };
+    expect(await again()).toEqual(refused);
+    expect(trace).toEqual(['admit', 'derived', 'replay']);
+    expect(h.sent).toHaveLength(2);
+    await sqlPipelineStore(db).fail(CHECK, 'canceled', null);
+    expect(await again()).toEqual(refused);
+    expect(START_REPLAYS_PER_IP_PER_HOUR).toBe(30);
+
+    // Another address has its own count, and a first start asks no replay limit.
+    expect(await h.start({ ip: '198.51.100.20' })).toEqual({
+      ok: true,
+      checkId: CHECK,
+      created: false,
+    });
+    trace.length = 0;
+    await startPublicCheck(traced(h.deps, trace), {
+      url: 'https://other.example/',
+      requestId: REQUEST,
+      ip: IP,
+    });
+    expect(trace).not.toContain('replay');
+    expect(trace).toContain('send');
+  });
+
+  it('a caller with no known address is not counted, as a first start’s address bucket is not', async () => {
+    const h = harness(db);
+    await h.start({ ip: 'unknown' });
+    const counted = await buckets(db);
+    expect(await h.start({ ip: 'unknown' })).toEqual({ ok: true, checkId: CHECK, created: false });
+    expect(await buckets(db)).toEqual(counted);
+  });
+
+  it('the replay limit is open when it cannot be counted', async () => {
+    const h = harness(db);
+    await h.start();
+    admin.client = { rpc: async () => ({ data: null, error: { message: 'down' } }) };
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(await h.start()).toEqual({ ok: true, checkId: CHECK, created: false });
+    expect(h.sent).toHaveLength(2);
+    vi.restoreAllMocks();
+  });
+
+  it('after a send that failed: the retry sends the event once, with no second row, and counts one replay', async () => {
     const failing = harness(db);
     failing.deps.pipeline.send = async () => {
       throw new Error('event service down');
@@ -445,8 +513,8 @@ describe('a start that is sent again', () => {
     const h = harness(db);
     expect(await h.start()).toEqual({ ok: true, checkId: CHECK, created: false });
     expect(h.sent.map((e) => e.id)).toEqual([EVENT]);
-    expect(await rowsOf(db)).toEqual({ sites: 1, checks: 1, rateLimits: 3 });
-    expect(await buckets(db)).toEqual(counted);
+    expect(await rowsOf(db)).toEqual({ sites: 1, checks: 1, rateLimits: 4 });
+    expect(await buckets(db)).toEqual(withReplays(counted, 1));
   });
 
   const ENDED = `started_at = queued_at, finished_at = now(), coverage = '{}'::jsonb,
@@ -481,9 +549,9 @@ describe('a start that is sent again', () => {
         ip: IP,
       }),
     ).toEqual({ ok: true, checkId: CHECK, created: false });
-    expect(trace).toEqual(['admit', 'derived']);
+    expect(trace).toEqual(['admit', 'derived', 'replay']);
     expect(h.sent).toHaveLength(1);
-    expect(await rowsOf(db)).toEqual({ sites: 1, checks: 1, rateLimits: 3 });
+    expect(await rowsOf(db)).toEqual({ sites: 1, checks: 1, rateLimits: 4 });
   });
 
   it('a queued check an account has kept: the same check, and the pipeline is sent nothing', async () => {
@@ -494,7 +562,7 @@ describe('a start that is sent again', () => {
     await db.query(`update public.checks set expires_at = null`);
     expect(await h.start()).toEqual({ ok: true, checkId: CHECK, created: false });
     expect(h.sent).toHaveLength(1);
-    expect(await rowsOf(db)).toEqual({ sites: 1, checks: 1, rateLimits: 3 });
+    expect(await rowsOf(db)).toEqual({ sites: 1, checks: 1, rateLimits: 4 });
   });
 
   it('makes the check again, under the same id, once its rows were deleted', async () => {

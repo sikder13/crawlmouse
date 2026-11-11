@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { captureServerEvent, posthogSend, type CaptureBody } from './analytics-server';
+import {
+  CAPTURE_TIMEOUT_MS,
+  captureServerEvent,
+  posthogSend,
+  type CaptureBody,
+} from './analytics-server';
 
 function recorder() {
   const sent: CaptureBody[] = [];
@@ -97,5 +102,37 @@ describe('posthogSend', () => {
       vi.fn(async () => new Response(null, { status: 500 })),
     );
     await expect(posthogSend(body)).rejects.toThrow('capture answered 500');
+  });
+
+  it('waits CAPTURE_TIMEOUT_MS (2 s) for PostHog: a send that does not settle is aborted and dropped', async () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
+    const bound = new AbortController();
+    const asked: number[] = [];
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
+      asked.push(ms);
+      return bound.signal;
+    });
+    // PostHog accepts the connection and never answers: the fetch settles only when it is aborted.
+    vi.stubGlobal(
+      'fetch',
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+    const logged: unknown[][] = [];
+    vi.spyOn(console, 'error').mockImplementation((...args) => void logged.push(args));
+
+    let settled = false;
+    const capture = captureServerEvent(null, EVENT).then(() => {
+      settled = true;
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect([settled, asked]).toEqual([false, [CAPTURE_TIMEOUT_MS]]);
+    expect(CAPTURE_TIMEOUT_MS).toBe(2000);
+
+    bound.abort();
+    await capture;
+    expect(logged).toEqual([['analytics: server capture of check_started failed']]);
   });
 });

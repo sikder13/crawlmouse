@@ -528,9 +528,20 @@ describe('readBatch', () => {
     expect(got?.link_edges).toHaveLength(1);
   });
 
-  it('answers null for a missing object, a non-contract object and an access batch', async () => {
+  it('throws when the object cannot be read: a missing object, or a request that failed', async () => {
+    await expect(readBatch(memoryEvidenceStore(), PATH)).rejects.toThrow(
+      `evidence: get ${PATH}: not found`,
+    );
+    const failing = {
+      get: async () => {
+        throw new Error('storage: connection reset');
+      },
+    };
+    await expect(readBatch(failing, PATH)).rejects.toThrow('storage: connection reset');
+  });
+
+  it('answers null for an object that was read and is not a crawl batch’s contract result', async () => {
     const evidence = memoryEvidenceStore();
-    expect(await readBatch(evidence, PATH)).toBeNull();
     await evidence.put(PATH, gzipJson({ ...result, pages: [{ url: 'nope' }] }));
     expect(await readBatch(evidence, PATH)).toBeNull();
     await evidence.put(PATH, gzipSync(Buffer.from('not json')));

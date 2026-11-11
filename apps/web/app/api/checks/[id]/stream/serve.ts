@@ -12,7 +12,8 @@
  *
  * Limits. A poll every POLL_MS; the stream closes itself STREAM_CLOSE_MS after it opened, before
  * the route's `maxDuration`, and the browser reconnects; STREAM_OPENS_PER_IP_PER_HOUR opens an hour
- * for one address (../_lib/limit-keys.ts); one batch result in memory at a time (`readBatch`'s bounds).
+ * for one address, which is also what bounds the streams one address holds open at once
+ * (../_lib/limit-keys.ts); one batch result in memory at a time (`readBatch`'s bounds).
  */
 import { isExpired, readableCheck, type Viewer } from '../../../../../lib/v2/pipeline/public';
 import {
@@ -147,7 +148,7 @@ export async function serveStream(
           const out = checkEvents(cursor, facts);
           send(out.events, out.cursor);
           if (cursor.ended) {
-            if (!before.ended) await finished(req, checkId, access.trigger, facts, cursor, deps);
+            if (!before.ended) await finished(req, checkId, access.trigger, facts, deps);
             break;
           }
           // A comment line when there was nothing to send, so an idle connection is not dropped.
@@ -158,7 +159,8 @@ export async function serveStream(
           snapshot = await deps.store.snapshot(checkId);
         }
       } catch {
-        // A read that failed ends this connection; the browser reconnects from its last id.
+        // A read that failed (the snapshot, or a batch's object) ends this connection; the browser
+        // reconnects from its last id, which is before a batch whose read failed.
       } finally {
         open = false;
         try {
@@ -183,15 +185,16 @@ export async function serveStream(
 }
 
 /**
- * `check_finished`, once for a check: `finishedOnce` admits one capture for the check in its
- * bucket's 24-hour window. The scores are read for a finished or partial check.
+ * `check_finished`: `finishedOnce` admits one capture for the check in its bucket's 24-hour window.
+ * What it carries is read from the check's rows (`facts`, `scores`) and from `readableCheck`'s
+ * answer; the cursor, which the client sends, gives it nothing. The scores are read for a finished
+ * or partial check.
  */
 async function finished(
   req: Request,
   checkId: string,
   trigger: PublicServerEvents['check_finished']['trigger'],
   facts: ReturnType<typeof factsOf>,
-  cursor: Cursor,
   deps: StreamDeps,
 ): Promise<void> {
   const status = facts.status as PublicServerEvents['check_finished']['status'];
@@ -200,7 +203,7 @@ async function finished(
   await deps.captureFinished(req, checkId, {
     trigger,
     status,
-    pages: cursor.pages,
+    pages: facts.counts?.pages_crawled ?? 0,
     durationMs: Math.round(facts.elapsedMs),
     ...scores,
   });

@@ -5,7 +5,11 @@ import { LIMITS, type CheckRouteLimits } from './limit-keys';
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The stream and notify routes' buckets, counted by `checkRateLimit` (each fails open). */
+/**
+ * The stream and notify routes' buckets, counted by `checkRateLimit`. No call sets `failClosed`, so
+ * a count that cannot be read lets the request through. ../wiring.test.ts pins each call's key,
+ * number and window.
+ */
 export const checkRouteLimits: CheckRouteLimits = {
   async streamOpens(ip) {
     const { key, limit } = LIMITS.streamOpens;

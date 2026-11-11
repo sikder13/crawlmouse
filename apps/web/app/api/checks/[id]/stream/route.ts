@@ -1,5 +1,6 @@
 import { supabaseServer } from '@/lib/supabase/server';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import type { Viewer } from '@/lib/v2/pipeline/public';
 import { checkRouteDeps } from '../_lib/deps';
 import { serveStream } from './serve';
 
@@ -15,6 +16,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const {
     data: { user },
   } = await sb.auth.getUser();
+  const viewer: Viewer = { userId: user?.id ?? null };
   const { id } = await params;
-  return serveStream(req, id, { userId: user?.id ?? null }, checkRouteDeps(sb));
+  return serveStream(req, id, viewer, checkRouteDeps(sb, viewer));
 }

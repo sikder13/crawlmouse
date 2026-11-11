@@ -26,7 +26,8 @@ describe.each<[string, (db: PGlite) => StartStore]>([
   beforeEach(async () => {
     db = await doorDb();
     store = make(db);
-  });
+    // The first call applies each migration to the template database; later calls clone it.
+  }, 120_000);
 
   it('inserts a site no account keeps, under the id it is given', async () => {
     await store.insertUnkeptSite(SITE, 'example.com');

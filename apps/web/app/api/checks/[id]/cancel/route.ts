@@ -1,5 +1,6 @@
 import { supabaseServer } from '@/lib/supabase/server';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import type { Viewer } from '@/lib/v2/pipeline/public';
 import { checkRouteDeps } from '../_lib/deps';
 import { cancel } from './cancel';
 
@@ -13,6 +14,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const {
     data: { user },
   } = await sb.auth.getUser();
+  const viewer: Viewer = { userId: user?.id ?? null };
   const { id } = await params;
-  return cancel(id, { userId: user?.id ?? null }, checkRouteDeps(sb));
+  return cancel(id, viewer, checkRouteDeps(sb, viewer));
 }

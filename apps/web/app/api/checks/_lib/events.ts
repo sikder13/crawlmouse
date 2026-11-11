@@ -1,11 +1,13 @@
 /**
  * The two product events of the public check flow that the server sends (CC-22b D12): a check
  * started, and a check's end reached a viewer's progress stream. A typed wrapper over the server's
- * one sender (`lib/analytics-server.ts`), which applies the visitor's consent and drops a failed
- * send.
+ * sender of product events (`lib/analytics-server.ts`), which applies the visitor's consent and
+ * drops a failed send.
  *
  * The check is named by `checkRef`, a hash, because its id is the capability to read it: the
- * distinct id is `check:{ref}` and the properties carry `check_ref`.
+ * distinct id is `check:{ref}` and the properties carry `check_ref`. That holds for these two
+ * server events. The browser's own events from an audit page carry the page's URL, which holds
+ * the check id (instrumentation-client.ts: posthog-js with `capture_pageview`).
  */
 import type { Check } from '@crawlmouse/types/v2';
 import { captureServerEvent, type SendCapture } from '../../../../lib/analytics-server';

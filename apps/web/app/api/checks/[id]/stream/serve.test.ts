@@ -116,6 +116,18 @@ describe('the stream of a check anyone with its id may read', () => {
     expect(h.limits.filter((k) => k.startsWith('event:check_finished:'))).toHaveLength(2);
   });
 
+  it('check_finished carries the row’s page count, whatever counts the Last-Event-ID names', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'forged-cursor.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await h.pipeline.fail(ids.checkId, 'canceled', null);
+    // A cursor that fits the check (batch 0, not ended) and names counts the check never had.
+    const res = await open(h, ids, anonymous, '1.0.0.999999999.999999999.0.0');
+    expect(res.status).toBe(200);
+    await res.text();
+    expect(h.captured.map((c) => [c.event, c.properties.pages])).toEqual([['check_finished', 2]]);
+  });
+
   it('sends nothing to PostHog for a visitor whose consent is required', async () => {
     const h = harness(db);
     const ids = await running(db, h, 'consent.example');
@@ -156,6 +168,35 @@ describe('the stream of a check anyone with its id may read', () => {
     const state = fold(groups.flatMap((g) => g.events));
     expect(state.nodes.map((n) => n.url)).toEqual([urlOf('/b')]);
     expect(state.pages_crawled).toBe(3);
+  });
+
+  it('a batch read that fails closes the connection, and the batch’s pages arrive on the reconnect', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'flaky-read.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await storeBatch(h, ids, 2, two, { pages: 3, links: 3 });
+    const get = h.deps.evidence.get;
+    let failures = 1;
+    h.deps.evidence = {
+      async get(path) {
+        if (path.endsWith('batch-2.json.gz') && failures-- > 0) throw new Error('storage: reset');
+        return get(path);
+      },
+    };
+
+    const first = groupsOf(await (await open(h, ids)).text());
+    expect(first.groups.map((g) => typesOf(g.events))).toEqual([
+      ['page_fetched', 'page_linked', 'page_fetched', 'page_linked'],
+    ]);
+    // The cursor the browser comes back with is still before batch 2.
+    expect(first.groups[0]!.id).toMatch(/^1\.1\./);
+
+    h.betweenPolls.push(cancelled(h, ids));
+    const second = groupsOf(await (await open(h, ids, anonymous, first.groups[0]!.id!)).text());
+    expect(second.groups.map((g) => typesOf(g.events))[0]).toEqual(['page_fetched', 'page_linked']);
+    expect(second.groups.at(-1)!.events.at(-1)!.type).toBe('ended');
+    const all = [...first.groups, ...second.groups].flatMap((g) => g.events);
+    expect(fold(all).nodes.map((n) => n.url)).toEqual([urlOf('/'), urlOf('/a'), urlOf('/b')]);
   });
 
   it('a queued check: nothing but the end when it is cancelled before it starts', async () => {
@@ -289,17 +330,16 @@ describe('who may open the stream', () => {
   });
 
   it('closes when the check expires or its site is removed mid-stream', async () => {
+    // Both instants are the harness clock's: the stream reads `expires_at` against `deps.now()`.
+    const at = new Date(NOW).toISOString();
     for (const [host, change] of [
-      [
-        'expires-mid.example',
-        `update public.checks set expires_at = now() - interval '1 day' where site_id = $1`,
-      ],
-      ['removed-mid.example', `update public.sites set removed_at = now() where id = $1`],
+      ['expires-mid.example', `update public.checks set expires_at = $2 where site_id = $1`],
+      ['removed-mid.example', `update public.sites set removed_at = $2 where id = $1`],
     ] as const) {
       const h = harness(db);
       const ids = await running(db, h, host);
       h.betweenPolls.push(async () => {
-        await db.query(change, [ids.siteId]);
+        await db.query(change, [ids.siteId, at]);
         await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
       });
       const { groups } = groupsOf(await (await open(h, ids)).text());
