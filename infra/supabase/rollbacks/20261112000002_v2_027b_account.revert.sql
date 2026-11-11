@@ -5,6 +5,19 @@
 -- search_path 20261108000002 set.
 
 -- ─── C ────────────────────────────────────────────────────────────────────────────────────────────
+-- The stored Slack URLs are Vault secrets the table names; they go with it, so a revert leaves none
+-- behind and every account has to save its URL again after a re-apply.
+do $$ begin
+  if to_regclass('public.account_slack_destinations') is not null then
+    delete from vault.secrets s using public.account_slack_destinations d where s.id = d.vault_secret_id;
+  end if;
+end $$;
+drop function if exists public.account_slack_last4(uuid);
+drop function if exists public.clear_account_slack_webhook(uuid);
+drop function if exists public.set_account_slack_webhook(uuid, text);
+drop table if exists public.account_slack_destinations;
+-- Its trigger went with the table.
+drop function if exists public.account_slack_destinations_drop_secret();
 
 -- ─── B ────────────────────────────────────────────────────────────────────────────────────────────
 drop function if exists public.finish_erasure(uuid);

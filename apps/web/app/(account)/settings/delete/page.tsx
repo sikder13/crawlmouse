@@ -1,0 +1,32 @@
+import type { Metadata } from 'next';
+import { notFound, redirect } from 'next/navigation';
+import { LiveActions } from '@/components/v2/screens/account/LiveActions';
+import { DeleteScreen } from '@/components/v2/screens/settings/DeleteScreen';
+import { checksPublicEnabled } from '@/lib/auth/flags';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+import { deletionAccounts } from '@/lib/v2/account/deletion-plan';
+import { readSettingsPage } from '@/lib/v2/account/settings-pages';
+import { deleteStepView } from '@/lib/v2/view/settings';
+
+// Not indexed, not in the sitemap and rendered per request: the (account) layout says so for
+// every page in the group.
+export const metadata: Metadata = { title: 'Delete this account' };
+
+/**
+ * Settings › Delete (spec 27 `deleteConfirm`): the owner re-types the primary site's hostname and
+ * asks for the confirmation link; the page lists the accounts the deletion removes, read from the
+ * erasure's plan once the session has shown the caller is the owner. Any other role gets a 404, as
+ * does everyone while V2_CHECKS_PUBLIC is off.
+ */
+export default async function DeletePage() {
+  if (!checksPublicEnabled()) return notFound();
+  const page = await readSettingsPage();
+  if (page.kind === 'signed_out') redirect('/login');
+  if (page.kind === 'none' || page.role !== 'owner') notFound();
+  const removes = await deletionAccounts(supabaseAdmin(), page.userId);
+  return (
+    <LiveActions>
+      <DeleteScreen data={deleteStepView(page.d, page.viewer, { removes })} />
+    </LiveActions>
+  );
+}

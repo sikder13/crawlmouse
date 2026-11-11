@@ -1412,4 +1412,126 @@ grant execute on function public.finish_erasure(uuid) to service_role;
 
 -- ═══ C: the account's Slack destination (D7) ══════════════════════════════════════════════════════
 
+-- The account's Slack incoming-webhook URL (D7). The URL is a Vault secret named
+-- `slack_webhook:<account id>`; this table holds that secret's id and the URL's last four characters,
+-- which the settings page shows. No client role and not service_role holds a privilege on the table:
+-- the three functions below are the way in, and none of them returns the URL (decrypting it to send
+-- an alert is CC-28's). The row goes with its account; its trigger takes the secret with it.
+create table if not exists public.account_slack_destinations (
+  account_id uuid primary key references public.accounts (id) on delete cascade,
+  vault_secret_id uuid not null,
+  last4 text not null check (length(last4) = 4),
+  updated_at timestamptz not null default now()
+);
+alter table public.account_slack_destinations enable row level security;
+revoke all on public.account_slack_destinations from public, anon, authenticated, service_role;
+
+-- Stores or replaces the account's URL and returns its last four characters. A replace updates the
+-- one secret in place, so an account never holds two. The URL is held to Slack's incoming-webhook
+-- form, as the route holds it, and Slack is refused on a Free account: the tier is read as
+-- alert_rules_entitlement_check (003) reads it, the account row locked so two writes for one account
+-- run one after the other.
+create or replace function public.set_account_slack_webhook(p_account uuid, p_url text)
+returns text
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v_name text := 'slack_webhook:' || p_account::text;
+  v_tier text;
+  v_secret uuid;
+begin
+  if p_url is null or length(p_url) > 500
+     or p_url !~ '^https://hooks\.slack\.com/services/[A-Za-z0-9_/-]+$' then
+    raise exception 'set_account_slack_webhook: not a Slack incoming-webhook URL' using errcode = '22023';
+  end if;
+  select case
+           when a.state = 'pro_trial' and a.trial_variant = 'no_card'
+             then case when now() < a.trial_ends_at then a.tier else 'free' end
+           when a.state = 'past_due'
+             then case when now() < a.past_due_since + interval '168 hours' then a.past_due_tier else 'free' end
+           else a.tier
+         end
+    into v_tier
+    from public.accounts a
+   where a.id = p_account and a.deleted_at is null and a.deletion_confirmed_at is null
+     for update;
+  if not found then
+    raise exception 'set_account_slack_webhook: no account %', p_account using errcode = 'P0002';
+  end if;
+  if v_tier is null or v_tier not in ('pro', 'agency') then
+    raise exception 'set_account_slack_webhook: Slack alerts need a paid plan' using errcode = '23514';
+  end if;
+
+  select d.vault_secret_id into v_secret
+    from public.account_slack_destinations d where d.account_id = p_account;
+  if v_secret is null then
+    -- A secret of this name with no row (a row deleted without its trigger) is reused, not duplicated.
+    select s.id into v_secret from vault.secrets s where s.name = v_name;
+  end if;
+  if v_secret is null then
+    v_secret := vault.create_secret(p_url, v_name, '');
+  else
+    perform vault.update_secret(v_secret, p_url);
+  end if;
+  insert into public.account_slack_destinations as d (account_id, vault_secret_id, last4, updated_at)
+  values (p_account, v_secret, right(p_url, 4), now())
+  on conflict (account_id) do update
+    set vault_secret_id = excluded.vault_secret_id, last4 = excluded.last4, updated_at = excluded.updated_at;
+  return right(p_url, 4);
+end;
+$$;
+
+-- Removes the account's URL; true when there was one. The trigger removes the secret.
+create or replace function public.clear_account_slack_webhook(p_account uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  delete from public.account_slack_destinations d where d.account_id = p_account;
+  return found;
+end;
+$$;
+
+-- What the settings page shows: the URL's last four characters, or null when none is set.
+create or replace function public.account_slack_last4(p_account uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+  select d.last4 from public.account_slack_destinations d where d.account_id = p_account;
+$$;
+
+-- A destination row that goes (a clear, or its account's cascade at the purge) takes its secret with
+-- it. Definer, because a cascaded delete fires the trigger as the role that deleted the account.
+create or replace function public.account_slack_destinations_drop_secret()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  delete from vault.secrets s where s.id = old.vault_secret_id;
+  return old;
+end;
+$$;
+drop trigger if exists account_slack_destinations_drop_secret on public.account_slack_destinations;
+create trigger account_slack_destinations_drop_secret after delete on public.account_slack_destinations
+  for each row execute function public.account_slack_destinations_drop_secret();
+
+revoke all on function public.set_account_slack_webhook(uuid, text) from public, anon, authenticated;
+revoke all on function public.clear_account_slack_webhook(uuid) from public, anon, authenticated;
+revoke all on function public.account_slack_last4(uuid) from public, anon, authenticated;
+revoke all on function public.account_slack_destinations_drop_secret()
+  from public, anon, authenticated, service_role;
+grant execute on function public.set_account_slack_webhook(uuid, text) to service_role;
+grant execute on function public.clear_account_slack_webhook(uuid) to service_role;
+grant execute on function public.account_slack_last4(uuid) to service_role;
+
+
 -- ═══ end C ════════════════════════════════════════════════════════════════════════════════════════
