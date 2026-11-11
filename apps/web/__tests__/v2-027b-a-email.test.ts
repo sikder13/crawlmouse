@@ -315,6 +315,45 @@ describe('one email change in flight per person, across the accounts they own (f
   });
 });
 
+describe('no email change while the person’s deletion is under way (fix round 1, S1)', () => {
+  it('refuses while a live deletion link exists for the person (CMA07)', async () => {
+    for (const kind of ['delete_confirm', 'delete_restore']) {
+      const p = await person();
+      await db.query(`select public.create_account_token($1, $2, $3, now() + interval '1 hour')`, [
+        p.accountId,
+        p.userId,
+        kind,
+      ]);
+      expect(await sqlstate(request(p, `during-${kind}@example.org`)), kind).toBe('CMA07');
+    }
+  });
+
+  it('allows it once the deletion link is used, revoked or expired', async () => {
+    const p = await person();
+    await db.query(
+      `select public.create_account_token($1, $2, 'delete_confirm', now() + interval '1 hour')`,
+      [p.accountId, p.userId],
+    );
+    await db.query(
+      `update public.account_tokens set revoked_at = now() where user_id = $1 and kind = 'delete_confirm'`,
+      [p.userId],
+    );
+    expect(await sqlstate(request(p, 'after-revoked@example.org'))).toBe('none');
+  });
+
+  it('refuses while the person has a pending erasure (CMA07)', async () => {
+    const p = await person();
+    const other = await person();
+    // The erasure row alone, on another account's id, so the account's own mark (CMA03) is not what refuses.
+    await db.query(
+      `insert into public.pending_erasures (user_id, accounts, confirmed_at, purge_after)
+       values ($1, array[$2]::uuid[], now(), now() + interval '7 days')`,
+      [p.userId, other.accountId],
+    );
+    expect(await sqlstate(request(p, 'during-erasure@example.org'))).toBe('CMA07');
+  });
+});
+
 describe('apply_email_change', () => {
   it('moves the profile and the person’s seat, keeps the old address, and issues a seven-day undo link', async () => {
     const p = await person();

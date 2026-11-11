@@ -228,6 +228,25 @@ describe('requestEmailChange', () => {
     }
   });
 
+  it('refuses with 409 deletion_pending while the person’s deletion is under way, and sends nothing', async () => {
+    const p = await person();
+    await db.query(
+      `select public.create_account_token($1, $2, 'delete_confirm', now() + interval '1 hour')`,
+      [p.accountId, p.userId],
+    );
+    const { ports: pp, rec } = ports();
+    expect(
+      await requestEmailChange(pp, {
+        accountId: p.accountId,
+        userId: p.userId,
+        currentEmail: p.email,
+        newEmail: 'while-deleting@example.org',
+        ip: '203.0.113.9',
+      }),
+    ).toEqual({ ok: false, status: 409, code: 'deletion_pending' });
+    expect(rec.emails).toEqual([]);
+  });
+
   it('refuses a second change while the first one’s undo link is live', async () => {
     const p = await person();
     await changed(p, 'first@example.org');

@@ -68,6 +68,7 @@ const REFUSALS: Readonly<Record<string, EmailChangeOutcome>> = {
   CMA04: refused(409, 'address_taken'),
   CMA05: refused(410, 'link_unusable'),
   CMA06: refused(409, 'try_again'),
+  CMA07: refused(409, 'deletion_pending'),
 };
 
 const LINK_UNUSABLE = REFUSALS.CMA05!;

@@ -286,10 +286,11 @@ grant execute on function public.issue_account_link(uuid) to service_role;
 -- One change is in flight per person, across every account they hold: a request is refused (CMA02)
 -- while the person has a live confirmation link, or a live undo link whose change has applied; an undo
 -- link whose change was never confirmed and has expired does not hold them, and the next request
--- revokes it. account_tokens_one_live_email_link_uq holds when two requests race. Both links are rows with no token until the mailer issues them
--- (issue_account_link, owner ruling Q5); a function here accepts a token only for a row that was
--- issued (`issued_at is not null`), so a row the mailer never issued, whose token_hash is null,
--- cannot be consumed.
+-- revokes it. account_tokens_one_live_email_link_uq holds when two requests race. No change starts
+-- while the person's deletion is under way (CMA07). Both links are rows with no token until the
+-- mailer issues them (issue_account_link, owner ruling Q5); a function here accepts a token only for
+-- a row that was issued (`issued_at is not null`), so a row the mailer never issued, whose
+-- token_hash is null, cannot be consumed.
 --
 -- Refusals, by SQLSTATE; lib/v2/account/email-change.ts answers each:
 --   CMA01  the new address is the person's current one
@@ -299,6 +300,8 @@ grant execute on function public.issue_account_link(uuid) to service_role;
 --   CMA05  the link's token is unknown, of another kind, used, revoked or expired, or its change
 --          was stopped
 --   CMA06  the undo was prepared for a change that was pending, and the change applied in between
+--   CMA07  the person's deletion is under way: a live delete_confirm or delete_restore link, or a
+--          pending_erasures row
 
 -- users.email_normalized: the rule of apps/web/lib/auth/normalize-email.ts (the trial ledger's key),
 -- for an address request_email_change accepted (lowercase, no surrounding space). The TS function
@@ -381,6 +384,12 @@ begin
   end if;
   if pg_catalog.lower(v_current) = p_new_email then
     raise exception 'request_email_change: that is the current address' using errcode = 'CMA01';
+  end if;
+  if exists (select 1 from public.pending_erasures e where e.user_id = p_user)
+     or exists (select 1 from public.account_tokens k
+                 where k.user_id = p_user and k.kind in ('delete_confirm', 'delete_restore')
+                   and k.used_at is null and k.revoked_at is null and k.expires_at > p_now) then
+    raise exception 'request_email_change: the person''s deletion is under way' using errcode = 'CMA07';
   end if;
   if exists (
        select 1 from public.account_tokens k
