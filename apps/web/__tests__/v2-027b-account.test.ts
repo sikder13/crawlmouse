@@ -165,3 +165,110 @@ describe('the file', () => {
     }
   });
 });
+
+describe('issuing and taking a link', () => {
+  const RAW = 'A'.repeat(43);
+  const issue = (
+    o: { accountId: string; userId: string },
+    kind: string,
+    hash: string,
+    expires = `now() + interval '1 hour'`,
+  ) =>
+    db.query<{ id: string }>(
+      `select public.issue_account_token($1, $2, $3, $4, $5, ${expires}, $6, $7) as id`,
+      kind.startsWith('email')
+        ? [o.accountId, o.userId, kind, hash, RAW, 'new@example.com', 'old@example.com']
+        : [o.accountId, o.userId, kind, hash, RAW, null, null],
+    );
+  const secrets = async () =>
+    (await db.query<{ n: number }>(`select count(*)::int n from vault.secrets`)).rows[0]!.n;
+
+  it('stores the hash on the row and the raw token only in Vault, and the mailer can take it once', async () => {
+    const o = await owner('take@example.com');
+    const before = await secrets();
+    const id = (await issue(o, 'delete_confirm', '1'.repeat(64))).rows[0]!.id;
+    const row = await db.query<{ token_hash: string; name: string }>(
+      `select t.token_hash, s.name from public.account_tokens t join vault.secrets s on s.id = t.link_secret_id where t.id = $1`,
+      [id],
+    );
+    expect(row.rows[0]).toEqual({ token_hash: '1'.repeat(64), name: `account_link:${id}` });
+    expect(await secrets()).toBe(before + 1);
+
+    const first = await db.query(`select * from public.take_account_link($1)`, [id]);
+    expect(first.rows).toEqual([
+      { kind: 'delete_confirm', token: RAW, recipient: 'take@example.com' },
+    ]);
+    expect(await secrets()).toBe(before);
+    expect((await db.query(`select * from public.take_account_link($1)`, [id])).rows).toEqual([]);
+  });
+
+  it('sends an email change to the new address and its undo to the old one', async () => {
+    const o = await owner('route@example.com');
+    const change = (await issue(o, 'email_change', '2'.repeat(64))).rows[0]!.id;
+    expect(
+      (await db.query(`select recipient from public.take_account_link($1)`, [change])).rows,
+    ).toEqual([{ recipient: 'new@example.com' }]);
+    await db.query(`update public.account_tokens set used_at = now() where id = $1`, [change]);
+    const undo = (await issue(o, 'email_change_undo', '3'.repeat(64))).rows[0]!.id;
+    expect(
+      (await db.query(`select recipient from public.take_account_link($1)`, [undo])).rows,
+    ).toEqual([{ recipient: 'old@example.com' }]);
+  });
+
+  it('revokes a live token of the same kind for the account when a new one is issued', async () => {
+    const o = await owner('again@example.com');
+    const first = (await issue(o, 'delete_confirm', '4'.repeat(64))).rows[0]!.id;
+    await issue(o, 'delete_confirm', '5'.repeat(64));
+    const { rows } = await db.query<{ revoked: boolean }>(
+      `select revoked_at is not null as revoked from public.account_tokens where id = $1`,
+      [first],
+    );
+    expect(rows[0]!.revoked).toBe(true);
+    expect((await db.query(`select * from public.take_account_link($1)`, [first])).rows).toEqual(
+      [],
+    );
+  });
+
+  it('refuses a raw value newToken() would not make', async () => {
+    const o = await owner('raw@example.com');
+    await expect(
+      db.query(
+        `select public.issue_account_token($1, $2, 'delete_confirm', $3, 'short', now() + interval '1 hour')`,
+        [o.accountId, o.userId, '6'.repeat(64)],
+      ),
+    ).rejects.toThrow(/raw token/);
+  });
+
+  it('leaves no secret behind when an account goes, or when the sweep finds a dead link', async () => {
+    const o = await owner('cascade@example.com');
+    const before = await secrets();
+    await issue(o, 'delete_confirm', '7'.repeat(64));
+    const dead = (await issue(o, 'delete_restore', '8'.repeat(64), `now() + interval '1 second'`))
+      .rows[0]!.id;
+    expect(await secrets()).toBe(before + 2);
+    await db.query(
+      `update public.account_tokens set expires_at = created_at + interval '1 millisecond' where id = $1`,
+      [dead],
+    );
+    expect(
+      (await db.query<{ n: number }>(`select public.sweep_account_links() n`)).rows[0]!.n,
+    ).toBe(1);
+    expect(await secrets()).toBe(before + 1);
+    await db.query(`delete from public.accounts where id = $1`, [o.accountId]);
+    expect(await secrets()).toBe(before);
+  });
+
+  it('grants the client roles nothing on Vault or on the link functions', async () => {
+    const { rows } = await db.query<{ role: string; what: string }>(
+      `select r.role, w.what from (values ('anon'), ('authenticated')) r(role),
+         (values ('vault.secrets'), ('vault.decrypted_secrets')) w(what)
+        where has_table_privilege(r.role, w.what, 'select,insert,update,delete')
+       union all
+       select r.role, f.what from (values ('anon'), ('authenticated')) r(role),
+         (values ('public.issue_account_token(uuid, uuid, text, text, text, timestamptz, text, text)'),
+                 ('public.take_account_link(uuid)'), ('public.sweep_account_links()')) f(what)
+        where has_function_privilege(r.role, f.what, 'execute')`,
+    );
+    expect(rows).toEqual([]);
+  });
+});

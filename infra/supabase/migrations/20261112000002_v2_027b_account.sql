@@ -183,6 +183,123 @@ $$;
 revoke all on function public.end_user_sessions(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.end_user_sessions(uuid, uuid) to service_role;
 
+-- Issues a link: the token row with its hash, and the raw token in a Vault secret until the mailer
+-- takes it. The secret's name carries the token row's id only. A token of the same kind for the same
+-- account that is still live is revoked first, so a second request ends the first link (email
+-- changes are also held to one in flight by account_tokens_one_email_change_uq).
+create or replace function public.issue_account_token(
+  p_account uuid, p_user uuid, p_kind text, p_hash text, p_raw text, p_expires_at timestamptz,
+  p_new_email text default null, p_old_email text default null)
+returns uuid
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v_id uuid;
+begin
+  if p_raw is null or p_raw !~ '^[A-Za-z0-9_-]{43}$' then
+    raise exception 'issue_account_token: the raw token is not one newToken() makes' using errcode = '22023';
+  end if;
+  update public.account_tokens t set revoked_at = now()
+   where t.account_id = p_account and t.kind = p_kind and t.used_at is null and t.revoked_at is null;
+  insert into public.account_tokens (account_id, user_id, kind, token_hash, new_email, old_email, expires_at)
+  values (p_account, p_user, p_kind, p_hash, p_new_email, p_old_email, p_expires_at)
+  returning id into v_id;
+  update public.account_tokens t
+     set link_secret_id = vault.create_secret(p_raw, 'account_link:' || v_id::text, '')
+   where t.id = v_id;
+  return v_id;
+end;
+$$;
+
+-- The mailer's one read of a link (CC-28): the raw token and where it goes, after which the secret is
+-- gone. Null when the token is used, revoked, expired or already taken. The recipient is the new
+-- address for an email_change, the old one for its undo, and the sign-in address otherwise.
+create or replace function public.take_account_link(p_token uuid)
+returns table (kind text, token text, recipient text)
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v public.account_tokens%rowtype;
+begin
+  select * into v from public.account_tokens t where t.id = p_token for update;
+  if not found or v.link_secret_id is null then return; end if;
+  if v.used_at is not null or v.revoked_at is not null or v.expires_at <= now() then
+    delete from vault.secrets s where s.id = v.link_secret_id;
+    update public.account_tokens t set link_secret_id = null where t.id = v.id;
+    return;
+  end if;
+  kind := v.kind;
+  select d.decrypted_secret into token from vault.decrypted_secrets d where d.id = v.link_secret_id;
+  recipient := case v.kind
+                 when 'email_change' then v.new_email
+                 when 'email_change_undo' then v.old_email
+                 else (select u.email from public.users u where u.id = v.user_id)
+               end;
+  delete from vault.secrets s where s.id = v.link_secret_id;
+  update public.account_tokens t set link_secret_id = null where t.id = v.id;
+  return next;
+end;
+$$;
+
+-- A token row that goes (its account's cascade, or the sweep) takes its unsent secret with it. Definer,
+-- because a cascaded delete fires the trigger as the role that deleted the account.
+create or replace function public.account_tokens_drop_secret()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  if old.link_secret_id is not null then
+    delete from vault.secrets s where s.id = old.link_secret_id;
+  end if;
+  return old;
+end;
+$$;
+drop trigger if exists account_tokens_drop_secret on public.account_tokens;
+create trigger account_tokens_drop_secret after delete on public.account_tokens
+  for each row execute function public.account_tokens_drop_secret();
+
+-- Removes the secrets of links that can no longer be used and were never taken. Run by the daily purge.
+create or replace function public.sweep_account_links()
+returns integer
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  v integer;
+begin
+  with stale as (
+    select t.id, t.link_secret_id from public.account_tokens t
+     where t.link_secret_id is not null
+       and (t.used_at is not null or t.revoked_at is not null or t.expires_at <= now())
+       for update
+  ), dropped as (
+    delete from vault.secrets s using stale where s.id = stale.link_secret_id returning s.id
+  ), cleared as (
+    update public.account_tokens t set link_secret_id = null from stale where t.id = stale.id returning t.id
+  )
+  -- A data-modifying CTE runs whether or not the outer query reads it, so `dropped` always runs.
+  select count(*) into v from cleared;
+  return v;
+end;
+$$;
+
+revoke all on function public.issue_account_token(uuid, uuid, text, text, text, timestamptz, text, text)
+  from public, anon, authenticated;
+revoke all on function public.take_account_link(uuid) from public, anon, authenticated;
+revoke all on function public.account_tokens_drop_secret() from public, anon, authenticated;
+revoke all on function public.sweep_account_links() from public, anon, authenticated;
+grant execute on function public.issue_account_token(uuid, uuid, text, text, text, timestamptz, text, text)
+  to service_role;
+grant execute on function public.take_account_link(uuid) to service_role;
+grant execute on function public.sweep_account_links() to service_role;
+
 -- ═══ A: email change (D3) ═════════════════════════════════════════════════════════════════════════
 
 -- ═══ end A ════════════════════════════════════════════════════════════════════════════════════════
