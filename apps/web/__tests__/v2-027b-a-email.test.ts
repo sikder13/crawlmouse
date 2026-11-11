@@ -251,6 +251,70 @@ describe('request_email_change', () => {
   });
 });
 
+/** A second account the person owns (an agency they created), with its active owner seat. */
+async function secondAccount(p: { userId: string; email: string }): Promise<string> {
+  const { rows } = await db.query<{ id: string }>(
+    `insert into public.accounts (kind, state, tier, seat_limit, site_limit, state_history)
+     values ('agency', 'free', 'free', 5, 5, '[{"state":"free","since":"2026-11-01T00:00:00.000Z"}]'::jsonb)
+     returning id`,
+  );
+  const id = rows[0]!.id;
+  await db.query(
+    `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+     values ($1, $2, $3, 'owner', 'active', now())`,
+    [id, p.userId, p.email],
+  );
+  return id;
+}
+
+describe('one email change in flight per person, across the accounts they own (fix round 1, C5)', () => {
+  it('refuses a request from a second account while the first account’s confirmation link is live', async () => {
+    const p = await person();
+    const other = await secondAccount(p);
+    await request(p, 'from-first@example.org');
+    expect(
+      await sqlstate(request({ accountId: other, userId: p.userId }, 'from-second@example.org')),
+    ).toBe('CMA02');
+  });
+
+  it('refuses it while an applied change’s undo link is live on the first account', async () => {
+    const p = await person();
+    const other = await secondAccount(p);
+    const r = await request(p, 'applied-first@example.org');
+    await apply(r.hash);
+    expect(
+      await sqlstate(request({ accountId: other, userId: p.userId }, 'from-second@example.org')),
+    ).toBe('CMA02');
+  });
+
+  it('lets it through once the first account’s request expired unconfirmed, ending its links', async () => {
+    const p = await person();
+    const other = await secondAccount(p);
+    const first = await request(p, 'abandoned-first@example.org');
+    const later = minutes(NOW(), EMAIL_CHANGE_LINK_MINUTES + 1);
+    await db.query(`select public.request_email_change($1, $2, 'second@example.org', $3)`, [
+      other,
+      p.userId,
+      later,
+    ]);
+    expect((await token(first.id)).revoked).toBe(true);
+    expect((await token(first.undoId)).revoked).toBe(true);
+  });
+
+  it('holds the person to one live link of each kind in the index, whichever account it is on', async () => {
+    const p = await person();
+    const other = await secondAccount(p);
+    await request(p, 'indexed@example.org');
+    await expect(
+      db.query(
+        `insert into public.account_tokens (account_id, user_id, kind, new_email, old_email, expires_at)
+         values ($1, $2, 'email_change', 'x@example.org', $3, now() + interval '1 hour')`,
+        [other, p.userId, p.email],
+      ),
+    ).rejects.toThrow(/account_tokens_one_live_email_link_uq/);
+  });
+});
+
 describe('apply_email_change', () => {
   it('moves the profile and the person’s seat, keeps the old address, and issues a seven-day undo link', async () => {
     const p = await person();
