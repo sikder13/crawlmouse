@@ -613,6 +613,25 @@ describe('fix round 2', () => {
 });
 
 describe('read_deletion_link', () => {
+  it('names each account’s subscription status, from the plan the account follows (R3 item 1)', async () => {
+    const o = await owner();
+    const sub = `sub_read${serial}`;
+    await db.query(
+      `insert into public.subscriptions (id, account_id, status, plan, interval) values ($1, $2, 'past_due', 'pro', 'month')`,
+      [sub, o.accountId],
+    );
+    await db.query(`update public.accounts set current_subscription_id = $2 where id = $1`, [
+      o.accountId,
+      sub,
+    ]);
+    const { confirm: raw } = await request(o);
+    const r = await json<{ accounts: Array<{ id: string; subscription: string | null }> }>(
+      `select public.read_deletion_link('delete_confirm', $1, now()) as r`,
+      [hashToken(raw)],
+    );
+    expect(r.accounts.map((a) => [a.id, a.subscription])).toEqual([[o.accountId, 'past_due']]);
+  });
+
   it('shows the accounts and the window without using the link', async () => {
     const o = await owner();
     const { confirm: raw, restore: restoreRaw } = await request(o);
@@ -625,7 +644,7 @@ describe('read_deletion_link', () => {
       ok: true,
       userId: o.userId,
       purgeAfter: null,
-      accounts: [{ id: o.accountId, host: o.host.toLowerCase() }],
+      accounts: [{ id: o.accountId, host: o.host.toLowerCase(), subscription: null }],
     });
     expect((await read('delete_confirm', restoreRaw)).code).toBe('invalid_link');
     expect((await read('delete_restore', restoreRaw)).code).toBe('not_confirmed');

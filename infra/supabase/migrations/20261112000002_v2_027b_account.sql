@@ -1257,9 +1257,10 @@ $$;
 -- What a deletion link's page shows, without using the link: {ok: false, code} with `invalid_link`
 -- (no such token of that kind, or used, revoked or expired), `not_confirmed` (a restore link before its
 -- deletion was confirmed) or `window_closed` (a restore link after its window); otherwise {ok: true,
--- userId, accounts: [{id, host}], purgeAfter}: for a confirmation link, the accounts the confirm would mark,
+-- userId, accounts: [{id, host, subscription}], purgeAfter}: for a confirmation link, the accounts the confirm would mark,
 -- and for a restore link, those its confirm marked (purgeAfter null for a confirmation link). `host` is
--- deletion_hostname's, so the sign-in address for an account with no site.
+-- deletion_hostname's, so the sign-in address for an account with no site. `subscription` is the
+-- status of the plan the account follows (its mirror row), or null: the page's money sentence.
 create or replace function public.read_deletion_link(p_kind text, p_hash text, p_now timestamptz)
 returns jsonb
 language plpgsql
@@ -1295,7 +1296,11 @@ begin
     'userId', v.user_id,
     'purgeAfter', v_purge,
     'accounts', coalesce((select jsonb_agg(jsonb_build_object(
-                                   'id', a.id, 'host', public.deletion_hostname(a.id, v.user_id))
+                                   'id', a.id, 'host', public.deletion_hostname(a.id, v.user_id),
+                                   'subscription', (select sb.status from public.accounts ac
+                                                      join public.subscriptions sb
+                                                        on sb.id = ac.current_subscription_id
+                                                     where ac.id = a.id))
                                  order by a.id::text)
                             from unnest(v_accounts) a(id)), '[]'));
 end;

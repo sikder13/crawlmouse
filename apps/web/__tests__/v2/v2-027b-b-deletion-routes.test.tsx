@@ -11,7 +11,12 @@ import {
 } from '../../lib/v2/account/deletion-link';
 import { LINK_FLOWS } from '../../lib/v2/account/link-cookie';
 import { newToken } from '../../lib/v2/account/tokens';
-import { DELETE_COPY, REFUND_POLICY, RESTORE_COPY } from '../../lib/v2/copy/deletion';
+import {
+  DELETE_COPY,
+  deletionMoney,
+  REFUND_POLICY,
+  RESTORE_COPY,
+} from '../../lib/v2/copy/deletion';
 
 vi.mock('server-only', () => ({}));
 
@@ -136,7 +141,7 @@ describe('the pages', () => {
   const view = {
     ok: true as const,
     purgeAfter: '2026-11-17T10:00:00.000Z',
-    accounts: [{ id: 'a1', host: 'shop.example' }],
+    accounts: [{ id: 'a1', host: 'shop.example', subscription: 'active' }],
   };
 
   it('the delete page names the accounts, posts no field to its API route, and says the published refund policy', () => {
@@ -153,6 +158,48 @@ describe('the pages', () => {
       renderToStaticMarkup(<>{DELETE_COPY.money[1]}</>),
     );
     expect(html).toContain(renderToStaticMarkup(<>{REFUND_POLICY}</>));
+  });
+
+  it('says each account’s money sentence against that account, from its plan’s state (R3 item 1)', () => {
+    const html = renderToStaticMarkup(
+      <DeletionScreen
+        flow="deleteConfirm"
+        view={{
+          ok: true,
+          purgeAfter: null,
+          accounts: [
+            { id: 'acc-active', host: 'active.example', subscription: 'active' },
+            { id: 'acc-late', host: 'late.example', subscription: 'past_due' },
+            { id: 'acc-none', host: 'none.example', subscription: null },
+            { id: 'acc-ended', host: 'ended.example', subscription: 'canceled' },
+          ],
+        }}
+      />,
+    );
+    const item = (id: string) => {
+      const m = new RegExp(`<li[^>]*data-account="${id}"[^>]*>([\\s\\S]*?)</li>`).exec(html);
+      expect(m, id).not.toBeNull();
+      return m![1]!;
+    };
+    const html1 = (line: string) => renderToStaticMarkup(<>{line}</>);
+    const [ends] = deletionMoney('active')!;
+    const [failed] = deletionMoney('past_due')!;
+    expect(ends).not.toBe(failed);
+    const refund = html1(REFUND_POLICY);
+    expect(item('acc-active')).toContain(html1(ends!));
+    expect(item('acc-active')).toContain(refund);
+    expect(item('acc-active')).not.toContain(html1(failed!));
+    expect(item('acc-late')).toContain(html1(failed!));
+    expect(item('acc-late')).toContain(refund);
+    expect(item('acc-late')).not.toContain(html1(ends!));
+    for (const id of ['acc-none', 'acc-ended']) {
+      expect(item(id)).not.toContain(html1(ends!));
+      expect(item(id)).not.toContain(html1(failed!));
+      expect(item(id)).not.toContain(refund);
+    }
+    // Each plan sentence is said once, against its account, not for the page as a whole.
+    expect(html.split(html1(ends!)).length - 1).toBe(1);
+    expect(html.split(html1(failed!)).length - 1).toBe(1);
   });
 
   it('the refund sentence is the Terms page’s own', () => {
