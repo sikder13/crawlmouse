@@ -32,7 +32,13 @@ export const PLATFORM_SHIM = `
   create role service_role bypassrls;
   create schema if not exists auth;
   grant usage on schema auth to anon, authenticated, service_role;
-  create table if not exists auth.users (id uuid primary key, email text);
+  -- created_at and banned_until: 027b's email undo reads them (Q10's conditions).
+  create table if not exists auth.users (
+    id uuid primary key,
+    email text,
+    created_at timestamptz not null default now(),
+    banned_until timestamptz
+  );
   create or replace function auth.uid() returns uuid language sql stable as $shim$
     select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
   $shim$;

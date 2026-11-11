@@ -20,16 +20,11 @@ import { personalAccount, signUp } from './helpers/v2-check-tables';
 const MIGRATION = '20261112000002_v2_027b_account.sql';
 const ROLLBACK = '20261112000002_v2_027b_account.revert.sql';
 
-/** Supabase's auth.users has both columns; the shared shim leaves them out, and the undo reads them. */
-const AUTH_CREATED_AT = `alter table auth.users add column created_at timestamptz not null default now(),
-                                             add column banned_until timestamptz;`;
-
 let db: PGlite;
 
 // Applying every migration to a fresh PGlite takes several seconds, more under a parallel run.
 beforeAll(async () => {
   db = await freshDb();
-  await db.exec(AUTH_CREATED_AT);
   await applyAllMigrations(db);
 }, 120_000);
 afterAll(async () => db.close());
@@ -546,7 +541,6 @@ describe('the file', () => {
   it('applies twice, and its rollback removes section A’s functions', async () => {
     const twice = await freshDb();
     try {
-      await twice.exec(AUTH_CREATED_AT);
       await applyAllMigrations(twice);
       await twice.exec(readMigration(MIGRATION));
       await twice.exec(readRollback(ROLLBACK));
