@@ -46,14 +46,14 @@ describe.each<[string, (db: PGlite) => StartStore]>([
   });
 
   it('reads neither row before a start', async () => {
-    expect(await store.derived(SITE, CHECK)).toEqual({ checkExists: false, siteKept: false });
+    expect(await store.derived(SITE, CHECK)).toEqual({ checkStatus: null, siteKept: false });
   });
 
   it('reads the site without its check, then both', async () => {
     await store.insertUnkeptSite(SITE, 'example.com');
-    expect(await store.derived(SITE, CHECK)).toEqual({ checkExists: false, siteKept: false });
+    expect(await store.derived(SITE, CHECK)).toEqual({ checkStatus: null, siteKept: false });
     await queueCheck(db);
-    expect(await store.derived(SITE, CHECK)).toEqual({ checkExists: true, siteKept: false });
+    expect(await store.derived(SITE, CHECK)).toEqual({ checkStatus: 'queued', siteKept: false });
   });
 
   it('reads a site an account has taken as kept', async () => {
@@ -61,6 +61,8 @@ describe.each<[string, (db: PGlite) => StartStore]>([
     await queueCheck(db);
     const account = await accountOf(db, await signUp(db, 'owner@example.org'));
     await db.query(`update public.sites set account_id = $2 where id = $1`, [SITE, account.id]);
-    expect(await store.derived(SITE, CHECK)).toEqual({ checkExists: true, siteKept: true });
+    expect(await store.derived(SITE, CHECK)).toEqual({ checkStatus: 'queued', siteKept: true });
+    await db.query(`select public.fail_check($1::uuid, 'canceled', null)`, [CHECK]);
+    expect(await store.derived(SITE, CHECK)).toEqual({ checkStatus: 'failed', siteKept: true });
   });
 });

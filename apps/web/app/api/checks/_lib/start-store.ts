@@ -5,10 +5,11 @@
  * twin for PGlite, and `start-store.test.ts` runs one set of cases against both.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Check } from '@crawlmouse/types/v2';
 
 export interface DerivedRows {
-  /** A check with the derived check id exists, in any state. */
-  checkExists: boolean;
+  /** The status of the check with the derived check id; null when there is none. */
+  checkStatus: Check['status'] | null;
   /** The derived site exists and an account keeps it. */
   siteKept: boolean;
 }
@@ -22,12 +23,12 @@ export interface StartStore {
 export function supabaseStartStore(sb: SupabaseClient): StartStore {
   return {
     async derived(siteId, checkId) {
-      const check = await sb.from('checks').select('id').eq('id', checkId).maybeSingle();
+      const check = await sb.from('checks').select('status').eq('id', checkId).maybeSingle();
       if (check.error) throw new Error(`start store: read check: ${check.error.message}`);
       const site = await sb.from('sites').select('account_id').eq('id', siteId).maybeSingle();
       if (site.error) throw new Error(`start store: read site: ${site.error.message}`);
       return {
-        checkExists: check.data !== null,
+        checkStatus: check.data === null ? null : (check.data.status as Check['status']),
         siteKept: site.data !== null && site.data.account_id !== null,
       };
     },

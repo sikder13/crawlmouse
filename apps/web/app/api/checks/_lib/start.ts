@@ -3,8 +3,11 @@
  *
  * 1. The host, by sign-up's rule (`publicHost`), then the SSRF guard on `https://{host}/`. A refusal
  *    answers one fixed body; the guard's own message names the address a host resolved to.
- * 2. The rows the request's derived ids name. A check that exists is answered as it is, in any
- *    state and whoever keeps it: no bucket is counted and the pipeline is not called.
+ * 2. The rows the request's derived ids name. A check that exists is answered as it is, whoever
+ *    keeps it, and no bucket is counted. While it is still queued on a site no account keeps,
+ *    `requestCheck` is called again first: the insert finds the row and the event goes out under the
+ *    same id, so a retry after a send that failed starts the run, and Inngest drops the event when
+ *    the first one arrived. In any other state the pipeline is not called.
  * 3. The day's ceiling, then the caller's address (with Turnstile once it is over its limit), then
  *    the domain: v1's order, so a refused request does not count against a later bucket.
  * 4. The site no account keeps, then `requestCheck` with the derived check id as its fresh id.
@@ -78,7 +81,12 @@ export async function startPublicCheck(deps: StartDeps, input: StartInput): Prom
   const siteId = publicSiteId(requestId, host);
   const checkId = publicCheckId(requestId, host);
   const derived = await deps.store.derived(siteId, checkId);
-  if (derived.checkExists) return { ok: true, checkId, created: false };
+  const request = () =>
+    requestCheck({ ...deps.pipeline, newId: () => checkId }, { siteId, trigger: 'first_audit' });
+  if (derived.checkStatus !== null) {
+    if (derived.checkStatus === 'queued' && !derived.siteKept) await request();
+    return { ok: true, checkId, created: false };
+  }
   if (derived.siteKept) {
     return refuse(409, 'request_spent', 'This request was already used. Start a new audit.');
   }
@@ -119,10 +127,7 @@ export async function startPublicCheck(deps: StartDeps, input: StartInput): Prom
   }
 
   await deps.store.insertUnkeptSite(siteId, host);
-  const { created } = await requestCheck(
-    { ...deps.pipeline, newId: () => checkId },
-    { siteId, trigger: 'first_audit' },
-  );
+  const { created } = await request();
   return { ok: true, checkId, created };
 }
 

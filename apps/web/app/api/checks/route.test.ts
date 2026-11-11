@@ -194,11 +194,30 @@ describe('POST /api/checks, a start', () => {
     expect(sent).toHaveLength(1);
   });
 
-  it('the same request again answers the same check and starts nothing', async () => {
+  it('the same request again answers the same check, with no second row', async () => {
     await POST(post(VALID));
     expect(await read(await POST(post(VALID)))).toEqual({ status: 200, body: { checkId: CHECK } });
     expect(await counts()).toEqual({ sites: 1, checks: 1 });
+    expect(new Set((sent as Array<{ id: string }>).map((e) => e.id))).toEqual(
+      new Set([`check:anon:${CHECK}`]),
+    );
+  });
+
+  it('a retry after a send that failed is a 200 that sends the event, and no `check_started`', async () => {
+    h.deps = deps({
+      pipeline: {
+        ...deps().pipeline,
+        send: async () => {
+          throw new Error('event service down');
+        },
+      },
+    });
+    expect((await POST(post(VALID))).status).toBe(500);
+    h.deps = deps();
+    expect(await read(await POST(post(VALID)))).toEqual({ status: 200, body: { checkId: CHECK } });
     expect(sent).toHaveLength(1);
+    expect(await counts()).toEqual({ sites: 1, checks: 1 });
+    expect(captured).toEqual([]);
   });
 
   it('a refusal is answered with its status and body', async () => {

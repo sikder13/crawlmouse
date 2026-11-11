@@ -404,7 +404,9 @@ describe('the limits, counted in the database', () => {
 });
 
 describe('a start that is sent again', () => {
-  it('answers the same check: one site, one check, one event, and no bucket counted twice', async () => {
+  const EVENT = `check:anon:${CHECK}`;
+
+  it('while the check is queued: the same check, the same event id again, one row, no bucket counted', async () => {
     const h = harness(db);
     const first = await h.start();
     const counted = await buckets(db);
@@ -413,10 +415,11 @@ describe('a start that is sent again', () => {
     expect(again).toEqual({ ok: true, checkId: CHECK, created: false });
     expect(await rowsOf(db)).toEqual({ sites: 1, checks: 1, rateLimits: 3 });
     expect(await buckets(db)).toEqual(counted);
-    expect(h.sent.map((e) => e.id)).toEqual([`check:anon:${CHECK}`]);
+    expect(h.sent.map((e) => e.id)).toEqual([EVENT, EVENT]);
+    expect(h.sent[1]).toEqual(h.sent[0]);
   });
 
-  it('stops at the derived rows: no limit is asked and the pipeline is not called', async () => {
+  it('while the check is queued: asks no limit, and calls the pipeline for the event', async () => {
     const h = harness(db);
     await h.start();
     const trace: string[] = [];
@@ -425,23 +428,65 @@ describe('a start that is sent again', () => {
       requestId: REQUEST.toUpperCase(),
       ip: IP,
     });
-    expect(trace).toEqual(['admit', 'derived']);
+    expect(trace).toEqual(['admit', 'derived', 'requestSite', 'insertQueued', 'send']);
   });
 
+  it('after a send that failed: the retry sends the event once, with no second row or bucket count', async () => {
+    const failing = harness(db);
+    failing.deps.pipeline.send = async () => {
+      throw new Error('event service down');
+    };
+    await expect(failing.start()).rejects.toThrow('event service down');
+    expect((await db.query('select id, status from public.checks')).rows).toEqual([
+      { id: CHECK, status: 'queued' },
+    ]);
+    const counted = await buckets(db);
+
+    const h = harness(db);
+    expect(await h.start()).toEqual({ ok: true, checkId: CHECK, created: false });
+    expect(h.sent.map((e) => e.id)).toEqual([EVENT]);
+    expect(await rowsOf(db)).toEqual({ sites: 1, checks: 1, rateLimits: 3 });
+    expect(await buckets(db)).toEqual(counted);
+  });
+
+  const ENDED = `started_at = queued_at, finished_at = now(), coverage = '{}'::jsonb,
+                 lineage_id = gen_random_uuid()`;
+  // The start reads the check's status alone, so an ended check is written here without the
+  // lineage row a real one refers to.
+  const ended = async (set: string) => {
+    await db.query('alter table public.checks drop constraint checks_lineage_id_fkey');
+    await db.query(`update public.checks set ${set}`);
+  };
   it.each<[string, (store: ReturnType<typeof sqlPipelineStore>) => Promise<unknown>]>([
     ['is running', (store) => store.claim(CHECK, 'run-1', null)],
     ['was canceled', (store) => store.fail(CHECK, 'canceled', null)],
-    ['has expired', () => db.query(`update public.checks set expires_at = '2026-11-01'`)],
-  ])('answers the same check when it %s', async (_, change) => {
+    ['ended partial', () => ended(`status = 'partial', ${ENDED}`)],
+    [
+      'has finished',
+      () =>
+        ended(
+          `status = 'finished', ${ENDED}, technical_seo = '{"refusal": {"refused": true}}'::jsonb,
+           ai_readability = '{"withheld": true}'::jsonb`,
+        ),
+    ],
+  ])('when the check %s: the same check, nothing sent, no pipeline call', async (_, change) => {
     const h = harness(db);
     await h.start();
     await change(sqlPipelineStore(db));
-    expect(await h.start()).toEqual({ ok: true, checkId: CHECK, created: false });
+    const trace: string[] = [];
+    expect(
+      await startPublicCheck(traced(h.deps, trace), {
+        url: 'https://example.com/',
+        requestId: REQUEST,
+        ip: IP,
+      }),
+    ).toEqual({ ok: true, checkId: CHECK, created: false });
+    expect(trace).toEqual(['admit', 'derived']);
     expect(h.sent).toHaveLength(1);
     expect(await rowsOf(db)).toEqual({ sites: 1, checks: 1, rateLimits: 3 });
   });
 
-  it('answers the same check after an account has kept it, and sends the pipeline nothing', async () => {
+  it('a queued check an account has kept: the same check, and the pipeline is sent nothing', async () => {
     const h = harness(db);
     await h.start();
     const account = await accountOf(db, await signUp(db, 'owner@example.org'));
@@ -459,7 +504,7 @@ describe('a start that is sent again', () => {
     expect(await rowsOf(db)).toEqual(expect.objectContaining({ sites: 0, checks: 0 }));
     expect(await h.start()).toEqual({ ok: true, checkId: CHECK, created: true });
     expect(await rowsOf(db)).toEqual(expect.objectContaining({ sites: 1, checks: 1 }));
-    expect(h.sent.map((e) => e.id)).toEqual([`check:anon:${CHECK}`, `check:anon:${CHECK}`]);
+    expect(h.sent.map((e) => e.id)).toEqual([EVENT, EVENT]);
   });
 
   it('queues the check when only the site row was written the first time', async () => {
@@ -467,17 +512,6 @@ describe('a start that is sent again', () => {
     const h = harness(db);
     expect(await h.start()).toEqual({ ok: true, checkId: CHECK, created: true });
     expect(await rowsOf(db)).toEqual(expect.objectContaining({ sites: 1, checks: 1 }));
-  });
-
-  it('after a send that failed, answers the queued check and sends nothing', async () => {
-    const failing = harness(db);
-    failing.deps.pipeline.send = async () => {
-      throw new Error('event service down');
-    };
-    await expect(failing.start()).rejects.toThrow('event service down');
-    const h = harness(db);
-    expect(await h.start()).toEqual({ ok: true, checkId: CHECK, created: false });
-    expect(h.sent).toEqual([]);
   });
 
   it('refuses when an account keeps the derived site and the derived check is gone', async () => {
