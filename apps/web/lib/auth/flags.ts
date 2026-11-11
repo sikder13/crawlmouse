@@ -29,6 +29,8 @@ export function pipelineEnabled(env: Env = process.env): boolean {
  * link is opened, that a kept site is re-checked, and that change notes come from alerts@. Those
  * sentences are true only once requestCheck is called from the claim route and Sign-up, checks are
  * scheduled, and CC-28 sends from alerts@; the flag stays off until then.
+ * It also gives the claim its one-transaction commit with the evidence move, and, with V2_PIPELINE=1,
+ * gives the claim and the first-login hook the first-audit request (door-deps.ts, CC-22b D7).
  */
 export function checksPublicEnabled(env: Env = process.env): boolean {
   return env.V2_CHECKS_PUBLIC?.trim() === '1';

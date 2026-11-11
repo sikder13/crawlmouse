@@ -4,14 +4,8 @@
  * the changes it found. A change is reported as first observed at a check, after what we found
  * with it, never as caused by it: a check sees that something differs, not why.
  */
-import type {
-  Change,
-  Check,
-  EvidenceClass,
-  FixtureDataset,
-  GradeName,
-  Verdict,
-} from '@crawlmouse/types/v2';
+import type { Change, Check, EvidenceClass, GradeName, Verdict } from '@crawlmouse/types/v2';
+import type { ViewDataset } from '../../fixtures';
 
 type ChangeKind = Change['kind'];
 type ChangeSubject = Change['subject'];
@@ -54,7 +48,8 @@ export interface ChangesView {
   rows: ChangeRowView[];
   /** What a change looks like, for a first audit: an example, not this site's data. */
   example: ChangeRowView[] | null;
-  history: { key: string; when: string; label: string }[];
+  /** Each audit of the site so far; `href` is its result page, where the page has a route for it. */
+  history: { key: string; when: string; label: string; href?: string }[];
   historyNote: string | null;
   coverage: { read: string };
   keep: { title: string; sub: string } | null;
@@ -142,7 +137,7 @@ const EXAMPLE: ChangeRowView[] = [
 ];
 
 /** The account's clock, or UTC for an audit nobody has kept. */
-function clockOf(d: FixtureDataset, check: Check) {
+function clockOf(d: ViewDataset, check: Check) {
   const account = d.accounts.find((a) => a.id === siteOf(d, check).account_id);
   return (ts: string) =>
     account ? weekdayTime(ts, account.timezone) : `${weekdayTime(ts, 'UTC')} UTC`;
@@ -200,7 +195,7 @@ function historyLabel(c: Check): string {
 }
 
 /** The site's graded checks up to and including this one, newest first. */
-function auditsUpTo(d: FixtureDataset, check: Check): Check[] {
+function auditsUpTo(d: ViewDataset, check: Check): Check[] {
   const at = Date.parse(check.queued_at);
   return d.checks
     .filter(
@@ -213,7 +208,7 @@ function auditsUpTo(d: FixtureDataset, check: Check): Check[] {
 }
 
 /** "weekly, Fri around 06:00" (FACTS H4), or null when nothing re-checks the site. */
-function scheduleOf(d: FixtureDataset, check: Check, kept: boolean): string | null {
+function scheduleOf(d: ViewDataset, check: Check, kept: boolean): string | null {
   const s = siteOf(d, check).schedule;
   if (!kept || !s) return null;
   if (s.cadence === 'on_deploy') return 'on each deploy';
@@ -221,7 +216,7 @@ function scheduleOf(d: FixtureDataset, check: Check, kept: boolean): string | nu
 }
 
 export function changesView(
-  d: FixtureDataset,
+  d: ViewDataset,
   checkId: string,
   options: SegmentOptions = {},
 ): ChangesView {
@@ -234,6 +229,7 @@ export function changesView(
     key: c.id,
     when: dateTimeUtc(c.finished_at!),
     label: historyLabel(c),
+    ...(options.hrefs?.check ? { href: options.hrefs.check(c.id) } : {}),
   }));
   const next = scheduleOf(d, check, kept);
   const tiles = (middle: ChangesView['tiles'][number]) => [
@@ -270,7 +266,11 @@ export function changesView(
       history,
       historyNote: kept
         ? null
-        : 'The second row appears after the next check. "Re-run, free" in the header runs one now, without an account, but it replaces this audit rather than comparing with it.',
+        : `The second row appears after the next check.${
+            options.rerun === false
+              ? ''
+              : ' "Re-run, free" in the header runs one now, without an account, but it replaces this audit rather than comparing with it.'
+          }`,
       coverage: { read: 'No earlier audit of this site to compare with' },
       keep: kept
         ? null
@@ -283,7 +283,7 @@ export function changesView(
   }
 
   const rows = d.changes.filter((c) => c.check_id === check.id).map((c) => rowOf(c, check, at));
-  const previous = findCheck(d, check.previous_check_id);
+  const previous = d.checks.find((c) => c.id === check.previous_check_id);
   const when = at(check.finished_at!);
   return {
     frame,
@@ -307,7 +307,7 @@ export function changesView(
     history,
     historyNote: null,
     coverage: {
-      read: previous.finished_at
+      read: previous?.finished_at
         ? `Compared with the check of ${dateTimeUtc(previous.finished_at)}`
         : 'Compared with the check before it',
     },

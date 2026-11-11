@@ -1,6 +1,7 @@
 import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
+import { hasPacketToCopy } from '../../../../lib/v2/view/no-packet';
 import type { ContentView } from '../../../../lib/v2/view/segment/content';
 import { ContentGrid } from './ContentGrid';
 import { SectionFixes, VerdictCard } from './SegmentParts';
@@ -16,7 +17,7 @@ import styles from './SegmentScreen.module.css';
 export function ContentScreen({ data }: { data: ContentView }) {
   const { frame, headline } = data;
   return (
-    <SegmentShell frame={frame} keep={data.keep} nextPrimary={data.fixes.open.length === 0}>
+    <SegmentShell frame={frame} keep={data.keep} nextPrimary={!hasPacketToCopy(data.fixes)}>
       <VerdictCard
         title={headline.title}
         pill={headline.pill}

@@ -93,7 +93,7 @@ const INVENTORY: [entry: string, why: string][] = [
     'STRING slice of our own notice copy (`NOTICE_LINES`, CC-26b), never crawled text: its first character is ASCII, so the cut after it cannot split a surrogate pair.',
   ],
   [
-    "apps/web/lib/v2/rewrites.ts :: path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;",
+    "apps/web/lib/v2/rewrites.ts :: path.length > 2 && path.endsWith('/') ? path.slice(0, -1) : path;",
     'STRING slice of a request path in the middleware, to drop one trailing ASCII `/` before matching `V2_REWRITES` (CC-26b). Not crawled text, never persisted or rendered.',
   ],
   [
@@ -118,6 +118,11 @@ const INVENTORY: [entry: string, why: string][] = [
     'packages/engine/src/v2/build/record.ts :: const top = ranks.slice(0, hubs).reduce((n, v) => n + v, 0);',
     "ARRAY slice of PageRank numbers, sorted high to low: v1's top hub tier, summed for Check.structure " +
       '(CC-20a). No string is indexed.',
+  ],
+  [
+    "apps/web/lib/v2/pipeline/expire.ts :: error: cause instanceof Error ? cause.message.slice(0, 200) : 'not an Error',",
+    'NOT A CUT of crawled text. The message of an error thrown by the evidence store or the database ' +
+      'when the expiry could not delete a site, bounded for the report line. It holds no page text.',
   ],
   [
     'apps/web/lib/v2/pipeline/load.ts :: const chunk = values.slice(i, i + VALUES_PER_REQUEST);',

@@ -62,6 +62,8 @@ export type CheckFailed = { checkId: string; siteId: string; reason: FailureReas
 
 export type CheckCancelRequested = { checkId: string };
 
+export type CheckNotifyRequested = { checkId: string; siteId: string };
+
 /**
  * The ids check.failed and check.finished are sent with: one of each per check, so a second send of
  * either (a retried step, or two handlers failing the same check) starts no second run of what they

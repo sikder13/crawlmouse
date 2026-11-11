@@ -10,10 +10,11 @@
  * A target has no address of its own, by two checks. The middleware answers 404 to a request it
  * sees for a target in any spelling it can read (a rewrite it makes does not pass through it again).
  * And it removes `REWRITE_HEADER` from the requests it forwards and sets it only on its own rewrite,
- * so a target page that answers 404 without the header (`reachedByRewrite`) is not served by a
- * spelling the first check missed. The first is pinned in `middleware.test.ts`; the second in
- * `middleware.test.ts` (the marker), `rewrite-target.test.ts` (the reader) and the target page's
- * own test.
+ * so a target page rendered per request that answers 404 without the header (`reachedByRewrite`)
+ * is not served by a spelling the first check missed: `/dashboard/v2` does. A prerendered target
+ * cannot read a request header, so `/v2-home` (prerendered, CC-22b) has the first check only. The
+ * first is pinned in `middleware.test.ts`; the second in `middleware.test.ts` (the marker),
+ * `rewrite-target.test.ts` (the reader) and `app/dashboard/v2/page.test.tsx`.
  */
 
 export interface V2Rewrite {
@@ -23,13 +24,20 @@ export interface V2Rewrite {
   to: string;
 }
 
-export const V2_REWRITES: readonly V2Rewrite[] = [{ from: '/dashboard', to: '/dashboard/v2' }];
+export const V2_REWRITES: readonly V2Rewrite[] = [
+  // CC-22b: the v2 home. app/page.tsx stays main's file; a flag branch in it linked v2's stylesheets
+  // on the flag-off home (measured by CC-22b on 2026-11-10).
+  { from: '/', to: '/v2-home' },
+  // CC-26b: the signed-in dashboard.
+  { from: '/dashboard', to: '/dashboard/v2' },
+];
 
 /** Set by the middleware on its own rewrite; removed from every request it forwards otherwise. */
 export const REWRITE_HEADER = 'x-crawlmouse-v2-rewrite';
 
+/** `path` without one trailing slash; `/` and `//` keep theirs, so neither is read as the other. */
 const withoutSlash = (path: string): string =>
-  path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
+  path.length > 2 && path.endsWith('/') ? path.slice(0, -1) : path;
 
 /**
  * The spellings a request path can reach a page by: as sent, and percent-decoded, which is how

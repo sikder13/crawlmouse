@@ -3,14 +3,9 @@
  * the HTML the server sends, template by template, and the two responses behind each page the
  * check kept (the untagged control fetch, and the rendering browser's).
  */
-import type {
-  AccessTest,
-  Check,
-  FixSection,
-  FixtureDataset,
-  PageResult,
-} from '@crawlmouse/types/v2';
+import type { AccessTest, Check, FixSection, PageResult } from '@crawlmouse/types/v2';
 import { findCheck } from '../../fixtures';
+import { AI_WAITING } from '../effect-headline';
 import { listOf, percent, templateNoun, testedAt, timeOfDay } from '../../format';
 import {
   EDGE_SENTENCE,
@@ -20,9 +15,10 @@ import {
   meetsEdge,
 } from '../../sentences';
 import { capitalise, count, numberWord, plural } from '../../words';
-import type { CoverageView, DoorView } from '../result';
+import { sampledCoverage, type CoverageView, type DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
 import { SEGMENTS, segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
+import type { ViewDataset } from '../../fixtures';
 
 export interface NoJsEvidence {
   title: string;
@@ -202,17 +198,74 @@ function fixesNote(fixes: SectionFixesView): string | null {
   }.`;
 }
 
-export function nojsView(
-  d: FixtureDataset,
-  checkId: string,
-  options: SegmentOptions = {},
+/**
+ * The page of a check with no site-wide share (`without_js` null). What it says of the pages is
+ * counted from the check's page rows; what it says of AI readability is read from the grade.
+ */
+function notMeasured(
+  d: ViewDataset,
+  check: Check,
+  coverage: NonNullable<Check['coverage']>,
+  frame: SegmentFrame,
+  options: SegmentOptions,
 ): NoJsView {
+  const fixes = sectionFixes(d, check, 'without_js', options.plan);
+  const measured = d.page_results.filter((p) => p.check_id === check.id && p.without_js);
+  const n = measured.length;
+  const pages = `${capitalise(numberWord(n))} ${plural(n, 'page', 'pages')}`;
+  const record =
+    n === 0
+      ? 'No page in this audit’s record has its text measured without JavaScript, so there is no share to show.'
+      : `${pages} in this audit’s record ${plural(n, 'has its', 'have their')} text measured without JavaScript, but the audit recorded no site-wide share, so there is none to show.`;
+  const aiWaits = check.ai_readability?.withheld_reasons.includes('readable_unmeasured');
+  return {
+    frame,
+    headline: {
+      title: 'Text without JavaScript was not measured in this audit.',
+      pill: { state: 'neutral', label: 'not measured' },
+      body: aiWaits ? `${record} ${AI_WAITING.readable_unmeasured}.` : record,
+    },
+    tiles: [
+      {
+        label: 'Pages measured',
+        value: `${count(n)} of ${count(coverage.pages_discovered)}`,
+        note: null,
+      },
+    ],
+    measuredSet:
+      n === 0
+        ? 'No page was measured without JavaScript.'
+        : `${pages} measured without JavaScript; no site-wide share was recorded.`,
+    recordLine: null,
+    proLabel: 'CSV with Pro',
+    rows: [],
+    initial: null,
+    missing: 'The audit kept no response for this page.',
+    coverage: {
+      tested: n,
+      total: coverage.pages_discovered,
+      groups: new Set(measured.map((p) => p.template_key)).size,
+    },
+    fixes,
+    fixesNote: fixesNote(fixes),
+    keep: frame.keptUntil
+      ? {
+          title:
+            'Keep this audit: an email when a template stops shipping its text, and every fix for 14 days.',
+          sub: `One email creates a free account that re-checks monthly, with 14 days of Pro to start, including CSV and PDF export. Otherwise this page expires ${frame.keptUntil}.`,
+        }
+      : null,
+  };
+}
+
+export function nojsView(d: ViewDataset, checkId: string, options: SegmentOptions = {}): NoJsView {
   const check = findCheck(d, checkId);
   const coverage = check.coverage;
-  if (!coverage || !check.without_js) {
-    throw new Error(`Check ${check.id} was not measured without JavaScript`);
+  if (!coverage) {
+    throw new Error(`Check ${check.id} has no coverage; the segments show graded checks`);
   }
   const frame = segmentFrame(d, checkId, 'nojs', options);
+  if (!check.without_js) return notMeasured(d, check, coverage, frame, options);
   const templates = coverage.templates;
   const order = (k: string) => templates.findIndex((t) => t.template_key === k);
   const measured = d.page_results
@@ -251,7 +304,7 @@ export function nojsView(
   const withheld = d.withheld.find(
     (w) => w.check_id === check.id && w.collection === 'access_tests',
   );
-  const fixes = sectionFixes(d, check, 'without_js');
+  const fixes = sectionFixes(d, check, 'without_js', options.plan);
   return {
     frame,
     headline: {
@@ -305,11 +358,7 @@ export function nojsView(
     missing: withheld
       ? `This record holds ${count(withheld.included)} of the ${count(withheld.total)} responses the audit kept, and this page’s are not among them.`
       : 'The audit kept no response for this page.',
-    coverage: {
-      tested: coverage.pages_sampled,
-      total: coverage.pages_discovered,
-      groups: templates.length,
-    },
+    coverage: sampledCoverage(d, check),
     fixes,
     fixesNote: fixesNote(fixes),
     keep: frame.keptUntil

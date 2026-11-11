@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { isRewriteTarget, rewriteOf, V2_REWRITES } from './rewrites';
 
 describe('V2_REWRITES', () => {
-  it('rewrites /dashboard, with or without its trailing slash, and nothing else', () => {
+  it('rewrites / and /dashboard (with or without its trailing slash), and nothing else', () => {
+    expect(rewriteOf('/')).toEqual({ from: '/', to: '/v2-home' });
     expect(rewriteOf('/dashboard')).toEqual({ from: '/dashboard', to: '/dashboard/v2' });
     expect(rewriteOf('/dashboard/')).toEqual({ from: '/dashboard', to: '/dashboard/v2' });
-    for (const p of ['/', '/dashboard/v2', '/dashboard/x', '/dashboards', '/Dashboard'])
+    for (const p of ['//', '/index', '/dashboard/v2', '/dashboard/x', '/dashboards', '/Dashboard'])
       expect(rewriteOf(p)).toBeNull();
   });
 
@@ -29,9 +30,13 @@ describe('V2_REWRITES', () => {
       '/dashboard/v2/x',
       '/dashboard/v2.rsc',
       '/dashboard/%76%32.rsc',
+      '/v2-home',
+      '/v2-home/',
+      '/v%32-home',
+      '/v2-home.rsc',
     ])
       expect(isRewriteTarget(p)).toBe(true);
-    for (const p of ['/dashboard', '/dashboard/x', '/', '/dashboards/v2'])
+    for (const p of ['/dashboard', '/dashboard/x', '/', '//', '/dashboards/v2', '/v2-home-extra'])
       expect(isRewriteTarget(p)).toBe(false);
   });
 

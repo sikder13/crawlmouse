@@ -49,10 +49,18 @@ export const FUNNEL_EVENTS = [
   // login starts the no-card Pro trial, `site_added {n}` when it attaches the named first site.
   'trial_started',
   'site_added',
-  // CC-26b — the signed-in product (ARCH-2 §8). Sent from the server (lib/v2/account/events.ts):
-  // `check_started {trigger, check_ref}` when a re-check or a first check is queued, `fix_marked_done {type}`,
-  // and `fix_closed {type, checksToClose}` when a check verifies a fix.
+  // CC-22b — the public check flow. `check_started` and `check_finished` are sent from the server
+  // (app/api/checks/_lib/events.ts); the other four go through track(), so a visitor's consent
+  // decision applies.
+  'home_viewed',
   'check_started',
+  'check_finished',
+  'result_viewed',
+  'fix_opened',
+  'keep_clicked',
+  // CC-26b — the signed-in product (ARCH-2 §8), sent from the server (lib/v2/account/events.ts):
+  // `fix_marked_done {type}` from mark done, and `fix_closed {type, checksToClose}` when a check
+  // verifies a fix. Its re-checks and first checks send CC-22b's `check_started {trigger, check_ref}`.
   'fix_marked_done',
   'fix_closed',
 ] as const;

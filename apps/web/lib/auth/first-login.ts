@@ -21,7 +21,9 @@
  * A decision the function cannot make is reported as `auth.trial-decision-failed` and leaves the
  * account Free; it is not retried (docs/specs/v2/06c-trial-function.md, known gaps).
  * The named site (at any sign-in) follows; its `(account_id, host)` unique index makes a second
- * insert a no-op.
+ * insert a no-op. With `firstAudit` given (door-deps.ts, under V2_CHECKS_PUBLIC with V2_PIPELINE;
+ * CC-22b D7), a site this call attached gets its first audit requested; a failure there is reported
+ * as `first-audit-failed` and the sign-in goes on with the site attached.
  */
 import { planEffects, type PlannedEffect } from '../billing/effects';
 import { next, type EntitlementSnapshot, type Transition } from '../billing/state-machine';
@@ -29,7 +31,7 @@ import { toTransitionParams, type EntitlementStore } from '../billing/state-mach
 import { effectiveTier } from '../entitlement-v2';
 import type { FunnelEvent } from '../analytics-events';
 import { TimeZoneSchema } from '@crawlmouse/types/v2';
-import type { DoorStore, LedgerHash, MemberAccount, Report } from './door-store';
+import type { DoorStore, FirstAudit, LedgerHash, MemberAccount, Report } from './door-store';
 import { hashLedgerValue, ledgerValues } from './ledger';
 import { scheduleFor } from './schedule';
 import { siteLimitAt } from './site-limit';
@@ -84,6 +86,8 @@ export interface FirstLoginDeps {
    * V2_BILLING unset.
    */
   dispatch: (planned: readonly PlannedEffect[]) => Promise<void>;
+  /** Requests the first audit of a site this hook attached; absent, none is requested. */
+  firstAudit?: FirstAudit;
 }
 
 /** What the hook decided about the trial, each with the case that produces it. The spec lists them. */
@@ -140,8 +144,26 @@ export async function runFirstLogin(
   // A site named on Sign-up is attached at any sign-in that has room: an existing account uses the
   // same form ("Already have an account? Use the same form").
   const added = await attachNamedSite(deps, input, account, zone);
-  if (added !== null) events.push({ name: 'site_added', props: { n: added.n } });
+  if (added !== null) {
+    events.push({ name: 'site_added', props: { n: added.n } });
+    await requestFirstAudit(deps, account, added, input.userId);
+  }
   return { trial, siteId: added?.siteId ?? null, events };
+}
+
+/** The attached site's first audit; a failure is reported, not raised. */
+async function requestFirstAudit(
+  deps: FirstLoginDeps,
+  account: MemberAccount,
+  site: { siteId: string; host: string },
+  userId: string,
+): Promise<void> {
+  if (!deps.firstAudit) return;
+  try {
+    await deps.firstAudit({ siteId: site.siteId, host: site.host, userId });
+  } catch {
+    deps.report('first-audit-failed', { accountId: account.accountId, siteId: site.siteId });
+  }
 }
 
 function validZone(zone: string | undefined): string | null {
@@ -226,13 +248,13 @@ function failureOf(e: unknown, code: unknown): Record<string, string> {
   return typeof code === 'string' ? { reason: 'rpc_error', code } : { reason: 'rpc_error' };
 }
 
-/** The named site, and its number among the account's kept sites (`site_added {n}`). */
+/** The named site, its host, and its number among the account's kept sites (`site_added {n}`). */
 async function attachNamedSite(
   deps: FirstLoginDeps,
   input: FirstLoginInput,
   account: MemberAccount,
   zone: string,
-): Promise<{ siteId: string; n: number } | null> {
+): Promise<{ siteId: string; host: string; n: number } | null> {
   const raw = input.signup?.site;
   if (typeof raw !== 'string') return null;
   const host = hostFromSiteInput(raw);
@@ -253,5 +275,5 @@ async function attachNamedSite(
     host,
     schedule: scheduleFor(tier, kept === 0, now, zone),
   });
-  return inserted === 'exists' ? null : { siteId: inserted.siteId, n: kept + 1 };
+  return inserted === 'exists' ? null : { siteId: inserted.siteId, host, n: kept + 1 };
 }

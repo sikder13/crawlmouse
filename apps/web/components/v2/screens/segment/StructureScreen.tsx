@@ -4,6 +4,7 @@ import { Heading } from '../../Heading';
 import { ScrollRegion } from '../../ScrollRegion';
 import { Table } from '../../Table';
 import { MapSvg } from '../../map/MapSvg';
+import { hasPacketToCopy } from '../../../../lib/v2/view/no-packet';
 import type { StructureMapView, StructureView } from '../../../../lib/v2/view/segment/structure';
 import { SectionFixes, VerdictCard } from './SegmentParts';
 import { SegmentShell } from './SegmentShell';
@@ -59,7 +60,7 @@ function LinkMap({ map }: { map: StructureMapView }) {
 export function StructureScreen({ data }: { data: StructureView }) {
   const { frame, headline, orphans } = data;
   return (
-    <SegmentShell frame={frame} keep={data.keep} nextPrimary={data.fixes.open.length === 0}>
+    <SegmentShell frame={frame} keep={data.keep} nextPrimary={!hasPacketToCopy(data.fixes)}>
       <VerdictCard
         title={headline.title}
         pill={headline.pill}

@@ -31,17 +31,22 @@ describe('shouldSendEvent', () => {
 });
 
 describe('FUNNEL_EVENTS list-drift lock', () => {
-  it('has exactly the 38 funnel events (7 launch + 9 conversion-spine + 10 SPEC 04 viral loop + 7 SPEC 05 AI + 2 CC-25 account door + 3 CC-26b) with no duplicates', () => {
-    expect(FUNNEL_EVENTS.length).toBe(38);
-    expect(new Set(FUNNEL_EVENTS).size).toBe(38);
+  it('has exactly the 43 funnel events (7 launch + 9 conversion-spine + 10 SPEC 04 viral loop + 7 SPEC 05 AI + 2 CC-25 account door + 6 CC-22b public check flow + 2 CC-26b) with no duplicates', () => {
+    expect(FUNNEL_EVENTS.length).toBe(43);
+    expect(new Set(FUNNEL_EVENTS).size).toBe(43);
+    for (const e of ['trial_started', 'site_added']) expect(FUNNEL_EVENTS).toContain(e);
     for (const e of [
-      'trial_started',
-      'site_added',
+      'home_viewed',
       'check_started',
+      'check_finished',
+      'result_viewed',
+      'fix_opened',
+      'keep_clicked',
       'fix_marked_done',
       'fix_closed',
-    ])
+    ]) {
       expect(FUNNEL_EVENTS).toContain(e);
+    }
     // the SPEC 02 conversion-spine cohort is present (snake_case, distinct from the kebab launch ones)
     for (const e of [
       'grade_revealed',

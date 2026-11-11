@@ -1,6 +1,7 @@
 import posthog from 'posthog-js';
 import * as Sentry from '@sentry/nextjs';
 import { beforeSendSampler } from '@/lib/analytics';
+import { sentryBrowserOptions } from '@/lib/auth/sentry-scrub';
 import { consentRequiredFromCookie, CONSENT_DECISION_STORAGE_KEY } from '@/lib/consent';
 
 // Sentry (client) — moved here from sentry.client.config.ts per @sentry/nextjs v8+ guidance.
@@ -10,6 +11,9 @@ Sentry.init({
   tracesSampleRate: 0.1,
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 1.0,
+  // The id in an `/audit/<id>` or `/checks/<id>` address is written out of each event and
+  // transaction before it is sent (lib/auth/sentry-scrub.ts).
+  ...sentryBrowserOptions(),
 });
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 

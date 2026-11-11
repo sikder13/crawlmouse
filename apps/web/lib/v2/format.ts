@@ -203,9 +203,8 @@ export function listOf(items: readonly string[]): string {
 export const percent = (share: number) => Math.round(share * 100);
 
 /**
- * How each template is named in a sentence, by its label. A template not listed here is an error,
- * so a new fixture cannot be described with a guessed noun; format.test.ts checks every fixture's
- * templates are listed.
+ * How each template is named in a sentence, by its label. format.test.ts checks every contract
+ * fixture's templates are listed here. A label that is not listed is named by `nounOfKey`.
  */
 export const TEMPLATE_NOUNS: Record<string, { inList: string; adjective: string; pages: string }> =
   {
@@ -222,7 +221,42 @@ export const TEMPLATE_NOUNS: Record<string, { inList: string; adjective: string;
     Work: { inList: 'work', adjective: 'work', pages: 'work pages' },
   };
 
-export function templateNoun(label: string) {
-  if (!Object.hasOwn(TEMPLATE_NOUNS, label)) throw new Error(`No noun for template "${label}"`);
-  return TEMPLATE_NOUNS[label]!;
+type TemplateNoun = (typeof TEMPLATE_NOUNS)[string];
+
+/** The listed labels that name a section of pages. "Homepage" names one page, the path "/". */
+const SECTION_NAMES = Object.keys(TEMPLATE_NOUNS).filter((name) => name !== 'Homepage');
+
+const PLACEHOLDER = /^\{[^}]+\}$/;
+
+/**
+ * The noun for a label that is not in TEMPLATE_NOUNS. A measured check labels a template with its
+ * key ("/", "/blog/{slug}", "/about": packages/engine/src/v2/build/assemble.ts `templatesOf`), so a
+ * label that is a path is named from the path, as the engine's fix titles name it
+ * (packages/engine/src/v2/build/template-noun.ts; format.test.ts compares `pages` with the engine's
+ * noun over generated keys): "/" is the homepage; a first segment that names a listed section, with
+ * a placeholder after it, is that section; a path with no placeholder is one page; any other is the
+ * pages under its first segment. In a list and as an adjective the path stands for itself. A label
+ * that is not a path is used as it is written.
+ */
+function nounOfKey(label: string): TemplateNoun {
+  if (!label.startsWith('/')) {
+    return { inList: label, adjective: label, pages: `${label} pages` };
+  }
+  const segments = label.split('/').filter(Boolean);
+  const [first] = segments;
+  if (first === undefined) return TEMPLATE_NOUNS.Homepage!;
+  if (!segments.some((s) => PLACEHOLDER.test(s))) {
+    return { inList: label, adjective: label, pages: `the ${label} page` };
+  }
+  const section = SECTION_NAMES.find((name) => name.toLowerCase() === first);
+  if (section) return TEMPLATE_NOUNS[section]!;
+  return {
+    inList: label,
+    adjective: label,
+    pages: PLACEHOLDER.test(first) ? `pages like ${label}` : `pages under /${first}/`,
+  };
+}
+
+export function templateNoun(label: string): TemplateNoun {
+  return Object.hasOwn(TEMPLATE_NOUNS, label) ? TEMPLATE_NOUNS[label]! : nounOfKey(label);
 }
