@@ -16,7 +16,7 @@ export function sqlExpireStore(run: RunSql): ExpireStore {
     async expiredUnkept(cutoff, bareBefore, after, limit) {
       const { rows } = await run((db) =>
         db.query<ExpiredRow>(
-          `select site_id, check_id, batches, remaining
+          `select site_id, check_id, batches, copied_for, remaining
              from public.expired_unkept_sites($1::timestamptz, $2::timestamptz, $3::uuid, $4)`,
           [cutoff, bareBefore, after, limit],
         ),
@@ -38,7 +38,7 @@ export function sqlExpireStore(run: RunSql): ExpireStore {
     async unsettledKept(since, after, limit) {
       const { rows } = await run((db) =>
         db.query<UnsettledRow>(
-          `select check_id, site_id, account_id, batches, remaining
+          `select check_id, site_id, account_id, batches, strays, remaining
              from public.unsettled_kept_checks($1::timestamptz, $2::uuid, $3)`,
           [since, after, limit],
         ),

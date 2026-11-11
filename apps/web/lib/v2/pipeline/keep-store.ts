@@ -51,6 +51,11 @@ export interface KeepStore {
   hostKept(accountId: string, host: string): Promise<boolean>;
   /** Null when there is no such check. */
   evidenceOf(checkId: string): Promise<CheckEvidence | null>;
+  /**
+   * `note_check_copy`: records, on the check's row, that its objects are about to be copied for the
+   * account. False when there is no such check.
+   */
+  noteCopy(checkId: string, accountId: string): Promise<boolean>;
   /** `keep_check`: ownership, the expiry and the path pairs in one transaction. */
   keep(commit: KeepCommit): Promise<KeepOutcome>;
   /** `move_check_paths`: how many stored paths it rewrote. */
@@ -123,6 +128,14 @@ export function supabaseKeepStore(sb: SupabaseClient): KeepStore {
         accountId: site.account_id,
         batches: batches.map((b) => b.batch),
       };
+    },
+
+    async noteCopy(checkId, accountId) {
+      const noted = must(
+        'note_check_copy',
+        await sb.rpc('note_check_copy', { p_check: checkId, p_account: accountId }),
+      );
+      return noted === true;
     },
 
     async keep(commit) {

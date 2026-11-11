@@ -49,6 +49,16 @@ export function sqlKeepStore(run: RunSql): KeepStore {
       return r ? { status: r.status, accountId: r.account_id, batches: r.batches } : null;
     },
 
+    async noteCopy(checkId, accountId) {
+      const { rows } = await run((db) =>
+        db.query<{ noted: boolean }>(`select public.note_check_copy($1::uuid, $2::uuid) as noted`, [
+          checkId,
+          accountId,
+        ]),
+      );
+      return rows[0]!.noted === true;
+    },
+
     async keep(commit) {
       const a = keepArgs(commit);
       const { rows } = await run((db) =>

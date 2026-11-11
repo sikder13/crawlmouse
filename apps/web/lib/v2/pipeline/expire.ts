@@ -5,18 +5,21 @@
  * `expireUnkept` deletes the sites no account keeps once they are past keeping
  * (`unkept_site_expired`, migration 022b): for each, its checks' evidence objects are removed, then
  * the site's row is deleted and its checks, their measurement rows and its fixes go by the foreign
- * keys' cascades. The objects go first, so a run that stops between the two is finished by the
+ * keys' cascades. The objects removed are those under `anon/` and, for each account in a check's
+ * `copied_for`, the same names in that account's directory of the check: what a Keep copied and did
+ * not commit. The objects go first, so a run that stops between the two is finished by the
  * next, which lists the site again. A site an account keeps is not listed, and the delete statement
  * asks `account_id is null` itself.
  *
  * `settleKept` moves what the ended checks of kept sites still hold under `anon/`
  * (`settleKeptCheck`, keep.ts): a check kept while it ran, one whose copy failed or ran out of
- * budget inside the claim, and one whose `anon/` objects a failed removal left.
+ * budget inside the claim, and one whose `anon/` objects a failed removal left. For a check claimed
+ * inside the sweep window it also removes the copies a refused Keep left under another account.
  *
  * Both work in bounded batches inside a time budget and return counts, with what is left for the
  * next run.
  */
-import { objectNames, settleKeptCheck, type KeepDeps } from './keep';
+import { copyPaths, objectNames, settleKeptCheck, type KeepDeps } from './keep';
 import type { ExpireStore } from './expire-store';
 import { ANONYMOUS_EXPIRY_HOURS } from './limits';
 import { evidencePath, type EvidenceStore } from './types';
@@ -28,7 +31,10 @@ import { evidencePath, type EvidenceStore } from './types';
  * the claim's own expiry test to commit.
  */
 export const EXPIRY_GRACE_MS = 10 * 60 * 1000;
-/** Sites listed and deleted per batch: one Storage removal per check, one delete per batch. */
+/**
+ * Sites listed and deleted per batch: one Storage removal per check (and one more for each account
+ * in its `copied_for`), one delete per batch.
+ */
 export const EXPIRY_BATCH_SITES = 50;
 /** Batches per run, so 1,000 sites a run at most. */
 export const EXPIRY_MAX_BATCHES = 20;
@@ -92,6 +98,9 @@ export async function expireUnkept(deps: ExpireDeps): Promise<ExpireOutput> {
           await deps.evidence.remove(
             objectNames(check.batches).map((name) => evidencePath(owner, name)),
           );
+          for (const accountId of check.copiedFor) {
+            await deps.evidence.remove(copyPaths({ ...owner, batches: check.batches }, accountId));
+          }
         }
         cleared.set(site.siteId, site.checks.length);
       } catch {

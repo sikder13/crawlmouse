@@ -11,6 +11,7 @@ import type { ClaimKeepInput } from '../../auth/claim';
 import { evidenceDir, getJson, type EvidenceDirectory } from './evidence';
 import {
   claimKeep,
+  copyPaths,
   KEEP_MOVE_BUDGET_MS,
   objectNames,
   settleKeptCheck,
@@ -96,6 +97,17 @@ const NAMED_BY_ROWS = (check: StoredCheck): EvidenceName[] => [
 
 const keysUnder = (memory: Memory, prefix: string) =>
   [...memory.objects.keys()].filter((k) => k.startsWith(`${prefix}/`)).sort();
+
+/** The check's objects in an account's directory of it. */
+const copiesFor = (memory: Memory, check: StoredCheck, accountId: string) =>
+  keysUnder(memory, evidenceDir({ ...anonOwner(check), accountId }));
+
+const copiedFor = async (checkId: string): Promise<string[]> =>
+  (
+    await db.query<{ copied_for: string[] }>(`select copied_for from public.checks where id = $1`, [
+      checkId,
+    ])
+  ).rows[0]!.copied_for;
 
 type Op = 'list' | 'get' | 'put' | 'remove';
 
@@ -295,6 +307,8 @@ describe('claimKeep', () => {
     const before = [...memory.objects.keys()].sort();
     expect(await claimKeep(depsOf(memory).deps).keep(inputOf(check, who))).toBe('expired');
     expect([...memory.objects.keys()].sort()).toEqual(before);
+    // The account stays on the row: the expiry removes by it whatever a late request wrote.
+    expect(await copiedFor(check.checkId)).toEqual([who.accountId]);
     expect(await siteAccount(db, check.siteId)).toBeNull();
     expect(await storedPaths(db, check.checkId)).toEqual(
       pathsOf(check, null, NAMED_BY_ROWS(check)),
@@ -333,6 +347,7 @@ describe('claimKeep', () => {
     expect(await claimKeep(depsOf(racing).deps).keep(inputOf(check, loser))).toBe('not_unowned');
     expect(won).toBe('taken');
     expect(await siteAccount(db, check.siteId)).toBe(winner.accountId);
+    expect(await copiedFor(check.checkId)).toEqual([loser.accountId]);
     expect(
       keysUnder(memory, evidenceDir({ ...anonOwner(check), accountId: loser.accountId })),
     ).toEqual([]);
@@ -376,6 +391,142 @@ describe('claimKeep', () => {
       );
     }
   }, 120_000);
+
+  it('the account is on the check’s row before the first storage call, and off it once the Keep commits', async () => {
+    const memory = memoryEvidenceStore();
+    const check = await storedCheck(db, memory, { host: host(), expiresAt: LATER });
+    const who = await keeper();
+    const seen: string[][] = [];
+    const watching = failing(memory, async (_op, _p, nth) => {
+      if (nth === 1) seen.push(await copiedFor(check.checkId));
+      return false;
+    });
+    expect(await copiedFor(check.checkId)).toEqual([]);
+    expect(await claimKeep(depsOf(watching).deps).keep(inputOf(check, who))).toBe('taken');
+    expect(seen).toEqual([[who.accountId]]);
+    expect(await copiedFor(check.checkId)).toEqual([]);
+  });
+
+  it('copies nothing when the account cannot be recorded, and still keeps the check on its old paths', async () => {
+    for (const noteCopy of [
+      async () => {
+        throw new Error('database: refused');
+      },
+      async () => false,
+    ]) {
+      const memory = memoryEvidenceStore();
+      const check = await storedCheck(db, memory, { host: host(), expiresAt: LATER });
+      const who = await keeper();
+      const touched: string[] = [];
+      const { deps, reported } = depsOf(
+        failing(memory, (op) => {
+          touched.push(op);
+          return false;
+        }),
+      );
+      const unrecorded: KeepDeps = { ...deps, store: { ...deps.store, noteCopy } };
+      expect(await claimKeep(unrecorded).keep(inputOf(check, who))).toBe('taken');
+      expect(touched).toEqual([]);
+      expect(await storedPaths(db, check.checkId)).toEqual(
+        pathsOf(check, null, NAMED_BY_ROWS(check)),
+      );
+      expect(reported.map((r) => r.signal)).toEqual(['keep-evidence-not-moved']);
+    }
+  });
+
+  it('a commit that throws removes the copies it made and throws the same error', async () => {
+    const memory = memoryEvidenceStore();
+    const check = await storedCheck(db, memory, { host: host(), expiresAt: LATER });
+    const who = await keeper();
+    const before = [...memory.objects.keys()].sort();
+    const { deps, reported } = depsOf(memory);
+    const down = new Error('database: connection lost');
+    let copiesAtCommit: string[] = [];
+    const throwing: KeepDeps = {
+      ...deps,
+      store: {
+        ...deps.store,
+        keep: async () => {
+          copiesAtCommit = copiesFor(memory, check, who.accountId);
+          throw down;
+        },
+      },
+    };
+    await expect(claimKeep(throwing).keep(inputOf(check, who))).rejects.toBe(down);
+    expect(copiesAtCommit).toEqual(pathsOf(check, who.accountId, STORED(check)));
+    expect([...memory.objects.keys()].sort()).toEqual(before);
+    expect(await siteAccount(db, check.siteId)).toBeNull();
+    expect(reported).toEqual([]);
+    expect(await copiedFor(check.checkId)).toEqual([who.accountId]);
+  });
+
+  it('a commit whose answer was lost after it committed keeps the copies: the rows name them', async () => {
+    const memory = memoryEvidenceStore();
+    const check = await storedCheck(db, memory, { host: host(), expiresAt: LATER });
+    const who = await keeper();
+    const { deps } = depsOf(memory);
+    const lost: KeepDeps = {
+      ...deps,
+      store: {
+        ...deps.store,
+        keep: async (commit) => {
+          await deps.store.keep(commit);
+          throw new Error('database: answer lost');
+        },
+      },
+    };
+    await expect(claimKeep(lost).keep(inputOf(check, who))).rejects.toThrow('answer lost');
+    expect(await siteAccount(db, check.siteId)).toBe(who.accountId);
+    for (const path of await storedPaths(db, check.checkId)) {
+      expect(memory.objects.has(path), path).toBe(true);
+    }
+  });
+
+  it('a discard that fails is reported with the account and how many objects it left, for a refused commit and for a thrown one', async () => {
+    for (const commit of ['refused', 'threw'] as const) {
+      const memory = memoryEvidenceStore();
+      const check = await storedCheck(db, memory, {
+        host: host(),
+        expiresAt: commit === 'refused' ? new Date(Date.now() - 1000) : LATER,
+      });
+      const who = await keeper();
+      const { deps, reported } = depsOf(failing(memory, (op) => op === 'remove'));
+      const run: KeepDeps =
+        commit === 'refused'
+          ? deps
+          : {
+              ...deps,
+              store: {
+                ...deps.store,
+                keep: async () => {
+                  throw new Error('database: connection lost');
+                },
+              },
+            };
+      const outcome = await claimKeep(run)
+        .keep(inputOf(check, who))
+        .catch(() => 'threw');
+      expect(outcome).toBe(commit === 'refused' ? 'expired' : 'threw');
+      expect(reported, commit).toEqual([
+        {
+          signal: 'keep-evidence-discard-failed',
+          extra: {
+            checkId: check.checkId,
+            accountId: who.accountId,
+            objects: String(STORED(check).length),
+          },
+        },
+      ]);
+      // What it left is findable: the names under the account the row records.
+      expect(copiesFor(memory, check, who.accountId)).toEqual(
+        pathsOf(check, who.accountId, STORED(check)),
+      );
+      expect(copyPaths(check, who.accountId).sort()).toEqual(
+        pathsOf(check, who.accountId, objectNames(check.batches)),
+      );
+      expect(await copiedFor(check.checkId)).toEqual([who.accountId]);
+    }
+  });
 
   it('a removal that fails after the commit is reported, and the next settle finishes it', async () => {
     const memory = memoryEvidenceStore();
@@ -435,6 +586,47 @@ describe('settleKeptCheck', () => {
         check.batches.map((b): EvidenceName => `batch-${b}`),
       ),
     );
+  });
+
+  it('removes the copies under each stray account, by name, and leaves the keeper’s objects and other checks’', async () => {
+    const memory = memoryEvidenceStore();
+    const check = await storedCheck(db, memory, { host: host(), expiresAt: LATER, built: true });
+    const other = await storedCheck(db, memory, { host: host(), expiresAt: LATER });
+    const who = await keeper();
+    const stray = await keeper();
+    const { deps } = depsOf(memory);
+    expect(await claimKeep(deps).keep(inputOf(check, who))).toBe('taken');
+    const mine = [...memory.objects.keys()].sort();
+    // What a Keep by `stray` that did not commit left: a copy of each object, `built` among them.
+    for (const name of [...STORED(check), 'built'] as const) {
+      const bytes = objectBytes(check.checkId, name);
+      await memory.put(
+        evidencePath({ ...anonOwner(check), accountId: stray.accountId }, name),
+        bytes,
+      );
+    }
+    // An object of the stray account that is not this check's stays.
+    const theirs = evidencePath({ ...anonOwner(other), accountId: stray.accountId }, 'seeds');
+    await memory.put(theirs, objectBytes(other.checkId, 'seeds'));
+
+    const kept = { ...check, accountId: who.accountId };
+    // The keeper's own id in the list (a Keep of the same account that lost a race) removes nothing.
+    expect(await settleKeptCheck(deps, { ...kept, strays: [who.accountId, stray.accountId] })).toBe(
+      'nothing',
+    );
+    expect([...memory.objects.keys()].sort()).toEqual([...mine, theirs].sort());
+  });
+
+  it('a stray removal that fails throws, for the caller to count', async () => {
+    const memory = memoryEvidenceStore();
+    const check = await storedCheck(db, memory, { host: host(), expiresAt: LATER });
+    const who = await keeper();
+    const stray = await keeper();
+    expect(await claimKeep(depsOf(memory).deps).keep(inputOf(check, who))).toBe('taken');
+    const { deps } = depsOf(failing(memory, (op) => op === 'remove'));
+    await expect(
+      settleKeptCheck(deps, { ...check, accountId: who.accountId, strays: [stray.accountId] }),
+    ).rejects.toThrow('remove refused');
   });
 
   it('a failed copy changes nothing and answers failed', async () => {
