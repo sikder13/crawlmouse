@@ -11,3 +11,13 @@ export const MAX_RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** The longest window plus one hour of margin. */
 export const PRUNE_AFTER_MS = MAX_RATE_LIMIT_WINDOW_MS + 60 * 60 * 1000;
+
+/**
+ * The start of the window `nowMs` falls in: windows are aligned to multiples of their length since
+ * the epoch, so every caller of one bucket counts into the same row. `checkRateLimit` uses it, and
+ * so does the SQL that takes a `global:audits:day` slot itself (migration 20261112000001), which is
+ * passed this value rather than computing its own.
+ */
+export function rateLimitWindowStart(nowMs: number, windowMs: number): Date {
+  return new Date(Math.floor(nowMs / windowMs) * windowMs);
+}

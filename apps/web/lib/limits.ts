@@ -24,6 +24,8 @@ export const DOMAIN_AUDITS_PER_HOUR = 5; // free/anon: lets a user re-check thei
 // Global backstop: a hard ceiling on total audits started per day across ALL callers. Sized well
 // above expected launch volume; trips only on a platform-wide abuse spike. (18%-MRR guard.)
 export const GLOBAL_AUDITS_PER_DAY = 5000;
+/** The `rate_limits` bucket that counts every check start against GLOBAL_AUDITS_PER_DAY. */
+export const GLOBAL_AUDITS_BUCKET = 'global:audits:day';
 export const MAGIC_LINK_PER_IP_PER_HOUR = 5; // sign-in emails per IP
 export const MAGIC_LINK_PER_EMAIL_PER_HOUR = 3; // sign-in emails per address
 export const VERIFY_CHECKS_PER_HOUR = 10; // domain-verification checks per user (outbound fetch/DNS)
