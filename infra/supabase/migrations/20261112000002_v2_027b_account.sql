@@ -1287,6 +1287,11 @@ begin
     select q.accounts, q.purge_after into v_accounts, v_purge
       from public.pending_erasures q where q.user_id = v.user_id;
     if not found then return jsonb_build_object('ok', false, 'code', 'not_confirmed'); end if;
+    -- As restore_account: the link restores only the deletion it was sent with.
+    if not exists (select 1 from public.account_tokens c
+                    where c.id = v.paired_with and c.kind = 'delete_confirm' and c.used_at is not null) then
+      return jsonb_build_object('ok', false, 'code', 'invalid_link');
+    end if;
     if v_purge <= greatest(p_now, now()) then
       return jsonb_build_object('ok', false, 'code', 'window_closed');
     end if;

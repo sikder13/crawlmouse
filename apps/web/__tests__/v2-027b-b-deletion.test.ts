@@ -644,6 +644,12 @@ describe('fix round 3: restore links and the person’s other links', () => {
     const { o, x, yLinks } = await twoRequests();
     // Confirmed through Y's link; X's request was never confirmed.
     expect((await confirm(yLinks.confirm)).ok).toBe(true);
+    // The page the link opens says so too, rather than offering a button its POST refuses.
+    const page = await json<{ ok: boolean; code?: string }>(
+      `select public.read_deletion_link('delete_restore', $1, now()) as r`,
+      [hashToken(x.restore)],
+    );
+    expect(page).toEqual({ ok: false, code: 'invalid_link' });
     expect((await restore(x.restore)).code).toBe('invalid_link');
     expect(await marked(o.accountId)).toBe(1);
     expect((await restore(yLinks.restore)).ok).toBe(true);
