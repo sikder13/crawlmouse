@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { recordedBuild } from '../../../../../../../packages/engine/fixtures/v2/build/recorded';
 import { buildCheck } from '@crawlmouse/engine/v2/pipeline';
 import type { BatchResult, CrawlPage } from '@crawlmouse/types/v2';
@@ -27,7 +27,7 @@ import {
   type Ids,
 } from '../../../../../__tests__/v2/_lib/check-routes-harness';
 import { STREAM_OPENS_PER_IP_PER_HOUR } from '../_lib/limit-keys';
-import { POLL_MS, STREAM_CLOSE_MS, serveStream } from './serve';
+import { BATCH_READ_ATTEMPTS, POLL_MS, STREAM_CLOSE_MS, serveStream } from './serve';
 
 const anonymous: Viewer = { userId: null };
 const one = crawlResult(
@@ -170,7 +170,7 @@ describe('the stream of a check anyone with its id may read', () => {
     expect(state.pages_crawled).toBe(3);
   });
 
-  it('a batch read that fails closes the connection, and the batch’s pages arrive on the reconnect', async () => {
+  it('a batch read that fails once is read again on the same connection', async () => {
     const h = harness(db);
     const ids = await running(db, h, 'flaky-read.example');
     await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
@@ -183,20 +183,48 @@ describe('the stream of a check anyone with its id may read', () => {
         return get(path);
       },
     };
-
-    const first = groupsOf(await (await open(h, ids)).text());
-    expect(first.groups.map((g) => typesOf(g.events))).toEqual([
-      ['page_fetched', 'page_linked', 'page_fetched', 'page_linked'],
-    ]);
-    // The cursor the browser comes back with is still before batch 2.
-    expect(first.groups[0]!.id).toMatch(/^1\.1\./);
-
-    h.betweenPolls.push(cancelled(h, ids));
-    const second = groupsOf(await (await open(h, ids, anonymous, first.groups[0]!.id!)).text());
-    expect(second.groups.map((g) => typesOf(g.events))[0]).toEqual(['page_fetched', 'page_linked']);
-    expect(second.groups.at(-1)!.events.at(-1)!.type).toBe('ended');
-    const all = [...first.groups, ...second.groups].flatMap((g) => g.events);
+    h.betweenPolls.push(async () => undefined, cancelled(h, ids));
+    const { groups } = groupsOf(await (await open(h, ids)).text());
+    const all = groups.flatMap((g) => g.events);
     expect(fold(all).nodes.map((n) => n.url)).toEqual([urlOf('/'), urlOf('/a'), urlOf('/b')]);
+    expect(all.at(-1)!.type).toBe('ended');
+  });
+
+  it('a batch whose read keeps failing is passed over after BATCH_READ_ATTEMPTS, and the rest goes on', async () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const h = harness(db);
+    const ids = await running(db, h, 'lost-object.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await storeBatch(h, ids, 2, two, { pages: 3, links: 3 });
+    const get = h.deps.evidence.get;
+    let tries = 0;
+    h.deps.evidence = {
+      async get(path) {
+        if (path.endsWith('batch-2.json.gz')) {
+          tries += 1;
+          throw new Error('storage: object not found');
+        }
+        return get(path);
+      },
+    };
+    h.betweenPolls.push(
+      async () => undefined,
+      async () => undefined,
+      cancelled(h, ids),
+    );
+    const { groups } = groupsOf(await (await open(h, ids)).text());
+    const all = groups.flatMap((g) => g.events);
+    expect(tries).toBe(BATCH_READ_ATTEMPTS);
+    // Batch 1's pages are drawn, batch 2's are not, and the check's counts and end still arrive.
+    expect(fold(all).nodes.map((n) => n.url)).toEqual([urlOf('/'), urlOf('/a')]);
+    expect(fold(all).pages_crawled).toBe(3);
+    expect(all.at(-1)!.type).toBe('ended');
+    // The cursor is past the batch, so a later connection does not try it again.
+    expect(groups.at(-1)!.id).toMatch(/^1\.2\./);
+    expect(warned.mock.calls).toEqual([
+      [`[api/checks/stream] batch 2 was not read in ${BATCH_READ_ATTEMPTS} tries; passed over`],
+    ]);
+    warned.mockRestore();
   });
 
   it('a queued check: nothing but the end when it is cancelled before it starts', async () => {
