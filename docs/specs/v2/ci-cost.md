@@ -193,7 +193,18 @@ only where the change can reach), not only fewer triggers.
   environment, whose required reviewer is the owner while the repository is public
   (`docs/specs/v2/repo-private.md`, D1, with the command that reads it back). Updated here:
   `repo-private.md`, the comments in `db-apply-prod.yml` and `db-rollback-prod.yml`, and
-  `docs/ops/incident-plan.md`, which already said "then approve" and now says when that applies. `docs/ops/db-migrations.md` (§1, and the secrets
-  table in §7) still says there is no reviewer; it is outside this step and is listed for a
-  follow-up.
+  `docs/ops/incident-plan.md`, which already said "then approve" and now says when that applies,
+  and `docs/ops/db-migrations.md` §1 (step 5 and the paragraph after the steps) and §7 (by owner
+  ruling). The two sentences it withdrew are registered in
+  `apps/web/__tests__/docs-withdrawn-claims.test.ts`, which fails if either returns:
+  `pnpm --filter @crawlmouse/web exec vitest run __tests__/docs-withdrawn-claims.test.ts`.
 - `PROJECT_OVERVIEW.md` §9 and `docs/specs/v2/repo-private.md` (D5, D6) point here for the triggers.
+
+## `test (web)` in three shards (added by owner ruling)
+
+The web suite outgrew one job: 13 min 25 s on run 43056751031 (job start to end), and cancelled at
+its 15-minute limit on run 43073710281. It now runs as `test-web-shard`, three jobs of
+`vitest run --shard=N/3`, each with 25 minutes. The required check `test (web)` is the job
+`test-web`, which passes only when every shard passed, so `protect-main` is unchanged. A test
+checks that each of the eleven required check names is reported by exactly one job of `ci.yml`.
+Wall time after the change is in the PR, read from this branch's CI run.
