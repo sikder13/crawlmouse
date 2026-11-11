@@ -47,7 +47,7 @@ export const SETTINGS_COPY = {
     `Those are the ${numberWord(kinds)} kinds from us. If you pay, Stripe sends the receipts. There is no newsletter and no product-update mail to unsubscribe from.`,
   dangerTitle: 'Danger',
   deleteLabel: 'Delete this account',
-  /** FACTS E6: the seven-day undo. */
+  /** FACTS E6: the seven-day undo, by the restore link (questions.md Q16). */
   deleteText: (sites: number, grace: number) =>
     `${
       sites === 0
@@ -57,7 +57,7 @@ export const SETTINGS_COPY = {
           : sites === 2
             ? 'Removes both sites, their history and reports'
             : `Removes all ${numberWord(sites)} sites, their history and reports`
-    }. Takes effect after a confirmation link. For ${numberWord(grace)} days the sign-in email can undo it; after that nothing is kept.`,
+    }. Takes effect after a confirmation link. For ${numberWord(grace)} days the restore link in that email undoes it; after that the account is erased, apart from the few things the confirmation page lists.`,
   deleteAction: 'Delete…',
   /**
    * Owner ruling Q7: the deletion page's own money sentences (lib/v2/copy/deletion.ts), the second of
@@ -66,7 +66,7 @@ export const SETTINGS_COPY = {
   deleteMoney: DELETE_COPY.money.join(' '),
   /** The confirmation step (owner ruling 12). */
   deleteSteps: (what: string, email: string, grace: number) =>
-    `Type the ${what} below and we send a confirmation link to ${email}. The link opens a page where you confirm the deletion; sign-in then stops at once, and for ${numberWord(grace)} days a sign-in link from that address restores the account.`,
+    `Type the ${what} below and we send a confirmation link to ${email}. The link opens a page where you confirm the deletion; sign-in then stops at once, and for ${numberWord(grace)} days the restore link in the same email restores the account.`,
   hostnameNoun: 'hostname',
   emailNoun: 'sign-in address',
   retype: (expected: string) => `Type ${expected} to confirm`,
@@ -219,8 +219,9 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     kind: 'facts',
     locked: 'Takes effect after a confirmation link; nothing is kept.',
     rendered:
-      'Takes effect after a confirmation link. For seven days the sign-in email can undo it; after that nothing is kept.',
-    source: 'FACTS E6',
+      'Takes effect after a confirmation link. For seven days the restore link in that email undoes it; after that the account is erased, apart from the few things the confirmation page lists.',
+    source:
+      'FACTS E6, as CC-27b built it (questions.md Q16): the restore link restores, a sign-in link cannot once sign-in is stopped, and the erasure keeps what the confirmation page lists',
   },
   {
     screen: 'settings',

@@ -485,7 +485,7 @@ export interface DeleteStepView {
   shell: ShellView;
   header: { title: string; line: string };
   cardTitle: string;
-  /** What deleting removes, and how long the sign-in email can undo it (FACTS E6). */
+  /** What deleting removes, and how long the restore link in the email can undo it (FACTS E6, Q16). */
   text: string;
   /** How it goes from here: the link to the sign-in address, sign-in stopping, the restore. */
   steps: string;
