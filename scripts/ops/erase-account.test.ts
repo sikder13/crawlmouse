@@ -646,6 +646,39 @@ describe('erase-account (B-F2)', () => {
     await bare.close();
   }, 300_000);
 
+  it('redacts a rejected takedown request as it does a removed one (T8)', async () => {
+    const p = await person();
+    await pglite.query(
+      `insert into public.takedown_requests (domain, requester_email, reason, status, public_report_slug)
+       values ('a.example', $1, 'mine', 'rejected', $2)`,
+      [p.email.toUpperCase(), p.slug],
+    );
+    const plan = await planErasure(db(), { userId: p.id });
+    expect(plan.counts['takedown_requests redacted (closed)']).toBe(2);
+    await removeObjects(plan.storage);
+    await executeErasure(db(), { userId: p.id }, sqlDelete);
+    expect(
+      await n(
+        `select count(*) from public.takedown_requests where status = 'rejected' and public_report_slug = $1
+            and requester_email = $2`,
+        [p.slug, REDACTED_EMAIL],
+      ),
+    ).toBe(1);
+  }, 120_000);
+
+  it('takes the address from auth.users and from public.users when the two differ (T10)', async () => {
+    const p = await person();
+    const auth = `auth-only-${p.email}`;
+    await pglite.query(`update auth.users set email = $2 where id = $1`, [p.id, auth]);
+    await pglite.query(`insert into public.waitlist (email, source) values ($1, 'developers')`, [
+      auth,
+    ]);
+    const plan = await planErasure(db(), { userId: p.id });
+    expect([...plan.emails].sort()).toEqual([auth, p.email].sort());
+    // A row under each address is counted.
+    expect(plan.counts['waitlist deleted']).toBe(2);
+  }, 120_000);
+
   it('refuses an address that names more than one user, and changes nothing', async () => {
     const tag = `twice-${++serial}@example.com`;
     await pglite.query(`insert into auth.users (id, email) values (gen_random_uuid(), $1)`, [tag]);
