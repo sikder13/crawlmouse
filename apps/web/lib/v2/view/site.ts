@@ -9,7 +9,6 @@ import {
   type Check,
   type CrawlerResult,
   type Fix,
-  type FixtureDataset,
   type Site,
   type Verdict,
 } from '@crawlmouse/types/v2';
@@ -30,7 +29,14 @@ import { aiWithheldSummary } from '../sentences';
 /** The verdicts "blocked" names (FACTS I2), the ones the crawler alert fires on. */
 const BLOCKING_VERDICTS: Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rule'];
 import { capitalise, count, numberWord, plural } from '../words';
-import { PLAN_NAMES, resultChecks, viewAt, type AccountView, type Viewer } from './account';
+import {
+  PLAN_NAMES,
+  resultChecks,
+  viewAt,
+  type AccountDataset,
+  type AccountView,
+  type Viewer,
+} from './account';
 import {
   aiOf,
   axisLabels,
@@ -44,6 +50,7 @@ import {
   zoneOf,
 } from './checks';
 import { action, type ActionView } from './account-actions';
+import { accountShellView, type ShellView } from './account-shell';
 import { isFreeFix } from './free-fixes';
 import { points } from './result';
 import { CAUSE_SHORT } from './segment/access';
@@ -94,6 +101,8 @@ export interface FixRowView {
   /** Outside the three Free shows (BUILD §3: the three largest open fixes). */
   pro: boolean;
   packet: ActionView;
+  /** Mark done, for a fix still to do that the tier opens; a live page shows it. */
+  markDone: ActionView | null;
 }
 
 export interface SiteView {
@@ -282,8 +291,7 @@ function noteOf(v: AccountView, f: Fix): string | null {
     .sort((a, b) => instant(a.at) - instant(b.at));
   const marked = events.filter((e) => e.kind === 'marked_done').at(-1);
   if (!marked) return null;
-  if (f.status === 'marked_done')
-    return `marked done ${weekday(marked.at, zone)}; re-check pending`;
+  if (f.status === 'marked_done') return SITE_COPY.markedDoneNote(weekday(marked.at, zone));
   const reopened = events.find((e) => e.kind === 'reopened' && instant(e.at) >= instant(marked.at));
   if (f.status === 'reopened' && reopened) {
     const when =
@@ -316,8 +324,16 @@ function fixRow(v: AccountView, result: Check, f: Fix, all: readonly Fix[]): Fix
       { checkId: result.id, fixId: f.id },
       { context: `for fix ${f.number}` },
     ),
+    markDone:
+      todo(f) && !pro
+        ? action('markDone', SITE_COPY.markDone, { id: f.id }, { context: `fix ${f.number}` })
+        : null,
   };
 }
+
+/** A fix the reader still has to do: open, reopened, or one we could not verify. */
+const todo = (f: Fix) =>
+  f.status === 'open' || f.status === 'reopened' || f.status === 'unable_to_verify';
 
 function scheduleValue(s: Site, zone: string): string {
   const sch = s.schedule;
@@ -326,7 +342,7 @@ function scheduleValue(s: Site, zone: string): string {
   return `${scheduleCell(s)} around ${String(sch.hour_local).padStart(2, '0')}:00, ${zone}`;
 }
 
-export function siteView(d: FixtureDataset, viewer: Viewer, siteId: string): SiteView {
+export function siteView(d: AccountDataset, viewer: Viewer, siteId: string): SiteView {
   const v = viewAt(d, viewer);
   const zone = zoneOf(v);
   const site = v.d.sites.find((s) => s.id === siteId);
@@ -368,9 +384,7 @@ export function siteView(d: FixtureDataset, viewer: Viewer, siteId: string): Sit
   ]
     .filter(Boolean)
     .join(' · ');
-  // The reader's next action is a fix still to do: open, reopened, or one we could not verify.
-  const todo = (f: Fix) =>
-    f.status === 'open' || f.status === 'reopened' || f.status === 'unable_to_verify';
+  // The reader's next action is a fix still to do.
   const byRank = (a: Fix, b: Fix) => (a.rank ?? Infinity) - (b.rank ?? Infinity);
   const target = [...fresh].filter(todo).sort(byRank)[0] ?? fixes.filter(todo).sort(byRank)[0];
   const openLatest = (primary: boolean) =>
@@ -578,6 +592,73 @@ export function siteView(d: FixtureDataset, viewer: Viewer, siteId: string): Sit
           ),
         })),
       foot: SITE_COPY.alertsFoot(to),
+    },
+  };
+}
+
+/** A site whose first check has not ended with a result, as its page shows it (D8). */
+export interface FirstCheckView {
+  shell: ShellView;
+  title: string;
+  /** "Tue 10 Nov · First check running · 42 pages read so far". */
+  line: string;
+  state: 'queued' | 'running' | 'deferred' | 'failed' | 'none';
+  body: string;
+  /** Watch the check while it has one under way; run one again when it failed or never ran. */
+  actions: ActionView[];
+}
+
+export type SitePageView =
+  | { kind: 'site'; site: SiteView }
+  | { kind: 'first_check'; first: FirstCheckView };
+
+/**
+ * The site page: the site's view once a check has ended with a result, otherwise its first check
+ * as it stands at `viewer.now`, read from that check's own record.
+ */
+export function sitePage(d: AccountDataset, viewer: Viewer, siteId: string): SitePageView {
+  const v = viewAt(d, viewer);
+  const site = v.d.sites.find((s) => s.id === siteId);
+  if (!site) throw new Error(`Site ${siteId} is not the viewer’s at ${viewer.now}`);
+  if (resultChecks(v, site.id).length) return { kind: 'site', site: siteView(d, viewer, siteId) };
+
+  const zone = zoneOf(v);
+  const t = instant(viewer.now);
+  const latest = d.checks
+    .filter((c) => c.site_id === site.id && instant(c.queued_at) <= t)
+    .sort((a, b) => instant(a.queued_at) - instant(b.queued_at))
+    .at(-1);
+  const ended = latest?.finished_at != null && instant(latest.finished_at) <= t;
+  const state: FirstCheckView['state'] = !latest
+    ? 'none'
+    : ended
+      ? 'failed'
+      : latest.status === 'deferred'
+        ? 'deferred'
+        : latest.started_at && instant(latest.started_at) <= t
+          ? 'running'
+          : 'queued';
+  const copy = SITE_COPY.firstCheck;
+  const progress = state === 'running' ? latest!.progress : null;
+  const line = [
+    dayDate(v.now, zone),
+    state === 'deferred' ? copy.deferred(dayDate(latest!.deferred_until!, zone)) : copy[state],
+    progress ? copy.pagesRead(count(progress.pages_crawled)) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const again = state === 'failed' || state === 'none';
+  return {
+    kind: 'first_check',
+    first: {
+      shell: accountShellView(v, 'Sites'),
+      title: site.host,
+      line,
+      state,
+      body: state === 'failed' ? copy.failedBody : state === 'none' ? copy.noneBody : copy.body,
+      actions: again
+        ? [action('runCheck', 'Run a check now', { id: site.id }, { primary: true })]
+        : [action('openAudit', copy.watch, { checkId: latest!.id }, { primary: true })],
     },
   };
 }

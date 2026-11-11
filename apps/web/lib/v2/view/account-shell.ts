@@ -139,7 +139,8 @@ export function accountShellView(
   { plan = 'rail' }: { plan?: PlanPlace } = {},
 ): ShellView {
   const fresh = newChanges(v).length;
-  const seat = v.d.seats.find((s) => s.role === 'owner');
+  // The reader's own seat; a preview names none and reads as the owner.
+  const seat = v.d.seats.find((s) => (v.seatId ? s.id === v.seatId : s.role === 'owner'));
   return {
     nav: ACCOUNT_NAV.map((n) => ({
       ...n,

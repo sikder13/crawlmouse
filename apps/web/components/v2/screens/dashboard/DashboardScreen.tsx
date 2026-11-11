@@ -237,43 +237,49 @@ function Sites({ data }: Props) {
         <span className={shared.sub}>{sites.note}</span>
         {sites.upsell ? <ActionControl action={sites.upsell} /> : null}
       </CardHead>
-      <Table
-        label="Watched sites"
-        rowHeader
-        columns={[
-          { header: 'Site', mono: true },
-          { header: 'Technical SEO' },
-          { header: 'AI readability' },
-          { header: 'Since last crawl' },
-          { header: 'Schedule', muted: true },
-          { header: 'Last check', numeric: true, mono: true, muted: true },
-        ]}
-        rows={sites.rows.map((r) => ({
-          key: r.key,
-          cells: [
-            <a key="h" href={r.href}>
-              {r.host}
-            </a>,
-            <GradeText key="s" grade={r.seo} />,
-            <GradeText key="a" grade={r.ai} withheld={r.aiWithheld} />,
-            r.since.pills.length ? (
-              <span key="c" className={shared.pills} data-v2-verdicts={r.since.verdicts.join(' ')}>
-                {r.since.pills.map((p) => (
-                  <StatusPill key={p.label} state={p.state}>
-                    {p.label}
-                  </StatusPill>
-                ))}
-              </span>
-            ) : (
-              <span key="c" className={shared.muted}>
-                {r.sinceLabel}
-              </span>
-            ),
-            r.schedule,
-            r.lastCheck,
-          ],
-        }))}
-      />
+      {sites.rows.length ? (
+        <Table
+          label="Watched sites"
+          rowHeader
+          columns={[
+            { header: 'Site', mono: true },
+            { header: 'Technical SEO' },
+            { header: 'AI readability' },
+            { header: 'Since last crawl' },
+            { header: 'Schedule', muted: true },
+            { header: 'Last check', numeric: true, mono: true, muted: true },
+          ]}
+          rows={sites.rows.map((r) => ({
+            key: r.key,
+            cells: [
+              <a key="h" href={r.href}>
+                {r.host}
+              </a>,
+              <GradeText key="s" grade={r.seo} />,
+              <GradeText key="a" grade={r.ai} withheld={r.aiWithheld} />,
+              r.since.pills.length ? (
+                <span
+                  key="c"
+                  className={shared.pills}
+                  data-v2-verdicts={r.since.verdicts.join(' ')}
+                >
+                  {r.since.pills.map((p) => (
+                    <StatusPill key={p.label} state={p.state}>
+                      {p.label}
+                    </StatusPill>
+                  ))}
+                </span>
+              ) : (
+                <span key="c" className={shared.muted}>
+                  {r.sinceLabel}
+                </span>
+              ),
+              r.schedule,
+              r.lastCheck,
+            ],
+          }))}
+        />
+      ) : null}
       {sites.foot ? <div className={shared.foot}>{sites.foot}</div> : null}
     </Card>
   );

@@ -23,9 +23,13 @@
  */
 import {
   AccountSchema,
+  AlertRuleSchema,
+  ReportSchema,
   SeatSchema,
   type Account,
   type AgencyBranding,
+  type AlertRule,
+  type Report,
   type Seat,
 } from '@crawlmouse/types/v2';
 import { GATES, type Tier } from '../../entitlement-v2';
@@ -150,5 +154,45 @@ export function seatFromRow(row: Row, siteIds: readonly string[]): Seat {
     theme: row.theme,
     invited_at: instantFromDb(row.created_at),
     accepted_at: instantOrNull(row.accepted_at),
+  });
+}
+
+/** An alert rule: its columns are the contract's fields. */
+export function alertRuleFromRow(row: Row): AlertRule {
+  return AlertRuleSchema.parse({
+    id: row.id,
+    account_id: row.account_id,
+    site_id: row.site_id,
+    kind: row.kind,
+    enabled: row.enabled,
+    threshold_points: row.threshold_points,
+    channels: row.channels,
+    last_fired_at: instantOrNull(row.last_fired_at),
+    last_fired_check_id: row.last_fired_check_id,
+  });
+}
+
+/** A report: its columns are the contract's fields, less the database's `storage_path`. */
+export function reportFromRow(row: Row): Report {
+  return ReportSchema.parse({
+    id: row.id,
+    account_id: row.account_id,
+    site_id: row.site_id,
+    kind: row.kind,
+    format: row.format,
+    status: row.status,
+    made_by: row.made_by,
+    created_at: instantFromDb(row.created_at),
+    covers_check_ids: row.covers_check_ids,
+    byte_count: row.byte_count,
+    share_expires_at: instantOrNull(row.share_expires_at),
+    public_slug: row.public_slug,
+    scheduled_for: instantOrNull(row.scheduled_for),
+    sent_at: instantOrNull(row.sent_at),
+    recipient_email: row.recipient_email,
+    owner_seat_id: row.owner_seat_id,
+    headline: row.headline,
+    open_tracking: row.open_tracking,
+    opened_at: instantOrNull(row.opened_at),
   });
 }

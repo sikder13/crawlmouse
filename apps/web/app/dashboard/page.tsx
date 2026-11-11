@@ -12,6 +12,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { loadDashboardSites } from '@/lib/dashboard';
 import { loadReportSettingsForSites } from '@/lib/dashboard-report-settings';
 import { isProActive } from '@/lib/pro';
+import { checksPublicEnabled } from '@/lib/auth/flags';
 
 // Signed-in application surface — never a search result. `follow` keeps outbound links live.
 export const metadata = {
@@ -20,6 +21,12 @@ export const metadata = {
 };
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ upgraded?: string }> }) {
+  // V2_CHECKS_PUBLIC serves the v2 dashboard. It is imported here and nowhere else, so the v1 page
+  // has no static import of it.
+  if (checksPublicEnabled()) {
+    const { default: V2Dashboard } = await import('./v2-dashboard');
+    return <V2Dashboard />;
+  }
   const { upgraded } = await searchParams;
   const sb = await supabaseServer();
   const {

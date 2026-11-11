@@ -350,7 +350,8 @@ A table of records that scrolls sideways on a phone rather than squeezing (phone
 ### ThemeControl
 
 System, Light or Dark (DESIGN-LOCK §2: three states, default System). The choice applies at once
-and is kept in this browser; saving it to the account is the form's job, which a preview stops.
+and is kept in this browser. Under `LiveActions` it is also saved to the seat: sent as JSON with
+the page staying put, or, without script, by the form itself. A preview saves nothing.
 
 | Prop      | Type          | Required | Note                                                                                     |
 | --------- | ------------- | -------- | ---------------------------------------------------------------------------------------- |
@@ -527,6 +528,10 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Final-Site                                   | `/v2-preview/screens/site`                               | screen    |                                      |
 | Site, clean (stand-in Free account)          | `/v2-preview/screens/site/clean`                         | screen    |                                      |
 | Site, withheld                               | `/v2-preview/screens/site/withheld`                      | screen    |                                      |
+| Dashboard, no site                           | `/v2-preview/screens/dashboard/no-site`                  | screen    |                                      |
+| Site, first check running                    | `/v2-preview/screens/site/first-check`                   | screen    |                                      |
+| Dashboard, no account                        | `/v2-preview/screens/dashboard/no-account`               | screen    |                                      |
+| Dashboard, more than one account             | `/v2-preview/screens/dashboard/ambiguous`                | screen    |                                      |
 | Final-Alerts                                 | `/v2-preview/screens/alerts`                             | screen    |                                      |
 | Alerts, free                                 | `/v2-preview/screens/alerts/free`                        | screen    |                                      |
 | Final-Reports                                | `/v2-preview/screens/reports`                            | screen    |                                      |

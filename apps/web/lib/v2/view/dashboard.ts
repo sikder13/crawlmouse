@@ -9,7 +9,6 @@ import {
   type Change,
   type Check,
   type CrawlerResult,
-  type FixtureDataset,
   type Site,
   type Verdict,
 } from '@crawlmouse/types/v2';
@@ -38,6 +37,7 @@ import {
   primarySites,
   resultChecks,
   viewAt,
+  type AccountDataset,
   type AccountView,
   type Viewer,
 } from './account';
@@ -448,7 +448,7 @@ export function firstBaselines(
   return out;
 }
 
-function health(d: FixtureDataset, viewer: Viewer, v: AccountView): HealthView {
+function health(d: AccountDataset, viewer: Viewer, v: AccountView): HealthView {
   const now = healthAt(v);
   const value = meanOf(now.values.values());
   // withheld first: it is the reason D5 names
@@ -713,8 +713,83 @@ function setup(v: AccountView, site: Site, firstRun: boolean, trial: boolean): S
   };
 }
 
-export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView {
+/** The add-site action: the slots left, or the plans when none is. */
+function addSiteAction(v: AccountView, primaryAction = false): ActionView {
+  const slots = primarySites(v).length;
+  const limit = v.account.limits.sites;
+  const label = `Add a site · ${slots} of ${limit} on ${PLAN_NAMES[v.tier]}`;
+  return slots >= limit
+    ? action('pricing', label, {}, { context: '(see the plans with more sites)' })
+    : action(
+        'addSite',
+        label,
+        {},
+        {
+          primary: primaryAction,
+          input: { name: 'host', type: 'text', ...COPY.siteField },
+        },
+      );
+}
+
+/** The one-time offer of a Pro trial: a Free account that never had a trial (H5). */
+function startPro(v: AccountView): DashboardView['startPro'] {
+  return v.account.state === 'free' &&
+    !v.account.state_history.some((h) => h.state.endsWith('_trial'))
+    ? {
+        title: COPY.startProHeading,
+        body: COPY.startProBody(TRIAL_DAYS, GATES.pro.competitorsPerSite, GATES.pro.sites),
+        start: action(
+          'startTrial',
+          COPY.startProTitle(TRIAL_DAYS),
+          {},
+          {
+            fields: { accountId: v.account.id },
+          },
+        ),
+      }
+    : null;
+}
+
+/** Day 0 before any site: the header asks for one, and nothing else is measured yet. */
+function noSiteView(v: AccountView): DashboardView {
+  const zone = zoneOf(v);
+  const trial = v.account.state === 'pro_trial' || v.account.state === 'agency_trial';
+  return {
+    shell: accountShellView(v, 'Sites'),
+    firstRun: true,
+    header: {
+      title: COPY.noSiteTitle,
+      line: [
+        dayDate(v.now, zone),
+        '0 sites',
+        trial ? `trial ends ${dayDate(v.account.trial_ends_at!, zone)}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      actions: [addSiteAction(v, true)],
+    },
+    strip: null,
+    changed: [],
+    history: null,
+    crawlersByCheck: null,
+    legend: [],
+    crawlersNow: null,
+    sites: {
+      note: `0 of ${v.account.limits.sites} on ${PLAN_NAMES[v.tier]}`,
+      upsell: null,
+      rows: [],
+      foot: COPY.noSiteNote,
+    },
+    topFixes: null,
+    setup: null,
+    threeKinds: null,
+    startPro: startPro(v),
+  };
+}
+
+export function dashboardView(d: AccountDataset, viewer: Viewer): DashboardView {
   const v = viewAt(d, viewer);
+  if (primarySites(v).length === 0) return noSiteView(v);
   const zone = zoneOf(v);
   const primary = primarySite(v);
   const result = latest(v, primary.id);
@@ -741,17 +816,7 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
   const sitesWord = `${v.d.sites.length} ${plural(v.d.sites.length, 'site', 'sites')}`;
   const prev = sinceCheck(v);
 
-  const addSite =
-    slots >= limit
-      ? action(
-          'pricing',
-          `Add a site · ${slots} of ${limit} on ${plan}`,
-          {},
-          {
-            context: '(see the plans with more sites)',
-          },
-        )
-      : action('addSite', `Add a site · ${slots} of ${limit} on ${plan}`);
+  const addSite = addSiteAction(v);
   const openAudit = (label: string, primaryAction = false) =>
     action('openAudit', label, { checkId: result!.id }, { primary: primaryAction });
   const runCheck = (primaryAction: boolean) =>
@@ -911,13 +976,6 @@ export function dashboardView(d: FixtureDataset, viewer: Viewer): DashboardView 
             settings: action('emailSettings', 'Email settings'),
           }
         : null,
-    startPro:
-      v.account.state === 'free' && !v.account.state_history.some((h) => h.state.endsWith('_trial'))
-        ? {
-            title: COPY.startProHeading,
-            body: COPY.startProBody(TRIAL_DAYS, GATES.pro.competitorsPerSite, GATES.pro.sites),
-            start: action('startTrial', COPY.startProTitle(TRIAL_DAYS)),
-          }
-        : null,
+    startPro: startPro(v),
   };
 }
