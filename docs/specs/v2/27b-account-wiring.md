@@ -88,7 +88,8 @@ No page here shares a path with a v1 page, so `V2_REWRITES` gains no row.
   role (`accountShellView(…, { role })`). This step's pages do: `/settings`, `/settings/plan`,
   `/settings/delete`, `/trial-ended`. The others still read every member as the owner, and pass the
   role when their steps wire them: `dashboard.ts` (CC-26b), `alerts.ts`, `changes-log.ts` and
-  `reports.ts` (CC-28 and the agency-workspace step). Callers:
+  `reports.ts` (CC-28 and the agency-workspace step), and CC-26b's live `/sites/[id]` through
+  `site.ts`. Each can pass `readerRole(v)` (`lib/v2/view/account.ts`), which CC-26b added. Callers:
   `grep -rn "accountShellView(" apps/web/lib/v2/view --include=*.ts | grep -v test`.
 - Nothing is emailed until CC-28's mailer handles `email.requested` for the three account templates and calls
   `issue_account_link`. Until then a request creates its link rows and they expire unused.
