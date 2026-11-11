@@ -24,14 +24,33 @@ export const V2_REWRITES: readonly V2Rewrite[] = [{ from: '/dashboard', to: '/da
 const withoutSlash = (path: string): string =>
   path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
 
-/** The rewrite for a request path (a trailing slash allowed), or null. */
-export function rewriteOf(pathname: string): V2Rewrite | null {
-  const path = withoutSlash(pathname);
-  return V2_REWRITES.find((r) => r.from === path) ?? null;
+/**
+ * The spellings a request path can reach a page by: as sent, and percent-decoded, which is how
+ * Next's production router reads a path before it matches a page (`/dashboard/%76%32` is
+ * `/dashboard/v2` there). Null when the path does not decode.
+ */
+function spellings(pathname: string): string[] | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    return null;
+  }
+  return [withoutSlash(pathname), withoutSlash(decoded)];
 }
 
-/** Whether a request path is a rewrite target, or under one (a trailing slash allowed). */
+/** The rewrite for a request path (a trailing slash allowed, either spelling), or null. */
+export function rewriteOf(pathname: string): V2Rewrite | null {
+  const paths = spellings(pathname) ?? [];
+  return V2_REWRITES.find((r) => paths.includes(r.from)) ?? null;
+}
+
+/**
+ * Whether a request path is a rewrite target or under one, in either spelling. A path that does not
+ * decode counts as one, so no spelling the check cannot read reaches a target.
+ */
 export function isRewriteTarget(pathname: string): boolean {
-  const path = withoutSlash(pathname);
-  return V2_REWRITES.some((r) => path === r.to || path.startsWith(`${r.to}/`));
+  const paths = spellings(pathname);
+  if (paths === null) return true;
+  return V2_REWRITES.some((r) => paths.some((p) => p === r.to || p.startsWith(`${r.to}/`)));
 }
