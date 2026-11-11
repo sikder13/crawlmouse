@@ -124,11 +124,11 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
 
   // ── the banner ──
   const reminder = daysBefore(end, TRIAL_REMINDER_DAYS_BEFORE_END, zone);
-  const sent =
+  const reminderLine =
     a.email_prefs.trial_reminder && at(reminder) <= at(v.now)
       ? sameDay(reminder, v.now, zone)
-        ? COPY.sentToday
-        : COPY.sentOn(dayDate(reminder, zone))
+        ? COPY.reminderToday
+        : COPY.reminderOn(dayDate(reminder, zone))
       : null;
   const cardLine = card === null ? COPY.noCard : COPY.card(card, dayDate(end, zone));
   const dashboard = ACCOUNT_NAV[0];
@@ -202,7 +202,7 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
     },
     banner: {
       title: COPY.bannerTitle(plan, dayDate(end, zone)),
-      sub: [sent, cardLine].filter(Boolean).join(' '),
+      sub: [reminderLine, cardLine].filter(Boolean).join(' '),
       keep:
         card === null
           ? action(
