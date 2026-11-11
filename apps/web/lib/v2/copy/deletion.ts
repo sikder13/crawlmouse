@@ -27,7 +27,7 @@ export const DELETE_COPY = {
    * paid for nothing yet, as of a paid period.
    */
   moneyEnds: MONEY_ENDS,
-  /** The confirmation page's lines when it does not know the subscription's state. */
+  /** The lines when the subscription's state is not known: Settings' preview, which has no mirror. */
   money: [MONEY_ENDS, REFUND_POLICY],
   /**
    * A plan the confirm does not set to end, which the purge cancels at once (C3b): `past_due` and
