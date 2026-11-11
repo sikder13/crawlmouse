@@ -147,6 +147,7 @@ export async function serveStream(
               send(out.events, out.cursor);
             }
           }
+          if (!open) break;
           const facts = factsOf(snapshot, deps.now());
           const out = checkEvents(cursor, facts);
           send(out.events, out.cursor);

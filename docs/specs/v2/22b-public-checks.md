@@ -16,9 +16,7 @@ by hand. The test commands below are run from the repo root and take
 
 Production keeps both unset in this step. Proof of the unset state: `vitest app/api/checks/route.test.ts
 "app/api/checks/[id]/flag.test.ts" app/api/checks/v1-start-pin.test.ts middleware.test.ts
-components/v2/screens/home/live-home.test.tsx __tests__/v1-inventory.test.ts`. A production
-build of this branch was also compared with one of `origin/main`, flag unset: `/` is prerendered in
-both and links the same stylesheets.
+components/v2/screens/home/live-home.test.tsx __tests__/v1-inventory.test.ts`.
 
 Three things change with the flag unset:
 
@@ -60,7 +58,8 @@ Three things change with the flag unset:
   `/audit/[id]/overview`; `/audit/[id]` redirects there when the id is a v2 check the viewer may
   read, and is v1's page otherwise. A production build links a page's stylesheets for each module
   the page can reach, through `import()` too, so a flag branch in v1's page put v2's CSS on it
-  (measured on a production build: one more stylesheet on `/audit/[id]`, two more on `/`).
+  (measured on a production build of an earlier commit of this branch: four stylesheets on `/`
+  where main links one, and one more than main on `/audit/[id]`).
 - **D6, "the Free three fixes in full".** The engine writes no packet and no before/after for a
   fix today (`packages/engine/src/v2/grade/outcomes.ts`), so an open fix shows its title, its effect
   and the pages affected, and one line saying its steps are not written yet (the engine writes no
@@ -225,6 +224,13 @@ GeoIP lookup, a 2-second bound on the send, and nothing sent unless `serverCaptu
 cookies. They name the check by `check_ref`, a hash of its id. Client events go through posthog-js,
 which records the page URL as it does on v1's `/audit/[id]`.
 
+## The live run
+
+`__tests__/v2/public-checks.live.test.tsx` runs the start, the pipeline on the staging worker, the
+stream, the read-back and the result page's component in one process, on PGlite with a bucket in
+memory; its header lists what differs from production. It is skipped unless the worker's three
+values are in the environment.
+
 ## Before the flag is set
 
 - `V2_PIPELINE` on first, with the worker's environment (CC-20b's checklist).
@@ -246,6 +252,9 @@ which records the page URL as it does on v1's `/audit/[id]`.
   address with a zero 16-bit half (`packages/engine/src/ssrf-guard.ts`). The host rule here refuses
   an IP literal, so the way in is a DNS record, as on v1.
 - The v2 home emits the FAQ structured data and does not show the questions.
+- A batch object that stays unreadable for three tries is left off that viewing's live map, and
+  a read that hangs is not bounded by the stream. The stream stops reading for a client that has
+  gone, which no test covers.
 - A run of the expiry deletes 1,000 sites at most; a day with more expired sites than that leaves
   the rest for the next run. A site with very many rows may pass the database's statement timeout
   and be skipped each day; it is reported by id.
@@ -268,5 +277,6 @@ which records the page URL as it does on v1's `/audit/[id]`.
   (`lib/v2/format.ts`; rulings round 2, 0.3).
 - A challenge of one crawler is worded from that crawler's rows, with the control fetch beside it
   (`lib/v2/view/segment/access.ts`; 0.4).
-- Files outside the step's path list that the pages needed were approved as listed: the inventory
-  rows and generated specs 22 to 24, `lib/v2/format.ts`, and the shared test support (0.5).
+- The files outside the step's path list that workstream B changed were approved as it listed them:
+  the inventory's rows for the audit page, the generated specs 22 and 23, the pinned list of
+  flag-gated pages, and a shared test-support file (0.5).

@@ -217,7 +217,13 @@ describe('v2 stays out of live pages', () => {
   });
 
   it('no module that is not a test imports a test file, which the rule above lets import v2', () => {
-    const isTest = (file: string) => /\.test(\.tsx?)?$/.test(file);
+    // An import can name a test file with no extension, with its own, or with `.js` (which
+    // next.config.mjs resolves to the `.ts` or `.tsx` file).
+    const isTest = (file: string) => /\.test(\.[cm]?[jt]sx?)?$/.test(file);
+    for (const spec of ['./x.test', './x.test.ts', './x.test.tsx', '@/lib/x.test', './x.test.js'])
+      expect(isTest(spec), spec).toBe(true);
+    for (const spec of ['./x', './testing', './x.tests', './x.test.css', '@/lib/test'])
+      expect(isTest(spec), spec).toBe(false);
     const offenders: string[] = [];
     for (const file of sources.filter((f) => !isTest(f))) {
       for (const m of readFileSync(file, 'utf8').matchAll(SPEC)) {

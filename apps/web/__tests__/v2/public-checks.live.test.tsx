@@ -1,28 +1,33 @@
 /**
  * The live run of the public check flow (CC-22b): a visitor's start, the pipeline on the deployed
- * staging worker, the progress stream, the read-back and the rendered result page, in one process.
+ * staging worker, the progress stream, the read-back and the result page's markup, in one process.
  *
- * What is the product's own code: `startPublicCheck` with the real SSRF guard and real DNS; the
- * pipeline's steps and orchestration (`runCheck` over `checkSteps`, as CC-20b's live run); the
- * stream (`serveStream`), opened while the check runs and again after it ends; `loadCheckFor`; and
- * the result page's component. What differs from production:
+ * The product's own code that runs: `startPublicCheck` with the real SSRF guard and real DNS; the
+ * pipeline's steps and orchestration (`runCheck` over `checkSteps`, as CC-20b's live run);
+ * `serveStream`, opened while the check runs and again after it ends; `loadCheckFor`; and the
+ * result page's component, `CheckPage`.
  *
- * - the database is PGlite with every migration, through the SQL twins of the stores, where
- *   production runs the supabase-js stores over PostgREST;
- * - the evidence store is a bucket in memory, where production uses Storage;
- * - the start's limits, Turnstile and session answer "allowed, no session" (each has its own
- *   tests); the stream's limits are the harness's counters;
- * - each pipeline step runs once, with no retries and no replays, and each sleep is a real wait;
- * - the page is rendered to markup here, not served by Next.
+ * What differs from production:
+ * - No HTTP and no browser: the route files and the middleware are not run (`startPublicCheck`
+ *   and `serveStream` are called directly), the reconnect is this test's own loop with the last
+ *   event id, and `CheckPage` is rendered to markup here, not served by its page file.
+ * - No Inngest: each step runs once, with no retries and no replays, each sleep is a real wait,
+ *   `sendEvent` does nothing, and checkFn's onFailure and the cancel handler do not run.
+ * - The database is PGlite with the migrations applied, through the SQL twins of the stores,
+ *   where production runs the supabase-js stores over PostgREST.
+ * - The evidence store is a bucket in memory, where production uses Storage.
+ * - The start's limits, Turnstile and session answer "allowed, no session"; the stream's limits
+ *   are the harness's counters, and its `check_finished` capture goes to an array.
+ * - VERCEL_GIT_COMMIT_SHA is set to the commit under test.
  *
  * Nothing here reads or writes production data.
  *
  * Skipped unless the three worker values are in the environment (the gitignored scripts/.env.local):
  *
  *   set -a; . scripts/.env.local; set +a
- *   LIVE_OUT=<file> pnpm --filter @crawlmouse/web exec vitest run app/api/checks/live.test.tsx
+ *   LIVE_OUT=<file> pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/public-checks.live.test.tsx
  *
- * The summary line holds counts, step ids and the site's own host: no credential, no check id.
+ * The summary line holds counts and the site's own host: no credential, no check id, no request id.
  */
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -30,27 +35,22 @@ import { appendFileSync } from 'node:fs';
 import type { PGlite } from '@electric-sql/pglite';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { runCheck, type CheckStepTools } from '../../../../../inngest/check';
-import type { CheckRequested } from '../../../../../inngest/check-events';
-import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
-import { groupsOf, harness, request } from '../../../__tests__/v2/_lib/check-routes-harness';
-import { admitSiteHost } from '../../../lib/auth/admit-site';
-import { stepDeps } from '../../../lib/v2/pipeline/functions';
-import { loadCheckFor } from '../../../lib/v2/pipeline/load-for';
-import { checkSteps } from '../../../lib/v2/pipeline/steps';
-import { pglitePersistDb } from '../../../lib/v2/pipeline/test-support/pglite';
-import { memberUnderRls, planFromDb } from '../../../lib/v2/pipeline/test-support/public-checks';
-import { sqlPipelineStore } from '../../../lib/v2/pipeline/test-support/sql-store';
-import {
-  INITIAL_STATE,
-  reduce,
-  type CrawlState,
-  type ProgressEvent,
-} from '../../../lib/v2/progress';
-import { CheckPage } from '../../audit/[id]/_lib/CheckPage';
-import { startPublicCheck } from './_lib/start';
-import { sqlStartStore } from './_lib/start-store-sql';
-import { serveStream } from './[id]/stream/serve';
+import { runCheck, type CheckStepTools } from '../../../../inngest/check';
+import type { CheckRequested } from '../../../../inngest/check-events';
+import { applyAllMigrations, freshDb } from '../helpers/pglite-migrations';
+import { groupsOf, harness, request } from './_lib/check-routes-harness';
+import { admitSiteHost } from '../../lib/auth/admit-site';
+import { stepDeps } from '../../lib/v2/pipeline/functions';
+import { loadCheckFor } from '../../lib/v2/pipeline/load-for';
+import { checkSteps } from '../../lib/v2/pipeline/steps';
+import { pglitePersistDb } from '../../lib/v2/pipeline/test-support/pglite';
+import { memberUnderRls, planFromDb } from '../../lib/v2/pipeline/test-support/public-checks';
+import { sqlPipelineStore } from '../../lib/v2/pipeline/test-support/sql-store';
+import { INITIAL_STATE, reduce, type CrawlState, type ProgressEvent } from '../../lib/v2/progress';
+import { CheckPage } from '../../app/audit/[id]/_lib/CheckPage';
+import { startPublicCheck } from '../../app/api/checks/_lib/start';
+import { sqlStartStore } from '../../app/api/checks/_lib/start-store-sql';
+import { serveStream } from '../../app/api/checks/[id]/stream/serve';
 
 vi.mock('server-only', () => ({}));
 
@@ -129,6 +129,11 @@ describe.skipIf(!configured)('the public check flow on the staging worker, again
         { event: { data: sent[0]! }, step: tools, runId: `live-${randomUUID()}` },
         checkSteps(deps),
       );
+      // A run that throws ends the wait on the stream below: nothing here would fail the check's row.
+      let thrown: unknown = null;
+      run.catch((cause) => {
+        thrown = cause;
+      });
 
       // 3. The stream while the check runs: one connection, read to its close, with real time.
       h.deps.now = Date.now;
@@ -157,7 +162,8 @@ describe.skipIf(!configured)('the public check flow on the staging worker, again
           live,
         );
         cursor = groups.at(-1)?.id ?? cursor;
-        if (connections > 40) throw new Error('the stream did not end in 40 connections');
+        if (thrown !== null) throw thrown;
+        if (connections > 12) throw new Error('the stream did not end in 12 connections');
       }
       const result = await run;
       const wallS = Math.round((Date.now() - t0) / 1000);
@@ -221,7 +227,7 @@ describe.skipIf(!configured)('the public check flow on the staging worker, again
       expect(live.nodes.length).toBeGreaterThan(0);
       const crawled = new Set(read.dataset.page_results.map((p) => p.url));
       expect(live.nodes.filter((n) => !crawled.has(n.url))).toEqual([]);
-      // The page names the site and carries no id of the check's rows other than in its own links.
+      // The page names the site, and does not carry the site's id.
       expect(markup).toContain(HOST);
       expect(markup).not.toContain(read.dataset.sites[0]!.id);
     },
