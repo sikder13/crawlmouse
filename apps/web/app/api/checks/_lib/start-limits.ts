@@ -21,8 +21,8 @@ const HOUR_MS = 60 * 60 * 1000;
  * Repeats of a start whose check is already there that one address may send in an hour. The form
  * sends a request id a second time once, for a submit's second attempt after the person check
  * (components/v2/screens/home/start-check.ts), and mints a new id for each later submit. A repeat
- * under the limit costs a DNS lookup, the derived read and, while the check is queued, one
- * `check.requested` send.
+ * under the limit costs a DNS lookup, the derived read, this bucket's own count and, while the
+ * check is queued, `requestCheck`'s site read, its insert attempt and one `check.requested` send.
  */
 export const START_REPLAYS_PER_IP_PER_HOUR = 30;
 

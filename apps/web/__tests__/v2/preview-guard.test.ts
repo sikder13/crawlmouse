@@ -182,7 +182,7 @@ describe('v2 stays out of live pages', () => {
     V2_LIVE.some((dir) => file.startsWith(dir + '/')) ||
     file.startsWith(join(WEB_ROOT, 'components', 'v2') + '/') ||
     file.startsWith(join(WEB_ROOT, '__tests__', 'v2') + '/') ||
-    // A test beside the code it tests: no page imports a test file.
+    // A test beside the code it tests; the next case holds that no other module imports one.
     /\.test\.tsx?$/.test(file);
 
   const sources = walk(WEB_ROOT).filter(
@@ -211,6 +211,18 @@ describe('v2 stays out of live pages', () => {
         const spec = m[1] ?? '';
         const abs = resolveSpec(file, spec);
         if (abs && isV2(abs)) offenders.push(`${relative(WEB_ROOT, file)} -> ${spec}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('no module that is not a test imports a test file, which the rule above lets import v2', () => {
+    const isTest = (file: string) => /\.test(\.tsx?)?$/.test(file);
+    const offenders: string[] = [];
+    for (const file of sources.filter((f) => !isTest(f))) {
+      for (const m of readFileSync(file, 'utf8').matchAll(SPEC)) {
+        const spec = m[1] ?? '';
+        if (isTest(spec)) offenders.push(`${relative(WEB_ROOT, file)} -> ${spec}`);
       }
     }
     expect(offenders).toEqual([]);

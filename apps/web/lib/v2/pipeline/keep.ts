@@ -24,7 +24,8 @@
  * where that removal fails, a request is still in flight when the budget passes, or the process
  * stops first, the account stays on the row and the daily function removes the copies by name:
  * with the site's own objects when the site expires unkept (`expireUnkept`), and from
- * `settleKeptCheck` when another account kept it.
+ * `settleKeptCheck` when another account kept it, during SETTLE_SWEEP_MS after that claim
+ * (expire.ts).
  */
 import type { ClaimKeep } from '../../auth/claim';
 import type { Report } from '../../auth/door-store';

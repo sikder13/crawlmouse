@@ -291,7 +291,7 @@ $$;
 -- The first p_limit ended checks (finished, partial or failed), in id order after p_after, of sites
 -- an account keeps, that hold a stored evidence path under anon/, or whose site was updated at or
 -- after p_since and that either are a first audit or have an account in copied_for (a claim sets
--- sites.updated_at, so this lists a check claimed since then: its anon/ objects a failed removal may
+-- sites.updated_at, as any other write to the site's row does, so this lists a check claimed since then: its anon/ objects a failed removal may
 -- have left, and the copies a refused Keep of it may have left under another account). `strays` is
 -- the check's copied_for. `remaining` as above.
 

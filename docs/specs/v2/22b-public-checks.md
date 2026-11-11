@@ -24,9 +24,9 @@ Three things change with the flag unset:
 
 - The cookie banner writes the visitor's analytics decision to a `cm_consent` cookie beside
   localStorage (`lib/consent.ts`; owner ruling Q6).
-- The Sentry scrubber, on the server and in the browser, replaces the id in an `/audit/{id}` or
-  `/audits/{id}` path, as it did for `/checks/{id}` (`vitest lib/auth/sentry-scrub.test.ts`). A v1
-  audit id is a capability too.
+- The Sentry scrubber replaces the id in an `/audit/{id}` or `/audits/{id}` path, as it did on the
+  server for `/checks/{id}`, and it now runs in the browser too, where main ran none
+  (`vitest lib/auth/sentry-scrub.test.ts`). A v1 audit id is a capability too.
 - The middleware answers a cross-site POST to a new route 403 and a non-JSON one 415 before the
   route's own 404, as it does for the claim route (`vitest __tests__/security/json-body.test.ts`).
   This follows the plan review, not an owner ruling; it is listed for the owner in the pull request.
@@ -62,8 +62,9 @@ Three things change with the flag unset:
   the page can reach, through `import()` too, so a flag branch in v1's page put v2's CSS on it
   (measured on a production build: one more stylesheet on `/audit/[id]`, two more on `/`).
 - **D6, "the Free three fixes in full".** The engine writes no packet and no before/after for a
-  fix today (`packages/engine/src/v2/grade/outcomes.ts`), so an open fix shows its title, effect,
-  effort and evidence, and one line saying its steps are not written yet. No packet text is made
+  fix today (`packages/engine/src/v2/grade/outcomes.ts`), so an open fix shows its title, its effect
+  and the pages affected, and one line saying its steps are not written yet (the engine writes no
+  effort either). No packet text is made
   up in the web app. **"The primary action is Keep":** the result's orange button is the locked
   design's "Open the fix"; Keep is the bar below it. Not ruled on; listed for the owner in the pull
   request.
@@ -151,11 +152,15 @@ No event is replayed from a recording or estimated.
 lib/v2/pipeline/stream.budget.test.ts`, which prints the numbers): one batch result
   in memory at a time; a batch over 4 MiB gzipped or 16 MiB inflated is skipped and the stream
   carries steps and counts for it. Storage download time is not in the measurement.
-- The route polls every 1.5 s with two requests (the check with its site, and the batches after
-  the cursor), closes itself at 240 s inside a 300 s function
+- The route polls every 1.5 s with two requests (the check with its site, and the check's batch
+  rows), closes itself at 240 s inside a 300 s function
   limit, and resumes from `Last-Event-ID`; a cursor that does not parse answers 400. 120 opens an
   hour per address.
 - The capability is checked when the stream opens and again when the site's account changes.
+- A batch object that cannot be read is tried three times on a connection, a poll's wait apart,
+  then passed over and logged; that batch's pages stay off the live map for that viewing, and
+  the steps, counts and end still arrive (`vitest "app/api/checks/[id]/stream/serve.test.ts" -t
+"keeps failing"`).
 
 ## Notify and cancel (D9)
 
@@ -179,7 +184,9 @@ db/rollback.test.ts db/check.test.ts`).
   clears the expiry and rewrites the stored paths by explicit old/new pairs in one transaction, and
   the old objects are removed. `keep_check` refuses a check at or past `expires_at` on the
   database's clock. Before its first copy a claim records its account in `checks.copied_for`, so
-  copies left by a Keep that did not commit are removed by the claim or by the daily run.
+  copies left by a Keep that did not commit are removed by the claim, or by the daily run: with
+  the site when it expires unkept, and during three days after the claim when another account
+  kept it.
 - First audits: a site named on Sign-up when it is attached, and a claimed site whose claimed check
   failed. One per site (`stableId('first_audit', siteId)`), counted against `global:audits:day` and
   the host's hourly bucket, skipped under `CRAWL_PAUSED` or with `V2_PIPELINE` off. A skipped one
@@ -261,3 +268,5 @@ which records the page URL as it does on v1's `/audit/[id]`.
   (`lib/v2/format.ts`; rulings round 2, 0.3).
 - A challenge of one crawler is worded from that crawler's rows, with the control fetch beside it
   (`lib/v2/view/segment/access.ts`; 0.4).
+- Files outside the step's path list that the pages needed were approved as listed: the inventory
+  rows and generated specs 22 to 24, `lib/v2/format.ts`, and the shared test support (0.5).

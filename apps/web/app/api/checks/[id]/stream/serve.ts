@@ -138,6 +138,8 @@ export async function serveStream(
           if (!cursor.ended) {
             const startedAtMs = snapshot.startedAt === null ? null : Date.parse(snapshot.startedAt);
             for (const batch of storedCrawlBatches(snapshot)) {
+              // The client has gone: no more objects are read for it.
+              if (!open) break;
               if (batch.batch <= cursor.batch) continue;
               // One result in memory at a time: it is read, turned into events and dropped.
               const result = await readStored(deps, batch.batch, batch.resultPath!);

@@ -16,11 +16,16 @@ const h = vi.hoisted(() => ({
   deps: null as unknown,
   /** What the route handed to Next's `after`, to run once its response has gone. */
   afterTasks: [] as Array<() => unknown>,
+  /** Next refuses `after` outside a request scope; set to make it throw as Next does. */
+  afterThrows: false,
 }));
 vi.mock('server-only', () => ({}));
 vi.mock('next/server', async (original) => ({
   ...(await original<typeof import('next/server')>()),
-  after: (task: () => unknown) => void h.afterTasks.push(task),
+  after: (task: () => unknown) => {
+    if (h.afterThrows) throw new Error('`after` was called outside a request scope');
+    h.afterTasks.push(task);
+  },
 }));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => ({
@@ -365,6 +370,19 @@ describe('POST /api/checks, `check_started`', () => {
       body: { checkId: CHECK },
     });
     expect(h.afterTasks).toHaveLength(1);
+  });
+
+  it('when `after` refuses the task, the start still answers 200 and the event is captured', async () => {
+    h.afterThrows = true;
+    try {
+      expect(await read(await POST(post(VALID)))).toEqual({
+        status: 200,
+        body: { checkId: CHECK },
+      });
+      expect(captured.map((c) => c.body.event)).toEqual(['check_started']);
+    } finally {
+      h.afterThrows = false;
+    }
   });
 
   it('nothing is left for `after` when the request is answered with a check already there', async () => {
