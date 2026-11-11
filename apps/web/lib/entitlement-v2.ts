@@ -57,7 +57,7 @@ export interface TierGates {
   checksPerSiteDay: number;
   /**
    * Re-checks a member may ask for, per site per day (DECISION-LOG E6): `manual` and `fix_recheck`
-   * requests together, counted per site in the account's time zone by migration 20261112000001.
+   * requests together, counted per site over the last 24 hours by migration 20261112000001.
    */
   manualChecksPerSiteDay: number;
 }

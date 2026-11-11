@@ -9,6 +9,9 @@ import { readAccount } from '@/lib/v2/account/pages';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { dashboardView } from '@/lib/v2/view/dashboard';
 
+// Read per request: a build with the flag off would otherwise prerender this page as its 404.
+export const dynamic = 'force-dynamic';
+
 // Signed-in application surface, as v1's /dashboard: never a search result.
 export const metadata = {
   robots: { index: false, follow: true },
