@@ -193,7 +193,7 @@ const lenient = ROUTE_POLICIES.filter((p) => p.origin === 'lenient');
 const passes = (res: NextResponse) => res.headers.get('x-middleware-next') === '1';
 
 describe('a state-changing API request from another site is refused before the route runs', () => {
-  it('guards exactly the nineteen strict routes, named here', () => {
+  it('guards exactly the twenty-one strict routes, named here', () => {
     expect(guarded.map((p) => p.route).sort()).toEqual([
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
@@ -204,6 +204,8 @@ describe('a state-changing API request from another site is refused before the r
       'api/billing/portal',
       'api/billing/pro-trial/start',
       'api/checks/[id]/claim',
+      'api/fixes/[id]/done',
+      'api/fixes/[id]/email-developer',
       'api/me',
       'api/reports/[slug]/claim',
       'api/reports/[slug]/logo',

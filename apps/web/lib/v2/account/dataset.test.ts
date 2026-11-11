@@ -66,6 +66,8 @@ beforeAll(async () => {
     built,
     vantage: pageVantage(crawlRows(input.batches)),
     map_path: null,
+    // A site's first check: its build read no fixes.
+    read: [],
   });
 
   // A second site with no check yet, and a developer scoped to it alone.

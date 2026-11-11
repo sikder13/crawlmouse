@@ -48,6 +48,7 @@ const inputOf = (b: BuiltCheck = built): PersistInput => ({
   built: b,
   vantage,
   map_path: `anon/${b.check.site_id}/${b.check.id}/map.json.gz`,
+  read: [],
 });
 const site = () => recordedBuild().site;
 const checkOf = (b: BuiltCheck = built) => ({ ...recordedBuild().check, id: b.check.id });
@@ -73,7 +74,7 @@ describe('persistBuiltCheck: what it sends', () => {
   it('every row the builder made: the bulk rows staged in order, each page with its crawl row’s vantage, the rest in the last call', async () => {
     const { db, sent, stages } = recording({ written: true, counts: { page_results: 60 } });
     const outcome = await persistBuiltCheck(db, inputOf());
-    expect(outcome).toEqual({ written: true, counts: { page_results: 60 } });
+    expect(outcome).toEqual({ written: true, counts: { page_results: 60 }, verified: [] });
     const stagedRows = (collection: string) =>
       stages.filter(([, c]) => c === collection).flatMap(([, , , rows]) => rows);
     expect(stages.every(([id]) => id === built.check.id)).toBe(true);
@@ -104,6 +105,7 @@ describe('persistBuiltCheck: what it sends', () => {
     expect(p.usage_event).toBeNull();
     expect(p.diff_inputs).toEqual(built.diff_inputs);
     expect(p.map_path).toBe(inputOf().map_path);
+    expect(p.read).toEqual([]);
     expect(Object.keys(p).sort()).toEqual([
       'changes',
       'check',
@@ -112,6 +114,7 @@ describe('persistBuiltCheck: what it sends', () => {
       'fixes',
       'lineages',
       'map_path',
+      'read',
       'staged',
       'usage_event',
     ]);
@@ -119,7 +122,11 @@ describe('persistBuiltCheck: what it sends', () => {
 
   it('stops staging once a stage answers that the check is written, and still asks the last call', async () => {
     const { db, sent, stages } = recording({ written: false, counts: {} }, false);
-    expect(await persistBuiltCheck(db, inputOf())).toEqual({ written: false, counts: {} });
+    expect(await persistBuiltCheck(db, inputOf())).toEqual({
+      written: false,
+      counts: {},
+      verified: [],
+    });
     expect(stages).toHaveLength(1);
     expect(sent).toHaveLength(1);
   });
@@ -339,11 +346,15 @@ describe('persist_built_check, through persistBuiltCheck', () => {
         link_edges: built.link_edges.length,
         access_tests: built.access_tests.length,
         fixes: built.fixes.length,
+        fixes_withheld: 0,
         fix_events: built.fix_events.length,
+        fix_events_withheld: 0,
         changes: built.changes.length,
+        changes_withheld: 0,
         usage_events: 0,
         usage_events_skipped: 0,
       },
+      verified: [],
     });
     expect(await count('page_results')).toBe(built.page_results.length);
     expect(await count('link_edges')).toBe(built.link_edges.length);
@@ -691,7 +702,7 @@ describe('persist_built_check, through persistBuiltCheck', () => {
     );
     await seedRunningCheck(db, site(), checkOf());
     await expect(persistBuiltCheck(pglitePersistDb(db), inputOf())).rejects.toThrow(
-      new RegExp(`wrote ${built.fixes.length - 1} of ${built.fixes.length} fixes`),
+      new RegExp(`wrote ${built.fixes.length - 1} and withheld 0 of ${built.fixes.length} fixes`),
     );
     expect(await count('page_results')).toBe(0);
   });
@@ -842,6 +853,7 @@ function atTheCap(): PersistInput {
     built: { ...built, page_results, link_edges },
     vantage: capVantage,
     map_path: `anon/${built.check.site_id}/${built.check.id}/map.json.gz`,
+    read: [],
   };
 }
 
@@ -927,13 +939,15 @@ describe('a built check at the page cap (Q11)', () => {
 
 /**
  * GUARD: a built check's rows are written by persist.ts, through migration 008's functions, and by
- * no other code the scan reads (D5).
+ * no other code the scan reads (D5), but for the fix lifecycle CC-26b adds (D5, plan revision R16):
+ * a member's mark done, which fixes-store.ts sends to mark_fix_done, and migration 20261112000001,
+ * which defines mark_fix_done and redefines persist_built_check, with its revert restoring 008's.
  *
  * WHAT IT SCANS: the .ts, .tsx, .js, .mjs, .cjs and .sql files under apps/web, inngest, scripts,
  * packages and infra (`sources` below), leaving out files named `*.test.<ext>` or `*.spec.<ext>` and
- * directories named node_modules, .next, .turbo, dist, coverage, `__tests__` or `test-support`. Two
- * files may write: WRITER and MIGRATION. The tests below require writes found in both (so the scan is
- * seen to work on the real code) and in no other file.
+ * directories named node_modules, .next, .turbo, dist, coverage, `__tests__` or `test-support`. The
+ * files in WRITERS may write, each exactly the names WRITERS gives it. The tests below require those
+ * names found in each (so the scan is seen to work on the real code) and a write in no other file.
  *
  * WHAT COUNTS AS A WRITE, in code, read from the TypeScript AST (the `typescript` package):
  *   - a call of `from` (`x.from(…)`, `x?.from(…)`, `x['from'](…)`, or a bare `from(…)`) whose first
@@ -970,7 +984,18 @@ const WRITTEN = new Set([
   'measurement_lineages',
   'persist_chunks',
 ]);
-const PERSIST_FUNCTIONS = new Set(['persist_built_check', 'stage_check_rows']);
+const PERSIST_FUNCTIONS = new Set(['persist_built_check', 'stage_check_rows', 'mark_fix_done']);
+
+/** The persist body's tables: what 008 writes, and what 026b's redefinition and its revert write. */
+const PERSIST_BODY = [...WRITTEN];
+/** Each file that may write, and the names it writes, in the order the scan finds them in code. */
+const WRITERS: Readonly<Record<string, readonly string[]>> = {
+  [WRITER]: ['stage_check_rows', 'persist_built_check'],
+  [MIGRATION]: PERSIST_BODY,
+  'apps/web/lib/v2/account/fixes-store.ts': ['mark_fix_done'],
+  'infra/supabase/migrations/20261112000001_v2_026b_sites_fixes.sql': PERSIST_BODY,
+  'infra/supabase/rollbacks/20261112000001_v2_026b_sites_fixes.revert.sql': PERSIST_BODY,
+};
 
 const named = (names: Set<string>) => `(?:"?public"?\\s*\\.\\s*)?"?(${[...names].join('|')})"?\\b`;
 const SQL_WRITES = [
@@ -1521,7 +1546,7 @@ describe('the one-writer guard: what counts as a write', () => {
   });
 });
 
-describe('persist.ts and migration 008 are the only code that writes a built check’s rows', () => {
+describe('the writers in WRITERS are the only code that writes a built check’s rows', () => {
   let files: string[];
   let found: (Write & { file: string })[];
   beforeAll(() => {
@@ -1545,26 +1570,23 @@ describe('persist.ts and migration 008 are the only code that writes a built che
     expect(files.filter((f) => f.startsWith('infra/supabase/migrations/')).length).toBeGreaterThan(
       40,
     );
-    expect(files).toContain(WRITER);
-    expect(files).toContain(MIGRATION);
+    for (const file of Object.keys(WRITERS)) expect(files).toContain(file);
     expect(files.some((f) => /\.(test|spec)\./.test(f) || f.includes('/test-support/'))).toBe(
       false,
     );
   });
 
-  it('finds the writes of persist.ts and of migration 008, each table and function by name', () => {
-    expect(found.filter((w) => w.file === WRITER).map((w) => w.name)).toEqual([
-      'stage_check_rows',
-      'persist_built_check',
-    ]);
-    expect(new Set(found.filter((w) => w.file === MIGRATION).map((w) => w.name))).toEqual(
-      new Set([...WRITTEN]),
-    );
+  it('finds each writer’s writes, each table and function by name, and nothing else in it', () => {
+    expect(found.filter((w) => w.file === WRITER).map((w) => w.name)).toEqual(WRITERS[WRITER]);
+    for (const [file, names] of Object.entries(WRITERS))
+      expect(new Set(found.filter((w) => w.file === file).map((w) => w.name)), file).toEqual(
+        new Set(names),
+      );
   });
 
   it('finds no write in any other file', () => {
     const others = found
-      .filter((w) => w.file !== WRITER && w.file !== MIGRATION)
+      .filter((w) => !Object.hasOwn(WRITERS, w.file))
       .map((w) => `${w.file}:${w.line}: ${w.name}`);
     expect(others).toEqual([]);
   });
