@@ -97,9 +97,59 @@ describe('markDone', () => {
     ]);
   });
 
-  it('a form is sent to the site’s page', async () => {
+  it('a form is sent to the site’s page, saying the mark is made and its re-check queued', async () => {
     const res = await mark(fw.w.ownerId, fw.ranked[1]!, 'form');
-    expect([res.status, res.headers.get('location')]).toEqual([303, `/sites/${fw.w.site1}`]);
+    expect([res.status, res.headers.get('location')]).toEqual([
+      303,
+      `/sites/${fw.w.site1}?notice=marked_done`,
+    ]);
+  });
+
+  it('a form whose re-check was not queued is told why, the mark standing', async () => {
+    const next = '2026-11-11T09:00:00.000Z';
+    for (const [outcome, query] of [
+      [
+        { queued: false, reason: 'capped', nextAllowedAt: next },
+        `notice=marked_done_capped&next=${encodeURIComponent(next)}`,
+      ],
+      [
+        { queued: false, reason: 'check_running', checkId: randomUUID() },
+        'notice=marked_done_check_running',
+      ],
+      [{ queued: false, reason: 'capacity' }, 'notice=marked_done_capacity'],
+      [{ queued: false, reason: 'paused' }, 'notice=marked_done_site_paused'],
+      [{ queued: false, reason: 'removed' }, 'notice=marked_done_not_checked'],
+    ] as [RecheckOutcome, string][]) {
+      recheck = outcome;
+      const fix = await freshOpenFix();
+      const res = await mark(fw.w.ownerId, fix, 'form');
+      expect([res.status, res.headers.get('location')]).toEqual([
+        303,
+        `/sites/${fw.w.site1}?${query}`,
+      ]);
+      expect((await state(fix)).status).toBe('marked_done');
+    }
+  });
+
+  it('a refused form goes back to the site’s page with the notice: the gate, and not markable', async () => {
+    const hidden = await mark(fw.w.ownerId, fw.ranked[3]!, 'form');
+    expect([hidden.status, hidden.headers.get('location')]).toEqual([
+      303,
+      `/sites/${fw.w.site1}?notice=upgrade_required`,
+    ]);
+    const fix = fw.ranked[2]!;
+    await db.query(
+      `update public.site_fixes set status = 'verified_resolved', last_state = 'not_detected', rank = null
+        where id = $1`,
+      [fix],
+    );
+    await makePro(db, fw.w.accountId);
+    const done = await mark(fw.w.ownerId, fix, 'form');
+    expect([done.status, done.headers.get('location')]).toEqual([
+      303,
+      `/sites/${fw.w.site1}?notice=not_markable`,
+    ]);
+    expect(asked).toEqual([]);
   });
 
   it('marking again writes no second event and sends no second fix_marked_done, and asks for the re-check again', async () => {

@@ -5,7 +5,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { captureFor } from '@/lib/v2/account/events';
 import { markDone } from '@/lib/v2/account/fixes';
 import { supabaseFixesStore } from '@/lib/v2/account/fixes-store';
-import { isId, notFound, readBody, refuse, serviceRefusal } from '@/lib/v2/account/route';
+import { isId, notFound, readBody, refuse, refuseTo } from '@/lib/v2/account/route';
 import { supabaseRequestRecheck } from '@/lib/v2/account/sites-store';
 
 export const runtime = 'nodejs';
@@ -19,8 +19,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!checksPublicEnabled()) return notFound();
-  if (isCrawlPaused()) return serviceRefusal('paused');
-  if (!pipelineEnabled()) return serviceRefusal('unavailable');
+  // Before the fix is read there is no site page to go back to: a form goes to the dashboard.
+  if (isCrawlPaused()) return refuseTo(req, '/dashboard', 503, 'paused');
+  if (!pipelineEnabled()) return refuseTo(req, '/dashboard', 503, 'unavailable');
 
   const sb = await supabaseServer();
   const {

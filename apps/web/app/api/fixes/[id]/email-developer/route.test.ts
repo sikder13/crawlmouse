@@ -190,3 +190,36 @@ describe('POST /api/fixes/[id]/email-developer', () => {
     },
   );
 });
+
+describe('POST /api/fixes/[id]/email-developer from a live form', () => {
+  const FORM = 'application/x-www-form-urlencoded';
+  const where = (res: Response) => [res.status, res.headers.get('location')];
+
+  it('recorded: back to the dashboard saying so, the address not in the address bar', async () => {
+    const res = await post(fw.ranked[0]!, 'email=dev%40agency.example', FORM);
+    expect(where(res)).toEqual([303, '/dashboard?notice=email_requested']);
+    expect(h.sent).toHaveLength(1);
+  });
+
+  it('an address that is not one: back with invalid_email, nothing recorded', async () => {
+    const res = await post(fw.ranked[0]!, 'email=nope', FORM);
+    expect(where(res)).toEqual([303, '/dashboard?notice=invalid_email']);
+    expect(h.sent).toEqual([]);
+  });
+
+  it('over a limit: back with rate_limited and when the limit resets', async () => {
+    h.limited.add('fix-email:user');
+    const res = await post(fw.ranked[0]!, 'email=dev%40agency.example', FORM);
+    expect(res.status).toBe(303);
+    const to = new URL(res.headers.get('location')!, 'https://crawlmouse.com');
+    expect(to.pathname).toBe('/dashboard');
+    expect(to.searchParams.get('notice')).toBe('rate_limited');
+    expect(Date.parse(to.searchParams.get('next')!)).toBeGreaterThan(Date.now());
+    expect(h.sent).toEqual([]);
+  });
+
+  it('a fix the tier does not open: back with upgrade_required', async () => {
+    const res = await post(fw.ranked[3]!, 'email=dev%40agency.example', FORM);
+    expect(where(res)).toEqual([303, '/dashboard?notice=upgrade_required']);
+  });
+});

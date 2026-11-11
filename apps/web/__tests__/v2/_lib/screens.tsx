@@ -8,8 +8,12 @@ import { ResultScreen } from '../../../components/v2/screens/result/ResultScreen
 import { ResultState } from '../../../components/v2/screens/result/ResultStates';
 import { DashboardScreen } from '../../../components/v2/screens/dashboard/DashboardScreen';
 import { SiteScreen } from '../../../components/v2/screens/site/SiteScreen';
+import { FirstCheckScreen } from '../../../components/v2/screens/site/FirstCheckScreen';
+import { AccountStateScreen } from '../../../components/v2/screens/account/AccountStateScreen';
 import {
   dashboardPreview,
+  firstCheckPreview,
+  noSitePreview,
   shellPreview,
   sitePreview,
 } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
@@ -84,6 +88,11 @@ export const ACCOUNT_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/site/withheld': () => (
     <SiteScreen data={sitePreview('withheld')} shell={shellPreview('withheld')} />
   ),
+  // CC-26b: the states a live account reaches that no fixture moment holds.
+  '/v2-preview/screens/dashboard/no-site': () => <DashboardScreen data={noSitePreview()} />,
+  '/v2-preview/screens/site/first-check': () => <FirstCheckScreen data={firstCheckPreview()} />,
+  '/v2-preview/screens/dashboard/no-account': () => <AccountStateScreen state="no_account" />,
+  '/v2-preview/screens/dashboard/ambiguous': () => <AccountStateScreen state="ambiguous" />,
 };
 
 /**

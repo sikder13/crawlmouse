@@ -46,6 +46,37 @@ describe('noticeLine', () => {
     ],
     ['trial_failed', 'The trial did not start. Nothing was changed; try again later.'],
     ['trial_unavailable', 'Trials cannot be started right now. Try again later.'],
+    ['not_markable', 'That fix cannot be marked done: it is already marked, or no longer open.'],
+    ['marked_done', 'Marked done. A re-check is queued; it confirms the fix or reopens it.'],
+    [
+      'marked_done_capped',
+      'Marked done. This site has used its re-checks for the last 24 hours, so none was queued; the next check confirms the fix or reopens it. A re-check can be asked from Tue 13:30.',
+    ],
+    [
+      'marked_done_check_running',
+      'Marked done. A check of this site was already running, so no re-check was queued; ask for one once it ends. The next check confirms the fix or reopens it.',
+    ],
+    [
+      'marked_done_capacity',
+      'Marked done. Today’s checks are all taken, so no re-check was queued; the next check confirms the fix or reopens it.',
+    ],
+    [
+      'marked_done_site_paused',
+      'Marked done. Checks of this site are paused, so no re-check was queued; the next check confirms the fix or reopens it.',
+    ],
+    [
+      'marked_done_not_checked',
+      'Marked done. No re-check was queued; the next check confirms the fix or reopens it.',
+    ],
+    [
+      'email_requested',
+      'Recorded. The fix will be emailed to that address; it has not been sent yet.',
+    ],
+    ['invalid_email', 'That is not an email address, so nothing was recorded.'],
+    [
+      'rate_limited',
+      'Too many emails were asked for in a short time, so nothing was recorded. Ask again from Tue 13:30.',
+    ],
     ['invalid', 'That request was not understood, so nothing was changed.'],
   ] as const)('%s', (code, line) => {
     expect(noticeLine({ notice: code, next: NEXT }, ZONE)).toEqual({ code, text: line });
@@ -58,6 +89,12 @@ describe('noticeLine', () => {
   it('a cap with no readable time leaves the time out rather than guess', () => {
     expect(noticeLine({ notice: 'capped', next: 'soon' }, ZONE)!.text).toBe(
       'This site has used its re-checks for the last 24 hours on your plan.',
+    );
+  });
+
+  it('a capped mark with no time still says the mark stands', () => {
+    expect(noticeLine({ notice: 'marked_done_capped' }, ZONE)!.text).toBe(
+      'Marked done. This site has used its re-checks for the last 24 hours, so none was queued; the next check confirms the fix or reopens it.',
     );
   });
 
