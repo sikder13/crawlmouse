@@ -65,6 +65,15 @@ const heap = (): number => {
 };
 const mib = (bytes: number) => Math.round((bytes / 1024 / 1024) * 100) / 100;
 
+interface BatchCost {
+  gzip: number;
+  raw: number;
+  readMs: number;
+  heldBytes: number;
+  events: number;
+  eventBytes: number;
+}
+
 async function measure(name: string, textChars: number, linksPerPage: number) {
   const results = batchesOf(textChars, linksPerPage);
   const objects = results.map((r) => gzipJson(r));
@@ -72,7 +81,7 @@ async function measure(name: string, textChars: number, linksPerPage: number) {
   const evidence = { get: async (path: string) => objects[paths.indexOf(path)]! };
 
   // One batch at a time, as the route reads them.
-  const perBatch = [];
+  const perBatch: BatchCost[] = [];
   let cursor = START;
   for (let i = 0; i < objects.length; i++) {
     const before = heap();
@@ -140,9 +149,8 @@ async function measure(name: string, textChars: number, linksPerPage: number) {
   const body = await res.text();
   const replayMs = performance.now() - t0;
 
-  const max = (pick: (b: (typeof perBatch)[number]) => number) => Math.max(...perBatch.map(pick));
-  const sum = (pick: (b: (typeof perBatch)[number]) => number) =>
-    perBatch.reduce((n, b) => n + pick(b), 0);
+  const max = (pick: (b: BatchCost) => number) => Math.max(...perBatch.map(pick));
+  const sum = (pick: (b: BatchCost) => number) => perBatch.reduce((n, b) => n + pick(b), 0);
   return {
     shape: name,
     pages: PAGES,

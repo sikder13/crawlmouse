@@ -15,7 +15,8 @@ import { memoryEvidenceStore } from '../../../../../lib/v2/pipeline/test-support
 import { pgliteCheckReader } from '../../../../../lib/v2/pipeline/test-support/pglite';
 import { sqlPipelineStore } from '../../../../../lib/v2/pipeline/test-support/sql-store';
 import { ProgressEventSchema, type ProgressEvent } from '../../../../../lib/v2/progress';
-import { capturePublicEvent, type CaptureBody } from '../../_lib/events';
+import type { CaptureBody } from '../../../../../lib/analytics-server';
+import { capturePublicEvent } from '../../_lib/events';
 import type { CancelDeps } from '../cancel/cancel';
 import type { NotifyDeps } from '../notify/notify';
 import type { StreamDeps } from '../stream/serve';
