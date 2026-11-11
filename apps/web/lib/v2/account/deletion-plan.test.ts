@@ -39,7 +39,7 @@ const site = (accountId: string, host: string, at: string) =>
   ]);
 
 describe('deletionAccounts', () => {
-  it('names the account by its oldest live primary site, not a newer one, a staging copy or a removed one', async () => {
+  it('names the account by its oldest live site, not a newer one or a removed one', async () => {
     const userId = await signUp(db, `del-${randomUUID().slice(0, 8)}@example.com`);
     const { accountId } = await personalAccount(db, userId);
     await site(accountId, 'newer.example', '2026-10-02T00:00:00Z');
