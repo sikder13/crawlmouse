@@ -48,6 +48,17 @@ type Events = {
   'check.finished': { data: CheckFinished };
   'check.failed': { data: CheckFailed };
   'check.cancel.requested': { data: CheckCancelRequested };
+  // CC-26b: a member asked for a fix's packet to be emailed to a developer
+  // (POST /api/fixes/[id]/email-developer). CC-28's mailer sends it; nothing in CC-26b does.
+  'fix.email_developer_requested': {
+    data: {
+      fixId: string;
+      siteId: string;
+      accountId: string;
+      requestedBySeatId: string;
+      to: string;
+    };
+  };
 };
 
 export const inngest = new Inngest({
