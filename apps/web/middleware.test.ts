@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { NextRequest, NextResponse, type NextFetchEvent } from 'next/server';
 import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
 import { config, handleEdge, middleware } from './middleware';
@@ -83,6 +83,58 @@ describe('handleEdge', () => {
   });
 });
 
+describe('the v2 dashboard rewrite (CC-26b D1)', () => {
+  const at = (path: string) => new NextRequest(new Request(`https://crawlmouse.com${path}`));
+  const rewriteOf = (res: NextResponse) => res.headers.get('x-middleware-rewrite');
+
+  /** A refresh that rotated the session: a cookie on the response, no-store headers beside it. */
+  function rotated(req: NextRequest) {
+    req.cookies.set(AUTH_COOKIE, 'fresh-token');
+    const res = NextResponse.next({ request: req });
+    res.cookies.set(AUTH_COOKIE, 'fresh-token', { path: '/' });
+    res.headers.set('cache-control', 'private, no-cache, no-store, must-revalidate, max-age=0');
+    return Promise.resolve(res);
+  }
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each(['/dashboard', '/dashboard/'])(
+    'with V2_CHECKS_PUBLIC=1, %s is served by /dashboard/v2',
+    async (path) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+      const res = await handleEdge(at(path), rotated);
+      expect(rewriteOf(res)).toBe('https://crawlmouse.com/dashboard/v2');
+    },
+  );
+
+  it('keeps the query string (v1 reads ?upgraded=1)', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const res = await handleEdge(at('/dashboard?upgraded=1'), rotated);
+    expect(rewriteOf(res)).toBe('https://crawlmouse.com/dashboard/v2?upgraded=1');
+  });
+
+  it('the rewrite keeps the rotated session: its cookie, its no-store header and the updated request', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const res = await handleEdge(at('/dashboard'), rotated);
+    expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
+    expect(res.headers.get('cache-control')).toContain('no-store');
+    expect(res.headers.get('x-middleware-request-cookie')).toContain('fresh-token');
+    expect(res.cookies.get(CONSENT_REQUIRED_COOKIE)).toBeDefined();
+  });
+
+  it.each([
+    ['the flag unset', '', '/dashboard'],
+    ['the flag not 1', 'true', '/dashboard'],
+    ['another page', '1', '/dashboard/x'],
+    ['the home page', '1', '/'],
+  ])('no rewrite with %s', async (_name, flag, path) => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+    const res = await handleEdge(at(path), rotated);
+    expect(rewriteOf(res)).toBeNull();
+    expect(res.cookies.get(AUTH_COOKIE)?.value).toBe('fresh-token');
+  });
+});
+
 describe('middleware (exported entrypoint)', () => {
   it('wires handleEdge → updateSession end-to-end and returns a response with the consent cookie for an anonymous request', async () => {
     const event = { waitUntil: vi.fn() } as unknown as NextFetchEvent;
@@ -141,7 +193,7 @@ const lenient = ROUTE_POLICIES.filter((p) => p.origin === 'lenient');
 const passes = (res: NextResponse) => res.headers.get('x-middleware-next') === '1';
 
 describe('a state-changing API request from another site is refused before the route runs', () => {
-  it('guards exactly the fourteen strict routes, named here', () => {
+  it('guards exactly the nineteen strict routes, named here', () => {
     expect(guarded.map((p) => p.route).sort()).toEqual([
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
@@ -150,11 +202,16 @@ describe('a state-changing API request from another site is refused before the r
       'api/billing/cancel',
       'api/billing/checkout',
       'api/billing/portal',
+      'api/billing/pro-trial/start',
       'api/checks/[id]/claim',
+      'api/me',
       'api/reports/[slug]/claim',
       'api/reports/[slug]/logo',
       'api/reports/[slug]/visibility',
       'api/reports/[slug]/white-label',
+      'api/sites',
+      'api/sites/[id]',
+      'api/sites/[id]/checks',
       'api/verify/check/[id]',
       'api/verify/start',
     ]);
