@@ -15,7 +15,7 @@ import { recordedBuild } from '../../../../../../packages/engine/fixtures/v2/bui
 import { asRole } from '../../../../__tests__/helpers/pglite-migrations';
 import { putJson } from '../evidence';
 import { ACCOUNT_CLOCK_COLUMNS, clockFromAccountRow, fixPlanOf } from '../load-for';
-import { pageVantage, persistBuiltCheck } from '../persist';
+import { pageVantage, persistBuiltCheck, readOfFixes } from '../persist';
 import type { PublicCheckDeps } from '../public';
 import { evidencePath, type EvidenceStore } from '../types';
 import { memoryEvidenceStore } from './memory-evidence';
@@ -86,6 +86,8 @@ export async function persistBuild(
     built,
     vantage: pageVantage(crawlPages(input.batches)),
     map_path,
+    // What this build read of the site's fixes, as the finish step hands it on (CC-26b's watermark).
+    read: readOfFixes(input.fixes, input.events),
   });
   return built;
 }
