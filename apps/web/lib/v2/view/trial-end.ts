@@ -216,7 +216,7 @@ export function trialEndView(
 
   return {
     // Reached from the dashboard's banner: it sits under Sites, as Final-TrialEnd marks it.
-    shell: accountShellView(v, 'Sites', { plan: 'page', billingEnd }),
+    shell: accountShellView(v, 'Sites', { plan: 'page', billingEnd, role }),
     header: {
       title: COPY.title(days, plan),
       line,
@@ -371,7 +371,7 @@ export function trialEndedView(
   const zone = a.timezone;
   const { stays, pauses } = staysAndPauses(v, plan);
   return {
-    shell: accountShellView(v, 'Sites', { plan: 'page' }),
+    shell: accountShellView(v, 'Sites', { plan: 'page', role }),
     header: {
       title: COPY.ended.title(plan),
       line: [dayDate(v.now, zone), COPY.sites(v.d.sites.length)].join(' · '),

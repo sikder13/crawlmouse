@@ -368,7 +368,7 @@ export function settingsView(
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
-    shell: accountShellView(v, 'Settings', { plan: 'page', billingEnd }),
+    shell: accountShellView(v, 'Settings', { plan: 'page', billingEnd, role }),
     header: {
       title: COPY.title,
       line: [a.email, trial ? COPY.trialLeft(plan, days!) : plan].join(' · '),
@@ -558,7 +558,7 @@ export function deleteStepView(
   const site = primarySites(v).length ? primarySite(v) : null;
   const expected = site ? site.host : a.email;
   return {
-    shell: accountShellView(v, 'Settings'),
+    shell: accountShellView(v, 'Settings', { role }),
     header: { title: COPY.deleteLabel, line: a.email },
     cardTitle: COPY.deleteCardTitle,
     text: deleteText(v),

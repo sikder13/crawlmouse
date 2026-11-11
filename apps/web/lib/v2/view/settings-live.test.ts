@@ -159,3 +159,27 @@ describe('the delete step when the request would be refused (CC-27b review, item
     expect(v.submit).not.toBeNull();
   });
 });
+
+describe('the rail’s trial card for each role (fix round 2, item 2)', () => {
+  // bad-site at its as_of is past its first run, so the rail's card carries Keep.
+  const home = fixture('bad-site');
+
+  it('offers the owner Keep, and a manager neither Keep nor Billing', () => {
+    const owner = deleteStepView(home, ACCOUNT_VIEWERS.home(), { role: 'owner' }).shell.trial;
+    expect(owner?.keep).toMatchObject({ href: '/api/billing/checkout' });
+    for (const role of ['account_manager', 'developer'] as const) {
+      const card = deleteStepView(home, ACCOUNT_VIEWERS.home(), { role }).shell.trial;
+      expect(card).not.toBeNull();
+      expect(card!.keep).toBeNull();
+      expect(card!.billing).toBeNull();
+    }
+  });
+
+  it('on the first run, Billing is the owner’s alone', () => {
+    const day0 = ACCOUNT_VIEWERS.day0();
+    expect(deleteStepView(home, day0, { role: 'owner' }).shell.trial?.billing).toMatchObject({
+      href: '/settings/plan',
+    });
+    expect(deleteStepView(home, day0, { role: 'account_manager' }).shell.trial?.billing).toBeNull();
+  });
+});
