@@ -140,7 +140,7 @@ describe('the flag and the session', () => {
     h.state.user = null;
     const res = await post(form);
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: 'auth_required' });
+    expect(await res.json()).toEqual({ code: 'auth_required' });
     expect(h.log).toEqual(['getUser']);
   });
 });
@@ -163,7 +163,7 @@ describe('membership', () => {
     h.state.role = role;
     const res = await post(form);
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: 'not_owner' });
+    expect(await res.json()).toEqual({ code: 'not_owner' });
     expect(h.log).not.toContain('supabaseAdmin');
     expect(h.startTrial).not.toHaveBeenCalled();
   });
@@ -209,7 +209,7 @@ describe('the owner', () => {
     h.state.trialUsedAt = '2026-10-01T00:00:00.000Z';
     const res = await post(form);
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: 'not_eligible' });
+    expect(await res.json()).toEqual({ code: 'not_eligible' });
     expect(h.startTrial).not.toHaveBeenCalled();
     expect(h.dispatch).not.toHaveBeenCalled();
     expect(h.capture).not.toHaveBeenCalled();
@@ -219,7 +219,7 @@ describe('the owner', () => {
     h.state.decision = { outcome: 'refused', hits: ['device'] };
     const res = await post(form);
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: 'refused' });
+    expect(await res.json()).toEqual({ code: 'refused' });
     expect(h.dispatch).not.toHaveBeenCalled();
     expect(h.capture).not.toHaveBeenCalled();
   });

@@ -604,6 +604,7 @@ What the brief adds that no locked screen has, marked `data-v2-addition` where i
 | site      | A crawler row read aloud in full ("Googlebot: allowed by robots.txt at all six checks"), and each glyph cell’s verdict in words, for screen readers | CC-26 brief, scope 6 (accessibility); FACTS row 223 |
 | site      | A site whose first check has not ended: its state, the pages read so far and a link to the check                                                    | CC-26b brief, D8                                    |
 | site      | A Mark done control on each fix row still to do, on a live page                                                                                     | CC-26b plan revision R13                            |
+| site      | A fix marked done and not yet measured: its note says the next check confirms the fix or reopens it; no undo is offered                             | CC-26b owner ruling Q4                              |
 
 ## The routes CC-26b wires
 

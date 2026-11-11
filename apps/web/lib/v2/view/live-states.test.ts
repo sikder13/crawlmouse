@@ -235,3 +235,30 @@ describe('the site page’s fix rows', () => {
     }
   });
 });
+
+describe('a fix marked done and not yet measured (owner ruling Q4)', () => {
+  it('says the next check confirms it or reopens it, and offers no undo or second mark', () => {
+    const base = siteView(bad, { accountId: ACCOUNT, now: bad.as_of }, OUTFITTER);
+    const row = base.fixes.rows.find((r) => r.markDone !== null)!;
+    const at = new Date(Date.parse(bad.as_of) - 3_600_000).toISOString();
+    const marked: FixtureDataset = {
+      ...bad,
+      fix_events: [
+        ...bad.fix_events,
+        {
+          id: 'f0000000-0000-4000-8000-0000000000aa',
+          fix_id: row.key,
+          at,
+          kind: 'marked_done',
+          by_seat_id: bad.seats[0]!.id,
+        },
+      ],
+    };
+    const v = siteView(marked, { accountId: ACCOUNT, now: bad.as_of }, OUTFITTER);
+    const after = v.fixes.rows.find((r) => r.key === row.key)!;
+    expect(after.note).toMatch(/^marked done \w+; the next check confirms the fix or reopens it$/);
+    expect(after.markDone).toBeNull();
+    const labels = JSON.stringify(v).toLowerCase();
+    expect(labels).not.toMatch(/undo|unmark|reopen this/);
+  });
+});

@@ -23,19 +23,19 @@ export interface ProTrialInput {
 
 export type ProTrialAnswer =
   | { outcome: 'started'; variant: 'no_card' }
-  | { outcome: Exclude<TrialOutcome, 'started'>; status: number; error: string };
+  | { outcome: Exclude<TrialOutcome, 'started'>; status: number; code: string };
 
 /** What each outcome other than `started` answers. */
 export const REFUSALS: Record<
   Exclude<TrialOutcome, 'started'>,
-  { status: number; error: string }
+  { status: number; code: string }
 > = {
-  not_eligible: { status: 409, error: 'not_eligible' },
-  denied: { status: 409, error: 'refused' },
-  not_first: { status: 409, error: 'conflict' },
-  failed: { status: 500, error: 'trial_failed' },
-  no_pepper: { status: 503, error: 'trial_unavailable' },
-  no_account: { status: 404, error: 'not_found' },
+  not_eligible: { status: 409, code: 'not_eligible' },
+  denied: { status: 409, code: 'refused' },
+  not_first: { status: 409, code: 'conflict' },
+  failed: { status: 500, code: 'trial_failed' },
+  no_pepper: { status: 503, code: 'trial_unavailable' },
+  no_account: { status: 404, code: 'not_found' },
 };
 
 const date = z

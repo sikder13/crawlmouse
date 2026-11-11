@@ -291,8 +291,7 @@ function noteOf(v: AccountView, f: Fix): string | null {
     .sort((a, b) => instant(a.at) - instant(b.at));
   const marked = events.filter((e) => e.kind === 'marked_done').at(-1);
   if (!marked) return null;
-  if (f.status === 'marked_done')
-    return `marked done ${weekday(marked.at, zone)}; re-check pending`;
+  if (f.status === 'marked_done') return SITE_COPY.markedDoneNote(weekday(marked.at, zone));
   const reopened = events.find((e) => e.kind === 'reopened' && instant(e.at) >= instant(marked.at));
   if (f.status === 'reopened' && reopened) {
     const when =

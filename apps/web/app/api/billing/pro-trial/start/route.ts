@@ -62,7 +62,7 @@ export async function POST(req: Request) {
       ip: getClientIp(req),
     },
   );
-  if (answer.outcome !== 'started') return refuse(answer.status, answer.error);
+  if (answer.outcome !== 'started') return refuse(answer.status, answer.code);
   await captureFor(req)('trial_started', accountId, { kind: 'pro', variant: answer.variant });
   return respond(body.kind, '/dashboard');
 }

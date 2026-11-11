@@ -33,6 +33,12 @@ export const SITE_COPY = {
     noneBody: 'No check has been asked for yet. Run one to grade the site.',
     watch: 'Watch the check',
   },
+  /**
+   * A fix marked done and not yet measured again. Reopen is deferred (owner ruling Q4), so the note
+   * says what happens next instead of offering an undo.
+   */
+  markedDoneNote: (day: string) =>
+    `marked done ${day}; the next check confirms the fix or reopens it`,
   /** The fix row's control on a live page. */
   markDone: 'Mark done',
 };
@@ -215,5 +221,10 @@ export const SITE_ADDITIONS: Addition[] = [
     screen: 'site',
     what: 'A Mark done control on each fix row still to do, on a live page',
     source: 'CC-26b plan revision R13',
+  },
+  {
+    screen: 'site',
+    what: 'A fix marked done and not yet measured: its note says the next check confirms the fix or reopens it; no undo is offered',
+    source: 'CC-26b owner ruling Q4',
   },
 ];

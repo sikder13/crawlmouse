@@ -78,7 +78,7 @@ describe('starting the Pro trial for a Free account', () => {
     const o = await owner('again');
     await start(o);
     const { answer, d } = await start(o);
-    expect(answer).toMatchObject({ outcome: 'not_eligible', status: 409, error: 'not_eligible' });
+    expect(answer).toMatchObject({ outcome: 'not_eligible', status: 409, code: 'not_eligible' });
     expect(d.dispatch).not.toHaveBeenCalled();
   });
 
@@ -88,7 +88,7 @@ describe('starting the Pro trial for a Free account', () => {
     await start(await owner('d2'), deps(), device);
     const third = await owner('d3');
     const { answer, d } = await start(third, deps(), device);
-    expect(answer).toMatchObject({ outcome: 'denied', status: 409, error: 'refused' });
+    expect(answer).toMatchObject({ outcome: 'denied', status: 409, code: 'refused' });
     expect(d.dispatch).not.toHaveBeenCalled();
     const { rows } = await db.query<{ state: string }>(
       `select state from public.accounts where id = $1`,
