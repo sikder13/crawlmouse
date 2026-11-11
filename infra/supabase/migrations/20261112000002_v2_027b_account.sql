@@ -308,8 +308,9 @@ grant execute on function public.issue_account_link(uuid) to service_role;
 --   CMA05  the link's token is unknown, of another kind, used, revoked or expired, or its change
 --          was stopped
 --   CMA06  the undo was prepared for a change that was pending, and the change applied in between
---   CMA07  the person's deletion is under way: a live delete_confirm or delete_restore link, or a
---          pending_erasures row
+--   CMA07  the person's deletion is under way: a live delete_confirm link (the 24 hours before a
+--          confirm) or a pending_erasures row (after it). A live delete_restore link alone does not
+--          refuse: every deletion request creates one for 8 days, confirmed or not (fix round 2).
 
 -- users.email_normalized: the rule of apps/web/lib/auth/normalize-email.ts (the trial ledger's key),
 -- for an address request_email_change accepted (lowercase, no surrounding space). The TS function
@@ -395,7 +396,7 @@ begin
   end if;
   if exists (select 1 from public.pending_erasures e where e.user_id = p_user)
      or exists (select 1 from public.account_tokens k
-                 where k.user_id = p_user and k.kind in ('delete_confirm', 'delete_restore')
+                 where k.user_id = p_user and k.kind = 'delete_confirm'
                    and k.used_at is null and k.revoked_at is null and k.expires_at > p_now) then
     raise exception 'request_email_change: the person''s deletion is under way' using errcode = 'CMA07';
   end if;

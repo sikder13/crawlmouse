@@ -316,15 +316,18 @@ describe('one email change in flight per person, across the accounts they own (f
 });
 
 describe('no email change while the person’s deletion is under way (fix round 1, S1)', () => {
-  it('refuses while a live deletion link exists for the person (CMA07)', async () => {
-    for (const kind of ['delete_confirm', 'delete_restore']) {
-      const p = await person();
-      await db.query(
-        `select public.create_account_token($1, $2, $3, now() + interval '1 hour', p_recipient => 'x@example.com')`,
-        [p.accountId, p.userId, kind],
-      );
-      expect(await sqlstate(request(p, `during-${kind}@example.org`)), kind).toBe('CMA07');
-    }
+  it('refuses while the person’s deletion request is live, and accepts once its confirm link expired unconfirmed (fix round 2)', async () => {
+    const p = await person();
+    const { rows } = await db.query<{ r: { ok: boolean } }>(
+      `select public.request_account_deletion($1, $2, public.deletion_hostname($1, $2)) as r`,
+      [p.accountId, p.userId],
+    );
+    expect(rows[0]!.r.ok).toBe(true);
+    // Inside the confirm link's 24 hours the S1 sequence is still refused.
+    expect(await sqlstate(request(p, 'during-request@example.org'))).toBe('CMA07');
+    // After it, the request was abandoned: its restore link (8 days) no longer holds the address.
+    const later = new Date(Date.now() + 25 * 60 * 60_000);
+    expect(await sqlstate(request(p, 'after-abandoned@example.org', later))).toBe('none');
   });
 
   it('allows it once the deletion link is used, revoked or expired', async () => {
