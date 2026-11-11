@@ -327,6 +327,7 @@ describe('erase-account (B-F2)', () => {
     expect(plan.kept).toEqual({
       'trial_ledger (peppered hashes; account reference set null)': 1,
       'takedown_requests (open; the address stays until closed)': 1,
+      'previous address now held by another person': 0,
     });
     expect(plan.mintedReports).toEqual([p.slug]);
     expect(plan.storage).toEqual(p.storage);
@@ -733,6 +734,42 @@ describe('the rules 027b adds (D5)', () => {
         )
       ).rows[0]!.p,
     ).toEqual(['kept@example.com']);
+  }, 120_000);
+
+  it('leaves out a previous address another person now signs in with, and keeps what is theirs', async () => {
+    const p = await plain();
+    const old = `taken-${p.email}`;
+    await pglite.query(`update public.users set previous_emails = array[$2] where id = $1`, [
+      p.id,
+      old,
+    ]);
+    // Someone else signs up with the address this person moved away from.
+    const other = await plain();
+    await pglite.query(`update auth.users set email = $2 where id = $1`, [other.id, old]);
+    await pglite.query(`update public.users set email = $2 where id = $1`, [other.id, old]);
+    await pglite.query(`insert into public.waitlist (email, source) values ($1, 'developers')`, [
+      old,
+    ]);
+    await pglite.query(
+      `insert into public.seats (account_id, invited_email, role, status) values ($1, $2, 'developer', 'invited')`,
+      [p.bystander.accountId, old],
+    );
+    await pglite.query(
+      `insert into auth.audit_log_entries (id, payload, created_at)
+       values (gen_random_uuid(), json_build_object('actor_username', $1::text, 'action', 'login'), now())`,
+      [old],
+    );
+    const plan = await planErasure(db(), { userId: p.id });
+    expect(plan.emails).toEqual([p.email]);
+    expect(plan.kept['previous address now held by another person']).toBe(1);
+    await erase({ userId: p.id });
+    expect(await n(`select count(*) from public.waitlist where email = $1`, [old])).toBe(1);
+    expect(await n(`select count(*) from public.seats where invited_email = $1`, [old])).toBe(1);
+    expect(
+      await n(`select count(*) from auth.audit_log_entries where payload->>'actor_username' = $1`, [
+        old,
+      ]),
+    ).toBe(1);
   }, 120_000);
 
   it('nulls checks.notify_email outside the person’s accounts, and every one with no user', async () => {

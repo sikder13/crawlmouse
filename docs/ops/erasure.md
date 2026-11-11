@@ -71,7 +71,8 @@ checks of sites outside their accounts, `email_events`, `waitlist`, the address 
 other accounts, `fix_email_requests` outside their accounts that one of their seats made or that are
 addressed to them, rate-limit keys ending in `:<address>` or `:<user id>`, and closed takedown
 requests' address. The addresses are the one given, the user's own, and `users.previous_emails`
-(the addresses an email change moved away from). It deletes the accounts on which the person is the only active member, with
+(the addresses an email change moved away from), less any previous address another person now signs
+in with: that one is theirs, and the dry run counts it under "kept". It deletes the accounts on which the person is the only active member, with
 what cascades from them. Each change must touch the rows the dry run counted, or the transaction
 is rolled back and nothing changes. Then it deletes the auth user through the Auth admin API, which
 deletes `public.users` and what cascades from it. It prints every count again, read with the same

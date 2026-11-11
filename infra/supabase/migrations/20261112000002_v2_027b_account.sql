@@ -904,7 +904,7 @@ $$;
 -- Name the person by user id or by address, not both. An address that names more than one user, or
 -- an id no user has, raises. Returns {userId, emails, accounts, refusals, counts, kept, storage,
 -- mintedReports}, the keys scripts/ops/erase-account.ts prints. `emails` is the address given, the
--- user's current ones and users.previous_emails, lower-cased.
+-- user's current ones and users.previous_emails (less any another person now holds), lower-cased.
 create or replace function public.erase_person_plan(p_user uuid, p_email text)
 returns json
 language plpgsql
@@ -920,6 +920,7 @@ declare
   v_accounts uuid[] := '{}';
   v_refusals text[] := '{}';
   v_counts json;
+  v_held bigint := 0;
 begin
   if (p_user is null) = (v_given is null) then
     raise exception 'erase_person_plan: name exactly one of a user id and an address' using errcode = '22023';
@@ -942,13 +943,21 @@ begin
                         || array(select lower(btrim(a.email)) from auth.users a where a.id = v_user)
                         || array(select lower(btrim(pu.email)) from public.users pu where pu.id = v_user)
                         || array(select lower(btrim(p.e)) from public.users pu, unnest(pu.previous_emails) p(e)
-                                  where pu.id = v_user)) with ordinality t(e, i)
+                                  where pu.id = v_user
+                                    and not public.email_held_by_other(p.e, v_user))) with ordinality t(e, i)
            where e is not null and e <> ''
            group by e) s;
 
   if v_user is not null then
     v_accounts := public.erase_person_accounts(v_user);
     v_refusals := array(select f.message from public.erase_person_refusals(v_user, v_accounts) f);
+  end if;
+  -- A previous address that another person now signs in with is theirs: it is left out of the
+  -- addresses, so nothing of theirs is erased, and counted under `kept`.
+  if v_user is not null then
+    select count(*) into v_held
+      from public.users pu, unnest(pu.previous_emails) p(e)
+     where pu.id = v_user and public.email_held_by_other(p.e, v_user);
   end if;
   v_counts := public.erase_person_counts(v_user, v_emails, v_accounts);
   if json_array_length(v_counts->'storage') > 0 then
@@ -963,7 +972,13 @@ begin
     'accounts', to_json(array(select a::text from unnest(v_accounts) a order by 1)),
     'refusals', to_json(v_refusals),
     'counts', v_counts->'counts',
-    'kept', v_counts->'kept',
+    'kept', case when v_user is null then v_counts->'kept'
+                 else (select json_object_agg(k.key, k.value order by k.i)
+                         from (select e.key, e.value, e.i
+                                 from json_each(v_counts->'kept') with ordinality e(key, value, i)
+                               union all
+                               select 'previous address now held by another person', to_json(v_held), 1000) k)
+            end,
     'storage', v_counts->'storage',
     'mintedReports', to_json(array(select r.slug from public.public_reports r
                                     where v_user is not null and r.minted_by = v_user order by r.slug)));
