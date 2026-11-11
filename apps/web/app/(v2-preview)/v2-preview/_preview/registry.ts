@@ -170,6 +170,25 @@ export const PREVIEWS: PreviewEntry[] = [
     kind: 'screen',
   },
   { path: '/v2-preview/screens/site/withheld', name: 'Site, withheld', kind: 'screen' },
+  { path: '/v2-preview/screens/dashboard/no-site', name: 'Dashboard, no site', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/site/first-check',
+    name: 'Site, first check running',
+    kind: 'screen',
+  },
+  // A sign-in the viewer cannot place on one account: nothing to act on.
+  {
+    path: '/v2-preview/screens/dashboard/no-account',
+    name: 'Dashboard, no account',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/dashboard/ambiguous',
+    name: 'Dashboard, more than one account',
+    kind: 'screen',
+    orange: 0,
+  },
   { path: '/v2-preview/screens/alerts', name: 'Final-Alerts', kind: 'screen' },
   // The stand-in Free account has sent nothing, so there is no open fix to act on.
   { path: '/v2-preview/screens/alerts/free', name: 'Alerts, free', kind: 'screen', orange: 0 },
