@@ -106,7 +106,7 @@ export function secondInput(first: BuiltCheck): BuildInput {
       {
         ...b,
         pages: b.pages.map((p) =>
-          p.url === HOME ? { ...p, links_out: (p.links_out ?? 0) + 1 } : p,
+          p.url === HOME && p.links_read ? { ...p, links_out: (p.links_out ?? 0) + 1 } : p,
         ),
         link_edges: [
           ...b.link_edges,

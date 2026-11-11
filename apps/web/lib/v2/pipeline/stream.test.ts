@@ -95,6 +95,17 @@ describe('nextEvents, against events written out by hand', () => {
     expect(formatCursor(out.cursor)).toBe('1.1.5.2.3.9000.0');
   });
 
+  it('a page whose links were not read in full is not sent with its partial count', () => {
+    const cut = { ...row({ path: '/long', at: 900, links: 7 }), links_read: false };
+    const out = nextEvents(START, {
+      check: running(2, 2, 3, 9000),
+      startedAtMs: STARTED,
+      batches: [{ batch: 1, result: crawlResult([row({ path: '/', at: 500 }), cut], []) }],
+    });
+    const fetched = out.events.filter((e) => e.type === 'page_fetched').map((e) => e.url);
+    expect(fetched).toEqual([urlOf('/')]);
+  });
+
   it('a check already finished on the first poll: both batches before any stage, then the end', () => {
     const out = nextEvents(START, {
       check: {

@@ -152,10 +152,12 @@ type Page = CrawlBatchResult['pages'][number];
 /**
  * A crawl row as `page_fetched`, whose status, time and link count are not nullable: `status` is
  * the row's `status_code`, `ms` its `timing.total_ms`, `links` its `links_out`, `identity` its
- * `identity_sent`. Null when the row holds no value for one of the three.
+ * `identity_sent`. Null when the row holds no value for one of the three, or its links were not
+ * read in full: `links_out` is then not the page's count (`links_read`, worker-batch.ts).
  */
 function fetchedEvent(page: Page, at_ms: number): ProgressEvent | null {
-  if (page.status_code === null || page.timing === null || page.links_out === null) return null;
+  if (page.status_code === null || page.timing === null) return null;
+  if (!page.links_read || page.links_out === null) return null;
   return {
     type: 'page_fetched',
     at_ms,
