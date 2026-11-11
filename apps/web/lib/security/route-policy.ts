@@ -33,6 +33,24 @@ export interface RoutePolicy {
 }
 
 export const ROUTE_POLICIES: readonly RoutePolicy[] = [
+  { route: 'api/account/email', methods: ['POST'], class: 'member', origin: 'strict' },
+  {
+    route: 'api/account/email/confirm',
+    methods: ['POST'],
+    class: 'public',
+    reason:
+      "the confirmation link's token, read from its cookie, is the credential; the confirming browser need not be signed in (CC-27b D3)",
+    session: 'optional',
+    origin: 'strict',
+  },
+  {
+    route: 'api/account/email/undo',
+    methods: ['POST'],
+    class: 'public',
+    reason:
+      "the undo link's token, read from its cookie, is the credential; the person may have no session left (CC-27b D3)",
+    origin: 'strict',
+  },
   {
     route: 'api/admin/takedown/process',
     methods: ['POST'],
@@ -188,6 +206,20 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     origin: 'any',
   },
   // Outside /api. The middleware's origin guard reads API rows only; /login/verify checks its own.
+  {
+    route: 'account/email/[token]',
+    methods: ['GET'],
+    class: 'public',
+    reason: "the emailed link's token, moved into a cookie; it changes nothing (CC-27b D3)",
+    origin: 'any',
+  },
+  {
+    route: 'account/email-undo/[token]',
+    methods: ['GET'],
+    class: 'public',
+    reason: "the emailed link's token, moved into a cookie; it changes nothing (CC-27b D3)",
+    origin: 'any',
+  },
   { route: 'billing', methods: ['GET'], class: 'user', origin: 'any' },
   {
     route: 'embed/[domain]',
