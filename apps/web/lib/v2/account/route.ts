@@ -80,6 +80,7 @@ export const NOTICE_CODES = [
   // re-check
   'capped',
   'check_running',
+  'recently_checked',
   'site_paused',
   // add, edit and remove a site
   'adds_capped',
@@ -93,6 +94,7 @@ export const NOTICE_CODES = [
   'scoped_seat',
   'no_account',
   'account_ambiguous',
+  'confirm_required',
   // the Pro trial
   'not_owner',
   'not_eligible',
@@ -105,6 +107,7 @@ export const NOTICE_CODES = [
   'marked_done',
   'marked_done_capped',
   'marked_done_check_running',
+  'marked_done_recently_checked',
   'marked_done_capacity',
   'marked_done_site_paused',
   'marked_done_not_checked',
@@ -175,7 +178,7 @@ export function refuseTo(
 export function tooSoonTo(
   from: Request | RequestBody['kind'],
   back: string,
-  code: Extract<NoticeCode, 'capped' | 'adds_capped' | 'domain_capped'>,
+  code: Extract<NoticeCode, 'capped' | 'recently_checked' | 'adds_capped' | 'domain_capped'>,
   nextAllowedAt: string,
   now = Date.now(),
 ): Response {

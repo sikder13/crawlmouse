@@ -294,6 +294,36 @@ describe('POST /api/sites/[id]/checks', () => {
     expect(h.send).not.toHaveBeenCalled();
     expect(h.capture).not.toHaveBeenCalled();
   });
+  it('a bucket check that has already ended is 429 recently_checked with Retry-After; a form gets its notice', async () => {
+    pinBucket();
+    const p = await person(h.db, 'ended');
+    const s = await keptSite(h.db, p.accountId);
+    as(p);
+    const first = (await (await recheck(s.id)).json()) as { checkId: string };
+    await h.db.query(`select public.claim_check($1, 'run-1', '{"phase":"crawl"}'::jsonb)`, [
+      first.checkId,
+    ]);
+    await h.db.query(`select public.fail_check($1, 'internal')`, [first.checkId]);
+    h.send.mockClear();
+    h.capture.mockClear();
+    const bucketEnd = new Date((Math.floor(Date.now() / 120_000) + 1) * 120_000).toISOString();
+    const res = await recheck(s.id);
+    expect([res.status, await res.json()]).toEqual([
+      429,
+      { code: 'recently_checked', nextAllowedAt: bucketEnd },
+    ]);
+    const retry = Number(res.headers.get('retry-after'));
+    expect(retry).toBeGreaterThanOrEqual(1);
+    expect(retry).toBeLessThanOrEqual(120);
+    const form = await recheck(s.id, 'application/x-www-form-urlencoded', '');
+    expect([form.status, form.headers.get('location')]).toEqual([
+      303,
+      `/sites/${s.id}?notice=recently_checked&next=${encodeURIComponent(bucketEnd)}`,
+    ]);
+    expect(h.send).not.toHaveBeenCalled();
+    expect(h.capture).not.toHaveBeenCalled();
+  });
+
   it('at the day’s global:audits:day ceiling: 503 capacity, nothing queued or sent, the count unchanged', async () => {
     const p = await person(h.db, 'ceiling');
     const s = await keptSite(h.db, p.accountId);

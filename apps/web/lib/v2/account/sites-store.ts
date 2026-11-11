@@ -16,6 +16,7 @@ import type { SiteSchedule } from '../../auth/schedule';
 import { normalizeDomain } from '../../domain';
 import { DOMAIN_AUDITS_PER_HOUR, GLOBAL_AUDITS_BUCKET, GLOBAL_AUDITS_PER_DAY } from '../../limits';
 import { MAX_RATE_LIMIT_WINDOW_MS, rateLimitWindowStart } from '../../rate-limit-window';
+import { MANUAL_BUCKET_S } from '../pipeline/limits';
 import { requestCheck, type RequestDeps } from '../pipeline/request';
 import { supabasePipelineStore, type QueuedCheck } from '../pipeline/store';
 import type { RecheckOutcome, RequestRecheck } from './recheck';
@@ -70,6 +71,12 @@ const CappedAnswer = z.discriminatedUnion('outcome', [
   z.strictObject({ outcome: z.literal('paused'), paused_reason: z.string() }),
 ]);
 
+/** When the 2-minute bucket that `atMs` falls in ends (`bucketedKey`'s manual and re-check bucket). */
+const bucketEnd = (atMs: number): string => {
+  const ms = MANUAL_BUCKET_S * 1000;
+  return new Date((Math.floor(atMs / ms) + 1) * ms).toISOString();
+};
+
 /** A request the database did not record; thrown out of `insertQueued`, so nothing is sent. */
 class NotQueued extends Error {
   constructor(readonly outcome: RecheckOutcome & { queued: false }) {
@@ -105,7 +112,14 @@ export function supabaseRequestRecheck(
               return true;
             case 'exists':
               if (a.status === 'queued') return false;
-              throw new NotQueued({ queued: false, reason: 'check_running', checkId: row.id });
+              if (a.status === 'running') {
+                throw new NotQueued({ queued: false, reason: 'check_running', checkId: row.id });
+              }
+              throw new NotQueued({
+                queued: false,
+                reason: 'recently_checked',
+                nextAllowedAt: bucketEnd(Date.parse(row.queued_at)),
+              });
             case 'capped':
               throw new NotQueued({
                 queued: false,
