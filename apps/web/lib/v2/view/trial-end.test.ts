@@ -260,6 +260,13 @@ describe('Trial ending, the reminder line around its date (fix round 2, item 4)'
     );
   });
 
+  it('later on the day, after the moment it was due, still says the day', () => {
+    // 03:00Z on 5 Nov is 22:00 on Wed 4 Nov in Indiana: past 21:41, still the reminder's day.
+    expect(at('2026-11-05T03:00:00.000Z')).toBe(
+      `The reminder is due once, on Wed 4 Nov. ${NO_CARD}`,
+    );
+  });
+
   it('once the day has passed, says nothing of it', () => {
     expect(at('2026-11-06T12:00:00.000Z')).toBe(NO_CARD);
   });

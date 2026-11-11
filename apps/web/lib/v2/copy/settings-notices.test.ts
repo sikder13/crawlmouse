@@ -1,8 +1,9 @@
 /**
  * What /settings and /settings/delete say after a form comes back (CC-27b review, item 6): the
  * success lines, and a sentence for each refusal code the routes behind them can answer. The codes
- * are read from the routes' and modules' sources, so a code added there without a sentence here
- * turns this red.
+ * are read from the TypeScript sources below, in the forms `codesIn` matches, and from three SQL
+ * functions in the forms `sqlCodesIn` matches: a code added in one of those forms without a sentence
+ * here turns this red; a code written in another form, or in another function, is not seen.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -45,8 +46,9 @@ function sqlBody(sql: string, name: string): string {
 }
 
 /**
- * The codes a SQL body names: the code column of `erase_person_refusals`' rows (`select <n>, <key>,
- * '<code>'`), and `'<code>'` returned from a `then` or an `else`.
+ * The codes a SQL body names in two forms: a refusal row of `erase_person_refusals`
+ * (`select <n>, <key>, '<code>'`), and a literal `'<code>'` after a `then` or an `else`. A code a
+ * body names in any other form is not read.
  */
 function sqlCodesIn(body: string): string[] {
   const out = new Set<string>();
@@ -136,5 +138,12 @@ describe('settingsNotice', () => {
   it('nothing in the query: no line', () => {
     expect(settingsNotice({}, 'settings')).toBeNull();
     expect(settingsNotice({ saved: '0', email: 'x' }, 'settings')).toBeNull();
+  });
+});
+
+describe('the live_subscription sentence (fix round 3, item 2)', () => {
+  it('claims nothing about the confirm, which sets only an active or trialing plan to end', () => {
+    expect(REFUSAL_SENTENCES.live_subscription).not.toMatch(/confirm/i);
+    expect(REFUSAL_SENTENCES.live_subscription).toMatch(/erased/);
   });
 });
