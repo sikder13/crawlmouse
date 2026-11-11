@@ -71,6 +71,16 @@ v1's `app/dashboard/page.tsx` is main's file, pinned by its sha256 in
   no consent cookie): the rewrite-target check counts it as a target rather than guess
   (`lib/v2/rewrites.ts`). Next answers such a path 404 itself (measured with `next start`).
 
+- A request for a rewrite target by its own address (`/dashboard/v2`, `/v2-home`, any spelling the
+  middleware reads) gets an empty 404 from the middleware, with no session refresh, where CC-22b's
+  version rewrote it to the site's not-found page.
+- The rewrite-target check reads a path as sent, percent-decoded and without `.rsc`. Next adds
+  `.prefetch.rsc` and `.segments/` paths only with partial prerendering or the client segment cache,
+  neither of which is enabled; `spellings()` in `lib/v2/rewrites.ts` must learn them if either is.
+- Three catalog tests this branch added list rows to still open PGlite databases they do not close,
+  as they do on main: `__tests__/v2-001-entitlement-tables.test.ts`,
+  `__tests__/v2-003-check-tables.test.ts` and `__tests__/v2-003-cross-account.test.ts`.
+
 ## Deploy order
 
 The code goes out before the migration's apply, never the reverse: the new `persist_built_check`

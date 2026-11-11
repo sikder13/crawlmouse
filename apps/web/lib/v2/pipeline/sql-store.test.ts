@@ -6,7 +6,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { buildCheck, GRADE_VERSION } from '@crawlmouse/engine/v2/pipeline';
 import type { BatchResult, CrawlPage } from '@crawlmouse/types/v2';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, asRole, freshDb } from '../../../__tests__/helpers/pglite-migrations';
@@ -43,9 +43,16 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
     await applyAllMigrations(template);
   }, 120_000);
 
+  /** Each test's clone, closed when the test ends. */
+  const clones: PGlite[] = [];
+  afterEach(async () => {
+    await Promise.all(clones.splice(0).map((c) => c.close()));
+  });
+
   /** A fresh database, and the store over it as the service role, one transaction per call. */
   async function fresh() {
     const db = (await template.clone()) as PGlite;
+    clones.push(db);
     const sql: SqlDb = {
       query: (text, params) => asRole(db, 'service_role', null, (tx) => tx.query(text, params)),
     };
