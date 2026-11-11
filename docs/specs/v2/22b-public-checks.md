@@ -16,7 +16,10 @@ by hand. The test commands below are run from the repo root and take
 
 Production keeps both unset in this step. Proof of the unset state: `vitest app/api/checks/route.test.ts
 "app/api/checks/[id]/flag.test.ts" app/api/checks/v1-start-pin.test.ts middleware.test.ts
-components/v2/screens/home/live-home.test.tsx __tests__/v1-inventory.test.ts`.
+components/v2/screens/home/live-home.test.tsx __tests__/v1-inventory.test.ts`. A production build
+of this branch at `54b948e1` (2026-11-11), flag unset, was compared with one of `origin/main`
+`607bb19a`: `/` is prerendered in both, links one stylesheet in both, and its body is the same once
+hashed asset names, the build id and Sentry's per-request tags are set aside.
 
 Three things change with the flag unset:
 
@@ -204,8 +207,7 @@ db/rollback.test.ts db/check.test.ts`).
 
 `middleware.ts` holds `V2_REWRITES`; with the flag set `/` is rewritten to `/v2-home`, a prerendered
 page that renders the v2 home and main's three JSON-LD blocks under the root layout's title,
-description, canonical and robots. A direct request to `/v2-home` answers the site's 404 with the
-flag set or unset (`vitest middleware.test.ts`). `app/page.tsx` is main's file
+description, canonical and robots. The middleware sends a direct request for `/v2-home`, or a path under it, to a path no route serves, with the flag set or unset (`vitest middleware.test.ts`); on the production build named above each such request answered the site's 404, in upper case and percent-encoded too. `app/page.tsx` is main's file
 (`git diff origin/main -- apps/web/app/page.tsx` prints nothing).
 
 ## Events (D12)
