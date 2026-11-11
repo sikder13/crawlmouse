@@ -198,10 +198,13 @@ export async function restoreAccount(ports: DeletionPorts, token: string): Promi
     // The answer may be lost after the restore committed: the database says which. Nothing can be
     // sent for the plans the restore would resume (their names went with the answer), so it is
     // reported, user id only, for the subscriptions to be resumed by hand.
-    const state = await ports.rpc<'pending' | 'restored' | 'erased'>('erasure_state', {
-      p_user: link.userId,
+    let state: 'pending' | 'restored' | 'erased' | null = null;
+    // Tried BAN_ATTEMPTS times; on the last failure reported (user id only), and the restore's own
+    // error is thrown, as when the restore did not commit: the page says it did not work.
+    await withRetries(ports, link.userId, async () => {
+      state = await ports.rpc('erasure_state', { p_user: link.userId });
     });
-    if (state === 'pending') throw error;
+    if (state === null || state === 'pending') throw error;
     ports.report(error, link.userId);
     // The purge finished in between: the account is not back.
     if (state === 'erased') return refusal('window_closed');
