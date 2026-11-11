@@ -5,12 +5,13 @@
  * this module adds what SQL cannot do: the Auth ban, the emails, the events, and the Inngest event that
  * ends the subscription.
  *
- * The database decides the Auth ban: a person is banned while they have a pending_erasures row
- * (`banAfterConfirm`, `unbanAfterRestore`). Confirm: the SQL confirm (marks the accounts, queues the person, ends their
- * sessions); then the ban, which a failure only reports, because the purge bans again before it
- * erases; then one `account.deletion_confirmed` per marked account. Restore: the link is read, the
- * SQL restore consumes the token and clears the row, and then the ban is lifted; a restore whose
- * answer is lost is judged by whether the row is still there.
+ * The Auth ban follows the pending_erasures row. Confirm: the SQL confirm (marks the accounts,
+ * queues the person, ends their sessions); then the ban (`banAfterConfirm`), which a failure only
+ * reports, because the purge bans again before it erases; then one `account.deletion_confirmed` per
+ * marked account. Restore: the link is read, the SQL restore consumes the token and clears the row,
+ * and then the ban is lifted (`unbanAfterRestore`). A restore whose answer is lost is judged by
+ * `erasure_state`: still pending (it did not commit, so the error is thrown), restored, or erased by
+ * the purge in between.
  * A subscription the deletion set to end is resumed by `account.restored` (deletionResumeFn).
  */
 import type { Tier } from '../../entitlement-v2';
@@ -156,7 +157,9 @@ async function banAfterConfirm(ports: DeletionPorts, userId: string): Promise<vo
 
 /**
  * A committed restore lifts the ban with no read first: the restore cleared the person's
- * pending_erasures row, and a confirm's late ban reads the row again on its own path.
+ * pending_erasures row. A confirm whose ban lands after this unban reads the row again after banning
+ * and lifts the ban when the row is gone; if that read fails it counts as pending, so that ban stays
+ * (reported, user id only).
  */
 async function unbanAfterRestore(ports: DeletionPorts, userId: string): Promise<void> {
   await withRetries(ports, userId, () => ports.auth.unban(userId));

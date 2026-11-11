@@ -1438,8 +1438,9 @@ begin
 end;
 $$;
 
--- Whether the person is waiting for erasure: the source of truth for their Auth ban. A route that
--- bans or unbans reads it after its own change, so the last writer's ban follows the database.
+-- Whether the person is waiting for erasure. The confirm reads it before its Auth ban and again
+-- after it, lifting the ban when the row is gone (banAfterConfirm, lib/v2/account/deletion.ts); a
+-- committed restore lifts the ban without reading it.
 create or replace function public.erasure_pending(p_user uuid)
 returns boolean
 language sql
