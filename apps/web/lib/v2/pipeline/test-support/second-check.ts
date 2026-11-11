@@ -39,7 +39,11 @@ export function secondCrawl(): BatchResult[] {
       return { ...r, body, body_excerpt: body };
     });
     const pages = b.pages.map((p) => {
-      if (p.url === HOME) return { ...p, links_out: (p.links_out ?? 0) + 1 };
+      if (p.url === HOME) {
+        // The homepage's links were read in full, so its count can grow by the link added.
+        if (!p.links_read) throw new Error('second-check: the homepage links must be read');
+        return { ...p, links_out: (p.links_out ?? 0) + 1 };
+      }
       if (UNTITLED.includes(p.url)) return { ...p, title: { text: '', chars: 0, cut: false } };
       return p;
     });

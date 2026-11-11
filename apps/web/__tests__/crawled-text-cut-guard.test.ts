@@ -77,6 +77,30 @@ const isCut = (line: string): boolean =>
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
   [
+    'apps/web/lib/v2/account/sites-test-support.ts :: [accountId, tier, g.sites, g.seats, g.competitorsPerSite, `sub_${randomUUID().slice(0, 8)}`],',
+    'STRING slice of a `randomUUID()` (or a site id, also a UUID) in PGlite test seeding: `[0-9a-f-]` only, never crawled text, and written only to a test database (CC-26b).',
+  ],
+  [
+    'apps/web/lib/v2/account/sites-test-support.ts :: const email = `${tag}-${randomUUID().slice(0, 8)}@example.com`;',
+    'STRING slice of a `randomUUID()` (or a site id, also a UUID) in PGlite test seeding: `[0-9a-f-]` only, never crawled text, and written only to a test database (CC-26b).',
+  ],
+  [
+    'apps/web/lib/v2/account/sites-test-support.ts :: const host = `${id.slice(0, 8)}.example`;',
+    'STRING slice of a `randomUUID()` (or a site id, also a UUID) in PGlite test seeding: `[0-9a-f-]` only, never crawled text, and written only to a test database (CC-26b).',
+  ],
+  [
+    'apps/web/lib/v2/copy/notices.ts :: const capitalised = (t: string) => t[0]!.toUpperCase() + t.slice(1);',
+    'STRING slice of our own notice copy (`NOTICE_LINES`, CC-26b), never crawled text: its first character is ASCII, so the cut after it cannot split a surrogate pair.',
+  ],
+  [
+    "apps/web/lib/v2/rewrites.ts :: path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;",
+    'STRING slice of a request path in the middleware, to drop one trailing ASCII `/` before matching `V2_REWRITES` (CC-26b). Not crawled text, never persisted or rendered.',
+  ],
+  [
+    "apps/web/lib/v2/rewrites.ts :: return path.endsWith('.rsc') ? [path, withoutSlash(path.slice(0, -'.rsc'.length))] : [path];",
+    'STRING slice of a request path in the middleware, dropping the ASCII `.rsc` suffix before matching (CC-26b). Not crawled text, never persisted or rendered.',
+  ],
+  [
     'packages/engine/src/v2/build/plan.ts :: .slice(0, STAGE1_CHALLENGED)',
     'ARRAY slice of PageResult rows: the first STAGE1_CHALLENGED challenged pages, in URL order, for the ' +
       'stage-1 access sample (CC-20a). No string is indexed.',
