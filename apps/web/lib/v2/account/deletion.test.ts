@@ -334,6 +334,11 @@ describe('fix round 2: reads that fail around a committed confirm or restore', (
     expect(await confirmDeletion(flaky.ports, delete_confirm)).toEqual({ ok: true });
     expect(banned.has(o.userId)).toBe(true);
     expect(flaky.events.map((e) => e.name)).toEqual(['account.deletion_confirmed']);
+    // Each failed read (before the ban and after it) is reported, with the user id and nothing else.
+    expect(flaky.reported).toEqual([
+      ['Error: read timed out', o.userId],
+      ['Error: read timed out', o.userId],
+    ]);
   });
 
   it('a restore whose answer was lost after it committed is reported with the user id only (item 2)', async () => {
