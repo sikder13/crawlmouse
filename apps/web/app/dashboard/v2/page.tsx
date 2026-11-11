@@ -8,6 +8,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { readAccount } from '@/lib/v2/account/pages';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { dashboardView } from '@/lib/v2/view/dashboard';
+import { noticeLine } from '@/lib/v2/copy/notices';
 
 // Read per request: a build with the flag off would otherwise prerender this page as its 404.
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,11 @@ export const metadata = {
  * v1's `app/dashboard/page.tsx` imports nothing of it, so neither this page nor its stylesheets are
  * in v1's graph. With the flag off it is a 404, reached or not.
  */
-export default async function V2Dashboard() {
+export default async function V2Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   if (!checksPublicEnabled()) return notFound();
   const r = await loadViewer();
   if (r.kind === 'signed_out') redirect('/login');
@@ -32,7 +37,10 @@ export default async function V2Dashboard() {
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
   return (
     <LiveActions>
-      <DashboardScreen data={dashboardView(d, viewer)} />
+      <DashboardScreen
+        data={dashboardView(d, viewer)}
+        notice={noticeLine(await searchParams, account.timezone)}
+      />
     </LiveActions>
   );
 }

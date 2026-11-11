@@ -85,12 +85,13 @@ beforeAll(async () => {
 
 afterEach(() => vi.unstubAllEnvs());
 
-const open = (id: string, userId: string | null = ownerId) => {
+const open = (id: string, userId: string | null = ownerId, search: Record<string, string> = {}) => {
   h.userId = userId;
-  return SitePage({ params: Promise.resolve({ id }) });
+  return SitePage({ params: Promise.resolve({ id }), searchParams: Promise.resolve(search) });
 };
 const notFoundError = { digest: expect.stringMatching(/404/) };
-const children = (el: unknown) => (el as ReactElement<{ children: ReactElement }>).props.children;
+const children = (el: unknown) =>
+  (el as ReactElement<{ children: ReactElement<{ notice?: unknown }> }>).props.children;
 
 describe('/sites/[id] with V2_CHECKS_PUBLIC off', () => {
   it('is a 404 even for the owner of the site', async () => {
@@ -125,6 +126,16 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
     await expect(open(removed)).rejects.toMatchObject(notFoundError);
     await expect(open(randomUUID())).rejects.toMatchObject(notFoundError);
     await expect(open('not-an-id')).rejects.toMatchObject(notFoundError);
+  });
+
+  it('a refused form’s notice is passed to the screen; an unknown one is none', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const shown = children(await open(kept, ownerId, { notice: 'capped' }));
+    expect(shown.props.notice).toMatchObject({ code: 'capped' });
+    const first = children(await open(empty, ownerId, { notice: 'site_paused' }));
+    expect(first.props.notice).toMatchObject({ code: 'site_paused' });
+    expect(children(await open(kept, ownerId, { notice: 'whatever' })).props.notice).toBeNull();
+    expect(children(await open(kept)).props.notice).toBeNull();
   });
 
   it('the other account’s owner opens their own site and not this one', async () => {

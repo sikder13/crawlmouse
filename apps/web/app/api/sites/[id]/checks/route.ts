@@ -3,8 +3,16 @@ import { isCrawlPaused } from '@/lib/crawl-pause';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { captureFor, checkStarted } from '@/lib/v2/account/events';
-import { isId, notFound, readBody, refuse, respond, serviceRefusal } from '@/lib/v2/account/route';
-import { readSite, tooSoon } from '@/lib/v2/account/sites';
+import {
+  isId,
+  notFound,
+  readBody,
+  refuse,
+  refuseTo,
+  respond,
+  tooSoonTo,
+} from '@/lib/v2/account/route';
+import { readSite } from '@/lib/v2/account/sites';
 import { supabaseRequestRecheck } from '@/lib/v2/account/sites-store';
 import { readEntitlement } from '@/lib/v2/account/viewer';
 
@@ -23,8 +31,11 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!checksPublicEnabled()) return notFound();
-  if (isCrawlPaused()) return serviceRefusal('paused');
-  if (!pipelineEnabled()) return serviceRefusal('unavailable');
+  const { id } = await params;
+  // The site's page, or the dashboard for an id that names none (it is a 404 once signed in).
+  const back = isId(id) ? `/sites/${id}` : '/dashboard';
+  if (isCrawlPaused()) return refuseTo(req, back, 503, 'paused');
+  if (!pipelineEnabled()) return refuseTo(req, back, 503, 'unavailable');
 
   const sb = await supabaseServer();
   const {
@@ -32,7 +43,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   } = await sb.auth.getUser();
   if (!user) return refuse(401, 'auth_required');
 
-  const { id } = await params;
   if (!isId(id)) return notFound();
   const { data: member, error: memberError } = await sb.rpc('is_member_for_site', { p_site: id });
   if (memberError) throw new Error(`is_member_for_site failed: ${memberError.message}`);
@@ -40,14 +50,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const site = await readSite(sb, id);
   if (site === null || site.removed_at !== null) return notFound();
   if (site.paused_reason !== null) {
-    return refuse(409, 'site_paused', { pausedReason: site.paused_reason });
+    return refuseTo(req, back, 409, 'site_paused', { pausedReason: site.paused_reason });
   }
   const entitlement = await readEntitlement(sb, site.account_id, new Date());
   if (entitlement === null) return notFound();
 
   // A button posts an empty form; a script may post `{}`. Neither carries a field.
   const body = await readBody(req);
-  if (body !== null && Object.keys(body.fields).length > 0) return refuse(400, 'invalid');
+  if (body !== null && Object.keys(body.fields).length > 0)
+    return refuseTo(req, back, 400, 'invalid');
 
   const outcome = await supabaseRequestRecheck(supabaseAdmin())({
     siteId: id,
@@ -69,14 +80,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   switch (outcome.reason) {
     case 'capped':
-      return tooSoon('capped', outcome.nextAllowedAt);
+      return tooSoonTo(req, back, 'capped', outcome.nextAllowedAt);
     case 'check_running':
-      return refuse(409, 'check_running', { checkId: outcome.checkId });
+      return refuseTo(req, back, 409, 'check_running', { checkId: outcome.checkId });
     case 'capacity':
-      return serviceRefusal('capacity');
+      return refuseTo(req, back, 503, 'capacity');
     case 'removed':
       return notFound();
     case 'paused':
-      return refuse(409, 'site_paused');
+      return refuseTo(req, back, 409, 'site_paused');
   }
 }

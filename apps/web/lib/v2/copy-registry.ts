@@ -23,6 +23,7 @@ import { CHANGES_ADDITIONS, CHANGES_CHANGES } from './copy/segment-changes';
 import { CONTENT_ADDITIONS, CONTENT_CHANGES } from './copy/segment-content';
 import { DASHBOARD_ADDITIONS, DASHBOARD_CHANGES } from './copy/dashboard';
 import { SITE_ADDITIONS, SITE_CHANGES } from './copy/site';
+import { NOTICE_ADDITIONS } from './copy/notices';
 import { ALERTS_ADDITIONS, ALERTS_CHANGES } from './copy/alerts';
 import { REPORTS_ADDITIONS, REPORTS_CHANGES } from './copy/reports';
 import { SETTINGS_ADDITIONS, SETTINGS_CHANGES } from './copy/settings';
@@ -461,6 +462,7 @@ export const ADDITIONS: Addition[] = [
   ...ACCOUNT_DOOR_ADDITIONS,
   ...DASHBOARD_ADDITIONS,
   ...SITE_ADDITIONS,
+  ...NOTICE_ADDITIONS,
   ...ALERTS_ADDITIONS,
   ...REPORTS_ADDITIONS,
   ...SETTINGS_ADDITIONS,
