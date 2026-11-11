@@ -1,4 +1,8 @@
-/** What a public start runs on in production: the service-role client, the limiter and Inngest. */
+/**
+ * What a public start runs on in production: the engine's URL guard, Turnstile's verifier, the
+ * service-role client, the limiter and Inngest. start-deps.test.ts runs this factory with those
+ * replaced at the module boundary.
+ */
 import 'server-only';
 import { admitSiteHost } from '../../../../lib/auth/admit-site';
 import { inngest } from '../../../../lib/inngest';
