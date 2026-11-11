@@ -19,7 +19,7 @@ import {
   type CrawlPage,
   type FixtureDataset,
 } from '@crawlmouse/types/v2';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
@@ -47,6 +47,11 @@ const MONTHLY = { cadence: 'monthly', iso_weekday: 4, hour_local: 6 } as const;
 
 const crawlRows = (batches: readonly unknown[]): CrawlPage[] =>
   (batches as BatchResult[]).flatMap((b) => (b.kind === 'crawl' ? b.pages : []));
+
+// Closed when the file ends: a PGlite holds its memory outside the JS heap until then.
+afterAll(async () => {
+  await db?.close();
+});
 
 beforeAll(async () => {
   db = await freshDb();

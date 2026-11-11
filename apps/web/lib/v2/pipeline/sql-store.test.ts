@@ -6,7 +6,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { buildCheck, GRADE_VERSION } from '@crawlmouse/engine/v2/pipeline';
 import type { BatchResult, CrawlPage } from '@crawlmouse/types/v2';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, asRole, freshDb } from '../../../__tests__/helpers/pglite-migrations';
@@ -33,6 +33,11 @@ const PROGRESS = {
 
 describe('sqlPipelineStore on PGlite (migration 008)', () => {
   let template: PGlite;
+  // Closed when the file ends: a PGlite holds its memory outside the JS heap until then.
+  afterAll(async () => {
+    await template?.close();
+  });
+
   beforeAll(async () => {
     template = await freshDb();
     await applyAllMigrations(template);

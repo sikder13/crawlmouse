@@ -5,7 +5,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
@@ -15,6 +15,11 @@ import { supabaseEntitlementStore } from '../../billing/state-machine-apply';
 import { ownedAccount, startProTrial } from './pro-trial';
 
 let db: PGlite;
+
+// Closed when the file ends: a PGlite holds its memory outside the JS heap until then.
+afterAll(async () => {
+  await db?.close();
+});
 
 beforeAll(async () => {
   db = await freshDb();

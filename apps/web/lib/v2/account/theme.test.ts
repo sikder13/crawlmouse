@@ -4,13 +4,18 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
 import { saveTheme, ThemeBody } from './theme';
 
 let db: PGlite;
+
+// Closed when the file ends: a PGlite holds its memory outside the JS heap until then.
+afterAll(async () => {
+  await db?.close();
+});
 
 beforeAll(async () => {
   db = await freshDb();

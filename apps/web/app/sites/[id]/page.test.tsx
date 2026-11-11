@@ -8,7 +8,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { buildCheck } from '@crawlmouse/engine/v2/pipeline';
 import type { BatchResult, CrawlPage } from '@crawlmouse/types/v2';
 import type { ReactElement } from 'react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
@@ -41,6 +41,7 @@ import { SiteScreen } from '@/components/v2/screens/site/SiteScreen';
 import { siteOfCaller } from '@/lib/v2/account/pages';
 import SitePage from './page';
 
+let db: PGlite;
 let ownerId: string;
 let strangerId: string;
 let kept: string;
@@ -51,8 +52,13 @@ let theirs: string;
 const crawlRows = (batches: readonly unknown[]): CrawlPage[] =>
   (batches as BatchResult[]).flatMap((b) => (b.kind === 'crawl' ? b.pages : []));
 
+// Closed when the file ends: a PGlite holds its memory outside the JS heap until then.
+afterAll(async () => {
+  await db?.close();
+});
+
 beforeAll(async () => {
-  const db = await freshDb();
+  db = await freshDb();
   await applyAllMigrations(db);
   h.db = db;
   ownerId = await signUp(db, `owner-${randomUUID().slice(0, 8)}@example.com`);
