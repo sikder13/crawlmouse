@@ -171,9 +171,12 @@ describe('the finders see what they claim to see', () => {
       isFlagGated(join(WEB, p)),
     );
     expect(hidden).toEqual([
+      'app/sites/[id]/page.tsx',
       'app/api/billing/agency-trial/route.ts',
       'app/api/billing/cancel/route.ts',
+      'app/api/billing/pro-trial/start/route.ts',
       'app/api/checks/[id]/claim/route.ts',
+      'app/api/me/route.ts',
       'app/api/webhooks/stripe-account/route.ts',
     ]);
   });

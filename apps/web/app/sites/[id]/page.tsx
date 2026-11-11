@@ -26,7 +26,7 @@ export const metadata: Metadata = {
  * not sit on; the sign-in page for a caller who is not signed in.
  */
 export default async function SitePage({ params }: { params: Promise<{ id: string }> }) {
-  if (!checksPublicEnabled()) notFound();
+  if (!checksPublicEnabled()) return notFound();
   const { id } = await params;
   const session = await supabaseServer();
   const {
