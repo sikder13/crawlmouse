@@ -1,6 +1,7 @@
 /**
- * The ExpireStore over SQL, for PGlite: the same three functions supabaseExpireStore calls, each
- * call through `run` (one transaction as the service role in the tests).
+ * The ExpireStore over SQL, for PGlite: migration 022b's three functions by positional arguments,
+ * each call through `run` (one transaction as the service role in the tests).
+ * ../expire-store.test.ts runs the same cases against this and supabaseExpireStore.
  */
 import {
   expiredPage,

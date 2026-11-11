@@ -1,8 +1,12 @@
 /**
  * What the daily expiry reads and deletes in Postgres (CC-22b D8): migration 022b section D's
  * `expired_unkept_sites`, `delete_expired_unkept_sites` and `unsettled_kept_checks`. This is the
- * service-role supabase-js implementation; `test-support/sql-expire-store.ts` calls the same three
- * functions over PGlite.
+ * service-role supabase-js implementation; `test-support/sql-expire-store.ts` is the same interface
+ * in SQL for PGlite. expire-store.test.ts runs one set of cases against both, this one through a
+ * PostgREST stand-in that takes each function's argument names and return shape from the migrated
+ * catalog (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/expire-store.test.ts`).
+ * PostgREST's row cap (`max_rows`, 1000 in infra/supabase/config.toml) is not modelled there: the
+ * expiry's read answers one row per check of at most EXPIRY_BATCH_SITES sites.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { KeptCheck } from './keep';

@@ -1,7 +1,8 @@
 /**
- * The KeepStore over SQL, for PGlite: the same statements as supabaseKeepStore, written out. Each
- * call runs through `run`, which the tests give as one transaction as the service role, as each
- * PostgREST request is.
+ * The KeepStore over SQL, for PGlite. It is written apart from supabaseKeepStore (`evidenceOf` is
+ * one join here and three requests there); ../keep-store.test.ts runs the same cases against both.
+ * Each call runs through `run`, which the tests give as one transaction as the service role, as
+ * each PostgREST request is.
  */
 import {
   keepArgs,
