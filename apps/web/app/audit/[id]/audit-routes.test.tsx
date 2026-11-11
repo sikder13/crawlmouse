@@ -251,11 +251,14 @@ describe('with V2_CHECKS_PUBLIC on', () => {
 });
 
 describe('what the v1 page and its 404 import', () => {
-  /** The module specifiers a file imports statically (`import … from`), not through `import()`. */
-  const staticImports = (file: string) =>
-    [...readFileSync(join(HERE, file), 'utf8').matchAll(/^import\s[^;]*?from\s+'([^']+)';/gms)].map(
-      (m) => m[1]!,
-    );
+  /**
+   * The module specifiers a file imports statically, not through `import()`: `import … from '…'`,
+   * and the bare `import '…'` a stylesheet is imported with. One file deep: the modules it names
+   * are not read in turn.
+   */
+  const importsOf = (source: string) =>
+    [...source.matchAll(/^import\s(?:[^;'"]*?\sfrom\s+)?'([^']+)';/gm)].map((m) => m[1]!);
+  const staticImports = (file: string) => importsOf(readFileSync(join(HERE, file), 'utf8'));
   const V2 = /_lib\/|_crawl\/|components\/v2|styles\/v2|lib\/v2/;
 
   /** The v2 modules that hold no screen, and so no stylesheet: the reader of a check, and its paths. */
@@ -293,7 +296,16 @@ describe('what the v1 page and its 404 import', () => {
     expect(imports.filter((m) => m[1] === undefined).map((m) => m[0])).toEqual([]);
   });
 
-  it('the scan sees a static v2 import where there is one', () => {
+  it('the scan sees a static v2 import where there is one, with `from` and without', () => {
     expect(staticImports('access/page.tsx').filter((m) => V2.test(m))).not.toEqual([]);
+    // A stylesheet is imported bare. This one is the v2 tokens, in a file the v1 page must not reach.
+    const bare = staticImports('_lib/CheckPage.tsx').filter((m) => /\.css$/.test(m));
+    expect(bare).toEqual(['../../../../styles/v2/tokens.css']);
+    expect(bare.filter((m) => V2.test(m))).toEqual(bare);
+    // An import written over several lines is one import, named by its `from`.
+    expect(importsOf("import {\n  a,\n  type B,\n} from './x';\nimport './y.css';\n")).toEqual([
+      './x',
+      './y.css',
+    ]);
   });
 });
