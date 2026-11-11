@@ -226,10 +226,14 @@ describe('the registry finds the row a request path reaches', () => {
   it("each row's own path matches that row alone: no two rows overlap", () => {
     // A static route's path also matches a dynamic sibling's pattern, so this catches the overlap Next
     // would settle by preferring the static route, and the lookup would settle by registry order.
+    // A route group's segment is not in the URL.
     const samples = (route: string) =>
-      [route.replace(/\[\[?\.\.\.[^\]]+\]\]?/g, 'a/b').replace(/\[[^\]]+\]/g, 'sample')].map(
-        (p) => `/${p}`,
-      );
+      [
+        route
+          .replace(/\([^)]*\)\//g, '')
+          .replace(/\[\[?\.\.\.[^\]]+\]\]?/g, 'a/b')
+          .replace(/\[[^\]]+\]/g, 'sample'),
+      ].map((p) => `/${p}`);
     for (const p of ROUTE_POLICIES) {
       for (const path of samples(p.route)) {
         expect(

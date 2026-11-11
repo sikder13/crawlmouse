@@ -1,4 +1,3 @@
-import '../../../styles/v2/tokens.css';
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
@@ -10,15 +9,9 @@ import { readLinkRow } from '@/lib/v2/account/email-change-read';
 import { LINK_FLOWS } from '@/lib/v2/account/link-cookie';
 import { isToken } from '@/lib/v2/account/tokens';
 
-export const dynamic = 'force-dynamic';
-
-// Not indexed and not in the sitemap: a page reached from one person's emailed link. The root
-// layout's canonical ("/") would be wrong here (OPERATING-RULES §13: indexing is the route's call).
-export const metadata: Metadata = {
-  title: 'Change your sign-in address',
-  robots: { index: false, follow: false },
-  alternates: { canonical: null },
-};
+// Not indexed, not in the sitemap and rendered per request: the (account) layout says so for
+// every page in the group.
+export const metadata: Metadata = { title: 'Change your sign-in address' };
 
 const one = (v: string | string[] | undefined) => (typeof v === 'string' ? v : undefined);
 
