@@ -48,6 +48,11 @@ export interface FixOptions {
   /** Show a since-kept check as it was at its finish, as the Result preview does. */
   asFirstSeen?: boolean;
   hrefs?: FixHrefs;
+  /**
+   * Whether the page can mark a fix done and re-check, which the "When you've shipped it" card
+   * describes. The previews show the card; a page with no such action passes false and has none.
+   */
+  rerun?: boolean;
 }
 
 export interface FixFrame {
@@ -127,7 +132,8 @@ export interface OpenFixPage extends FixBase {
   switcher: { heading: string; detected: string | null; options: FrameworkOption[] } | null;
   /**
    * What happens once the fix ships, with the ask that opens the keep bar; null on a kept audit,
-   * whose account action the preview does not have.
+   * whose account action the preview does not have, and on a page that cannot re-check
+   * (`FixOptions.rerun`).
    */
   shipped: { heading: string; body: string; action: SegmentLink } | null;
 }
@@ -379,7 +385,7 @@ export function fixView(
   d: ViewDataset,
   checkId: string,
   fixId: string,
-  { plan = 'free', asFirstSeen = false, hrefs = NO_HREFS }: FixOptions = {},
+  { plan = 'free', asFirstSeen = false, hrefs = NO_HREFS, rerun = true }: FixOptions = {},
 ): FixView {
   const check = findCheck(d, checkId);
   const fix = d.fixes.find((x) => x.id === fixId);
@@ -473,7 +479,7 @@ export function fixView(
   const p = fix.packet;
   const pages = bare.affected_pages > 1 ? `the ${count(bare.affected_pages)} pages` : 'the page';
   const shipped =
-    keptUntil === null
+    keptUntil === null || !rerun
       ? null
       : {
           heading: "When you've shipped it",

@@ -147,6 +147,17 @@ describe('/audit/[id]: the result of a measured check, read by a visitor', () =>
       expect(preview).toContain(`>${label}`);
   });
 
+  it('says a share link is kept only where the page has one', () => {
+    const until = resultOf(one).keptUntil!;
+    const markup = html(<CheckPage read={one} />);
+    expect(markup).toContain(`this result is kept until ${until}`);
+    expect(markup).not.toContain('share link');
+    // The preview, which shows Share, says both are kept.
+    expect(html(resultScreenAlone(one))).toContain(
+      `this result and its share link are kept until ${until}`,
+    );
+  });
+
   it('asks to keep the audit with the check it shows, and for no email to read it', () => {
     const data = resultOf(one);
     expect(data.keptUntil).not.toBeNull();
@@ -401,6 +412,22 @@ describe('/audit/[id]/fix/[fixId]', () => {
     expect(markup).toContain(escaped(live()[0]!.title));
   });
 
+  it('a page with no way to mark a fix done leaves out the card that describes it', () => {
+    const SHIPPED = 'When you&#x27;ve shipped it';
+    for (const read of [one, withPackets()]) {
+      const found = fixOf(read, live()[0]!.id)!;
+      expect(found.view).toMatchObject({ kind: 'open', shipped: null });
+      const markup = html(<FixBody read={read} found={found} />);
+      expect(markup).not.toContain(SHIPPED);
+      expect(markup).not.toContain('Mark done and re-check now');
+      expect(markup).not.toContain('replaces this audit');
+    }
+    // The preview, which passes no page options, shows the card for the same fix.
+    const preview = fixView(one.dataset, FIRST, live()[0]!.id);
+    expect(preview).toMatchObject({ kind: 'open', shipped: { heading: "When you've shipped it" } });
+    expect(html(fixScreen(preview))).toContain(SHIPPED);
+  });
+
   it('the no-steps line is absent when the fix has a packet, and on a locked fix', () => {
     const read = withPackets();
     const open = fixOf(read, live()[0]!.id)!;
@@ -581,7 +608,7 @@ describe('nothing internal goes on the wire for a kept check (D3)', () => {
 });
 
 import { FixScreen } from '../../../../components/v2/screens/fix/FixScreen';
-import type { FixView } from '../../../../lib/v2/view/fix';
+import { fixView, type FixView } from '../../../../lib/v2/view/fix';
 
 const fixScreen = (view: FixView) => <FixScreen data={view} />;
 /** A string as React writes it into markup. */
