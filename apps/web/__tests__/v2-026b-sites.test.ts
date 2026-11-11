@@ -706,6 +706,41 @@ function sectionA(text: string): string {
   return text.slice(start, end);
 }
 
+describe('the section header’s account of each lock', () => {
+  /**
+   * The header says which row each function locks first and which columns it reads in that same
+   * statement. Read from the installed definitions: the first statement that reads a table must be
+   * the FOR UPDATE, on that table, selecting those columns.
+   */
+  it.each([
+    ['request_capped_check', 'sites', ['s.removed_at', 's.paused_reason']],
+    ['add_site', 'accounts', []],
+    [
+      'edit_site',
+      'sites',
+      ['s.account_id', 's.staging_of_site_id', 's.removed_at', 's.owner_seat_id'],
+    ],
+    ['remove_site', 'sites', ['s.removed_at']],
+  ] as const)('%s locks %s first, reading %j in that statement', async (fn, table, columns) => {
+    const { rows } = await db.query<{ def: string }>(
+      `select pg_get_functiondef(p.oid) as def from pg_proc p
+        where p.pronamespace = 'public'::regnamespace and p.proname = $1`,
+      [fn],
+    );
+    const body = rows[0]!.def;
+    const firstRead = body.search(/\bfrom public\.\w+/);
+    const lock =
+      /^\s*(select|perform)\s+([^;]*?)\s+(?:into\s[^;]*?\s+)?from public\.(\w+)\s[^;]*?for update;/m.exec(
+        body,
+      );
+    expect(lock, 'a FOR UPDATE statement').not.toBeNull();
+    expect(body.indexOf(lock![0]) + lock![0].indexOf('from public.')).toBe(firstRead);
+    expect(lock![3]).toBe(table);
+    const read = lock![1] === 'perform' ? [] : lock![2]!.split(',').map((c) => c.trim());
+    expect(read).toEqual(columns);
+  });
+});
+
 describe('take_rate_slot', () => {
   it('is security definer, owned by postgres, and no client role may execute it, service_role included', async () => {
     const { rows } = await db.query<Record<string, unknown>>(
