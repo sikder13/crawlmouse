@@ -60,15 +60,17 @@ export const formatCursor = (c: Cursor): string =>
 export function parseCursor(text: string): Cursor | null {
   const m = CURSOR.exec(text);
   if (!m) return null;
-  const [batch, step, pages, links, at] = m.slice(1, 6).map(Number) as [
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
+  const group = (i: number) => Number(m[i]);
+  const step = group(2);
   if (step > ALL_DONE) return null;
-  return { batch, step, pages, links, at, ended: m[6] === '1' };
+  return {
+    batch: group(1),
+    step,
+    pages: group(3),
+    links: group(4),
+    at: group(5),
+    ended: m[6] === '1',
+  };
 }
 
 /** What the check's row says, as one poll reads it. */
