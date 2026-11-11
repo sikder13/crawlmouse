@@ -14,6 +14,8 @@
  *
  * `log` receives each request as the calls that built it, when it is sent. `before` runs ahead of
  * each request with those calls, for a test that changes the database between two requests.
+ * `as` runs each request as a signed-in caller instead (`authenticated`, with that user as the JWT
+ * subject), so row security and column grants apply as they do to a session client.
  */
 import type { PGlite } from '@electric-sql/pglite';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -24,6 +26,7 @@ export type Call = [method: string, ...args: unknown[]];
 export interface PostgrestOptions {
   log?: Call[][];
   before?: (request: readonly Call[]) => Promise<void>;
+  as?: { userId: string };
 }
 
 export interface PostgrestError {
@@ -82,7 +85,8 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
     options.log?.push(calls);
     await options.before?.(calls);
     try {
-      const { rows } = await asRole(pg, 'service_role', null, (tx) =>
+      const role = options.as === undefined ? 'service_role' : 'authenticated';
+      const { rows } = await asRole(pg, role, options.as?.userId ?? null, (tx) =>
         tx.query<Record<string, unknown>>(sql, params),
       );
       return {
