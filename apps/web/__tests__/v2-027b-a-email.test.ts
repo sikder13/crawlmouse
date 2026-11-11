@@ -2,6 +2,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import fc from 'fast-check';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { normalizeEmail } from '../lib/auth/normalize-email';
+import { EMAIL_CHANGE_LINK_MINUTES, EMAIL_UNDO_DAYS } from '../lib/v2/account/email-change-page';
 import { hashToken, newToken } from '../lib/v2/account/tokens';
 import {
   applyAllMigrations,
@@ -155,7 +156,7 @@ describe('request_email_change', () => {
       used: false,
       revoked: false,
     });
-    expect(t.expires_at.getTime()).toBe(minutes(now, 60).getTime());
+    expect(t.expires_at.getTime()).toBe(minutes(now, EMAIL_CHANGE_LINK_MINUTES).getTime());
     expect(await events(p.accountId)).toEqual(['email_change_requested']);
   });
 
@@ -218,7 +219,7 @@ describe('apply_email_change', () => {
       new_email: 'new.name+work@googlemail.com',
       used: false,
     });
-    expect(u.expires_at.getTime()).toBe(minutes(now, 7 * 24 * 60).getTime());
+    expect(u.expires_at.getTime()).toBe(minutes(now, EMAIL_UNDO_DAYS * 24 * 60).getTime());
     expect((await token(r.id)).used).toBe(true);
     expect(await events(p.accountId)).toEqual(['email_change_requested', 'email_changed']);
   });
