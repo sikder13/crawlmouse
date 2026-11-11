@@ -181,7 +181,9 @@ describe('v2 stays out of live pages', () => {
     file.startsWith(ACCOUNT_GROUP + '/') ||
     V2_LIVE.some((dir) => file.startsWith(dir + '/')) ||
     file.startsWith(join(WEB_ROOT, 'components', 'v2') + '/') ||
-    file.startsWith(join(WEB_ROOT, '__tests__', 'v2') + '/');
+    file.startsWith(join(WEB_ROOT, '__tests__', 'v2') + '/') ||
+    // A test beside the code it tests: no page imports a test file.
+    /\.test\.tsx?$/.test(file);
 
   const sources = walk(WEB_ROOT).filter(
     (f) => /\.(tsx?|jsx?|mjs|css)$/.test(f) && !f.includes('/tests/e2e/'),
