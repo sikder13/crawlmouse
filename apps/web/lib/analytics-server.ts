@@ -8,9 +8,11 @@
  * given the request's `Cookie` header only, to read the visitor's consent, and puts nothing of the
  * request in the event. Callers pass no email and no host in `properties`.
  *
- * When it sends: only if `serverCaptureAllowed` says the visitor's consent allows it, and only with
- * a project key. A send that fails is logged by event name, without the payload, and dropped, so
- * an event does not fail the action it records.
+ * When it sends: if `serverCaptureAllowed` says the visitor's consent allows it and there is a
+ * project key. A send that fails, or that PostHog has not answered in CAPTURE_TIMEOUT_MS, is logged
+ * by event name, without the payload, and dropped: `captureServerEvent` resolves either way. The
+ * check routes run it after their response (`after`, app/api/checks/route.ts and
+ * app/api/checks/[id]/_lib/deps.ts), so the wait is not the visitor's.
  */
 import type { FunnelEvent } from './analytics-events';
 import { serverCaptureAllowed } from './consent';
@@ -33,7 +35,13 @@ export type SendCapture = (body: CaptureBody) => Promise<void>;
 
 const POSTHOG_CAPTURE_URL = 'https://us.i.posthog.com/i/v0/e/';
 
-/** Posts to PostHog's capture endpoint with the project key; sends nothing without one. */
+/** How long a capture waits for PostHog before the request is aborted. */
+export const CAPTURE_TIMEOUT_MS = 2000;
+
+/**
+ * Posts to PostHog's capture endpoint with the project key; sends nothing without one. The request
+ * is aborted, and so rejects, when PostHog has not answered in CAPTURE_TIMEOUT_MS.
+ */
 export const posthogSend: SendCapture = async (body) => {
   const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   if (!apiKey) return;
@@ -41,6 +49,7 @@ export const posthogSend: SendCapture = async (body) => {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ api_key: apiKey, ...body }),
+    signal: AbortSignal.timeout(CAPTURE_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`capture answered ${res.status}`);
 };
