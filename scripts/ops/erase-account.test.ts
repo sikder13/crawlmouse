@@ -291,6 +291,7 @@ describe('erase-account (B-F2)', () => {
     expect(plan.refusals).toEqual([
       `${p.storage.length} storage objects are still stored; delete them through the Storage API first (docs/ops/erasure.md §4)`,
     ]);
+    expect(plan.refusalCodes).toEqual(['storage']);
     // Every count, each from the fixture: none of domain_verifications, embed_badges, or a
     // share link or API key this person created; seedWorld gives the account two sites, each with a
     // check and a report.
@@ -549,9 +550,11 @@ describe('erase-account (B-F2)', () => {
       `update public.users set pro_until = now() + interval '1 day' where id = $1`,
       [p.id],
     );
-    expect((await planErasure(db(), { userId: p.id })).refusals).toEqual([
+    const withV1 = await planErasure(db(), { userId: p.id });
+    expect(withV1.refusals).toEqual([
       'users.pro_until is in the future; cancel the subscription in Stripe first',
     ]);
+    expect(withV1.refusalCodes).toEqual(['v1_subscription']);
     const withPro = await everything();
     await expect(executeErasure(db(), { userId: p.id }, sqlDelete)).rejects.toThrow(
       /refusing to erase/,

@@ -359,8 +359,8 @@ describe('restoreAccount', () => {
   it('a restore whose answer is lost after it committed still unbans', async () => {
     const { o, delete_restore } = await confirmed();
     const lost = recorder({
-      rpc: async (fn, args) => {
-        const r = await rpc(fn, args);
+      rpc: async <T>(fn: string, args: Record<string, unknown>) => {
+        const r = await rpc<T>(fn, args);
         if (fn === 'restore_account') throw new Error('connection reset');
         return r;
       },

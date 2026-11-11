@@ -911,8 +911,9 @@ $$;
 
 -- What an erasure would do. Changes nothing (a stable function: Postgres refuses a write in it).
 -- Name the person by user id or by address, not both. An address that names more than one user, or
--- an id no user has, raises. Returns {userId, emails, accounts, refusals, counts, kept, storage,
--- mintedReports}, the keys scripts/ops/erase-account.ts prints. `emails` is the address given, the
+-- an id no user has, raises (unless a confirmed deletion queued that id: see below). Returns {userId,
+-- emails, accounts, refusals, refusalCodes, counts, kept, storage, mintedReports}: the keys
+-- scripts/ops/erase-account.ts prints, and each refusal's code. `emails` is the address given, the
 -- user's current ones and users.previous_emails (less any another person now holds), lower-cased.
 create or replace function public.erase_person_plan(p_user uuid, p_email text)
 returns json
@@ -928,6 +929,7 @@ declare
   v_emails text[];
   v_accounts uuid[] := '{}';
   v_refusals text[] := '{}';
+  v_codes text[] := '{}';
   v_counts json;
   v_held bigint := 0;
   v_orphan boolean := false;
@@ -972,10 +974,13 @@ begin
                            and not exists (select 1 from public.seats s
                                             where s.account_id = a.id and s.status = 'active')
                          order by a.id::text);
-    v_refusals := array(select f.message from public.erase_person_refusals(v_user, v_accounts) f);
   elsif v_user is not null then
     v_accounts := public.erase_person_accounts(v_user);
-    v_refusals := array(select f.message from public.erase_person_refusals(v_user, v_accounts) f);
+  end if;
+  if v_user is not null then
+    select coalesce(array_agg(f.message order by f.i), '{}'), coalesce(array_agg(f.code order by f.i), '{}')
+      into v_refusals, v_codes
+      from public.erase_person_refusals(v_user, v_accounts) with ordinality f(code, message, i);
   end if;
   -- A previous address that another person now signs in with is theirs: it is left out of the
   -- addresses, so nothing of theirs is erased, and counted under `kept`.
@@ -989,6 +994,7 @@ begin
     -- The rows that name them go with the erasure, after which nothing can list them.
     v_refusals := v_refusals || (json_array_length(v_counts->'storage')::text
       || ' storage objects are still stored; delete them through the Storage API first (docs/ops/erasure.md §4)');
+    v_codes := v_codes || 'storage'::text;
   end if;
 
   return json_build_object(
@@ -996,6 +1002,9 @@ begin
     'emails', to_json(v_emails),
     'accounts', to_json(array(select a::text from unnest(v_accounts) a order by 1)),
     'refusals', to_json(v_refusals),
+    -- Each refusal's code, in the same order (`storage` for the line above): what the sequence in
+    -- lib/v2/account/erase.ts reads, so it never depends on where a line sits.
+    'refusalCodes', to_json(v_codes),
     'counts', v_counts->'counts',
     'kept', case when v_user is null then v_counts->'kept'
                  else (select json_object_agg(k.key, k.value order by k.i)
