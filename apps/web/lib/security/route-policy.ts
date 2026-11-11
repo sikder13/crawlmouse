@@ -207,14 +207,14 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   },
   // Outside /api. The middleware's origin guard reads API rows only; /login/verify checks its own.
   {
-    route: 'account/email/[token]',
+    route: '(account)/account/email/[token]',
     methods: ['GET'],
     class: 'public',
     reason: "the emailed link's token, moved into a cookie; it changes nothing (CC-27b D3)",
     origin: 'any',
   },
   {
-    route: 'account/email-undo/[token]',
+    route: '(account)/account/email-undo/[token]',
     methods: ['GET'],
     class: 'public',
     reason: "the emailed link's token, moved into a cookie; it changes nothing (CC-27b D3)",

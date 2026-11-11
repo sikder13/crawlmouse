@@ -4,7 +4,11 @@
  * registry's comparison. Every duration is a parameter, filled from the constants the database's
  * expiries are pinned to (`lib/v2/account/email-change-page.ts`).
  */
-import { EMAIL_CHANGE_LINK_MINUTES, type PageCode } from '../account/email-change-page';
+import {
+  EMAIL_CHANGE_LINK_MINUTES,
+  EMAIL_UNDO_DAYS,
+  type PageCode,
+} from '../account/email-change-page';
 
 export const SUPPORT_ADDRESS = 'support@crawlmouse.com';
 
@@ -29,7 +33,7 @@ export const EMAIL_CHANGE_COPY = {
     },
     done: {
       heading: 'Your sign-in address is changed.',
-      lead: 'Sign in with the new address from now on. Every other browser signed in to your account has been signed out, and the old address has been sent a link that puts it back.',
+      lead: `Sign in with the new address from now on. Every other browser signed in to your account has been signed out. The link we sent to the old address can put it back for ${EMAIL_UNDO_DAYS} days.`,
     },
     unusable: {
       heading: 'This link has been used or has expired.',
@@ -45,16 +49,16 @@ export const EMAIL_CHANGE_COPY = {
     },
   },
   emailUndo: {
-    title: 'Put your sign-in address back',
+    title: 'Stop the change to your sign-in address',
     ready: {
-      heading: 'Put your sign-in address back.',
+      heading: 'Stop the change to your sign-in address.',
       lead: (address) =>
-        `Your sign-in address goes back to ${address}, and every browser signed in to your account is signed out.`,
-      button: 'Put my address back',
+        `Your sign-in address stays ${address}, or goes back to it if the change has already been confirmed. Every browser signed in to your account is signed out.`,
+      button: 'Stop the change',
     },
     done: {
-      heading: 'Your sign-in address is back.',
-      lead: 'Every browser signed in to your account has been signed out. Sign in again with this address.',
+      heading: 'The change is stopped.',
+      lead: 'Your sign-in address is the one this email was sent to. Every browser signed in to your account has been signed out; sign in again with this address.',
     },
     unusable: {
       heading: 'This link has been used or has expired.',

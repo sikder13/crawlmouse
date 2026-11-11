@@ -136,9 +136,13 @@ create index if not exists account_events_account_idx on public.account_events (
 alter table public.account_events enable row level security;
 revoke all on public.account_events from public, anon, authenticated;
 
--- Only one email change in flight per account: an unused, unrevoked confirmation or undo token blocks
--- a second request. An index, not a read-then-insert check, so two concurrent requests cannot both pass.
-create unique index if not exists account_tokens_one_email_change_uq on public.account_tokens (account_id)
+-- One live link of each email kind per account. A request creates the confirmation link and the old
+-- address's undo link together, so the two kinds live side by side; request_email_change refuses a
+-- second change while either of the first one's links is live (CMA02), and this index is what holds
+-- when two requests race past that check.
+drop index if exists public.account_tokens_one_email_change_uq;
+create unique index if not exists account_tokens_one_live_email_link_uq
+  on public.account_tokens (account_id, kind)
   where kind in ('email_change', 'email_change_undo') and used_at is null and revoked_at is null;
 
 -- The addresses a person signed in with before an email change. The erasure reads them with the current
@@ -187,8 +191,8 @@ revoke all on function public.end_user_sessions(uuid, uuid) from public, anon, a
 grant execute on function public.end_user_sessions(uuid, uuid) to service_role;
 
 -- Creates a link's row, with no token yet (the mailer issues it at send). A live token of the same kind
--- for the same account is revoked first, so a second request ends the first link (email changes are
--- also held to one in flight by account_tokens_one_email_change_uq).
+-- for the same account is revoked first, so a second request ends the first link (an email change
+-- is refused while one is in flight, by request_email_change and account_tokens_one_live_email_link_uq).
 create or replace function public.create_account_token(
   p_account uuid, p_user uuid, p_kind text, p_expires_at timestamptz,
   p_new_email text default null, p_old_email text default null, p_paired_with uuid default null)
@@ -265,24 +269,34 @@ grant execute on function public.issue_account_link(uuid) to service_role;
 
 -- ═══ A: email change (D3) ═════════════════════════════════════════════════════════════════════════
 
--- The person's sign-in address changes in two steps, each a link: the confirmation link goes to the
--- new address (request_email_change), and confirming it moves the rows (apply_email_change) and
--- issues a seven-day "this wasn't me" link to the old address, which moves them back
--- (prepare_email_undo, then undo_email_change). Supabase Auth's own row is changed by the caller,
--- between the calls (lib/v2/account/email-change.ts); revert_email_change undoes apply_email_change
--- when Auth refuses. One change is in flight per account: while an undo link is live a new request
--- is refused (account_tokens_one_email_change_uq); a request made while an earlier one is still
--- unconfirmed replaces it (create_account_token revokes the earlier link). Both links are rows with
--- no token until the mailer issues them (issue_account_link, owner ruling Q5); a function here
--- accepts a token only for a row that was issued (`issued_at is not null`), so a row the mailer never
--- issued, whose token_hash is null, cannot be consumed.
+-- The person's sign-in address changes in two steps, each a link. A request (request_email_change)
+-- creates both links at once: the confirmation link, for the new address, and the "this wasn't me"
+-- link, for the old one, so the old address hears before anything changes (D3). Confirming moves the
+-- rows (apply_email_change) and gives the undo link seven days from that moment. The undo
+-- (prepare_email_undo, then undo_email_change) stops a pending change, or, once it has applied, moves
+-- the rows back. Supabase Auth's own row is changed by the caller, between the calls
+-- (lib/v2/account/email-change.ts); revert_email_change undoes apply_email_change when Auth refuses.
+--
+-- The two links of one request are the email_change row and the email_change_undo row of the same
+-- account created in the same transaction: their created_at, the transaction's now(), is equal, and
+-- so are their addresses. That is how each function here finds a link's partner.
+--
+-- One change is in flight per account: a request is refused (CMA02) while the account has a live
+-- confirmation link, or a live undo link whose change has applied; an undo link whose change was
+-- never confirmed and has expired does not hold the account. account_tokens_one_live_email_link_uq
+-- holds when two requests race. Both links are rows with no token until the mailer issues them
+-- (issue_account_link, owner ruling Q5); a function here accepts a token only for a row that was
+-- issued (`issued_at is not null`), so a row the mailer never issued, whose token_hash is null,
+-- cannot be consumed.
 --
 -- Refusals, by SQLSTATE; lib/v2/account/email-change.ts answers each:
 --   CMA01  the new address is the person's current one
---   CMA02  an email change is in flight for the account (its undo link is live)
+--   CMA02  an email change is in flight for the account
 --   CMA03  the account is marked for deletion
 --   CMA04  another sign-in user or profile holds the address
---   CMA05  the link's token is unknown, of another kind, used, revoked or expired
+--   CMA05  the link's token is unknown, of another kind, used, revoked or expired, or its change
+--          was stopped
+--   CMA06  the undo was prepared for a change that was pending, and the change applied in between
 
 -- users.email_normalized: the rule of apps/web/lib/auth/normalize-email.ts (the trial ledger's key),
 -- for an address request_email_change accepted (lowercase, no surrounding space). The TS function
@@ -330,13 +344,13 @@ as $$
                   where pg_catalog.lower(u.email) = pg_catalog.lower(p_email) and u.id <> p_user);
 $$;
 
--- The confirmation link's row, sixty minutes from p_now, with no token until the mailer issues it.
--- Returns its id (the mailer's handle).
--- Whether the new address is in use is not checked here: the request answers the same either way,
--- and apply_email_change refuses a held address.
+-- Both links' rows, with no token until the mailer issues them: the confirmation link sixty minutes
+-- from p_now, the undo link sixty minutes and seven days (it outlives any confirm). Returns
+-- {change_token_id, undo_token_id}, the mailer's handles. Whether the new address is in use is not
+-- checked here: the request answers the same either way, and apply_email_change refuses a held address.
 create or replace function public.request_email_change(
   p_account uuid, p_user uuid, p_new_email text, p_now timestamptz)
-returns uuid
+returns jsonb
 language plpgsql
 security definer
 set search_path = pg_catalog, public, pg_temp
@@ -345,7 +359,8 @@ declare
   v_marked boolean;
   v_current text;
   v_constraint text;
-  v_id uuid;
+  v_change uuid;
+  v_undo uuid;
 begin
   if p_new_email is null or p_new_email <> pg_catalog.lower(pg_catalog.btrim(p_new_email))
      or pg_catalog.length(p_new_email) > 254 or p_new_email !~ '^[^@]+@[^@]+$' then
@@ -365,30 +380,43 @@ begin
   if pg_catalog.lower(v_current) = p_new_email then
     raise exception 'request_email_change: that is the current address' using errcode = 'CMA01';
   end if;
+  if exists (
+       select 1 from public.account_tokens k
+        where k.account_id = p_account and k.used_at is null and k.revoked_at is null
+          and k.expires_at > p_now
+          and (k.kind = 'email_change'
+               or (k.kind = 'email_change_undo' and exists (
+                     select 1 from public.account_tokens c
+                      where c.account_id = k.account_id and c.kind = 'email_change'
+                        and c.created_at = k.created_at and c.used_at is not null)))) then
+    raise exception 'request_email_change: an email change is in flight' using errcode = 'CMA02';
+  end if;
   begin
-    v_id := public.create_account_token(p_account, p_user, 'email_change',
-                                        p_now + interval '60 minutes', p_new_email, v_current);
+    v_change := public.create_account_token(p_account, p_user, 'email_change',
+                                            p_now + interval '60 minutes', p_new_email, v_current);
+    v_undo := public.create_account_token(p_account, p_user, 'email_change_undo',
+                                          p_now + interval '60 minutes' + interval '7 days',
+                                          p_new_email, v_current);
   exception when unique_violation then
     get stacked diagnostics v_constraint = constraint_name;
-    if v_constraint = 'account_tokens_one_email_change_uq' then
+    if v_constraint = 'account_tokens_one_live_email_link_uq' then
       raise exception 'request_email_change: an email change is in flight' using errcode = 'CMA02';
     end if;
     raise;
   end;
   insert into public.account_events (account_id, kind, actor_user_id)
   values (p_account, 'email_change_requested', p_user);
-  return v_id;
+  return pg_catalog.jsonb_build_object('change_token_id', v_change, 'undo_token_id', v_undo);
 end;
 $$;
 
 -- Confirms the change in one transaction: consumes the email_change token, refuses a held address,
 -- moves public.users (email, email_normalized; the address it leaves is appended to previous_emails)
--- and the person's seats invited under the old address, and creates the undo link's row for the old
--- address, seven days from p_now (the mailer issues its token). Returns {user_id, account_id, old_email, new_email,
--- undo_token_id, tier}; tier is accounts.tier as stored. The advisory lock serialises the
--- functions here that move a person to the same address; Auth's own sign-up does not take it, so
--- a sign-up can still claim the address before the caller's Auth update, which then fails and is
--- reverted.
+-- and the person's seats invited under the old address, and sets the request's undo link to expire
+-- seven days from p_now. Returns {user_id, account_id, old_email, new_email, undo_token_id, tier};
+-- tier is accounts.tier as stored. The advisory lock serialises the functions here that move a person
+-- to the same address; Auth's own sign-up does not take it, so a sign-up can still claim the address
+-- before the caller's Auth update, which then fails and is reverted.
 create or replace function public.apply_email_change(p_hash text, p_now timestamptz)
 returns jsonb
 language plpgsql
@@ -418,6 +446,15 @@ begin
   if public.email_held_by_other(t.new_email, t.user_id) then
     raise exception 'apply_email_change: the address is taken' using errcode = 'CMA04';
   end if;
+  update public.account_tokens u set expires_at = p_now + interval '7 days'
+   where u.account_id = t.account_id and u.kind = 'email_change_undo' and u.created_at = t.created_at
+     and u.used_at is null and u.revoked_at is null
+  returning u.id into v_undo;
+  if v_undo is null then
+    -- The request's undo link was used (which revokes this link too) or replaced: no change applies
+    -- without a way back.
+    raise exception 'apply_email_change: the change has no live undo link' using errcode = 'CMA05';
+  end if;
   select u.email into v_old from public.users u where u.id = t.user_id for update;
 
   update public.account_tokens k set used_at = p_now where k.id = t.id;
@@ -432,10 +469,6 @@ begin
   end;
   update public.seats s set invited_email = t.new_email
    where s.user_id = t.user_id and pg_catalog.lower(s.invited_email) = pg_catalog.lower(v_old);
-  v_undo := public.create_account_token(t.account_id, t.user_id, 'email_change_undo',
-                                        p_now + interval '7 days', t.new_email, v_old);
-  -- `at` is the transaction's now(), the same instant as the undo token's created_at, which is how
-  -- revert_email_change finds this row.
   insert into public.account_events (account_id, kind, actor_user_id)
   values (t.account_id, 'email_changed', t.user_id);
   return pg_catalog.jsonb_build_object(
@@ -445,8 +478,8 @@ end;
 $$;
 
 -- When Auth refuses the change apply_email_change made in our rows: the rows go back, the undo link
--- is revoked and the email_changed event is removed. The email_change token stays used, so the
--- person asks again.
+-- is revoked and the latest email_changed event of the person on the account is removed. The
+-- email_change token stays used, so the person asks again.
 create or replace function public.revert_email_change(p_undo_token uuid)
 returns void
 language plpgsql
@@ -472,16 +505,19 @@ begin
    where s.user_id = t.user_id and pg_catalog.lower(s.invited_email) = pg_catalog.lower(t.new_email);
   update public.account_tokens k set revoked_at = now() where k.id = t.id;
   delete from public.account_events e
-   where e.account_id = t.account_id and e.kind = 'email_changed'
-     and e.actor_user_id = t.user_id and e.at = t.created_at;
+   where e.id = (select x.id from public.account_events x
+                  where x.account_id = t.account_id and x.kind = 'email_changed'
+                    and x.actor_user_id = t.user_id
+                  order by x.at desc limit 1);
 end;
 $$;
 
--- The undo's first step; it consumes nothing. Refuses an unusable link (CMA05). When another sign-in
--- user holds the old address, it is cleared out of the way only when all four of the owner's
--- conditions hold (ruling Q10); otherwise the undo is refused (CMA04):
---   1. it was created after the change was applied (the undo row is created by apply_email_change,
---      so its created_at is that moment);
+-- The undo's first step; it consumes nothing. Refuses an unusable link (CMA05). Says whether the
+-- request's change has applied (`applied`): before it has, nothing else is read, since the old
+-- address is still the person's. After it has, and another sign-in user holds the old address, that
+-- user is cleared out of the way only when all four of the owner's conditions hold (ruling Q10);
+-- otherwise the undo is refused (CMA04):
+--   1. it was created after the change was applied (the confirmation link's used_at);
 --   2. it has no seat but the one handle_new_user gave it at sign-up;
 --   3. it has no row in audits or sessions, and no account but the one handle_new_user gave it,
 --      which holds nothing: personal, on Free, no Stripe customer, no other seat, no site;
@@ -492,7 +528,7 @@ $$;
 -- sign-up (measured: __tests__/v2-027b-a-email.test.ts, "a sign-up has the seat and account").
 -- The provisioned account is deleted here, its seat with it, and the user's id is returned as
 -- `squatter` for the caller to delete from Auth (its profile goes with it, 20261109000003).
--- Returns {user_id, account_id, old_email, squatter}.
+-- Returns {user_id, account_id, old_email, applied, squatter}.
 create or replace function public.prepare_email_undo(p_hash text, p_now timestamptz)
 returns jsonb
 language plpgsql
@@ -501,6 +537,7 @@ set search_path = pg_catalog, public, pg_temp
 as $$
 declare
   t public.account_tokens%rowtype;
+  v_applied_at timestamptz;
   v_holder auth.users%rowtype;
   v_provisioned uuid;
 begin
@@ -511,6 +548,13 @@ begin
   if not found then
     raise exception 'prepare_email_undo: the link cannot be used' using errcode = 'CMA05';
   end if;
+  select c.used_at into v_applied_at from public.account_tokens c
+   where c.account_id = t.account_id and c.kind = 'email_change' and c.created_at = t.created_at;
+  if v_applied_at is null then
+    return pg_catalog.jsonb_build_object(
+      'user_id', t.user_id, 'account_id', t.account_id, 'old_email', t.old_email,
+      'applied', false, 'squatter', null);
+  end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('account_email:' || pg_catalog.lower(t.old_email), 0));
   select * into v_holder from auth.users u
    where pg_catalog.lower(u.email) = pg_catalog.lower(t.old_email) and u.id <> t.user_id
@@ -520,13 +564,14 @@ begin
       raise exception 'prepare_email_undo: the old address is taken' using errcode = 'CMA04';
     end if;
     return pg_catalog.jsonb_build_object(
-      'user_id', t.user_id, 'account_id', t.account_id, 'old_email', t.old_email, 'squatter', null);
+      'user_id', t.user_id, 'account_id', t.account_id, 'old_email', t.old_email,
+      'applied', true, 'squatter', null);
   end if;
 
   select u.default_account_id into v_provisioned from public.users u where u.id = v_holder.id;
   if not (
     -- 1
-    coalesce(v_holder.created_at > t.created_at, false)
+    coalesce(v_holder.created_at > v_applied_at, false)
     -- 2
     and not exists (select 1 from public.seats s
                      where s.user_id = v_holder.id
@@ -552,15 +597,18 @@ begin
   delete from public.accounts a where a.id = v_provisioned;
   return pg_catalog.jsonb_build_object(
     'user_id', t.user_id, 'account_id', t.account_id, 'old_email', t.old_email,
-    'squatter', v_holder.id);
+    'applied', true, 'squatter', v_holder.id);
 end;
 $$;
 
--- The undo's last step, after the caller has set Auth back to the old address: consumes the undo
--- link and moves public.users and the seats back. The old address leaves previous_emails; the one
--- the change set is added to it, since it is part of the person's record for the erasure. Returns
--- {user_id, account_id}.
-create or replace function public.undo_email_change(p_hash text, p_now timestamptz)
+-- The undo's last step: consumes the undo link. Before the change applied, it revokes the
+-- confirmation link, so the change cannot apply, and touches no other row. After, the caller has set
+-- Auth back to the old address, and the rows move back: the old address leaves previous_emails and
+-- the one the change set is added to it, since it is part of the person's record for the erasure.
+-- Either way an email_change_undone event is written. p_applied is what prepare_email_undo said; if
+-- the change applied since, the caller has not set Auth back, so this refuses (CMA06) and the caller
+-- starts the undo again. Returns {user_id, account_id, applied}.
+create or replace function public.undo_email_change(p_hash text, p_now timestamptz, p_applied boolean)
 returns jsonb
 language plpgsql
 security definer
@@ -568,6 +616,7 @@ set search_path = pg_catalog, public, pg_temp
 as $$
 declare
   t public.account_tokens%rowtype;
+  c public.account_tokens%rowtype;
 begin
   select * into t from public.account_tokens k
    where k.token_hash = p_hash and k.kind = 'email_change_undo'
@@ -577,6 +626,21 @@ begin
   if not found then
     raise exception 'undo_email_change: the link cannot be used' using errcode = 'CMA05';
   end if;
+  select * into c from public.account_tokens k
+   where k.account_id = t.account_id and k.kind = 'email_change' and k.created_at = t.created_at
+     for update;
+  if (c.used_at is not null) <> p_applied then
+    raise exception 'undo_email_change: the change applied after the undo was prepared' using errcode = 'CMA06';
+  end if;
+
+  if c.used_at is null then
+    update public.account_tokens k set revoked_at = now() where k.id = c.id and k.revoked_at is null;
+    update public.account_tokens k set used_at = p_now where k.id = t.id;
+    insert into public.account_events (account_id, kind, actor_user_id)
+    values (t.account_id, 'email_change_undone', t.user_id);
+    return pg_catalog.jsonb_build_object('user_id', t.user_id, 'account_id', t.account_id, 'applied', false);
+  end if;
+
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('account_email:' || pg_catalog.lower(t.old_email), 0));
   if public.email_held_by_other(t.old_email, t.user_id) then
     raise exception 'undo_email_change: the old address is taken' using errcode = 'CMA04';
@@ -597,7 +661,7 @@ begin
    where s.user_id = t.user_id and pg_catalog.lower(s.invited_email) = pg_catalog.lower(t.new_email);
   insert into public.account_events (account_id, kind, actor_user_id)
   values (t.account_id, 'email_change_undone', t.user_id);
-  return pg_catalog.jsonb_build_object('user_id', t.user_id, 'account_id', t.account_id);
+  return pg_catalog.jsonb_build_object('user_id', t.user_id, 'account_id', t.account_id, 'applied', true);
 end;
 $$;
 
@@ -608,14 +672,14 @@ revoke all on function public.request_email_change(uuid, uuid, text, timestamptz
 revoke all on function public.apply_email_change(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.revert_email_change(uuid) from public, anon, authenticated;
 revoke all on function public.prepare_email_undo(text, timestamptz) from public, anon, authenticated;
-revoke all on function public.undo_email_change(text, timestamptz) from public, anon, authenticated;
+revoke all on function public.undo_email_change(text, timestamptz, boolean) from public, anon, authenticated;
 grant execute on function public.normalize_email(text) to service_role;
 grant execute on function public.email_held_by_other(text, uuid) to service_role;
 grant execute on function public.request_email_change(uuid, uuid, text, timestamptz) to service_role;
 grant execute on function public.apply_email_change(text, timestamptz) to service_role;
 grant execute on function public.revert_email_change(uuid) to service_role;
 grant execute on function public.prepare_email_undo(text, timestamptz) to service_role;
-grant execute on function public.undo_email_change(text, timestamptz) to service_role;
+grant execute on function public.undo_email_change(text, timestamptz, boolean) to service_role;
 
 -- ═══ end A ════════════════════════════════════════════════════════════════════════════════════════
 

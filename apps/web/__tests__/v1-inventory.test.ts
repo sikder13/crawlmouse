@@ -172,12 +172,8 @@ describe('the finders see what they claim to see', () => {
     );
     expect(hidden).toEqual([
       'app/account/delete/page.tsx',
-      'app/account/email-undo/page.tsx',
-      'app/account/email/page.tsx',
       'app/account/restore/page.tsx',
       'app/account/delete/[token]/route.ts',
-      'app/account/email-undo/[token]/route.ts',
-      'app/account/email/[token]/route.ts',
       'app/account/restore/[token]/route.ts',
       'app/api/account/delete/confirm/route.ts',
       'app/api/account/email/confirm/route.ts',

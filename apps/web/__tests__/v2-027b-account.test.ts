@@ -124,23 +124,27 @@ describe('what the clients can reach', () => {
   });
 });
 
-describe('one email change in flight', () => {
-  it('refuses a second live email-change token for the account, and allows one once the first is used', async () => {
+describe('one live email link per kind', () => {
+  it('holds an account to one live link of each email kind, and lets the two kinds live together', async () => {
     const o = await owner('flight@example.com');
-    const insert = (hash: string, kind = 'email_change') =>
+    const insert = (hash: string, kind: string) =>
       db.query(
         `insert into public.account_tokens (account_id, user_id, kind, token_hash, issued_at, new_email, old_email, expires_at)
          values ($1, $2, $3, $4, now(), 'new@example.com', 'flight@example.com', now() + interval '1 hour')`,
         [o.accountId, o.userId, kind, hash],
       );
-    await insert('a'.repeat(64));
-    await expect(insert('b'.repeat(64), 'email_change_undo')).rejects.toThrow(
-      /account_tokens_one_email_change_uq/,
-    );
+    // A request creates both links at once (D3: the old address hears at request time).
+    await insert('a'.repeat(64), 'email_change');
+    await insert('b'.repeat(64), 'email_change_undo');
+    for (const kind of ['email_change', 'email_change_undo']) {
+      await expect(insert('c'.repeat(64), kind)).rejects.toThrow(
+        /account_tokens_one_live_email_link_uq/,
+      );
+    }
     await db.query(`update public.account_tokens set used_at = now() where token_hash = $1`, [
       'a'.repeat(64),
     ]);
-    await insert('c'.repeat(64), 'email_change_undo');
+    await insert('d'.repeat(64), 'email_change');
   });
 });
 
