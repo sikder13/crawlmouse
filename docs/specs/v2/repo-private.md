@@ -36,12 +36,18 @@ longer starts an apply. Each workflow runs four jobs:
 - `report` opens an issue on any failure.
 
 `environment: production` stays on the `apply` and `rollback` jobs, which still use what it holds: the
-production secrets, and a deployment-branch policy of `main` only. It is no longer called an approval
-anywhere. The sha256 gate is unchanged. `db/production.ts plan` refuses any pending file that a passed
-dry run of the merged pull request did not apply byte for byte, and `apply` re-checks the manifest and
-production's fingerprint (`docs/ops/db-migrations.md` §1). The approval moves from a click on the
-environment to the owner's own dispatch: the same person, the same proof, and nothing applies on merge.
-`docs/ops/db-migrations.md` §1 and §4 give the exact clicks.
+production secrets, and a deployment-branch policy of `main` only. The sha256 gate is unchanged.
+`db/production.ts plan` refuses any pending file that a passed dry run of the merged pull request did
+not apply byte for byte, and `apply` re-checks the manifest and production's fingerprint
+(`docs/ops/db-migrations.md` §1). Nothing applies on merge.
+
+**Dispatch, then approve.** The owner dispatches the workflow from `main`, then approves the
+`production` environment in GitHub: while the repository is public the environment has a required
+reviewer, the owner, and the `apply` or `rollback` job waits for that approval (run 43067443133,
+2026-11-11). Read the rule back:
+`gh api repos/sikder13/crawlmouse/environments/production --jq '.protection_rules[] | {type, reviewers: [.reviewers[]?.reviewer.login]}'`.
+Once the repository is private, GitHub does not enforce required reviewers on Pro (the table above),
+so the dispatch alone starts the job and the owner check is what stands.
 
 **What the check cannot do.** It tells GitHub accounts apart, not the tools that act for one. Any token
 that acts as the owner and can write Actions passes it. That includes the owner's `gh` login on a
@@ -177,8 +183,13 @@ the flip, and after the flip it is skipped rather than failed. `codeql-baseline.
 
 ## D5 — one CI run per commit
 
-`ci.yml` triggers on `push` to every branch only. A pull request's required checks are the ones its
-head commit's push run reported: status checks attach to a commit, not to an event. The ruleset
+> **Changed by CC-COST** (`docs/specs/v2/ci-cost.md`). `ci.yml` now also runs on a dispatch and
+> nightly, and the visual set waits until a branch is up for merge. What follows is CC-REPO's rule, and
+> still holds for every push.
+
+`ci.yml` triggers on `push` to every branch (and, since CC-COST, `workflow_dispatch` and a nightly
+`schedule`; it has no `pull_request` trigger). A pull request's required checks are the ones its
+head commit's runs reported: status checks attach to a commit, not to an event. The ruleset
 requires a branch to be up to date with `main`, so the head that was tested carries `main`'s tree.
 
 The `prettier` and `migrations-append-only` jobs lost their `pull_request` branches. Their comparison
@@ -189,6 +200,11 @@ A pull request from a fork gets no CI, so it cannot meet the required checks. Af
 collaborators can fork.
 
 ## D6 — visual tests when something that can affect rendering changed
+
+> **Changed by CC-COST** (`docs/specs/v2/ci-cost.md`, D1–D2). The path filter below now decides only
+> once the branch is up for merge: on `main`, with an open pull request, or on a dispatch with
+> `visual: true`. On any other push the visual set is deferred and the `visual` job takes another
+> name, so the required check stays unmet.
 
 Three jobs run only when the `changes` job finds a change that can affect rendering:
 
@@ -293,7 +309,7 @@ Out of this step:
      shown by the D2 test; do not dispatch production to check it.
 3. **Budget:** Settings → Billing and licensing → Budgets and alerts → an Actions budget of **$300 a
    month, set for November**, with "stop usage" on at the limit and alerts at 50, 75 and 90%. The owner
-   re-sets it after the step that cuts the visual cost. From D7's projection (about 75,700 minutes a month,
+   re-sets it from CC-COST's measured projection (`docs/specs/v2/ci-cost.md`, D6). From D7's projection (about 75,700 minutes a month,
    about 2,500 a day), $300 at $0.006 a minute plus the 3,000 included minutes is about 53,000 minutes,
    about 21 days of private-repo CI. November reaches the stop only if the flip is before about the
    10th. GitHub budgets are monthly, so it stays at $300 until the owner re-sets it; a full month at

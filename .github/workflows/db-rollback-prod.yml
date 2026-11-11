@@ -5,9 +5,10 @@ name: DB rollback on production
 # fingerprint. db-apply-prod.yml never runs a rollback; this workflow is the only way one reaches
 # production. docs/ops/db-migrations.md is the runbook.
 #
-# The approval is the owner's own dispatch. The `production` environment holds the production
-# secrets and deploys from main only; it has no required reviewer, because on a private repository
-# under a personal GitHub Pro account environment reviewers are not enforced. The `authorize` job
+# The owner dispatches it from main, then approves the `production` environment, which holds the
+# production secrets and deploys from main only. Its required reviewer (the owner) is enforced while
+# the repository is public; on a private repository under a personal GitHub Pro account it is not,
+# and the dispatch alone starts the job (docs/specs/v2/repo-private.md, D1). The `authorize` job
 # (no environment, no secret, no permission) refuses unless the run is a workflow_dispatch from
 # main, dispatched and run by the repository owner, and `plan` and `rollback` run the same check
 # as their first step: a re-run of a failed job does not re-run a passed `authorize`, and only a
@@ -111,8 +112,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # Holds SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD; deployment branches: main only. No
-    # reviewer: the owner's dispatch is the approval, checked by the first step.
+    # Holds SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD; deployment branches: main only. Waits
+    # for the owner's approval while the repository is public; the first step checks the dispatch.
     environment: production
     permissions:
       contents: read
