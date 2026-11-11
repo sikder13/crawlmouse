@@ -187,7 +187,22 @@ describe('keep_check', () => {
         )
       ).rows.map((r) => r.p);
 
+    const stranger = await keeper();
     const outside = [
+      // Only the account differs: the same name, in another account's directory of this check.
+      [
+        {
+          old_path: `${anon}/batch-0.json.gz`,
+          new_path: `${stranger.accountId}/${siteId}/${checkId}/batch-0.json.gz`,
+        },
+      ],
+      // Only the source differs: the same name, read from another site's directory.
+      [
+        {
+          old_path: `anon/${who.accountId}/${checkId}/batch-0.json.gz`,
+          new_path: `${mine}/batch-0.json.gz`,
+        },
+      ],
       [
         {
           old_path: `${anon}/batch-0.json.gz`,

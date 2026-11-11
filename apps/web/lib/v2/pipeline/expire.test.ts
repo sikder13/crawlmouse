@@ -314,7 +314,7 @@ describe('a claim against the expiry, at each point', () => {
     expect(await exists('sites', check.siteId)).toBe(0);
   });
 
-  it('a site an account took after it was listed is not deleted: the delete itself asks account_id is null', async () => {
+  it('a site an account took after it was listed is not deleted: the delete statement tests the site again', async () => {
     const check = await storedCheck(db, memory, { host: host(), expiresAt: EXPIRED });
     const who = await keeper();
     const real = sqlExpireStore(asService(db));
