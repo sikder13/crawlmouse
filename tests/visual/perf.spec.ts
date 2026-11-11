@@ -46,8 +46,9 @@ import { test, expect, type Browser, type Page, type TestInfo } from './pw';
  *   60 Hz frame; packages/timing/src/busy.ts). Its mean is at most BUDGET.meanWorkMs, and its 95th
  *   percentile, the bursts, at most BUDGET.p95WorkMs. The slices are fixed in time, so the reading
  *   is what the page did, whatever refresh rate the runner manages. The mean is the one judged
- *   closely: a map that does twice its work moves it by about 40% (the map is part of the page's
- *   work), while the 95th percentile, near the slice's own length, moves less. Work off the main
+ *   closely: a map rendered and animated twice moved it by about a third, 2.195 to 2.93 ms (the
+ *   map is part of the page's work), and the 95th percentile less, 5.61 to 7.5 ms (ci-cost.md, D3).
+ *   Work off the main
  *   thread (the map's layouts in their Worker, raster) is not in it. Until CC-COST the budget was
  *   the 95th percentile interval between frames, at most 17.5 ms: a runner that dropped to 30 fps
  *   read 33.3 ms in all five runs with nothing in the page changed, and failed (the run of
@@ -317,6 +318,7 @@ function judge(name: string, rows: Record<string, unknown>[], budgets: Budgeted[
       median: mid,
       limit: b.limit,
       pass,
+      ...(b.advisory ? { advisory: true } : {}),
       samples,
     });
     if (!pass && !b.advisory) {
@@ -485,7 +487,10 @@ async function measure(
   };
   // What says this run measured anything; it must hold on every run.
   const broken = [
-    trace.mainThreads > 0 ? null : `run ${run + 1}: the trace holds no main thread`,
+    // The busy time sums every renderer main thread into one set of slices: two would count twice.
+    trace.mainThreads === 1
+      ? null
+      : `run ${run + 1}: the trace holds ${trace.mainThreads} renderer main threads, not 1`,
     trace.tasks > 0 ? null : `run ${run + 1}: the trace holds no main-thread task`,
     measured.frames > (WINDOW_MS / 1000) * MIN_FPS
       ? null

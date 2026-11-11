@@ -10,6 +10,8 @@ export interface Sample {
   limit: number;
   /** Whether the median met the limit, by the recorder's own rule. */
   pass: boolean;
+  /** Recorded for the trend only: a miss does not fail the run. */
+  advisory?: boolean;
   samples: number[];
 }
 
