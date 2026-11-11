@@ -40,6 +40,7 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     verifier: 'timingSafeEqual',
     origin: 'any',
   },
+  { route: 'api/alert-rules', methods: ['POST', 'PUT'], class: 'member', origin: 'strict' },
   {
     route: 'api/audits/[id]/cancel',
     methods: ['POST'],
