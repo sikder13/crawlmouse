@@ -17,8 +17,9 @@
  *   drops `cookie`, `cookies`, `set-cookie`, `token_hash`, `post_login_next` and span cookie-header
  *   keys at any depth; and replaces a `token_hash` or `code` query value (URL-encoded or not), a
  *   `post_login_next=` value, a PostgREST `=eq.` filter value, the id after `/check/`,
- *   `/checks/`, `/audit/` or `/audits/` in a path, and an emailed account link's token in its
- *   `/account/…/` path, wherever a string holds one.
+ *   `/checks/`, `/audit/` or `/audits/` in a path, an emailed account link's token in its
+ *   `/account/…/` path, and a seat invitation's token in its `/invite/` path, wherever a string
+ *   holds one.
  *
  * The browser SDK runs `scrubDoorSecrets` too (`sentryBrowserOptions`, instrumentation-client.ts):
  * a check's pages are at `/audit/<id>/…`, so the browser's own URL, its navigation and fetch
@@ -69,6 +70,15 @@ const ACCOUNT_LINK_PATH = new RegExp(
   'gi',
 );
 /**
+ * A seat invitation's token in its link's path (`/invite/<token>`; CC-31), with the slashes as
+ * CHECK_PATH reads them. As with an account link, the link's own GET is the one request that carries
+ * the token in a URL (`app/invite/[token]/route.ts`); the page it lands on is `/invite`, with none.
+ */
+const INVITE_LINK_PATH = new RegExp(
+  `(${SLASH}invite${SLASH})[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])`,
+  'gi',
+);
+/**
  * The SDK's own processing state, which holds the live scope and client: never part of what is
  * sent, and not ours to walk (a getter-only property on it throws when assigned).
  */
@@ -87,7 +97,8 @@ function scrub(value: unknown, seen: WeakSet<object>): unknown {
       .replace(NEXT_IN_STRING, '$1[Filtered]')
       .replace(POSTGREST_FILTER, '$1[Filtered]')
       .replace(CHECK_PATH, '$1[Filtered]')
-      .replace(ACCOUNT_LINK_PATH, '$1[Filtered]');
+      .replace(ACCOUNT_LINK_PATH, '$1[Filtered]')
+      .replace(INVITE_LINK_PATH, '$1[Filtered]');
   }
   if (value === null || typeof value !== 'object') return value;
   if (seen.has(value)) return value;

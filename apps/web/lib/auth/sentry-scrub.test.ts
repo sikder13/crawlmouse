@@ -66,6 +66,36 @@ describe('scrubDoorSecrets, an id in an audit address', () => {
   });
 });
 
+describe('scrubDoorSecrets, a seat invitation’s token in its link', () => {
+  const TOKEN = 'Ab3_-'.repeat(8) + 'xyz';
+
+  it('the sample is shaped as the tokens are: 43 base64url characters', () => {
+    expect(TOKEN).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
+  it.each([
+    ['the link', `/invite/${TOKEN}`, '/invite/[Filtered]'],
+    ['a transaction name', `GET /invite/${TOKEN}`, 'GET /invite/[Filtered]'],
+    ['a query after it', `${ORIGIN}/invite/${TOKEN}?x=1`, `${ORIGIN}/invite/[Filtered]?x=1`],
+    ['encoded slashes', `to=%2Finvite%2F${TOKEN}`, 'to=%2Finvite%2F[Filtered]'],
+    ['lower-case encoding', `to=%2finvite%2f${TOKEN}`, 'to=%2finvite%2f[Filtered]'],
+    ['upper case', `/INVITE/${TOKEN}`, '/INVITE/[Filtered]'],
+  ])('%s', (_, text, scrubbed) => {
+    expect(scrubDoorSecrets({ text }).text).toBe(scrubbed);
+  });
+
+  it('leaves the page the link lands on, and a segment that is not a token', () => {
+    for (const text of [
+      'GET /invite',
+      '/invite?notice=invite_gone',
+      `/invite/${TOKEN}x`,
+      '/invite/short',
+    ]) {
+      expect(scrubDoorSecrets({ text }).text).toBe(text);
+    }
+  });
+});
+
 describe('the SDK options that run the scrubber', () => {
   const event = () => ({ request: { url: `${ORIGIN}/audit/${ID}/overview` } });
   const scrubbedEvent = { request: { url: `${ORIGIN}/audit/[Filtered]/overview` } };
