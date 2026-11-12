@@ -270,6 +270,16 @@ describe('what alerts nothing', () => {
 });
 
 describe('email (D5, D7)', () => {
+  it('carries an opened change’s fix as a link to the fix page, through the send', async () => {
+    const FIX = 'f0000000-0000-4000-8000-0000000000aa';
+    const h = harness({ data: data({ changes: [{ ...block, fix_id: FIX }, content] }) });
+    expect(await deliverAlert(h.deps, CHECK, 'email')).toEqual({ status: 'sent', reason: null });
+    expect(h.sent[0]!.html).toContain(`https://crawlmouse.com/audit/${CHECK}/fix/${FIX}`);
+    expect(h.sent[0]!.text).toContain(
+      `Open the fix: https://crawlmouse.com/audit/${CHECK}/fix/${FIX}`,
+    );
+  });
+
   it('sends one message per recipient seat, keyed by check and seat, with that seat’s unsubscribe', async () => {
     const h = harness();
     expect(await deliverAlert(h.deps, CHECK, 'email')).toEqual({ status: 'sent', reason: null });

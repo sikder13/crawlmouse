@@ -109,7 +109,8 @@ describe('scrubDoorSecrets, a Slack webhook in any shape the stored URL may take
     ['encoded slashes', 'https%3A%2F%2Fhooks.slack.com%2Fservices%2FT1%2FB2%2FSLACKSECRET'],
   ])('%s', (_, url) => {
     const out = JSON.stringify(scrubDoorSecrets({ url, breadcrumbs: [{ data: { url } }] }));
-    expect(out).not.toMatch(/SLACK_?SECRET/);
-    expect(out).toContain('services');
+    // No part of the secret is left: each case's secret holds `SECRET`, its tail included.
+    expect(out).not.toMatch(/SECRET|_SECRET|SECRET-x/);
+    expect(out).toMatch(/services(?:\/|%2F)\[Filtered\]/i);
   });
 });

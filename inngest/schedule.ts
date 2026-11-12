@@ -84,7 +84,7 @@ export interface ScheduleDeps {
 
 export type TickOutput =
   | { paused: true }
-  | { claimed: number; requested: number; released: number; unreleased: number };
+  | { claimed: number; requested: number; released: number; stale: number; unreleased: number };
 
 export function createScheduleTickFn(deps: () => ScheduleDeps) {
   return inngest.createFunction(

@@ -23,7 +23,8 @@ export interface MailPreview {
   kind: MailKind;
   /**
    * The message over fixture data. `unsubscribeUrl` replaces the stand-in footer link of alert and
-   * summary mail, so a sample built with real `unsubscribeLinks` shows one token throughout.
+   * summary mail: the owner's `.eml` samples (built outside the repository, through `send()` with real
+   * `unsubscribeLinks`) pass it so a sample shows one token throughout; previews.test.ts holds it.
    */
   render(opts?: PreviewOptions): RenderedMail;
 }

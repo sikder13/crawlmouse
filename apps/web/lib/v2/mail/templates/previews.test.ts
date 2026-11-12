@@ -64,7 +64,8 @@ describe('the previews a sample is built from', () => {
 
   it('the summary’s days hold every change it lists', () => {
     const m = mailPreview('weekly-summary')!.render();
-    expect(m.text).toMatch(/from \d+ \w+ to \d+ \w+/);
-    expect(m.text).not.toContain('No changes');
+    // Worked by hand from bad-site's changes, dated 25, 27 and 30 Oct UTC: the days run from 25 Oct
+    // 00:00 UTC (24 Oct 20:00 in Indianapolis, where the preview is read) to the end of 30 Oct.
+    expect(m.text).toContain('What your checks found from 24 Oct to 30 Oct.');
   });
 });
