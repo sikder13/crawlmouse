@@ -236,8 +236,9 @@ grant execute on function public.account_link_recipient(uuid) to service_role;
 
 -- ═══ B: the scheduler (D4) ════════════════════════════════════════════════════════════════════════
 -- Granted to service_role: account_effective_tier, next_check_after, claim_due_sites,
--- release_scheduled_claim. The trigger
--- functions to no role. Tests: apps/web/__tests__/v2-028-schedule.test.ts; two ticks racing,
+-- release_scheduled_claim. The trigger functions to no role; they are not security definer, so they run
+-- as the writer of the row (service_role, or a definer function's owner) and call next_check_after and
+-- account_effective_tier with its grants. Tests: apps/web/__tests__/v2-028-schedule.test.ts; two ticks racing,
 -- scripts/db/monitoring-race.test.ts.
 
 -- The tier an account has at p_now, as effectiveTier() in apps/web/lib/entitlement-v2.ts computes it
@@ -328,7 +329,6 @@ $$;
 create or replace function public.sites_schedule_next()
 returns trigger
 language plpgsql
-security definer
 set search_path = pg_catalog, pg_temp
 as $$
 begin
@@ -365,7 +365,6 @@ create trigger sites_schedule_next before insert or update on public.sites
 create or replace function public.accounts_timezone_reschedule()
 returns trigger
 language plpgsql
-security definer
 set search_path = pg_catalog, pg_temp
 as $$
 declare

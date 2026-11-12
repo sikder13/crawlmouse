@@ -305,6 +305,39 @@ describe('the triggers that keep next_check_at', () => {
     expect((await siteRow(id)).next_check_at!.getUTCHours()).toBe(21);
   });
 
+  it('run as the writer, not as their owner: service_role adds a site and moves a zone through them', async () => {
+    const { rows: defs } = await db.query<{ proname: string; prosecdef: boolean }>(
+      `select proname, prosecdef from pg_proc
+        where pronamespace = 'public'::regnamespace
+          and proname in ('sites_schedule_next', 'accounts_timezone_reschedule')
+        order by proname`,
+    );
+    expect(defs).toEqual([
+      { proname: 'accounts_timezone_reschedule', prosecdef: false },
+      { proname: 'sites_schedule_next', prosecdef: false },
+    ]);
+    const acc = await account('pro', 'UTC');
+    const id = randomUUID();
+    const hours = await asRole(db, 'service_role', null, async (tx) => {
+      await tx.query(
+        `insert into public.sites (id, account_id, host, schedule_cadence, schedule_iso_weekday,
+                                   schedule_hour_local, schedule_offset_min)
+         values ($1, $2, $3, 'weekly', 1, 6, 0)`,
+        [id, acc, `${id.slice(0, 8)}.example`],
+      );
+      const read = async () =>
+        (
+          await tx.query<{ n: Date }>(`select next_check_at n from public.sites where id = $1`, [
+            id,
+          ])
+        ).rows[0]!.n.getUTCHours();
+      const before = await read();
+      await tx.query(`update public.accounts set timezone = 'Asia/Tokyo' where id = $1`, [acc]);
+      return [before, await read()];
+    });
+    expect(hours).toEqual([6, 21]);
+  });
+
   it('leaves a site that is already due as it is when the account’s zone changes', async () => {
     const acc = await account('pro', 'UTC');
     const id = await site(acc, { weekday: 1, hour: 6, offset: 0 });
