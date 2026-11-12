@@ -71,6 +71,19 @@ export const FUNNEL_EVENTS = [
   'account_deletion_confirmed',
   'account_restored',
   'account_purged',
+  // CC-31 — the agency's workspace (lib/v2/agency/events.ts), sent from the server and keyed by the
+  // account's id, with no address and no host. ARCH-2 §8 names `seat_invited`, `report_generated`
+  // and `share_link_opened`; the other seven are this step's.
+  'seat_invited',
+  'seat_accepted',
+  'report_generated',
+  'report_downloaded',
+  'report_shared',
+  'share_link_opened',
+  'proof_viewed',
+  'first_client_added',
+  'first_client_report_sent',
+  'seats_bought',
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];
