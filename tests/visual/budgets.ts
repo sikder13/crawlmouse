@@ -24,16 +24,20 @@ export const ADVISORY = {
 
 /**
  * The main thread's mean busy time per 16.7 ms slice, per crawl-screen window, in a reference
- * runner's milliseconds (divided by the runner probe's ratio to its reference). The coarse safety
- * net beside MAP_WRITES_PER_FRAME: it catches a large regression, not a third more work. Set from
- * the CI readings in docs/specs/v2/ci-cost.md, D3; advisory when they spread by more than 15%.
+ * runner's milliseconds (divided by the runner probe's ratio to its reference). The coarse layer
+ * beside MAP_WRITES_PER_FRAME: it would catch a large regression, not a third more work.
+ *
+ * Advisory (owner ruling, 2026-11-11): across five CI readings of the crawl window, and four of the
+ * other two, the normalised readings spread by 27%, 21% and 59% with the crawl screen's own code unchanged, over the
+ * 15% the ruling allows a judged limit (docs/specs/v2/ci-cost.md, D3). The limits are about 1.2
+ * times the highest reading, for the nightly trend's "over, advisory".
  */
-export const MEAN_WORK_ADVISORY = false;
+export const MEAN_WORK_ADVISORY = true;
 
 export const MEAN_WORK_MS: Record<string, number> = {
-  'the crawl, the map growing': 2.75,
-  'the crawler tests, the log and verdicts landing': 0.65,
-  'on a phone, the crawler tests beginning': 2.45,
+  'the crawl, the map growing': 3.2,
+  'the crawler tests, the log and verdicts landing': 0.75,
+  'on a phone, the crawler tests beginning': 2.8,
 };
 
 /**

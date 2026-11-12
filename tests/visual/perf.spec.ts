@@ -51,18 +51,19 @@ import { test, expect, type Browser, type Page, type TestInfo } from './pw';
  *   page only before the first report).
  * - Layout shift within a window: at most 0.001, zero within rounding. The whole replay, end
  *   included, is measured by motion.spec.ts ("layout shift over a whole replay").
- * - Work per frame: the main thread's busy time in each 16.7 ms slice of the traced window (one
- *   60 Hz frame; packages/timing/src/busy.ts). Its mean is at most the window's MEAN_WORK_MS, and its 95th
- *   percentile, the bursts, at most BUDGET.p95WorkMs. The slices are fixed in time, so the reading
- *   is what the page did, whatever refresh rate the runner manages. The mean is the one judged
- *   closely: a map rendered and animated twice moved it by about a third, 2.195 to 2.93 ms (the
- *   map is part of the page's work), and the 95th percentile less, 5.61 to 7.5 ms (ci-cost.md, D3).
- *   Work off the main
- *   thread (the map's layouts in their Worker, raster) is not in it. Until CC-COST the budget was
- *   the 95th percentile interval between frames, at most 17.5 ms: a runner that dropped to 30 fps
- *   read 33.3 ms in all five runs with nothing in the page changed, and failed (the run of
- *   b23d4ca6), so the budget measured the machine. docs/specs/v2/ci-cost.md, D3, has the
- *   measurements behind the limit.
+ * - Twice the map's work: the gate is a count, "the crawl map, counted" below, which no machine
+ *   changes. The milliseconds here are the coarse layer beside it.
+ * - Work per frame, in milliseconds: the main thread's busy time in each 16.7 ms slice of the
+ *   traced window (one 60 Hz frame; packages/timing/src/busy.ts). Its 95th percentile, the bursts,
+ *   is at most BUDGET.p95WorkMs. Its mean, divided by the runner probe's ratio to its reference
+ *   (`meanWorkRefMs`), is held against the window's MEAN_WORK_MS, advisory while MEAN_WORK_ADVISORY
+ *   is set: across five CI readings it spread by more than 15% with the crawl screen's code unchanged
+ *   (docs/specs/v2/ci-cost.md, D3). The slices are fixed in time, so the reading is what the page
+ *   did, whatever refresh rate the runner manages. Work off the main thread (the map's layouts in
+ *   their Worker, raster) is not in it. Until CC-COST the budget was the 95th percentile interval
+ *   between frames, at most 17.5 ms: a runner that dropped to 30 fps read 33.3 ms in all five runs
+ *   with nothing in the page changed, and failed (the run of b23d4ca6), so the budget measured the
+ *   machine.
  * - Frames: none over 100 ms, a stall a reader sees, at any refresh rate. The 95th percentile
  *   interval and the share over 34 ms are printed and recorded for the nightly trend, not judged:
  *   both move with the refresh rate.
