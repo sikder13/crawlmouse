@@ -42,9 +42,19 @@ import V2Dashboard from './page';
 type El = ReactElement<{ state?: string; data?: { firstRun: boolean; header: { title: string } } }>;
 const render = () => V2Dashboard({ searchParams: Promise.resolve({}) }) as Promise<El>;
 const BAD = 'a0000000-0000-4000-8000-000000000001';
-const viewerOn = (accountId: string, seatId: string, timezone = 'UTC') => ({
+const SUMMIT = { id: 'a0000000-0000-4000-8000-0000000000aa', kind: 'agency', name: 'Summit' };
+const viewerOn = (
+  accountId: string,
+  seatId: string,
+  timezone = 'UTC',
+  others: (typeof SUMMIT)[] = [],
+) => ({
   kind: 'viewer',
-  viewer: { account: { id: accountId, timezone }, seat: { id: seatId } },
+  viewer: {
+    account: { id: accountId, timezone },
+    seat: { id: seatId },
+    accounts: [{ id: accountId, kind: 'personal', name: null }, ...others],
+  },
 });
 
 const HERE = join(process.cwd(), 'app', 'dashboard');
@@ -104,6 +114,23 @@ describe('/dashboard/v2', () => {
     h.dataset = fixture('bad-site');
     const home = (await render()).props as unknown as { children: El };
     expect(home.children.props.data!.firstRun).toBe(false);
+  });
+
+  it('a person with one seat has no switcher; with a second seat the rail offers the other account', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const owner = fixture('bad-site').seats[0]!.id;
+    h.dataset = fixture('bad-site');
+    type Framed = { children: ReactElement<{ data: { shell: { switcher: unknown } } }> };
+    const switcher = async () =>
+      ((await render()).props as unknown as Framed).children.props.data.shell.switcher;
+    h.viewer = viewerOn(BAD, owner);
+    expect(await switcher()).toBeNull();
+    h.viewer = viewerOn(BAD, owner, 'UTC', [SUMMIT]);
+    expect(await switcher()).toMatchObject({
+      current: 'Personal account',
+      visiting: null,
+      others: [{ label: 'Summit', href: '/api/seats/switch', fields: { accountId: SUMMIT.id } }],
+    });
   });
 
   it('with the flag on, reads the viewer: signed out goes to /login', async () => {

@@ -20,9 +20,20 @@ import {
   seedRunningCheck,
 } from '../../../lib/v2/pipeline/test-support/pglite';
 
-const h = vi.hoisted(() => ({ db: null as unknown, userId: null as string | null }));
+const h = vi.hoisted(() => ({
+  db: null as unknown,
+  userId: null as string | null,
+  /** The switcher cookie's value on this request, or null for none. */
+  chosen: null as string | null,
+}));
 
 vi.mock('server-only', () => ({}));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      name === 'cm_account' && h.chosen !== null ? { name, value: h.chosen } : undefined,
+  }),
+}));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => ({
     ...postgrestOver(h.db as PGlite, h.userId ? { as: { userId: h.userId } } : {}),
@@ -39,6 +50,8 @@ vi.mock('@/lib/v2/pipeline/load', () => ({
 import { FirstCheckScreen } from '@/components/v2/screens/site/FirstCheckScreen';
 import { SiteScreen } from '@/components/v2/screens/site/SiteScreen';
 import { siteOfCaller } from '@/lib/v2/account/pages';
+import { agencyAccount } from '@/lib/v2/agency/test-support';
+import type { ShellView } from '@/lib/v2/view/account-shell';
 import SitePage from './page';
 
 let db: PGlite;
@@ -92,7 +105,10 @@ beforeAll(async () => {
   );
 }, 300_000);
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  h.chosen = null;
+});
 
 const open = (id: string, userId: string | null = ownerId, search: Record<string, string> = {}) => {
   h.userId = userId;
@@ -101,6 +117,11 @@ const open = (id: string, userId: string | null = ownerId, search: Record<string
 const notFoundError = { digest: expect.stringMatching(/404/) };
 const children = (el: unknown) =>
   (el as ReactElement<{ children: ReactElement<{ notice?: unknown }> }>).props.children;
+/** The frame a rendered screen carries: the site screen's own prop, or the first-check view's. */
+const shellOf = (screen: ReactElement) => {
+  const props = screen.props as { shell?: ShellView; data: { shell: ShellView } };
+  return props.shell ?? props.data.shell;
+};
 
 describe('/sites/[id] with V2_CHECKS_PUBLIC off', () => {
   it('is a 404 even for the owner of the site', async () => {
@@ -179,6 +200,79 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
     expect(await siteOfCaller(unguarded, userId, site, now)).not.toBeNull();
     await db.query(`update public.accounts set deleted_at = now() where id = $1`, [accountId]);
     expect(await siteOfCaller(unguarded, userId, site, now)).toBeNull();
+  });
+
+  it('a person with one seat has no switcher in the rail', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    expect(shellOf(children(await open(kept))).switcher).toBeNull();
+    expect(shellOf(children(await open(empty))).switcher).toBeNull();
+  });
+
+  describe('for a person with a seat on a second account', () => {
+    let agencyId: string;
+    let client: string;
+    let ownId: string;
+
+    beforeAll(async () => {
+      const db = h.db as PGlite;
+      ownId = (await personalAccount(db, ownerId)).accountId;
+      agencyId = (await agencyAccount(db, { id: ownerId, email: 'owner@example.com' })).accountId;
+      // The personal account on a Pro trial: its rail's card links to billing (or has Keep).
+      const ends = new Date(Date.now() + 9 * 86_400_000).toISOString();
+      await db.query(
+        `update public.accounts set state = 'pro_trial', tier = 'pro', trial_variant = 'no_card',
+           trial_ends_at = $2, trial_used_at = now(),
+           state_history = state_history || jsonb_build_array(jsonb_build_object('state', 'pro_trial', 'since', now()::text))
+         where id = $1`,
+        [ownId, ends],
+      );
+      client = randomUUID();
+      await db.query(
+        `insert into public.sites (id, account_id, host) values ($1, $2, 'client.example')`,
+        [client, agencyId],
+      );
+    });
+
+    it('acting in the site’s account: the rail names it and lists the other', async () => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+      h.chosen = agencyId;
+      expect(shellOf(children(await open(client))).switcher).toMatchObject({
+        current: 'Summit Digital',
+        visiting: null,
+        others: [{ label: 'Personal account', fields: { accountId: ownId } }],
+      });
+      // No cookie: the person acts in their default, personal account, whose site this is.
+      h.chosen = null;
+      for (const site of [kept, empty]) {
+        const shell = shellOf(children(await open(site)));
+        expect(shell.switcher).toMatchObject({ current: 'Personal account', visiting: null });
+        expect(shell.trial!.keep ?? shell.trial!.billing).not.toBeNull();
+      }
+    });
+
+    it('acting in another account: the rail offers the switch to the site’s, with no Keep and no billing link', async () => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+      // The person acts in the agency and opens their personal account's sites by address: one
+      // with a result (the site screen takes the frame as a prop) and one with no check yet.
+      h.chosen = agencyId;
+      for (const site of [kept, empty]) {
+        const shell = shellOf(children(await open(site)));
+        expect(shell.switcher!.visiting).toMatchObject({
+          acting: 'Summit Digital',
+          switchTo: {
+            label: 'Switch to Personal account',
+            href: '/api/seats/switch',
+            fields: { accountId: ownId },
+          },
+        });
+        expect(shell.trial).toMatchObject({ keep: null, billing: null });
+      }
+      // And the other way: acting in the personal account, on the agency's site.
+      h.chosen = null;
+      expect(shellOf(children(await open(client))).switcher!.visiting!.switchTo.fields).toEqual({
+        accountId: agencyId,
+      });
+    });
   });
 
   it('the other account’s owner opens their own site and not this one', async () => {
