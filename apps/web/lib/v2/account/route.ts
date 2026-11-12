@@ -133,6 +133,7 @@ export const NOTICE_CODES = [
   'extras_changed',
   'extras_unchanged',
   'in_use',
+  'mixed_change',
   'payment_failed',
   'subscription_unchangeable',
   'billing_unavailable',

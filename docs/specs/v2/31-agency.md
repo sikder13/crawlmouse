@@ -224,7 +224,7 @@ confirms.
 rest of the period is charged at once, and a charge that fails leaves the subscription unchanged.
 When quantities only fall it is sent with `proration_behavior: 'none'` (`LOWER`): no credit, and the
 lower quantity bills from the next invoice. A request that raises one quantity and lowers the other
-is sent as a raise, so Stripe prorates the lowered item too.
+is refused (400 `mixed_change`), since one update has one proration rule.
 
 The idempotency key names the subscription, its latest invoice, the last event the mirror applied,
 and the quantities the change starts from and ends at, so a retry of one request repeats it and the

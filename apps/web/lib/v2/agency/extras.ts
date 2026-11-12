@@ -9,8 +9,9 @@
  * Refused before any Stripe call: quantities the plan does not sell (`limitsFor`), more extra seats
  * than `MAX_EXTRA_SEATS`, and a limit below what the account uses (`in_use`), so the webhook does not
  * remove a person or pause a site because of a request made here. Refused once the subscription is
- * read: one that is set to end, one that is not `active` or `trialing`, and one whose items are not
- * the catalog's Agency plan (`mirrorOf`).
+ * read: one that is set to end, one that is not `active` or `trialing`, one whose items are not
+ * the catalog's Agency plan (`mirrorOf`), and a change that raises one quantity and lowers the other
+ * (`mixed_change`): one update has one proration rule, and a raise's would credit the lowered item.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
@@ -96,7 +97,7 @@ export interface ExtrasDeps {
 }
 
 export type ExtrasRefusal =
-  | { ok: false; status: 400; code: 'invalid' }
+  | { ok: false; status: 400; code: 'invalid' | 'mixed_change' }
   | { ok: false; status: 402; code: 'payment_failed' }
   | { ok: false; status: 404; code: 'not_found' }
   | { ok: false; status: 409; code: 'in_use'; detail: { what: 'seats' | 'sites'; inUse: number } }
@@ -171,7 +172,7 @@ async function itemChange(
 /**
  * Sets the account's extra seats and sites to `want`. In order: the quantities, then what the
  * account uses, then the subscription as Stripe holds it, then one update of the items that change,
- * with `RAISE` when either quantity rises and `LOWER` when quantities only fall.
+ * with `RAISE` when quantities rise and `LOWER` when they fall.
  */
 export async function changeExtras(
   deps: ExtrasDeps,
@@ -232,6 +233,8 @@ export async function changeExtras(
       await itemChange(deps.catalog, held.interval, 'site', existing.site, from.sites, want.sites),
     ];
     const rises = want.seats > from.seats || want.sites > from.sites;
+    const falls = want.seats < from.seats || want.sites < from.sites;
+    if (rises && falls) return { ok: false, status: 400, code: 'mixed_change' };
     const updated = await deps.stripe.subscriptions.update(
       sub.id,
       { items: changes.filter((c) => c !== null), ...(rises ? RAISE : LOWER) },
@@ -313,6 +316,7 @@ const BACK = '/seats';
 /** What a refused form is told: the subscription's three refusals share one line. */
 const FORM_NOTICE: Record<ExtrasRefusal['code'], NoticeCode | null> = {
   invalid: 'invalid',
+  mixed_change: 'mixed_change',
   payment_failed: 'payment_failed',
   not_found: null,
   in_use: 'in_use',

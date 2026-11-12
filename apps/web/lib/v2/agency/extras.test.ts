@@ -146,17 +146,12 @@ describe('changeExtras: a raise', () => {
     expect(await w.extras()).toEqual({ seats: 4, sites: 5 });
   });
 
-  it('with one quantity rising and one falling, is sent as a raise', async () => {
+  it('with one quantity rising and one falling, is refused before any update, either way round', async () => {
     const w = world({ seats: 2, sites: 5 });
-    await w.change(3, 0);
-    expect(w.stripe.updates[0]!.params).toEqual({
-      items: [
-        { id: `si_${agency.id}_seat`, quantity: 3 },
-        { id: `si_${agency.id}_site`, deleted: true },
-      ],
-      ...RAISE,
-    });
-    expect(await w.extras()).toEqual({ seats: 3, sites: 0 });
+    expect(await w.change(3, 0)).toEqual({ ok: false, status: 400, code: 'mixed_change' });
+    expect(await w.change(1, 6)).toEqual({ ok: false, status: 400, code: 'mixed_change' });
+    expect(w.stripe.updates).toEqual([]);
+    expect(await w.extras()).toEqual({ seats: 2, sites: 5 });
   });
 
   it('a declined card is 402, and the subscription is as it was', async () => {
