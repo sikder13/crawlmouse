@@ -272,6 +272,12 @@ export const PREVIEWS: PreviewEntry[] = [
     kind: 'screen',
     orange: 0,
   },
+  {
+    path: '/v2-preview/screens/agency-trial/held',
+    name: 'Agency trial, on the trial: its billing and Cancel',
+    kind: 'screen',
+    orange: 0,
+  },
   // CC-29 workstream C. For agencies' orange element is the trial button; Developers' is the
   // closing audit's button. The /check pages have no artboard: each is the Home screen's parts,
   // with the hero form's button orange.

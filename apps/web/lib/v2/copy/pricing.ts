@@ -245,7 +245,7 @@ export const PRICING_COPY = {
       ],
       [
         'Agency trial',
-        `Card on file is charged ${usd(priceOf('agency', interval))} on day ${TRIAL_DAYS + 1} unless you cancel; from Settings, any day, ${numberWord(CANCEL_CLICKS)} clicks, no call`,
+        `Card on file is charged ${usd(priceOf('agency', interval))} on day ${TRIAL_DAYS + 1} unless you cancel; from the Agency trial page, any day, ${numberWord(CANCEL_CLICKS)} clicks, no call`,
       ],
     ],
   },

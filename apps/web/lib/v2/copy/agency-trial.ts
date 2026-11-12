@@ -20,7 +20,7 @@ export const AGENCY_TRIAL_COPY = {
   /** The page's title and h1. */
   title: 'Start your Agency trial.',
   lead: (interval: Interval, chargeDate: string) =>
-    `${TRIAL_DAYS} days, nothing charged. On day ${TRIAL_DAYS + 1} — ${chargeDate} if you start today — the card is charged ${usd(priceOf('agency', interval))} for the ${period(interval)} unless you cancel from Settings any day before, ${numberWord(CANCEL_CLICKS)} clicks; canceling puts the account on Free; nothing you can see is deleted. We email you ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before, as with every trial.`,
+    `${TRIAL_DAYS} days, nothing charged. On day ${TRIAL_DAYS + 1} — ${chargeDate} if you start today — the card is charged ${usd(priceOf('agency', interval))} for the ${period(interval)} unless you cancel, from this page, any day before, ${numberWord(CANCEL_CLICKS)} clicks; canceling puts the account on Free; nothing you can see is deleted. We email you ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before, as with every trial.`,
   /** Q16: an agency account with no subscription and no trial used is a Checkout that did not finish. */
   returning:
     'Your last visit to the card page did not finish, so nothing started. Check the details and continue to the card again.',
@@ -53,7 +53,7 @@ export const AGENCY_TRIAL_COPY = {
   fine: `${capitalise(numberWord(EMAIL_KINDS.length))} kinds of email and no others: sign-in links, a note when a check finds a change, and the reminder ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before the trial ends. Stripe sends the receipts.`,
   /** Q15: where the trialist lands until the agency workspace (CC-31) has its switcher. */
   secondAccount:
-    'The trial is a second account for the agency, separate from your own. After the card page you return to your own account’s plan; the agency account opens from the agency workspace.',
+    'The trial is a second account for the agency, separate from your own. After the card page you return to your own account’s plan; the agency account’s billing and its Cancel are on this page.',
   notSure: `Not sure yet? Your own account can start ${TRIAL_DAYS} days of Pro with no card, from`,
   pricing: 'Pricing',
   seePlans: 'See the plans',
@@ -68,6 +68,27 @@ export const AGENCY_TRIAL_COPY = {
     billing_unavailable: 'The card page is not available right now. Try again in a few minutes.',
     failed: 'It did not go through. Try again in a moment.',
   } as Record<string, string>,
+  /** Q26: an owned agency account's billing and Cancel, naming the account (CC-03 D8). */
+  manage: {
+    title: 'Your agency accounts',
+    unnamed: 'Your agency account',
+    state: (state: 'agency_trial' | 'agency' | 'past_due', ends: string | null) =>
+      state === 'agency_trial'
+        ? `On the Agency trial${ends ? `, which ends ${ends}` : ''}. The card is charged when it ends unless you cancel.`
+        : state === 'agency'
+          ? 'On Agency.'
+          : 'The last payment failed. Update the card from Manage billing to keep Agency.',
+    portal: 'Manage billing',
+    cancel: (state: 'agency_trial' | 'agency' | 'past_due') =>
+      state === 'agency_trial' ? 'Cancel the trial' : 'Cancel',
+    confirm: 'Yes, cancel',
+    confirmText: (state: 'agency_trial' | 'agency' | 'past_due', ends: string | null) =>
+      state === 'agency_trial'
+        ? `The trial runs to ${ends ?? 'its end'} and the card is not charged; the account then goes to Free. Nothing you can see is deleted.`
+        : state === 'agency'
+          ? 'Agency runs to the end of the period paid for; the account then goes to Free. Nothing you can see is deleted.'
+          : 'The subscription ends now and the account goes to Free. Nothing you can see is deleted.',
+  },
   held: {
     title: 'You already have Agency.',
     text: 'One of your accounts is on Agency now, so there is no trial to start.',

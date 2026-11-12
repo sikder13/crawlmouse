@@ -19,7 +19,9 @@ const view = agencyTrialView(
     email: 'me@summit.agency',
     interval: 'month',
     timeZone: 'UTC',
-    standing: { held: false, used: null, open: null },
+    standing: { held: false, billing: [], used: null, open: null },
+    customers: new Map(),
+    cancelAsked: null,
   },
   NOW,
 ) as FormView;

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AGENCY_MONTHLY, AGENCY_YEARLY } from '../../billing/prices';
+import { parseCancel } from '../../billing/cancel';
+import { portalRefusal } from '../../billing/portal-v2';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import {
   agencyStanding,
@@ -27,14 +29,28 @@ const row = (over: Partial<AgencyAccountRow> = {}): AgencyAccountRow => ({
   ...over,
 });
 
-const NONE: AgencyStanding = { held: false, used: null, open: null };
+const NONE: AgencyStanding = { held: false, billing: [], used: null, open: null };
 const USED = {
   accountId: 'a0000000-0000-4000-8000-00000000000b',
   trialUsedAt: new Date('2026-10-01T10:00:00Z'),
   deleted: false,
 };
-const view = (standing: AgencyStanding, interval: 'month' | 'year' = 'month') =>
-  agencyTrialView({ email: 'me@agency.com', interval, timeZone: 'UTC', standing }, NOW);
+const view = (
+  standing: AgencyStanding,
+  interval: 'month' | 'year' = 'month',
+  more: { customers?: Map<string, string | null>; cancelAsked?: string | null } = {},
+) =>
+  agencyTrialView(
+    {
+      email: 'me@agency.com',
+      interval,
+      timeZone: 'UTC',
+      standing,
+      customers: more.customers ?? new Map(),
+      cancelAsked: more.cancelAsked ?? null,
+    },
+    NOW,
+  );
 
 describe('agencyStanding', () => {
   it('no agency account: nothing held, used or open', () => {
@@ -43,19 +59,34 @@ describe('agencyStanding', () => {
 
   it('an owned Free account with no trial and no subscription is the open Checkout (Q16)', () => {
     const r = row();
-    expect(agencyStanding([r], null, NOW)).toEqual({ held: false, used: null, open: r });
+    expect(agencyStanding([r], null, NOW)).toEqual({
+      held: false,
+      billing: [],
+      used: null,
+      open: r,
+    });
   });
 
   it('an owned account whose trial was used is used, and is not open', () => {
     const r = row({ trialUsedAt: new Date('2026-09-01T00:00:00Z') });
-    expect(agencyStanding([r], USED, NOW)).toEqual({ held: false, used: USED, open: null });
+    expect(agencyStanding([r], USED, NOW)).toEqual({
+      held: false,
+      billing: [],
+      used: USED,
+      open: null,
+    });
   });
 
   // N5: the used trial is the function's (readUsedAgencyTrial), a deleted account included, so the
   // page refuses what start_agency_trial_account refuses even when no live row shows it.
   it('a used trial on a deleted account is used, with no live account to show', () => {
     const deleted = { ...USED, deleted: true };
-    expect(agencyStanding([], deleted, NOW)).toEqual({ held: false, used: deleted, open: null });
+    expect(agencyStanding([], deleted, NOW)).toEqual({
+      held: false,
+      billing: [],
+      used: deleted,
+      open: null,
+    });
     expect(view(agencyStanding([], deleted, NOW)).kind).toBe('used');
   });
 
@@ -126,22 +157,23 @@ describe('agencyTrialView', () => {
   });
 
   it('a returning person is told the Checkout did not finish, with what they typed', () => {
-    const v = view({ held: false, used: null, open: row() });
+    const v = view({ held: false, billing: [], used: null, open: row() });
     if (v.kind !== 'form') throw new Error('form expected');
     expect(v.returning).toMatch(/did not finish/);
     expect(v.defaults).toEqual({ agencyName: 'Summit Digital', site: 'clientsite.com' });
   });
 
   it('a used trial: the reason and no form', () => {
-    expect(view({ held: false, used: USED, open: null })).toEqual({
+    expect(view({ held: false, billing: [], used: USED, open: null })).toEqual({
       kind: 'used',
+      manage: [],
       title: 'Your Agency trial was used.',
       text: 'The trial is one per person, and yours started Thu 1 Oct. Agency can still be chosen, from Pricing.',
     });
   });
 
   it('Agency held: no form', () => {
-    expect(view({ held: true, used: USED, open: null }).kind).toBe('held');
+    expect(view({ held: true, billing: [], used: USED, open: null }).kind).toBe('held');
   });
 });
 
@@ -153,5 +185,94 @@ describe('chargeDate', () => {
     ['2026-12-25T12:00:00Z', 'UTC', 'Fri 8 Jan'],
   ])('a trial started %s (%s) is charged %s', (at, zone, want) => {
     expect(chargeDate(new Date(at), zone)).toBe(want);
+  });
+});
+
+// Q26 / correctness B1: Settings acts on the person's default account, so an owned agency account's
+// billing and Cancel are on this page, each naming the account.
+describe('an owned agency account’s billing', () => {
+  const SUB = { subscriptionId: 'sub_1', trialUsedAt: new Date('2026-10-20T00:00:00Z') };
+  const trialing = row({
+    ...SUB,
+    state: 'agency_trial',
+    tier: 'agency',
+    trialVariant: 'card_required',
+    trialEndsAt: new Date('2026-11-03T15:00:00Z'),
+  });
+
+  it.each([
+    ['agency_trial', trialing, true],
+    ['agency', row({ ...SUB, state: 'agency', tier: 'agency' }), true],
+    [
+      'past_due',
+      row({ ...SUB, state: 'past_due', tier: 'agency', pastDueTier: 'agency', pastDueSince: NOW }),
+      true,
+    ],
+    ['free', row({ ...SUB, subscriptionId: null }), false],
+    [
+      'agency, a seat that is not the owner',
+      row({ ...SUB, state: 'agency', tier: 'agency', role: 'account_manager' }),
+      false,
+    ],
+  ] as const)('%s: offered here %s', (_n, r, offered) => {
+    expect(agencyStanding([r], USED, NOW).billing).toEqual(offered ? [r] : []);
+  });
+
+  it('the trial: Manage billing and the first click of Cancel, both naming the account', () => {
+    const v = view(agencyStanding([trialing], USED, NOW), 'year', {
+      customers: new Map([[trialing.id, 'cus_1']]),
+    });
+    expect(v.kind).toBe('held');
+    expect(v.manage).toEqual([
+      {
+        accountId: trialing.id,
+        title: 'Summit Digital',
+        text: 'On the Agency trial, which ends Tue 3 Nov. The card is charged when it ends unless you cancel.',
+        portal: {
+          method: 'post',
+          action: '/api/billing/portal',
+          fields: { accountId: trialing.id },
+          label: 'Manage billing',
+        },
+        cancel: {
+          ask: {
+            method: 'get',
+            action: '/agency-trial',
+            fields: { cancel: trialing.id, interval: 'year' },
+            label: 'Cancel the trial',
+          },
+          confirm: null,
+        },
+      },
+    ]);
+  });
+
+  it('the second click posts confirm=true for that account, the body CC-03’s cancel parses', () => {
+    const v = view(agencyStanding([trialing], USED, NOW), 'month', { cancelAsked: trialing.id });
+    expect(v.manage[0]!.cancel!.confirm).toEqual({
+      method: 'post',
+      action: '/api/billing/cancel',
+      fields: { accountId: trialing.id, confirm: 'true' },
+      label: 'Yes, cancel',
+      text: 'The trial runs to Tue 3 Nov and the card is not charged; the account then goes to Free. Nothing you can see is deleted.',
+    });
+    expect(parseCancel({ kind: 'form', fields: v.manage[0]!.cancel!.confirm!.fields })).toEqual({
+      accountId: trialing.id,
+      confirmed: true,
+    });
+    expect(
+      view(agencyStanding([trialing], USED, NOW), 'month', { cancelAsked: 'other' }).manage[0]!
+        .cancel!.confirm,
+    ).toBeNull();
+  });
+
+  it('no Stripe customer: no Manage billing (portalRefusal); no subscription: no Cancel', () => {
+    const noSub = row({ ...SUB, state: 'agency', tier: 'agency', subscriptionId: null });
+    const v = view(agencyStanding([trialing, noSub], USED, NOW));
+    expect(portalRefusal(null)).not.toBeNull();
+    expect(v.manage.map((m) => [m.portal, m.cancel === null])).toEqual([
+      [null, false],
+      [null, true],
+    ]);
   });
 });

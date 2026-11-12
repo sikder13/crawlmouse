@@ -55,13 +55,19 @@ const agencyRow = (over: Partial<AgencyAccountRow>): AgencyAccountRow => ({
   ...over,
 });
 
-const trial = (rows: AgencyAccountRow[], used: UsedTrial | null = null) =>
+const trial = (
+  rows: AgencyAccountRow[],
+  used: UsedTrial | null = null,
+  customers: ReadonlyMap<string, string | null> = new Map(),
+) =>
   agencyTrialView(
     {
       email: 'owner@summitdigital.co',
       interval: 'month',
       timeZone: 'UTC',
       standing: agencyStanding(rows, used, AT),
+      customers,
+      cancelAsked: null,
     },
     AT,
   );
@@ -71,4 +77,21 @@ export const agencyTrialReturning = () => trial([agencyRow({})]);
 export const agencyTrialUsed = () => {
   const row = agencyRow({ trialUsedAt: new Date('2026-10-01T10:00:00Z') });
   return trial([row], { accountId: row.id, trialUsedAt: row.trialUsedAt!, deleted: false });
+};
+
+/** On the Agency trial: no form, the account's Manage billing and Cancel (Q26). */
+export const agencyTrialHeld = () => {
+  const row = agencyRow({
+    state: 'agency_trial',
+    tier: 'agency',
+    trialVariant: 'card_required',
+    trialEndsAt: new Date('2026-11-08T15:00:00Z'),
+    trialUsedAt: new Date('2026-10-25T15:00:00Z'),
+    subscriptionId: 'sub_preview',
+  });
+  return trial(
+    [row],
+    { accountId: row.id, trialUsedAt: row.trialUsedAt!, deleted: false },
+    new Map([[row.id, 'cus_preview']]),
+  );
 };
