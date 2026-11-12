@@ -601,8 +601,9 @@ end;
 $$;
 
 -- The account's Slack incoming-webhook URL (027b's Vault secret), for the alert being sent and for
--- nothing else; null when none is set or the account's tier at p_now has no Slack. Read here, at
--- send time, so a downgrade stops Slack without touching the rules (003's note on alertFn).
+-- nothing else; null when none is set, the account's tier at p_now has no Slack, or the account is
+-- deleted or marked for deletion. Read here, at send time, so a downgrade stops Slack without
+-- touching the rules (003's note on alertFn).
 create or replace function public.account_slack_webhook_url(p_account uuid, p_now timestamptz)
 returns text
 language sql
@@ -612,8 +613,10 @@ set search_path = pg_catalog, pg_temp
 as $$
   select s.decrypted_secret
     from public.account_slack_destinations d
+    join public.accounts a on a.id = d.account_id
     join vault.decrypted_secrets s on s.id = d.vault_secret_id
    where d.account_id = p_account
+     and a.deleted_at is null and a.deletion_confirmed_at is null
      and public.account_effective_tier(p_account, p_now) in ('pro', 'agency');
 $$;
 

@@ -144,5 +144,6 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
 - A fix with no packet is answered `queued` and nothing is sent.
 - The Alerts page shows what `changes.notified` records; a failed or suppressed channel (`alert_events`) is not
   shown.
-- The Supabase ports for alerts and the summary (`alerts-store.ts`, `summary-store.ts`) are typechecked and their
-  SQL is tested on PGlite; the PostgREST reads themselves have not run against a real PostgREST.
+- The Supabase ports for alerts and the summary (`alerts-store.ts`, `summary-store.ts`) run in
+  `lib/v2/monitor/stores.test.ts` through a PostgREST stand-in over PGlite (`__tests__/helpers/postgrest-pglite.ts`,
+  capped at 1,000 rows as `max_rows` is), not against a real PostgREST.

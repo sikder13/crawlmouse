@@ -281,7 +281,12 @@ describe('the Slack ledger: claim before post (D5; review r1, test quality B1)',
         [key, accountId, now],
       )
     )[0]!.r;
-  const finishSlack = async (key: string, status: string, now: string, code: string | null = null) =>
+  const finishSlack = async (
+    key: string,
+    status: string,
+    now: string,
+    code: string | null = null,
+  ) =>
     (
       await svc<{ r: boolean }>(`select public.finish_slack_send($1, $2, $3, $4) r`, [
         key,
@@ -406,6 +411,31 @@ describe('the Slack URL at send time (D5)', () => {
         ])
       )[0]!.u,
     ).toBeNull();
+  });
+
+  it('answers null for an account marked for deletion, or deleted (review r1, test quality B2)', async () => {
+    const url = 'https://hooks.slack.com/services/T0000/B0000/markedAccount1';
+    const urlOf = async (accountId: string) =>
+      (
+        await svc<{ u: string | null }>(`select public.account_slack_webhook_url($1, now()) u`, [
+          accountId,
+        ])
+      )[0]!.u;
+    const marked = await account('pro');
+    const deleted = await account('pro');
+    for (const a of [marked, deleted]) {
+      await svc(`select public.set_account_slack_webhook($1, $2)`, [a.accountId, url]);
+      expect(await urlOf(a.accountId)).toBe(url);
+    }
+    await db.query(
+      `update public.accounts set deletion_confirmed_at = now(), purge_after = now() + interval '7 days' where id = $1`,
+      [marked.accountId],
+    );
+    await db.query(`update public.accounts set deleted_at = now() where id = $1`, [
+      deleted.accountId,
+    ]);
+    expect(await urlOf(marked.accountId)).toBeNull();
+    expect(await urlOf(deleted.accountId)).toBeNull();
   });
 
   it('is executable by service_role only', async () => {
