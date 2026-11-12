@@ -51,12 +51,13 @@ const ident = (s: string): string => {
   return s;
 };
 
+/** A column list, each name quoted, so a column named as a keyword (`changes.where`) reads. */
 const columnsOf = (list: string): string =>
   list === '*'
     ? '*'
     : list
         .split(',')
-        .map((c) => ident(c.trim()))
+        .map((c) => `"${ident(c.trim())}"`)
         .join(', ');
 
 /** A value as PostgREST puts it on the wire. */

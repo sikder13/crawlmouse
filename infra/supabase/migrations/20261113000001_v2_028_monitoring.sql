@@ -769,7 +769,10 @@ $$;
 -- The accounts whose weekly summary is due in the hour holding p_now: a paid tier at p_now, not
 -- deleted or marked, and Monday 08:00–08:59 in the account's zone. week_key names the ISO week in
 -- that zone ("2026-W46"), which keys the summary's sends; week_start is that Monday 00:00 local.
-create or replace function public.due_summary_accounts(p_now timestamptz)
+-- A page at a time, in account-id order: at most p_limit (1 to 1000, PostgREST's max_rows) accounts
+-- after p_after (null: from the first), so a caller reads the whole list past PostgREST's row cap.
+create or replace function public.due_summary_accounts(p_now timestamptz, p_after uuid,
+                                                       p_limit integer)
 returns table (account_id uuid, week_key text, week_start timestamptz)
 language sql
 stable
@@ -784,9 +787,12 @@ as $$
       select coalesce((select n.name from pg_catalog.pg_timezone_names n where n.name = a.timezone limit 1),
                       'UTC') as tz) z
    where a.deleted_at is null and a.deletion_confirmed_at is null
+     and (p_after is null or a.id > p_after)
      and public.account_effective_tier(a.id, p_now) in ('pro', 'agency')
      and extract(isodow from p_now at time zone z.tz) = 1
-     and extract(hour from p_now at time zone z.tz) = 8;
+     and extract(hour from p_now at time zone z.tz) = 8
+   order by a.id
+   limit least(greatest(coalesce(p_limit, 1000), 1), 1000);
 $$;
 
 -- An unsubscribe link's change (D7): `alerts` takes email out of the seat's alert channels,
@@ -849,7 +855,7 @@ revoke all on function public.account_slack_webhook_url(uuid, timestamptz) from 
 revoke all on function public.alert_email_recipients(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.summary_recipients(uuid) from public, anon, authenticated;
 revoke all on function public.record_alert_delivery(jsonb) from public, anon, authenticated;
-revoke all on function public.due_summary_accounts(timestamptz) from public, anon, authenticated;
+revoke all on function public.due_summary_accounts(timestamptz, uuid, integer) from public, anon, authenticated;
 revoke all on function public.unsubscribe_seat(uuid, text) from public, anon, authenticated;
 grant execute on function public.claim_slack_send(text, uuid, timestamptz) to service_role;
 grant execute on function public.seed_default_alert_rules(uuid) to service_role;
@@ -858,7 +864,7 @@ grant execute on function public.account_slack_webhook_url(uuid, timestamptz) to
 grant execute on function public.alert_email_recipients(uuid, uuid) to service_role;
 grant execute on function public.summary_recipients(uuid) to service_role;
 grant execute on function public.record_alert_delivery(jsonb) to service_role;
-grant execute on function public.due_summary_accounts(timestamptz) to service_role;
+grant execute on function public.due_summary_accounts(timestamptz, uuid, integer) to service_role;
 grant execute on function public.unsubscribe_seat(uuid, text) to service_role;
 
 -- ═══ end C ════════════════════════════════════════════════════════════════════════════════════════

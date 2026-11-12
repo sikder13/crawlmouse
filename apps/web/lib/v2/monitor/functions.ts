@@ -90,8 +90,8 @@ export function monitorFunctions(env: Env = process.env): InngestFunction.Like[]
       env,
     ),
     createSummaryTickFn({
-      due: (now, offset, limit) =>
-        duePage(supabaseSummaryStore(serviceClient(env), log), new Date(now), offset, limit),
+      due: (now, after, limit) =>
+        duePage(supabaseSummaryStore(serviceClient(env), log), new Date(now), after, limit),
     }),
     createSummarySendFn({ send: (due) => sendSummary(summaryDeps(env), due) }, env),
   ];

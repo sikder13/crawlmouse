@@ -91,7 +91,7 @@ $$;
 -- The default rules the migration seeded stay: they are ordinary rules an account may have changed.
 drop function if exists public.seed_default_alert_rules(uuid);
 drop function if exists public.unsubscribe_seat(uuid, text);
-drop function if exists public.due_summary_accounts(timestamptz);
+drop function if exists public.due_summary_accounts(timestamptz, uuid, integer);
 drop function if exists public.record_alert_delivery(jsonb);
 drop function if exists public.summary_recipients(uuid);
 drop function if exists public.alert_email_recipients(uuid, uuid);

@@ -140,8 +140,10 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
   has gone out breaks those links until it is on again.
 - Slack turns a bare URL in message text into a link (a fix title naming a page on the member's site); we build no
   link and previews are off.
-- The weekly summary reads at most 5,000 changes per account-week; past that it logs `summary.read_capped` and its
-  counts are of the rows read.
+- The weekly summary reads at most 5,000 changes per account-week, a page at a time past PostgREST's 1,000-row
+  cap; past 5,000 it logs `summary.read_capped` and its counts are of the rows read.
+- The alert and summary recipients are each read in one call, so PostgREST's 1,000-row cap bounds an account's
+  recipient seats to 1,000 per message.
 - `check_finished` replayed after Inngest's 24-hour idempotency window is counted again.
 - `alert_sent` and `summary_sent` are counted by each run that completes with the mail delivered, `done`
   included, so a send whose record failed is still counted; an event replayed after Inngest's 24-hour

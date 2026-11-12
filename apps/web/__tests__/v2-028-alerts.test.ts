@@ -596,7 +596,7 @@ describe('recipients honour a seat’s client scope (review r1, security S1)', (
 describe('due_summary_accounts (D6)', () => {
   const due = (now: string) =>
     svc<{ account_id: string; week_key: string; week_start: Date }>(
-      `select * from public.due_summary_accounts($1)`,
+      `select * from public.due_summary_accounts($1, null, 1000)`,
       [now],
     );
 
@@ -608,6 +608,28 @@ describe('due_summary_accounts (D6)', () => {
     expect(hit?.week_start.toISOString()).toBe('2026-11-16T05:00:00.000Z');
     expect((await due('2026-11-16T08:30:00Z')).some((r) => r.account_id === accountId)).toBe(false);
     expect((await due('2026-11-16T14:00:00Z')).some((r) => r.account_id === accountId)).toBe(false);
+  });
+
+  it('pages in account order: at most p_limit after p_after, the limit held to 1–1000 (review r1, correctness S3)', async () => {
+    const ids: string[] = [];
+    for (let k = 0; k < 4; k++) ids.push((await account('pro', 'Asia/Tokyo')).accountId);
+    // Monday 2026-11-16 08:30 in Tokyo is 23:30 UTC on Sunday.
+    const at = '2026-11-15T23:30:00Z';
+    const page = async (after: string | null, limit: number) =>
+      (
+        await svc<{ account_id: string }>(
+          `select account_id from public.due_summary_accounts($1, $2, $3)`,
+          [at, after, limit],
+        )
+      ).map((r) => r.account_id);
+    const all = await page(null, 1000);
+    for (const id of ids) expect(all).toContain(id);
+    expect(all).toEqual([...all].sort());
+    expect(await page(null, 2)).toEqual(all.slice(0, 2));
+    expect(await page(all[1]!, 2)).toEqual(all.slice(2, 4));
+    expect(await page(all.at(-1)!, 2)).toEqual([]);
+    expect(await page(null, 0)).toEqual(all.slice(0, 1));
+    expect(await page(null, 5000)).toEqual(all);
   });
 
   it('is never due for a Free account or a marked one', async () => {

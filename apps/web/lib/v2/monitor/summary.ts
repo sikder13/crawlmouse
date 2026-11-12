@@ -25,7 +25,11 @@ export interface SummaryDue {
 }
 
 export interface SummaryStore {
-  due(now: Date): Promise<SummaryDue[]>;
+  /**
+   * Up to `limit` accounts due at `now`, in account-id order, after the account `after` (null: from
+   * the first): a page of `due_summary_accounts`.
+   */
+  due(now: Date, after: string | null, limit: number): Promise<SummaryDue[]>;
   /** The account's zone and whether it is marked for deletion; null when there is no such account. */
   account(accountId: string): Promise<{ marked: boolean; zone: string } | null>;
   /** The account's live sites' changes detected in [since, until), baselines left out. */
@@ -84,15 +88,18 @@ export function weekBefore(iso: string, zone: string): string {
   return new Date(guess + offsetMs(zone, end) - offsetMs(zone, guess)).toISOString();
 }
 
-/** Sorted by account, so a page of the list is the same page on every retry of its step. */
+/**
+ * One page of the due list, after the last account of the page before: keyed on the account id, not
+ * an offset, so an account that stops being due between two pages moves no other account across the
+ * page boundary.
+ */
 export async function duePage(
   store: SummaryStore,
   now: Date,
-  offset: number,
+  after: string | null,
   limit: number,
 ): Promise<SummaryDue[]> {
-  const all = [...(await store.due(now))].sort((a, b) => a.accountId.localeCompare(b.accountId));
-  return all.filter((_, k) => k >= offset && k < offset + limit);
+  return store.due(now, after, limit);
 }
 
 export async function sendSummary(deps: SummaryDeps, due: SummaryDue): Promise<SummaryAnswer> {

@@ -232,15 +232,19 @@ describe('sendSummary (D6)', () => {
 });
 
 describe('duePage', () => {
-  it('pages the due accounts in account order, the same page on every call', async () => {
-    const ids = ['c', 'a', 'b', 'd', 'e'].map((x) => ({
-      accountId: x,
-      weekKey: 'w',
-      weekStart: 's',
-    }));
-    const store = { due: async () => ids } as never;
-    expect((await duePage(store, NOW, 0, 2)).map((d) => d.accountId)).toEqual(['a', 'b']);
-    expect((await duePage(store, NOW, 2, 2)).map((d) => d.accountId)).toEqual(['c', 'd']);
-    expect((await duePage(store, NOW, 4, 2)).map((d) => d.accountId)).toEqual(['e']);
+  it('asks the store for the page after the account it is given', async () => {
+    const asked: [string, string | null, number][] = [];
+    const store = {
+      due: async (now: Date, after: string | null, limit: number) => {
+        asked.push([now.toISOString(), after, limit]);
+        return [];
+      },
+    } as never;
+    await duePage(store, NOW, null, 20);
+    await duePage(store, NOW, 'a0000000-0000-4000-8000-000000000009', 20);
+    expect(asked).toEqual([
+      [NOW.toISOString(), null, 20],
+      [NOW.toISOString(), 'a0000000-0000-4000-8000-000000000009', 20],
+    ]);
   });
 });

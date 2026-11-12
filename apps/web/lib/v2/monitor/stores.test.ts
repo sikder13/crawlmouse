@@ -191,3 +191,87 @@ describe('the recipients through PostgREST’s set-returning calls (review r1, s
     ]);
   });
 });
+
+/** `n` more copies of change `id`, each a second later, at a `where` of its own (the idempotency key). */
+const copies = (id: string, n: number) =>
+  db.query(
+    `insert into public.changes
+     select (jsonb_populate_record(c, jsonb_build_object(
+               'id', gen_random_uuid(), 'detected_at', c.detected_at + make_interval(secs => g),
+               'where', c."where" || ' #' || gen_random_uuid()))).*
+       from public.changes c, generate_series(1, $2) g
+      where c.id = $1`,
+    [id, n],
+  );
+
+describe('reads past PostgREST’s 1,000 rows (review r1, correctness S3)', () => {
+  it('alert data: every change of the check, and every event of the fixes they name', async () => {
+    const a = await paidAccount();
+    const s = await site(a.accountId);
+    const c = await check(s, await check(s));
+    const fixId = randomUUID();
+    await insertRow(db, 'site_fixes', ROWS.site_fixes(fixId, s, c, 1));
+    const first = randomUUID();
+    await insertRow(db, 'changes', { ...ROWS.changes(first, s, c), fix_id: fixId });
+    await copies(first, 1204);
+    await db.query(
+      `insert into public.fix_events (id, fix_id, at, kind, check_id)
+       select gen_random_uuid(), $1, now() + make_interval(secs => g), 'reopened', $2
+         from generate_series(1, 1100) g`,
+      [fixId, c],
+    );
+    const store = supabaseAlertStore(client());
+    const ctx = (await store.context(c))!;
+    const data = await store.data({ ...ctx, accountId: a.accountId });
+    expect(data.changes).toHaveLength(1205);
+    expect(new Set(data.changes.map((x) => x.id)).size).toBe(1205);
+    expect(data.fixEvents).toHaveLength(1100);
+  });
+
+  it('the summary: every change of the week past 1,000, and the cap logged only past 5,000', async () => {
+    const logs: unknown[] = [];
+    const store = supabaseSummaryStore(client(), (event, fields) => logs.push({ event, fields }));
+    const a = await paidAccount();
+    const s = await site(a.accountId);
+    const c = await check(s);
+    const first = randomUUID();
+    await insertRow(db, 'changes', {
+      ...ROWS.changes(first, s, c),
+      detected_at: '2026-11-10T00:00:00.000Z',
+    });
+    await copies(first, 1499);
+    const week = ['2026-11-09T00:00:00.000Z', '2026-11-16T00:00:00.000Z'] as const;
+    const read = async () =>
+      (await store.sites(a.accountId, ...week)).reduce((n, x) => n + x.changes.length, 0);
+    expect(await read()).toBe(1500);
+    expect(logs).toEqual([]);
+    await copies(first, 3500);
+    expect(await read()).toBe(5000);
+    expect(logs).toEqual([]);
+    await copies(first, 1);
+    expect(await read()).toBe(5000);
+    expect(logs).toEqual([
+      { event: 'summary.read_capped', fields: { account: a.accountId, rows: 5000 } },
+    ]);
+  });
+
+  it('the due list: every account due, a page at a time after the last one read', async () => {
+    const accounts: string[] = [];
+    for (let k = 0; k < 7; k++) accounts.push((await paidAccount('Pacific/Kiritimati')).accountId);
+    const store = supabaseSummaryStore(client(), () => {});
+    // Monday 2026-11-16 08:30 in Kiritimati (UTC+14) is 18:30 UTC on Sunday.
+    const now = new Date('2026-11-15T18:30:00.000Z');
+    const seen: string[] = [];
+    let after: string | null = null;
+    for (let pages = 0; pages < 100; pages++) {
+      const page = await store.due(now, after, 3);
+      seen.push(...page.map((d) => d.accountId));
+      if (page.length < 3) break;
+      after = page.at(-1)!.accountId;
+    }
+    const mine = seen.filter((id) => accounts.includes(id));
+    expect(mine.sort()).toEqual([...accounts].sort());
+    expect(new Set(seen).size).toBe(seen.length);
+    expect(seen).toEqual([...seen].sort());
+  });
+});

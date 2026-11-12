@@ -6,9 +6,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SummaryChange, SummarySite } from '../mail/templates/weekly-summary';
 import { zoneOrUtc } from './alerts-store';
+import { inLists, pagedRows } from './paged';
 import type { SummaryStore } from './summary';
 
-/** The most change rows one summary reads; more than this is logged, not silently dropped. */
+/**
+ * The most change rows one summary reads; past it, `summary.read_capped` is logged and the summary
+ * counts the rows read (spec 28, known gaps). Read a page at a time past PostgREST's 1,000 rows.
+ */
 export const SUMMARY_READ_MAX = 5000;
 
 const fail = (what: string, error: { code?: string } | null) =>
@@ -19,8 +23,12 @@ export function supabaseSummaryStore(
   log: (event: 'summary.read_capped', fields: Readonly<Record<string, string | number>>) => void,
 ): SummaryStore {
   return {
-    async due(now) {
-      const { data, error } = await sb.rpc('due_summary_accounts', { p_now: now.toISOString() });
+    async due(now, after, limit) {
+      const { data, error } = await sb.rpc('due_summary_accounts', {
+        p_now: now.toISOString(),
+        p_after: after,
+        p_limit: limit,
+      });
       if (error) throw fail('due_summary_accounts', error);
       return ((data ?? []) as { account_id: string; week_key: string; week_start: string }[]).map(
         (r) => ({
@@ -46,35 +54,47 @@ export function supabaseSummaryStore(
     },
 
     async sites(accountId, since, until): Promise<SummarySite[]> {
-      const { data: sites, error } = await sb
-        .from('sites')
-        .select('id, host')
-        .eq('account_id', accountId)
-        .is('removed_at', null);
-      if (error) throw fail('sites', error);
-      if (!sites?.length) return [];
-      const { data: rows, error: changesError } = await sb
-        .from('changes')
-        .select(
-          'site_id, kind, subject, severity, summary, where, pages_affected, ua, grade_deltas, detected_at',
-        )
-        .in(
-          'site_id',
-          sites.map((s) => s.id),
-        )
-        .gte('detected_at', since)
-        .lt('detected_at', until)
-        .neq('kind', 'baseline')
-        .order('detected_at')
-        .limit(SUMMARY_READ_MAX);
-      if (changesError) throw fail('changes', changesError);
-      const list = (rows ?? []) as (SummaryChange & { site_id: string })[];
-      if (list.length >= SUMMARY_READ_MAX) {
-        log('summary.read_capped', { account: accountId, rows: list.length });
+      const sites = await pagedRows<{ id: string; host: string }>('sites', (from, to) =>
+        sb
+          .from('sites')
+          .select('id, host')
+          .eq('account_id', accountId)
+          .is('removed_at', null)
+          .order('id')
+          .range(from, to),
+      );
+      if (!sites.length) return [];
+      // One row past the most a summary reads, so a week with more is logged, not cut silently.
+      const list: (SummaryChange & { site_id: string })[] = [];
+      for (const ids of inLists(sites.map((s) => s.id))) {
+        if (list.length > SUMMARY_READ_MAX) break;
+        list.push(
+          ...(await pagedRows<SummaryChange & { site_id: string }>(
+            'changes',
+            (from, to) =>
+              sb
+                .from('changes')
+                .select(
+                  'site_id, kind, subject, severity, summary, where, pages_affected, ua, grade_deltas, detected_at',
+                )
+                .in('site_id', ids)
+                .gte('detected_at', since)
+                .lt('detected_at', until)
+                .neq('kind', 'baseline')
+                .order('detected_at')
+                .order('id')
+                .range(from, to),
+            SUMMARY_READ_MAX + 1 - list.length,
+          )),
+        );
+      }
+      if (list.length > SUMMARY_READ_MAX) {
+        list.length = SUMMARY_READ_MAX;
+        log('summary.read_capped', { account: accountId, rows: SUMMARY_READ_MAX });
       }
       return sites.map((s) => ({
-        siteId: s.id as string,
-        host: s.host as string,
+        siteId: s.id,
+        host: s.host,
         changes: list.filter((c) => c.site_id === s.id).map(({ site_id: _site, ...c }) => c),
       }));
     },
