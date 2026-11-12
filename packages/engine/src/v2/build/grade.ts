@@ -10,7 +10,7 @@
  * filing.ts over the detectors' input; filing.test.ts holds filing.ts to the detectors' own filing. The withheld reasons, refusals and
  * fix effects are theirs, passed through.
  */
-import type { PageResult } from '@crawlmouse/types/v2';
+import type { FixType, PageResult } from '@crawlmouse/types/v2';
 import { buildCorpus } from '../../projection/relevance.js';
 import { enumerateFixes } from '../../projection/ledger.js';
 import { detectAccess } from '../access/index.js';
@@ -36,6 +36,8 @@ export interface Graded {
   structure: Detection[];
   grades: Grades;
   outcomes: DetectorOutcome[];
+  /** The detected fixes whose packet builder threw: each carries no packet. */
+  packet_faults: { type: FixType; fingerprint: string }[];
 }
 
 export function gradeAssembled(
@@ -89,18 +91,21 @@ export function gradeAssembled(
     edges: assembled.edges,
     access_tests: assembled.access_tests,
   };
+  // A builder that throws leaves its fix without a packet (packets/written.ts); the grading summary
+  // counts them, so a fault is seen where the check's steps are logged.
+  const packet_faults: Graded['packet_faults'] = [];
   const { outcomes } = detectorOutcomes(
     grades,
     access.detections,
     structure,
     detectRendered(withOrphans),
-    writtenFrom(facts),
+    writtenFrom(facts, ({ type, fingerprint }) => packet_faults.push({ type, fingerprint })),
   );
   const pages = withOrphans.map((p) => ({
     ...p,
     content_failures: grades.content_failures.get(p.url) ?? null,
   }));
-  return { pages, robots_txt, access, structure, grades, outcomes };
+  return { pages, robots_txt, access, structure, grades, outcomes, packet_faults };
 }
 
 /**

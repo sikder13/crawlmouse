@@ -43,8 +43,14 @@ describe('writtenFrom', () => {
     ],
   ])('leaves a fix without a packet, and does not throw, on %s', (_name, broken, held) => {
     expect(() => writePacket('orphan_pages', broken, held)).toThrow();
-    const written = writtenFrom(held)({ family: 'structure', record: broken });
+    const faults: unknown[] = [];
+    const written = writtenFrom(held, (f) => faults.push(f))({
+      family: 'structure',
+      record: broken,
+    });
     expect(written.packet).toBeNull();
+    expect(faults).toMatchObject([{ type: 'orphan_pages', fingerprint: broken.fingerprint }]);
+    expect((faults[0] as { error: unknown }).error).toBeInstanceOf(Error);
     expect(written.effort).toEqual(effortOf({ family: 'structure', record }));
     expect(written.before_after).toEqual([]);
   });

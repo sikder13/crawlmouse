@@ -364,12 +364,10 @@ describe('the size of a structure packet (security review, finding 5)', () => {
 
   it('stays under the stated bound for URLs of the worker’s longest and the largest records', () => {
     const seen = new Map<string, number>();
-    fc.assert(
-      fc.property(
-        fc.constantFrom(64, 512, MAX_URL_LENGTH),
-        fc.constantFrom(...fills),
-        fc.constantFrom(...stacks),
-        (length, fill, stack) => {
+    // each combination once: a random draw of them can miss the one that passes packet_chars
+    for (const length of [64, 512, MAX_URL_LENGTH]) {
+      for (const fill of fills) {
+        for (const stack of stacks) {
           for (const input of sites(urlOf(length, fill))) {
             const facts = factsFor(input, SERVED, stack);
             for (const record of detectStructure(input)) {
@@ -391,10 +389,9 @@ describe('the size of a structure packet (security review, finding 5)', () => {
               expect(packet!.verify.command.length, record.type).toBeLessThanOrEqual(COMMAND_MAX);
             }
           }
-        },
-      ),
-      { numRuns: 60 },
-    );
+        }
+      }
+    }
     // a packet of one body does pass packet_chars: the bound on it is one_body_chars, and no less
     expect(Math.max(...seen.values())).toBeGreaterThan(PACKET_BOUNDS.packet_chars);
     expect([...seen.keys()].sort()).toEqual([

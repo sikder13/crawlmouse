@@ -44540,6 +44540,7 @@
       "ai_readability": null,
       "ai_readability_withheld": true,
       "fixes_written": 11,
+      "packets_not_written": 0,
       "changes": 11
     }
   ]

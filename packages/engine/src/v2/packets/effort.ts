@@ -21,7 +21,7 @@ export interface EffortRule {
 
 const ONE_TEMPLATE: EffortRule = {
   effort: { kind: 'templates', templates: 1, deploys: 1 },
-  rule: 'The record names one template (`template_key`), so the change is to one template, and a change to one template ships in one deploy.',
+  rule: 'The record names one template (its template key: `template_key`, or the subject of its key for a paginated list), so the change is to one template, and a change to one template ships in one deploy.',
 };
 
 const ONE_PAGE: EffortRule = {
