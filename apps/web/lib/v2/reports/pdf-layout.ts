@@ -182,7 +182,7 @@ class Sources {
 }
 
 class Flow {
-  private y = MARGIN.top;
+  private y: number = MARGIN.top;
   private pageNumber = 0;
   private instances = 0;
   private readonly bottom: number;
