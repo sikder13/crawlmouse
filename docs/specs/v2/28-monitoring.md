@@ -138,9 +138,10 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
 
 ## Known gaps
 
-- A worker that dies after Resend accepted an account email and before `finish`, or a `finish` that fails
-  then, makes the retry mint a new link token, which replaces the delivered one; Resend refuses the second
-  send, so that email's link no longer works (Q10).
+- After Resend has accepted an account email, any failure before `finish` records it as sent (a worker that
+  dies, a `finish` that fails, or a timeout or proxy 5xx on the send itself) makes the retry mint a new link
+  token, which replaces the delivered one; Resend refuses the second send (409, a different payload), so that
+  email's link no longer works and the person asks again (Q10).
 - Gmail and Outlook turn a host or URL written as text into a link: the check-notify host, a packet's URLs,
   an alert row's `where`. Our HTML links none of them (`templates/inspect.ts` reads every target). The
   check-notify mail names a host the visitor chose, to an address the visitor typed; v1's notify mail
