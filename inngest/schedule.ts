@@ -98,7 +98,7 @@ export function createScheduleTickFn(deps: () => ScheduleDeps) {
       const paused = await step.run('pause-gate', async () => deps().paused());
       if (paused) return { paused: true };
 
-      const done = { claimed: 0, requested: 0, released: 0, unreleased: 0 };
+      const done = { claimed: 0, requested: 0, released: 0, stale: 0, unreleased: 0 };
       for (let round = 0; round < SCHEDULE_ROUNDS; round += 1) {
         const id = `claim-${round}`;
         const claim = (await step.run(id, async () =>
@@ -119,17 +119,22 @@ export function createScheduleTickFn(deps: () => ScheduleDeps) {
             failedThisRound = true;
           }
           try {
-            await step.run(`release:${at}`, async () => {
+            const out = (await step.run(`release:${at}`, async () => {
               const d = deps();
-              const out = await d.release(site, claim.global);
-              try {
-                d.report(ids, 'released');
-              } catch {
-                // A reporter that throws must not repeat the release.
+              const released = await d.release(site, claim.global);
+              // Reported only when the claim was given back: a site saved again or removed since its
+              // claim restores nothing (correctness review r2).
+              if (released.restored) {
+                try {
+                  d.report(ids, 'released');
+                } catch {
+                  // A reporter that throws must not repeat the release.
+                }
               }
-              return out;
-            });
-            done.released += 1;
+              return released;
+            })) as { restored: boolean };
+            if (out.restored) done.released += 1;
+            else done.stale += 1;
           } catch {
             await step.run(`release-failed:${at}`, async () => {
               try {

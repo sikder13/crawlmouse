@@ -139,7 +139,7 @@ describe('scheduleTickFn steps (D4)', () => {
     const deps = fakeDeps([{ global: GLOBAL, sites }]);
     const run = inngestLike();
     expect(await run.execute(handlerOf(deps))).toEqual({
-      out: { claimed: 2, requested: 2, released: 0, unreleased: 0 },
+      out: { claimed: 2, requested: 2, released: 0, stale: 0, unreleased: 0 },
     });
     expect(deps.claim).toHaveBeenCalledTimes(1);
     expect(deps.claim).toHaveBeenCalledWith(SCHEDULE_PAGE);
@@ -164,8 +164,24 @@ describe('scheduleTickFn steps (D4)', () => {
     });
     const run = inngestLike();
     const out = await run.execute(handlerOf(deps));
-    expect(out).toEqual({ out: { claimed: 1, requested: 1, released: 0, unreleased: 0 } });
+    expect(out).toEqual({
+      out: { claimed: 1, requested: 1, released: 0, stale: 0, unreleased: 0 },
+    });
     expect(deps.request).toHaveBeenCalledTimes(1);
+  });
+
+  it('a release that gives nothing back (the site saved or removed since) is counted stale and not reported', async () => {
+    const deps = fakeDeps([{ global: GLOBAL, sites: [{ siteId: A, slot: SLOT, next: NEXT }] }], {
+      request: async () => {
+        throw new Error('database unavailable');
+      },
+      release: async () => ({ restored: false, slot_released: false }),
+    });
+    const run = inngestLike(3);
+    expect(await run.execute(handlerOf(deps))).toEqual({
+      out: { claimed: 1, requested: 0, released: 0, stale: 1, unreleased: 0 },
+    });
+    expect(deps.report).not.toHaveBeenCalled();
   });
 
   it('a request step that fails every retry releases that claim once, reports it once, and the tick goes on', async () => {
@@ -181,7 +197,7 @@ describe('scheduleTickFn steps (D4)', () => {
     });
     const run = inngestLike(3);
     expect(await run.execute(handlerOf(deps))).toEqual({
-      out: { claimed: 2, requested: 1, released: 1, unreleased: 0 },
+      out: { claimed: 2, requested: 1, released: 1, stale: 0, unreleased: 0 },
     });
     expect(run.tries.get(`request:${A}:${SLOT}`)).toBe(3);
     expect(deps.release.mock.calls).toEqual([[{ siteId: A, slot: SLOT, next: NEXT }, GLOBAL]]);
@@ -212,7 +228,13 @@ describe('scheduleTickFn steps (D4)', () => {
     });
     const run = inngestLike(3);
     expect(await run.execute(handlerOf(deps))).toEqual({
-      out: { claimed: SCHEDULE_PAGE, requested: SCHEDULE_PAGE - 1, released: 0, unreleased: 1 },
+      out: {
+        claimed: SCHEDULE_PAGE,
+        requested: SCHEDULE_PAGE - 1,
+        released: 0,
+        stale: 0,
+        unreleased: 1,
+      },
     });
     expect(run.tries.get(`release:${A}:${SLOT}`)).toBe(3);
     expect(deps.report.mock.calls).toEqual([[{ siteId: A, slot: SLOT }, 'release_failed']]);
@@ -246,7 +268,7 @@ describe('scheduleTickFn steps (D4)', () => {
       },
     );
     expect(await inngestLike(3).execute(handlerOf(deps))).toEqual({
-      out: { claimed: 2, requested: 1, released: 0, unreleased: 1 },
+      out: { claimed: 2, requested: 1, released: 0, stale: 0, unreleased: 1 },
     });
     expect(deps.report).toHaveBeenCalledTimes(1);
   });
@@ -262,7 +284,7 @@ describe('scheduleTickFn steps (D4)', () => {
     });
     const run = inngestLike(3);
     expect(await run.execute(handlerOf(deps))).toEqual({
-      out: { claimed: 1, requested: 1, released: 0, unreleased: 0 },
+      out: { claimed: 1, requested: 1, released: 0, stale: 0, unreleased: 0 },
     });
     expect(deps.release).not.toHaveBeenCalled();
     expect(deps.report).not.toHaveBeenCalled();
@@ -286,6 +308,7 @@ describe('scheduleTickFn steps (D4)', () => {
         claimed: SCHEDULE_ROUNDS * SCHEDULE_PAGE,
         requested: SCHEDULE_ROUNDS * SCHEDULE_PAGE,
         released: 0,
+        stale: 0,
         unreleased: 0,
       },
     });
@@ -389,7 +412,7 @@ describe('owner ruling Q9 over a fake of the SQL: a request that fails every ret
     const next = fakeDeps([]);
     const second = { ...f.deps(false), request: next.request };
     expect(await inngestLike().execute(handlerOf(second))).toEqual({
-      out: { claimed: 1, requested: 1, released: 0, unreleased: 0 },
+      out: { claimed: 1, requested: 1, released: 0, stale: 0, unreleased: 0 },
     });
     expect(next.request.mock.calls).toEqual([[{ siteId: A, slot: SLOT, next: NEXT }]]);
     expect(f.count()).toBe(1);
