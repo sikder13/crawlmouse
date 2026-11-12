@@ -658,33 +658,47 @@ export function siteView(d: AccountDataset, viewer: Viewer, siteId: string): Sit
       ],
     },
     alerts: {
-      rows: v.d.alert_rules
-        .filter((r) => r.site_id === null || r.site_id === site.id)
-        .map((r) => ({
-          key: r.id,
-          label: ALERT_LABELS[r.kind](r.threshold_points),
-          verdicts: r.kind === 'crawler_blocked' ? BLOCKING_VERDICTS : [],
-          on: r.enabled,
-          fired:
-            r.last_fired_at && r.last_fired_check_id && siteChecks.has(r.last_fired_check_id)
-              ? `fired ${weekdayTime(r.last_fired_at, zone)}`
-              : null,
-          extra:
-            !r.enabled && r.kind === 'any_change' && contentNow.length
-              ? contentNow.map((c) => `${c.summary}, ${weekday(c.detected_at, zone)}`).join('; ')
-              : null,
-          toggle: action(
-            'alertRules',
-            ALERT_LABELS[r.kind](r.threshold_points),
-            { id: site.id },
-            {
-              fields: { rule: r.kind, enabled: String(!r.enabled) },
-            },
-          ),
-        })),
+      rows: siteRules(v.d.alert_rules, site.id).map((r) => ({
+        key: r.id,
+        label: ALERT_LABELS[r.kind](r.threshold_points),
+        verdicts: r.kind === 'crawler_blocked' ? BLOCKING_VERDICTS : [],
+        on: r.enabled,
+        fired:
+          r.last_fired_at && r.last_fired_check_id && siteChecks.has(r.last_fired_check_id)
+            ? `fired ${weekdayTime(r.last_fired_at, zone)}`
+            : null,
+        extra:
+          !r.enabled && r.kind === 'any_change' && contentNow.length
+            ? contentNow.map((c) => `${c.summary}, ${weekday(c.detected_at, zone)}`).join('; ')
+            : null,
+        toggle: action(
+          'alertRules',
+          ALERT_LABELS[r.kind](r.threshold_points),
+          { id: site.id },
+          {
+            fields: { rule: r.kind, enabled: String(!r.enabled) },
+          },
+        ),
+      })),
       foot: SITE_COPY.alertsFoot(to),
     },
   };
+}
+
+/**
+ * The rules that apply to one site: each account-level rule, or in its place the site's own row of
+ * that kind (CC-28 D8, `PUT /api/sites/[id]/alert-rules`), then any kind the site alone has.
+ */
+function siteRules<R extends { site_id: string | null; kind: string }>(
+  rules: readonly R[],
+  siteId: string,
+): R[] {
+  const own = rules.filter((r) => r.site_id === siteId);
+  const account = rules.filter((r) => r.site_id === null);
+  return [
+    ...account.map((r) => own.find((o) => o.kind === r.kind) ?? r),
+    ...own.filter((o) => !account.some((r) => r.kind === o.kind)),
+  ];
 }
 
 /** A site whose first check has not ended with a result, as its page shows it (D8). */
