@@ -26,6 +26,7 @@ const BREAKS = /[\p{Cc}\p{Zl}\p{Zp}\p{Zs}]+/gu;
 export const MAX_CRAWLED_CHARS = 200;
 
 const made = new WeakSet<object>();
+const lines = new WeakSet<object>();
 
 /** Text that may be interpolated into a packet line. */
 export interface Safe {
@@ -101,12 +102,12 @@ export function line(parts: TemplateStringsArray, ...values: readonly Safe[]): L
     }
   });
   const value = Object.freeze({ line: text.trim() });
-  made.add(value);
+  lines.add(value);
   return value;
 }
 
 /** The text of a line `line` made; anything else throws. */
 export function textOf(value: Line): string {
-  if (!made.has(value)) throw new Error('packets: not a line made by `line`');
+  if (!lines.has(value)) throw new Error('packets: not a line made by `line`');
   return value.line;
 }
