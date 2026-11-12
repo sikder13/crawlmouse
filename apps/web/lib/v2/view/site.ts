@@ -404,7 +404,8 @@ export type NextChecks = ReadonlyMap<string, string | null>;
  * When a site's next scheduled check is due, "Fri 13 Nov around 06:37", or null. A live page passes
  * `next`, the scheduler's own column, and the time is read from it and nowhere else; it is shown only
  * for a site the scheduler claims (claim_due_sites: not paused, and on Free the first site only, its
- * other sites waiting, owner ruling Q4). A preview's fixture holds no such column, so with no `next`
+ * other sites waiting, owner ruling Q4). A time at or before the viewer's now reads `due now`. A
+ * preview's fixture holds no such column, so with no `next`
  * the line is `nextCheck`'s weekly stand-in from the saved schedule.
  */
 export function nextCheckLine(
@@ -417,6 +418,9 @@ export function nextCheckLine(
   const at = next.get(site.id) ?? null;
   if (at === null || site.paused) return null;
   if (v.gates.schedule === 'monthly_first_site_only' && site.id !== primarySite(v).id) return null;
+  // A time already reached (the global ceiling or CRAWL_PAUSED left the site waiting) is not named
+  // as a past date: the check is due now.
+  if (instant(at) <= instant(v.now)) return 'due now';
   return `${dayDateOf(at)} around ${hourMinute(at, zoneOf(v))}`;
 }
 
