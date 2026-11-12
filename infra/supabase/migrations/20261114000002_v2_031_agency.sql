@@ -589,6 +589,160 @@ grant execute on function public.remove_seat(uuid, uuid, timestamptz) to service
 
 -- ═══ B: reports, share links and client report schedules ══════════════════════════════════════════
 
+-- ─── B2: share links and schedules ───────────────────────────────────────────────────────────────
+
+-- A share link (CC-31 D7) is a share_links row: the sha256 of a random token, the report it opens and
+-- when it stops. revoked_at is the time it was withdrawn, or replaced by a newer link of the same
+-- report. The table is granted to no client role (003), so neither is the column.
+--
+-- The four functions are granted to service_role alone. A route calls create_share_link and
+-- revoke_share_links only after the caller's own session has read the report and answered seat_may;
+-- open_share_link and read_share_link are called for whoever holds the token, which is the credential.
+--
+-- What these comments say about outcomes, grants and re-running is tested by:
+--   pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-share.test.ts
+alter table public.share_links add column if not exists revoked_at timestamptz;
+
+-- Makes the link of p_report: a row for p_token_hash that expires 30 days after p_now, with
+-- reports.share_expires_at set to the same time. The report's row is locked first, so two calls for
+-- one report run one after the other, and the links it held before are revoked: a report has one
+-- link that opens.
+-- Answers {outcome}: 'created' with expires_at; 'not_found' (no report p_report); 'not_ready' (the
+-- report has no stored file: storage_path is null).
+create or replace function public.create_share_link(
+  p_report uuid, p_token_hash text, p_user uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_path text;
+  v_expires timestamptz;
+begin
+  if p_report is null or p_token_hash is null or p_now is null then
+    raise exception 'create_share_link: a required argument is null' using errcode = '22004';
+  end if;
+  select r.storage_path into v_path from public.reports r where r.id = p_report for update;
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'not_found');
+  end if;
+  if v_path is null then
+    return pg_catalog.jsonb_build_object('outcome', 'not_ready');
+  end if;
+  v_expires := p_now + interval '30 days';
+  update public.share_links l
+     set revoked_at = p_now
+   where l.report_id = p_report and l.revoked_at is null;
+  insert into public.share_links (token_hash, report_id, expires_at, created_by, created_at)
+  values (p_token_hash, p_report, v_expires, p_user, p_now);
+  update public.reports r set share_expires_at = v_expires where r.id = p_report;
+  return pg_catalog.jsonb_build_object('outcome', 'created', 'expires_at', v_expires);
+end;
+$$;
+
+-- The link a token hash names, when it opens: not revoked, p_now before its expiry, its report's
+-- file stored, and the report's account neither deleted nor marked for deletion.
+-- open_share_link counts the view in the statement that reads the link, so a link that does not
+-- open is not counted. Answers {outcome}: 'open' with report_id, account_id, site_id, kind, format
+-- and storage_path; 'gone' when a row holds the hash and does not open; 'unknown' when none does.
+create or replace function public.open_share_link(p_token_hash text, p_now timestamptz)
+returns jsonb
+language sql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+  with opened as (
+    update public.share_links l
+       set view_count = l.view_count + 1
+      from public.reports r
+      join public.accounts a on a.id = r.account_id
+     where l.token_hash = p_token_hash
+       and r.id = l.report_id
+       and l.revoked_at is null
+       and l.expires_at > p_now
+       and r.storage_path is not null
+       and a.deleted_at is null
+       and a.deletion_confirmed_at is null
+    returning r.id, r.account_id, r.site_id, r.kind, r.format, r.storage_path
+  )
+  select coalesce(
+    (select pg_catalog.jsonb_build_object(
+              'outcome', 'open', 'report_id', o.id, 'account_id', o.account_id,
+              'site_id', o.site_id, 'kind', o.kind, 'format', o.format,
+              'storage_path', o.storage_path)
+       from opened o),
+    (select pg_catalog.jsonb_build_object('outcome', 'gone')
+       from public.share_links l
+      where l.token_hash = p_token_hash),
+    pg_catalog.jsonb_build_object('outcome', 'unknown'));
+$$;
+
+-- open_share_link's answer without the count: the shared page's own read, after the link was opened.
+create or replace function public.read_share_link(p_token_hash text, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+  select coalesce(
+    (select pg_catalog.jsonb_build_object(
+              'outcome', 'open', 'report_id', r.id, 'account_id', r.account_id,
+              'site_id', r.site_id, 'kind', r.kind, 'format', r.format,
+              'storage_path', r.storage_path)
+       from public.share_links l
+       join public.reports r on r.id = l.report_id
+       join public.accounts a on a.id = r.account_id
+      where l.token_hash = p_token_hash
+        and l.revoked_at is null
+        and l.expires_at > p_now
+        and r.storage_path is not null
+        and a.deleted_at is null
+        and a.deletion_confirmed_at is null),
+    (select pg_catalog.jsonb_build_object('outcome', 'gone')
+       from public.share_links l
+      where l.token_hash = p_token_hash),
+    pg_catalog.jsonb_build_object('outcome', 'unknown'));
+$$;
+
+-- Withdraws the links of p_report that are not revoked yet, and clears reports.share_expires_at.
+-- Returns how many links it revoked.
+create or replace function public.revoke_share_links(p_report uuid, p_now timestamptz)
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_revoked integer;
+begin
+  if p_report is null or p_now is null then
+    raise exception 'revoke_share_links: a required argument is null' using errcode = '22004';
+  end if;
+  perform 1 from public.reports r where r.id = p_report for update;
+  update public.share_links l
+     set revoked_at = p_now
+   where l.report_id = p_report and l.revoked_at is null;
+  get diagnostics v_revoked = row_count;
+  update public.reports r set share_expires_at = null where r.id = p_report;
+  return v_revoked;
+end;
+$$;
+
+revoke all on function public.create_share_link(uuid, text, uuid, timestamptz)
+  from public, anon, authenticated;
+revoke all on function public.open_share_link(text, timestamptz) from public, anon, authenticated;
+revoke all on function public.read_share_link(text, timestamptz) from public, anon, authenticated;
+revoke all on function public.revoke_share_links(uuid, timestamptz) from public, anon, authenticated;
+grant execute on function public.create_share_link(uuid, text, uuid, timestamptz) to service_role;
+grant execute on function public.open_share_link(text, timestamptz) to service_role;
+grant execute on function public.read_share_link(text, timestamptz) to service_role;
+grant execute on function public.revoke_share_links(uuid, timestamptz) to service_role;
+
 -- ═══ end B ════════════════════════════════════════════════════════════════════════════════════════
 
 -- ═══ C: erasure and mail kinds ════════════════════════════════════════════════════════════════════
