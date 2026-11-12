@@ -151,6 +151,8 @@ function harness(
   const captures: unknown[] = [];
   const posts: { url: string; text: string }[] = [];
   const slackRows = new Map<string, string>();
+  /** Every argument the Slack ledger was given: what slack_sends would hold. */
+  const ledgerCalls: unknown[][] = [];
   const reads: string[] = [];
   const ledger = memoryLedger();
   let recordFailures = o.recordFailures ?? 0;
@@ -176,12 +178,16 @@ function harness(
           { seatId: SEAT_2, email: ADDRESSES[1]! },
         ],
       slackUrl: async () => (o.slackUrl === undefined ? HOOK : o.slackUrl),
-      claimSlack: async (key) => {
+      claimSlack: async (...args) => {
+        ledgerCalls.push(['claimSlack', ...args]);
+        const [key] = args;
         if (slackRows.get(key) === 'sent') return { outcome: 'done' };
         slackRows.set(key, 'sending');
         return { outcome: 'go', attempt: 1 };
       },
-      finishSlack: async (key, status) => {
+      finishSlack: async (...args) => {
+        ledgerCalls.push(['finishSlack', ...args]);
+        const [key, status] = args;
         slackRows.set(key, status);
       },
       record: async (d) => {
@@ -214,12 +220,15 @@ function harness(
     log: (event, fields) => logs.push({ event, fields }),
     now: () => NOW,
   };
-  return { deps, sent, records, logs, captures, posts, slackRows, ledger, reads };
+  return { deps, sent, records, logs, captures, posts, slackRows, ledgerCalls, ledger, reads };
 }
 
-/** Everything the work let out, but the transport's own message and the Slack POST. */
+/**
+ * Everything the work let out, but the transport's own message and the Slack POST: the records, the
+ * log lines, the events, and every argument given to the Slack ledger (its key and error code).
+ */
 const leaked = (h: ReturnType<typeof harness>, extra: unknown[] = []) =>
-  JSON.stringify([h.records, h.logs, h.captures, ...extra]);
+  JSON.stringify([h.records, h.logs, h.captures, h.ledgerCalls, ...extra]);
 
 describe('what alerts nothing', () => {
   it.each<[string, AlertContext | null, string]>([
@@ -409,13 +418,19 @@ describe('Slack (D5)', () => {
     ]);
   });
 
-  it('never puts the webhook URL in a record, a log line, an event or an answer', async () => {
+  it('never puts the webhook URL in a record, the Slack ledger, a log line, an event or an answer', async () => {
     for (const slack of [
       { ok: true } as const,
       { ok: false, code: 'slack_404', retryable: false } as const,
+      { ok: false, code: 'slack_503', retryable: true } as const,
     ]) {
       const h = harness({ slack });
-      const answer = await deliverAlert(h.deps, CHECK, 'slack');
+      const answer = await deliverAlert(h.deps, CHECK, 'slack').catch((e: unknown) => [
+        String(e),
+        (e as Error).stack,
+      ]);
+      // anti-vacuity: the ledger was given its key and, on a failure, its code
+      expect(h.ledgerCalls.map((c) => c[0])).toEqual(['claimSlack', 'finishSlack']);
       const plan = await planAlert(h.deps, CHECK);
       const out = leaked(h, [answer, plan]);
       expect(out).not.toContain('hooks.slack.com');
