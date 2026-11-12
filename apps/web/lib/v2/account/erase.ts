@@ -117,7 +117,7 @@ export function blockingRefusals(plan: ErasurePlan): string[] {
   return plan.refusals.filter((_, i) => plan.refusalCodes[i] !== 'storage');
 }
 
-/** The address hashes of the plan's addresses, one per mailbox as `normalizeEmail` folds it. */
+/** The address hashes of the plan's addresses, one per address as `hashMailAddress` reads it. */
 export function mailHashes(pepper: string, emails: readonly string[]): string[] {
   return [...new Set(emails.map((e) => hashMailAddress(pepper, e)))].sort();
 }

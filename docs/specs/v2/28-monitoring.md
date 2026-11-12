@@ -44,9 +44,9 @@ The transport sends the ledger key as Resend's `Idempotency-Key` (24 hours), so 
 sent again; a repeat whose payload changed is refused by Resend with 409 `invalid_idempotent_request`, which
 the transport answers as sent.
 
-The address hash is HMAC-SHA256 under `TRIAL_LEDGER_PEPPER` over `mail:` and the address as
-`normalizeEmail` folds it (`lib/v2/mail/address-hash.ts`): a `+tag` or a Gmail dot names the same mailbox for
-a suppression.
+The address hash is HMAC-SHA256 under `TRIAL_LEDGER_PEPPER` over `mail:` and the address trimmed and
+lower-cased (`lib/v2/mail/address-hash.ts`). A `+tag` is not folded: a bounce on `x+tag@` suppresses that
+address only, so a stranger cannot silence someone's own address through a tagged one they typed.
 
 Verify: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/mail __tests__/v2-028-mail.test.ts`, and the
 two-transaction claim on a real Postgres: `scripts/db/monitoring-race.test.ts` (CI's `db-cli-files` job).

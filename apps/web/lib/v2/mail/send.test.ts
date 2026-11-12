@@ -100,7 +100,11 @@ describe('send: claim before send (D1)', () => {
   it('claims with the peppered hash of the address, never the address', async () => {
     const { d, mem } = deps();
     await send(d, request({ to: 'Some.One+tag@Example.com' }));
-    expect(mem.claims[0]!.addressHash).toBe(hashMailAddress(PEPPER, 'some.one@example.com'));
+    expect(mem.claims[0]!.addressHash).toBe(hashMailAddress(PEPPER, 'some.one+tag@example.com'));
+    // A `+tag` is not folded away: a bounce on one tagged address must not suppress the plain one.
+    expect(hashMailAddress(PEPPER, 'some.one+tag@example.com')).not.toBe(
+      hashMailAddress(PEPPER, 'some.one@example.com'),
+    );
     expect(JSON.stringify(mem.claims)).not.toMatch(/example\.com/i);
   });
 

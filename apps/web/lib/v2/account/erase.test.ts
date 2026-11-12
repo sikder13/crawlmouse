@@ -236,9 +236,10 @@ describe('the rows found by address hash (CC-28 D9)', () => {
     const planned = await planWithMail(p, { userId: 'u1' });
     const a = hashMailAddress(PEPPER, 'a@example.com');
     const b = hashMailAddress(PEPPER, 'b@example.com');
+    const news = hashMailAddress(PEPPER, 'a+news@example.com');
     expect(a).toMatch(/^[0-9a-f]{64}$/);
-    // `a+news@` folds to `a@` (normalizeEmail), so it names the same mailbox and the same hash.
-    expect(seen).toEqual([[a, b].sort()]);
+    // `A@` is `a@` lower-cased; `a+news@` is an address of its own, hashed as written.
+    expect(seen).toEqual([[a, b, news].sort()]);
     expect(planned.counts[MAIL_SENDS_KEY]).toBe(3);
     expect(planned.kept[MAIL_KEPT_KEY]).toBe(2);
   });

@@ -79,10 +79,10 @@ describe('the Resend webhook: v1’s record, kept', () => {
 });
 
 describe('suppression (D7)', () => {
-  it('a hard bounce suppresses the address’s hash, normalised as the ledger hashes it', async () => {
+  it('a hard bounce suppresses the hash of the address as written, lower-cased, tag kept', async () => {
     expect((await post(signed(bounce('Permanent')))).status).toBe(200);
     expect(rpc).toHaveBeenCalledWith('record_email_suppression', {
-      p_hash: hashMailAddress(PEPPER, 'bounced@example.com'),
+      p_hash: hashMailAddress(PEPPER, 'bounced+tag@example.com'),
       p_reason: 'hard_bounce',
       p_now: expect.any(String),
     });
@@ -117,22 +117,26 @@ describe('suppression (D7)', () => {
     err.mockRestore();
   });
 
-  it('end to end: the address a hard bounce suppressed is not mailed again', async () => {
+  it('end to end: the address a hard bounce suppressed is not mailed again; the untagged one still is', async () => {
     await post(signed(bounce('Permanent')));
     const [, args] = rpc.mock.calls[0] as unknown as [string, { p_hash: string }];
     const ledger = memoryLedger(new Set([args.p_hash]));
     const transport = memoryTransport();
-    const out = await send(
-      { ledger, transport, pepper: PEPPER, now: () => new Date(), log: () => undefined },
-      {
-        kind: 'check_notify',
-        to: 'bounced@example.com',
-        idempotencyKey: 'check_notify:x',
-        accountId: null,
-        render: async () => ({ subject: 's', text: 't', html: 'h' }),
-      },
-    );
-    expect(out).toBe('suppressed');
+    const mail = (to: string, key: string) =>
+      send(
+        { ledger, transport, pepper: PEPPER, now: () => new Date(), log: () => undefined },
+        {
+          kind: 'check_notify',
+          to,
+          idempotencyKey: key,
+          accountId: null,
+          render: async () => ({ subject: 's', text: 't', html: 'h' }),
+        },
+      );
+    expect(await mail('bounced+tag@example.com', 'check_notify:x')).toBe('suppressed');
     expect(transport.sent).toEqual([]);
+    // A stranger's tagged address cannot silence the plain one (security review r1, B2).
+    expect(await mail('bounced@example.com', 'check_notify:y')).toBe('sent');
+    expect(transport.sent.map((m) => m.to)).toEqual(['bounced@example.com']);
   });
 });

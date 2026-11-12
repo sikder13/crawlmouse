@@ -2,8 +2,9 @@
  * Suppression from Resend's webhook (D7): a hard bounce (`email.bounced` whose `bounce.type` is
  * `Permanent`) or a complaint (`email.complained`) records the address's hash with
  * `record_email_suppression`, and `claim_email_send` then answers `suppressed` for every kind that is
- * not account mail. The address is hashed as the ledger hashes it (`hashMailAddress`, so a `+tag` or a
- * Gmail dot names the same mailbox) and is neither stored nor logged here. Resend's payload, read
+ * not account mail. The address is hashed as the send ledger hashes it (`hashMailAddress`: the address
+ * as written, lower-cased, so a bounce on `x+tag@` suppresses that address only) and is neither stored
+ * nor logged here. Resend's payload, read
  * 2026-11-12 (resend.com/docs/webhooks/emails/bounced, /complained): `data.to` is an array of the
  * affected recipients; a bounce's `data.bounce.type` is e.g. `Permanent` or `Temporary`.
  */
