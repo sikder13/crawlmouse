@@ -189,7 +189,9 @@ describe('/seats', () => {
     expect(main).toContain(member.email);
     expect(main).toContain('pending@example.com');
     expect(main).toContain('Invited, not yet accepted');
-    expect(main).toContain('Invited. The seat is held for that address');
+    expect(main).toContain(
+      'Invited. The invitation will be emailed to that address from alerts@crawlmouse.com, and the seat is held for it',
+    );
     expect(main).toMatch(/<form[^>]* action="\/api\/seats"/);
     expect(main).toMatch(/<form[^>]* action="\/api\/billing\/seats"/);
     expect(main).toContain(`action="/api/seats/id/${seatId}"`);
