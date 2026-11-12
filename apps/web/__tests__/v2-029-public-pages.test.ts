@@ -233,6 +233,51 @@ describe('readUsedAgencyTrial agrees with start_agency_trial_account', () => {
   });
 });
 
+// Correctness N-r2-1: the function stops a person starting a second trial once one is used, but not
+// holding two used agency accounts (a second owner seat on another agency account, or an account
+// made before either trial was used). The read then names the live one, whichever was used first, so
+// Pricing can offer its paid plan rather than "used on an account since deleted".
+describe('readUsedAgencyTrial with two used agency accounts', () => {
+  async function agencyAccount(userId: string, usedDaysAgo: number, deleted: boolean) {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.accounts
+         (kind, state, tier, seat_limit, site_limit, state_history, trial_used_at, deleted_at)
+       values ('agency', 'free', 'free', 5, 25,
+               '[{"state":"free","since":"2026-01-01T00:00:00.000Z"}]',
+               now() - make_interval(days => $1), case when $2 then now() end)
+       returning id`,
+      [usedDaysAgo, deleted],
+    );
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'owner@example.com', 'owner', 'active', now())`,
+      [rows[0]!.id, userId],
+    );
+    return rows[0]!.id;
+  }
+
+  it.each([
+    ['the deleted one used first', 9, 3],
+    ['the deleted one used last', 3, 9],
+  ])('a live and a deleted one, %s: the live one', async (_, deletedAgo, liveAgo) => {
+    const userId = await person();
+    const deleted = await agencyAccount(userId, deletedAgo, true);
+    const live = await agencyAccount(userId, liveAgo, false);
+    expect(deleted).not.toBe(live);
+    const read = await readUsedAgencyTrial(postgrestOver(db) as never, userId);
+    expect(read).toMatchObject({ accountId: live, deleted: false });
+    expect((await start(userId, 'other.example')).outcome).toBe('trial_used');
+  });
+
+  it('two deleted ones: the one used first, still used', async () => {
+    const userId = await person();
+    const first = await agencyAccount(userId, 9, true);
+    await agencyAccount(userId, 3, true);
+    const read = await readUsedAgencyTrial(postgrestOver(db) as never, userId);
+    expect(read).toMatchObject({ accountId: first, deleted: true });
+  });
+});
+
 describe('contact_requests', () => {
   it.each(['anon', 'authenticated'] as const)('%s can neither read nor write it', async (role) => {
     await expect(
