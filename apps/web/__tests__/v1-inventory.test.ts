@@ -209,6 +209,12 @@ describe('the finders see what they claim to see', () => {
       'app/api/fixes/[id]/packet/route.ts',
       'app/api/me/route.ts',
       'app/api/report-files/[id]/share/route.ts',
+      'app/api/report-files/confirm/route.ts',
+      'app/api/report-files/pause/route.ts',
+      'app/api/report-files/schedules/site/[siteId]/client/route.ts',
+      'app/api/report-files/schedules/site/[siteId]/confirm/route.ts',
+      'app/api/report-files/schedules/site/[siteId]/resume/route.ts',
+      'app/api/report-files/schedules/site/[siteId]/route.ts',
       'app/api/seats/accept/route.ts',
       'app/api/seats/id/[id]/resend/route.ts',
       'app/api/seats/id/[id]/route.ts',
@@ -219,6 +225,8 @@ describe('the finders see what they claim to see', () => {
       'app/api/webhooks/stripe-account/route.ts',
       'app/invite/[token]/route.ts',
       'app/s/[token]/route.ts',
+      'app/s/confirm/[token]/route.ts',
+      'app/s/pause/[token]/route.ts',
     ]);
   });
 
