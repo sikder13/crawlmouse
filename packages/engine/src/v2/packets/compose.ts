@@ -14,9 +14,9 @@
  * packet keeps the body for its own framework and its context says the others were left out. It is
  * not a bound on what is left. One body is as long as its three sections, its `expect` and its
  * command, and a command is not cut here: a cut command is a different command. Its length is bounded
- * where it is written: the structure builders name a fixed number of URLs, none longer than the
- * worker stores, and stop a list at a stated length, the `expect` saying what was left out
- * (html-checks.ts `COMMAND_BOUNDS`). compose.test.ts holds those builders' packets to
+ * where it is written: the structure builders name a fixed number of a record's URLs, which the
+ * worker stores up to MAX_URL_LENGTH characters, and stop a list at a stated length, the `expect`
+ * saying what was left out (html-checks.ts `COMMAND_BOUNDS`). compose.test.ts holds those builders' packets to
  * `one_body_chars` over records whose URLs are the worker's longest and whose lists are its largest;
  * that is a measured bound for those builders, and `compose` enforces none on a single body.
  */
