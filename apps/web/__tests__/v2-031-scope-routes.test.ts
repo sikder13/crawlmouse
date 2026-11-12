@@ -27,6 +27,9 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('server-only', () => ({}));
+// No switcher cookie on these requests: each person acts in their default account. The site page
+// reads it to tell which account the caller acts in (the rail's switcher).
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => sessionOver(h.db, h.user, h.asked),
 }));
