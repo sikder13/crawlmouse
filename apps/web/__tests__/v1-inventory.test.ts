@@ -202,10 +202,15 @@ describe('the finders see what they claim to see', () => {
       'app/api/fixes/[id]/email-developer/route.ts',
       'app/api/fixes/[id]/packet/route.ts',
       'app/api/me/route.ts',
+      'app/api/seats/accept/route.ts',
+      'app/api/seats/id/[id]/resend/route.ts',
+      'app/api/seats/id/[id]/route.ts',
+      'app/api/seats/route.ts',
       'app/api/sites/[id]/checks/route.ts',
       'app/api/sites/[id]/route.ts',
       'app/api/sites/route.ts',
       'app/api/webhooks/stripe-account/route.ts',
+      'app/invite/[token]/route.ts',
     ]);
   });
 
