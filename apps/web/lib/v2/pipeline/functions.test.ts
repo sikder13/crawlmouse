@@ -18,6 +18,7 @@ import { CHECK_REAPER_FN_ID } from '../../../../../inngest/check-reaper';
 import { inngest } from '../../../../../inngest/client';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { PLAN_CONCURRENCY_CAP } from '../../../../../inngest/concurrency';
+import { SCHEDULE_TICK_FN_ID } from '../../../../../inngest/schedule';
 import { recordedInput } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { workerClientFromEnv } from '../../worker-client/client';
 import { CRAWL_USER_AGENT } from './discover';
@@ -248,6 +249,24 @@ describe('registration with V2_PIPELINE=1 (D3)', () => {
     ]);
   });
 
+  it('registers the scheduler (CC-28 D4) only with V2_PIPELINE=1 and V2_CHECKS_PUBLIC=1', () => {
+    const tick = `crawlmouse-${SCHEDULE_TICK_FN_ID}`;
+    for (const [env, registered] of [
+      [{}, false],
+      [{ V2_PIPELINE: '1' }, false],
+      [{ V2_CHECKS_PUBLIC: '1' }, false],
+      [{ V2_PIPELINE: '1', V2_CHECKS_PUBLIC: '0' }, false],
+      [{ V2_PIPELINE: 'true', V2_CHECKS_PUBLIC: '1' }, false],
+      [{ V2_PIPELINE: '1', V2_CHECKS_PUBLIC: '1' }, true],
+    ] as const) {
+      const ids = configsOf(inngestFunctions(env)).map((c) => c.id);
+      expect(
+        ids.filter((id) => id === tick),
+        JSON.stringify(env),
+      ).toHaveLength(registered ? 1 : 0);
+    }
+  });
+
   it('registers no expiry with V2_PIPELINE unset', () => {
     expect(configsOf(inngestFunctions({})).map((c) => c.id)).not.toContain(
       `crawlmouse-${CHECK_EXPIRY_FN_ID}`,
@@ -323,7 +342,11 @@ describe('no registered function can declare a concurrency limit above the plan 
               vi.stubEnv('INNGEST_CHECK_CONCURRENCY', check);
               const configs = configsOf(fresh.inngestFunctions(process.env));
               expect(configs.length).toBe(
-                (flag === '1' ? 10 : 5) + (billing === '1' ? 2 : 0) + (pub === '1' ? 3 : 0),
+                (flag === '1' ? 10 : 5) +
+                  (billing === '1' ? 2 : 0) +
+                  (pub === '1' ? 3 : 0) +
+                  // CC-28's scheduler tick.
+                  (pub === '1' && flag === '1' ? 1 : 0),
               );
               const deletionIds = [
                 'crawlmouse-crawlmouse.account.deletion-cancel',
