@@ -6,11 +6,46 @@ export const BUDGET = {
   /** A main-thread task longer than this is a stall. */
   stallMs: 100,
   layoutShift: 0.001,
+  /** The 95th percentile of the main thread's busy time per 16.7 ms slice: the bursts. */
+  p95WorkMs: 10,
+  /** A frame interval longer than this is a stall, at any refresh rate. */
+  maxFrameMs: 100,
+};
+
+/**
+ * Frame-interval readings printed and recorded for the nightly trend, not judged: they move with
+ * the refresh rate the runner manages (docs/specs/v2/ci-cost.md, D3).
+ */
+export const ADVISORY = {
   p95FrameMs: 17.5,
   slowFrameMs: 34,
   slowShare: 0.01,
-  maxFrameMs: 100,
 };
+
+/**
+ * The main thread's mean busy time per 16.7 ms slice, per crawl-screen window, in a reference
+ * runner's milliseconds (divided by the runner probe's ratio to its reference). The coarse layer
+ * beside MAP_WRITES_PER_FRAME: it would catch a large regression, not a third more work.
+ *
+ * Advisory (owner ruling, 2026-11-11): across six CI readings of the crawl window (five runs), and five of each
+ * of the other two, the normalised readings spread by 27%, 21% and 59% with the crawl screen's own code unchanged, over the
+ * 15% the ruling allows a judged limit (docs/specs/v2/ci-cost.md, D3). The limits are about 1.2
+ * times the highest reading, for the nightly trend's "over, advisory".
+ */
+export const MEAN_WORK_ADVISORY = true;
+
+export const MEAN_WORK_MS: Record<string, number> = {
+  'the crawl, the map growing': 3.2,
+  'the crawler tests, the log and verdicts landing': 0.75,
+  'on a phone, the crawler tests beginning': 2.8,
+};
+
+/**
+ * The crawl window's map writes per 60 Hz frame of replay time, counted on a fake clock
+ * (perf.spec.ts, "the crawl map, counted"): the gate for twice the map's work. Set from the count in
+ * docs/specs/v2/ci-cost.md, D3.
+ */
+export const MAP_WRITES_PER_FRAME = 5.4;
 
 /** How long each crawl-screen window plays. */
 export const WINDOW_MS = 12_000;

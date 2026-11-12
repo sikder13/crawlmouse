@@ -63,7 +63,11 @@ The scripts behind them are in `scripts/db`. Their tests:
    It refuses when a pending file is not in that dry run, when its sha256 differs from the bytes the dry run applied, or when production's
    fingerprint differs from the one the dry run read
    (`pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts`).
-5. **Apply.** The `apply` job starts as soon as `plan` passes; there is no second click. It checks
+5. **Apply (the owner approves).** When `plan` passes, the `apply` job waits for the owner to approve
+   the `production` environment (the run → **Review deployments** → `production` → **Approve and
+   deploy**): its required reviewer is the owner while the repository is public (run 43067443133,
+   2026-11-11). On a private repository on GitHub Pro required reviewers are not enforced, and
+   `apply` then starts as soon as `plan` passes. It checks
    that production's pending files still equal the manifest the `plan` job printed and that
    production's fingerprint still equals the one the `plan` job read, runs
    `supabase db push`, runs the checks, and writes the fingerprint to the job summary. A failure
@@ -78,9 +82,11 @@ To apply files whose pull request was merged earlier, give `dry_run_pr` the numb
 pull request whose passed dry run applied those files.
 
 Until CC-REPO merged, a merge that changed a migration started this workflow and the `apply` job waited
-for the owner's approval on the `production` environment. Required reviewers are not available to a
-private repository on GitHub Pro, so after the repository went private that wait would have
-vanished and a merge would have applied with no approval. The approval is now the owner's own run.
+for the owner's approval on the `production` environment. Now nothing starts on a merge: the owner
+dispatches the run (step 4), then approves the environment (step 5). GitHub enforces required
+reviewers on a public repository only, on Pro, so once the repository is private the dispatch alone
+starts the apply, and the owner check in `authorize` is what stands. Read the environment's rules
+back: `gh api repos/sikder13/crawlmouse/environments/production --jq '.protection_rules[] | {type, reviewers: [.reviewers[]?.reviewer.login]}'`.
 
 ## 2. What the owner reads before running the apply
 
@@ -403,8 +409,9 @@ so two databases can be compared section by section.
 | GitHub environment `production` | `SUPABASE_SERVICE_ROLE_KEY` | no workflow; the owner removes it before the repository turns private |
 
 A branch's database password comes from the Management API at run time and is masked in the log
-before use. `production` accepts deployments from `main` only; it has no required reviewer, because
-a private repository on GitHub Pro cannot have one. What stands in for it is that only the owner can
+before use. `production` accepts deployments from `main` only, and its required reviewer is the
+owner, enforced while the repository is public (§1, step 5). A private repository on GitHub Pro does
+not enforce required reviewers; what stands in for one then is that only the owner can
 start the two workflows that use it: both are `workflow_dispatch` only and refuse any other actor or
 ref (`pnpm --filter @crawlmouse/scripts exec vitest run db/production-workflows.test.ts`). That check
 tells accounts apart, not tools: a token that acts as the owner with Actions write passes it, which is

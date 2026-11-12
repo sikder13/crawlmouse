@@ -14,9 +14,10 @@ name: DB apply to production
 #              the fingerprint. It never retries and never runs a rollback.
 #   report     opens an issue when any job fails.
 #
-# The approval is the owner's own dispatch. The environment has no required reviewer: on a private
-# repository under a personal GitHub Pro account, environment reviewers are not enforced. So
-# `plan` and `apply` each run the same check as `authorize` as their first step, before anything
+# The owner dispatches it from main, then approves the `production` environment. Its required
+# reviewer (the owner) is enforced while the repository is public; on a private repository under a
+# personal GitHub Pro account it is not, and the dispatch alone starts the job
+# (docs/specs/v2/repo-private.md, D1). So `plan` and `apply` each run the same check as `authorize` as their first step, before anything
 # is checked out or any secret is read. A re-run of a failed job does not re-run a passed
 # `authorize`, and only a step in the re-run job sees who re-ran it (github.triggering_actor).
 #
@@ -159,8 +160,8 @@ jobs:
     if: needs.plan.outputs.pending != '0'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # Holds SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD; deployment branches: main only. No
-    # reviewer: the owner's dispatch is the approval, checked by the first step.
+    # Holds SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD; deployment branches: main only. Waits
+    # for the owner's approval while the repository is public; the first step checks the dispatch.
     environment: production
     permissions:
       contents: read

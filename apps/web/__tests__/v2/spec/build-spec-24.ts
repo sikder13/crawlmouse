@@ -27,7 +27,15 @@ import {
 } from '../../../app/(v2-preview)/v2-preview/_preview/segments';
 import { RESULT_PREVIEWS } from '../../../app/(v2-preview)/v2-preview/_preview/screens';
 import type { ResultView } from '../../../lib/v2/view/result';
-import { BUDGET, EXPLORER, RUNS, WINDOW_MS } from '../../../../../tests/visual/budgets';
+import {
+  BUDGET,
+  EXPLORER,
+  MAP_WRITES_PER_FRAME,
+  MEAN_WORK_ADVISORY,
+  MEAN_WORK_MS,
+  RUNS,
+  WINDOW_MS,
+} from '../../../../../tests/visual/budgets';
 import { code, readInterfaces, table } from './build-spec-22';
 
 export const SPEC_24_PATH = join(WEB_ROOT, '..', '..', 'docs', 'specs', 'v2', '24-fix-and-map.md');
@@ -188,7 +196,13 @@ function budgetSection(): string {
       [
         [
           `The crawl screen, three windows of ${WINDOW_MS / 1000} s`,
-          `no task over ${BUDGET.stallMs} ms; layout shift at most ${BUDGET.layoutShift}; 95th percentile frame at most ${BUDGET.p95FrameMs} ms; at most ${BUDGET.slowShare * 100}% of frames over ${BUDGET.slowFrameMs} ms; none over ${BUDGET.maxFrameMs} ms`,
+          `no task over ${BUDGET.stallMs} ms; layout shift at most ${BUDGET.layoutShift}; the crawl map writing at most ${MAP_WRITES_PER_FRAME} times per 60 Hz frame of replay (counted on a fake clock); the main thread busy, per 16.7 ms slice in a reference runner's milliseconds${MEAN_WORK_ADVISORY ? ' (advisory)' : ''}, on average at most ${Object.entries(
+            MEAN_WORK_MS,
+          )
+            .map(([name, ms]) => `${ms} ms (${name})`)
+            .join(
+              ', ',
+            )}, and at most ${BUDGET.p95WorkMs} ms in 95% of slices; no frame over ${BUDGET.maxFrameMs} ms`,
         ],
         [
           `The explorer, ${code(EXPLORER.path)}, ${EXPLORER.ms / 1000} s, a step down the list every ${EXPLORER.stepMs} ms`,
