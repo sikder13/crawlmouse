@@ -79,6 +79,7 @@ const ANONYMOUS: Record<
   'api/billing/checkout': { status: 401, body: { error: 'auth_required' } },
   'api/billing/portal': { status: 401, body: { error: 'auth_required' } },
   'api/billing/pro-trial/start': { status: 401, body: { code: 'auth_required' } },
+  'api/billing/seats': { status: 401, body: { code: 'auth_required' } },
   'api/billing/status': { status: 401, body: { pro: false } },
   'api/checks/[id]/claim': { status: 401, body: { code: 'auth_required' } },
   'api/fixes/[id]/done': { status: 401, body: { code: 'auth_required' } },
@@ -114,6 +115,8 @@ beforeEach(() => {
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
   vi.stubEnv('V2_PIPELINE', '1');
   vi.stubEnv('CRAWL_PAUSED', '');
+  // The seat purchase answers 404 with V2_BILLING unset, before it reads the session.
+  vi.stubEnv('V2_BILLING', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
 

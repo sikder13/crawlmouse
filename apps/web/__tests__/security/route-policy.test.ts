@@ -294,6 +294,7 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/billing/checkout',
       'api/billing/portal',
       'api/billing/pro-trial/start',
+      'api/billing/seats',
       'api/checks/[id]/cancel',
       'api/checks/[id]/claim',
       'api/fixes/[id]/done',

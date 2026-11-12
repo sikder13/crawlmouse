@@ -347,6 +347,8 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     reason: "the restore link's token, from its HttpOnly cookie, is the credential (D4)",
     origin: 'strict',
   },
+  // CC-31 workstream A: extra seats and sites on the Agency subscription (D4).
+  { route: 'api/billing/seats', methods: ['POST'], class: 'member', origin: 'strict' },
   // CC-31 workstream A: seats and invitations (D3). A seat's own routes sit under `id/`, so no path
   // here matches two rows (`api/seats/accept` would also match a seat id directly under `seats`).
   { route: 'api/seats', methods: ['POST'], class: 'member', origin: 'strict' },
