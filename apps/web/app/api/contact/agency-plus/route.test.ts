@@ -182,23 +182,39 @@ describe('POST /api/contact/agency-plus', () => {
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  it('is a 404 with V2_BILLING unset', async () => {
-    vi.stubEnv('V2_BILLING', '');
+  // The mailer and the purge register only with V2_CHECKS_PUBLIC=1 (lib/v2/pipeline/functions.ts), so
+  // a request stored without it would be neither mailed nor deleted: the form needs both flags.
+  it.each([
+    ['', '', 404],
+    ['1', '', 404],
+    ['', '1', 404],
+    ['1', '1', 200],
+  ])('V2_BILLING=%j, V2_CHECKS_PUBLIC=%j: %i', async (billing, checksPublic, status) => {
+    vi.stubEnv('V2_BILLING', billing);
+    vi.stubEnv('V2_CHECKS_PUBLIC', checksPublic);
+    vi.stubEnv('TURNSTILE_SECRET_KEY', 'set');
     const { POST } = await import('./route');
-    expect((await POST(request(GOOD))).status).toBe(404);
-    expect(r.inserted).toEqual([]);
-    expect(r.buckets).toEqual([]);
+    const req = new Request('https://crawlmouse.com/api/contact/agency-plus', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.4' },
+      body: JSON.stringify(GOOD),
+    });
+    expect((await POST(req)).status).toBe(status);
+    const served = status === 200 ? 1 : 0;
+    expect([r.inserted.length, r.sent.length, r.buckets.length]).toEqual([served, served, served]);
   });
 
   it('a body that is not JSON is a 400', async () => {
     vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
     const { POST } = await import('./route');
     expect((await POST(request(null, 'email=a'))).status).toBe(400);
     expect(r.inserted).toEqual([]);
   });
 
-  it('with the flag on, stores the row in contact_requests and sends the event', async () => {
+  it('with both flags on, stores the row in contact_requests and sends the event', async () => {
     vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
     vi.stubEnv('TURNSTILE_SECRET_KEY', 'set');
     const { POST } = await import('./route');
     const req = new Request('https://crawlmouse.com/api/contact/agency-plus', {

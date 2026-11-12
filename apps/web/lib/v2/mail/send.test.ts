@@ -13,6 +13,7 @@ import type { MailLedger } from './ledger';
 import { memoryLedger, type MemoryLedger } from './memory';
 import { keyRef, MailRetry, send, type MailDeps, type SendRequest } from './send';
 import { resendTransport, type MailTransport, type TransportResult } from './transport';
+import { AGENCY_PLUS_INBOX } from './templates/agency-plus-contact';
 import { ACCOUNT_KINDS, MAIL_KINDS, OWN_INBOX_KINDS, type OutgoingMail } from './types';
 
 const PEPPER = 'p'.repeat(40);
@@ -143,6 +144,28 @@ describe('send: claim before send (D1)', () => {
       ),
     ).toBe('sent');
     expect(t.sent.map((m) => m.idempotencyKey)).toEqual(['tr']);
+  });
+
+  it('sends own-inbox mail to our inbox only: any other address is refused before any claim', async () => {
+    expect(OWN_INBOX_KINDS.size).toBeGreaterThan(0);
+    for (const kind of OWN_INBOX_KINDS) {
+      const { d, mem, t, log } = deps();
+      for (const to of ['buyer@agency.example', AGENCY_PLUS_INBOX.toUpperCase(), 'support@x.co']) {
+        expect(await send(d, request({ kind, to, idempotencyKey: `${kind}:${to}` }))).toBe(
+          'invalid_address',
+        );
+      }
+      expect(mem.claims).toHaveLength(0);
+      expect(t.sent).toHaveLength(0);
+      expect(log).toHaveBeenCalledWith('mail.invalid_address', expect.objectContaining({ kind }));
+      expect(await send(d, request({ kind, to: AGENCY_PLUS_INBOX, idempotencyKey: kind }))).toBe(
+        'sent',
+      );
+      expect(t.sent.map((m) => m.to)).toEqual([AGENCY_PLUS_INBOX]);
+    }
+    // Any other kind still goes to the address it names.
+    const { d } = deps();
+    expect(await send(d, request({ to: 'buyer@agency.example' }))).toBe('sent');
   });
 
   it('refuses an address that is not a plain one, before any claim', async () => {

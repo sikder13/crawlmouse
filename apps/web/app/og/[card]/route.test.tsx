@@ -20,13 +20,23 @@ vi.mock('next/og', () => ({
   },
 }));
 
+// The card module as it is, with its response function watched: the route's own gate answers before it.
+vi.mock('@/lib/v2/social-card', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/v2/social-card')>();
+  return { ...real, socialCardResponse: vi.fn(real.socialCardResponse) };
+});
+
 const { GET } = await import('./route');
-const { CARD_TOKENS, SOCIAL_CARDS, socialCardPath } = await import('@/lib/v2/social-card');
+const { CARD_TOKENS, SOCIAL_CARDS, socialCardPath, socialCardResponse } =
+  await import('@/lib/v2/social-card');
 const { AGENCIES_COPY } = await import('@/lib/v2/copy/agencies');
 const { CHECK_COPY } = await import('@/lib/v2/copy/check-pages');
 const { DEVELOPERS_COPY } = await import('@/lib/v2/copy/developers');
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.mocked(socialCardResponse).mockClear();
+});
 
 const get = (card: string) =>
   GET(new Request(`https://crawlmouse.com/og/${card}`), {
@@ -57,7 +67,11 @@ describe('GET /og/<card>', () => {
     ALL_ON();
     const res = await get(card);
     expect(res.status).toBe(200);
-    expect(res.options).toEqual({ width: 1200, height: 630 });
+    expect(res.options).toEqual({
+      width: 1200,
+      height: 630,
+      headers: { 'CDN-Cache-Control': 'public, max-age=86400' },
+    });
     const markup = renderToStaticMarkup(res.element!).replace(/&#x27;/g, "'");
     expect(markup).toContain(`>${title}<`);
     expect(markup).toContain(`crawlmouse.com${SOCIAL_CARDS[card]!.path}`);
@@ -68,7 +82,38 @@ describe('GET /og/<card>', () => {
   it.each(TITLES)('%s: a 404 while its page’s flag is off', async (card, _title, flag) => {
     ALL_ON();
     vi.stubEnv(flag, '');
-    expect((await get(card)).status).toBe(404);
+    const res = await get(card);
+    expect(res.status).toBe(404);
+    // Nothing tells the CDN to keep the 404, so the card is served once its flag is back on.
+    expect(res.headers.get('cdn-cache-control')).toBeNull();
+  });
+
+  it('Next’s ImageResponse sends the CDN header beside its own Cache-Control', async () => {
+    ALL_ON();
+    const res = await get('pricing');
+    const { ImageResponse } = await vi.importActual<typeof import('next/og')>('next/og');
+    const real = new ImageResponse(
+      res.element!,
+      res.options as ConstructorParameters<typeof ImageResponse>[1],
+    );
+    await real.body?.cancel();
+    expect(real.headers.get('cdn-cache-control')).toBe('public, max-age=86400');
+    expect(real.headers.get('cache-control')).toBe(
+      'public, immutable, no-transform, max-age=31536000',
+    );
+    expect(real.headers.get('content-type')).toBe('image/png');
+  });
+
+  it('with both flags off, a 404 for every card without asking the card table', async () => {
+    vi.stubEnv('V2_BILLING', '');
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    for (const card of [...Object.keys(SOCIAL_CARDS), 'home']) {
+      expect((await get(card)).status).toBe(404);
+    }
+    expect(socialCardResponse).not.toHaveBeenCalled();
+    vi.stubEnv('V2_BILLING', '1');
+    await get('pricing');
+    expect(socialCardResponse).toHaveBeenCalledWith('pricing');
   });
 
   it.each(['', 'home', 'v2-pricing', 'check-other', '__proto__', 'constructor', 'toString'])(

@@ -75,8 +75,11 @@ export interface MailStore {
   contactRequest(contactId: string): Promise<ContactRequest | null>;
   /** Sets `contact_requests.sent_at` when it is not set. */
   markContactSent(contactId: string, at: Date): Promise<void>;
-  /** `purge_sent_contact_requests`: deletes the requests sent more than 30 days before `now`; the count. */
-  purgeSentContacts(now: Date): Promise<number>;
+  /**
+   * `purge_contact_requests`: deletes the requests sent more than 30 days before `now`, and the unsent
+   * ones made more than 30 days before it; the count.
+   */
+  purgeContacts(now: Date): Promise<number>;
 }
 
 const fail = (what: string, error: { code?: string } | null): never => {
@@ -252,9 +255,9 @@ export function supabaseMailStore(sb: SupabaseClient): MailStore {
       if (r.error) fail('contact_requests update', r.error);
     },
 
-    async purgeSentContacts(now) {
-      const r = await sb.rpc('purge_sent_contact_requests', { p_now: now.toISOString() });
-      if (r.error) fail('purge_sent_contact_requests', r.error);
+    async purgeContacts(now) {
+      const r = await sb.rpc('purge_contact_requests', { p_now: now.toISOString() });
+      if (r.error) fail('purge_contact_requests', r.error);
       return z.number().int().nonnegative().parse(r.data);
     },
   };

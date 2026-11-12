@@ -12,8 +12,8 @@
  * - fixToDeveloperFn, on `fix.email_developer_requested`.
  * - checkFinishedEventFn, on `check.finished`: the product event `check_finished`, once per check
  *   (Inngest's idempotency on the check id, and one step).
- * - contactPurgeFn, daily: deletes the Agency Plus requests sent more than 30 days ago
- *   (`purge_sent_contact_requests`, migration 20261114000001); an unsent request is kept.
+ * - contactPurgeFn, daily: deletes the Agency Plus requests sent more than 30 days ago, and the unsent
+ *   ones made more than 30 days ago (`purge_contact_requests`, migration 20261114000001).
  *
  * Each runs its handler in one step. A `MailRetry` (a send worth retrying, or a claim another worker
  * holds) is thrown on, so Inngest retries the step; any other error is logged by name and the step
@@ -130,7 +130,7 @@ export function createCheckFinishedEventFn(handlers: () => MailHandlers) {
 }
 
 /**
- * The daily deletion of sent Agency Plus requests: one step, whose answer is the count deleted. Safe to
+ * The daily deletion of Agency Plus requests: one step, whose answer is the count deleted. Safe to
  * run again: a retried step deletes what is still past the line.
  */
 export function createContactPurgeFn(purge: () => Promise<number>) {
@@ -138,6 +138,6 @@ export function createContactPurgeFn(purge: () => Promise<number>) {
     { id: CONTACT_PURGE_FN_ID, concurrency: { limit: 1 } },
     // Off the hour, and away from v1's cleanup (04:00), the reconcile (03:00) and the expiry (05:17).
     { cron: '43 5 * * *' },
-    async ({ step }) => ({ deleted: await step.run('purge-sent', () => purge()) }),
+    async ({ step }) => ({ deleted: await step.run('purge', () => purge()) }),
   );
 }

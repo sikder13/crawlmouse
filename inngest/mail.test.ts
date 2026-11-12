@@ -138,7 +138,7 @@ describe('CC-29: the Agency Plus request and its deletion', () => {
     expect((c.concurrency as { limit: number }).limit).toBe(1);
     const { step, ran } = steps();
     expect(await handler(fn)({ step })).toEqual({ deleted: 3 });
-    expect(ran).toEqual(['purge-sent']);
+    expect(ran).toEqual(['purge']);
     expect(purge).toHaveBeenCalledTimes(1);
   });
 });

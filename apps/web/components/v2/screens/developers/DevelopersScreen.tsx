@@ -21,7 +21,8 @@ export type DevelopersAudit = 'live' | 'preview' | 'home-link';
 /**
  * Developers, v2 (Final-Developers, CC-29 D5). The one orange element is the closing audit's
  * button, as the artboard draws it; the developer list's button is neutral. The read API's card
- * carries the "coming" mark; the roadmap keeps the artboard's statuses, which are plans.
+ * carries the "coming" mark. The roadmap renders the statuses in lib/v2/copy/developers.ts: the
+ * artboard's, except "Write API" and "MCP server", which read "planned" (rulings-3 Q37).
  */
 export function DevelopersScreen({
   data,

@@ -13,7 +13,8 @@
  * - "unsubscribe in one click" is cut from the developer list's promise: the list has no unsubscribe
  *   link today.
  * - The roadmap's "Write API" and "MCP server" rows read "planned", not the artboard's "building"
- *   (owner ruling, rulings-3 Q37); the other rows keep the artboard's statuses.
+ *   (owner ruling, rulings-3 Q37); the other rows keep the artboard's statuses. The roadmap's heading,
+ *   the intro and the description say what follows the read API is planned, not being built.
  */
 
 /** The read API's rate limit and key prefix (FACTS A4, DECISION J13); no plan gate holds them. */

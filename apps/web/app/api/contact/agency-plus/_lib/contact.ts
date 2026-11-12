@@ -1,10 +1,10 @@
 /**
  * The Agency Plus contact form (CC-29 D2, FACTS A3: a contact form only, nothing built behind it).
- * The route answers 404 while V2_BILLING is off and reads the JSON body; this takes it from there,
- * in order: a strict body; a per-IP daily limit; Turnstile when
- * it is enforced (`turnstileEnforced`: a secret is set, or this is production); then the request is
- * stored with the service role and `email.requested {template: 'agency_plus_contact', contactId}`
- * names the row for the mailer. The address is in the row only, never in the event.
+ * The route answers 404 unless V2_BILLING and V2_CHECKS_PUBLIC are both on, and reads the JSON
+ * body; this takes it from there, in order: a strict body; a per-IP daily limit; Turnstile when it is
+ * enforced (`turnstileEnforced`: a secret is set, or this is production); then the request is stored
+ * with the service role and `email.requested {template: 'agency_plus_contact', contactId}` names the
+ * row for the mailer. The address is in the row only, never in the event.
  */
 import { z } from 'zod';
 

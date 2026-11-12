@@ -22,6 +22,7 @@ import { supabaseMailStore } from '../lib/v2/mail/store';
 
 const MIGRATION = '20261114000001_v2_029_public_pages.sql';
 const ROLLBACK = '20261114000001_v2_029_public_pages.revert.sql';
+const ROLLBACK_028 = '20261113000001_v2_028_monitoring.revert.sql';
 
 let db: PGlite;
 beforeAll(async () => {
@@ -326,27 +327,45 @@ describe('contact_requests: the mail store reads, marks and deletes them (CC-29,
     expect((await store().contactRequest(id))!.sentAt).toBe(NOW.toISOString());
   });
 
-  it('deletes the requests sent more than 30 days before now, and keeps the rest', async () => {
-    const old = await request(new Date(NOW.getTime() - 30 * DAY - 1000));
-    const edge = await request(new Date(NOW.getTime() - 30 * DAY));
-    const recent = await request(new Date(NOW.getTime() - 29 * DAY));
-    const unsentOld = await request(null);
-    await db.query(`update public.contact_requests set created_at = $2 where id = $1`, [
-      unsentOld,
-      new Date(NOW.getTime() - 400 * DAY).toISOString(),
-    ]);
-    const deleted = await store().purgeSentContacts(NOW);
-    expect(deleted).toBeGreaterThanOrEqual(1);
-    expect(await exists(old)).toBe(false);
-    expect(await exists(edge)).toBe(true);
-    expect(await exists(recent)).toBe(true);
-    expect(await exists(unsentOld)).toBe(true);
-    expect(await store().purgeSentContacts(NOW)).toBe(0);
+  // A sent row goes 30 days after sent_at, an unsent one 30 days after created_at: the line is strict,
+  // so a row exactly 30 days old is kept and one a millisecond older is deleted.
+  it('deletes each request 30 days after it was sent, or after it was made when it was not', async () => {
+    const ago = (ms: number) => new Date(NOW.getTime() - ms);
+    const made = async (createdAt: Date, sentAt: Date | null) => {
+      const id = await request(sentAt);
+      await db.query(`update public.contact_requests set created_at = $2 where id = $1`, [
+        id,
+        createdAt.toISOString(),
+      ]);
+      return id;
+    };
+    const rows = {
+      sentPast: await made(ago(31 * DAY), ago(30 * DAY + 1)),
+      sentEdge: await made(ago(31 * DAY), ago(30 * DAY)),
+      sentRecentMadeLongAgo: await made(ago(400 * DAY), ago(29 * DAY)),
+      unsentPast: await made(ago(30 * DAY + 1), null),
+      unsentEdge: await made(ago(30 * DAY), null),
+      unsentRecent: await made(ago(29 * DAY), null),
+    };
+    const deleted = await store().purgeContacts(NOW);
+    expect(deleted).toBeGreaterThanOrEqual(2);
+    const kept = Object.fromEntries(
+      await Promise.all(Object.entries(rows).map(async ([k, id]) => [k, await exists(id)])),
+    );
+    expect(kept).toEqual({
+      sentPast: false,
+      sentEdge: true,
+      sentRecentMadeLongAgo: true,
+      unsentPast: false,
+      unsentEdge: true,
+      unsentRecent: true,
+    });
+    expect(await store().purgeContacts(NOW)).toBe(0);
   });
 
   it.each(['anon', 'authenticated'] as const)('%s cannot run the deletion', async (role) => {
     await expect(
-      asRole(db, role, null, (tx) => tx.query('select public.purge_sent_contact_requests(now())')),
+      asRole(db, role, null, (tx) => tx.query('select public.purge_contact_requests(now())')),
     ).rejects.toThrow(/permission denied/);
   });
 });
@@ -394,12 +413,24 @@ describe('the rollback', () => {
   it('removes what the migration adds, twice over, and the migration applies again', async () => {
     const own = await freshDb();
     try {
-      await applyAllMigrations(own);
+      const kindCheck = async () =>
+        (
+          await own.query<{ def: string }>(
+            `select pg_get_constraintdef(oid) as def from pg_constraint
+              where conrelid = 'public.email_sends'::regclass and conname = 'email_sends_kind_check'`,
+          )
+        ).rows.map((r) => r.def);
+      // CC-28's check as it stands before this migration, to hold the rollback's restore to.
+      await applyAllMigrations(own, undefined, (f) => f < MIGRATION);
+      const before = await kindCheck();
+      expect(before).toHaveLength(1);
+      expect(before[0]).not.toContain('agency_plus_contact');
+      await applyAllMigrations(own, undefined, (f) => f >= MIGRATION);
       const present = async () =>
         (
           await own.query<{ n: number }>(
             `select (select count(*) from pg_proc where proname = 'start_agency_trial_account')
-                  + (select count(*) from pg_proc where proname = 'purge_sent_contact_requests')
+                  + (select count(*) from pg_proc where proname = 'purge_contact_requests')
                   + (select count(*) from pg_constraint
                       where conname = 'email_sends_kind_check'
                         and pg_get_constraintdef(oid) like '%agency_plus_contact%')
@@ -422,16 +453,35 @@ describe('the rollback', () => {
       await own.exec(readRollback(ROLLBACK));
       await own.exec(readRollback(ROLLBACK));
       expect(Number(await present())).toBe(0);
-      // CC-28's eight-kind check is back, with exactly one email_sends kind check in force.
-      const checks = await own.query<{ def: string }>(
-        `select pg_get_constraintdef(oid) as def from pg_constraint
-          where conrelid = 'public.email_sends'::regclass and conname = 'email_sends_kind_check'`,
-      );
-      expect(checks.rows).toHaveLength(1);
-      expect(checks.rows[0]!.def).toContain('weekly_summary');
+      // CC-28's check is back exactly as it was before this migration, and the only one in force.
+      expect(await kindCheck()).toEqual(before);
       await own.exec(readMigration(MIGRATION));
       await own.exec(readMigration(MIGRATION));
       expect(Number(await present())).toBe(9);
+    } finally {
+      await own.close();
+    }
+  }, 300_000);
+
+  // db-rollback-prod.yml runs one file at a time, so the owner can revert 028 first.
+  it('runs, twice over, after 028 has been reverted', async () => {
+    const own = await freshDb();
+    try {
+      await applyAllMigrations(own);
+      await own.exec(readRollback(ROLLBACK_028));
+      await own.exec(readRollback(ROLLBACK));
+      await own.exec(readRollback(ROLLBACK));
+      const { rows } = await own.query<{
+        sends: string | null;
+        contacts: string | null;
+        n: number;
+      }>(
+        `select pg_catalog.to_regclass('public.email_sends')::text as sends,
+                pg_catalog.to_regclass('public.contact_requests')::text as contacts,
+                (select count(*) from pg_proc
+                  where proname in ('purge_contact_requests', 'start_agency_trial_account'))::int as n`,
+      );
+      expect(rows[0]).toEqual({ sends: null, contacts: null, n: 0 });
     } finally {
       await own.close();
     }
