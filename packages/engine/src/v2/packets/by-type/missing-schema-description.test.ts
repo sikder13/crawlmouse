@@ -39,7 +39,7 @@ describe('missing_schema_description: what the packet says', () => {
 
   it('states the extent and the failing pages from the record', () => {
     expect(packet.context[0]).toBe(
-      'The check `schema_with_description` fails on 2 of the 13 pages of the template `/blog/{slug}` it was decided on.',
+      'The check for structured data with a description fails on 2 of the 13 pages of the template `/blog/{slug}` it was decided on.',
     );
     expect(packet.context).toContain(
       'Failing pages: `https://shop.test/blog/a`, `https://shop.test/blog/b`.',

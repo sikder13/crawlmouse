@@ -36,7 +36,7 @@ describe('the lines every content packet opens with', () => {
 
   it('are the extent, the caller’s rule, the failing pages and the grade line, in that order', () => {
     expect(contentContext(record, contentFacts(), [rule]).map(textOf)).toEqual([
-      'The check `direct_answer_150` fails on 2 of the 3 pages of the template `/guides/{slug}` it was decided on.',
+      'The check for a quotable opening sentence fails on 2 of the 3 pages of the template `/guides/{slug}` it was decided on.',
       'The rule.',
       'Failing pages: `https://shop.test/guides/a`, `https://shop.test/guides/b`.',
       'The check does not count towards a grade yet, so this fix moves no grade today.',

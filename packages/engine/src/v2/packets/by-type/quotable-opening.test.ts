@@ -49,7 +49,7 @@ describe('quotable_opening: what the packet says', () => {
 
   it('quotes nothing from the pages: the record holds no page text', () => {
     expect(packet.context[0]).toBe(
-      'The check `direct_answer_150` fails on 2 of the 13 pages of the template `/blog/{slug}` it was decided on.',
+      'The check for a quotable opening sentence fails on 2 of the 13 pages of the template `/blog/{slug}` it was decided on.',
     );
     expect(packet.keep.join(' ')).toMatch(/already says/);
   });

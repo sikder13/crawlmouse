@@ -15,6 +15,7 @@ import {
 } from './by-type/client-rendered-template.js';
 import { jsOnlyNavigation } from './by-type/js-only-navigation.js';
 import { compose } from './compose.js';
+import { identifiersIn } from './test-support/content.js';
 import { NO_STACK } from './test-support/facts.js';
 import { hostileText, outsideCodeSpans, UNSHOWN } from './test-support/hostile.js';
 import {
@@ -73,7 +74,13 @@ function detected(base: string, rendered: [number, number][], more = 0): Rendere
 }
 
 const allText = (p: ReturnType<typeof compose>) =>
-  [p, ...p.packets].flatMap((b) => [...b.context, ...b.change, ...b.keep, b.verify.expect]);
+  [p, ...p.packets].flatMap((b) => [
+    ...b.context,
+    ...b.change,
+    ...b.keep,
+    b.verify.expect,
+    ...(b.verify.see ? [b.verify.see.today, b.verify.see.after] : []),
+  ]);
 
 describe('the client-rendered template packet, from its record', () => {
   it('states the template, the pages rendered of the pages graded, and the words of each rendered page', () => {
@@ -103,6 +110,13 @@ describe('the client-rendered template packet, from its record', () => {
       'Find what adds the content of the pages of `/guides/{slug}` in the browser. The audit measured the words, not what adds them.',
     );
     for (const body of p.packets) expect(body.change[0], body.framework).toMatch(/^Find what adds/);
+  });
+
+  it('shows no identifier of ours: every value is said in words', () => {
+    for (const crawlers of [SERVED, []]) {
+      const p = compose(builder, detected('https://a.test', [[41, 312]], 3), factsOf(crawlers));
+      for (const text of allText(p)) expect(identifiersIn(text), text).toEqual([]);
+    }
   });
 
   it('says one page in the singular, and two in the plural', () => {

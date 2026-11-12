@@ -78,9 +78,17 @@ export const EDGE_VENDOR_SOURCES: readonly DocSource[] = [
   },
 ];
 
-/** A cause the rows name, in words; a cause with no entry is shown as recorded. */
-const CAUSE_TEXT: Readonly<Partial<Record<AccessCause, string>>> = {
+/** Each cause a row can name, in words: a cause the contract adds does not compile without its own. */
+const CAUSE_TEXT: Readonly<Record<AccessCause, string>> = {
   cloudflare_1020: 'Cloudflare’s error 1020',
+  bot_fight_mode: 'a Bot Fight Mode challenge',
+  client_rendered_template: 'a template whose text is added in the browser',
+  robots_txt_disallow: 'a Disallow rule in robots.txt',
+  automation_challenge: 'a challenge the edge serves to automated requests of any user agent',
+  rate_limit_429: 'a rate limit (status 429)',
+  pay_per_crawl_402: 'a request for payment to crawl (status 402)',
+  cross_host_redirect: 'a redirect to another host',
+  verified_bot_only: 'a rule that admits the crawler only from its verified addresses',
 };
 
 /**
@@ -141,7 +149,7 @@ function context(record: AccessDetection, facts: PacketFacts): Line[] {
 
   const causes = [...new Set(record.evidence.causes)]
     .sort(byOrder)
-    .map((c) => (Object.hasOwn(CAUSE_TEXT, c) ? ours(CAUSE_TEXT[c]!) : code(c)));
+    .map((c) => ours(CAUSE_TEXT[c]));
   lines.push(
     causes.length > 0
       ? line`Cause the responses name: ${list(causes, causes.length, 'cause')}.`

@@ -1,6 +1,11 @@
 import fc from 'fast-check';
 import { afterEach, describe, expect, it } from 'vitest';
-import { FixPacketSchema, type AccessTest, type PageResult } from '@crawlmouse/types/v2';
+import {
+  AccessCauseSchema,
+  FixPacketSchema,
+  type AccessTest,
+  type PageResult,
+} from '@crawlmouse/types/v2';
 import { MITIGATION_HEADERS } from '../../../../worker/src/verdict/response.js';
 import { accessRow } from '../../../fixtures/v2/build/rows.js';
 import type { AccessDetection } from '../access/types.js';
@@ -14,6 +19,7 @@ import {
 } from './by-type/edge-rule-blocks-crawler.js';
 import { compose } from './compose.js';
 import { userAgentOf } from './crawler.js';
+import { identifiersIn } from './test-support/content.js';
 import { NO_STACK } from './test-support/facts.js';
 import { hostileText, outsideCodeSpans, UNSHOWN } from './test-support/hostile.js';
 import type { RequestListener } from 'node:http';
@@ -104,7 +110,13 @@ const CLOUDFLARE: PacketFacts['stack'] = {
 
 const SITE_PAGES = Array.from({ length: 8 }, (_, i) => `https://a.test/p/${i}`);
 const allText = (p: ReturnType<typeof compose>) =>
-  [p, ...p.packets].flatMap((b) => [...b.context, ...b.change, ...b.keep, b.verify.expect]);
+  [p, ...p.packets].flatMap((b) => [
+    ...b.context,
+    ...b.change,
+    ...b.keep,
+    b.verify.expect,
+    ...(b.verify.see ? [b.verify.see.today, b.verify.see.after] : []),
+  ]);
 
 describe('the edge-rule packet, from its record', () => {
   it('states the crawler, the pages refused of the pages judged, and what the rows show', () => {
@@ -134,6 +146,34 @@ describe('the edge-rule packet, from its record', () => {
     expect(context).toContain('Cause the responses name: Cloudflare’s error 1020.');
     expect(context).toContain('Response headers: `cf-ray`, `server: cloudflare`.');
     expect(context.join('\n')).not.toMatch(/Crawlmouse tag|no product/);
+  });
+
+  it.each(AccessCauseSchema.options)('says the cause %s in words', (cause) => {
+    const { record, rows } = detected({
+      crawler: 'PerplexityBot',
+      pages: SITE_PAGES.slice(0, 2),
+      cause,
+      signatures: ['cf-ray', 'server: cloudflare'],
+    });
+    for (const stack of [NO_STACK, CLOUDFLARE]) {
+      const p = compose(builder, record, factsOf(rows, stack));
+      const named = p.context.find((l) => l.startsWith('Cause the responses name: '))!;
+      expect(named).not.toContain('`');
+      for (const text of allText(p)) expect(identifiersIn(text), text).toEqual([]);
+    }
+  });
+
+  it('says each cause once', () => {
+    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES.slice(0, 3) });
+    const causes = ['rate_limit_429', 'cloudflare_1020', 'rate_limit_429'] as const;
+    const { context } = compose(
+      builder,
+      { ...record, evidence: { ...record.evidence, causes: [...causes] } },
+      factsOf(rows),
+    );
+    expect(context).toContain(
+      'Cause the responses name: Cloudflare’s error 1020, a rate limit (status 429).',
+    );
   });
 
   it('names no URL its record does not hold', () => {

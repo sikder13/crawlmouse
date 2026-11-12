@@ -7,6 +7,7 @@
  * says, so a packet states the check's rule (from content/thresholds.ts) and names the pages; it
  * quotes nothing from them.
  */
+import type { ContentCheck } from '@crawlmouse/types/v2';
 import type { ContentDetection } from '../content/aggregate.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
 import { CHROME } from '../content/thresholds.js';
@@ -38,6 +39,15 @@ export const template = (fix: ContentDetection): Safe => code(fix.template_key, 
 
 const pages = (n: number): Safe => ours(n === 1 ? 'page' : 'pages');
 
+/** What each content check looks for, in words: a check the contract adds does not compile without its own. */
+const CHECK_LOOKS_FOR: Readonly<Record<ContentCheck, string>> = {
+  direct_answer_150: 'a quotable opening sentence',
+  question_headings: 'a heading phrased as a question',
+  schema_with_description: 'structured data with a description',
+  author_and_date: 'an author and a publication date in markup',
+  specs_as_text: 'specifications as text',
+};
+
 /** The page a content packet's command requests: the first failing page of the record. */
 export function firstFailingPage(fix: ContentDetection): string {
   const [first] = fix.affected_urls;
@@ -66,7 +76,7 @@ export function contentContext(
 ): Line[] {
   const { failing, of, unread } = fix.extent;
   return [
-    line`The check ${code(fix.check)} fails on ${count(failing)} of the ${count(of)} ${pages(of)} of the template ${template(fix)} it was decided on.`,
+    line`The check for ${ours(CHECK_LOOKS_FOR[fix.check])} fails on ${count(failing)} of the ${count(of)} ${pages(of)} of the template ${template(fix)} it was decided on.`,
     ...rule,
     ...(unread > 0
       ? [

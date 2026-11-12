@@ -32,7 +32,7 @@ describe('missing_author_date: what the packet says', () => {
 
   it('states the extent from the record and what the check reads', () => {
     expect(packet.context[0]).toBe(
-      'The check `author_and_date` fails on 2 of the 13 pages of the template `/blog/{slug}` it was decided on.',
+      'The check for an author and a publication date in markup fails on 2 of the 13 pages of the template `/blog/{slug}` it was decided on.',
     );
     const text = packet.context.join(' ');
     for (const read of [

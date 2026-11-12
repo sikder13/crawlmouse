@@ -107,9 +107,36 @@ export const servedRow = (
 export const engineVerdict = (type: ContentFixType, html: string): PageVerdict =>
   CONTENT_CHECKS[checkOf(type)].judge(readPage(html));
 
-/** Every string of a packet a reader is shown, over its own body and its other stacks' bodies. */
+/**
+ * Every string of a packet a reader is shown, over its own body and its other stacks' bodies: the
+ * sections, `expect`, and what the readable command prints today and after the fix.
+ */
 export const shownText = (p: FixPacket): string[] =>
-  [p, ...p.packets].flatMap((b) => [...b.context, ...b.change, ...b.keep, b.verify.expect]);
+  [p, ...p.packets].flatMap((b) => [
+    ...b.context,
+    ...b.change,
+    ...b.keep,
+    b.verify.expect,
+    ...(b.verify.see ? [b.verify.see.today, b.verify.see.after] : []),
+  ]);
+
+/** Names a platform gave its own markup or API, which a packet prints as the platform spells them. */
+const PLATFORM_NAMES = [
+  'the_author_posts_link',
+  'article:published_time',
+  'get_the_time',
+  'the_time',
+  'the_date',
+];
+
+/**
+ * The snake_case words of `text`, the shape of this repository's enum values and keys, less the
+ * platform's own names. A packet shows none: each is said in words.
+ */
+export function identifiersIn(text: string): string[] {
+  const ours = PLATFORM_NAMES.reduce((t, name) => t.replaceAll(name, ''), text);
+  return ours.match(/[a-z]+_[a-z_]+/g) ?? [];
+}
 
 const open: TwoStateSite[] = [];
 
@@ -294,6 +321,18 @@ const CUT_NOTE = / \(cut from \d+ characters\)/g;
 export function contentPacketProperties(type: ContentFixType): void {
   const framework = fc.constantFrom(null, ...PacketFrameworkSchema.options);
   const served = fc.constantFrom('every_crawler' as const, 'no_crawler' as const);
+
+  describe(`${type}: no identifier of ours in the text`, () => {
+    it.each([null, ...PacketFrameworkSchema.options])(
+      'says the check and every value in words (stack: %s)',
+      (f) => {
+        for (const s of ['every_crawler', 'no_crawler'] as const) {
+          const p = writePacket(type, contentRecord(type), contentFacts(s, f))!;
+          for (const text of shownText(p)) expect(identifiersIn(text), text).toEqual([]);
+        }
+      },
+    );
+  });
 
   describe(`${type}: properties over hostile records`, () => {
     it('gives the same packet, byte for byte, for the same record and facts', () => {
