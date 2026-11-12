@@ -309,12 +309,15 @@ describe('scheduleTickFn steps (D4)', () => {
         next: NEXT,
       })),
     };
-    const deps = fakeDeps([full, { global: GLOBAL, sites: [{ siteId: A, slot: SLOT, next: NEXT }] }], {
-      request: async (s) => {
-        if (s.siteId === A) throw new Error('down');
-        return { checkId: 'x', created: true };
+    const deps = fakeDeps(
+      [full, { global: GLOBAL, sites: [{ siteId: A, slot: SLOT, next: NEXT }] }],
+      {
+        request: async (s) => {
+          if (s.siteId === A) throw new Error('down');
+          return { checkId: 'x', created: true };
+        },
       },
-    });
+    );
     await inngestLike().execute(handlerOf(deps));
     expect(deps.claim).toHaveBeenCalledTimes(1);
     expect(deps.release).toHaveBeenCalledTimes(1);

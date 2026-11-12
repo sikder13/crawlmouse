@@ -399,10 +399,7 @@ async function claim(now: string, limit: number, s: Slot) {
       account_id: string;
       slot: Date;
       next_at: Date;
-    }>(
-      `select * from public.claim_due_sites($1, $2, $3)`,
-      [now, limit, JSON.stringify(s)],
-    );
+    }>(`select * from public.claim_due_sites($1, $2, $3)`, [now, limit, JSON.stringify(s)]);
     return rows;
   });
 }
@@ -608,7 +605,9 @@ describe('release_scheduled_claim (owner ruling Q9)', () => {
     const s = slot();
     const [claimed] = await claim(NOW, 50, s);
     expect(await countOf(s)).toBe(1);
-    expect(await release(id, claimed!.slot.toISOString(), claimed!.next_at.toISOString(), s)).toEqual({
+    expect(
+      await release(id, claimed!.slot.toISOString(), claimed!.next_at.toISOString(), s),
+    ).toEqual({
       restored: true,
       slot_released: true,
     });
