@@ -85,7 +85,7 @@ describe('the alert email (D5, D3)', () => {
     const lines = mail.text.split('\n').filter((l) => l.startsWith('- '));
     expect(lines).toEqual([
       '- Problem: GPTBot: allowed → disallowed by robots.txt',
-      '- Changed: AI readability D → F (41 → 22)',
+      '- Problem: AI readability D → F (41 → 22)',
       '- Changed: 17 pages changed content',
       '- Resolved: 3 orphan pages now linked',
     ]);
