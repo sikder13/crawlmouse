@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { reportRobotsIndex, isReportGone, isReportClaimed } from './report-visibility';
 import type { PublicReportRow } from './reports';
+import { fixture } from './v2/fixtures';
+import { buildPublicSnapshot } from './v2/reports/build-snapshot';
+import { FIRST_AUDIT } from './v2/view/segment/test-helpers';
 
 // SPEC 04 §3/§8 (V5, V13-partial) + deploy-order safety. Robots + 404 gating derived from the report
 // row's visibility columns. Pre-migration (columns undefined) preserves today's indexed behavior;
@@ -37,8 +40,12 @@ describe('reportRobotsIndex', () => {
   });
 
   it('never indexes a hidden or taken-down report', () => {
-    expect(reportRobotsIndex(row({ indexable: true, claimed_at: 't', hidden_at: 't' }))).toBe(false);
-    expect(reportRobotsIndex(row({ indexable: true, claimed_at: 't', takedown_requested_at: 't' }))).toBe(false);
+    expect(reportRobotsIndex(row({ indexable: true, claimed_at: 't', hidden_at: 't' }))).toBe(
+      false,
+    );
+    expect(
+      reportRobotsIndex(row({ indexable: true, claimed_at: 't', takedown_requested_at: 't' })),
+    ).toBe(false);
   });
 });
 
@@ -60,5 +67,46 @@ describe('isReportClaimed', () => {
     expect(isReportClaimed(row({ claimed_at: 't' }))).toBe(true);
     expect(isReportClaimed(row({ claimed_at: null }))).toBe(false);
     expect(isReportClaimed(row({ claimed_at: undefined }))).toBe(true); // legacy rows were all verified
+  });
+});
+
+describe('isReportGone — a v2 report (CC-29)', () => {
+  const v2 = {
+    domain: 'example-outfitter.com',
+    grade: null,
+    score: null,
+    cms_detected: null,
+    orphan_count: null,
+    avg_depth: null,
+    takedown_requested_at: null,
+    created_at: '2026-11-12T00:00:00Z',
+    hidden_at: null,
+    report_snapshot: buildPublicSnapshot(
+      fixture('bad-site'),
+      FIRST_AUDIT['bad-site'],
+      '2026-11-12T18:00:00.000Z',
+    ) as unknown as PublicReportRow['report_snapshot'],
+  } satisfies PublicReportRow;
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('is gone with V2_CHECKS_PUBLIC off, so no v1 surface renders it', () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    expect(isReportGone(v2)).toBe(true);
+  });
+
+  it('is live with the flag on, although its grade column is null', () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    expect(isReportGone(v2)).toBe(false);
+  });
+
+  it('is gone when hidden or taken down, flag on', () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    expect(isReportGone({ ...v2, hidden_at: '2026-11-12T19:00:00Z' })).toBe(true);
+    expect(isReportGone({ ...v2, takedown_requested_at: '2026-11-12T19:00:00Z' })).toBe(true);
+  });
+
+  it('a v1 row with no grade stays gone with the flag on', () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    expect(isReportGone({ ...v2, report_snapshot: null })).toBe(true);
   });
 });

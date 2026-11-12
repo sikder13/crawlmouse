@@ -1,4 +1,6 @@
 import type { PublicReportRow } from './reports';
+import { checksPublicEnabled } from './auth/flags';
+import { isV2Snapshot } from './v2/reports/snapshot';
 
 // SPEC 04 §3/§8 — robots + 404 gating for a public report, derived from its visibility columns.
 // Deploy-order safety: when a column is `undefined` (a legacy/pre-Runbook-B read), preserve today's
@@ -6,12 +8,18 @@ import type { PublicReportRow } from './reports';
 // claimed + indexed. Post-migration, a NEW unclaimed report has `indexable=false`/`claimed_at=null`
 // (the guardrail default) → noindex.
 
-/** A report is GONE (render 404) when hidden, taken down, missing, or ungradeable. */
+/**
+ * A report is GONE (render 404) when hidden, taken down, missing, or ungradeable. A v2 report (CC-29)
+ * has no `grade` of its own (the insert trigger copies it from `audits`, and a v2 row names none): it
+ * is gone while V2_CHECKS_PUBLIC is off, so no v1 surface renders a v2 snapshot, and otherwise only
+ * when hidden or taken down.
+ */
 export function isReportGone(report: PublicReportRow | null): boolean {
-  if (!report || !report.grade) return true;
+  if (!report) return true;
   if (report.takedown_requested_at) return true;
   if (report.hidden_at) return true; // undefined (pre-migration) is falsy → not hidden
-  return false;
+  if (isV2Snapshot(report.report_snapshot)) return !checksPublicEnabled();
+  return !report.grade;
 }
 
 /** Claimed = domain-verified owner. Pre-migration rows (undefined) were all verified → claimed. */
