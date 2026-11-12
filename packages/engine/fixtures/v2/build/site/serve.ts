@@ -6,17 +6,35 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { whoSent } from '../../../../../worker/src/test-support/discriminators.js';
 import {
+  CLIENT_RENDERED,
   COLLECTIONS,
   EDGE_REFUSED,
+  guideWithIntro,
   pages,
   REDIRECT_TO,
+  renderedGuide,
+  renderedGuideWithIntro,
   ROBOTS_TXT,
   sitemapPaths,
   STAGE2_CRAWLER,
 } from './site.js';
 
-/** The request handler generate.ts serves the site with. `variant` adds one link (see generate.ts). */
-export function handler(variant: { linkRedirectTarget: boolean } = { linkRedirectTarget: false }) {
+/**
+ * How the site is served. Both false is the recorded fixture.
+ *   `linkRedirectTarget`  one more link, to the redirect chain's final URL (generate.ts `variant/`)
+ *   `guidesWithIntro`     the guides serve their heading and intro and leave their sections to a
+ *                         script (site.ts `guideWithIntro`), for the live proof (live-proof.ts)
+ */
+export interface SiteVariant {
+  linkRedirectTarget: boolean;
+  guidesWithIntro?: boolean;
+}
+
+/** What the server answers at each path under `variant`, and the rendered side of each guide. */
+export function servedSite(variant: SiteVariant): {
+  pages: ReturnType<typeof pages>;
+  renderedGuide: (path: string) => string;
+} {
   const site = pages();
   if (variant.linkRedirectTarget) {
     const c = site.get(`/collections/${COLLECTIONS[1]}`)!;
@@ -28,6 +46,18 @@ export function handler(variant: { linkRedirectTarget: boolean } = { linkRedirec
       ),
     });
   }
+  if (variant.guidesWithIntro) {
+    for (const g of CLIENT_RENDERED) site.set(g, { ...site.get(g)!, body: guideWithIntro(g) });
+  }
+  return {
+    pages: site,
+    renderedGuide: variant.guidesWithIntro ? renderedGuideWithIntro : renderedGuide,
+  };
+}
+
+/** The request handler generate.ts serves the site with. */
+export function handler(variant: SiteVariant = { linkRedirectTarget: false }) {
+  const site = servedSite(variant).pages;
   return (req: IncomingMessage, res: ServerResponse): void => {
     const path = req.url ?? '/';
     const who = whoSent(String(req.headers['user-agent'] ?? ''));

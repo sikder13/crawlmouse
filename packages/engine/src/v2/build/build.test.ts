@@ -48,6 +48,7 @@ import { readBatches } from './batches.js';
 import { buildCheck, serialiseBuilt } from './build.js';
 import { registryVersion } from './lineage.js';
 import { SUMMARY_BYTES } from './summaries.js';
+import { stackOf } from './record.js';
 import type { BuildInput } from './types.js';
 
 const EXPECTED = new URL('../../../fixtures/v2/build/expected.json', import.meta.url);
@@ -442,6 +443,18 @@ describe('what the built check holds, from its own rows', () => {
       .find((p) => p.url === HOST)!;
     expect(home.stack_signals!.cms).toBe('custom');
     expect(built.check.stack!.backend).toBeNull();
+  });
+
+  it('names the CMS the worker recognised as the backend, and no front end: nothing recorded tells one', () => {
+    const rows = new Map([
+      [HOST, { stack_signals: { cms: 'wordpress', detected_from: 'HTML and response headers' } }],
+    ]) as unknown as Parameters<typeof stackOf>[0]['rows'];
+    expect(stackOf({ rows, homepage_url: HOST, access_tests: [] })).toEqual({
+      frontend: null,
+      backend: { cms: 'wordpress', detected_from: 'homepage HTML and response headers' },
+      edge: null,
+    });
+    expect(built.check.stack!.frontend).toBeNull();
   });
 });
 

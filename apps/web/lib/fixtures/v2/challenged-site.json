@@ -2230,7 +2230,8 @@
         "verify": {
           "command": "re-check this site once the rule is in place",
           "expect": "the AI crawlers get 200 on the homepage",
-          "ua": "OAI-SearchBot"
+          "ua": "OAI-SearchBot",
+          "see": null
         },
         "packets": []
       },
@@ -2281,7 +2282,8 @@
         "verify": {
           "command": "crawl, then measure click depth for the 4 guides",
           "expect": "each is within three clicks",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },

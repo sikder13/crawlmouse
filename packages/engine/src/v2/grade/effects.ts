@@ -19,7 +19,8 @@
  * a check Quotable does not count (CONTENT_CHECKS `scored`) waits on `check_not_scored`, and the
  * overview leaves it out; an edge fix whose crawler has too few pages for a share waits on
  * `crawler_too_few_pages`. A robots.txt disallow is the site's stated intent: it opens no fix, so it
- * has no counterfactual here.
+ * has no counterfactual here. A client-rendered template's fix moves Readable alone: its pages'
+ * `text_share` becomes 1.
  *
  * Absorbed. A fix that alone would raise a grade (Technical SEO plus AI readability above 0) and whose
  * effect in the order is 0 or less was absorbed by a fix ranked above it. That fix is looked for among
@@ -39,6 +40,7 @@ import type { AccessDetection } from '../access/types.js';
 import type { ContentDetection } from '../content/aggregate.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
+import type { RenderedDetection } from '../detectors/rendered.js';
 import type { Detection } from '../detectors/types.js';
 import { accessScore, crawlerShare, type CrawlerTally } from './access.js';
 import { aiReadability } from './ai-readability.js';
@@ -54,7 +56,8 @@ import { isGraded, seoParts, type TechnicalSeoInput } from './technical-seo.js';
 export type FixRecord =
   | { family: 'structure'; record: Detection }
   | { family: 'access'; record: AccessDetection }
-  | { family: 'content'; record: ContentDetection };
+  | { family: 'content'; record: ContentDetection }
+  | { family: 'rendered'; record: RenderedDetection };
 
 interface Inputs {
   seo: TechnicalSeoInput;
@@ -84,7 +87,9 @@ function addEdge(seo: TechnicalSeoInput, from: string, to: string): TechnicalSeo
  * URL), so the page lands within MAX_HEALTHY_DEPTH clicks with the smallest change to the link graph;
  * the shallowest page there is when none is that deep.
  */
-function shallowParent(seo: TechnicalSeoInput): string {
+export function shallowParent(
+  seo: Pick<TechnicalSeoInput, 'pages' | 'edges' | 'homepage_url'>,
+): string {
   const depth = new Map([[seo.homepage_url, 0]]);
   const out = new Map<string, string[]>();
   for (const e of seo.edges) out.set(e.from_url, [...(out.get(e.from_url) ?? []), e.to_url]);
@@ -165,13 +170,29 @@ const cleared = (seo: TechnicalSeoInput, fingerprint: string): TechnicalSeoInput
   ),
 });
 
-function servedAll(c: CrawlerTally): CrawlerTally {
+/**
+ * The edge fix's counterfactual on its crawler's tally: served, and reading the text, on the pages a
+ * user-agent rule blocked it on. The fix's before and after reads it too (packets/before-after.ts).
+ */
+export function servedAll(c: CrawlerTally): CrawlerTally {
   const blocked = c.counts.blocked_by_ua_rule ?? 0;
   return {
     ...c,
     counts: { ...c.counts, blocked_by_ua_rule: 0, allowed: (c.counts.allowed ?? 0) + blocked },
   };
 }
+
+/**
+ * The content fix's counterfactual on its check's tally: the `failing` pages pass. The fix's before
+ * and after reads it too (packets/before-after.ts).
+ */
+export const allPassing = <T extends { passing: number }>(tally: T, failing: number): T => ({
+  ...tally,
+  passing: tally.passing + failing,
+});
+
+/** The text share of a page once its template is rendered on the server: the whole text. */
+export const SERVER_RENDERED_SHARE = 1;
 
 /** The content checks Quotable counts (CONTENT_CHECKS `scored`): none until CC-18 (labels.test.ts). */
 export const COUNTED: ReadonlySet<ContentCheck> = new Set(
@@ -208,9 +229,26 @@ export function applyFix(
     if (!counts(f, counted) || t === undefined) return inputs;
     const checks = {
       ...ai.quotable.checks,
-      [f.record.check]: { ...t, passing: t.passing + f.record.extent.failing },
+      [f.record.check]: allPassing(t, f.record.extent.failing),
     };
     return { seo, ai: { ...ai, quotable: { checks } } };
+  }
+  if (f.family === 'rendered') {
+    // The render step keeps no link, so only the client-rendered template has a counterfactual: the
+    // template's graded pages serve their words without JavaScript, rendered this check or not.
+    if (f.record.type !== 'client_rendered_template') {
+      throw new Error(`effects: no counterfactual for ${f.record.type}`);
+    }
+    const template = f.record.template_key;
+    return {
+      seo,
+      ai: {
+        ...ai,
+        readable: ai.readable.map((p) =>
+          p.template_key === template ? { ...p, text_share: SERVER_RENDERED_SHARE } : p,
+        ),
+      },
+    };
   }
   const r = f.record;
   const url = subjectOfKey(r.key);
@@ -324,7 +362,9 @@ const fingerprintOf = (f: FixRecord) => f.record.fingerprint;
 /** What a fix names: its pages, its crawler or its template. */
 function names(f: FixRecord): Set<string> {
   if (f.family === 'access') return new Set([`crawler:${f.record.crawler}`]);
-  if (f.family === 'content') return new Set([`template:${f.record.template_key}`]);
+  if (f.family === 'content' || f.family === 'rendered') {
+    return new Set([`template:${f.record.template_key}`]);
+  }
   return new Set([subjectOfKey(f.record.key), ...f.record.affected_urls]);
 }
 

@@ -5,6 +5,7 @@ import type { Check, FixtureDataset } from '@crawlmouse/types/v2';
 import { findCheck, fixture, type FixtureName } from '../../lib/v2/fixtures';
 import { CHECKS } from '../../lib/v2/recordings';
 import { FIX_MAP_INVENTORY, type CC24Page } from '../../lib/v2/view/fix-map-inventory';
+import { bodyFor } from '../../lib/v2/view/test-support/multi-body';
 import { FixPreview } from '../../app/(v2-preview)/v2-preview/_preview/FixPreview';
 import { MapPreview } from '../../app/(v2-preview)/v2-preview/_preview/MapPreview';
 
@@ -164,13 +165,14 @@ const TABLE: Record<string, Record<string, Change[]>> = {
     'fixes[].packet.framework': [
       {
         change: (_, d) => (fix(d, 2).packet!.framework = 'webflow'),
-        expect: { fix: ['Not on Webflow?'] },
+        expect: { fix: ['Written for Webflow; the audit detected Next.js 14'] },
       },
     ],
-    'fixes[].packet.frameworks': [
+    'fixes[].packet.packets': [
       {
-        change: (_, d) => (fix(d, 2).packet!.frameworks = ['nextjs', 'wordpress']),
-        expect: { fix: ['Next.js WordPress Keep this audit'] },
+        // A second body: the switch appears, with a toggle for it.
+        change: (_, d) => (fix(d, 2).packet!.packets = [bodyFor('wordpress')]),
+        expect: { fix: ['Not on Next.js?', 'Next.js WordPress Keep this audit'] },
       },
     ],
     'checks[].stack.frontend': [
@@ -182,7 +184,15 @@ const TABLE: Record<string, Record<string, Change[]>> = {
     'checks[].stack.backend': [
       {
         change: (c) => (c.stack!.backend = { cms: 'wordpress', detected_from: 'the REST API' }),
-        expect: { fix: ['WordPress as the backend', 'WordPress from the REST API'] },
+        expect: { fix: ['WordPress as the backend'] },
+      },
+      {
+        // Where it was detected from is said in the switch card, which a second body brings.
+        change: (c, d) => {
+          fix(d, 2).packet!.packets = [bodyFor('webflow')];
+          c.stack!.backend = { cms: 'wordpress', detected_from: 'the REST API' };
+        },
+        expect: { fix: ['WordPress from the REST API'] },
       },
     ],
   },

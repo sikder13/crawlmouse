@@ -659,6 +659,90 @@ const INVENTORY: [entry: string, why: string][] = [
     "apps/web/lib/v2/mail/templates/alert.ts :: ua === '' || (summary.startsWith(ua) && /^(?:[\\s:]|$)/.test(summary.slice(ua.length)));",
     'NOT A CUT that is kept: the rest of a change summary after a crawler name it starts with, only tested for a word boundary to decide whether to name the crawler again (CC-28 copy pass); nothing cut is rendered or persisted.',
   ],
+  [
+    "packages/engine/src/v2/grade/outcomes.ts :: : `${points.slice(0, MAX_TITLE_CHARS).join('')}…`;",
+    'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). A fix title past MAX_TITLE_CHARS, marked with an ellipsis (CC-30, titleOf).',
+  ],
+  [
+    'packages/engine/src/v2/packets/by-type/client-rendered-template.ts :: const shown = all.slice(0, PAGES_SHOWN);',
+    'ARRAY slice of the record’s rendered pages (`RenderedPage[]`), to bound how many a packet lists; the line counts the rest. No string is cut (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/by-type/generic-anchor-text.ts :: const shown = links.slice(0, MAX_LINKS).map(({ to, text }): Line => {',
+    'ARRAY slice of the hub’s generic links, to bound how many steps the packet lists; the packet counts the rest. No string is cut (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/compose.ts :: ...texts.slice(0, PACKET_BOUNDS.section_lines),',
+    'ARRAY slice of a packet section’s lines at PACKET_BOUNDS.section_lines; the section’s last line counts the lines left out. No string is cut (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/compose.ts :: const kept = points.slice(0, PACKET_BOUNDS.line_chars).join('');",
+    'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). A packet line past PACKET_BOUNDS.line_chars; the line says how long it was (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/html-checks.ts :: for (const item of items.slice(0, max)) {',
+    'ARRAY slice of the URLs or phrases a verify command names (`listed`), bounded by count and by total length; `expect` says how many were left out. No string is cut (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/by-type/generic-anchor-text.ts :: const seen = named.slice(0, MAX_SEEN);',
+    'ARRAY slice of the generic link texts the readable command names, to bound it; the line counts the rest. No string is cut (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/html-checks.ts :: .slice(1)',
+    'STRING slice of `URL.search`, to drop its leading ASCII `?` before the query is sorted for comparison. Used to compare two URLs in the engine only; never persisted or rendered (CC-30, compared).',
+  ],
+  [
+    "packages/engine/src/v2/packets/html-checks.ts :: const wordUrl = (target: string): string => url(target).word.slice(1, -1).replaceAll(`'\\\\''`, \"'\");",
+    'STRING slice of a URL already written by `url` (packets/shell.ts): ASCII only, every other character percent-encoded, so no cut can split a surrogate pair. It removes the two ASCII quotes around the shell word (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/html-checks.ts :: text.replace(/%([0-9A-Fa-f]{2})/g, (_, hex: string) =>',
+    'NOT A CUT: a `{2}` quantifier matching the two hex digits of one percent-escape, to decode it for comparing two URLs. Nothing is truncated, and the result is compared, never persisted or rendered (CC-30, compared).',
+  ],
+  [
+    'packages/engine/src/v2/packets/structure.ts :: const path = written.slice(new URL(written).origin.length);',
+    'STRING slice of a URL already written by `url` (packets/shell.ts): ASCII only, every other character percent-encoded, so no cut can split a surrogate pair. It drops the origin, which ends on an ASCII boundary (CC-30, pathOf).',
+  ],
+  [
+    "packages/engine/src/v2/packets/structure.ts :: const written = urlWord(target).word.slice(1, -1).replaceAll(`'\\\\''`, \"'\");",
+    'STRING slice of a URL already written by `url` (packets/shell.ts): ASCII only, every other character percent-encoded, so no cut can split a surrogate pair. It removes the two ASCII quotes around the shell word (CC-30, pathOf).',
+  ],
+  [
+    "packages/engine/src/v2/packets/test-support/content.ts :: ...(ours.match(new RegExp(`\\\\b1 (?:[a-z]+ ){1,2}(?:${COUNTED})\\\\b`, 'g')) ?? []),",
+    'NOT A CUT: a `{1,2}` quantifier in a test helper’s pattern for "1 <plural>" wording; it matches, it does not truncate, and nothing is persisted (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/test-support/structure.ts :: res.writeHead(301, { location: body.slice(MOVED.length) }).end('moved');",
+    'STRING slice in a test server: the redirect target after a fixed ASCII marker the test itself wrote. Test support only (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/structure.ts :: const tail = [...path].slice(-PATH_TAIL_CHARS).join('');",
+    'CODE-POINT cut, not a char-index one: the receiver is `[...path]`, an array of whole code points, so the cut cannot split a surrogate pair. The end of a long path, kept so a readable command stays short (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/test-support/structure.ts :: ...(ours.match(new RegExp(`\\\\b1 (?:[a-z]+ ){1,2}(?:${COUNTED})\\\\b`, 'g')) ?? []),",
+    'NOT A CUT: a `{1,2}` quantifier in a test helper’s pattern for "1 <plural>" wording; it matches, it does not truncate, and nothing is persisted (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/test-support/structure.ts :: const list = u('list').slice(0, -8);",
+    'STRING slice in a test helper, of an ASCII URL the test itself builds, to make a second URL of the same length. Test support only (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/shell.ts :: return quoted([...clean(crawled)].slice(0, max).join(''));",
+    'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). Crawled text in a verify command, cut to its bound before it is single-quoted (CC-30, crawledWord).',
+  ],
+  [
+    'packages/engine/src/v2/packets/test-support/content.ts :: const shown = span.slice(1, -1);',
+    'STRING slice in a test helper that removes the two ASCII backticks around a code span matched by a regex anchored on them; never persisted or rendered (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/text.ts :: const shown = items.slice(0, max).map((s) => s.text);',
+    'ARRAY slice of `Safe` values in `list`, to bound how many a line names; the line counts the rest. No string is cut (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/text.ts :: return safe(`\\`${points.slice(0, max).join('')}\\` (cut from ${points.length} characters)`);",
+    'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). Crawled text in a packet line, cut to its bound; the line says how long the text was (CC-30, code).',
+  ],
 ];
 
 function sourceFiles(dir: string, out: string[] = []): string[] {

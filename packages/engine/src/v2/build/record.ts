@@ -57,6 +57,28 @@ function edgeOf(tests: readonly AccessTest[]): NonNullable<Check['stack']>['edge
     : null;
 }
 
+/**
+ * The check's stack: the CMS the worker recognised on the homepage, and the edge vendor. No front end
+ * is read yet.
+ */
+export function stackOf(
+  assembled: Pick<Assembled, 'rows' | 'homepage_url' | 'access_tests'>,
+): NonNullable<Check['stack']> {
+  const home = assembled.rows.get(assembled.homepage_url);
+  return {
+    frontend: null,
+    // detectCms answers `custom` when no signature matched: no CMS was recognised, which is not one.
+    backend:
+      home?.stack_signals && home.stack_signals.cms !== 'custom'
+        ? {
+            cms: home.stack_signals.cms,
+            detected_from: `homepage ${home.stack_signals.detected_from}`,
+          }
+        : null,
+    edge: edgeOf(assembled.access_tests),
+  };
+}
+
 /** The structure counts the screens read, over the graded population where they are rates. */
 export function structureOf(
   pages: readonly PageResult[],
@@ -94,7 +116,6 @@ export function checkRecord(
       .filter(isGraded)
       .map((p) => ({ template_key: p.template_key, text_share: p.without_js?.text_share ?? null })),
   );
-  const home = assembled.rows.get(assembled.homepage_url);
   const tested = access.map((b) => b.finished_at).sort((a, b) => Date.parse(a) - Date.parse(b));
   return {
     id: input.check.id,
@@ -130,18 +151,7 @@ export function checkRecord(
         text_share: null,
       }),
     ),
-    stack: {
-      frontend: null,
-      // detectCms answers `custom` when no signature matched: no CMS was recognised, which is not one.
-      backend:
-        home?.stack_signals && home.stack_signals.cms !== 'custom'
-          ? {
-              cms: home.stack_signals.cms,
-              detected_from: `homepage ${home.stack_signals.detected_from}`,
-            }
-          : null,
-      edge: edgeOf(assembled.access_tests),
-    },
+    stack: stackOf(assembled),
     competitors: [],
     // The contract keeps progress for a running check only (CheckSchema check_progress).
     progress: null,

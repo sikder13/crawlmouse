@@ -7409,7 +7409,8 @@
         "verify": {
           "command": "curl -s https://example-outfitter.com/robots.txt | grep -c \"Claude-SearchBot\"",
           "expect": "0 (today: 1)",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
@@ -7471,7 +7472,8 @@
         "verify": {
           "command": "curl -s -o /dev/null -w \"%{http_code}\" -A \"Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot\" https://example-outfitter.com/",
           "expect": "200 (today: 403)",
-          "ua": "GPTBot"
+          "ua": "GPTBot",
+          "see": null
         },
         "packets": []
       },
@@ -7567,7 +7569,8 @@
         "verify": {
           "command": "curl -sA \"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot\" https://example-outfitter.com/products/ridge-2p | grep -c \"three-season\"",
           "expect": "≥ 1 (today: 0)",
-          "ua": "OAI-SearchBot"
+          "ua": "OAI-SearchBot",
+          "see": null
         },
         "packets": []
       },
@@ -7627,7 +7630,8 @@
         "verify": {
           "command": "crawl, then count internal links into each of the 7 pages",
           "expect": "each has ≥ 1 link in (today: 0)",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
@@ -7686,7 +7690,8 @@
         "verify": {
           "command": "render /products/ridge-2p in a browser, then read its first 150 words",
           "expect": "a two-sentence summary before the gallery (until fix 2 lands, crawlers that skip JavaScript cannot see it)",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
@@ -7742,7 +7747,8 @@
         "verify": {
           "command": "crawl, then count generic anchors on the 6 pages",
           "expect": "none left on those 6 pages",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
@@ -7793,7 +7799,8 @@
         "verify": {
           "command": "crawl, then measure click depth for the 3 pages",
           "expect": "each is within three clicks",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
@@ -7846,7 +7853,8 @@
         "verify": {
           "command": "render the 61 product pages in a browser, then look for a specifications table",
           "expect": "a table on each of the 61 pages (today: none)",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
@@ -7901,7 +7909,8 @@
         "verify": {
           "command": "crawl, then read the 13 blog posts",
           "expect": "author and date on all 13",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
@@ -7954,7 +7963,8 @@
         "verify": {
           "command": "crawl without running JavaScript",
           "expect": "each of the 5 pages has a link in the raw HTML",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
@@ -8009,7 +8019,8 @@
         "verify": {
           "command": "curl -s https://example-outfitter.com/products/ridge-2p | grep -o 'rel=\"canonical\"[^>]*'",
           "expect": "the page's own URL",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
@@ -8060,7 +8071,8 @@
         "verify": {
           "command": "crawl, then follow the link",
           "expect": "one response, no redirect",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
@@ -8111,7 +8123,8 @@
         "verify": {
           "command": "crawl the collections",
           "expect": "no ?page=1 URL is found",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
@@ -8162,7 +8175,8 @@
         "verify": {
           "command": "crawl the hreflang pairs",
           "expect": "every pair links both ways",
-          "ua": null
+          "ua": null,
+          "see": null
         },
         "packets": []
       },
