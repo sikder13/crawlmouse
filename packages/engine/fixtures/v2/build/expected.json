@@ -31249,7 +31249,37 @@
       },
       "effort": null,
       "before_after": [],
-      "packet": null,
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "generic"
+        ],
+        "context": [
+          "`ClaudeBot` was refused on 50 of the 50 sampled pages the audit judged it on, by a rule that matches its user agent.",
+          "Status of the refused requests: 403 (50 requests).",
+          "The responses name no product: the audit did not identify what holds the rule.",
+          "On 50 of those pages another identity was served from the same address (`OAI-SearchBot`), so the refusal is aimed at the user agent.",
+          "The audit sent this user agent with a Crawlmouse tag, from Crawlmouse’s address. What the operator’s own crawler gets is in the site’s logs.",
+          "Pages refused: `https://built-site.test`, `https://built-site.test/blog/camp-cooking-ideas`, `https://built-site.test/blog/campfire-safety-basics`, `https://built-site.test/blog/choosing-tent-pegs`, `https://built-site.test/blog/coming-soon-note` and 45 more pages not shown."
+        ],
+        "change": [
+          "Decide first whether `ClaudeBot` should be let in. It is a training crawler, and the audit records what was refused, not what the site intends: the choice is the site owner's. The steps below apply if it should be served.",
+          "Find the rule that refuses requests whose User-Agent header contains `ClaudeBot`. It can be in the CDN or WAF, a bot-management product, the web server's configuration or the application's middleware.",
+          "Remove `ClaudeBot` from what the rule matches, or add an exception that serves it.",
+          "Deploy the rule change, then run the check below."
+        ],
+        "keep": [
+          "Leave the rule's other clauses as they are: change only what matches `ClaudeBot`.",
+          "Keep robots.txt as the place that states which crawlers may read the site. This change does not edit it.",
+          "Serve `ClaudeBot` the same page a visitor gets, not a version made for crawlers."
+        ],
+        "verify": {
+          "command": "curl -sS -o /dev/null -w '%{http_code}' -A 'ClaudeBot' 'https://built-site.test/' | grep -qx 200",
+          "expect": "Exits 0 when the page answers status 200 to this user agent, and prints nothing. A redirect is not followed and does not pass. The audit's request for it was answered 403.",
+          "ua": "ClaudeBot"
+        },
+        "packets": []
+      },
       "gone": null
     },
     {
@@ -31694,6 +31724,7 @@
       "hreflang_gap",
       "robots_txt_blocks_crawler",
       "edge_rule_blocks_crawler",
+      "client_rendered_template",
       "quotable_opening",
       "no_question_headings",
       "missing_schema_description",
