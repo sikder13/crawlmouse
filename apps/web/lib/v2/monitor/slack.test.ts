@@ -50,9 +50,9 @@ describe('the Slack message (D5)', () => {
       ],
     });
     expect(text.split('\n')).toEqual([
-      'Crawlmouse: 2 changes on shop.example at the check that finished Fri 13 Nov 11:00',
-      '• Problem: GPTBot: allowed → disallowed by robots.txt (robots.txt, 12 pages)',
-      '• Changed: copy edited (robots.txt, 12 pages)',
+      'Crawlmouse: 2 changes on shop.example at the check that finished Fri 13 Nov 11:00 UTC',
+      '• Problem: GPTBot: allowed → disallowed by robots.txt (in robots.txt · 12 pages)',
+      '• Changed: copy edited (in robots.txt · 12 pages)',
       `Open the check: https://crawlmouse.com/audit/${CHECK}`,
     ]);
   });

@@ -12,7 +12,8 @@
  */
 import { promises as dns } from 'node:dns';
 import { validateUrlOrThrow, type DnsResolver } from '@crawlmouse/engine';
-import { dayDate, hourMinute } from '../format';
+import { dayDate } from '../format';
+import { clockTime } from '../mail/templates/when';
 import { count, plural } from '../words';
 import { oneLine } from '../mail/escape';
 import {
@@ -51,7 +52,7 @@ export function slackAlertText(input: SlackAlertInput): string {
   const host = slackEscape(oneLine(input.host, BOUNDS.host));
   const all = problemsFirst(input.changes);
   const { shown, more } = capRows(all, SLACK_ROWS_MAX);
-  const when = `${dayDate(input.checkedAt, input.zone)} ${hourMinute(input.checkedAt, input.zone)}`;
+  const when = `${dayDate(input.checkedAt, input.zone)} ${clockTime(input.checkedAt, input.zone)}`;
   const rows = shown
     .map(rowText)
     .map((r) => `• ${r.label}: ${slackEscape(r.line)} (${slackEscape(r.detail)})`);

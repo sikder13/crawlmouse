@@ -92,6 +92,15 @@ describe('the weekly summary (D6)', () => {
     expect(lines[busy + 4]).toBe('- Resolved: Orphans linked');
   });
 
+  it('says where and how many as one phrase, as the alert does (rulings-3 item 1)', () => {
+    const lines = mail.text.split('\n');
+    const busy = lines.indexOf('busy.example: 2 changes');
+    expect(lines[busy + 3]).toBe('  across the site · 5 pages');
+    expect(lines[busy + 5]).toBe('  on /blog/* · 5 pages');
+    expect(mail.html).toContain('across the site · 5 pages');
+    expect(mail.text).not.toContain('Open the fix');
+  });
+
   it('names the week in the account’s zone, Monday to Sunday', () => {
     expect(mail.text).toContain('What your checks found from 9 Nov to 15 Nov.');
   });

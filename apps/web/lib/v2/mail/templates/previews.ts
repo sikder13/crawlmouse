@@ -34,9 +34,25 @@ const bad = () => fixture('bad-site');
 const badHost = () => bad().sites[0]!.host;
 const badCheck = () => bad().checks[0]!.id;
 const badFix = () => bad().fixes.find((f) => f.packet !== null)!;
-/** bad-site's changes found by its newest check: what one alert lists. */
-const badChanges = () =>
-  bad().changes.filter((c) => c.check_id === badCheck() && c.kind !== 'baseline');
+const badSite = () => bad().sites[0]!.id;
+/** The site's changes, baselines left out: what a week's summary lists. */
+const siteChanges = () =>
+  bad().changes.filter((c) => c.site_id === badSite() && c.kind !== 'baseline');
+/**
+ * The site's check whose changes show every line an alert can carry: an opened change with a fix (the
+ * fix link), a grade whose letter moved (the grade line) and more than one kind of where.
+ */
+const alertCheck = () =>
+  bad().checks.find((ch) => {
+    const cs = siteChanges().filter((c) => c.check_id === ch.id);
+    return (
+      cs.some((c) => c.kind === 'opened' && c.fix_id !== null) &&
+      cs.some((c) => c.grade_deltas.some((d) => d.from_grade !== d.to_grade)) &&
+      new Set(cs.map((c) => c.where)).size > 1
+    );
+  })!;
+/** What one alert lists: that check's changes. */
+const alertChanges = () => siteChanges().filter((c) => c.check_id === alertCheck().id);
 
 const RENDERS: Record<MailPreviewSlug, () => RenderedMail> = {
   'check-notify': () => checkNotify({ host: badHost(), checkId: badCheck(), outcome: 'finished' }),
@@ -63,10 +79,10 @@ const RENDERS: Record<MailPreviewSlug, () => RenderedMail> = {
   alert: () =>
     alertTemplate({
       host: badHost(),
-      checkId: badCheck(),
-      checkedAt: bad().checks[0]!.finished_at ?? '2026-11-09T06:00:00.000Z',
+      checkId: alertCheck().id,
+      checkedAt: alertCheck().finished_at ?? '2026-11-09T06:00:00.000Z',
       zone: 'America/Indiana/Indianapolis',
-      changes: badChanges(),
+      changes: alertChanges(),
       unsubscribeUrl: UNSUBSCRIBE,
     }),
   'weekly-summary': () =>
@@ -74,7 +90,7 @@ const RENDERS: Record<MailPreviewSlug, () => RenderedMail> = {
       since: '2026-11-02T05:00:00.000Z',
       until: '2026-11-09T05:00:00.000Z',
       zone: 'America/Indiana/Indianapolis',
-      sites: [{ siteId: bad().sites[0]!.id, host: badHost(), changes: badChanges() }],
+      sites: [{ siteId: badSite(), host: badHost(), changes: siteChanges() }],
       unsubscribeUrl: UNSUBSCRIBE,
     }),
 };

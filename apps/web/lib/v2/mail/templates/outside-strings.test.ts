@@ -31,6 +31,7 @@ const HOSTILE = [
 
 const ID = 'c0000000-0000-4000-8000-0000000000aa';
 const SITE = 'b0000000-0000-4000-8000-0000000000bb';
+const FIX = 'f0000000-0000-4000-8000-0000000000cc';
 const TOKEN = 'T'.repeat(43);
 const UNSUB = 'https://crawlmouse.com/unsubscribe?t=abc.def';
 
@@ -119,7 +120,7 @@ const CASES: readonly Case<unknown>[] = [
       checkId: ID,
       checkedAt: '2026-11-13T10:00:00.000Z',
       zone: 'America/New_York',
-      changes: [change()],
+      changes: [{ ...change(), fix_id: FIX }],
       unsubscribeUrl: UNSUB,
     } satisfies AlertMailInput,
     render: alertTemplate,
@@ -132,6 +133,7 @@ const CASES: readonly Case<unknown>[] = [
       'changes.*.kind',
       'changes.*.subject',
       'changes.*.severity',
+      'changes.*.fix_id',
       'changes.*.grade_deltas.*.grade',
       'changes.*.grade_deltas.*.from_grade',
       'changes.*.grade_deltas.*.to_grade',
