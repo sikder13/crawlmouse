@@ -12,6 +12,7 @@ import {
   hostile,
   hostileUrl,
   packetOf,
+  pageAsRead,
   pageAt,
   SERVED,
   servedSite,
@@ -114,9 +115,9 @@ describe('the generic_anchor_text packet', () => {
 
   it('checks for the recorded texts, each once whatever its case', () => {
     const p = packetOf('generic_anchor_text', record, facts);
-    expect(p.verify.command).toMatch(/ARGC = 1 \} [^']*' 'Click here' 'Read more' 'here'$/);
+    expect(p.verify.command).toMatch(/' 'https:\/\/a\.test' 'Click here' 'Read more' 'here'$/);
     expect(p.verify.expect).toBe(
-      'Exit status 0 once `https://a.test/hub` has link text and none of it is `Click here`, `Read more`, `here`, compared without case, with spaces collapsed and the tags inside a link removed. Today the crawl recorded 4 such links.',
+      'Exit status 0 once `https://a.test/hub` has links and the first link to each target says none of the recorded generic texts: `Click here`, `Read more`, `here`, compared without case, with spaces collapsed and the tags inside a link removed. The crawl keeps one text for a target, the first, so a later link to the same target is not read. The command knows these recorded phrases only: another stock phrase in their place passes it, and is judged on the next check. Today the crawl recorded 4 such links.',
     );
   });
 
@@ -154,6 +155,83 @@ describe('the generic_anchor_text packet', () => {
       factsFor(live, SERVED),
     );
     expect((await inBothStates(served, p.verify.command)).fixed.status).not.toBe(0);
+  });
+
+  // the round 1 SEO review's input: the crawl keeps the first text for a target, and so does the command
+  it('verify reads the first link to each target, as the record does', async () => {
+    const named = ['Ridge footprint', 'Tent care guide', 'Alpine stove', 'Trail mug', 'Ridge tent'];
+    const hub = (extra: string) => ({
+      '/hub': `${anchors(named.map((t, i): [string, string] => [`/p/${i + 1}`, t]))}${extra}`,
+    });
+    served = await servedSite({
+      broken: hub('<a href="/p/6">Read more</a>'),
+      fixed: hub('<a href="/p/1">Read more</a>'),
+    });
+    const live = hubSite(served.base);
+    const p = packetOf(
+      'generic_anchor_text',
+      detected(detectGenericAnchors(live), `${served.base}/hub`),
+      factsFor(live, SERVED),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('on a site that serves its pages with a trailing slash, requests the hub as served', async () => {
+    const hub = (texts: string[]) => ({
+      '/hub/': anchors(texts.map((t, i): [string, string] => [`/p/${i + 1}/`, t])),
+    });
+    served = await servedSite({
+      broken: hub(['Click here', 'Ridge tent']),
+      fixed: hub(['Ridge footprint', 'Ridge tent']),
+    });
+    const live = hubSite(served.base);
+    const facts = factsFor(live, SERVED);
+    const pages = new Map(facts.pages);
+    const url = `${served.base}/hub`;
+    pages.set(url, { ...pages.get(url)!, final_url: `${url}/` });
+    const p = packetOf('generic_anchor_text', detected(detectGenericAnchors(live), url), {
+      ...facts,
+      pages,
+    });
+    expect(p.verify.command).toContain(` '${url}/' | `);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('agrees with the engine’s own reading of the pages served', async () => {
+    const hub = (texts: string[]) =>
+      `<html><body>${texts
+        .map((t, i) => `<a href="/p/${i + 1}"><span> ${t} </span></a>`)
+        .join('\n')}<!-- <a href="/p/9">Click here</a> --><a href="/">Home</a></body></html>`;
+    const states = {
+      broken: {
+        '/hub': hub(['Click&nbsp;here', 'READ   more', 'click here', 'here', 'Ridge tent']),
+      },
+      fixed: {
+        '/hub': hub(['Ridge footprint', 'Tent care', 'Alpine stove', 'Trail mug', 'Ridge tent']),
+      },
+    };
+    served = await servedSite(states);
+    const b = served.base;
+    const read = (state: 'broken' | 'fixed') =>
+      site(
+        [
+          pageAsRead(`${b}/hub`, states[state]['/hub'], { pr: 0.9 }),
+          { path: b, pr: 0.01, links: [`${b}/hub`] },
+          ...[1, 2, 3, 4, 5].map((n) => ({ path: `${b}/p/${n}`, pr: 0.01, links: [`${b}/hub`] })),
+        ],
+        { homepage: b },
+      );
+    const record = detected(detectGenericAnchors(read('broken')), `${b}/hub`);
+    expect(record.evidence.edges).toHaveLength(4);
+    const p = packetOf('generic_anchor_text', record, factsFor(read('broken'), SERVED));
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    expect(detectGenericAnchors(read('fixed')).filter((r) => r.state === 'detected')).toEqual([]);
   });
 });
 

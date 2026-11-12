@@ -3,16 +3,19 @@
  * The record's evidence is the generic links; their texts and their targets' titles are the check's
  * rows for those links.
  *
- * Verify reads the text of each `<a>` on the hub and passes when none of it is one of the recorded
- * generic texts. Texts are compared without case, with runs of spaces collapsed and the tags inside
- * a link removed, which is how the crawl reads link text. It also needs the page to have link text
- * at all, so a page that was not served, or whose links were removed, does not pass.
+ * Verify reads the text of the first `<a>` to each target on the hub, as the crawl keeps one text for
+ * a target, and passes when none of them is one of the recorded generic texts. Texts are compared
+ * without case, with runs of spaces collapsed and the tags inside a link removed, which is how the
+ * crawl reads link text. It also needs the page to have a link at all, so a page that was not served,
+ * or whose links were removed, does not pass. It knows the recorded phrases and no others: a link
+ * changed to another stock phrase passes the command and is judged on the next check.
  */
 import { TOP_HUB_FRACTION } from '../../detectors/thresholds.js';
-import { ANCHOR_TEXTS, command, fetchOf, noneOf } from '../html-checks.js';
+import { command, fetchOf, listed, noLinkSays } from '../html-checks.js';
+import { servedAt } from '../served-at.js';
 import { crawledWord } from '../shell.js';
 import { filedLinks, plural, subjectOf, titleOf } from '../structure.js';
-import { clean, code, count, line, list, type Line } from '../text.js';
+import { clean, code, count, line, list, ours, type Line } from '../text.js';
 import type { PacketEntry, PacketFacts, RecordOf } from '../types.js';
 
 /** The generic links a packet lists one by one, and the distinct texts its command names. */
@@ -95,20 +98,20 @@ export const genericAnchorText: PacketEntry<'generic_anchor_text'> = {
     if (texts.length === 0) {
       throw new Error('packets: a generic_anchor_text record names no link text the check holds');
     }
-    const named = texts.slice(0, MAX_TEXTS);
+    const wordOf = (text: string) => crawledWord(text, MAX_TEXT_CHARS);
+    const named = listed(texts, MAX_TEXTS, wordOf);
+    const left = texts.length - named.length;
     const fetch = fetchOf(facts, [hub]);
+    const on = servedAt(facts, hub);
     const generic = fix.evidence.edges.length;
     return {
-      command: command(
-        fetch.fragment,
-        ANCHOR_TEXTS,
-        noneOf(named.map((t) => crawledWord(t, MAX_TEXT_CHARS))),
-      ),
-      expect: line`Exit status 0 once ${code(hub)} has link text and none of it is ${list(
-        texts.map((t) => code(t, MAX_TEXT_CHARS)),
+      command: command(fetch.fragment, noLinkSays(on, named.map(wordOf))),
+      // what the command leaves out is said before the list, which a long line is cut in
+      expect: line`Exit status 0 once ${code(on)} has links and the first link to each target says none of the recorded generic texts${ours(left === 0 ? '' : ` the command names (it leaves ${left} of the ${texts.length} out, for length)`)}: ${list(
+        named.map((t) => code(t, MAX_TEXT_CHARS)),
         MAX_TEXTS,
         'text',
-      )}, compared without case, with spaces collapsed and the tags inside a link removed. Today the crawl recorded ${count(generic)} such ${plural(generic, 'link', 'links')}.`,
+      )}, compared without case, with spaces collapsed and the tags inside a link removed. The crawl keeps one text for a target, the first, so a later link to the same target is not read. The command knows these recorded phrases only: another stock phrase in their place passes it, and is judged on the next check. Today the crawl recorded ${count(generic)} such ${plural(generic, 'link', 'links')}.`,
       ua: fetch.ua,
     };
   },

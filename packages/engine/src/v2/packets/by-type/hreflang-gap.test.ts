@@ -12,6 +12,7 @@ import {
   hostile,
   hostileUrl,
   packetOf,
+  pageAsRead,
   pageAt,
   SERVED,
   servedSite,
@@ -217,24 +218,79 @@ describe('the hreflang_gap packet', () => {
   it('writes a Next.js body that says where the annotations come from, then the same steps', () => {
     const p = packetFor(cluster(base, 'hreflang_invalid_code'), base);
     expect(p.frameworks).toEqual(['generic', 'nextjs']);
-    expect(p.packets[0]!.change).toEqual([
-      'In the App Router the annotations come from alternates.languages (a map from hreflang value to URL) in the metadata export, or in generateMetadata, of the page.js of the route or of a layout.js above it. Make the changes below there.',
+    const next = p.packets[0]!;
+    expect(next.change.slice(0, 3)).toEqual([
+      'These steps are for the App Router (the app directory). There the annotations come from alternates.languages (a map from hreflang value to URL) in the metadata export, or in generateMetadata, of the page.js of the route or of a layout.js above it.',
       ...p.change,
     ]);
+    // setting alternates.languages in a page drops a layout's alternates.canonical: the body says so
+    expect(next.change[3]).toContain(
+      "carry the layout's alternates.canonical, media and types into the same object",
+    );
+    expect(next.keep.at(-1)).toBe(
+      'Keep the other fields of alternates each page has today (canonical, media, types).',
+    );
+  });
+
+  it('leaves the x-default step out of the Next.js body, whose cited page shows no such key', () => {
+    const only = packetFor(cluster(base, 'hreflang_missing_x_default'), base);
+    expect(only.frameworks).toEqual(['generic']);
+    expect(only.change.at(-1)).toBe(
+      'Add an x-default annotation to each page, naming the page for visitors whose language none of the others matches. Google recommends it and does not require it.',
+    );
+    const withSelf = packetFor(
+      cluster(base, 'hreflang_missing_self', {
+        de: [
+          ['en', '/en'],
+          ['de', '/de'],
+        ],
+      }),
+      base,
+    );
+    const next = withSelf.packets.find((b) => b.framework === 'nextjs')!;
+    expect(next.change.join(' ')).not.toContain('Add an x-default annotation');
+    expect(next.change.at(-1)).toBe(
+      'The Next.js page cited shows no x-default among the keys of alternates.languages: for that annotation, follow the generic rewrite and confirm the tag in the HTML served.',
+    );
   });
 
   it('asks the command for what the first marked page lacks, read from its own annotations', () => {
     const invalid = packetFor(cluster(base, 'hreflang_invalid_code'), base).verify;
     expect(invalid.command).toMatch(/^curl -sS -A '[^']*' 'https:\/\/a\.test\/en' \| /);
-    expect(invalid.command.endsWith("' 'https://a.test/en' '0' 'en-UK'")).toBe(true);
+    expect(invalid.command.endsWith("' 'https://a.test' '0' 'https://a.test/en' '0' 'en-UK'")).toBe(
+      true,
+    );
     const back = packetFor(cluster(base, 'hreflang_missing_return'), base).verify;
-    expect(back.command.endsWith("' 'https://a.test/en' '1' 'https://a.test/de'")).toBe(true);
+    expect(
+      back.command.endsWith("' 'https://a.test' '0' 'https://a.test/en' '1' 'https://a.test/de'"),
+    ).toBe(true);
     expect(back.expect).toBe(
-      'Exit status 0 once `https://a.test/en` lists itself under a language code and holds an x-default. It must also name `https://a.test/de`. Annotations are read from <link> elements with quoted, absolute URLs.',
+      'Exit status 0 once `https://a.test/en` lists itself under a value with the form of a language code, and carries no value of another form. It must also name `https://a.test/de`. It reads <link> elements in the <head> of the HTML, with absolute URLs; annotations in an HTTP Link header or a sitemap are not read, no alternate is requested, and a value is checked for its form, not against the registry of codes. An x-default is recommended and not required: the command does not ask for one.',
     );
     const gone = packetFor(cluster(base, 'hreflang_alternate_gone'), base).verify;
-    expect(gone.command.endsWith("' 'https://a.test/en' '0' 'https://a.test/fr'")).toBe(true);
+    expect(
+      gone.command.endsWith("' 'https://a.test' '0' 'https://a.test/en' '0' 'https://a.test/fr'"),
+    ).toBe(true);
     expect(gone.expect).toContain(' It must no longer hold `https://a.test/fr`. ');
+  });
+
+  it('asks the command for an x-default only when its absence is all the record proves', () => {
+    const only = packetFor(cluster(base, 'hreflang_missing_x_default'), base).verify;
+    expect(only.command.endsWith("' 'https://a.test' '1' 'https://a.test/en' '0'")).toBe(true);
+    expect(only.expect).toContain(
+      'under a value with the form of a language code and holds an x-default,',
+    );
+    expect(only.expect).not.toContain('does not ask for one');
+    const more = packetFor(
+      cluster(base, 'hreflang_missing_self', {
+        de: [
+          ['en', '/en'],
+          ['de', '/de'],
+        ],
+      }),
+      base,
+    ).verify;
+    expect(more.command).toContain("' 'https://a.test' '0' 'https://a.test/de' '0'");
   });
 
   const head = (ls: Links, origin: string) =>
@@ -264,6 +320,140 @@ describe('the hreflang_gap packet', () => {
       expect(broken.status).not.toBe(0);
       expect(fixed.status).toBe(0);
     });
+  });
+
+  // the round 1 SEO review's inputs, on a record whose page must name /de back
+  const RETURN: Links = [
+    ['en', '/en'],
+    ['de', '/de'],
+  ];
+  const tags = (
+    ls: Links,
+    origin: string,
+    write = (lang: string, href: string) =>
+      `<link rel="alternate" hreflang="${lang}" href="${href}">`,
+  ) => ls.map(([lang, path]) => write(lang, `${origin}${path}`)).join('');
+  it.each<[string, (origin: string) => string, boolean]>([
+    [
+      'the full set without an x-default, which is recommended and not required',
+      (o) => `<html><head>${tags(RETURN, o)}</head><body></body></html>`,
+      true,
+    ],
+    [
+      'attribute names in upper case',
+      (o) =>
+        `<html><head>${tags(RETURN, o, (lang, href) => `<LINK REL="alternate" HREFLANG="${lang}" HREF="${href}">`)}</head></html>`,
+      true,
+    ],
+    [
+      'the whole set commented out',
+      (o) => `<html><head><!-- ${tags(RETURN, o)} --></head><body></body></html>`,
+      false,
+    ],
+    [
+      'the set in the <body>',
+      (o) => `<html><head></head><body>${tags(RETURN, o)}</body></html>`,
+      false,
+    ],
+    [
+      'garbage codes with an x-default to a dead URL',
+      (o) =>
+        `<html><head>${tags(
+          [
+            ['english', '/en'],
+            ['german', '/de'],
+            ['x-default', '/dead'],
+          ],
+          o,
+        )}</head></html>`,
+      false,
+    ],
+  ])('verify, with %s, passes: %s', async (_name, fixedHtml, passes) => {
+    let origin = '';
+    served = await servedSite({
+      broken: {
+        get '/en'() {
+          return head(BROKEN.hreflang_missing_return.en, origin);
+        },
+      },
+      fixed: {
+        get '/en'() {
+          return fixedHtml(origin);
+        },
+      },
+    });
+    origin = served.base;
+    const p = packetFor(cluster(origin, 'hreflang_missing_return'), origin);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status === 0).toBe(passes);
+  });
+
+  it('on a site that serves its pages with a trailing slash, requests the page and reads its annotations as served', async () => {
+    const slashed = (ls: Links): Links => ls.map(([lang, path]) => [lang, `${path}/`]);
+    let origin = '';
+    served = await servedSite({
+      broken: {
+        get '/en/'() {
+          return head(slashed(BROKEN.hreflang_missing_return.en), origin);
+        },
+      },
+      fixed: {
+        get '/en/'() {
+          return head(slashed(FIXED), origin);
+        },
+      },
+    });
+    origin = served.base;
+    const input = cluster(origin, 'hreflang_missing_return');
+    const facts = factsFor(input, SERVED);
+    const pages = new Map(
+      [...facts.pages].map(([url, row]) => [
+        url,
+        url === origin ? row : { ...row, final_url: `${url}/` },
+      ]),
+    );
+    const p = packetOf('hreflang_gap', detected(detectHreflangGaps(input), `${origin}/de`), {
+      ...facts,
+      pages,
+    });
+    expect(p.verify.command).toContain(` '${origin}/en/' | `);
+    expect(p.verify.expect).toContain(`Exit status 0 once \`${origin}/en/\` lists itself`);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('agrees with the engine’s own reading of the pages served', async () => {
+    let origin = '';
+    const en = { broken: BROKEN.hreflang_missing_return.en, fixed: FIXED };
+    served = await servedSite({
+      broken: {
+        get '/en'() {
+          return head(en.broken, origin);
+        },
+      },
+      fixed: {
+        get '/en'() {
+          return head(en.fixed, origin);
+        },
+      },
+    });
+    origin = served.base;
+    const read = (state: 'broken' | 'fixed') =>
+      site(
+        [
+          { path: origin, links: [`${origin}/en`, `${origin}/de`] },
+          pageAsRead(`${origin}/en`, head(en[state], origin)),
+          pageAsRead(`${origin}/de`, head(FIXED, origin)),
+        ],
+        { homepage: origin },
+      );
+    const p = packetFor(read('broken'), origin);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    expect(detectHreflangGaps(read('fixed')).filter((r) => r.state === 'detected')).toEqual([]);
   });
 });
 

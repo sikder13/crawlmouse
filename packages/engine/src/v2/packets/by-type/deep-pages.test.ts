@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { afterEach, describe, expect, it } from 'vitest';
 import { edge, site } from '../../../../fixtures/v2/detectors/builders.js';
 import { detectDeepPages } from '../../detectors/deep-pages.js';
+import { detectOrphans } from '../../detectors/orphans.js';
 import type { DetectorInput } from '../../detectors/types.js';
 import { shallowParent } from '../../grade/effects.js';
 import { factsFor } from '../test-support/facts.js';
@@ -12,6 +13,7 @@ import {
   expectHostileSafe,
   hostileUrl,
   packetOf,
+  pageAsRead,
   pageAt,
   SERVED,
   servedSite,
@@ -82,13 +84,85 @@ describe('the deep_pages packet', () => {
     ]);
   });
 
-  it('does not say the parent holds no link today when the recorded links show one', () => {
+  it('writes no command that passes today: a parent that already links to the page is refused', () => {
     const linked: PacketFacts = {
       ...facts,
       edges: [...facts.edges, edge(`${base}/b`, `${base}/deep`)],
     };
     expect(packetOf('deep_pages', record, facts).verify.expect).toContain('today it holds none');
-    expect(packetOf('deep_pages', record, linked).verify.expect).not.toContain('today');
+    expect(() => packetOf('deep_pages', record, linked)).toThrow(/already links to the page/);
+  });
+
+  describe('a page that is also an orphan', () => {
+    /** home → /a → /b → /c; nothing links to /deep, and /island is out of reach too. */
+    const cut = site(
+      [
+        { path: base, links: [`${base}/a`] },
+        { path: `${base}/a`, links: [`${base}/b`] },
+        { path: `${base}/b`, links: [`${base}/c`] },
+        { path: `${base}/c`, links: [base] },
+        { path: `${base}/island`, links: [base] },
+        { path: `${base}/deep`, links: [base] },
+      ],
+      { homepage: base },
+    );
+    const unreachable = detected(detectDeepPages(cut), `${base}/deep`);
+    const suggesting = (parent: string): PacketFacts => {
+      const all = factsFor(cut, SERVED);
+      const pages = new Map(all.pages);
+      pages.set(`${base}/deep`, {
+        ...pages.get(`${base}/deep`)!,
+        is_orphan: true,
+        suggested_parent_url: `${base}${parent}`,
+      });
+      return { ...all, pages };
+    };
+
+    it('names the parent the orphan fix suggests when it is close enough, so the two fixes ask for one link', () => {
+      const withParent = suggesting('/a');
+      const deep = packetOf('deep_pages', unreachable, withParent);
+      expect(deep.change[1]).toBe(
+        "No other page links to this one, and the audit's fix for that suggests `https://a.test/a`, a page that close: one link there settles both. The estimate for this fix was computed with the link on `https://a.test/b`; any page as close does as well.",
+      );
+      const orphan = packetOf(
+        'orphan_pages',
+        detected(detectOrphans(cut), `${base}/deep`),
+        withParent,
+      );
+      expect(orphan.change[0]).toContain('on `https://a.test/a`.');
+      expect(deep.verify.command).toBe(orphan.verify.command);
+    });
+
+    it.each(['/c', '/island'])(
+      'keeps the estimate’s page when the suggested parent %s is too far, and says so',
+      (parent) => {
+        const deep = packetOf('deep_pages', unreachable, suggesting(parent));
+        expect(deep.change.slice(1, 3)).toEqual([
+          'On the links as crawled, the estimate for this fix puts the link on `https://a.test/b`, a page that close. Another page as close does as well: pick the one a visitor would look on.',
+          `No other page links to this one, and the audit's fix for that suggests \`https://a.test${parent}\`, which is not that close to the homepage: a link there alone leaves the page deep, and a link on \`https://a.test/b\` settles both.`,
+        ]);
+        expect(deep.verify.command).toContain(" 'https://a.test/b' | ");
+      },
+    );
+  });
+
+  it.each([
+    ['a comment', '<!-- <a href="/deep">Deep</a> -->'],
+    ['a script string', `<script>var nav='<a href="/deep">Deep</a>'</script>`],
+  ])('is not passed by a link written inside %s', async (_name, inert) => {
+    served = await servedSite({
+      broken: { '/b': `<a href="/">home</a>${inert}` },
+      fixed: { '/b': `<a href="/">home</a>${inert}<a href="/deep">Deep</a>` },
+    });
+    const live = chain(served.base);
+    const p = packetOf(
+      'deep_pages',
+      detected(detectDeepPages(live), `${served.base}/deep`),
+      factsFor(live, SERVED),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
   });
 
   it('verify fails while the shallow page does not link to the deep one and passes once it does', async () => {
@@ -111,6 +185,73 @@ describe('the deep_pages packet', () => {
     const { broken, fixed } = await inBothStates(served, p.verify.command);
     expect(broken.status).not.toBe(0);
     expect(fixed.status).toBe(0);
+  });
+
+  /** The chain's pages as HTML; `b` is what /b links to. With `slash`, every page is served at a slashed address. */
+  const chainHtml = (b: string[], slash = '') =>
+    Object.fromEntries(
+      Object.entries({
+        '/': ['/a'],
+        '/a': ['/c', '/b'],
+        '/b': b,
+        '/c': ['/d'],
+        '/d': ['/e'],
+        '/e': ['/deep'],
+        '/deep': ['/'],
+      }).map(([path, links]) => [
+        path === '/' ? path : `${path}${slash}`,
+        anchors(links.map((l) => (l === '/' ? l : `${l}${slash}`))),
+      ]),
+    );
+
+  it('on a site that serves its pages with a trailing slash, requests and names the served addresses', async () => {
+    served = await servedSite({
+      broken: chainHtml(['/'], '/'),
+      fixed: chainHtml(['/', '/deep'], '/'),
+    });
+    const u = (path: string) => `${served!.base}${path}`;
+    const live = site(
+      chain(served.base).pages.map((p) => ({
+        path: p.url,
+        links: chain(served!.base)
+          .edges.filter((e) => e.from_url === p.url)
+          .map((e) => e.to_url),
+        facts: { final_url: p.url === served!.base ? p.url : `${p.url}/` },
+      })),
+      { homepage: served.base },
+    );
+    const p = packetOf(
+      'deep_pages',
+      detected(detectDeepPages(live), u('/deep')),
+      factsFor(live, SERVED),
+    );
+    expect(p.change[0]).toContain(`Add a link to \`${u('/deep/')}\` on a page`);
+    expect(p.verify.command).toContain(` '${u('/b/')}' | `);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('agrees with the engine’s own reading of the pages served', async () => {
+    const states = { broken: chainHtml(['/']), fixed: chainHtml(['/', '/deep']) };
+    served = await servedSite(states);
+    const read = (state: 'broken' | 'fixed') =>
+      site(
+        Object.entries(states[state]).map(([path, body]) =>
+          pageAsRead(path === '/' ? served!.base : `${served!.base}${path}`, body),
+        ),
+        { homepage: served!.base },
+      );
+    const url = `${served.base}/deep`;
+    const p = packetOf(
+      'deep_pages',
+      detected(detectDeepPages(read('broken')), url),
+      factsFor(read('broken'), SERVED),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    expect(detected(detectDeepPages(read('fixed')), url, 'not_detected').measured).toBe(3);
   });
 });
 

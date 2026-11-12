@@ -12,6 +12,7 @@ import {
   hostile,
   hostileUrl,
   packetOf,
+  pageAsRead,
   pageAt,
   SERVED,
   servedSite,
@@ -63,7 +64,8 @@ describe('the orphan_pages packet', () => {
   it('names the suggested parent, the link as markup, and the title as a starting point', () => {
     const p = packetOf('orphan_pages', record, withParent(input, orphan, `${base}/hub`));
     expect(p.change).toEqual([
-      'Add a link to `https://a.test/products/lantern` on `https://a.test/hub`. The audit suggests that page: of the pages that do not link here yet, its title, link text and URL are the closest match.',
+      "Add a link to `https://a.test/products/lantern` on `https://a.test/hub`. The audit ranks the content pages on this host that do not link here yet by the words their title, link texts and URL path share with this page's, and suggests the first; on a tie, the lower URL.",
+      '`https://a.test/hub` is 1 click from the homepage, so this link also puts the page within 3.',
       'Write the link as an <a> element with an href, in the HTML the server sends. A link that only JavaScript adds is not there for a crawler that does not run scripts.',
       'Give it link text that names the page. Its title, as a starting point: `Forgotten lantern`.',
     ]);
@@ -90,7 +92,7 @@ describe('the orphan_pages packet', () => {
       /^curl -sS -A '[^']*GPTBot[^']*' 'https:\/\/a\.test\/hub' \| /,
     );
     expect(p.verify.command).toMatch(
-      / \| grep -qxF -e 'https:\/\/a\.test\/products\/lantern' -e '\/products\/lantern'$/,
+      / \| LC_ALL=C awk '.*' 'https:\/\/a\.test' '0' 'https:\/\/a\.test\/products\/lantern'$/,
     );
     const none = packetOf('orphan_pages', record, {
       ...withParent(input, orphan, `${base}/hub`),
@@ -136,6 +138,115 @@ describe('the orphan_pages packet', () => {
       withParent(live, url, `${served.base}/hub`),
     );
     expect((await inBothStates(served, p.verify.command)).fixed.status).not.toBe(0);
+  });
+
+  it('says when a link on the suggested parent leaves the page deep', () => {
+    const far = site(
+      [
+        { path: base, links: [`${base}/a`] },
+        { path: `${base}/a`, links: [`${base}/b`] },
+        { path: `${base}/b`, links: [`${base}/c`] },
+        { path: `${base}/c`, links: [base] },
+        { path: `${base}/island`, links: [base] },
+        { path: orphan },
+      ],
+      { homepage: base },
+    );
+    const lantern = detected(detectOrphans(far), orphan);
+    const line = (parent: string) =>
+      packetOf('orphan_pages', lantern, withParent(far, orphan, `${base}${parent}`)).change[1];
+    expect(line('/b')).toBe(
+      '`https://a.test/b` is 2 clicks from the homepage, so this link also puts the page within 3.',
+    );
+    expect(line('/c')).toBe(
+      '`https://a.test/c` is 3 clicks from the homepage, so with this link alone the page is more than 3 clicks deep: where the audit lists a deep-page fix for this URL, it names a page close enough for both.',
+    );
+    expect(line('/island')).toBe(
+      'No path of links from the homepage reaches `https://a.test/island` either, so with this link alone the page stays out of reach of the homepage: where the audit lists a deep-page fix for this URL, it names a page close enough for both.',
+    );
+  });
+
+  // the round 1 correctness review's inputs: the engine reads no link from either
+  it.each([
+    ['a comment', '<!-- <a href="/products/lantern">Lantern</a> -->'],
+    ['a script string', `<script>var nav='<a href="/products/lantern">Lantern</a>'</script>`],
+  ])('is not passed by a link written inside %s', async (_name, inert) => {
+    const hub = (extra: string) => `<html><body><a href="/">home</a>${extra}</body></html>`;
+    served = await servedSite({
+      broken: { '/hub': hub(inert) },
+      fixed: { '/hub': hub(`${inert}<a href="/products/lantern">Lantern</a>`) },
+    });
+    const live = orphanSite(served.base);
+    const url = `${served.base}/products/lantern`;
+    const p = packetOf(
+      'orphan_pages',
+      detected(detectOrphans(live), url),
+      withParent(live, url, `${served.base}/hub`),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('on a site that serves its pages with a trailing slash, requests the parent and names the orphan as served', async () => {
+    const hub = (links: string[]) => ({ '/hub/': anchors(links) });
+    served = await servedSite({
+      broken: hub(['/']),
+      fixed: hub(['/', '/products/lantern/']),
+    });
+    const u = (path: string) => `${served!.base}${path}`;
+    const live = site(
+      [
+        { path: served.base, links: [u('/hub')] },
+        { path: u('/hub'), links: [served.base], facts: { final_url: u('/hub/') } },
+        { path: u('/products/lantern'), facts: { final_url: u('/products/lantern/') } },
+      ],
+      { homepage: served.base },
+    );
+    const url = u('/products/lantern');
+    const p = packetOf(
+      'orphan_pages',
+      detected(detectOrphans(live), url),
+      withParent(live, url, u('/hub')),
+    );
+    expect(p.change[0]).toContain(
+      `Add a link to \`${u('/products/lantern/')}\` on \`${u('/hub/')}\`.`,
+    );
+    expect(p.verify.command).toContain(` '${u('/hub/')}' | `);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('agrees with the engine’s own reading of the pages served', async () => {
+    const lantern = '/products/lantern';
+    const pages = (hub: string) => ({
+      '/': anchors(['/hub']),
+      '/hub': hub,
+      [lantern]: anchors(['/']),
+    });
+    const states = {
+      broken: pages(`<a href="/">home</a><!-- <a href="${lantern}">Lantern</a> -->`),
+      fixed: pages(`<a href="/">home</a><a href='${lantern}/#top'>Lantern</a>`),
+    };
+    served = await servedSite(states);
+    const read = (state: 'broken' | 'fixed') =>
+      site(
+        Object.entries(states[state]).map(([path, body]) =>
+          pageAsRead(path === '/' ? served!.base : `${served!.base}${path}`, body),
+        ),
+        { homepage: served!.base },
+      );
+    const url = `${served.base}${lantern}`;
+    const p = packetOf(
+      'orphan_pages',
+      detected(detectOrphans(read('broken')), url),
+      withParent(read('broken'), url, `${served.base}/hub`),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    expect(detected(detectOrphans(read('fixed')), url, 'not_detected').state).toBe('not_detected');
   });
 });
 

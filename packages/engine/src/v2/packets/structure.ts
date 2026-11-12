@@ -45,6 +45,37 @@ export function filedLinks(facts: Pick<PacketFacts, 'pages' | 'edges'>): readonl
 /** A check's links are filed once for its pages and links, however many of its fixes read them. */
 const filed = new WeakMap<object, WeakMap<object, readonly LinkEdge[]>>();
 
+/**
+ * How many clicks each page is from the homepage, over the links as filed; a page no path of links
+ * reaches is not in the map. Remembered by the facts, as the links are.
+ */
+export function clicksFromHome(
+  facts: Pick<PacketFacts, 'pages' | 'edges' | 'homepage_url'>,
+): ReadonlyMap<string, number> {
+  const links = filedLinks(facts);
+  const known = clicks.get(links);
+  if (known !== undefined) return known;
+  const out = new Map<string, string[]>();
+  for (const e of links) out.set(e.from_url, [...(out.get(e.from_url) ?? []), e.to_url]);
+  const depth = new Map([[facts.homepage_url, 0]]);
+  let frontier = [facts.homepage_url];
+  for (let d = 1; frontier.length > 0; d++) {
+    const next: string[] = [];
+    for (const from of frontier) {
+      for (const to of out.get(from) ?? []) {
+        if (depth.has(to)) continue;
+        depth.set(to, d);
+        next.push(to);
+      }
+    }
+    frontier = next;
+  }
+  clicks.set(links, depth);
+  return depth;
+}
+
+const clicks = new WeakMap<object, ReadonlyMap<string, number>>();
+
 /** Up to `max` URLs in code spans; a longer list says how many pages it leaves out. */
 export const pagesShown = (urls: readonly string[], max = 8): Safe =>
   list(

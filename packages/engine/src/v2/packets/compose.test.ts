@@ -1,11 +1,18 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { FixPacketSchema, PacketFrameworkSchema } from '@crawlmouse/types/v2';
+import { simhashAway, site, type PageSpec } from '../../../fixtures/v2/detectors/builders.js';
+import { MAX_URL_LENGTH } from '../batch-bounds.js';
+import { detectStructure } from '../detectors/index.js';
+import type { DetectorInput } from '../detectors/types.js';
 import { compose, PACKET_BOUNDS } from './compose.js';
+import { COMMAND_BOUNDS } from './html-checks.js';
+import { writePacket } from './registry.js';
 import { sh, url, word } from './shell.js';
 import { code, count, line, type Line } from './text.js';
 import { hostileText, outsideCodeSpans, UNSHOWN } from './test-support/hostile.js';
-import { NO_STACK } from './test-support/facts.js';
+import { factsFor, NO_STACK } from './test-support/facts.js';
+import { SERVED } from './test-support/structure.js';
 import type { PacketBuilder, PacketFacts, PacketFramework } from './types.js';
 
 /** A record as hostile as a crawled site can make one: every string in it is the site's. */
@@ -221,5 +228,183 @@ describe('compose over hostile records (properties)', () => {
         }
       }),
     );
+  });
+});
+
+const base = 'https://a.test';
+
+/** `site`, with a short text on each link: the fixture's own names the target, which is long here. */
+const siteOf = (pages: PageSpec[], options: { homepage: string }): DetectorInput =>
+  site(
+    pages.map((p) => ({
+      ...p,
+      links: p.links?.map((l) => (typeof l === 'string' ? { to: l, anchor: 'a link' } : l)),
+    })),
+    options,
+  );
+
+/** Sites whose detected records are as large as a crawl can make them, with URLs made by `u`. */
+function sites(u: (name: string) => string): DetectorInput[] {
+  const home = { homepage: base };
+  const hash = '0123456789abcdef';
+  const members = Array.from({ length: 14 }, (_, i) => u(`m${i}`));
+  const gone = Array.from({ length: 12 }, (_, i) => u(`gone${i}`));
+  const linkers = Array.from({ length: 10 }, (_, i) => u(`l${i}`));
+  const list = `${u('list').slice(0, MAX_URL_LENGTH - 8)}`;
+  return [
+    // an orphan, which is a deep page too; and a deep page at the end of a chain
+    siteOf(
+      [
+        { path: base, links: [u('a')] },
+        { path: u('a'), links: [u('b')] },
+        { path: u('b'), links: [u('c')] },
+        { path: u('c'), links: [u('d')] },
+        { path: u('d'), links: [base] },
+        { path: u('orphan') },
+      ],
+      home,
+    ),
+    // a hub of generic links
+    siteOf(
+      [
+        {
+          path: u('hub'),
+          pr: 0.9,
+          links: Array.from({ length: 30 }, (_, i) => ({
+            to: u(`t${i}`),
+            anchor: `${"click 'here' ".repeat(15)}${i}`,
+            generic: true,
+          })),
+        },
+        { path: base, pr: 0.01, links: [u('hub')] },
+        ...Array.from({ length: 30 }, (_, i): PageSpec => ({ path: u(`t${i}`), pr: 0.01 })),
+      ],
+      home,
+    ),
+    // a redirect chain many pages link to, and a canonical on a redirect that pages link under
+    siteOf(
+      [
+        { path: base, links: linkers },
+        ...linkers.map((l): PageSpec => ({ path: l, links: [u('old'), u('p')] })),
+        { path: u('old'), facts: { final_url: u('new'), redirect: { hops: 4, loop: false } } },
+        { path: u('p'), facts: { canonical: { href: u('t') } } },
+        { path: u('t'), facts: { final_url: u('t2'), canonical: { href: u('t2') } } },
+        { path: u('t2'), facts: { canonical: { href: u('t2') } } },
+      ],
+      home,
+    ),
+    // a list whose page 2 names page 1 as canonical and repeats it
+    siteOf(
+      [
+        { path: base, links: [list] },
+        {
+          path: list,
+          links: [`${list}?page=2`],
+          facts: { simhash: hash, canonical: { href: list } },
+        },
+        {
+          path: `${list}?page=2`,
+          template: '/list/{slug}',
+          kind: 'pagination',
+          facts: { simhash: simhashAway(hash, 1), canonical: { href: list } },
+        },
+      ],
+      home,
+    ),
+    // an hreflang cluster whose first page names none of the others back, under invalid codes,
+    // and names alternates that are gone
+    siteOf(
+      [
+        { path: base, links: members },
+        ...members.map(
+          (m, i): PageSpec => ({
+            path: m,
+            facts: {
+              hreflang:
+                i === 0
+                  ? [
+                      ...gone.map((href, j) => ({ lang: `not-a-code-${j}`, href })),
+                      { lang: 'en', href: u('elsewhere') },
+                    ]
+                  : members.map((href, j) => ({ lang: `l${j}`, href })),
+            },
+          }),
+        ),
+        ...gone.map((g): PageSpec => ({ path: g, status: 404 })),
+      ],
+      home,
+    ),
+  ];
+}
+
+/** A URL of `length` characters whose path repeats `fill`. */
+const urlOf =
+  (length: number, fill: string) =>
+  (name: string): string =>
+    `${base}/${name}/${fill.repeat(length)}`.slice(0, length);
+
+describe('the size of a structure packet (security review, finding 5)', () => {
+  const fills = ['a', "'", '%C3%A9', '[1-3]', '`', '"'];
+  const stacks = [
+    NO_STACK,
+    {
+      ...NO_STACK,
+      frontend: {
+        name: 'x',
+        framework: 'nextjs' as const,
+        version: null,
+        router: null,
+        detected_from: 'a test',
+      },
+    },
+  ];
+
+  /** Five URLs, each character of one written as three, and the programs and the list around them. */
+  const COMMAND_MAX = 5 * 3 * MAX_URL_LENGTH + COMMAND_BOUNDS.listed_chars;
+
+  it('stays under the stated bound for URLs of the worker’s longest and the largest records', () => {
+    const seen = new Map<string, number>();
+    fc.assert(
+      fc.property(
+        fc.constantFrom(64, 512, MAX_URL_LENGTH),
+        fc.constantFrom(...fills),
+        fc.constantFrom(...stacks),
+        (length, fill, stack) => {
+          for (const input of sites(urlOf(length, fill))) {
+            const facts = factsFor(input, SERVED, stack);
+            for (const record of detectStructure(input)) {
+              if (record.state !== 'detected') continue;
+              const packet = writePacket(record.type, record, facts);
+              const size = JSON.stringify(packet).length;
+              seen.set(record.type, Math.max(seen.get(record.type) ?? 0, size));
+              expect(size, record.type).toBeLessThanOrEqual(PACKET_BOUNDS.one_body_chars);
+              if (record.type === 'hreflang_gap' && length === MAX_URL_LENGTH) {
+                // the URLs and values of this cluster do not fit a command at this length: it says so
+                expect(packet!.verify.expect).toMatch(
+                  / Of the \d+ URLs and values that follow, the command leaves \d+ out: /,
+                );
+              }
+              // more than one body only under packet_chars; one body can be past it
+              if (packet!.packets.length > 0) {
+                expect(size, record.type).toBeLessThanOrEqual(PACKET_BOUNDS.packet_chars);
+              }
+              expect(packet!.verify.command.length, record.type).toBeLessThanOrEqual(COMMAND_MAX);
+            }
+          }
+        },
+      ),
+      { numRuns: 60 },
+    );
+    // a packet of one body does pass packet_chars: the bound on it is one_body_chars, and no less
+    expect(Math.max(...seen.values())).toBeGreaterThan(PACKET_BOUNDS.packet_chars);
+    expect([...seen.keys()].sort()).toEqual([
+      'canonical_mismatch',
+      'deep_pages',
+      'duplicate_pagination',
+      'generic_anchor_text',
+      'hreflang_gap',
+      'orphan_pages',
+      'redirect_chain',
+    ]);
   });
 });
