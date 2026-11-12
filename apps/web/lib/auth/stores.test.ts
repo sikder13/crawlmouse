@@ -86,6 +86,16 @@ describe('supabaseDoorStore', () => {
     expect(f.calls.map((c) => c.table)).toEqual(['users']);
   });
 
+  it('loadMember reads an account only while it is neither deleted nor marked for deletion (spec 27b)', async () => {
+    const f = fakeSb([{ data: { default_account_id: 'acc' } }, { data: null }]);
+    await expect(supabaseDoorStore(f.sb).loadMember('u')).resolves.toBeNull();
+    const accounts = f.calls.find((c) => c.table === 'accounts')!;
+    expect(accounts.ops).toContainEqual(['is', ['deleted_at', null]]);
+    expect(accounts.ops).toContainEqual(['is', ['deletion_confirmed_at', null]]);
+    // No account row: no seat is looked for.
+    expect(f.calls.map((c) => c.table)).toEqual(['users', 'accounts']);
+  });
+
   it('a read error throws with its code rather than reading as "nothing there"', async () => {
     const f = fakeSb([{ error: { code: '42501', message: 'permission denied' } }]);
     await expect(supabaseDoorStore(f.sb).loadCheck('c')).rejects.toMatchObject({ code: '42501' });
