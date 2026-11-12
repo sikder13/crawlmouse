@@ -150,7 +150,7 @@ describe('after section C', () => {
   });
 
   it('a kind in neither list is refused by the CHECK', async () => {
-    for (const kind of ['seat_invites', 'client_reports', 'agency_plus_contact', '']) {
+    for (const kind of ['seat_invites', 'client_reports', 'no_such_kind', '']) {
       await expect(claim(kind, freshHash()), kind).rejects.toMatchObject({ code: '23514' });
     }
   });
@@ -234,7 +234,8 @@ describe('re-running and reverting', () => {
  * suppressible or not, then runs section C alone and the revert's block alone.
  */
 describe('a kind another migration added before this one', () => {
-  const OTHER = 'agency_plus_contact';
+  /** A name no migration uses, so this stays a stand-in whatever kinds are added later. */
+  const OTHER = 'kind_of_an_earlier_migration';
 
   /** The two definitions as an earlier migration would leave them, with one more kind. */
   async function earlierMigration(name: string, suppressible: boolean): Promise<void> {
