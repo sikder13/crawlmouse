@@ -18,8 +18,8 @@ export const RAW_EXPORT_FORMATS = ['csv', 'json', 'edge_list'] as const;
 
 /**
  * `POST /api/reports`: one of four requests. `compare` sets `checkId` (the later check) beside the
- * earlier one, or beside a fix the later check verified; with neither it is the baseline page of
- * that one check.
+ * earlier one (`previousCheckId`, the name the Reports screen posts it under), or beside a fix the
+ * later check verified; with neither it is the baseline page of that one check.
  */
 export const ReportRequestSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('audit_pdf'), siteId: Id, checkId: Id }),
@@ -27,7 +27,7 @@ export const ReportRequestSchema = z.discriminatedUnion('kind', [
     kind: z.literal('compare'),
     siteId: Id,
     checkId: Id,
-    beforeCheckId: Id.optional(),
+    previousCheckId: Id.optional(),
     fixId: Id.optional(),
   }),
   z.strictObject({
