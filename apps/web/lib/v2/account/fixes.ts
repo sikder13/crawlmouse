@@ -30,7 +30,7 @@ import {
   type RequestBody,
 } from './route';
 import { readEntitlement, type Entitlement } from './viewer-read';
-import { packetPrompt } from '../view/segment/fixes';
+import { packetBodies, packetPrompt } from '../view/segment/fixes';
 import { isFreeFix } from '../view/free-fixes';
 import type { CheckDataset } from '../pipeline/types';
 
@@ -207,18 +207,32 @@ const UNQUEUED: Record<Extract<RecheckOutcome, { queued: false }>['reason'], Not
 // ─── The packet ─────────────────────────────────────────────────────────────────────────────────
 
 /**
- * GET /api/fixes/[id]/packet once membership is established: `{packet}` for a fix the tier sees
- * (Free: `GATES.free.packets` is `visible_fixes_only`), 402 `packets` otherwise, 404 `no_packet` for
- * a fix no packet was written for.
+ * GET /api/fixes/[id]/packet once membership is established: 402 `packets` for a fix the tier does
+ * not see (Free: `GATES.free.packets` is `visible_fixes_only`), decided before the packet or the
+ * framework is looked at; 404 `no_packet` for a fix no packet was written for. Then, without
+ * `framework`, `{packet, prompt}`: the stored packet and the prompt of its own framework's body.
+ * With `framework` (the `?framework=` value as sent), `{body, prompt}` for the body written for it,
+ * and 404 `no_packet_for_framework` for a value the packet holds no body for, which a value that
+ * names no framework is too.
  */
-export async function packet(deps: FixDeps, caller: FixCaller): Promise<Response> {
+export async function packet(
+  deps: FixDeps,
+  caller: FixCaller,
+  framework: string | null = null,
+): Promise<Response> {
   const r = await reach(deps, caller);
   if (r === null) return notFound();
   if (r.entitlement.gates.packets !== 'all' && !(await visible(deps, r))) {
     return paywall('packets');
   }
   if (r.fix.packet === null) return refuse(404, 'no_packet');
-  return Response.json({ packet: r.fix.packet, prompt: packetPrompt(r.fix, r.fix.packet) });
+  const bodies = packetBodies(r.fix.packet);
+  if (framework === null) {
+    return Response.json({ packet: r.fix.packet, prompt: packetPrompt(r.fix, bodies[0]!) });
+  }
+  const body = bodies.find((b) => b.framework === framework);
+  if (body === undefined) return refuse(404, 'no_packet_for_framework');
+  return Response.json({ body, prompt: packetPrompt(r.fix, body) });
 }
 
 // ─── Email a developer ──────────────────────────────────────────────────────────────────────────
