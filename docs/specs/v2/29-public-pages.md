@@ -44,6 +44,14 @@ Where an artboard's figure disagrees with `prices.ts` (Agency $69, $9 a seat), t
 
 ## Known gaps
 
-The hide route keys on `audit_id`, so it cannot hide a v2 report; takedown can. A trialist lands on their
-personal account after Checkout until CC-31's switcher. The every-slug sweep needs production's rows in the
-branch, which only the owner can provide.
+- **No member can retract a v2 report.** The hide route keys on `audit_id`, and visibility needs a verified
+  domain and a claim; takedown is the only way to remove one. This blocks switching `V2_CHECKS_PUBLIC` on
+  until the owner controls of the v2 report page exist.
+- **Where a trialist lands.** After Checkout, a trialist lands on their personal account until CC-31's
+  account switcher exists. A cancel started from `/agency-trial` returns to `/settings/plan`, which needs
+  `V2_CHECKS_PUBLIC`.
+- **One agency trial per sign-in.** The rule is per sign-in, not per person: agency trials do not use
+  `trial_ledger`.
+- **Agency Plus requests are stored, not sent.** They are recorded until the mailer (CC-28) or an owner
+  routine reads `contact_requests`.
+- **The every-slug sweep** needs production's rows in a branch, which only the owner can provide.
