@@ -146,19 +146,19 @@ granted to `service_role` alone. A route asks `seat_may` through the caller's ow
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-a-seats.test.ts` runs each outcome
 below, the grants, and the migration applied twice and reverted.
 
-| Rule | Where it holds |
-|---|---|
-| An invitation is a `seats` row of status `invited`. Its link's token is minted when the mail is sent, lives 7 days, and is stored as its sha256 (`seats.invite_token_hash`, `invite_expires_at`); the row holds no raw token. | `issue_seat_invite`; the CHECK `seats_invite_token` |
-| A role is `account_manager` or `developer`. A scope is every client, or at least one live client site of the account that is not a staging copy. | `invite_seat`, `change_seat`, `seat_scope_valid` |
-| An address that holds an invited seat, or is the current address of an active member, is not invited again (`exists`). Addresses are compared in lower case and otherwise as written, so a plus-address is another address. | `invite_seat` |
-| The seat limit is the lower of `accounts.seat_limit` and the viewer's limit at that moment (the trial and past-due clocks read). Active seats and invited seats count toward it, an invited seat whose link has expired included, until it is removed. The count is made in the statement that writes the seat, under the account's row lock. | `invite_seat` |
-| A removed seat of the same address is written back to `invited` (its next invitation) rather than a second row added. | `invite_seat` |
-| An invitation is accepted by the signed-in user whose current address is the invited one, once. Another address is refused and the invitation stays usable. | `accept_seat_invite` |
-| An acceptance is refused while the account's active seats are not below `accounts.seat_limit`. | `accept_seat_invite` |
-| An account marked for deletion neither invites nor gains a member (spec 27b). | each function answers `marked` |
-| A resend is the row's next invitation (`invite_seq + 1`): the link sent before stops working at once. | `resend_seat_invite` |
-| Removing a seat sets `removed`, deletes its `seat_sites` rows and gives the sites it owned to the owner's seat. `is_member`, `is_member_for_site` and `seat_may` read `status = 'active'`, so the person's next request is refused. | `remove_seat` |
-| A seat id is looked up with the account the caller acts in, so another account's seat is `not_found`. | `change_seat`, `remove_seat`, `resend_seat_invite` |
+| Rule                                                                                                                                                                                                                                                                                                                                          | Where it holds                                      |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| An invitation is a `seats` row of status `invited`. Its link's token is minted when the mail is sent, lives 7 days, and is stored as its sha256 (`seats.invite_token_hash`, `invite_expires_at`); the row holds no raw token.                                                                                                                 | `issue_seat_invite`; the CHECK `seats_invite_token` |
+| A role is `account_manager` or `developer`. A scope is every client, or at least one live client site of the account that is not a staging copy.                                                                                                                                                                                              | `invite_seat`, `change_seat`, `seat_scope_valid`    |
+| An address that holds an invited seat, or is the current address of an active member, is not invited again (`exists`). Addresses are compared in lower case and otherwise as written, so a plus-address is another address.                                                                                                                   | `invite_seat`                                       |
+| The seat limit is the lower of `accounts.seat_limit` and the viewer's limit at that moment (the trial and past-due clocks read). Active seats and invited seats count toward it, an invited seat whose link has expired included, until it is removed. The count is made in the statement that writes the seat, under the account's row lock. | `invite_seat`                                       |
+| A removed seat of the same address is written back to `invited` (its next invitation) rather than a second row added.                                                                                                                                                                                                                         | `invite_seat`                                       |
+| An invitation is accepted by the signed-in user whose current address is the invited one, once. Another address is refused and the invitation stays usable.                                                                                                                                                                                   | `accept_seat_invite`                                |
+| An acceptance is refused while the account's active seats are not below `accounts.seat_limit`.                                                                                                                                                                                                                                                | `accept_seat_invite`                                |
+| An account marked for deletion neither invites nor gains a member (spec 27b).                                                                                                                                                                                                                                                                 | each function answers `marked`                      |
+| A resend is the row's next invitation (`invite_seq + 1`): the link sent before stops working at once.                                                                                                                                                                                                                                         | `resend_seat_invite`                                |
+| Removing a seat sets `removed`, deletes its `seat_sites` rows and gives the sites it owned to the owner's seat. `is_member`, `is_member_for_site` and `seat_may` read `status = 'active'`, so the person's next request is refused.                                                                                                           | `remove_seat`                                       |
+| A seat id is looked up with the account the caller acts in, so another account's seat is `not_found`.                                                                                                                                                                                                                                         | `change_seat`, `remove_seat`, `resend_seat_invite`  |
 
 Two invitations, or two acceptances, for the last seat: one passes and the other is `full`. That is
 run on a real Postgres with two connections, and again on a database built without the function's
@@ -175,14 +175,14 @@ account with members and an invitation.
 
 **Routes** (each a 404 with `V2_CHECKS_PUBLIC` unset):
 
-| Route | Who | Answers |
-|---|---|---|
-| `POST /api/seats` `{email, role, scope}` | `seat_may('invite_seat')`, in the account the caller acts in | 201; 402 `upgrade_required` with gate `seats` and `canBuySeats` (Free, or no seat free); 409 `seat_exists`; 400 `invalid_scope`; 429 `rate_limited` |
-| `PATCH /api/seats/id/[id]` `{role, scope}` | `seat_may('change_seat')` | 200; 404; 409 `seat_owner` |
-| `DELETE /api/seats/id/[id]` | `seat_may('remove_seat')` | 200; 404; 409 `seat_owner` |
-| `POST /api/seats/id/[id]/resend` | `seat_may('invite_seat')` | 200; 404; 409 `not_invited`; 429 |
-| `POST /api/seats/accept` | a signed-in user; the token is read from the `cm_link_invite` cookie | 200 or a 303 to `/dashboard`, with the switcher cookie set to the joined account; 410 `invite_gone`; 403 `email_mismatch`; 409 `invite_full`, `already_member` |
-| `GET /invite/[token]` | anyone holding the link | moves the token into the cookie and answers 303 to `/invite`; changes nothing |
+| Route                                      | Who                                                                  | Answers                                                                                                                                                        |
+| ------------------------------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/seats` `{email, role, scope}`   | `seat_may('invite_seat')`, in the account the caller acts in         | 201; 402 `upgrade_required` with gate `seats` and `canBuySeats` (Free, or no seat free); 409 `seat_exists`; 400 `invalid_scope`; 429 `rate_limited`            |
+| `PATCH /api/seats/id/[id]` `{role, scope}` | `seat_may('change_seat')`                                            | 200; 404; 409 `seat_owner`                                                                                                                                     |
+| `DELETE /api/seats/id/[id]`                | `seat_may('remove_seat')`                                            | 200; 404; 409 `seat_owner`                                                                                                                                     |
+| `POST /api/seats/id/[id]/resend`           | `seat_may('invite_seat')`                                            | 200; 404; 409 `not_invited`; 429                                                                                                                               |
+| `POST /api/seats/accept`                   | a signed-in user; the token is read from the `cm_link_invite` cookie | 200 or a 303 to `/dashboard`, with the switcher cookie set to the joined account; 410 `invite_gone`; 403 `email_mismatch`; 409 `invite_full`, `already_member` |
+| `GET /invite/[token]`                      | anyone holding the link                                              | moves the token into the cookie and answers 303 to `/invite`; changes nothing                                                                                  |
 
 A seat's own routes are under `/api/seats/id/`: a seat id directly under `/api/seats` would also match
 `/api/seats/accept` and `/api/seats/switch`, and the route registry holds each path to one row
@@ -211,13 +211,13 @@ is changed by its id (deleted at quantity 0), and a new one is added at
 `accounts.seat_limit` and `site_limit` change when the webhook applies the subscription Stripe
 confirms.
 
-| Case | Answer |
-|---|---|
-| Quantities the plan does not sell (`limitsFor`), or more than 100 extra seats in one request | 400 `invalid`, before any Stripe call |
-| A seat limit below the seats in use (active, and invited with a link not yet expired), or a site limit below the live client sites | 409 `in_use`, before any Stripe call |
-| No subscription; one set to end; one not `active` or `trialing`; one whose items are not the catalog's Agency plan | 409 |
-| The card is declined on a raise | 402 `payment_failed`; the subscription is as it was |
-| The quantities the subscription already holds | 200 `changed: false`; no Stripe write |
+| Case                                                                                                                               | Answer                                              |
+| ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Quantities the plan does not sell (`limitsFor`), or more than 100 extra seats in one request                                       | 400 `invalid`, before any Stripe call               |
+| A seat limit below the seats in use (active, and invited with a link not yet expired), or a site limit below the live client sites | 409 `in_use`, before any Stripe call                |
+| No subscription; one set to end; one not `active` or `trialing`; one whose items are not the catalog's Agency plan                 | 409                                                 |
+| The card is declined on a raise                                                                                                    | 402 `payment_failed`; the subscription is as it was |
+| The quantities the subscription already holds                                                                                      | 200 `changed: false`; no Stripe write               |
 
 **Proration** (owner ruling, questions.md Q4). When either quantity rises the update is sent with
 `proration_behavior: 'always_invoice'` and `payment_behavior: 'error_if_incomplete'` (`RAISE`): the
