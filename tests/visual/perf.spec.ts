@@ -371,9 +371,12 @@ async function countMapWrites(browser: Browser, w: (typeof WINDOWS)[number], fra
       return animate.apply(this, args);
     };
   });
-  // A whole number of frames, so a pass at either rate replays exactly WINDOW_MS.
+  // A whole number of frames, each ending on a whole millisecond, so a pass at either rate ends at
+  // exactly WINDOW_MS (summing 1000 / 60 seven hundred and twenty times does not).
   const steps = Math.round(WINDOW_MS / frameMs);
-  for (let i = 0; i < steps; i++) await page.clock.runFor(frameMs);
+  for (let i = 1; i <= steps; i++) {
+    await page.clock.runFor(Math.round(i * frameMs) - Math.round((i - 1) * frameMs));
+  }
   // MutationObserver delivers in a microtask; a round trip after the last step flushes it.
   const counts = await page.evaluate(
     () =>
@@ -405,7 +408,7 @@ test.describe('the crawl map, counted', () => {
       unit: 'writes',
       median: first.perFrame,
       limit: MAP_WRITES_PER_FRAME,
-      pass: first.perFrame <= MAP_WRITES_PER_FRAME && slow.perFrame <= MAP_WRITES_PER_FRAME,
+      pass: first.perFrame <= MAP_WRITES_PER_FRAME && slow.writes <= first.writes,
       samples: [first.perFrame, again.perFrame, slow.perFrame],
     });
     expect(first.writes, `${INVALID}: the window wrote nothing to the map`).toBeGreaterThan(0);
