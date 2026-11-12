@@ -608,6 +608,21 @@ const INVENTORY: [entry: string, why: string][] = [
     "packages/engine/src/url-canonical.ts :: if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);",
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
+  [
+    "apps/web/lib/v2/mail/escape.ts :: return points.length <= max ? clean : `${points.slice(0, Math.max(0, max - 1)).join('')}…`;",
+    'ARRAY slice of the code points of a string spread with `[...clean]` (CC-28 D3): each element is a ' +
+      'whole code point, so the cut cannot split a surrogate pair. This is the bound mail templates use.',
+  ],
+  [
+    "apps/web/lib/v2/mail/unsubscribe-token.ts :: body = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));",
+    'NOT A CUT. Decodes the whole base64url payload of an unsubscribe token we signed (CC-28 D7); nothing ' +
+      'is dropped, and the payload holds a seat id, a kind and a time, no crawled text.',
+  ],
+  [
+    "apps/web/lib/v2/mail/transport.ts :: providerId: typeof body?.id === 'string' ? body.id.slice(0, 200) : null,",
+    "STRING slice of Resend's message id, bounded to the ledger column's 200 characters (CC-28 D1). " +
+      'An id the provider issued, not crawled text.',
+  ],
 ];
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
