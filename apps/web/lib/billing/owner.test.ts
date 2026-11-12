@@ -4,37 +4,24 @@ import { ownedAccountId, requestedAccountId } from './owner';
 
 const A = '0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11';
 const B = '7d2f1c4a-9e3b-4b8a-8c1d-5e6f7a8b9c0d';
-const C = '3e4f5a6b-7c8d-4e9f-8a0b-1c2d3e4f5a6b';
 
-/** The caller's default account, as `readDefaultAccountId` answers it; records whether it was read. */
-function defaultOf(id: string | null) {
-  const read = { count: 0 };
-  return {
-    read,
-    fn: async () => {
-      read.count++;
-      return id;
-    },
-  };
-}
-const NO_DEFAULT = async () => {
-  throw new Error('the default account is read only for several owner seats');
-};
+type Result = { data: unknown; error: unknown };
 
-/** The caller's session client: records the seats query, then answers it with `result`. */
-function session(result: { data: unknown; error: unknown }) {
+/** The caller's session client: records each query, then answers it with its table's result. */
+function session(seats: Result, accounts: Result = { data: [], error: null }) {
   const calls: unknown[][] = [];
-  const chain: Record<string, unknown> = {};
-  for (const m of ['select', 'eq']) {
-    chain[m] = (...args: unknown[]) => {
-      calls.push([m, ...args]);
-      return chain;
-    };
-  }
-  chain.then = (resolve: (v: unknown) => unknown) => resolve(result);
   const sb = {
     from: (table: string) => {
       calls.push(['from', table]);
+      const chain: Record<string, unknown> = {};
+      for (const m of ['select', 'eq', 'in']) {
+        chain[m] = (...args: unknown[]) => {
+          calls.push([m, ...args]);
+          return chain;
+        };
+      }
+      chain.then = (resolve: (v: unknown) => unknown) =>
+        resolve(table === 'seats' ? seats : accounts);
       return chain;
     },
   } as unknown as SupabaseClient;
@@ -48,17 +35,18 @@ const SEATS_READ = [
   ['eq', 'role', 'owner'],
   ['eq', 'status', 'active'],
 ];
+const ok = (data: unknown): Result => ({ data, error: null });
 
 describe('ownedAccountId', () => {
   it("is the account of the caller's one active owner seat, read with the session", async () => {
-    const { sb, calls } = session({ data: [{ account_id: A }], error: null });
-    expect(await ownedAccountId(sb, 'u1', NO_DEFAULT)).toEqual({ ok: true, accountId: A });
+    const { sb, calls } = session(ok([{ account_id: A }]));
+    expect(await ownedAccountId(sb, 'u1')).toEqual({ ok: true, accountId: A });
     expect(calls).toEqual(SEATS_READ);
   });
 
   it('refuses 403 not_owner without an owner seat (a manager or no seat at all)', async () => {
-    const { sb } = session({ data: [], error: null });
-    expect(await ownedAccountId(sb, 'u1', NO_DEFAULT)).toEqual({
+    const { sb } = session(ok([]));
+    expect(await ownedAccountId(sb, 'u1')).toEqual({
       ok: false,
       status: 403,
       error: 'not_owner',
@@ -66,57 +54,56 @@ describe('ownedAccountId', () => {
   });
 
   // Q26: the Agency trial gives its person a second owner seat; a request that names no account
-  // (Settings' forms, the email change) then acts on their default, personal, account.
-  it('with two owner seats, is the default account when it is one of them', async () => {
-    const { sb } = session({ data: [{ account_id: A }, { account_id: B }], error: null });
-    for (const id of [A, B]) {
-      const d = defaultOf(id);
-      expect(await ownedAccountId(sb, 'u1', d.fn)).toEqual({ ok: true, accountId: id });
-      expect(d.read.count).toBe(1);
-    }
+  // (Settings' forms, the email change) then acts on their personal account, the default one.
+  it('with two owner seats, is the personal one, read with the session', async () => {
+    const { sb, calls } = session(ok([{ account_id: A }, { account_id: B }]), ok([{ id: A }]));
+    expect(await ownedAccountId(sb, 'u1')).toEqual({ ok: true, accountId: A });
+    expect(calls.slice(SEATS_READ.length)).toEqual([
+      ['from', 'accounts'],
+      ['select', 'id'],
+      ['in', 'id', [A, B]],
+      ['eq', 'kind', 'personal'],
+    ]);
   });
 
   it.each([
-    ['a default the caller holds no owner seat on', C],
-    ['no default', null],
-  ])('refuses 409 account_ambiguous with two owner seats and %s', async (_, id) => {
-    const { sb } = session({ data: [{ account_id: A }, { account_id: B }], error: null });
-    expect(await ownedAccountId(sb, 'u1', defaultOf(id).fn)).toEqual({
+    ['none of them personal', []],
+    ['two of them personal', [{ id: A }, { id: B }]],
+  ])('refuses 409 account_ambiguous with two owner seats and %s', async (_, personal) => {
+    const { sb } = session(ok([{ account_id: A }, { account_id: B }]), ok(personal));
+    expect(await ownedAccountId(sb, 'u1')).toEqual({
       ok: false,
       status: 409,
       error: 'account_ambiguous',
     });
   });
 
-  it('throws when the read fails, rather than answering as if there were no seat', async () => {
-    const { sb } = session({ data: null, error: { message: 'boom' } });
-    await expect(ownedAccountId(sb, 'u1', NO_DEFAULT)).rejects.toThrow('seats read failed: boom');
+  it('throws when a read fails, rather than answering as if there were no seat', async () => {
+    await expect(
+      ownedAccountId(session({ data: null, error: { message: 'boom' } }).sb, 'u1'),
+    ).rejects.toThrow('seats read failed: boom');
+    await expect(
+      ownedAccountId(
+        session(ok([{ account_id: A }, { account_id: B }]), {
+          data: null,
+          error: { message: 'down' },
+        }).sb,
+        'u1',
+      ),
+    ).rejects.toThrow('accounts read failed: down');
   });
 });
 
 describe('requestedAccountId', () => {
   it('is the account the request names, without reading the seats', async () => {
-    const { sb, calls } = session({ data: [{ account_id: A }], error: null });
-    const d = defaultOf(A);
-    expect(await requestedAccountId(sb, 'u1', B, d.fn)).toEqual({ ok: true, accountId: B });
+    const { sb, calls } = session(ok([{ account_id: A }, { account_id: B }]), ok([{ id: A }]));
+    expect(await requestedAccountId(sb, 'u1', B)).toEqual({ ok: true, accountId: B });
     expect(calls).toEqual([]);
-    expect(d.read.count).toBe(0);
-  });
-
-  it('a request naming an account with two owner seats acts on it, whatever the default', async () => {
-    const { sb } = session({ data: [{ account_id: A }, { account_id: B }], error: null });
-    expect(await requestedAccountId(sb, 'u1', B, defaultOf(A).fn)).toEqual({
-      ok: true,
-      accountId: B,
-    });
   });
 
   it("is the caller's owned account when the request names none", async () => {
-    const { sb, calls } = session({ data: [{ account_id: A }], error: null });
-    expect(await requestedAccountId(sb, 'u1', undefined, NO_DEFAULT)).toEqual({
-      ok: true,
-      accountId: A,
-    });
+    const { sb, calls } = session(ok([{ account_id: A }]));
+    expect(await requestedAccountId(sb, 'u1', undefined)).toEqual({ ok: true, accountId: A });
     expect(calls).toEqual(SEATS_READ);
   });
 });

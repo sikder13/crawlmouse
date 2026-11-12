@@ -33,23 +33,36 @@ vi.mock('@/lib/supabase/server', () => ({
         error: null,
       }),
     },
-    // The caller's active owner seats, as ownedAccountId's read returns them.
+    // ownedAccountId's two reads, answered from the database: the caller's active owner seats,
+    // and which of the accounts it names (`in`) are personal.
     from: (table: string) => {
       h.log.push(`session.from ${table}`);
+      let ids: string[] = [];
+      const read = (): Promise<unknown[]> => {
+        if (!h.user) return Promise.resolve([]);
+        return table === 'seats'
+          ? h.db
+              .query(
+                `select account_id from public.seats
+                  where user_id = $1 and role = 'owner' and status = 'active'`,
+                [h.user.id],
+              )
+              .then((r) => r.rows)
+          : h.db
+              .query(`select id from public.accounts where id = any($1) and kind = 'personal'`, [
+                ids,
+              ])
+              .then((r) => r.rows);
+      };
       const chain: Record<string, unknown> = {
         then: (resolve: (v: unknown) => unknown) =>
-          (h.user
-            ? h.db
-                .query<{ account_id: string }>(
-                  `select account_id from public.seats
-                    where user_id = $1 and role = 'owner' and status = 'active'`,
-                  [h.user.id],
-                )
-                .then((r) => r.rows)
-            : Promise.resolve([])
-          ).then((rows) => resolve({ data: rows, error: null })),
+          read().then((rows) => resolve({ data: rows, error: null })),
       };
       chain.select = chain.eq = () => chain;
+      chain.in = (_: string, values: string[]) => {
+        ids = values;
+        return chain;
+      };
       return chain;
     },
     rpc: async (fn: string, args: unknown) => {
@@ -62,7 +75,7 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => {
     h.log.push('supabaseAdmin');
-    return postgrestOver(h.db);
+    return {};
   },
 }));
 vi.mock('@/lib/v2/account/email-change-ports', () => ({
@@ -202,7 +215,7 @@ describe('POST /api/account/email', () => {
   });
 
   // Q26: the Agency trial gives its person a second owner seat; this form names no account, so it
-  // acts on their default, personal, one. The service role reads only that value before the role.
+  // acts on their personal (default) one, found with the caller's own client before the role.
   it('with the agency trial’s second owner seat, acts on the default account', async () => {
     const p = await person();
     const { rows } = await h.db.query<{ r: { account_id: string } }>(
@@ -210,12 +223,17 @@ describe('POST /api/account/email', () => {
       [p.id],
     );
     expect(rows[0]!.r.account_id).not.toBe(p.accountId);
+    const { rows: users } = await h.db.query<{ id: string }>(
+      `select default_account_id as id from public.users where id = $1`,
+      [p.id],
+    );
+    expect(users[0]!.id).toBe(p.accountId);
     await asked(p, 'two-seats@example.org');
     expect(h.rpcArgs).toEqual([{ p_account: p.accountId }]);
     expect(h.log).toEqual([
       'getUser',
       'session.from seats',
-      'supabaseAdmin',
+      'session.from accounts',
       'session.rpc member_role',
       'supabaseAdmin',
     ]);

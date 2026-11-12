@@ -10,13 +10,18 @@ const h = vi.hoisted(() => {
     user: { id: 'u1' } as unknown,
     seats: [{ account_id: ACCOUNT }] as unknown[],
     role: 'owner' as unknown,
-    defaultAccount: ACCOUNT as string | null,
+    personal: [] as unknown[],
     customer: 'cus_1' as string | null,
   };
   const seatsChain: Record<string, unknown> = {
     then: (resolve: (v: unknown) => unknown) => resolve({ data: state.seats, error: null }),
   };
   seatsChain.select = seatsChain.eq = () => seatsChain;
+  // The caller's owned accounts that are personal (ownedAccountId, for several owner seats).
+  const accountsChain: Record<string, unknown> = {
+    then: (resolve: (v: unknown) => unknown) => resolve({ data: state.personal, error: null }),
+  };
+  accountsChain.select = accountsChain.eq = accountsChain.in = () => accountsChain;
   const session = {
     auth: {
       getUser: async () => {
@@ -26,7 +31,7 @@ const h = vi.hoisted(() => {
     },
     from: (table: string) => {
       log.push(`session.from ${table}`);
-      return seatsChain;
+      return table === 'accounts' ? accountsChain : seatsChain;
     },
     rpc: async (fn: string, args: unknown) => {
       log.push(`rpc ${fn} ${JSON.stringify(args)}`);
@@ -50,22 +55,7 @@ vi.mock('@/lib/supabase/server', () => ({ supabaseServer: async () => h.session 
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => {
     h.log.push('supabaseAdmin');
-    return {
-      tag: 'admin',
-      // The caller's own default account (readDefaultAccountId), the one read made before the
-      // owner check, and only for several owner seats.
-      from: (table: string) => {
-        h.log.push(`admin.from ${table}`);
-        const chain: Record<string, unknown> = {
-          maybeSingle: async () => ({
-            data: { default_account_id: h.state.defaultAccount },
-            error: null,
-          }),
-        };
-        chain.select = chain.eq = () => chain;
-        return chain;
-      },
-    };
+    return { tag: 'admin' };
   },
 }));
 vi.mock('@/lib/stripe', () => ({ stripe: h.v1Stripe }));
@@ -118,7 +108,7 @@ beforeEach(() => {
   h.state.user = { id: 'u1' };
   h.state.seats = [{ account_id: ACCOUNT }];
   h.state.role = 'owner';
-  h.state.defaultAccount = ACCOUNT;
+  h.state.personal = [];
   h.state.customer = 'cus_1';
   h.create.mockReset();
 });
@@ -189,29 +179,26 @@ describe('POST /api/billing/portal, V2_BILLING=1', () => {
   });
 
   // Q26: Settings' Manage billing names no account; with the Agency trial's second owner seat it
-  // opens the default (personal) account's portal.
-  it('an owner of two accounts naming neither opens the default account', async () => {
+  // opens the personal (default) account's portal.
+  it('an owner of two accounts naming neither opens the personal one', async () => {
     h.state.seats = [{ account_id: ACCOUNT }, { account_id: OTHER }];
-    h.state.defaultAccount = OTHER;
+    h.state.personal = [{ id: OTHER }];
     const res = await post('');
     expect(res.status).toBe(303);
     expect(h.log.slice(0, 5)).toEqual([
       'getUser',
       'session.from seats',
-      'supabaseAdmin',
-      'admin.from users',
+      'session.from accounts',
       `rpc member_role {"p_account":"${OTHER}"}`,
+      'supabaseAdmin',
     ]);
   });
 
-  it.each([
-    ['a default the caller does not own', '3e4f5a6b-7c8d-4e9f-8a0b-1c2d3e4f5a6b'],
-    ['no default', null],
-  ])('409 account_ambiguous for an owner of two accounts naming neither, with %s', async (_, d) => {
+  it('409 account_ambiguous for an owner of two accounts naming neither, neither personal', async () => {
     h.state.seats = [{ account_id: ACCOUNT }, { account_id: OTHER }];
-    h.state.defaultAccount = d;
     const res = await post('');
     expect([res.status, await res.json()]).toEqual([409, { error: 'account_ambiguous' }]);
     expect(stripeCalls()).toEqual([]);
+    expect(h.log).not.toContain('supabaseAdmin');
   });
 });

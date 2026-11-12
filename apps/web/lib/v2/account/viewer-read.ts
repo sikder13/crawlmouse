@@ -166,26 +166,18 @@ export async function readEntitlement(
   };
 }
 
-/**
- * The caller's own `users.default_account_id`, read with the service role: the caller's column grant
- * on `users` leaves it out. Null when it is unset. The value is an id to choose among the caller's
- * own seats with, never an account to act on by itself.
- */
-export async function readDefaultAccountId(
-  admin: SupabaseClient,
-  userId: string,
-): Promise<string | null> {
-  const u = await admin.from('users').select('default_account_id').eq('id', userId).maybeSingle();
-  if (u.error) failed('users read', u.error);
-  return (u.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
-}
-
 /** The seat on the caller's default account, or null when the default is none of their seats. */
 async function defaultSeat(
   deps: ViewerDeps,
   userId: string,
   mine: z.infer<typeof SeatRow>[],
 ): Promise<z.infer<typeof SeatRow> | null> {
-  const id = await readDefaultAccountId(deps.admin, userId);
+  const u = await deps.admin
+    .from('users')
+    .select('default_account_id')
+    .eq('id', userId)
+    .maybeSingle();
+  if (u.error) failed('users read', u.error);
+  const id = (u.data as { default_account_id: string | null } | null)?.default_account_id;
   return mine.find((s) => s.account_id === id) ?? null;
 }
