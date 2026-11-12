@@ -10,16 +10,25 @@ import { PRICING_COPY } from '@/lib/v2/copy/pricing';
 import { pricingCapture } from '@/lib/v2/pricing/events';
 import { readPricingViewer } from '@/lib/v2/pricing/read';
 import { reachedByRewrite } from '@/lib/v2/rewrite-target';
+import { socialCardPath } from '@/lib/v2/social-card';
+import { socialMetadata } from '@/lib/v2/social-metadata';
 import { intervalFrom, pricingView } from '@/lib/v2/view/pricing';
 
 // Rendered per request: the plan buttons read the session.
 export const dynamic = 'force-dynamic';
 
-// v1's title and canonical (app/pricing/page.tsx); the description is the v2 plans'.
+// v1's title and canonical (app/pricing/page.tsx); the description is the v2 plans', and it is shared
+// as itself, with its own card (SEO R2-N6).
 export const metadata: Metadata = {
-  title: 'Pricing',
+  title: PRICING_COPY.pageTitle,
   description: PRICING_COPY.description(),
   alternates: { canonical: '/pricing' },
+  ...socialMetadata({
+    path: '/pricing',
+    title: PRICING_COPY.pageTitle,
+    description: PRICING_COPY.description(),
+    image: socialCardPath('pricing'),
+  }),
 };
 
 /**

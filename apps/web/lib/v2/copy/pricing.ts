@@ -212,6 +212,8 @@ export function planCopy(interval: Interval, proTrial: boolean): Record<Tier, Pl
 }
 
 export const PRICING_COPY = {
+  /** The page's title, v1's (app/pricing/page.tsx), before the root layout adds the site name. */
+  pageTitle: 'Pricing',
   /** The page's meta description. */
   /** The meta description: built capabilities only, since a search result carries no "coming" mark. */
   description: () =>

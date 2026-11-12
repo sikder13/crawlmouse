@@ -2,8 +2,9 @@
  * A public page's social metadata (CC-29 review r1, SEO N5), for its route's `metadata`. Next replaces
  * a parent's `openGraph` and `twitter` objects whole, so a page that sets either sets every field it
  * needs: its own url, title and description, the site name, the large card, and an image. The image is
- * the site's card (`app/opengraph-image.tsx`, served at `/opengraph-image`) unless the page has its
- * own, as a report does. Pinned per page in `__tests__/v2/social-metadata.test.tsx`.
+ * the page's own: a report's, or a v2 page's card (lib/v2/social-card.tsx). Without one it is the
+ * root's file card (`app/opengraph-image.tsx`, served at `/opengraph-image`), which is v1's
+ * internal-linking card. Pinned per page in `__tests__/v2/social-metadata.test.tsx`.
  */
 import type { Metadata } from 'next';
 
