@@ -7,6 +7,7 @@ import { FIRST_AUDIT } from './segment/test-helpers';
 import {
   publicReportCard,
   publicReportTitle,
+  reportCardOf,
   publicReportView,
   reportPageOf,
 } from './public-report';
@@ -190,5 +191,25 @@ describe('the title and the card', () => {
         { label: 'AI readability', mark: 'withheld', score: null, tone: 'default' },
       ],
     });
+  });
+});
+
+describe('reportCardOf', () => {
+  const v2 = snap('bad-site') as unknown as PublicReportRow['report_snapshot'];
+
+  it('draws the v2 card for a live v2 report with the flag on', () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    expect(reportCardOf(row({ report_snapshot: v2 }))).toEqual(publicReportCard(snap('bad-site')));
+  });
+
+  it('leaves every other row to v1’s card: flag off, v1, missing, hidden, taken down', () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    expect(reportCardOf(row({ report_snapshot: v2 }))).toBeNull();
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const v1 = { version: 1 } as unknown as PublicReportRow['report_snapshot'];
+    expect(reportCardOf(row({ grade: 'B', report_snapshot: v1 }))).toBeNull();
+    expect(reportCardOf(null)).toBeNull();
+    expect(reportCardOf(row({ report_snapshot: v2, hidden_at: MINTED }))).toBeNull();
+    expect(reportCardOf(row({ report_snapshot: v2, takedown_requested_at: MINTED }))).toBeNull();
   });
 });

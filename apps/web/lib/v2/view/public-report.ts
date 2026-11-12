@@ -10,6 +10,7 @@
  */
 import { VerdictSchema, type Verdict } from '@crawlmouse/types/v2';
 import type { PublicReportRow } from '../../reports';
+import { checksPublicEnabled } from '../../auth/flags';
 import { isReportGone, reportRobotsIndex } from '../../report-visibility';
 import { dateTimeUtc } from '../format';
 import { isLetter, toneOf } from '../letters';
@@ -158,4 +159,13 @@ export function publicReportCard(s: PublicSnapshotV2): PublicReportCard {
           : { label: g.label, mark: g.letter!, score: `${g.score} / 100`, tone: g.tone },
       ),
   };
+}
+
+/**
+ * The card `/r/<slug>/opengraph-image` draws for a row: the v2 card for a live v2 report while
+ * V2_CHECKS_PUBLIC is on; null for every other row, which keeps v1's card.
+ */
+export function reportCardOf(row: PublicReportRow | null): PublicReportCard | null {
+  if (!checksPublicEnabled() || row === null || !isV2Snapshot(row.report_snapshot)) return null;
+  return isReportGone(row) ? null : publicReportCard(row.report_snapshot);
 }
