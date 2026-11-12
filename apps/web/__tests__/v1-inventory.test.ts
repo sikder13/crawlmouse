@@ -210,6 +210,8 @@ describe('the finders see what they claim to see', () => {
       'app/api/fixes/[id]/email-developer/route.ts',
       'app/api/fixes/[id]/packet/route.ts',
       'app/api/me/route.ts',
+      'app/api/report-files/[id]/download/route.ts',
+      'app/api/reports/route.ts',
       'app/api/seats/accept/route.ts',
       'app/api/seats/id/[id]/resend/route.ts',
       'app/api/seats/id/[id]/route.ts',

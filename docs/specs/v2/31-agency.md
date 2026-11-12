@@ -366,6 +366,152 @@ the switch to an agency; the client page with a fix to raise, and with none.
 A report's content is a `ReportDoc` (`lib/v2/reports/generate.ts`): titles, tables and
 before-and-after pairs, as strings.
 
+### What `POST /api/reports` makes
+
+| Request | Row (`kind`, `format`) | File in the `reports` bucket |
+|---|---|---|
+| `audit_pdf` of one check | `audit_pdf`, `pdf` | the audit document as a PDF |
+| `compare` of one check | `compare`, `html` | the baseline document, as JSON |
+| `compare` with `previousCheckId` | `compare`, `html` | the before-and-after document of the two checks, as JSON |
+| `compare` with `fixId` | `compare`, `html`, `subject_fix_id` | the document of a fix the check verified, beside the check it was compared with, as JSON |
+| `raw_export` as `csv` | `raw_export`, `csv` | one record per page response |
+| `raw_export` as `edge_list` | `raw_export`, `edge_list` | `from,to,anchor`, one record per link |
+| `raw_export` as `json` | `raw_export`, `json` | the check and its pages, links and crawler tests |
+| `prospect_one_pager` | none | none: answered 501 `not_available` (not built, below) |
+
+A `compare` names its earlier check as `previousCheckId`, the field the Reports screen posts. The
+route's answers, in order, are in the comment on `POST` in `apps/web/app/api/reports/route.ts`, and
+each is a test in `route.test.ts` beside it.
+
+The file is made inside the request and the row is written first: `create_report` writes it
+`pending`, `finish_report` marks it `stored` with its path and size, `fail_report` marks it `failed`
+with `build_failed`, `store_failed` or `object_left`. What was thrown is not stored or returned
+(`generate-run.test.ts`), and `generate-run.ts` writes no log line
+(`grep -c 'console\.' apps/web/lib/v2/reports/generate-run.ts` prints 0). A row still
+`pending` fifteen minutes after it was asked for is marked `failed`, `abandoned`, by the account's
+next request (`fail_abandoned_reports`). `reports.file_state` is the one of these columns a client
+reads; `storage_path`, `failed_reason` and `subject_fix_id` are granted to no client role:
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b-reports.test.ts`.
+
+A report has one object. Its name is `<account id>/<report id>.<extension>` (`reportPath`), it is
+put over whatever is at that name, and `finish_report` stores no other name for a report.
+
+The bucket holds a report's object only while its row names it, because the erasure finds a report's
+file by `reports.storage_path`. When the row does not come to name the object (a throw while putting
+it or while marking the row stored, or a row that stopped being pending while the file was made),
+`generateReport` reads the row again, keeps an object the row does name, and otherwise removes the
+object before it marks the row `store_failed`. When the removal throws, the row is marked
+`object_left`: an object may remain at the report's own name with no row naming it, and that reason
+is the record of it (`select id, account_id, format from reports where failed_reason =
+'object_left'`). Each case is a test in `lib/v2/reports/generate-run.test.ts`.
+
+### What a document holds
+
+Built by `lib/v2/reports/generate-doc.ts` from the view functions the audit pages draw from, read as
+a paid plan reads them. A string of a document is one a view returned (a number it returned is
+written as its digits), the screens' word for a crawler's verdict, or one of the titles and labels
+in `lib/v2/copy/report-doc.ts`; the footer is "Checked with Crawlmouse" and the check's date, linking
+the home page. `pnpm --filter @crawlmouse/web exec vitest run lib/v2/reports/generate-doc.test.ts`
+holds the four documents to that over the contract fixtures, the recorded site and generated checks.
+
+- **Audit** (`auditDoc`): the site, when it was checked and how much was crawled; both grades with
+  their letter, score and summary (a withheld grade reads "withheld" with the page's reason); the
+  access page's headline, figures and method, with a table of crawlers per group; what the
+  no-JavaScript, structure and content pages head with, and their figures; the signals table; each
+  live fix in the audit's order with its pages, estimated effect, effort and kind.
+- **Baseline** (`baselineDoc`): the site, when and how much; both grades; the access section as
+  above; what the no-JavaScript page heads with. It says what those pages say, so a site that
+  something blocks reads as blocked.
+- **Before and after** (`compareDoc`): each grade as a pair (letter, score and summary of each
+  check, with each check's date); then, for each graded check after the earlier one up to the later
+  one, what its Changes page heads with and each change it lists, as a pair: the lines removed on
+  the earlier side, the cause and the lines added on the later side, with where, how many pages and
+  the effect on the grades.
+- **Fix verified** (`fixProofDoc`): the fix as its page showed it at the earlier check (its place
+  among the open fixes, and what the packet said was wrong) beside its page at the later check
+  ("Fix n, resolved" and when it was verified), then both grades as pairs.
+
+Each document's `notMeasured` is, for its check: the partial notice; why AI readability is withheld;
+that text without JavaScript, or the content checks, were not measured; the content checks the audit
+did not record; and how many signals were tested when not each was. Each is the page's own sentence.
+A comparison also lists what its earlier check did not measure, under its own heading.
+
+Times in a document are the views' for a check read without its account: UTC, and they say so.
+
+### The PDF
+
+`lib/v2/reports/pdf.ts` and `pdf-layout.ts`: A4, with `pdf-lib` 1.17.1 and `@pdf-lib/fontkit` 1.1.1
+(`grep -E '"(pdf-lib|@pdf-lib/fontkit)"' apps/web/package.json`), no browser. The fonts are Geist
+Regular and SemiBold and Geist Mono Regular from the npm package `geist` 1.9.2 (SIL Open Font
+License 1.1), in `apps/web/lib/v2/reports/fonts/` with the licence, embedded as subsets; `pdf.test.ts`
+pins each file's sha256. They are read from disk, so `next.config.mjs` names them in
+`outputFileTracingIncludes` for `/api/reports` and the Inngest route.
+
+Text is wrapped at white space; a word wider than its column is broken between characters; a table's
+column names are drawn again on each page it runs onto; a row or a pair taller than a page runs on.
+What is drawn is the document's strings and each page's number:
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/reports/pdf-layout.test.ts lib/v2/reports/pdf.test.ts`
+(generated documents; the second reads what `pdf-lib` is given during a render). The not-measured
+list is drawn after a rule, each sentence marked, with no heading: a `ReportDoc` has no string for one.
+
+The same document gives the same bytes: the file carries no creation or modification time and no
+producer.
+
+### Raw exports
+
+`lib/v2/reports/csv.ts`. The CSV's columns, in order: `url`, `final_url`, `status_code`, `kind`,
+`template_key`, `title`, `meta_description`, `depth`, `links_in`, `links_out`, `pagerank_share`,
+`is_orphan`, `js_only`, `found_via`, `sitemap_lastmod`, `suggested_parent_url`, `sampled`,
+`raw_words`, `rendered_words`, `text_share`, `text_state`, `crawlers_reached`,
+`crawlers_reading_text`, `content_failures`, `is_html`, `links_read`. What was not read is an empty
+cell. A page's redirects, declared canonical, hreflang and robots.txt verdicts are in the JSON file.
+
+In both CSV files a value that starts with `=`, `+`, `-`, `@`, tab or carriage return has an
+apostrophe put before it, and each cell is written in double quotes with its quotes doubled (RFC
+4180); records end with CRLF. `pnpm --filter @crawlmouse/web exec vitest run lib/v2/reports/csv.test.ts`
+reads the files back with a reader of its own over generated strings. The files are UTF-8 without a
+byte-order mark.
+
+The JSON file holds the contract's records of the check, its page results, link edges and access
+tests. Each of their fields is a column a member's own session may select:
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/reports/csv.columns.test.ts`.
+
+### Measured
+
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/reports/pdf.measure.test.ts` prints these: each
+file made three times, the median, with `--maxWorkers=2`, on the build machine on 2026-11-12. The
+sizes are the same on each run. The times are a machine's and moved with its load: the first column
+of times is one run at 16:28 with nothing else running; the second is the range of three runs of the
+final tree between 17:07 and 17:10, while other suites kept the load average near 15.
+
+| Check | `auditDoc` + `renderPdf`, quiet | under load | PDF | CSV | Edge list | JSON |
+|---|---|---|---|---|---|---|
+| the engine's recorded site (60 pages, 150 links, 400 crawler tests, 11 fixes) | 193 ms | 611 to 835 ms | 35,918 bytes, 4 pages | 20,800 bytes | 16,468 bytes | 1,309,952 bytes |
+| a generated check of 500 pages (1,359 links, 168 crawler tests, no fix) | 114 ms | 442 to 458 ms | 31,504 bytes, 3 pages | 147,930 bytes | 124,319 bytes | 911,442 bytes |
+
+Each raw export took 7 ms or less in those runs. The audit document does not list pages, so its cost
+does not grow with them: the larger time is the recorded site's, which has fixes and more crawler
+tests. These times leave out reading the check from the database. The decision's bound for making a
+report in the request is two seconds for a 500-page check; 458 ms is the slowest seen, so a report
+is made in the request (`maxDuration` 60) and no Inngest function makes one.
+
+### What a report does not hold
+
+- A drawing of the link map. The audit PDF has the structure page's figures (pages, links, orphans,
+  JavaScript-only pages, click depth); the Reports screen's `pdfBody` (`lib/v2/copy/reports.ts`)
+  says "link map", which names more than the PDF draws.
+- The table of orphan pages, the content grid, a page-by-page list, and raw responses. The pages are
+  the CSV; the responses are in the JSON.
+- The steps and commands of a fix's packet. The proof of a fix quotes the packet's statement of what
+  was wrong (`head.lede` of the fix page).
+- An account's name, logo or domain: Branding is not in this step (D11).
+
+### Not built: the prospect's one-pager
+
+`ReportRequestSchema` names `prospect_one_pager`, and the route answers it 501 `not_available`
+before it reads anything. `create_report` refuses the kind (22023). Nothing writes a prospect's
+site, and no document is built for one.
+
 ## 10. Download, share and schedules
 
 ## 11. Erasure, gate messages and events

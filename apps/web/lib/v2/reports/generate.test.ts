@@ -15,7 +15,7 @@ describe('ReportRequestSchema', () => {
     const ok = [
       { kind: 'audit_pdf', siteId: A, checkId: B },
       { kind: 'compare', siteId: A, checkId: B },
-      { kind: 'compare', siteId: A, checkId: B, beforeCheckId: A },
+      { kind: 'compare', siteId: A, checkId: B, previousCheckId: A },
       { kind: 'compare', siteId: A, checkId: B, fixId: A },
       { kind: 'raw_export', siteId: A, checkId: B, format: 'csv' },
       { kind: 'raw_export', siteId: A, checkId: B, format: 'edge_list' },

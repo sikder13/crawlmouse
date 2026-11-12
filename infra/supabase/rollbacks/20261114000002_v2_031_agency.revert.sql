@@ -3,6 +3,20 @@
 -- ─── C ────────────────────────────────────────────────────────────────────────────────────────────
 
 -- ─── B ────────────────────────────────────────────────────────────────────────────────────────────
+-- Report files: the functions, then the three columns (the grant on file_state goes with it).
+-- storage_path is 003's column and stays, so a stored file keeps its path; a pending or failed
+-- report becomes a row with no file state.
+drop function if exists public.fail_abandoned_reports(uuid, timestamptz);
+drop function if exists public.fail_report(uuid, text);
+drop function if exists public.finish_report(uuid, text, bigint);
+drop function if exists public.create_report(jsonb);
+drop function if exists public.report_file_path(uuid, uuid, text);
+alter table public.reports drop constraint if exists reports_failed_reason;
+alter table public.reports drop constraint if exists reports_stored_path;
+alter table public.reports drop constraint if exists reports_file_state;
+alter table public.reports drop column if exists subject_fix_id;
+alter table public.reports drop column if exists failed_reason;
+alter table public.reports drop column if exists file_state;
 
 -- ─── A ────────────────────────────────────────────────────────────────────────────────────────────
 -- The seat functions go, then the invitation's columns. A seat invited meanwhile stays, as a row of

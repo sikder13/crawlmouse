@@ -96,8 +96,8 @@ declared(rel, role, privilege, columns) as (
       'open_tracking', 'page_slug', 'paused_by_recipient_at', 'send_when_unchanged',
       'site_id', 'time_local', 'timezone', 'updated_at']),
     ('public.reports', 'authenticated', 'SELECT', array[
-      'account_id', 'byte_count', 'covers_check_ids', 'created_at', 'format', 'headline',
-      'id', 'kind', 'made_by', 'open_tracking', 'opened_at', 'owner_seat_id',
+      'account_id', 'byte_count', 'covers_check_ids', 'created_at', 'file_state', 'format',
+      'headline', 'id', 'kind', 'made_by', 'open_tracking', 'opened_at', 'owner_seat_id',
       'public_slug', 'recipient_email', 'scheduled_for', 'sent_at', 'share_expires_at',
       'site_id', 'status']),
     ('public.seat_sites', 'authenticated', 'SELECT', array[

@@ -195,6 +195,8 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     reason: 'liveness probe; reads nothing',
     origin: 'any',
   },
+  { route: 'api/report-files/[id]/download', methods: ['GET'], class: 'member', origin: 'any' },
+  { route: 'api/reports', methods: ['POST'], class: 'member', origin: 'strict' },
   {
     route: 'api/reports/hide',
     methods: ['POST'],

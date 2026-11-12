@@ -589,6 +589,239 @@ grant execute on function public.remove_seat(uuid, uuid, timestamptz) to service
 
 -- ═══ B: reports, share links and client report schedules ══════════════════════════════════════════
 
+-- ─── B: report files ──────────────────────────────────────────────────────────────────────────────
+-- A report's file in the private `reports` bucket. file_state is null for a report that has no file
+-- (a public link), 'pending' from create_report until the file is in the bucket, then 'stored', or
+-- 'failed' with failed_reason, a short code. storage_path is set exactly while file_state is 'stored'
+-- (reports_stored_path). subject_fix_id names the fix a proof page is about; it has no foreign key,
+-- and create_report accepts it only for a fix of the report's site.
+-- A client reads file_state; storage_path, failed_reason and subject_fix_id are granted to none.
+-- Functions, each security definer with search_path pg_catalog, pg_temp, owned by postgres, revoked
+-- from every client role and granted to service_role: create_report, finish_report, fail_report,
+-- fail_abandoned_reports.
+-- Tests: apps/web/__tests__/v2-031-b-reports.test.ts.
+
+alter table public.reports add column if not exists file_state text;
+alter table public.reports add column if not exists failed_reason text;
+alter table public.reports add column if not exists subject_fix_id uuid;
+
+-- A row that holds a path and no state is one this file's revert left: its file is stored. No
+-- such row exists the first time this runs, since nothing wrote storage_path before this file.
+update public.reports set file_state = 'stored' where storage_path is not null and file_state is null;
+
+alter table public.reports drop constraint if exists reports_file_state;
+alter table public.reports add constraint reports_file_state
+  check (file_state in ('pending', 'stored', 'failed'));
+alter table public.reports drop constraint if exists reports_stored_path;
+alter table public.reports add constraint reports_stored_path
+  check ((storage_path is not null) = (file_state is not distinct from 'stored'));
+alter table public.reports drop constraint if exists reports_failed_reason;
+alter table public.reports add constraint reports_failed_reason
+  check ((failed_reason is not null) = (file_state is not distinct from 'failed')
+         and (failed_reason is null or failed_reason ~ '^[a-z][a-z_]{0,39}$'));
+
+grant select (file_state) on public.reports to authenticated;
+
+-- The object name of a report's file: its account's folder, then the report's own id and the
+-- format's extension. apps/web/lib/v2/reports/generate.ts (reportPath, REPORT_FILES) writes the same
+-- name; the test this section names compares the two for each format.
+create or replace function public.report_file_path(p_account uuid, p_report uuid, p_format text)
+returns text
+language sql
+immutable
+set search_path = pg_catalog, pg_temp
+as $$
+  select p_account::text || '/' || p_report::text || '.' ||
+         case p_format
+           when 'pdf' then 'pdf'
+           when 'csv' then 'csv'
+           when 'json' then 'json'
+           when 'edge_list' then 'edges.csv'
+           when 'html' then 'doc.json'
+         end;
+$$;
+
+-- Writes one report a person asked for, waiting for its file: status 'ready', made_by 'user',
+-- file_state 'pending'. p holds account_id, site_id, kind, format and covers_check_ids, and may hold
+-- owner_seat_id and subject_fix_id; any other key, a kind this function does not make (audit_pdf as
+-- pdf, compare as html, raw_export as csv, json or edge_list), more than two checks, two for a
+-- kind other than compare, a repeated one, or a fix without two checks of a compare raises 22023.
+-- The row is written only when, in the insert's own statement, the site is the
+-- account's, each id of covers_check_ids is a finished or partial check of that site, and
+-- subject_fix_id, when given, is a fix of that site; otherwise P0002. Returns the report's id.
+create or replace function public.create_report(p jsonb)
+returns uuid
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_required constant text[] := array['account_id', 'site_id', 'kind', 'format', 'covers_check_ids'];
+  v_optional constant text[] := array['owner_seat_id', 'subject_fix_id'];
+  v_given text[];
+  v_account uuid;
+  v_site uuid;
+  v_kind text;
+  v_format text;
+  v_checks uuid[];
+  v_fix uuid;
+  v_id uuid;
+begin
+  if pg_catalog.jsonb_typeof(p) is distinct from 'object' then
+    raise exception 'create_report: p is not an object' using errcode = '22023';
+  end if;
+  v_given := array(select pg_catalog.jsonb_object_keys(p));
+  if not (v_given @> v_required and v_given <@ (v_required || v_optional))
+     or pg_catalog.jsonb_typeof(p -> 'covers_check_ids') is distinct from 'array' then
+    raise exception 'create_report: p is not a report request' using errcode = '22023';
+  end if;
+  v_account := (p ->> 'account_id')::uuid;
+  v_site := (p ->> 'site_id')::uuid;
+  v_kind := p ->> 'kind';
+  v_format := p ->> 'format';
+  v_fix := (p ->> 'subject_fix_id')::uuid;
+  v_checks := array(select e::uuid
+                      from pg_catalog.jsonb_array_elements_text(p -> 'covers_check_ids') e);
+  if v_account is null or v_site is null
+     or not coalesce((v_kind = 'audit_pdf' and v_format = 'pdf')
+                     or (v_kind = 'compare' and v_format = 'html')
+                     or (v_kind = 'raw_export' and v_format in ('csv', 'json', 'edge_list')), false)
+     or pg_catalog.cardinality(v_checks) not between 1 and 2
+     or (pg_catalog.cardinality(v_checks) = 2 and (v_kind <> 'compare' or v_checks[1] = v_checks[2]))
+     or (v_fix is not null and (v_kind <> 'compare' or pg_catalog.cardinality(v_checks) <> 2)) then
+    raise exception 'create_report: not a report this function makes' using errcode = '22023';
+  end if;
+
+  insert into public.reports (account_id, site_id, kind, format, status, made_by, covers_check_ids,
+                              owner_seat_id, subject_fix_id, file_state)
+  select v_account, v_site, v_kind, v_format, 'ready', 'user', v_checks,
+         (p ->> 'owner_seat_id')::uuid, v_fix, 'pending'
+   where exists (select 1 from public.sites s where s.id = v_site and s.account_id = v_account)
+     and (select pg_catalog.count(*)
+            from public.checks c
+           where c.id = any (v_checks)
+             and c.site_id = v_site
+             and c.status in ('finished', 'partial')) = pg_catalog.cardinality(v_checks)
+     and (v_fix is null
+          or exists (select 1 from public.site_fixes f where f.id = v_fix and f.site_id = v_site))
+  returning id into v_id;
+  if v_id is null then
+    raise exception 'create_report: the site, a check or the fix is not the account''s'
+      using errcode = 'P0002';
+  end if;
+  return v_id;
+end;
+$$;
+
+-- Records that a pending report's file is in the bucket: file_state 'stored', its path and size.
+-- p_path must be the report's own name (report_file_path), and p_bytes zero or more; otherwise
+-- 22023. No such report raises P0002. Returns true when it stored the path, false when the report
+-- was not pending (a second call for the same report changes nothing).
+create or replace function public.finish_report(p_report uuid, p_path text, p_bytes bigint)
+returns boolean
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_account uuid;
+  v_format text;
+  v_state text;
+begin
+  select r.account_id, r.format, r.file_state into v_account, v_format, v_state
+    from public.reports r
+   where r.id = p_report
+     for update;
+  if not found then
+    raise exception 'finish_report: no report %', p_report using errcode = 'P0002';
+  end if;
+  if p_path is distinct from public.report_file_path(v_account, p_report, v_format) then
+    raise exception 'finish_report: the path is not report %''s own', p_report
+      using errcode = '22023';
+  end if;
+  if p_bytes is null or p_bytes < 0 then
+    raise exception 'finish_report: p_bytes is not a size' using errcode = '22023';
+  end if;
+  if v_state is distinct from 'pending' then
+    return false;
+  end if;
+  update public.reports r
+     set file_state = 'stored', storage_path = p_path, byte_count = p_bytes
+   where r.id = p_report;
+  return true;
+end;
+$$;
+
+-- Records that a pending report's file could not be made: file_state 'failed' with p_reason, a
+-- short code (lower-case letters and underscores, at most 40; anything else raises 22023, so no
+-- crawled text and no stack trace is stored). Returns true when it marked the report, false when
+-- there is no such report or it was not pending.
+create or replace function public.fail_report(p_report uuid, p_reason text)
+returns boolean
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_count integer;
+begin
+  if p_reason is null or p_reason !~ '^[a-z][a-z_]{0,39}$' then
+    raise exception 'fail_report: the reason is not a short code' using errcode = '22023';
+  end if;
+  update public.reports r
+     set file_state = 'failed', failed_reason = p_reason
+   where r.id = p_report and r.file_state = 'pending';
+  get diagnostics v_count = row_count;
+  return v_count = 1;
+end;
+$$;
+
+-- Marks failed, with the reason 'abandoned', each report of p_account that a person asked for and
+-- that has been pending since before p_before: the request that was making its file has ended
+-- without storing one. Returns how many it marked.
+create or replace function public.fail_abandoned_reports(p_account uuid, p_before timestamptz)
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_count integer;
+begin
+  if p_account is null or p_before is null then
+    raise exception 'fail_abandoned_reports: an account and a time are required'
+      using errcode = '22023';
+  end if;
+  update public.reports r
+     set file_state = 'failed', failed_reason = 'abandoned'
+   where r.account_id = p_account
+     and r.made_by = 'user'
+     and r.file_state = 'pending'
+     and r.created_at < p_before;
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+alter function public.report_file_path(uuid, uuid, text) owner to postgres;
+alter function public.create_report(jsonb) owner to postgres;
+alter function public.finish_report(uuid, text, bigint) owner to postgres;
+alter function public.fail_report(uuid, text) owner to postgres;
+alter function public.fail_abandoned_reports(uuid, timestamptz) owner to postgres;
+revoke all on function public.report_file_path(uuid, uuid, text), public.create_report(jsonb),
+  public.finish_report(uuid, text, bigint), public.fail_report(uuid, text),
+  public.fail_abandoned_reports(uuid, timestamptz)
+  from public, anon, authenticated, service_role;
+grant execute on function public.report_file_path(uuid, uuid, text), public.create_report(jsonb),
+  public.finish_report(uuid, text, bigint), public.fail_report(uuid, text),
+  public.fail_abandoned_reports(uuid, timestamptz)
+  to service_role;
+
+
 -- ═══ end B ════════════════════════════════════════════════════════════════════════════════════════
 
 -- ═══ C: erasure and mail kinds ════════════════════════════════════════════════════════════════════
