@@ -9,7 +9,7 @@
  * top fixes than fixes) throws, so the slug sweep (scripts/db/report-slug-sweep.ts) reports it.
  */
 import { VerdictSchema, type Verdict } from '@crawlmouse/types/v2';
-import type { PublicReportRow } from '../../reports';
+import type { PublicReportRow } from '../../report-row';
 import { checksPublicEnabled } from '../../auth/flags';
 import { isReportGone, reportRobotsIndex } from '../../report-visibility';
 import { dateTimeUtc } from '../format';

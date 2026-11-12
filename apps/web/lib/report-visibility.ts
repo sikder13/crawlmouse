@@ -1,4 +1,4 @@
-import type { PublicReportRow } from './reports';
+import type { PublicReportRow } from './report-row';
 import { checksPublicEnabled } from './auth/flags';
 import { isV2Snapshot } from './v2/reports/snapshot';
 

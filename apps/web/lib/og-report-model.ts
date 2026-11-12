@@ -1,4 +1,4 @@
-import type { PublicReportRow } from './reports';
+import type { PublicReportRow } from './report-row';
 import { isReportGone } from './report-visibility';
 import { asNumber } from './numeric';
 import { isPassingScore } from './limits';
