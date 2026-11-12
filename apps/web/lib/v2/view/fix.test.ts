@@ -251,7 +251,7 @@ describe('fixView: the framework switch reads the packet’s bodies', () => {
     });
     // Independently of packetBodies: the second body's prompt is the hand-made WordPress body's.
     expect(v.packet.bodies[1]!.prompt.split('\n')).toEqual([
-      f.title,
+      `The audit’s title for this fix: "${f.title}"`,
       '',
       ...bodyFor('wordpress').context,
       '',

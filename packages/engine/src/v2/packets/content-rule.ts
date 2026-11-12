@@ -11,6 +11,7 @@ import type { ContentDetection } from '../content/aggregate.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
 import { CHROME } from '../content/thresholds.js';
 import { userAgentOf, verifyCrawler } from './crawler.js';
+import { servedAt } from './served-at.js';
 import { sh, url, word, type Command } from './shell.js';
 import { code, count, line, list, ours, type Line, type Safe } from './text.js';
 import type { PacketFacts } from './types.js';
@@ -55,9 +56,14 @@ export function gradeLine(scored: boolean): Line {
 
 /**
  * A content packet's context: the extent from the record, the check's rule (the caller's lines),
- * the pages not read when there are any, the failing pages, and whether the check is graded.
+ * the pages not read when there are any, the failing pages at the address each is served at
+ * (served-at.ts), and whether the check is graded.
  */
-export function contentContext(fix: ContentDetection, rule: readonly Line[]): Line[] {
+export function contentContext(
+  fix: ContentDetection,
+  facts: PacketFacts,
+  rule: readonly Line[],
+): Line[] {
   const { failing, of, unread } = fix.extent;
   return [
     line`The check ${code(fix.check)} fails on ${count(failing)} of the ${count(of)} ${pages(of)} of the template ${template(fix)} it was decided on.`,
@@ -68,7 +74,7 @@ export function contentContext(fix: ContentDetection, rule: readonly Line[]): Li
         ]
       : []),
     line`Failing ${pages(fix.affected_urls.length)}: ${list(
-      fix.affected_urls.map((u) => code(u, URL_CHARS)),
+      fix.affected_urls.map((u) => code(servedAt(facts, u), URL_CHARS)),
       EXAMPLE_PAGES,
       'page',
     )}.`,
@@ -111,7 +117,8 @@ export const RECHECK = ours(
 );
 
 /**
- * The command of a content packet: fetch the page, put each tag on its own line (`tr` turns line
+ * The command of a content packet: fetch the page at the address it is served at (served-at.ts), put
+ * each tag on its own line (`tr` turns line
  * breaks into spaces and each `<` into a line break, so a line starts with a tag's name and holds the
  * text up to the next tag), and let `program`, an awk program of ours, exit 0 when what it looks for
  * is there. Requested as a crawler the site serves today (crawler.ts), or as none when the audit
@@ -121,9 +128,10 @@ export function tagProbe(facts: PacketFacts, page: string, program: string): Tag
   const from = word('\\r\\n<');
   const to = word('  \\n');
   const entry = verifyCrawler(facts);
+  const address = url(servedAt(facts, page));
   if (entry === null) {
     return {
-      command: sh`curl -sS ${url(page)} | tr ${from} ${to} | awk ${word(program)}`,
+      command: sh`curl -sS ${address} | tr ${from} ${to} | awk ${word(program)}`,
       ua: null,
       sender: ours(
         "It requests with curl's own user agent: the audit recorded no crawler the site serves.",
@@ -131,13 +139,24 @@ export function tagProbe(facts: PacketFacts, page: string, program: string): Tag
     };
   }
   return {
-    command: sh`curl -sS -A ${word(userAgentOf(entry))} ${url(page)} | tr ${from} ${to} | awk ${word(program)}`,
+    command: sh`curl -sS -A ${word(userAgentOf(entry))} ${address} | tr ${from} ${to} | awk ${word(program)}`,
     ua: entry.token,
     sender: ours(`It requests as ${entry.token}, which the site serves today.`),
   };
 }
 
-/** awk, after `tagProbe`'s split: this line is a JSON-LD script block. */
+/**
+ * awk rules that undo `tagProbe`'s split inside a script element, for a program that reads one: from
+ * a script's opening tag to its closing tag the lines are joined with the `<` the split took (`J`),
+ * and the rules after these see the element as one line. So a `<` in a JSON-LD block's text does not
+ * end the block, and a tag's name in a script's text is not read as a tag. `Q` marks the joined line,
+ * so it is not taken for an opening tag again. A script that is not closed gives no line.
+ */
+export const AWK_SCRIPTS =
+  '{Q=0}J!=""{if(tolower($0)~/^\\/script[ \\t>]/){$0=J;J="";Q=1}else{J=J"<"$0;next}}' +
+  '!Q&&tolower($0)~/^script[ \\t>]/{J=$0;next}';
+
+/** awk, after `tagProbe`'s split and AWK_SCRIPTS: this line is a JSON-LD script block. */
 export const LD_BLOCK = 'tolower($0)~/^script[^>]*application\\/ld\\+json/';
 
 /** awk: the text a line holds after its tag, into `x`. */

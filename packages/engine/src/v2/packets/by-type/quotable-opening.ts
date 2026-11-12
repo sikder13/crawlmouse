@@ -24,7 +24,7 @@ import {
   template,
 } from '../content-rule.js';
 import { count, line, ours } from '../text.js';
-import type { PacketEntry } from '../types.js';
+import type { PacketEntry, PacketFacts } from '../types.js';
 
 /** What may follow a sentence's last mark and still end it (content/read.ts): quotes and brackets. */
 const CLOSERS = `("|'|”|’|\\)|\\]|»)*`;
@@ -48,8 +48,8 @@ const SENTENCE = ours(
   `a sentence of ${ANSWER_SENTENCE_WORDS.min} to ${ANSWER_SENTENCE_WORDS.max} words that ends in a full stop`,
 );
 
-const context = (fix: ContentDetection) =>
-  contentContext(fix, [
+const context = (fix: ContentDetection, facts: PacketFacts) =>
+  contentContext(fix, facts, [
     line`The check applies to a page of prose: an H1 with at least ${count(MIN_BODY_WORDS)} words after it and no ${mark('Product')} JSON-LD.`,
     line`It reads the first ${count(OPENING_WORDS)} words after the H1 and passes a page when a block there, other than a list item, has at least ${count(MIN_BLOCK_WORDS)} words and holds ${SENTENCE}. On the failing pages no block does.`,
     line`The audit keeps no page text, so this packet cannot quote the openings: read the failing pages.`,

@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { afterEach, describe, expect, it } from 'vitest';
-import { FixPacketSchema, type AccessTest } from '@crawlmouse/types/v2';
+import { FixPacketSchema, type AccessTest, type PageResult } from '@crawlmouse/types/v2';
+import { MITIGATION_HEADERS } from '../../../../worker/src/verdict/response.js';
 import { accessRow } from '../../../fixtures/v2/build/rows.js';
 import type { AccessDetection } from '../access/types.js';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
@@ -8,12 +9,14 @@ import { fingerprintOf } from '../detectors/fingerprint.js';
 import {
   EDGE_VENDOR_SOURCES,
   edgeRuleBlocksCrawler,
+  MITIGATION,
   PAGES_SHOWN,
 } from './by-type/edge-rule-blocks-crawler.js';
 import { compose } from './compose.js';
 import { userAgentOf } from './crawler.js';
 import { NO_STACK } from './test-support/facts.js';
 import { hostileText, outsideCodeSpans, UNSHOWN } from './test-support/hostile.js';
+import type { RequestListener } from 'node:http';
 import {
   inBothStates,
   runCommand,
@@ -81,11 +84,15 @@ function detected(s: Shape): { record: AccessDetection; rows: AccessTest[] } {
   };
 }
 
-const factsOf = (rows: AccessTest[], stack: PacketFacts['stack'] = NO_STACK): PacketFacts => ({
+const factsOf = (
+  rows: AccessTest[],
+  stack: PacketFacts['stack'] = NO_STACK,
+  pages: PacketFacts['pages'] = new Map(),
+): PacketFacts => ({
   homepage_url: 'https://a.test',
   stack,
   crawlers: [],
-  pages: new Map(),
+  pages,
   edges: [],
   access_tests: rows,
 });
@@ -145,17 +152,84 @@ describe('the edge-rule packet, from its record', () => {
     for (const u of urls) expect(record.affected_urls, u).toContain(u.replace(/\/$/, ''));
   });
 
-  it('leaves the choice to the site owner for a training crawler, and to no one else', () => {
-    const training = detected({ crawler: 'ClaudeBot', pages: SITE_PAGES });
-    expect(entryOf('ClaudeBot').group).toBe('ai_training');
-    expect(compose(builder, training.record, factsOf(training.rows)).change[0]).toMatch(
-      /^Decide first whether `ClaudeBot` should be let in\. It is a training crawler.*the choice is the site owner's/,
+  it.each(['ClaudeBot', 'PerplexityBot', 'ChatGPT-User'])(
+    'leaves the choice to the site owner for %s, worded by what the registry says it is for',
+    (token) => {
+      const { record, rows } = detected({ crawler: token, pages: SITE_PAGES });
+      expect(compose(builder, record, factsOf(rows)).change[0]).toBe(
+        `Decide first whether \`${token}\` should be let in. What it is for: ${entryOf(token).purpose} The audit records what was refused, not what the site intends, and a block can be deliberate: the choice is the site owner's. The steps below apply if it should be served.`,
+      );
+    },
+  );
+
+  it('writes that step for a crawler of each group the registry can request as', () => {
+    const groups = new Set(
+      CRAWLER_REGISTRY_V2.filter((e) => e.testable).map((e) => {
+        const { record, rows } = detected({ crawler: e.token, pages: SITE_PAGES });
+        expect(compose(builder, record, factsOf(rows)).change[0]).toMatch(/^Decide first whether/);
+        return e.group;
+      }),
     );
-    const search = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES });
-    expect(entryOf('PerplexityBot').group).not.toBe('ai_training');
-    expect(compose(builder, search.record, factsOf(search.rows)).change.join('\n')).not.toMatch(
-      /training crawler|Decide first/,
+    expect(groups.size).toBeGreaterThan(1);
+  });
+
+  it('says one page in the singular, and two in the plural', () => {
+    const one = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES.slice(0, 1) });
+    const single = compose(builder, one.record, factsOf(one.rows)).context;
+    expect(single[0]).toBe(
+      '`PerplexityBot` was refused on the 1 sampled page the audit judged it on, by a rule that matches its user agent.',
     );
+    expect(single).toContain(
+      'On that page another identity was served from the same address (`OAI-SearchBot`), so the refusal is aimed at the user agent.',
+    );
+    expect(single.at(-1)).toBe('Page refused: `https://a.test/p/0`.');
+    expect(compose(builder, { ...one.record, extent: null }, factsOf(one.rows)).context[0]).toBe(
+      '`PerplexityBot` was refused on 1 sampled page by a rule that matches its user agent.',
+    );
+    const two = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES.slice(0, 2) });
+    const both = compose(builder, two.record, factsOf(two.rows)).context;
+    expect(both[0]).toMatch(/^`PerplexityBot` was refused on 2 of the 2 sampled pages the audit/);
+    expect(both.join('\n')).toMatch(/On 2 of those pages another identity/);
+    expect(both.at(-1)).toBe('Pages refused: `https://a.test/p/0`, `https://a.test/p/1`.');
+    expect(compose(builder, { ...two.record, extent: null }, factsOf(two.rows)).context[0]).toBe(
+      '`PerplexityBot` was refused on 2 sampled pages by a rule that matches its user agent.',
+    );
+  });
+
+  it('gives the same packet whatever order the record lists its pages, causes and headers in', () => {
+    const { record, rows } = detected({
+      crawler: 'PerplexityBot',
+      pages: SITE_PAGES,
+      cause: 'cloudflare_1020',
+      signatures: ['server: cloudflare', 'cf-ray'],
+    });
+    const reordered: AccessDetection = {
+      ...record,
+      affected_urls: [...record.affected_urls].reverse(),
+      evidence: {
+        ...record.evidence,
+        access_test_ids: [...record.evidence.access_test_ids].reverse(),
+        pages: [...record.evidence.pages].reverse(),
+        signatures: [...record.evidence.signatures].reverse(),
+      },
+    };
+    expect(reordered.affected_urls).not.toEqual(record.affected_urls);
+    expect(JSON.stringify(compose(builder, reordered, factsOf([...rows].reverse())))).toBe(
+      JSON.stringify(compose(builder, record, factsOf(rows))),
+    );
+  });
+
+  it('names a refused page at the address its server answered at', () => {
+    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: ['https://a.test/p'] });
+    const pages = new Map([
+      [
+        'https://a.test/p',
+        { url: 'https://a.test/p', final_url: 'https://a.test/p/' } as PageResult,
+      ],
+    ]);
+    const p = compose(builder, record, factsOf(rows, NO_STACK, pages));
+    expect(p.context.at(-1)).toBe('Page refused: `https://a.test/p/`.');
+    expect(p.verify.command).toContain(" 'https://a.test/p/' | awk ");
   });
 
   it('names Cloudflare’s settings only when the check recorded Cloudflare as the edge', () => {
@@ -167,15 +241,34 @@ describe('the edge-rule packet, from its record', () => {
     const generic = compose(builder, record, factsOf(rows)).change.join('\n');
     expect(generic).not.toMatch(/Cloudflare|Bot Fight Mode|AI Crawl Control/);
     expect(generic).toMatch(/Find the rule that refuses requests whose User-Agent header contains/);
-    const cf = compose(builder, record, factsOf(rows, CLOUDFLARE)).change;
-    expect(cf[0]).toMatch(/^Cloudflare answered with error 1020/);
-    expect(cf.join('\n')).toMatch(/Security rules page/);
-    expect(cf.join('\n')).toMatch(/AI Crawl Control, Crawlers tab/);
-    expect(cf.join('\n')).toMatch(/Bot Fight Mode: it cannot be bypassed or skipped/);
-    // the 1020 sentence is the rows' cause, not the vendor's name
+    // without the 1020 cause: the features the Security Events log can name, each from its page
     const noCause = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES });
-    expect(compose(builder, noCause.record, factsOf(noCause.rows, CLOUDFLARE)).change[0]).toMatch(
-      /^In the Cloudflare dashboard open Security > Analytics/,
+    const cf = compose(builder, noCause.record, factsOf(noCause.rows, CLOUDFLARE)).change;
+    expect(cf[1]).toMatch(/^In the Cloudflare dashboard open Security > Analytics, Events tab/);
+    expect(cf.join('\n')).toMatch(/Security rules page/);
+    expect(cf.join('\n')).toMatch(/in AI Crawl Control, select Allow in the Actions column/);
+    expect(cf.join('\n')).toMatch(/Bot Fight Mode: it cannot be bypassed or skipped/);
+    expect(cf.join('\n')).not.toMatch(/1020/);
+  });
+
+  it('for error 1020, names what Cloudflare’s page says answers with it, and not a custom rule or AI Crawl Control as the cause', () => {
+    const { record, rows } = detected({
+      crawler: 'PerplexityBot',
+      pages: SITE_PAGES,
+      cause: 'cloudflare_1020',
+    });
+    const cf = compose(builder, record, factsOf(rows, CLOUDFLARE)).change;
+    expect(cf.slice(1, -1)).toEqual([
+      "Cloudflare answered with error 1020. Cloudflare's page for that error says it is returned when a security rule with a Block action and no custom response matched the request, gives API Shield schema validation and JWT validation as examples, and says a request blocked by a WAF custom rule or a WAF managed rule does not get it.",
+      "In the Cloudflare dashboard open Security > Analytics, Events tab, and find a refused request: the event shows which security feature and rule blocked it. Cloudflare's page does not list every feature that answers with error 1020, so the event is what names it.",
+      'Update the configuration of that feature or rule so that it no longer blocks `PerplexityBot`.',
+    ]);
+    expect(cf.join('\n')).not.toMatch(
+      /Security rules page|AI Crawl Control|Bot Fight Mode|access policy/,
+    );
+    // the page the steps rest on says the sentence the steps repeat
+    expect(EDGE_VENDOR_SOURCES[0]!.supports).toMatch(
+      /requests blocked by WAF custom rules or WAF managed rules do not get it/,
     );
   });
 
@@ -242,6 +335,65 @@ describe('the edge-rule verify command', () => {
       expect(site.userAgents()).toEqual(Array(2).fill(userAgentOf(entryOf(token))));
     },
   );
+
+  it('on a site that redirects the page to its slashed address: fails while refused, passes once served', async () => {
+    const ua = userAgentOf(entryOf('PerplexityBot'));
+    const serve =
+      (refuse: boolean): RequestListener =>
+      (req, res) => {
+        if (req.url === '/p') {
+          res.statusCode = 301;
+          res.setHeader('location', '/p/');
+        } else if (refuse && String(req.headers['user-agent']).includes(ua)) {
+          res.statusCode = 403;
+        }
+        res.end('<html><body>page</body></html>');
+      };
+    site = await twoStateSite({ broken: serve(true), fixed: serve(false) });
+    const page = `${site.base}/p`;
+    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: [page] });
+    const pages = new Map([[page, { url: page, final_url: `${page}/` } as PageResult]]);
+    const { command } = compose(builder, record, factsOf(rows, NO_STACK, pages)).verify;
+    expect(command).toContain(`'${page}/'`);
+    const { broken, fixed } = await inBothStates(site, command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    expect(fixed.stdout).toBe('');
+    // without the row's served address the command reads the redirect, in both states
+    const slashless = compose(builder, record, factsOf(rows)).verify.command;
+    expect((await runCommand(slashless)).status).not.toBe(0);
+  });
+
+  it('does not pass on a 200 that carries a challenge header the worker reads, and says what it does not read', async () => {
+    expect(MITIGATION).toEqual(MITIGATION_HEADERS);
+    let headers: Record<string, string> = {};
+    site = await twoStateSite({
+      broken: (_req, res) => {
+        for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
+        res.end('<html><title>Just a moment...</title></html>');
+      },
+      fixed: (_req, res) => void res.end('<html><body>page</body></html>'),
+    });
+    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: [`${site.base}/a`] });
+    const { command, expect: expected } = compose(builder, record, factsOf(rows)).verify;
+    for (const [header, value] of MITIGATION_HEADERS) {
+      headers = { [header]: value };
+      expect((await runCommand(command)).status, header).not.toBe(0);
+      headers = { [header.toUpperCase()]: `${value}; x` };
+      expect((await runCommand(command)).status, header).not.toBe(0);
+    }
+    // the limit: a block page with status 200 and no such header is not told apart
+    headers = {};
+    expect((await runCommand(command)).status).toBe(0);
+    expect(expected).toContain(
+      'with no challenge header (`cf-mitigated`, `x-vercel-mitigated`), and prints nothing.',
+    );
+    expect(expected).toContain(
+      'The command reads the status and those headers, not the body: a block page served with status 200 and none of those headers passes.',
+    );
+    site.use('fixed');
+    expect((await runCommand(command)).status).toBe(0);
+  });
 
   it('does not pass on a redirect, a challenge status, or a site that is not there', async () => {
     let status = 302;

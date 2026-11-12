@@ -3,6 +3,7 @@ import {
   closeSites,
   commandOn,
   contentFacts,
+  contentCommandOnSites,
   contentPacketProperties,
   contentRecord,
   engineVerdict,
@@ -130,6 +131,16 @@ describe('missing_author_date: the command and the engine’s check agree', () =
         `${BODY}<span itemprop="author">Jane Doe</span><meta itemprop="datePublished" content="${DATE}">`,
       ),
       '/mixed': page(ld({ ...article, author: 'Jane Doe' }), `${BODY}${time}`),
+      // a `<` in the block's own text, before the author: the block is still one block
+      '/less-than-in-headline': page(
+        ld({
+          headline: 'Tents < 2 kg and <nav>',
+          '@type': 'BlogPosting',
+          author: 'Jane Doe',
+          datePublished: DATE,
+        }),
+        BODY,
+      ),
     };
     for (const [path, html] of Object.entries(fixed)) {
       expect(engineVerdict(TYPE, html), path).toBe('pass');
@@ -186,6 +197,17 @@ describe('missing_author_date: stack bodies', () => {
     expect(wp.change.join(' ')).toContain('`<?php the_author_posts_link(); ?>`');
   });
 
+  it('says in its first step that the WordPress body assumes a PHP theme, and where a headless site changes', () => {
+    const facts = contentFacts();
+    const wp = writePacket(TYPE, contentRecord(TYPE), {
+      ...facts,
+      stack: { ...facts.stack, backend: { cms: 'wordpress', detected_from: 'a test' } },
+    })!;
+    expect(wp.change[0]).toBe(
+      'These steps assume a WordPress theme with PHP templates renders the page. If the front end is a separate application that reads WordPress as its data source, make the change there, as the generic steps describe.',
+    );
+  });
+
   it('cites a documentation page, with the date it was read, for each stack body and for the generic steps', () => {
     if (missingAuthorDate.kind !== 'builder') throw new Error('not a builder');
     const stacks = Object.values(missingAuthorDate.stacks);
@@ -200,3 +222,4 @@ describe('missing_author_date: stack bodies', () => {
 });
 
 contentPacketProperties(TYPE);
+contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED });

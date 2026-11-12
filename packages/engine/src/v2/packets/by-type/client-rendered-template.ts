@@ -1,27 +1,30 @@
 /**
- * The packet for a template whose rendered pages are empty shells without JavaScript.
+ * The packet for a template whose rendered pages hold far fewer words without JavaScript.
  *
  * Rendered from the record: the template key, how many of its graded pages the render step measured,
- * and each measured page's words without JavaScript against its words once rendered. The finding is
- * for the template by that sample, and the context says its size.
+ * and each measured page's words in the HTML response against its words once rendered. The record
+ * holds word counts and not what adds the words, so the packet states the counts and names no
+ * mechanism. The finding is for the template by that sample, and the context says its size.
  *
- * Verify. The record holds word counts and no phrase of the page, so the command counts words: it
- * requests the first rendered page of the record and counts the words of the HTML response outside
- * the elements in SKIPPED (the element names of the audit's own structural strip, the constant
- * AI_STRUCTURAL_STRIP that main-content.ts reads, and `head`). It exits 0 when the count
- * reaches `wordsNeeded`: the count at which the page's share of its measured rendered words is
- * READABLE_FROM (render/state.ts). Text inside a script, an inline JSON state included, is not counted.
+ * Verify. The record holds no phrase of the page, so the command counts words: it requests the first
+ * rendered page of the record at the address it is served at (served-at.ts) and counts the words of
+ * the HTML response outside the elements in SKIPPED. It exits 0 when the count reaches `wordsNeeded`:
+ * the count at which the page's share of its measured rendered words is READABLE_FROM
+ * (render/state.ts). Text inside a script, an inline JSON state included, is not counted.
  *
- * What the count is not: the audit's count. The audit also drops link-dense menus and elements by
- * ARIA role (main-content.ts), which one line of awk does not. A page whose static text outside
- * SKIPPED already reaches `wordsNeeded` would pass unfixed; `expect` gives the audit's two counts so
- * the printed number can be read against them.
+ * What the count is not: the audit's count. The audit also drops `header` elements, link-dense menus
+ * and elements by ARIA role (main-content.ts), which this command does not: a `header` inside an
+ * article holds the page's own text, and one line of awk cannot tell it from the site's. A page whose
+ * text outside SKIPPED already reaches `wordsNeeded` passes unfixed; `expect` says so, and gives the
+ * audit's two counts so the printed number can be read against them. The audit closes the fix earlier
+ * than the command passes (render/state.ts EMPTY_SHELL_LEAVES_ABOVE); `expect` says that too.
  */
 import type { RenderedDetection, RenderedPage } from '../../detectors/rendered.js';
-import { READABLE_FROM } from '../../render/state.js';
+import { EMPTY_SHELL_LEAVES_ABOVE, READABLE_FROM } from '../../render/state.js';
 import { userAgentOf, verifyCrawler } from '../crawler.js';
+import { servedAt } from '../served-at.js';
 import { int, sh, url, word } from '../shell.js';
-import { code, count, line, ours, type Line } from '../text.js';
+import { code, count, line, list, ours, type Line, type Safe } from '../text.js';
 import type { Change, DocSource, PacketEntry, PacketFacts } from '../types.js';
 
 /** The rendered pages a context shows, one line each, before it counts the rest. */
@@ -33,16 +36,20 @@ const READ = '2026-11-12';
 export const wordsNeeded = (page: Pick<RenderedPage, 'rendered_words'>): number =>
   Math.ceil(READABLE_FROM * page.rendered_words);
 
-/** Elements whose text the verify command leaves out. */
+/**
+ * Elements whose text the verify command leaves out: the element names of the audit's structural
+ * strip (AI_STRUCTURAL_STRIP, which main-content.ts reads) less `header`, and `title`. The head is
+ * not skipped as a whole: its closing tag may be omitted, and `title` is its one element with text
+ * that is not in this list already.
+ */
 export const SKIPPED = [
   'script',
   'style',
   'noscript',
   'template',
   'svg',
-  'head',
+  'title',
   'nav',
-  'header',
   'footer',
   'aside',
 ] as const;
@@ -63,20 +70,39 @@ const COUNT_WORDS = [
 
 const pagesOf = (n: number) => ours(n === 1 ? 'page' : 'pages');
 
+const byUrl = (a: RenderedPage, b: RenderedPage) => (a.url < b.url ? -1 : a.url > b.url ? 1 : 0);
+
+/** The record's rendered pages, sorted: the order the context lists them in and verify takes the first of. */
+const renderedPages = (record: RenderedDetection): RenderedPage[] =>
+  [...record.evidence.pages].sort(byUrl);
+
+/** How many of the template's graded pages were rendered, as a sentence. */
+function sample({ pages, rendered }: RenderedDetection['extent']): Safe {
+  if (pages === 1) return ours('The audit rendered its 1 graded page in a browser.');
+  return ours(
+    rendered === pages
+      ? `The audit rendered each of its ${pages} graded pages in a browser.`
+      : `The audit rendered ${rendered} of its ${pages} graded pages in a browser.`,
+  );
+}
+
 function context(record: RenderedDetection, facts: PacketFacts): Line[] {
   const { pages, rendered } = record.extent;
-  const shown = record.evidence.pages.slice(0, PAGES_SHOWN);
-  const rest = record.evidence.pages.length - shown.length;
+  const all = renderedPages(record);
+  const shown = all.slice(0, PAGES_SHOWN);
+  const rest = all.length - shown.length;
   const unrendered = pages - rendered;
   const lines: Line[] = [
-    line`The template ${code(record.template_key)} serves its main content by JavaScript. The audit rendered ${count(rendered)} of its ${count(pages)} graded ${pagesOf(pages)} in a browser, and without JavaScript each of them is an empty shell.`,
+    line`The HTML response of the template ${code(record.template_key)} holds far fewer words than its pages show once rendered in a browser: the difference is content added in the browser. ${sample(record.extent)}`,
     ...shown.map(
       (p) =>
-        line`${code(p.url)}: ${count(p.raw_words)} words in the HTML response, ${count(p.rendered_words)} once rendered.`,
+        line`${code(servedAt(facts, p.url))}: ${count(p.raw_words)} ${ours(p.raw_words === 1 ? 'word' : 'words')} in the HTML response, ${count(p.rendered_words)} once rendered in a browser.`,
     ),
   ];
   if (rest > 0) {
-    lines.push(line`${count(rest)} more rendered ${pagesOf(rest)} are not shown.`);
+    lines.push(
+      line`${count(rest)} more rendered ${pagesOf(rest)} ${ours(rest === 1 ? 'is' : 'are')} not shown.`,
+    );
   }
   if (record.measured !== null) {
     lines.push(
@@ -85,8 +111,9 @@ function context(record: RenderedDetection, facts: PacketFacts): Line[] {
   }
   lines.push(
     unrendered > 0
-      ? line`Measured by rendering ${count(rendered)} ${pagesOf(rendered)}. The other ${count(unrendered)} graded ${pagesOf(unrendered)} of the template were not rendered: the finding is for the template by this sample.`
+      ? line`Measured by rendering ${count(rendered)} ${pagesOf(rendered)}. The other ${count(unrendered)} graded ${pagesOf(unrendered)} of the template ${ours(unrendered === 1 ? 'was' : 'were')} not rendered: the finding is for the template by this sample.`
       : line`Measured by rendering ${count(rendered)} ${pagesOf(rendered)}: every graded page of the template.`,
+    SCOPE,
   );
   if (verifyCrawler(facts) === null) {
     lines.push(
@@ -95,6 +122,12 @@ function context(record: RenderedDetection, facts: PacketFacts): Line[] {
   }
   return lines;
 }
+
+/**
+ * The finding's scope, from how the audit works (render/sample.ts, detectors/rendered.ts): it is the
+ * same for every record, and says what no record of this type can hold.
+ */
+const SCOPE = line`The audit renders only pages it grades. A route whose HTML response holds too little text to be graded is not rendered, so another template of the site can have the same fault unmeasured.`;
 
 const KEEP: Line[] = [
   line`Keep every URL of the template as it is.`,
@@ -109,7 +142,7 @@ function generic(record: RenderedDetection): Change {
   const template = code(record.template_key);
   return {
     change: [
-      line`Find where the pages of ${template} get their main content. The HTML response holds little of it, so a script fetches or builds it in the browser.`,
+      line`Find what adds the content of the pages of ${template} in the browser. The audit measured the words, not what adds them.`,
       line`Render that content on the server, or at build time, so the HTML response of each page of the template holds its headings and body text.`,
       DEPLOY,
     ],
@@ -123,7 +156,7 @@ const NEXTJS_SOURCES: readonly DocSource[] = [
     url: 'https://nextjs.org/docs/app/getting-started/server-and-client-components',
     read: READ,
     supports:
-      'App Router: pages are Server Components by default, fetch data on the server and pass it to Client Components as props',
+      'App Router: pages are Server Components by default, fetch data on the server and pass it to Client Components as props; Client Components are for browser-only APIs such as window; a Server Component passed to a Client Component as children is rendered on the server',
   },
   {
     title: 'Fetching Data',
@@ -162,10 +195,10 @@ function nextjs(record: RenderedDetection): Change {
   const template = code(record.template_key);
   return {
     change: [
-      line`Find where the pages of ${template} fetch their main content. Content fetched in the browser (in a useEffect, or with a client library such as SWR or React Query) is not in the HTML the server sends.`,
+      line`Find what adds the content of the pages of ${template} in the browser. The audit measured the words, not what adds them. One place to look: a Client Component that fetches its data in the browser, with a library such as SWR or React Query.`,
       line`App Router (the route is under app/): fetch the data in the page's Server Component, an async function that awaits it, and render the content there. Pass it as props to any Client Component that needs it.`,
       line`Pages Router (the route is under pages/): export getStaticProps from the page to prerender it at build time, or getServerSideProps to render it at request time, and render the content from the props.`,
-      line`If the component that renders the content is imported with next/dynamic and ssr: false, remove ssr: false. That option disables prerendering for the component.`,
+      line`If the component that renders the content is imported with next/dynamic and ssr: false, that option disables prerendering for it. Remove the option if the component can render on the server. If it cannot, because it uses a browser-only API such as window, leave it as it is and render the content's text in a Server Component, passed to it as children or placed beside it.`,
       line`App Router, optional: export generateStaticParams from the page to generate the template's pages at build time.`,
       DEPLOY,
     ],
@@ -190,7 +223,7 @@ function hydrogen(record: RenderedDetection): Change {
   const template = code(record.template_key);
   return {
     change: [
-      line`Find where the pages of ${template} fetch their main content. A query made from the browser is not in the HTML the server sends.`,
+      line`Find what adds the content of the pages of ${template} in the browser. The audit measured the words, not what adds them.`,
       line`Query the Storefront API for that content in the route's loader function (context.storefront.query) and return it.`,
       line`Render the content in the route's component from useLoaderData.`,
       DEPLOY,
@@ -208,18 +241,25 @@ export const clientRenderedTemplate: PacketEntry<'client_rendered_template'> = {
     shopify_hydrogen: { write: hydrogen, sources: HYDROGEN_SOURCES },
   },
   verify: (record, facts) => {
-    const page = [...record.evidence.pages].sort((a, b) => (a.url < b.url ? -1 : 1))[0];
+    const page = renderedPages(record)[0];
     if (page === undefined) {
       throw new Error('packets: a client-rendered fix holds no rendered page');
     }
     const need = wordsNeeded(page);
     const entry = verifyCrawler(facts);
+    const address = url(servedAt(facts, page.url));
+    const skipped = list(
+      SKIPPED.map((tag) => ours(`\`${tag}\``)),
+      SKIPPED.length,
+      'element',
+    );
+    const percent = (share: number) => count(Math.round(share * 100));
     return {
       command:
         entry === null
-          ? sh`curl -sS ${url(page.url)} | tr ${word('\\r\\n')} ${word('  ')} | tr ${word('<')} ${word('\\n')} | awk -v need=${int(need)} ${word(COUNT_WORDS)}`
-          : sh`curl -sS -A ${word(userAgentOf(entry))} ${url(page.url)} | tr ${word('\\r\\n')} ${word('  ')} | tr ${word('<')} ${word('\\n')} | awk -v need=${int(need)} ${word(COUNT_WORDS)}`,
-      expect: line`Prints its count of the words in the HTML response outside scripts, styles and navigation, and exits 0 when that is ${count(need)} or more: ${count(Math.round(READABLE_FROM * 100))}% of the ${count(page.rendered_words)} words the audit counted once rendered. The audit counted ${count(page.raw_words)} without JavaScript. The count is the command’s own and differs a little from the audit’s.`,
+          ? sh`curl -sS ${address} | tr ${word('\\r\\n')} ${word('  ')} | tr ${word('<')} ${word('\\n')} | awk -v need=${int(need)} ${word(COUNT_WORDS)}`
+          : sh`curl -sS -A ${word(userAgentOf(entry))} ${address} | tr ${word('\\r\\n')} ${word('  ')} | tr ${word('<')} ${word('\\n')} | awk -v need=${int(need)} ${word(COUNT_WORDS)}`,
+      expect: line`Prints its count of the words in the HTML response and exits 0 at ${count(need)} or more: ${percent(READABLE_FROM)}% of the ${count(page.rendered_words)} the audit counted once rendered (it counted ${count(page.raw_words)} without JavaScript). The command counts all text outside ${skipped} elements: its count differs a little from the audit’s, and a page with that much text outside its main content passes unfixed. The audit’s next check closes the fix sooner: once every rendered page of the template has more than ${percent(EMPTY_SHELL_LEAVES_ABOVE)}% of its rendered words in the HTML response.`,
       ua: entry?.token ?? null,
     };
   },

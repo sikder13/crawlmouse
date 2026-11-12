@@ -9,6 +9,7 @@ import {
   closeSites,
   commandOn,
   contentFacts,
+  contentCommandOnSites,
   contentPacketProperties,
   contentRecord,
   engineVerdict,
@@ -153,3 +154,4 @@ describe('quotable_opening: the command and the engine’s check agree', () => {
 });
 
 contentPacketProperties(TYPE);
+contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED });

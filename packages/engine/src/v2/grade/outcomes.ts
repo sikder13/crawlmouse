@@ -44,19 +44,22 @@ export const STRUCTURE_CLASS: Readonly<Partial<Record<FixType, RecommendationCla
 const CRAWL_CONFIDENCE: Confidence = 'likely';
 
 /**
- * A client-rendered template is a documented requirement: Google's "Understand the JavaScript SEO
- * basics" says server-side rendering or pre-rendering is still a good idea because not all bots can
- * run JavaScript (read 2026-11-12). The same class as the structure rules a search engine documents.
+ * A client-rendered template is a best practice, not a documented requirement. Google's "Understand
+ * the JavaScript SEO basics" calls server-side rendering or pre-rendering "still a great idea" and
+ * requires nothing. The crawler pages of OpenAI and Anthropic that crawler-registry.ts cites say
+ * nothing about whether their crawlers run JavaScript (each read 2026-11-12), so no operator of a
+ * crawler the audit tests documents the rule either.
  */
-export const RENDERED_CLASS: RecommendationClass = 'documented_requirement';
+export const RENDERED_CLASS: RecommendationClass = 'best_practice';
 
 /**
- * A browser measured the template's pages: confirmed once PAGES_PER_FIX_TEMPLATE of them were rendered
- * (the detector opens a fix only when its rendered pages agree), likely on fewer. One page shows a
- * page; the render planner renders PAGES_PER_FIX_TEMPLATE of an open fix's template on the next check.
+ * A browser measured the template's pages, and the detector opens a fix only when its rendered pages
+ * agree. `confirmed` when PAGES_PER_FIX_TEMPLATE or more of the template's graded pages were rendered,
+ * or when each of them was (a template of one graded page, rendered); `likely` otherwise. The render
+ * planner renders up to PAGES_PER_FIX_TEMPLATE pages of an open fix's template on the next check.
  */
-export const renderedConfidence = (r: Pick<RenderedDetection, 'extent'>): Confidence =>
-  r.extent.rendered >= PAGES_PER_FIX_TEMPLATE ? 'confirmed' : 'likely';
+export const renderedConfidence = ({ extent }: Pick<RenderedDetection, 'extent'>): Confidence =>
+  extent.rendered >= Math.min(PAGES_PER_FIX_TEMPLATE, extent.pages) ? 'confirmed' : 'likely';
 
 /** "its" or "their", for the pages a template key names. */
 const possessive = (key: string) => (namesOnePage(key) ? 'its' : 'their');

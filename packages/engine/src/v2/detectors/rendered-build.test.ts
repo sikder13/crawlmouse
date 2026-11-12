@@ -75,15 +75,15 @@ describe('detected: every rendered page of the template is an empty shell', () =
       affected_pages: graded.length,
       crawler_uas: [],
       confidence: 'confirmed',
-      recommendation_class: 'documented_requirement',
+      recommendation_class: 'best_practice',
     });
     expect(FixSchema.safeParse(fix).success).toBe(true);
     expect(fix!.packet!.frameworks).toEqual(['generic', 'nextjs', 'shopify_hydrogen']);
     expect(fix!.packet!.context[0]).toBe(
-      `The template \`${PRODUCTS}\` serves its main content by JavaScript. The audit rendered ${rendered.length} of its ${graded.length} graded pages in a browser, and without JavaScript each of them is an empty shell.`,
+      `The HTML response of the template \`${PRODUCTS}\` holds far fewer words than its pages show once rendered in a browser: the difference is content added in the browser. The audit rendered ${rendered.length} of its ${graded.length} graded pages in a browser.`,
     );
     expect(fix!.packet!.context[1]).toBe(
-      `\`${rendered.map((p) => p.url).sort()[0]}\`: ${SHELL_RAW_WORDS} words in the HTML response, 170 once rendered.`,
+      `\`${rendered.map((p) => p.url).sort()[0]}\`: ${SHELL_RAW_WORDS} words in the HTML response, 170 once rendered in a browser.`,
     );
   });
 

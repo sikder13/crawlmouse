@@ -3,6 +3,7 @@ import {
   closeSites,
   commandOn,
   contentFacts,
+  contentCommandOnSites,
   contentPacketProperties,
   contentRecord,
   engineVerdict,
@@ -132,6 +133,10 @@ describe('missing_schema_description: the command and the engine’s check agree
         `${ld(article)}<script type="application/json">{"@type":"Product","description":"x"}</script>`,
       ),
       '/no-json-ld': page(''),
+      // the type in one block and the description in the next script: two blocks, neither passes
+      '/split-over-scripts': page(
+        `${ld({ ...article, headline: 'a < b' })}<script type="application/ld+json">{"description":"x"}</script>`,
+      ),
     };
     for (const html of Object.values(lazy)) expect(engineVerdict(TYPE, html)).toBe('fail');
     const statuses = await statusesOn(TYPE, lazy);
@@ -147,6 +152,13 @@ describe('missing_schema_description: the command and the engine’s check agree
       '/pretty': page(ld(described, 2)),
       '/second-block': page(`${ld({ '@type': 'Organization' })}${ld(described)}`),
       '/in-body': page('', `<h1>T</h1><p>Text.</p>${ld(described)}`),
+      // a `<` in the block's own text, before its type: the block is still one block
+      '/less-than-in-headline': page(
+        ld({ headline: 'Tents < 2 kg', '@type': 'BlogPosting', description: 'A tent.' }),
+      ),
+      '/markup-in-text': page(
+        ld({ headline: 'Use <nav> and </p> well', '@type': 'BlogPosting', description: 'A tent.' }),
+      ),
     };
     for (const html of Object.values(fixed)) expect(engineVerdict(TYPE, html)).toBe('pass');
     const statuses = await statusesOn(TYPE, fixed);
@@ -214,3 +226,4 @@ describe('missing_schema_description: stack bodies', () => {
 });
 
 contentPacketProperties(TYPE);
+contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED });

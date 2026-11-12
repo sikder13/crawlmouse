@@ -4,6 +4,7 @@ import {
   closeSites,
   commandOn,
   contentFacts,
+  contentCommandOnSites,
   contentPacketProperties,
   contentRecord,
   engineVerdict,
@@ -114,3 +115,4 @@ describe('specs_as_images: the command and the engine’s check', () => {
 });
 
 contentPacketProperties(TYPE);
+contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED });

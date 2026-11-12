@@ -4,6 +4,7 @@ import {
   closeSites,
   commandOn,
   contentFacts,
+  contentCommandOnSites,
   contentPacketProperties,
   contentRecord,
   engineVerdict,
@@ -127,3 +128,4 @@ describe('no_question_headings: the command and the engine’s check agree', () 
 });
 
 contentPacketProperties(TYPE);
+contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED });
