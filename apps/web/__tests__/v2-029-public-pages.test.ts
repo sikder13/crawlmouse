@@ -8,7 +8,9 @@ import {
   readMigration,
   readRollback,
 } from './helpers/pglite-migrations';
+import { postgrestOver } from './helpers/postgrest-pglite';
 import { personalAccount, signUp } from './helpers/v2-check-tables';
+import { agencyCheckouts } from '../app/api/agency-trial/_lib/checkouts';
 
 /**
  * Migration 20261114000001 (CC-29): start_agency_trial_account, contact_requests and one public report
@@ -131,13 +133,50 @@ describe('start_agency_trial_account', () => {
     ).rejects.toThrow(/permission denied/);
   });
 
-  it('authenticated cannot read the open Checkout columns', async () => {
+  it.each(['agency_checkout_url', 'agency_checkout_interval', 'agency_trial_consent_at'])(
+    'authenticated cannot read accounts.%s',
+    async (column) => {
+      const userId = await person();
+      await expect(
+        asRole(db, 'authenticated', userId, (tx) =>
+          tx.query(`select ${column} from public.accounts`),
+        ),
+      ).rejects.toThrow(/permission denied/);
+    },
+  );
+});
+
+// Correctness B3 / security N3: the stored Checkout carries its interval, so the route reuses it only
+// for a submit on the same interval.
+describe('the stored agency Checkout', () => {
+  const URL = 'https://checkout.stripe.com/c/pay/cs_test_1';
+
+  it('the route’s port stores the URL, the time and the interval, and reads them back', async () => {
     const userId = await person();
+    const { account_id } = await start(userId);
+    const port = agencyCheckouts(postgrestOver(db) as never);
+    expect(await port.open(account_id!)).toBeNull();
+    const at = new Date('2026-11-12T12:00:00.000Z');
+    for (const interval of ['year', 'month'] as const) {
+      await port.store(account_id!, { url: URL, at, interval });
+      expect(await port.open(account_id!)).toEqual({ url: URL, at, interval });
+    }
+  });
+
+  it('accounts.agency_checkout_interval holds month, year or nothing', async () => {
+    const userId = await person();
+    const { account_id } = await start(userId);
+    for (const ok of ['month', 'year', null]) {
+      await db.query('update public.accounts set agency_checkout_interval = $2 where id = $1', [
+        account_id,
+        ok,
+      ]);
+    }
     await expect(
-      asRole(db, 'authenticated', userId, (tx) =>
-        tx.query('select agency_checkout_url, agency_trial_consent_at from public.accounts'),
-      ),
-    ).rejects.toThrow(/permission denied/);
+      db.query(`update public.accounts set agency_checkout_interval = 'week' where id = $1`, [
+        account_id,
+      ]),
+    ).rejects.toThrow(/accounts_agency_checkout_interval_check/);
   });
 });
 
@@ -179,16 +218,17 @@ describe('the rollback', () => {
                   + (select count(*) from information_schema.columns
                       where table_name = 'accounts'
                         and column_name in ('agency_checkout_url', 'agency_checkout_at',
+                                            'agency_checkout_interval',
                                             'agency_trial_consent_at')) as n`,
           )
         ).rows[0]!.n;
-      expect(Number(await present())).toBe(6);
+      expect(Number(await present())).toBe(7);
       await own.exec(readRollback(ROLLBACK));
       await own.exec(readRollback(ROLLBACK));
       expect(Number(await present())).toBe(0);
       await own.exec(readMigration(MIGRATION));
       await own.exec(readMigration(MIGRATION));
-      expect(Number(await present())).toBe(6);
+      expect(Number(await present())).toBe(7);
     } finally {
       await own.close();
     }

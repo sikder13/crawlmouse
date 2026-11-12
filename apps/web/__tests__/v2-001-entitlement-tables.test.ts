@@ -48,6 +48,7 @@ const POSTURE: Record<
         // CC-29: the agency trial's open Checkout and its consent time, read by the service role only.
         'agency_checkout_url',
         'agency_checkout_at',
+        'agency_checkout_interval',
         'agency_trial_consent_at',
       ],
     },

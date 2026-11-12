@@ -90,7 +90,7 @@ describe('startAgencyTrial', () => {
     expect(await res.json()).toEqual({ url: URL_NEW });
     expect(calls.startAccount).toEqual([[USER.id, 'Summit Digital', 'clientsite.com']]);
     expect(calls.checkout).toEqual([{ accountId: ACCOUNT, email: USER.email, interval: 'month' }]);
-    expect(calls.stored).toEqual([[ACCOUNT, URL_NEW, NOW]]);
+    expect(calls.stored).toEqual([[ACCOUNT, { url: URL_NEW, at: NOW, interval: 'month' }]]);
     expect(calls.events).toEqual([
       ['plan_chosen', ACCOUNT, { plan: 'agency', interval: 'month' }],
       [
@@ -118,6 +118,7 @@ describe('startAgencyTrial', () => {
         openCheckout: async () => ({
           url: URL_OPEN,
           at: new Date(NOW.getTime() - CHECKOUT_REUSE_MS + 1000),
+          interval: 'month',
         }),
       },
       { outcome: 'existing', accountId: ACCOUNT, siteId: SITE },
@@ -135,6 +136,7 @@ describe('startAgencyTrial', () => {
         openCheckout: async () => ({
           url: URL_OPEN,
           at: new Date(NOW.getTime() - CHECKOUT_REUSE_MS),
+          interval: 'month',
         }),
       },
       { outcome: 'existing', accountId: ACCOUNT, siteId: SITE },
@@ -142,6 +144,31 @@ describe('startAgencyTrial', () => {
     expect(await (await startAgencyTrial(json(GOOD), USER, deps)).json()).toEqual({ url: URL_NEW });
     expect(calls.checkout).toHaveLength(1);
   });
+
+  // Correctness B3 / security N3: the consent names the interval, so a Checkout opened for the other
+  // interval is never handed back; a new one is opened, which expires the old (CC-03's startCheckout).
+  it.each([
+    ['month', 'year'],
+    ['year', 'month'],
+  ] as const)(
+    'a Checkout still open for %s is not reused for a %s submit: a new one, stored with its interval',
+    async (stored, asked) => {
+      const { deps, calls } = harness(
+        {
+          openCheckout: async () => ({
+            url: URL_OPEN,
+            at: new Date(NOW.getTime() - 1000),
+            interval: stored,
+          }),
+        },
+        { outcome: 'existing', accountId: ACCOUNT, siteId: SITE },
+      );
+      const res = await startAgencyTrial(json({ ...GOOD, interval: asked }), USER, deps);
+      expect(await res.json()).toEqual({ url: URL_NEW });
+      expect(calls.checkout).toEqual([{ accountId: ACCOUNT, email: USER.email, interval: asked }]);
+      expect(calls.stored).toEqual([[ACCOUNT, { url: URL_NEW, at: NOW, interval: asked }]]);
+    },
+  );
 
   it('a stored Checkout is reused only while CC-03’s session can still be open', () => {
     // CC-03 sets each session to expire SESSION_LIFETIME_S (31 min) after it is created.

@@ -11,12 +11,15 @@
 -- scripts/db/agency-trial-race.test.ts.
 
 -- ─── accounts: the open Checkout of an agency trial ──────────────────────────────────────────────
--- The route keeps the Checkout URL it opened, so a second submit gets the same session rather than a
--- second one that could also be completed. Clients read accounts through per-column grants, which do
--- not name these columns.
+-- The route keeps the Checkout URL it opened and the interval it was opened for, so a second submit
+-- on the same interval gets the same session rather than a second one that could also be completed;
+-- a submit on the other interval opens a new one. Clients read accounts through per-column grants,
+-- which do not name these columns.
 alter table public.accounts add column if not exists agency_checkout_url text
   constraint accounts_agency_checkout_url_check check (agency_checkout_url ~ '^https://checkout\.stripe\.com/');
 alter table public.accounts add column if not exists agency_checkout_at timestamptz;
+alter table public.accounts add column if not exists agency_checkout_interval text
+  constraint accounts_agency_checkout_interval_check check (agency_checkout_interval in ('month', 'year'));
 -- When the owner last ticked the Agency trial's consent (renewal, EU withdrawal, Terms; FACTS J15/L6).
 alter table public.accounts add column if not exists agency_trial_consent_at timestamptz;
 
