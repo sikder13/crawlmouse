@@ -105,6 +105,7 @@ map's effect on the whole page (+33% on a workstation). Normalised, CI's reading
 | 43100098012 (2) | 121.5 ms  | 2.270     | —             | —         |
 | 43117782092     | 100.48 ms | 2.136     | 0.531         | 1.454     |
 | 43125738080     | 101.35 ms | 2.690     | 0.614         | 2.306     |
+| 43131401594     | 112.89 ms | 2.331     | 0.571         | 2.088     |
 | **spread**      |           | **27.0%** | **20.6%**     | **58.6%** |
 
 Reference milliseconds, medians of five; the spread is (highest − lowest) / lowest. The first two
@@ -112,9 +113,10 @@ runs predate the normalisation and are normalised here by the same formula (×10
 43100098012's second attempt re-ran only the window that missed. **Every window spread by more than
 15% with the crawl screen's own code unchanged, so this layer is advisory** (`MEAN_WORK_ADVISORY` in
 `tests/visual/budgets.ts`): recorded for the nightly trend, never failing a run, while the count is
-the gate. With four readings already over 15%, a fifth could only widen the spread. The crawl
+the gate. That is six readings of the crawl window from five runs (43100098012 read twice, its second attempt
+re-running only the window that missed), and five of each of the other two. The crawl
 screen's own code is the same at every head these runs read, though `main` was merged in between
-(other screens and shared components changed): `git diff --name-only 83b7590e 05ede0b9 --
+(other screens and shared components changed): `git diff --name-only 83b7590e 9f443047 --
 apps/web/components/v2/screens/crawl apps/web/components/v2/map apps/web/lib/v2/map-layout.ts
 apps/web/lib/v2/map-layout.worker.ts apps/web/lib/v2/layout-scheduler.ts apps/web/lib/v2/player.ts
 apps/web/lib/v2/progress.ts` prints nothing. The limits are
