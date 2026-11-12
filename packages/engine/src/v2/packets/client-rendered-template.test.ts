@@ -1,13 +1,13 @@
 import fc from 'fast-check';
 import { afterEach, describe, expect, it } from 'vitest';
-import { FixPacketSchema } from '@crawlmouse/types/v2';
+import { FixPacketSchema, type PageResult } from '@crawlmouse/types/v2';
 import {
   detectRendered,
   type RenderedDetection,
   type RenderedInputPage,
 } from '../detectors/rendered.js';
 import { measurePage } from '../render/page.js';
-import { READABLE_FROM } from '../render/state.js';
+import { EMPTY_SHELL_LEAVES_ABOVE, jsTextState, READABLE_FROM } from '../render/state.js';
 import {
   clientRenderedTemplate,
   PAGES_SHOWN,
@@ -30,11 +30,14 @@ const builder = clientRenderedTemplate as PacketBuilder<RenderedDetection>;
 const T = '/guides/{slug}';
 const SERVED = [{ ua: 'OAI-SearchBot', verdict: 'allowed' as const }];
 
-const factsOf = (crawlers: PacketFacts['crawlers'] = SERVED): PacketFacts => ({
+const factsOf = (
+  crawlers: PacketFacts['crawlers'] = SERVED,
+  pages: PacketFacts['pages'] = new Map(),
+): PacketFacts => ({
   homepage_url: 'https://a.test',
   stack: NO_STACK,
   crawlers,
-  pages: new Map(),
+  pages,
   edges: [],
   access_tests: [],
 });
@@ -83,12 +86,85 @@ describe('the client-rendered template packet, from its record', () => {
       29,
     );
     expect(compose(builder, record, factsOf()).context).toEqual([
-      'The template `/guides/{slug}` serves its main content by JavaScript. The audit rendered 2 of its 31 graded pages in a browser, and without JavaScript each of them is an empty shell.',
-      '`https://a.test/guides/g-0`: 41 words in the HTML response, 312 once rendered.',
-      '`https://a.test/guides/g-1`: 38 words in the HTML response, 290 once rendered.',
+      'The HTML response of the template `/guides/{slug}` holds far fewer words than its pages show once rendered in a browser: the difference is content added in the browser. The audit rendered 2 of its 31 graded pages in a browser.',
+      '`https://a.test/guides/g-0`: 41 words in the HTML response, 312 once rendered in a browser.',
+      '`https://a.test/guides/g-1`: 38 words in the HTML response, 290 once rendered in a browser.',
       'Across the rendered pages, a median of 13% of the rendered words is in the HTML response. A crawler that does not run JavaScript reads the smaller number.',
       'Measured by rendering 2 pages. The other 29 graded pages of the template were not rendered: the finding is for the template by this sample.',
+      'The audit renders only pages it grades. A route whose HTML response holds too little text to be graded is not rendered, so another template of the site can have the same fault unmeasured.',
     ]);
+  });
+
+  it('states what was measured and names no mechanism the record does not hold', () => {
+    const p = compose(builder, detected('https://a.test', [[32, 312]], 3), factsOf());
+    const text = allText(p).join('\n');
+    expect(text).not.toMatch(/empty shell|by JavaScript|a script fetches|useEffect/);
+    expect(p.change[0]).toBe(
+      'Find what adds the content of the pages of `/guides/{slug}` in the browser. The audit measured the words, not what adds them.',
+    );
+    for (const body of p.packets) expect(body.change[0], body.framework).toMatch(/^Find what adds/);
+  });
+
+  it('says one page in the singular, and two in the plural', () => {
+    const one = compose(builder, detected('https://a.test', [[1, 100]]), factsOf()).context;
+    expect(one[0]).toMatch(/The audit rendered its 1 graded page in a browser\.$/);
+    expect(one[1]).toBe(
+      '`https://a.test/guides/g-0`: 1 word in the HTML response, 100 once rendered in a browser.',
+    );
+    expect(one).toContain('Measured by rendering 1 page: every graded page of the template.');
+    const two = compose(
+      builder,
+      detected('https://a.test', [
+        [2, 100],
+        [2, 100],
+      ]),
+      factsOf(),
+    ).context;
+    expect(two[0]).toMatch(/The audit rendered each of its 2 graded pages in a browser\.$/);
+    expect(two[1]).toMatch(/: 2 words in the HTML response/);
+    expect(two).toContain('Measured by rendering 2 pages: every graded page of the template.');
+    const oneOfTwo = compose(builder, detected('https://a.test', [[2, 100]], 1), factsOf()).context;
+    expect(oneOfTwo[0]).toMatch(/The audit rendered 1 of its 2 graded pages in a browser\.$/);
+    expect(oneOfTwo).toContain(
+      'Measured by rendering 1 page. The other 1 graded page of the template was not rendered: the finding is for the template by this sample.',
+    );
+    const shownPlus = (extra: number) =>
+      compose(
+        builder,
+        detected(
+          'https://a.test',
+          Array.from({ length: PAGES_SHOWN + extra }, () => [10, 100] as [number, number]),
+        ),
+        factsOf(),
+      ).context;
+    expect(shownPlus(1)).toContain('1 more rendered page is not shown.');
+    expect(shownPlus(2)).toContain('2 more rendered pages are not shown.');
+  });
+
+  it('gives the same packet whatever order the record lists its rendered pages in', () => {
+    const record = detected('https://a.test', [
+      [41, 312],
+      [38, 290],
+      [12, 400],
+    ]);
+    const reordered: RenderedDetection = {
+      ...record,
+      affected_urls: [...record.affected_urls].reverse(),
+      evidence: { pages: [...record.evidence.pages].reverse() },
+    };
+    expect(reordered.evidence.pages[0]).not.toEqual(record.evidence.pages[0]);
+    expect(JSON.stringify(compose(builder, reordered, factsOf()))).toBe(
+      JSON.stringify(compose(builder, record, factsOf())),
+    );
+  });
+
+  it('names a rendered page at the address its server answered at', () => {
+    const record = detected('https://a.test', [[41, 312]]);
+    const url = record.evidence.pages[0]!.url;
+    const pages = new Map([[url, { url, final_url: `${url}/` } as PageResult]]);
+    const p = compose(builder, record, factsOf(SERVED, pages));
+    expect(p.context[1]).toMatch(/^`https:\/\/a\.test\/guides\/g-0\/`: 41 words/);
+    expect(p.verify.command).toContain(" 'https://a.test/guides/g-0/' | tr ");
   });
 
   it('bounds the page lines and says how many it left out; says when every page was rendered', () => {
@@ -99,12 +175,9 @@ describe('the client-rendered template packet, from its record', () => {
     const { context } = compose(builder, many, factsOf());
     expect(context.filter((l) => l.startsWith('`https://'))).toHaveLength(PAGES_SHOWN);
     expect(context).toContain('2 more rendered pages are not shown.');
-    expect(context.at(-1)).toBe(
+    expect(context.at(-2)).toBe(
       `Measured by rendering ${PAGES_SHOWN + 2} pages: every graded page of the template.`,
     );
-    const one = compose(builder, detected('https://a.test', [[10, 100]]), factsOf()).context;
-    expect(one[0]).toMatch(/rendered 1 of its 1 graded page in a browser/);
-    expect(one.at(-1)).toBe('Measured by rendering 1 page: every graded page of the template.');
   });
 
   it('names no URL its record does not hold, and verifies on a rendered page of the record', () => {
@@ -128,6 +201,13 @@ describe('the client-rendered template packet, from its record', () => {
     expect(next.change.join('\n')).toMatch(/App Router/);
     expect(next.change.join('\n')).toMatch(/Pages Router/);
     expect(next.change.join('\n')).toMatch(/getStaticProps.*getServerSideProps/);
+    // ssr: false is often there for a reason: the step says what to do when it cannot be removed
+    expect(next.change.join('\n')).toMatch(
+      /Remove the option if the component can render on the server\. If it cannot, because it uses a browser-only API such as window, leave it as it is and render the content's text in a Server Component/,
+    );
+    expect(builder.stacks.nextjs!.sources.map((s) => s.supports).join('\n')).toMatch(
+      /browser-only APIs such as window.*passed to a Client Component as children is rendered on the server/,
+    );
     expect(p.packets.find((b) => b.framework === 'shopify_hydrogen')!.change.join('\n')).toMatch(
       /loader/,
     );
@@ -177,8 +257,12 @@ describe('the client-rendered template packet, from its record', () => {
     const { verify } = compose(builder, record, factsOf());
     expect(verify.command).toContain("need='250'");
     expect(verify.expect).toBe(
-      'Prints its count of the words in the HTML response outside scripts, styles and navigation, and exits 0 when that is 250 or more: 80% of the 312 words the audit counted once rendered. The audit counted 41 without JavaScript. The count is the command’s own and differs a little from the audit’s.',
+      'Prints its count of the words in the HTML response and exits 0 at 250 or more: 80% of the 312 the audit counted once rendered (it counted 41 without JavaScript). The command counts all text outside `script`, `style`, `noscript`, `template`, `svg`, `title`, `nav`, `footer`, `aside` elements: its count differs a little from the audit’s, and a page with that much text outside its main content passes unfixed. The audit’s next check closes the fix sooner: once every rendered page of the template has more than 45% of its rendered words in the HTML response.',
     );
+    expect(Math.round(EMPTY_SHELL_LEAVES_ABOVE * 100)).toBe(45);
+    // the largest counts a page can have leave the line under the packet's bound
+    const big = compose(builder, detected('https://a.test', [[99_999, 999_999]]), factsOf());
+    expect(big.verify.expect).not.toMatch(/line cut from/);
   });
 });
 
@@ -306,6 +390,87 @@ describe('the client-rendered template verify command', () => {
     await site.close();
     site = null;
     expect((await runCommand(command)).status).not.toBe(0);
+  });
+
+  it('on a site that redirects the page to its slashed address: the same two states', async () => {
+    const at =
+      (body: string) =>
+      (
+        req: { url?: string },
+        res: { statusCode: number; setHeader(n: string, v: string): void; end(b: string): void },
+      ) => {
+        if (req.url?.endsWith('/')) return html(body)(req, res);
+        res.statusCode = 301;
+        res.setHeader('location', `${req.url}/`);
+        res.end('<html><body>Moved</body></html>');
+      };
+    site = await twoStateSite({ broken: at(SHELL), fixed: at(SERVER_RENDERED) });
+    const record = measured(site.base);
+    const url = record.evidence.pages[0]!.url;
+    const pages = new Map([[url, { url, final_url: `${url}/` } as PageResult]]);
+    const { command } = compose(builder, record, factsOf(SERVED, pages)).verify;
+    expect(command).toContain(`'${url}/'`);
+    const { broken, fixed } = await inBothStates(site, command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    // without the row's served address the command counts the redirect's own body, in both states
+    const slashless = compose(builder, record, factsOf()).verify.command;
+    expect((await runCommand(slashless)).status).not.toBe(0);
+  });
+
+  it('passes on a server-rendered page whose head is not closed', async () => {
+    const unclosed = SERVER_RENDERED.replace('</head>', '');
+    expect(unclosed).not.toBe(SERVER_RENDERED);
+    site = await twoStateSite({
+      broken: html(SHELL.replace('</head>', '')),
+      fixed: html(unclosed),
+    });
+    const record = measured(site.base);
+    const { broken, fixed } = await inBothStates(
+      site,
+      compose(builder, record, factsOf()).verify.command,
+    );
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    expect(Number(fixed.stdout)).toBeGreaterThanOrEqual(wordsNeeded(record.evidence.pages[0]!));
+  });
+
+  it('passes on a server-rendered page whose text is inside a section’s header element', async () => {
+    const inHeader = guidePage({ body: `<article><header>${BODY}</header></article>` });
+    site = await twoStateSite({ broken: html(SHELL), fixed: html(inHeader) });
+    const { broken, fixed } = await inBothStates(
+      site,
+      compose(builder, measured(site.base), factsOf()).verify.command,
+    );
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('the stated limit: an unfixed page with enough static text outside its main content passes', async () => {
+    const record0 = measured('https://a.test');
+    const need = wordsNeeded(record0.evidence.pages[0]!);
+    const menu = `<div class="menu">${words(need, 'menu')}</div>`;
+    site = await twoStateSite({
+      broken: html(guidePage({ body: '' }).replace('<main>', `${menu}<main>`)),
+      fixed: html(SERVER_RENDERED),
+    });
+    const { verify } = compose(builder, measured(site.base), factsOf());
+    expect((await runCommand(verify.command)).status).toBe(0);
+    expect(verify.expect).toContain(
+      'a page with that much text outside its main content passes unfixed.',
+    );
+  });
+
+  it('asks for more than the audit needs to close the fix, and says so', () => {
+    // the page the command passes is not an empty shell on the next check, whatever it was before
+    expect(READABLE_FROM).toBeGreaterThan(EMPTY_SHELL_LEAVES_ABOVE);
+    expect(jsTextState(READABLE_FROM, 'empty_shell')).not.toBe('empty_shell');
+    expect(jsTextState(EMPTY_SHELL_LEAVES_ABOVE, 'empty_shell')).toBe('empty_shell');
+    expect(jsTextState(EMPTY_SHELL_LEAVES_ABOVE + 0.001, 'empty_shell')).not.toBe('empty_shell');
+    const { verify } = compose(builder, detected('https://a.test', [[41, 312]]), factsOf());
+    expect(verify.expect).toMatch(
+      /closes the fix sooner: once every rendered page of the template has more than 45% of its rendered words/,
+    );
   });
 
   it('requesting as no crawler: the same two states', async () => {
