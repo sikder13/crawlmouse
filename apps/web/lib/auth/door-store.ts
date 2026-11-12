@@ -48,7 +48,10 @@ export interface CheckForClaim {
 export type TakeSiteResult = 'taken' | 'not_unowned' | 'host_kept';
 
 export interface DoorStore {
-  /** The user's default account and its active owner seat, or null when the user has none. */
+  /**
+   * The user's default account and its active owner seat, or null when the user has none or the
+   * account is marked for deletion (`deletion_confirmed_at`, CC-27b).
+   */
   loadMember(userId: string): Promise<MemberAccount | null>;
   setTimezone(accountId: string, zone: string): Promise<void>;
   /**

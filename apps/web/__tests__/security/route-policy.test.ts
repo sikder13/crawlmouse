@@ -307,6 +307,7 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/reports/[slug]/white-label',
       'api/sites',
       'api/sites/[id]',
+      'api/sites/[id]/alert-rules',
       'api/sites/[id]/checks',
       'api/verify/check/[id]',
       'api/verify/start',

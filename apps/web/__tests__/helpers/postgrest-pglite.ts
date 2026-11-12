@@ -7,11 +7,13 @@
  * `maybeSingle` as the one row, null for none, PGRST116 for more.
  *
  * Modelled: `from(table)` with `select`, `insert`, `upsert` (`onConflict` required,
- * `ignoreDuplicates`) and `update`, each optionally followed by `select(columns)`, which returns the
- * written rows as PostgREST's `return=representation` does; the filters `eq`, `is`,
- * `not(column, 'is' | 'eq', value)`, `filter(column, 'is' | 'not.is', value)` and `in`; `order`, `limit`, `range` after a `select` that reads,
- * and `maybeSingle` after either kind of `select`; and `rpc(fn, args)` for a
- * function that returns one value. `maxRows` caps every read as PostgREST's `db-max-rows` does. The builders carry no other method, so a call a port adds throws in its test
+ * `ignoreDuplicates`) and `update`; the filters `eq`, `neq`, `gte`, `lt`, `is`,
+ * `not(column, 'is' | 'eq', value)`, `filter(column, 'is' | 'not.is', value)` and `in`; `select(columns)` after
+ * `insert` or `update`, which returns the written rows as PostgREST's `return=representation` does; `order`, `limit`, `range` and `maybeSingle` after a
+ * `select`, and `single` (one row, else PGRST116, as for none); and `rpc(fn, args)` for a function that returns one value, or, for a set-returning
+ * function (`returns table` / `setof`), its rows as an array, as PostgREST answers one.
+ * `maxRows` caps every read, a set-returning function's rows included, as PostgREST's `db-max-rows`
+ * does. The builders carry no other method, so a call a port adds throws in its test
  * until it is modelled here.
  *
  * `log` receives each request as the calls that built it, when it is sent. `before` runs ahead of
@@ -50,12 +52,13 @@ const ident = (s: string): string => {
   return s;
 };
 
+/** A column list, each name quoted, so a column named as a keyword (`changes.where`) reads. */
 const columnsOf = (list: string): string =>
   list === '*'
     ? '*'
     : list
         .split(',')
-        .map((c) => ident(c.trim()))
+        .map((c) => `"${ident(c.trim())}"`)
         .join(', ');
 
 /** A value as PostgREST puts it on the wire. */
@@ -121,6 +124,7 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
     let limit: number | null = null;
     let offset = 0;
     let single = false;
+    let exactlyOne = false;
     let reads = false;
     let statement = '';
     /** The columns a write returns (`select` after it), or null for a write that returns none. */
@@ -146,7 +150,7 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
       if ('error' in r) return { data: null, error: r.error };
       if (!reads && returning === null) return { data: null, error: null };
       if (!single) return { data: r.rows, error: null };
-      if (r.rows.length > 1) {
+      if (r.rows.length > 1 || (exactlyOne && r.rows.length === 0)) {
         return {
           data: null,
           error: {
@@ -164,6 +168,21 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
       eq(column: string, value: unknown) {
         calls.push(['eq', column, value]);
         where.push(`${ident(column)} = ${param(value)}`);
+        return filters;
+      },
+      neq(column: string, value: unknown) {
+        calls.push(['neq', column, value]);
+        where.push(`${ident(column)} <> ${param(value)}`);
+        return filters;
+      },
+      gte(column: string, value: unknown) {
+        calls.push(['gte', column, value]);
+        where.push(`${ident(column)} >= ${param(value)}`);
+        return filters;
+      },
+      lt(column: string, value: unknown) {
+        calls.push(['lt', column, value]);
+        where.push(`${ident(column)} < ${param(value)}`);
         return filters;
       },
       is(column: string, value: null | boolean) {
@@ -235,6 +254,13 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
         single = true;
         return filters;
       },
+      single() {
+        calls.push(['single']);
+        readOnly('single');
+        single = true;
+        exactlyOne = true;
+        return filters;
+      },
       then<T, E = never>(
         resolve: (v: Answer) => T | PromiseLike<T>,
         reject?: (e: unknown) => E | PromiseLike<E>,
@@ -290,17 +316,28 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
         params.push(sqlValue(v));
         return `${ident(k)} => $${params.length}`;
       });
-      const sql = `select public.${ident(fn)}(${named.join(', ')}) as r`;
+      const scalar = `select public.${ident(fn)}(${named.join(', ')}) as r`;
       return {
-        then<T, E = never>(
+        async then<T, E = never>(
           resolve: (v: Answer) => T | PromiseLike<T>,
           reject?: (e: unknown) => E | PromiseLike<E>,
         ): Promise<T | E> {
+          const { rows } = await pg.query<{ set: boolean }>(
+            `select bool_or(p.proretset) as set from pg_catalog.pg_proc p
+              where p.pronamespace = 'public'::regnamespace and p.proname = $1`,
+            [fn],
+          );
+          const set = rows[0]?.set === true;
+          const cap = capped(null);
+          const sql = set
+            ? `select * from public.${ident(fn)}(${named.join(', ')})` +
+              (cap === null ? '' : ` limit ${cap}`)
+            : scalar;
           return send(calls, sql, params)
-            .then(
-              (r): Answer =>
-                'error' in r ? { data: null, error: r.error } : { data: r.rows[0]!.r, error: null },
-            )
+            .then((r): Answer => {
+              if ('error' in r) return { data: null, error: r.error };
+              return { data: set ? r.rows : r.rows[0]!.r, error: null };
+            })
             .then(resolve, reject);
         },
       };

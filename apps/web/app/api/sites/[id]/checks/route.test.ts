@@ -275,7 +275,7 @@ describe('POST /api/sites/[id]/checks', () => {
     expect(await queued(paused.id)).toEqual([]);
   });
 
-  it('a bucket check that has started is 409 check_running, nothing sent', async () => {
+  it('a bucket check that has started gives way to the next bucket: 202 with a new check (CC-28 D11)', async () => {
     pinBucket();
     const p = await person(h.db, 'running');
     const s = await keptSite(h.db, p.accountId);
@@ -285,18 +285,16 @@ describe('POST /api/sites/[id]/checks', () => {
       first.checkId,
     ]);
     h.send.mockClear();
-    h.capture.mockClear();
     const res = await recheck(s.id);
-    expect([res.status, await res.json()]).toEqual([
-      409,
-      { code: 'check_running', checkId: first.checkId },
-    ]);
-    expect(h.send).not.toHaveBeenCalled();
-    expect(h.capture).not.toHaveBeenCalled();
+    const body = (await res.json()) as { checkId: string };
+    expect(res.status).toBe(202);
+    expect(body.checkId).not.toBe(first.checkId);
+    expect(h.send).toHaveBeenCalledTimes(1);
   });
-  it('a bucket check that has already ended is 429 recently_checked with Retry-After; a form gets its notice', async () => {
+
+  it('a next bucket whose check has also started is 409 check_running, nothing sent', async () => {
     pinBucket();
-    const p = await person(h.db, 'ended');
+    const p = await person(h.db, 'running2');
     const s = await keptSite(h.db, p.accountId);
     as(p);
     const first = (await (await recheck(s.id)).json()) as { checkId: string };
@@ -304,6 +302,34 @@ describe('POST /api/sites/[id]/checks', () => {
       first.checkId,
     ]);
     await h.db.query(`select public.fail_check($1, 'internal')`, [first.checkId]);
+    const second = (await (await recheck(s.id)).json()) as { checkId: string };
+    await h.db.query(`select public.claim_check($1, 'run-2', '{"phase":"crawl"}'::jsonb)`, [
+      second.checkId,
+    ]);
+    h.send.mockClear();
+    h.capture.mockClear();
+    const res = await recheck(s.id);
+    expect([res.status, await res.json()]).toEqual([
+      409,
+      { code: 'check_running', checkId: second.checkId },
+    ]);
+    expect(h.send).not.toHaveBeenCalled();
+    expect(h.capture).not.toHaveBeenCalled();
+  });
+
+  it('when the next bucket’s check has also ended: 429 recently_checked with Retry-After; a form gets its notice', async () => {
+    pinBucket();
+    const p = await person(h.db, 'ended');
+    const s = await keptSite(h.db, p.accountId);
+    as(p);
+    for (const run of ['run-1', 'run-2']) {
+      const c = (await (await recheck(s.id)).json()) as { checkId: string };
+      await h.db.query(`select public.claim_check($1, $2, '{"phase":"crawl"}'::jsonb)`, [
+        c.checkId,
+        run,
+      ]);
+      await h.db.query(`select public.fail_check($1, 'internal')`, [c.checkId]);
+    }
     h.send.mockClear();
     h.capture.mockClear();
     const bucketEnd = new Date((Math.floor(Date.now() / 120_000) + 1) * 120_000).toISOString();

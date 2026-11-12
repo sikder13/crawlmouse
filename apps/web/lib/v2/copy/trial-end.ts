@@ -17,7 +17,8 @@ export const TRIAL_END_COPY = {
   bannerTitle: (plan: string, date: string) =>
     `${plan} ends ${date}. Here is exactly what changes, and what doesn't.`,
   /**
-   * When the reminder is due, never that it was sent: nothing records a send until CC-28's mailer.
+   * When the reminder is due, never that it was sent: CC-28's send ledger (`email_sends`) records the
+   * send, and this page does not read it.
    * Shown while the reminder is on and its day has not passed.
    */
   reminderDue: (date: string) => `The reminder is due once, on ${date}.`,
@@ -159,7 +160,7 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
     locked: 'We sent this once, today, as promised.',
     rendered: 'The reminder is due once, on Wed 4 Nov.',
     source:
-      'Owner ruling (CC-27b Q17, 2026-11-11): nothing records that the reminder was sent (CC-28 sends it), so the sentence says when it is due, and nothing once its day has passed',
+      'Owner ruling (CC-27b Q17, 2026-11-11): the page reads no record that the reminder was sent (CC-28’s mailer records it in email_sends), so the sentence says when it is due, and nothing once its day has passed',
   },
   {
     screen: 'trial-end',

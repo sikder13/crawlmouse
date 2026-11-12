@@ -3,12 +3,27 @@
  * Applied in order by the lock comparison (__tests__/v2/account-door-screens.test.tsx). Entries
  * whose source is a CC-25 decision use the `facts` kind: a decision that supersedes the screen.
  */
-import type { Addition, CopyChange } from '../copy-registry';
+import { SIGNIN_SENDER, SIGNIN_SENDER_LOCKED } from '../../auth/constants';
+import type { Addition, CopyChange, LockedScreen } from '../copy-registry';
 
 const MASKED =
   'FACTS correction (CC-25 scope 3): Check-email shows the address masked, the local part shortened and the domain whole (lib/auth/mask-email.ts).';
 const SENDER =
-  'FACTS correction (CC-25 ruling 8): the sign-in link is sent from magic@ until CC-28 moves the Supabase template to signin@; the page names the sender that sends it (SIGNIN_SENDER).';
+  'FACTS correction (CC-25 ruling 8; CC-28 Q5): the page names the sender that sends the sign-in link (SIGNIN_SENDER), Supabase’s SMTP sender, until the owner moves it to signin@ at switch-on (docs/ops/senders.md).';
+
+/** The locked sender, corrected while the sign-in link comes from another (none once it does not). */
+const senderChange = (screen: LockedScreen): CopyChange[] =>
+  SIGNIN_SENDER === SIGNIN_SENDER_LOCKED
+    ? []
+    : [
+        {
+          screen,
+          kind: 'facts',
+          locked: SIGNIN_SENDER_LOCKED,
+          rendered: SIGNIN_SENDER,
+          source: SENDER,
+        },
+      ];
 const FIRST_TRIAL =
   'FACTS correction (CC-25 ruling 8): the trial is decided by the ledger at first login, after this page is shown, so the trial sentence is conditional.';
 const SAME_BROWSER =
@@ -80,13 +95,7 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     rendered: 'y…@company.com',
     source: MASKED,
   },
-  {
-    screen: 'check-email',
-    kind: 'facts',
-    locked: 'signin@crawlmouse.com',
-    rendered: 'magic@crawlmouse.com',
-    source: SENDER,
-  },
+  ...senderChange('check-email'),
   {
     screen: 'check-email',
     kind: 'facts',
@@ -111,13 +120,7 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     rendered: 'y…@company.com',
     source: MASKED,
   },
-  {
-    screen: 'check-email-no-audit',
-    kind: 'facts',
-    locked: 'signin@crawlmouse.com',
-    rendered: 'magic@crawlmouse.com',
-    source: SENDER,
-  },
+  ...senderChange('check-email-no-audit'),
   {
     screen: 'check-email-no-audit',
     kind: 'facts',

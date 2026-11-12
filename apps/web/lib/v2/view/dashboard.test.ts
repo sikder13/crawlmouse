@@ -342,16 +342,17 @@ describe('Who builds each account route', () => {
       .map(([key]) => key)
       .sort();
     // CC-27b D10 moved `reports` to wave 2; owner ruling Q15 gave the change log and the per-site
-    // rules to CC-28, and Integrations a later page of its own.
+    // rules to CC-28, which built them (app/changes/page.tsx, app/api/sites/[id]/alert-rules), and
+    // Integrations a later page of its own.
     expect(cc27b).toEqual(['emailSettings', 'plan']);
     expect(ACCOUNT_ACTIONS.reports.owner).toBe('wave 2');
     expect([ACCOUNT_ACTIONS.changeLog.owner, ACCOUNT_ACTIONS.alertRules.owner]).toEqual([
-      'CC-28',
-      'CC-28',
+      'built',
+      'built',
     ]);
     expect(ACCOUNT_ACTIONS.integrations.owner).toBe('later');
     expect(new Set(Object.values(ACCOUNT_ACTIONS).map((a) => a.owner))).toEqual(
-      new Set(['CC-26b', 'CC-27b', 'CC-28', 'wave 2', 'later', 'built']),
+      new Set(['CC-26b', 'CC-27b', 'wave 2', 'later', 'built']),
     );
   });
 });

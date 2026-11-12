@@ -2,6 +2,7 @@
  * Settings' written sentences (Final-Settings): every number a parameter or a named constant. The
  * lock corrections for the artboard follow.
  */
+import { SIGNIN_SENDER, SIGNIN_SENDER_LOCKED } from '../../auth/constants';
 import type { Addition, CopyChange } from '../copy-registry';
 import { listOf } from '../format';
 import { capitalise, count, numberWord, plural } from '../words';
@@ -46,6 +47,16 @@ export const SETTINGS_COPY = {
   /** FACTS A9: Stripe sends the receipts. */
   emailFoot: (kinds: number) =>
     `Those are the ${numberWord(kinds)} kinds from us. If you pay, Stripe sends the receipts. There is no newsletter and no product-update mail to unsubscribe from.`,
+  /**
+   * The member's own address, once a hard bounce or a spam report suppressed it (CC-28 D7): every kind
+   * of mail but account mail stops (`email_kind_suppressible`), so what still goes is named.
+   */
+  undeliverable: (address: string, reason: 'hard_bounce' | 'complaint') =>
+    `${
+      reason === 'hard_bounce'
+        ? `We could not deliver to ${address}`
+        : `Mail to ${address} was reported as spam`
+    }, so only sign-in links and mail about the account are sent to it now.`,
   dangerTitle: 'Danger',
   deleteLabel: 'Delete this account',
   /** FACTS E6: the seven-day undo, by the restore link (owner ruling, CC-27b Q16). */
@@ -192,14 +203,19 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     source:
       'The fixture’s account address is you@company.com: the locked page shows an edit in progress, which the preview, filled from the account, does not',
   },
-  {
-    screen: 'settings',
-    kind: 'facts',
-    locked: 'signin@crawlmouse.com',
-    rendered: 'magic@crawlmouse.com',
-    source:
-      'FACTS correction (CC-25 ruling 8, CC-27 D8): the sign-in link is sent from magic@ until CC-28 moves the Supabase template to signin@; the page names SIGNIN_SENDER',
-  },
+  // The locked sender, corrected while the sign-in link comes from another.
+  ...(SIGNIN_SENDER === SIGNIN_SENDER_LOCKED
+    ? []
+    : [
+        {
+          screen: 'settings' as const,
+          kind: 'facts' as const,
+          locked: SIGNIN_SENDER_LOCKED,
+          rendered: SIGNIN_SENDER,
+          source:
+            'FACTS correction (CC-25 ruling 8, CC-27 D8; CC-28 Q5): the page names SIGNIN_SENDER, Supabase’s SMTP sender, until the owner moves it to signin@ at switch-on (docs/ops/senders.md)',
+        },
+      ]),
   {
     screen: 'settings',
     kind: 'facts',
@@ -288,4 +304,10 @@ export const SETTINGS_CHANGES: CopyChange[] = [
   },
 ];
 
-export const SETTINGS_ADDITIONS: Addition[] = [];
+export const SETTINGS_ADDITIONS: Addition[] = [
+  {
+    screen: 'settings',
+    what: 'A line under the email kinds when mail to the reader’s own address hard-bounced or was reported as spam, saying that only sign-in links and account mail go to it now',
+    source: 'CC-28 D7 (Resend’s bounces and complaints suppress all but account mail)',
+  },
+];

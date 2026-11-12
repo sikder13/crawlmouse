@@ -2,10 +2,10 @@
 
 Branded HTML for the two transactional auth emails Crawlmouse sends:
 
-| File | Supabase template | Sign-in link type |
-| --- | --- | --- |
-| `magic-link.html` | **Magic Link** | `token_hash` + `type=magiclink` |
-| `signup.html` | **Confirm signup** | `token_hash` + `type=signup` |
+| File              | Supabase template  | Sign-in link type               |
+| ----------------- | ------------------ | ------------------------------- |
+| `magic-link.html` | **Magic Link**     | `token_hash` + `type=magiclink` |
+| `signup.html`     | **Confirm signup** | `token_hash` + `type=signup`    |
 
 These are applied **manually in the Supabase dashboard** at deploy time. There is
 **no database migration** — the dir is a plain folder (`infra/` is not a pnpm
@@ -91,8 +91,11 @@ for free. Run that script, then click the Cloudflare verification email that lan
 in that inbox to activate forwarding.
 
 Email Routing is **receive-only** — it forwards inbound mail but does not send. The
-auth emails themselves are *sent* from `magic@crawlmouse.com` via Resend SMTP (see
-`scripts/configure-supabase-smtp.sh`). To make your *replies* come from
+auth emails themselves are _sent_ from Supabase Auth's SMTP sender, `magic@crawlmouse.com` today, via
+Resend SMTP (`scripts/configure-supabase-smtp.sh` sets `smtp_admin_email`). The templates name no
+sender (`templates.test.ts` checks it); the app shows it as `SIGNIN_SENDER`
+(`apps/web/lib/auth/constants.ts`). Moving it to `signin@crawlmouse.com` is in
+`docs/ops/senders.md`. To make your _replies_ come from
 `support@crawlmouse.com`, add a Gmail "Send mail as" alias using Resend SMTP
 (`smtp.resend.com:587`, user `resend`, pass = `RESEND_API_KEY`) — optional polish.
 

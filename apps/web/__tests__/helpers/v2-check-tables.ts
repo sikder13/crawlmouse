@@ -438,6 +438,32 @@ export const ROWS = {
     requested_at: T1,
     sent_at: null,
   }),
+  email_sends: (id: string, accountId: string | null): Row => ({
+    id,
+    idempotency_key: `mail:${id}`,
+    kind: 'alert',
+    address_hash: SHA(3),
+    account_id: accountId,
+    status: 'sending',
+    attempts: 1,
+    claimed_at: T1,
+    updated_at: T1,
+  }),
+  email_suppressions: (hash: string): Row => ({
+    address_hash: hash,
+    reason: 'hard_bounce',
+    first_at: T1,
+    last_at: T1,
+  }),
+  slack_sends: (id: string, accountId: string | null): Row => ({
+    id,
+    idempotency_key: `slack:${id}`,
+    account_id: accountId,
+    status: 'sending',
+    attempts: 1,
+    claimed_at: T1,
+    updated_at: T1,
+  }),
 } as const;
 
 /** A valid research.check_runs row (the ledger is not in `public`, so not in ROWS). */
@@ -512,6 +538,8 @@ export const TABLES_027B: readonly NewTable[] = [
   'deletion_cancellations',
   'account_slack_destinations',
 ];
+/** The public tables 028 creates. */
+export const TABLES_028: readonly NewTable[] = ['email_sends', 'email_suppressions', 'slack_sends'];
 /** The public tables 029 creates. */
 export const TABLES_029: readonly NewTable[] = ['contact_requests'];
 /** The tables 003 creates. */
@@ -522,10 +550,11 @@ export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
       !TABLES_008.includes(t) &&
       !TABLES_026B.includes(t) &&
       !TABLES_027B.includes(t) &&
+      !TABLES_028.includes(t) &&
       !TABLES_029.includes(t),
   )
   .sort();
-/** Every public table 003, 006b, 008, 026b, 027b and 029 create. */
+/** Every public table 003, 006b, 008, 026b, 027b, 028 and 029 create. */
 export const ALL_NEW_TABLES = (Object.keys(ROWS) as NewTable[]).sort();
 
 /** Where a seeded row belongs: one of the account's two sites, or the account as a whole. */
@@ -574,6 +603,11 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.account_tokens')::text as t`,
   );
   const with027b = tokens[0]!.t !== null;
+  // Nor, migrated before 028, the mail and Slack ledgers.
+  const { rows: ledgers } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.email_sends')::text as t`,
+  );
+  const with028 = ledgers[0]!.t !== null;
   // Nor, migrated before 029, contact_requests.
   const { rows: contacts } = await db.query<{ t: string | null }>(
     `select to_regclass('public.contact_requests')::text as t`,
@@ -755,6 +789,19 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       { account_id: accountId },
       'account',
     );
+  }
+  if (with028) {
+    const mail = randomUUID();
+    await put('email_sends', ROWS.email_sends(mail, accountId), { id: mail }, 'account');
+    const hash = SHA(++k);
+    await put(
+      'email_suppressions',
+      ROWS.email_suppressions(hash),
+      { address_hash: hash },
+      'account',
+    );
+    const slack = randomUUID();
+    await put('slack_sends', ROWS.slack_sends(slack, accountId), { id: slack }, 'account');
   }
   if (with029) {
     const id = randomUUID();

@@ -65,6 +65,10 @@ const READ_SCOPE: Record<string, ReadScope> = {
   pending_erasures: 'none',
   deletion_cancellations: 'none',
   account_slack_destinations: 'none',
+  // 028: the mail and Slack ledgers and the suppressions. Service only.
+  email_sends: 'none',
+  email_suppressions: 'none',
+  slack_sends: 'none',
   // 029: the Agency Plus contact form. Service only.
   contact_requests: 'none',
 };

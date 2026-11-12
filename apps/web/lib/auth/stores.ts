@@ -38,6 +38,8 @@ export function supabaseDoorStore(sb: SupabaseClient): DoorStore {
         )
         .eq('id', accountId)
         .is('deleted_at', null)
+        // An account marked for deletion (CC-27b) starts no trial and claims no site in its window.
+        .is('deletion_confirmed_at', null)
         .maybeSingle();
       if (a.error) fail('accounts read', a.error);
       if (!a.data) return null;

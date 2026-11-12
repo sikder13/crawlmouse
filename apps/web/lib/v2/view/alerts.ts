@@ -15,6 +15,7 @@ import { dayDate, dayMonth, hourMinute, weekday, weekdayTime } from '../format';
 import {
   primarySite,
   primarySites,
+  readerRole,
   resultChecks,
   viewAt,
   type AccountDataset,
@@ -336,7 +337,7 @@ export function alertsView(d: AccountDataset, viewer: Viewer): AlertsView {
     : [];
 
   return {
-    shell: accountShellView(v, 'Alerts'),
+    shell: accountShellView(v, 'Alerts', { role: readerRole(v) ?? 'developer' }),
     header: { title: COPY.title, line, verdicts: [...new Set(open.flatMap(verdictsOf))], actions },
     fired: {
       title: COPY.firedTitle,

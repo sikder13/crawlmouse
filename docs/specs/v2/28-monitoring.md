@@ -1,0 +1,220 @@
+# CC-28 — scheduled checks, alerts, and the mail the product has promised
+
+The scheduler, the alerts, the mailer and the two pages that show them. Everything here is behind
+`V2_CHECKS_PUBLIC` (`checksPublicEnabled`, `apps/web/lib/auth/flags.ts`), and the Inngest functions also
+behind `V2_PIPELINE`; with them unset, the routes and pages answer 404 and the serve route registers what it
+registered before. The SQL is migration `20261113000001_v2_028_monitoring.sql` (sections A–D); its revert is
+`infra/supabase/rollbacks/20261113000001_v2_028_monitoring.revert.sql`.
+
+## Decisions
+
+| #   | Decision                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | One mailer, `apps/web/lib/v2/mail/`: `send()` over an injected `MailTransport` (Resend's in production, a file or memory transport anywhere else). The send ledger `email_sends` is claimed before the send (`claim_email_send`), keyed by the caller's idempotency key, holding a peppered hash of the address and no address or body. With Resend or the pepper unconfigured, nothing is claimed and the miss is logged. |
+| D2  | Every promised email is a typed template, a pure function to `{subject, text, html}`, with a test, a development-only preview route and visual baselines at 600 and 390 px, light and dark.                                                                                                                                                                                                                                |
+| D3  | Crawled and user text in mail is escaped and bounded; our markup makes no crawled string a link target (a mail client may autolink text: known gaps); the recipient is never in the copy; headers are built from validated values (`headers.ts`).                                                                                                                                                                          |
+| D4  | `scheduleTickFn`, hourly, claims due sites in SQL (`claim_due_sites`) and calls `requestCheck` with `scheduled`.                                                                                                                                                                                                                                                                                                           |
+| D5  | `alertFn` on `check.finished` applies the account's rules and sends one message per site, check, channel and recipient.                                                                                                                                                                                                                                                                                                    |
+| D6  | The weekly summary, for paid tiers, Monday 08:00 in the account's zone, never empty.                                                                                                                                                                                                                                                                                                                                       |
+| D7  | Alert and summary mail carry `List-Unsubscribe` and `List-Unsubscribe-Post`; account mail does not. Bounces and complaints suppress non-account mail.                                                                                                                                                                                                                                                                      |
+| D8  | `/alerts`, `/changes` and the per-site rule route on real data.                                                                                                                                                                                                                                                                                                                                                            |
+| D9  | Every table this step adds joins the erasure.                                                                                                                                                                                                                                                                                                                                                                              |
+| D10 | Mail from this step sends as `alerts@crawlmouse.com`; the sign-in sender move is prepared, not applied (`docs/ops/senders.md`).                                                                                                                                                                                                                                                                                            |
+| D11 | `check_finished` from the `check.finished` listener; the next bucket for a re-check whose bucket's check has started; events for alert sent, summary sent, unsubscribed.                                                                                                                                                                                                                                                   |
+| D12 | Out: deploy hooks and `on_deploy`, client reports, seats and invitations, pricing, packets, the unmark lifecycle, switching any flag on.                                                                                                                                                                                                                                                                                   |
+
+## The send ledger (D1)
+
+`send()` (`lib/v2/mail/send.ts`) runs, in order: the configuration check (no transport or no pepper: nothing
+claimed, `mail.unconfigured` logged); the address check (not a plain address: nothing claimed); the claim;
+`render()`, only after the claim answers `go`; the headers; the transport; `finish_email_send`.
+
+| Claim answer     | Meaning                                                     | `send()` does                                 |
+| ---------------- | ----------------------------------------------------------- | --------------------------------------------- |
+| `go` (attempt n) | Send now; attempt 1 to 3.                                   | Renders, sends, records `sent` or `failed`.   |
+| `done`           | The key was sent.                                           | Nothing.                                      |
+| `busy`           | Another worker claimed it under 2 minutes ago.              | Throws `MailRetry`; the step retries.         |
+| `suppressed`     | The address is suppressed and the kind is not account mail. | Nothing; the row records it.                  |
+| `exhausted`      | Three attempts failed.                                      | Logs `mail.exhausted`; nothing more is tried. |
+
+The retry rule: a retryable transport failure (network, 409 concurrent, 429, 5xx) records `failed` and throws
+`MailRetry`, so the Inngest step retries and the next claim is the next attempt; three attempts in all. A
+claim, render, header build or transport that throws, and a ledger write that fails, throw `MailRetry` as well
+(`send.ts`; a throw after `go` records `failed` first when the ledger answers). A claim left `sending` for more
+than 2 minutes is a worker that died mid-send, or a `finish` that failed, and the next claim takes it back. Every
+claim of a key not yet sent reads the suppressions, so a retry after a bounce recorded since the first attempt is
+answered `suppressed`.
+The transport sends the ledger key as Resend's `Idempotency-Key` (24 hours), so a send that did leave is not
+sent again; a repeat whose payload changed is refused by Resend with 409 `invalid_idempotent_request`, which
+the transport answers as sent.
+
+The address hash is HMAC-SHA256 under `TRIAL_LEDGER_PEPPER` over `mail:` and the address trimmed and
+lower-cased (`lib/v2/mail/address-hash.ts`). A `+tag` is not folded: a bounce on `x+tag@` suppresses that
+address only, so a stranger cannot silence someone's own address through a tagged one they typed.
+
+The Resend webhook (`app/api/webhooks/resend/route.ts`) keeps v1's `email_events` row, address and payload as
+received, for an event whose sender is not `alerts@`; an event about v2 mail (`isV2MailEvent`, its `data.from`)
+leaves no row there, only the suppression hash a bounce or complaint records.
+
+Verify: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/mail __tests__/v2-028-mail.test.ts`, and the
+two-transaction claim on a real Postgres: `scripts/db/monitoring-race.test.ts` (CI's `db-cli-files` job).
+
+## The scheduler (D4)
+
+When a schedule falls due is one SQL function, `next_check_after(cadence, weekday, hour, minute, zone,
+after)`: weekly, the next ISO weekday at that local time; monthly, the first such weekday of a month. A local
+time the clocks skip runs an hour later; a local time that happens twice runs once, at the later instant
+(`__tests__/v2-028-schedule.test.ts` pins both for New York and London). `sites.next_check_at` is written by
+a trigger on `sites` (schedule columns, `account_id`, `removed_at`) and one on `accounts.timezone`, for every
+writer (owner ruling Q3); both time a Free account's site monthly, as the claim runs it (Q4); a site with no `schedule_offset_min` gets one from its id. A zone change moves only the
+next checks still ahead of now (a site already due keeps its time, so the next tick claims it), by the saved
+cadence on a paid tier and monthly on any other, as the claim advances.
+
+`claim_due_sites(now, limit, slot)` claims kept, live, unpaused weekly or monthly sites whose `next_check_at`
+has passed, of accounts neither deleted nor marked for deletion, whose tier allows it at `now`: any site of a
+paid tier; on Free, the first live primary site in `apply_entitlement_transition`'s order, run monthly
+whatever its saved cadence (Q4). Rows another transaction holds are skipped. Each claim takes a
+`global:audits:day` slot in a block rolled back on refusal; a refusal ends the claim and leaves the rest due.
+A claimed site's `next_check_at` moves to the first due time after `now` in the same statement. The claim
+returns, per site, `site_id`, `account_id`, `slot` (the time it was due, which keys the request,
+`check:<site>:scheduled:<iso>`, so a retried request step makes the same check) and `next_at` (the
+`next_check_at` it set).
+
+When a site's request step fails every retry, `scheduleTickFn` catches it per site and runs a `release` step that calls `release_scheduled_claim` (owner ruling Q9):
+`next_check_at` goes back to the claimed time, so the next tick claims the site again, and the slot is given
+back while its 24-hour window is open. It acts only while `next_check_at` still holds the claim's `next_at`
+(to the millisecond). A schedule saved since the claim keeps the time the save computed, a site removed since
+keeps its null, and a second call finds the restored slot; in each, nothing is given back, so the slot of a
+site saved or removed between its claim and its release stays spent for that day. Sentry is told the site id
+and the slot. A release step that fails every retry as well is reported to Sentry (`schedule.claim_release_failed`,
+site id and slot) and the tick goes on to the next site; that site keeps its moved due time and its slot is spent.
+
+## The mail the product sends (D2, D3, D7, D11)
+
+| Event                                                      | Function                      | Template                                                        | Idempotency key                                     | Who it goes to                                                                                |
+| ---------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `email.requested` `trial_reminder`                         | `lib/v2/mail/functions.ts`    | `trial-reminder`                                                | `trial_reminder:<account>:<trial end>`              | the owner, while `email_trial_reminder` is on and the account is unmarked and on a live trial |
+| `email.requested` with `tokenId`                           | same                          | `email-change-confirm`, `email-change-notice`, `account-delete` | `account_link:<tokenId>`                            | `account_link_recipient`; the link is minted after the claim (Q10)                            |
+| `check.notify_requested`, `check.finished`, `check.failed` | same                          | `check-notify`                                                  | `check_notify:<check>`                              | `checks.notify_email`, once the check has ended; a cancelled check is told as failed          |
+| `fix.email_developer_requested`                            | same                          | `fix-to-developer`                                              | `fix_to_developer:<request>`                        | the request row's address; `sent_at` set after the send; the body is the packet as text       |
+| `check.finished`                                           | `lib/v2/monitor/functions.ts` | `alert`                                                         | `alert:<check>:email:<seat>`, `alert:<check>:slack` | `alert_email_recipients`; Slack through the account's URL at send time                        |
+| `summary.requested` (from the hourly summary tick)         | same                          | `weekly-summary`                                                | `summary:<account>:<ISO week>:<seat>`               | `summary_recipients`, never for an empty week                                                 |
+
+`check_finished` is sent once per check from the `check.finished` listener, with the owner read from the
+database and `source: 'pipeline'`; Inngest's idempotency on the check id holds it to one for 24 hours.
+
+Alert and summary mail carry `List-Unsubscribe: <https://crawlmouse.com/api/unsubscribe?t=…>` and
+`List-Unsubscribe-Post: List-Unsubscribe=One-Click`; the footer links the page `/unsubscribe?t=…`, which asks
+before it changes anything. Both take the same signed token (`lib/v2/mail/links.ts`), which names one seat and one
+kind and lasts 90 days. The POST route accepts a cross-site request (a mail client sends it), with the
+webhook policy class. The page's form is sent back to `/unsubscribe` with a two-minute cookie naming the kind it
+turned off, and the page says "Done" only with that cookie, so a crafted link cannot show it. Account mail carries
+neither. That a sent alert's and summary's two links carry one token, and that both routes accept it:
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/monitor/unsubscribe-send.test.ts`, over the deps
+`monitor/functions.ts` builds. (The preview pages show a stand-in footer link, signed by nothing.)
+
+What the alert says (`templates/alert.ts`), rendered from the changes it lists:
+
+- The opening line: when the check ran and what it found, `The check on Fri 30 Oct at 06:02 EDT found 3 problems
+and 1 other change.` A problem is an opened change or a falling grade (`isProblem`); a count of one is singular.
+- When the listed changes moved a grade's letter, one line above the rows: `AI readability D → F`, from the first
+  delta's letter to the last's, Technical SEO first. A grade whose letter held is left out; its row shows the scores.
+- Each row's second line gives where and how many as one phrase (`wherePhrase`): the engine's `all pages` reads
+  `across the site`, `robots.txt` reads `in robots.txt`, `stack` reads `in the site’s stack`, and any other `where`
+  reads `on <where>`; then `· 3 pages` (`1 page` at one) and any grade move.
+- An opened change with a `fix_id` adds `Open the fix`, the fix's page under the alert's check
+  (`auditHrefs(checkId).fix(fixId)`); a resolved one does not. `Open the check` stays the closing link.
+
+The weekly summary's rows use the same where phrase. A time in the alert, the trial reminder and the Slack message
+reads the account's clock with the zone's short name when Intl gives one (`21:41 EST`, `03:41 CET`: `en-US` is
+asked first, then `en-GB`), and `your time` when Intl gives only an offset (`GMT+9`); the IANA name is not shown
+(`templates/when.ts`; `when.test.ts` holds both outcomes).
+
+Alert and summary recipients honour a seat's client scope as `is_member_for_site` reads it (`client_scope_all`, or
+a `seat_sites` row for the site or the production site it stages): `alert_email_recipients(account, site)` answers
+only the seats that may read the site, and `summary_recipients` names each seat's sites, so a scoped seat's summary
+lists only those and a seat none of whose sites changed gets none.
+
+Slack is posted with `fetch` after the engine's `validateUrlOrThrow`, only to a `https://hooks.slack.com/services/…`
+URL, with no redirect followed and a timeout: the engine's `safeFetch` makes GET requests only. The message is
+plain text with Slack's `& < >` escapes and link previews off. `alert_events.destination_hash` is an HMAC under the
+mail pepper of the sorted recipient hashes (email) or of the URL (Slack).
+
+The six default rules (Q13) are seeded by the migration's backfill, for the accounts that exist when it runs, and
+again, for any kind missing, in four places: before alertFn evaluates a check that is not a site's first
+(`lib/v2/monitor/alerts.ts` `load`), before the Alerts page reads (`app/alerts/page.tsx`), before a site's page
+reads (`app/sites/[id]/page.tsx`), and before Settings and the trial screen read (`readSettingsPage`,
+`lib/v2/account/settings-pages.ts`). An account made after the migration that none of these has reached holds no
+rule yet. Verify:
+`grep -rn "seedDefaultAlertRules\|seedDefaultRules(" apps/web/app apps/web/lib --include=*.ts --include=*.tsx | grep -v test`.
+
+## Erasure (D9)
+
+`erase.ts` adds the mail step to the sequence: the plan gains `erase_mail_records(hashes, false)`'s counts, the
+apply is followed by `erase_mail_records(hashes, true)`, and the recount reads them again. The hashes are the plan's
+addresses under the mail pepper; with no pepper the plan refuses (`mail_pepper`) rather than skip the step. Both
+port sets implement it: `deletion-ports.ts` (the purge) and `scripts/ops/erase-account.ts`. The hash is of each
+address as the plan holds it, so a send to a tagged variant someone else typed (`person+x@`) is not reached; such a
+row holds only that HMAC, the kind and the times.
+
+## Owner rulings
+
+Q1–Q8, Q10 and Q11 approved as acted on (`questions.md` in the step's notes); Q9 changed to the release
+above. In short: the erasure hashes the plan's addresses and deletes ledger rows by hash (Q1); suppressions
+are kept on erasure (Q2); a trigger sets `next_check_at` (Q3); a Free first site runs monthly (Q4); the
+sign-in sender stays `magic@` until switch-on (Q5); `EMAIL_LINK_SECRET` keys unsubscribe tokens (Q6); the
+per-site rule route is `/api/sites/[id]/alert-rules` as `ACCOUNT_ACTIONS` names it (Q7); the trial reminder is
+account mail with no unsubscribe, and honours `email_trial_reminder` (Q8, correcting spec 27); an account
+link is minted only after the claim (Q10); unsubscribe and recipients are per seat (Q11).
+
+## Known gaps
+
+- After Resend has accepted an account email, any failure before `finish` records it as sent (a worker that
+  dies, a `finish` that fails, or a timeout or proxy 5xx on the send itself) makes the retry mint a new link
+  token, which replaces the delivered one; Resend refuses the second send (409, a different payload), so that
+  email's link no longer works and the person asks again (Q10).
+- Gmail and Outlook turn a host or URL written as text into a link: the check-notify host, a packet's URLs,
+  an alert row's `where`. Our HTML links none of them (`templates/inspect.ts` reads every target). The
+  check-notify mail names a host the visitor chose, to an address the visitor typed; v1's notify mail
+  (`inngest/notify.ts`) showed the domain the same way. A defang (`example[.]com`) was not chosen: it would
+  change the host a legitimate visitor reads in the activation email.
+- Slack's incoming webhooks take no idempotency key: a worker that dies between the POST and
+  `finish_slack_send` can repeat one Slack message when the claim is taken back.
+- The tick runs hourly at minute 0, so a site due at 06:37 starts at the 07:00 tick.
+- A claim whose database call committed but whose step result never reached Inngest is not released: the
+  step's retry claims the next due sites, and the first set waits for its next due time (one cadence lost,
+  one slot spent). Making the claim idempotent needs a claim keyed on the run (questions Q12).
+- A site removed between its claim and its request step still gets its queued `scheduled` check.
+- A claim whose request and release both fail every retry is not undone: the site waits for its next due time
+  (one cadence lost, one slot spent), and Sentry has its id and slot.
+- The unsubscribe page and route answer 404 while `V2_CHECKS_PUBLIC` is off, so turning the flag off after mail
+  has gone out breaks those links until it is on again.
+- Slack turns a bare URL in message text into a link (a fix title naming a page on the member's site); we build no
+  link and previews are off.
+- The weekly summary reads at most 5,000 changes per account-week, a page at a time past PostgREST's 1,000-row
+  cap; past 5,000 it logs `summary.read_capped` and its counts are of the rows read. The rows kept are those of
+  the sites read first, in site-id order, each oldest first: a site read later can be left out entirely.
+- A Free account's weekly schedule is timed monthly when it is saved (Q4). An upgrade that writes no site row
+  leaves that monthly time in place, so the first paid check waits for it; the claim moves the site weekly after.
+- The alert and summary recipients are each read in one call, so PostgREST's 1,000-row cap bounds an account's
+  recipient seats to 1,000 per message.
+- `check_finished` replayed after Inngest's 24-hour idempotency window is counted again.
+- `alert_sent` and `summary_sent` are counted by each run that completes with the mail delivered, `done`
+  included, so a send whose record failed is still counted; an event replayed after Inngest's 24-hour
+  idempotency window is counted again.
+- A fix with no packet is answered `queued` and nothing is sent.
+- `text_drop` fires on the `opened` text-without-JavaScript row a client-rendered-template fix writes. The engine
+  writes no other row of that subject, so a further drop while that fix stays open has no change to name and alerts
+  nothing, against the rule's label "drops more than N points". Closing it needs a change row for the share itself
+  (the engine's diff).
+- The Alerts page shows what `changes.notified` records; a failed or suppressed channel (`alert_events`) is not
+  shown.
+- `sendSummary` does not read the tier again: `due_summary_accounts` filters on `account_effective_tier` when the
+  tick runs, and `store.account` reads the zone and the deletion mark only. An account that drops to Free between
+  the tick and a retried send (`SUMMARY_RETRIES`, with Inngest's backoff) still gets that week's summary.
+- The account's zone is resolved twice: `due_summary_accounts` reads `pg_timezone_names` to find the Monday 08:00
+  that makes an account due, and `zoneOrUtc` reads the runtime's Intl to render the week. A zone one of them knows
+  and the other does not puts the due hour and the rendered week in different zones (one of them UTC).
+- The Supabase ports for alerts and the summary (`alerts-store.ts`, `summary-store.ts`) run in
+  `lib/v2/monitor/stores.test.ts` through a PostgREST stand-in over PGlite (`__tests__/helpers/postgrest-pglite.ts`,
+  capped at 1,000 rows as `max_rows` is), not against a real PostgREST.

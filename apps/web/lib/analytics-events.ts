@@ -71,6 +71,15 @@ export const FUNNEL_EVENTS = [
   'account_deletion_confirmed',
   'account_restored',
   'account_purged',
+  // CC-28 — monitoring. Sent from the server (lib/v2/monitor/functions.ts), keyed by the account's id,
+  // with no address or webhook URL: an alert sent on one channel `{channel, changes}`, and a weekly
+  // summary sent `{sites, changes}`.
+  'alert_sent',
+  'summary_sent',
+  // CC-28 — sent from the server, with no address: a seat's unsubscribe link used (`unsubscribed
+  // {kind}`, app/api/unsubscribe/route.ts). `check_finished` above is also sent once per check by the
+  // check.finished listener, with `source: 'pipeline'` (lib/v2/mail/handlers.ts).
+  'unsubscribed',
   // CC-29 — the public pages that sell, sent from the server through captureServerEvent and gated by
   // serverCaptureAllowed: `pricing_viewed` at the pricing page's per-request render; `plan_chosen
   // {plan, interval}` from POST /api/agency-trial only, since Free's and Pro's buttons start on pages

@@ -41,6 +41,7 @@ function constantsSection(): string {
       [
         [code('AUTH_LINK_MINUTES'), String(c.AUTH_LINK_MINUTES)],
         [code('SIGNIN_SENDER'), code(c.SIGNIN_SENDER)],
+        [code('SIGNIN_SENDER_LOCKED'), code(c.SIGNIN_SENDER_LOCKED)],
         [code('ALERTS_SENDER'), code(c.ALERTS_SENDER)],
         [
           code('FIRST_AUDIT_MINUTES'),
@@ -63,7 +64,7 @@ function constantsSection(): string {
       ],
     ),
     '',
-    `\`SIGNIN_SENDER\` is the address the Supabase template sends from today. CC-28 moves the template to \`signin@crawlmouse.com\` and changes the constant in the same step.`,
+    `\`SIGNIN_SENDER\` (${c.SIGNIN_SENDER}) is the address Supabase Auth's SMTP sender sends the sign-in link from. Moving it to \`${c.SIGNIN_SENDER_LOCKED}\`, the address the locked screens name, is the owner's settings change at switch-on and that one constant (owner ruling CC-28 Q5, \`docs/ops/senders.md\`).`,
   ].join('\n');
 }
 

@@ -5,9 +5,12 @@ import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { FirstCheckScreen } from '@/components/v2/screens/site/FirstCheckScreen';
 import { SiteScreen } from '@/components/v2/screens/site/SiteScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+import { seedDefaultAlertRules } from '@/lib/v2/monitor/alert-defaults';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId } from '@/lib/v2/account/route';
 import { readAccount, siteOfCaller } from '@/lib/v2/account/pages';
+import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { viewAt } from '@/lib/v2/view/account';
 import { accountShellView } from '@/lib/v2/view/account-shell';
 import { sitePage } from '@/lib/v2/view/site';
@@ -24,7 +27,8 @@ export const metadata: Metadata = {
 /**
  * One site of the caller's account (CC-26b D8). A 404 while V2_CHECKS_PUBLIC is off, and for a
  * malformed id, a site that does not exist, a removed one, or one on an account the caller does
- * not sit on; the sign-in page for a caller who is not signed in.
+ * not sit on; the sign-in page for a caller who is not signed in. It seeds the account's default
+ * alert rules before it reads them (CC-28 S4).
  */
 export default async function SitePage({
   params,
@@ -44,8 +48,12 @@ export default async function SitePage({
   const now = new Date();
   const site = await siteOfCaller(session, user.id, id, now);
   if (site === null) notFound();
+  // The account's default rules exist before the page reads them (Q13), as on /alerts: a new
+  // account's site lists its six rules before it ever opens /alerts or its first alert runs.
+  await seedDefaultAlertRules(supabaseAdmin(), site.accountId);
   const { d, viewer } = await readAccount(session, site.accountId, site.seatId, now);
-  const page = sitePage(d, viewer, id);
+  // The scheduler's own column (CC-28 D8), read once the caller's seat is established.
+  const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]));
   const notice = noticeLine(await searchParams, d.accounts[0]!.timezone);
   return (
     <LiveActions>

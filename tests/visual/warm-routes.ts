@@ -1,4 +1,4 @@
-import { PREVIEWS } from './pages';
+import { MAIL_PREVIEWS, PREVIEWS } from './pages';
 
 /**
  * Before any test: request each preview route once, one at a time. `next dev` compiles a route on
@@ -8,7 +8,7 @@ import { PREVIEWS } from './pages';
  */
 export default async function warmRoutes() {
   const base = `http://localhost:${process.env.VISUAL_PORT ?? 3130}`;
-  const routes = [...new Set(PREVIEWS.map((p) => p.path.split('?')[0]!))];
+  const routes = [...new Set([...PREVIEWS, ...MAIL_PREVIEWS].map((p) => p.path.split('?')[0]!))];
   for (const route of routes) {
     const res = await fetch(`${base}${route}`, { signal: AbortSignal.timeout(240_000) });
     if (!res.ok) throw new Error(`${route} answered ${res.status} while warming`);

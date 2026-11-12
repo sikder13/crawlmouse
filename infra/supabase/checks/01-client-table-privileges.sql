@@ -13,11 +13,12 @@ v2_tables(rel) as (
   values
     ('public.access_tests'), ('public.accounts'), ('public.agency_brands'), ('public.alert_events'),
     ('public.alert_rules'), ('public.api_keys'), ('public.changes'), ('public.check_ledger_links'),
-    ('public.checks'), ('public.crawl_batches'), ('public.deploy_hooks'), ('public.evidence_blobs'),
+    ('public.checks'), ('public.crawl_batches'), ('public.deploy_hooks'), ('public.email_sends'),
+    ('public.email_suppressions'), ('public.evidence_blobs'),
     ('public.contact_requests'), ('public.fix_email_requests'), ('public.fix_events'), ('public.link_edges'), ('public.measurement_lineages'),
     ('public.page_results'), ('public.persist_chunks'), ('public.report_schedules'),
     ('public.reports'), ('public.seat_sites'), ('public.seats'), ('public.share_links'),
-    ('public.site_fixes'), ('public.sites'), ('public.subscriptions'), ('public.trial_ledger'),
+    ('public.site_fixes'), ('public.sites'), ('public.slack_sends'), ('public.subscriptions'), ('public.trial_ledger'),
     ('public.usage_events')
 ),
 -- (relation, role, privilege, columns); null columns is a grant on the whole table.
@@ -46,7 +47,7 @@ declared(rel, role, privilege, columns) as (
       'vercel_domain_added_at']),
     ('public.alert_events', 'authenticated', 'SELECT', array[
       'change_ids', 'channel', 'check_id', 'destination_hash', 'id', 'provider_message_id',
-      'rule_id', 'sent_at', 'site_id', 'status']),
+      'reason', 'rule_id', 'sent_at', 'site_id', 'status']),
     ('public.alert_rules', 'authenticated', 'DELETE', null),
     ('public.alert_rules', 'authenticated', 'SELECT', array[
       'account_id', 'channels', 'enabled', 'id', 'kind', 'last_fired_at',
@@ -103,7 +104,8 @@ declared(rel, role, privilege, columns) as (
       'account_id', 'seat_id', 'site_id']),
     ('public.seats', 'authenticated', 'SELECT', array[
       'accepted_at', 'account_id', 'alert_channels', 'client_scope_all', 'created_at',
-      'id', 'invited_email', 'name', 'removed_at', 'role', 'status', 'theme', 'user_id']),
+      'email_weekly_summary', 'id', 'invited_email', 'name', 'removed_at', 'role', 'status',
+      'theme', 'user_id']),
     ('public.sites', 'authenticated', 'SELECT', array[
       'account_id', 'client_contact_email', 'client_contact_name', 'client_name',
       'competitor_hosts', 'created_at', 'host', 'id', 'owner_seat_id', 'paused',

@@ -270,6 +270,16 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   },
   { route: 'api/verify/check/[id]', methods: ['POST'], class: 'user', origin: 'strict' },
   { route: 'api/verify/start', methods: ['POST'], class: 'user', origin: 'strict' },
+  // CC-28 D7: the one-click unsubscribe. A mail provider POSTs it from no page of ours (RFC 8058), so it
+  // takes the webhooks' rule: no origin check, and the request's own credential, the signed token,
+  // verified before anything else. The body is bounded (lib/v2/mail/unsubscribe.ts, BODY_MAX).
+  {
+    route: 'api/unsubscribe',
+    methods: ['POST'],
+    class: 'webhook',
+    verifier: 'verifyUnsubscribeRequest',
+    origin: 'any',
+  },
   {
     route: 'api/webhooks/inngest',
     methods: ['GET', 'POST', 'PUT'],
@@ -372,6 +382,12 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     methods: ['POST'],
     class: 'public',
     reason: "the restore link's token, from its HttpOnly cookie, is the credential (D4)",
+    origin: 'strict',
+  },
+  {
+    route: 'api/sites/[id]/alert-rules',
+    methods: ['POST', 'PUT'],
+    class: 'member',
     origin: 'strict',
   },
 ];

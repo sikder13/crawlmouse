@@ -9,8 +9,9 @@ import { describe, expect, it } from 'vitest';
 import { ACCOUNT_VIEWERS } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
 import { fixture } from '../fixtures';
 import { DELETE_COPY, REFUND_POLICY } from '../copy/deletion';
+import { SETTINGS_COPY } from '../copy/settings';
 import { REFUSAL_SENTENCES } from '../copy/settings-notices';
-import { deleteStepView, settingsView } from './settings';
+import { deleteStepView, settingsView, type Undeliverable } from './settings';
 import { trialEndView, trialEndViewer } from './trial-end';
 
 const WEB = join(__dirname, '../../..');
@@ -232,5 +233,31 @@ describe('the rail on Settings, Settings › Plan and Trial ending, for each rol
         expect(card!.billing).toBeNull();
       }
     }
+  });
+});
+
+describe('an address the mailer no longer sends to (CC-28 D7)', () => {
+  const home = fixture('bad-site');
+  const at = (undeliverable: Undeliverable | null | undefined) =>
+    settingsView(home, ACCOUNT_VIEWERS.home(), { undeliverable }).email.undeliverable;
+
+  it('a hard bounce: says it could not deliver to the address it names', () => {
+    expect(at({ address: 'me@example.com', reason: 'hard_bounce' })).toBe(
+      SETTINGS_COPY.undeliverable('me@example.com', 'hard_bounce'),
+    );
+    expect(at({ address: 'me@example.com', reason: 'hard_bounce' })).toMatch(
+      /^We could not deliver to me@example\.com, so /,
+    );
+  });
+
+  it('a complaint: says mail to it was reported as spam, not that it could not be delivered', () => {
+    const line = at({ address: 'me@example.com', reason: 'complaint' })!;
+    expect(line).toMatch(/^Mail to me@example\.com was reported as spam, so /);
+    expect(line).not.toContain('could not deliver');
+  });
+
+  it('nothing suppressed, or not known: no line', () => {
+    expect(at(null)).toBeNull();
+    expect(at(undefined)).toBeNull();
   });
 });

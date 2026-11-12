@@ -197,6 +197,9 @@ describe('v2 stays out of live pages', () => {
       join(WEB_ROOT, 'app', ...r.to.split('/:')[0]!.split('/').filter(Boolean)),
     ),
     join(WEB_ROOT, 'app', 'sites'),
+    // CC-28: the Alerts page and the changes log.
+    join(WEB_ROOT, 'app', 'alerts'),
+    join(WEB_ROOT, 'app', 'changes'),
   ];
   const inV2PageDir = (file: string) => V2_PAGE_DIRS.some((d) => file.startsWith(d + '/'));
   const allowed = (file: string) =>
@@ -229,6 +232,8 @@ describe('v2 stays out of live pages', () => {
   it('each page in the signed-in v2 page folders is a 404 with its flag off', () => {
     const pages = sources.filter((f) => inV2PageDir(f) && PAGE.test(f));
     expect(pages.map((f) => relative(WEB_ROOT, f)).sort()).toEqual([
+      'app/alerts/page.tsx',
+      'app/changes/page.tsx',
       'app/dashboard/v2/page.tsx',
       'app/sites/[id]/page.tsx',
       'app/v2-developers/page.tsx',

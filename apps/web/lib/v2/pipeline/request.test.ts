@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GRADE_VERSION } from '@crawlmouse/engine/v2/pipeline';
-import { IdSchema } from '@crawlmouse/types/v2';
+import { IdSchema, type Check } from '@crawlmouse/types/v2';
 import { bucketedKey, checkIdOfKey } from './ids';
 import { DEFAULT_PAGE_CAP } from './limits';
 import { requestCheck, type RequestDeps } from './request';
@@ -173,5 +173,73 @@ describe('requestCheck (D13)', () => {
     expect(IdSchema.safeParse(id).success).toBe(true);
     expect(checkIdOfKey(`check:${SITE.id}:manual:1`)).toBe(id);
     expect(checkIdOfKey(`check:${SITE.id}:manual:2`)).not.toBe(id);
+  });
+});
+
+describe('requestCheck: the next bucket for a re-check whose bucket’s check has started (D11)', () => {
+  const B = NOON / 120_000;
+  /** The harness with a `checkStatus` that reads the statuses set here. */
+  function withStatus(statuses: Record<string, Check['status']>) {
+    const h = harness();
+    const asked: string[] = [];
+    h.deps.store.checkStatus = async (id) => {
+      asked.push(id);
+      return statuses[id] ?? null;
+    };
+    return { ...h, asked };
+  }
+
+  it.each([
+    ['manual', 'manual', 'running'],
+    ['manual', 'manual', 'finished'],
+    ['fix_recheck', 'recheck', 'running'],
+    ['fix_recheck', 'recheck', 'failed'],
+  ] as const)(
+    '%s (key word %s), its bucket’s check %s → the next bucket',
+    async (trigger, word, status) => {
+      const current = checkIdOfKey(`check:${SITE.id}:${word}:${B}`);
+      const h = withStatus({ [current]: status });
+      const got = await requestCheck(h.deps, { siteId: SITE.id, trigger });
+      const nextKey = `check:${SITE.id}:${word}:${B + 1}`;
+      expect(got).toEqual({ checkId: checkIdOfKey(nextKey), created: true });
+      expect(h.sent.map((e) => e.id)).toEqual([nextKey]);
+      expect(h.asked).toEqual([current]);
+    },
+  );
+
+  it.each([
+    ['still queued', 'queued' as const],
+    ['not there', undefined],
+  ])('keeps the bucket when its check is %s', async (_, status) => {
+    const current = checkIdOfKey(`check:${SITE.id}:manual:${B}`);
+    const h = withStatus(status === undefined ? {} : { [current]: status });
+    const got = await requestCheck(h.deps, { siteId: SITE.id, trigger: 'manual' });
+    expect(got.checkId).toBe(current);
+    expect(h.sent.map((e) => e.id)).toEqual([`check:${SITE.id}:manual:${B}`]);
+  });
+
+  it('a repeat in the same bucket after its check started finds the next bucket’s check, once', async () => {
+    const current = checkIdOfKey(`check:${SITE.id}:manual:${B}`);
+    const h = withStatus({ [current]: 'running' });
+    const a = await requestCheck(h.deps, { siteId: SITE.id, trigger: 'manual' });
+    const b = await requestCheck(h.deps, { siteId: SITE.id, trigger: 'manual' });
+    expect(b.checkId).toBe(a.checkId);
+    expect([a.created, b.created]).toEqual([true, false]);
+    expect(h.rows.size).toBe(1);
+  });
+
+  it.each(['scheduled', 'deploy', 'first_audit'] as const)(
+    'does not read a status for %s',
+    async (trigger) => {
+      const h = withStatus({});
+      await requestCheck(h.deps, { siteId: SITE.id, trigger });
+      expect(h.asked).toEqual([]);
+    },
+  );
+
+  it('a store with no status read keeps the bucket', async () => {
+    const h = harness();
+    const got = await requestCheck(h.deps, { siteId: SITE.id, trigger: 'manual' });
+    expect(got.checkId).toBe(checkIdOfKey(`check:${SITE.id}:manual:${B}`));
   });
 });
