@@ -92,7 +92,9 @@ Alert and summary mail carry `List-Unsubscribe: <https://crawlmouse.com/api/unsu
 `List-Unsubscribe-Post: List-Unsubscribe=One-Click`; the footer links the page `/unsubscribe?t=…`, which asks
 before it changes anything. Both take the same signed token (`lib/v2/mail/links.ts`), which names one seat and one
 kind and lasts 90 days. The POST route accepts a cross-site request (a mail client sends it), with the
-webhook policy class. Account mail carries neither.
+webhook policy class. The page's form is sent back to `/unsubscribe` with a two-minute cookie naming the kind it
+turned off, and the page says "Done" only with that cookie, so a crafted link cannot show it. Account mail carries
+neither.
 
 Slack is posted with `fetch` after the engine's `validateUrlOrThrow`, only to a `https://hooks.slack.com/services/…`
 URL, with no redirect followed and a timeout: the engine's `safeFetch` makes GET requests only. The message is

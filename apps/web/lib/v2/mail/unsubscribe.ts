@@ -45,13 +45,23 @@ const KINDS: readonly UnsubscribeKind[] = ['alerts', 'summary'];
 const refusalOf = (v: Extract<Verified, { ok: false }>): Refusal =>
   v.reason === 'expired' ? 'expired' : 'invalid';
 
-/** What the page shows, from its query. Reads the token; changes nothing. */
+/**
+ * The cookie the POST sets for the page it sends the form back to, naming the kind it turned off. The
+ * page says "Done" only when it holds it, so a crafted `/unsubscribe` link cannot show a false "Done"
+ * on our domain (security review r1, N5): no page of another site can set a cookie for crawlmouse.com.
+ * Short-lived, HttpOnly, and sent to `/unsubscribe` only. A refusal stays a query (`?error=`): a
+ * crafted one says a link cannot be used, which asks the reader to sign in rather than claiming a change.
+ */
+export const UNSUBSCRIBE_DONE_COOKIE = 'cm_unsubscribed';
+
+/** What the page shows, from its query and the done cookie. Reads the token; changes nothing. */
 export function unsubscribePageView(
-  query: { t?: string; done?: string; error?: string },
+  query: { t?: string; error?: string },
+  doneCookie: string | undefined,
   env: Env,
   now: Date,
 ): UnsubscribePageView {
-  const done = KINDS.find((k) => k === query.done);
+  const done = KINDS.find((k) => k === doneCookie);
   if (done) return { state: 'done', text: UNSUBSCRIBE_COPY.done[done] };
   const error = (Object.keys(UNSUBSCRIBE_COPY.refused) as Refusal[]).find((k) => k === query.error);
   if (error) return { state: 'refused', text: UNSUBSCRIBE_COPY.refused[error] };
@@ -113,7 +123,7 @@ export async function verifyUnsubscribeRequest(
 
 /**
  * The POST's answer: a mail client's one-click gets a plain status; the page's form goes back to the
- * page, which says what happened.
+ * page, which says what happened: done by the cookie `UNSUBSCRIBE_DONE_COOKIE`, a refusal by `?error=`.
  */
 export function unsubscribeAnswer(r: UnsubscribeRequest, origin: string): Response {
   const headers = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' };
@@ -123,10 +133,20 @@ export function unsubscribeAnswer(r: UnsubscribeRequest, origin: string): Respon
       headers: { ...headers, 'Content-Type': 'text/plain; charset=utf-8' },
     });
   }
-  const query = r.ok ? `done=${r.kind}` : `error=${r.code === 'too_large' ? 'invalid' : r.code}`;
+  if (r.ok) {
+    return new Response(null, {
+      status: 303,
+      headers: {
+        ...headers,
+        Location: `${origin}/unsubscribe`,
+        'Set-Cookie': `${UNSUBSCRIBE_DONE_COOKIE}=${r.kind}; Path=/unsubscribe; Max-Age=120; HttpOnly; Secure; SameSite=Lax`,
+      },
+    });
+  }
+  const error = r.code === 'too_large' ? 'invalid' : r.code;
   return new Response(null, {
     status: 303,
-    headers: { ...headers, Location: `${origin}/unsubscribe?${query}` },
+    headers: { ...headers, Location: `${origin}/unsubscribe?error=${error}` },
   });
 }
 
