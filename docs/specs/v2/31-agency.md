@@ -252,18 +252,22 @@ tests. Each of their fields is a column a member's own session may select:
 
 ### Measured
 
-`pnpm --filter @crawlmouse/web exec vitest run lib/v2/reports/pdf.measure.test.ts` prints these; the
-median of three runs on the build machine, 2026-11-12, with `--maxWorkers=2`.
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/reports/pdf.measure.test.ts` prints these: each
+file made three times, the median, with `--maxWorkers=2`, on the build machine on 2026-11-12. The
+sizes are the same on each run. The times are a machine's and moved with its load: the first column
+of times is one run at 16:28 with nothing else running; the second is the range of three runs of the
+final tree between 17:07 and 17:10, while other suites kept the load average near 15.
 
-| Check | `auditDoc` + `renderPdf` | PDF | CSV | Edge list | JSON |
-|---|---|---|---|---|---|
-| the engine's recorded site (60 pages, 150 links, 400 crawler tests, 11 fixes) | 193 ms | 35,860 bytes, 4 pages | 20,800 bytes | 16,468 bytes | 1,309,952 bytes |
-| a generated check of 500 pages (1,359 links, 168 crawler tests, no fix) | 114 ms | 31,504 bytes, 3 pages | 147,930 bytes | 124,319 bytes | 911,442 bytes |
+| Check | `auditDoc` + `renderPdf`, quiet | under load | PDF | CSV | Edge list | JSON |
+|---|---|---|---|---|---|---|
+| the engine's recorded site (60 pages, 150 links, 400 crawler tests, 11 fixes) | 193 ms | 611 to 835 ms | 35,918 bytes, 4 pages | 20,800 bytes | 16,468 bytes | 1,309,952 bytes |
+| a generated check of 500 pages (1,359 links, 168 crawler tests, no fix) | 114 ms | 442 to 458 ms | 31,504 bytes, 3 pages | 147,930 bytes | 124,319 bytes | 911,442 bytes |
 
-Each raw export took 2 ms or less. The audit document does not list pages, so its cost does not
-grow with them. These times leave out reading the check from the database. Both are under the two
-seconds the decision set, so a report is made in the request (`maxDuration` 60) and no Inngest
-function makes one.
+Each raw export took 7 ms or less in those runs. The audit document does not list pages, so its cost
+does not grow with them: the larger time is the recorded site's, which has fixes and more crawler
+tests. These times leave out reading the check from the database. The decision's bound for making a
+report in the request is two seconds for a 500-page check; 458 ms is the slowest seen, so a report
+is made in the request (`maxDuration` 60) and no Inngest function makes one.
 
 ### What a report does not hold
 
