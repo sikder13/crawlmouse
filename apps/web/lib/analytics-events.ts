@@ -71,6 +71,10 @@ export const FUNNEL_EVENTS = [
   'account_deletion_confirmed',
   'account_restored',
   'account_purged',
+  // CC-28 — sent from the server, with no address: a seat's unsubscribe link used (`unsubscribed
+  // {kind}`, app/api/unsubscribe/route.ts). `check_finished` above is also sent once per check by the
+  // check.finished listener, with `source: 'pipeline'` (lib/v2/mail/handlers.ts).
+  'unsubscribed',
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];
