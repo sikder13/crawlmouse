@@ -7,13 +7,14 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
 import { findCheck, fixture } from '../fixtures';
 import { CHECKS } from '../recordings';
 import { buildPublicSnapshot } from '../reports/build-snapshot';
+import { numberWord } from '../words';
 import {
   CAPABILITIES,
   agenciesView,
@@ -275,5 +276,86 @@ describe('perSitePhrase', () => {
         else expect(price / sites).toBe(n);
       }
     }
+  });
+});
+
+// Tier B TB-N3: a figure typed into the copy that equals today's value, as a numeral or a word,
+// passes a membership check. The view is built again against GATES and prices no copy could
+// contain, and today's values must be gone from it.
+describe('the figures follow GATES and prices.ts, not the values typed today', () => {
+  const ALTERED = {
+    pro: { sites: 11, seats: 3, competitorsPerSite: 2 },
+    agency: { sites: 37, seats: 13, competitorsPerSite: 6 },
+    PRO_MONTHLY: 23,
+    AGENCY_MONTHLY: 123,
+  };
+
+  async function alteredView() {
+    vi.resetModules();
+    vi.doMock('../../entitlement-v2', async (importOriginal) => {
+      const real = await importOriginal<typeof import('../../entitlement-v2')>();
+      return {
+        ...real,
+        GATES: {
+          ...real.GATES,
+          pro: { ...real.GATES.pro, ...ALTERED.pro },
+          agency: { ...real.GATES.agency, ...ALTERED.agency },
+        },
+      };
+    });
+    vi.doMock('../../billing/prices', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('../../billing/prices')>()),
+      PRO_MONTHLY: ALTERED.PRO_MONTHLY,
+      AGENCY_MONTHLY: ALTERED.AGENCY_MONTHLY,
+    }));
+    try {
+      return (await import('./agencies')).agenciesView();
+    } finally {
+      vi.doUnmock('../../entitlement-v2');
+      vi.doUnmock('../../billing/prices');
+      vi.resetModules();
+    }
+  }
+
+  /**
+   * Today's figures the alteration moves, each with its word. One and two are left out: "one click"
+   * and "two clicks" are the page's words for other things.
+   */
+  const moved = [
+    GATES.pro.sites,
+    GATES.pro.seats,
+    GATES.pro.competitorsPerSite,
+    GATES.agency.sites,
+    GATES.agency.seats,
+    GATES.agency.competitorsPerSite,
+    PRO_MONTHLY,
+    AGENCY_MONTHLY,
+  ].filter(
+    (n) =>
+      ![
+        ...Object.values(ALTERED.pro),
+        ...Object.values(ALTERED.agency),
+        ALTERED.PRO_MONTHLY,
+        ALTERED.AGENCY_MONTHLY,
+        TRIAL_DAYS,
+      ].includes(n) && n > 2,
+  );
+
+  it('the altered values reach the page', async () => {
+    const text = JSON.stringify({ ...(await alteredView()), onePager: null });
+    for (const n of [ALTERED.agency.sites, ALTERED.agency.seats, ALTERED.AGENCY_MONTHLY])
+      expect(text, String(n)).toContain(String(n));
+    expect(text).toContain(numberWord(ALTERED.agency.seats));
+  });
+
+  it('none of today’s moved values is left, as a numeral or as a word', async () => {
+    const text = JSON.stringify({ ...(await alteredView()), onePager: null });
+    expect(moved.length).toBeGreaterThan(4);
+    const left = moved.filter(
+      (n) =>
+        new RegExp(`(?<![\\d,.])${n}(?![\\d,])`).test(text) ||
+        (numberWord(n) !== String(n) && new RegExp(`\\b${numberWord(n)}\\b`, 'i').test(text)),
+    );
+    expect(left).toEqual([]);
   });
 });
