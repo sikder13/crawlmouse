@@ -472,7 +472,8 @@ describe('a failure stops neither the other seats nor the record (review r1 B2, 
     }
     expect(answer).toEqual({ status: 'failed', reason: 'send_exhausted' });
     expect(calls).toBe(seats.length * 3);
-    for (const s of seats) expect(h.ledger.attempts.get(`alert:${CHECK}:email:${s.seatId}`)).toBe(3);
+    for (const s of seats)
+      expect(h.ledger.attempts.get(`alert:${CHECK}:email:${s.seatId}`)).toBe(3);
     expect(h.records.at(-1)).toMatchObject({ status: 'failed', reason: 'send_exhausted' });
   });
 

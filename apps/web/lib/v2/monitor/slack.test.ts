@@ -162,7 +162,9 @@ describe('the POST', () => {
   it('answers a lookup that failed for the moment as retryable, without a request (review r1 N5)', async () => {
     const fetchMock = vi.fn(async () => new Response('', { status: 200 }));
     const lookupFailed = slackResolver(async () => {
-      throw Object.assign(new Error('getaddrinfo EAI_AGAIN hooks.slack.com'), { code: 'EAI_AGAIN' });
+      throw Object.assign(new Error('getaddrinfo EAI_AGAIN hooks.slack.com'), {
+        code: 'EAI_AGAIN',
+      });
     });
     // The guard production runs, over a lookup that fails: the poster's default wiring.
     const post = slackPoster({
@@ -204,9 +206,9 @@ describe('the POST', () => {
   });
 
   it('production’s poster uses that resolver: a failed lookup is retried, and nothing is sent', async () => {
-    const lookup = vi.spyOn(dnsPromises, 'lookup').mockRejectedValue(
-      Object.assign(new Error('getaddrinfo EAI_AGAIN'), { code: 'EAI_AGAIN' }),
-    );
+    const lookup = vi
+      .spyOn(dnsPromises, 'lookup')
+      .mockRejectedValue(Object.assign(new Error('getaddrinfo EAI_AGAIN'), { code: 'EAI_AGAIN' }));
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     try {
       expect(await slackPoster()(URL_A, 't')).toEqual({

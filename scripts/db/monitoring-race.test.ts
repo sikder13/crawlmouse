@@ -304,10 +304,7 @@ describe.skipIf(!URL_ENV)('migration 028: the Slack ledger under two real transa
       admin,
       names.unkeyed,
       editing(
-        [
-          SLACK_UNIQUE_KEY,
-          SLACK_UNIQUE_KEY.replace('not null unique check', 'not null check'),
-        ],
+        [SLACK_UNIQUE_KEY, SLACK_UNIQUE_KEY.replace('not null unique check', 'not null check')],
         [
           SLACK_SENDING_INSERT,
           "  select p_key, p_account, 'sending', 1, p_now, p_now\n" +
