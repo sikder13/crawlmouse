@@ -1,11 +1,9 @@
 /**
  * Reports (CC-31 D6): what a request names, the document a report is, and where its file is kept.
  *
- * A report's content is a `ReportDoc`, built from a check's stored records through the view
- * functions the screens use. The PDF, the proof page and the share page each draw a `ReportDoc` and
- * add no sentence of their own, so `docStrings` is the whole of what one can say: the property
- * tests compare what a renderer drew with it. A raw export (CSV, JSON, edge list) is the check's rows
- * and has no document.
+ * A report's content is a `ReportDoc`: titles, tables and before-and-after pairs, as strings.
+ * `docStrings` lists them, for the tests that compare what a renderer drew with what its document
+ * holds. A raw export (CSV, JSON, edge list) is the check's rows and has no document.
  */
 import { z } from 'zod';
 

@@ -2,9 +2,10 @@
  * The product events the agency's workspace sends from the server (CC-31 D10). Each name is in
  * `FUNNEL_EVENTS` (`AGENCY_EVENTS` is checked against it by the compiler).
  *
- * What is sent: the distinct id is the account's id; no email, host, token or id of a person is put
- * in properties. They go through `captureServerEvent` (lib/analytics-server.ts), which reads the
- * visitor's consent from the request's cookie header and drops a send that fails.
+ * What is sent: the distinct id is the account's id, and the properties are the typed ones below
+ * (a role, a report's kind and format, counts), which hold no address, host or token. They go through
+ * `captureServerEvent` (lib/analytics-server.ts), which reads the visitor's consent from the
+ * request's cookie header and drops a send that fails.
  */
 import type { Report } from '@crawlmouse/types/v2';
 import type { FunnelEvent } from '../../analytics-events';

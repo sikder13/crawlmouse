@@ -13,7 +13,7 @@ Migration: `infra/supabase/migrations/20261114000002_v2_031_agency.sql`, revert 
 | # | Decision |
 |---|---|
 | D1 | `V2_CHECKS_PUBLIC` gates the pages and routes of this step; unset, each answers 404. An Agency-only route answers 402 with the gate's name (`agencyBranding`) for a lower tier; an Agency-only page shows the gate (§12). |
-| D2 | `is_member_for_site` is the one rule for seeing a site. A service-role read is keyed by ids the caller's own session returned (§4). What a role may do is `seat_may` (§3); a route asks it and compares no role string. Out of scope is 404. |
+| D2 | `is_member_for_site` is the one rule for seeing a site. A service-role read is keyed by ids the caller's own session returned (§4). What a role may do is `seat_may` (§3), which the routes of this step and the site and alert routes ask. Out of scope is 404. |
 | D2b | A person with several seats chooses the account they act in; the choice is a cookie that is followed only when it names one of their own active seats (§5). `users.default_account_id` is not written. |
 | D3 | Seats and invitations: a single-use token, 7 days, stored as its hash; accepted only by the signed-in user whose email matches; the limit is checked in the statement that writes the seat. |
 | D4 | Seats and sites beyond the plan are bought through CC-03's catalog and Stripe client; limits follow the subscription the webhook confirms. |
@@ -146,8 +146,8 @@ transfer of ownership must move that rule from the seat to the person.
 
 ## 9. Reports, exports and the proof page
 
-A report's content is a `ReportDoc` (`lib/v2/reports/generate.ts`). The PDF, the proof page and the
-share page draw one and add no sentence of their own.
+A report's content is a `ReportDoc` (`lib/v2/reports/generate.ts`): titles, tables and
+before-and-after pairs, as strings.
 
 ## 10. Download, share and schedules
 
@@ -162,8 +162,8 @@ share page draw one and add no sentence of their own.
 - **Recipients.** A client report goes to the client's contact, `sites.client_contact_email`; its
   confirmation is recorded on `report_schedules` (Q3).
 - **Seats are the owner's.** The locked Seats artboard gives seats to the owner alone (Q5).
-- **402 on a page.** An App Router page cannot answer 402: an Agency-only page on a lower tier renders
-  the gate, and each Agency-only route answers 402 (Q12).
+- **402 on a page.** A page here answers 200, 404 or a redirect. An Agency-only page opened on a
+  lower tier renders the gate; an Agency-only route answers 402 (Q12).
 - **Tokens.** An invitation's and a share link's token is moved from the link's address into a cookie
   by a route handler, as CC-27b's emailed links are (Q15).
 - **Proration.** A raised quantity is invoiced at once (`always_invoice`); a lowered one is not
