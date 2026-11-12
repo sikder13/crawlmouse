@@ -78,6 +78,12 @@ type Events = {
   // event names the seat and the invitation's number, never an address or a token: the handler
   // reads both through issue_seat_invite.
   'seat.invite.requested': { data: { seat_id: string; seq: number } };
+  // CC-31: a client report schedule's two mails are asked for
+  // (apps/web/lib/v2/agency/schedules.ts). Each event names a site or a report and holds no
+  // address and no token: the handler reads both through issue_recipient_confirmation and
+  // issue_report_pause when it sends.
+  'report.confirmation.requested': { data: { site_id: string } };
+  'report.send.requested': { data: { report_id: string } };
 };
 
 export const inngest = new Inngest({

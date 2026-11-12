@@ -140,6 +140,18 @@ export const NOTICE_CODES = [
   'share_made',
   'share_revoked',
   'not_ready',
+  // client report schedules, and the recipient's two links (CC-31)
+  'schedule_saved',
+  'schedule_cleared',
+  'client_saved',
+  'invalid_owner',
+  'confirmation_requested',
+  'nothing_to_confirm',
+  'schedule_resumed',
+  'not_paused',
+  'report_confirmed',
+  'report_paused',
+  'report_link_gone',
   // any body the route could not read
   'invalid',
 ] as const;
@@ -148,9 +160,12 @@ export type NoticeCode = (typeof NOTICE_CODES)[number];
 
 const NOTICE_SET: ReadonlySet<string> = new Set(NOTICE_CODES);
 
-/** The pages a form posts from: the dashboard, Seats, Reports, an invitation's page, or one site's page. */
+/**
+ * The pages a form posts from: the dashboard, Seats, Reports, the agency's client reports, an
+ * invitation's page, a report recipient's two link pages, or one site's page.
+ */
 const BACK =
-  /^\/(?:dashboard|seats|reports|invite|sites\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+  /^\/(?:dashboard|seats|reports|agency\/reports|invite|s\/confirm|s\/pause|sites\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 /**
  * The page a form was posted from, when it is one a form can go back to (the dashboard or a site
