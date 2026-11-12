@@ -48,6 +48,11 @@ import { ChangesLogScreen } from '../../../components/v2/screens/changes-log/Cha
 import { InviteScreen } from '../../../components/v2/screens/invite/InviteScreen';
 import { SeatsScreen } from '../../../components/v2/screens/seats/SeatsScreen';
 import { ProofScreen } from '../../../components/v2/screens/proof/ProofScreen';
+import { RecipientLinkScreen } from '../../../components/v2/screens/share/RecipientLinkScreen';
+import {
+  REPORT_LINK_PREVIEWS,
+  type ReportLinkPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/report-link';
 import {
   PROOF_PREVIEWS,
   proofPreview,
@@ -133,6 +138,15 @@ export const CC31_PROOF_ELEMENTS: Record<string, () => React.ReactElement> = Obj
     () => <ProofScreen data={proofPreview(path)} />,
   ]),
 );
+
+/** CC-31 workstream B2: the page a client report's recipient lands on, by registry path. */
+export const CC31_REPORT_LINK_ELEMENTS: Record<string, () => React.ReactElement> =
+  Object.fromEntries(
+    (Object.keys(REPORT_LINK_PREVIEWS) as ReportLinkPreview[]).map((path) => [
+      path,
+      () => <RecipientLinkScreen data={REPORT_LINK_PREVIEWS[path]()} />,
+    ]),
+  );
 
 /** CC-31 workstream A: the Seats screen and the invitation page, by registry path. */
 export const CC31_SEAT_ELEMENTS: Record<string, () => React.ReactElement> = {

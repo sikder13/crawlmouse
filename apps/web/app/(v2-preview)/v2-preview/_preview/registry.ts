@@ -305,4 +305,14 @@ export const PREVIEWS: PreviewEntry[] = [
     kind: 'screen',
     orange: 0,
   },
+  // CC-31, the page a client report's recipient lands on. Its orange element is the one button; a
+  // link that cannot be used offers nothing.
+  { path: '/v2-preview/screens/report-link', name: 'Report link, confirm', kind: 'screen' },
+  { path: '/v2-preview/screens/report-link/pause', name: 'Report link, pause', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/report-link/gone',
+    name: 'Report link, cannot be used',
+    kind: 'screen',
+    orange: 0,
+  },
 ];
