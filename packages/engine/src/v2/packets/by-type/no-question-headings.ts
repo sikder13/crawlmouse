@@ -23,7 +23,7 @@ import {
   template,
 } from '../content-rule.js';
 import { count, line, list } from '../text.js';
-import type { PacketEntry } from '../types.js';
+import type { PacketEntry, PacketFacts } from '../types.js';
 
 /**
  * The marks that end a question for the check (thresholds.ts QUESTION_MARK): the test beside this
@@ -45,8 +45,8 @@ const PROGRAM =
   `l~/^h[23][ \\t>]/{h=s&&!c;${AWK_TEXT};t=x}` +
   `END{exit !f}`;
 
-const context = (fix: ContentDetection) =>
-  contentContext(fix, [
+const context = (fix: ContentDetection, facts: PacketFacts) =>
+  contentContext(fix, facts, [
     line`The check applies to a page of prose (an H1 with at least ${count(MIN_BODY_WORDS)} words after it and no ${mark('Product')} JSON-LD) with at least ${count(MIN_HEADINGS)} section headings: an ${mark('<h2>')} or ${mark('<h3>')} after the H1 whose next block is prose (${list(
       [...PROSE_BLOCKS].map((tag) => mark(`<${tag}>`)),
       PROSE_BLOCKS.size,

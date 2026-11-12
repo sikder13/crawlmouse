@@ -3,9 +3,16 @@
  * a page served in two states with the builder's command run against each, and the properties each
  * of the five builders is held to.
  */
+import { existsSync } from 'node:fs';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { FixPacketSchema, PacketFrameworkSchema, type ContentCheck } from '@crawlmouse/types/v2';
+import {
+  FixPacketSchema,
+  PacketFrameworkSchema,
+  type ContentCheck,
+  type PageResult,
+} from '@crawlmouse/types/v2';
 import type { ContentDetection, ContentFixType } from '../../content/aggregate.js';
 import { CONTENT_CHECKS, type PageVerdict } from '../../content/checks.js';
 import { readPage } from '../../content/read.js';
@@ -16,7 +23,7 @@ import { writePacket } from '../registry.js';
 import { clean } from '../text.js';
 import type { FixPacket, PacketFacts, PacketFramework } from '../types.js';
 import { NO_STACK } from './facts.js';
-import { hostileText, outsideCodeSpans, UNSHOWN } from './hostile.js';
+import { HOSTILE_FRAGMENTS, hostileText, outsideCodeSpans, UNSHOWN } from './hostile.js';
 import {
   inBothStates,
   runCommand,
@@ -62,6 +69,7 @@ export const FIRST_TESTABLE_UA = userAgentOf(FIRST_TESTABLE);
 export function contentFacts(
   served: 'every_crawler' | 'no_crawler' = 'every_crawler',
   framework: PacketFramework | null = null,
+  pages: PacketFacts['pages'] = new Map(),
 ): PacketFacts {
   return {
     homepage_url: 'https://shop.test/',
@@ -82,11 +90,17 @@ export function contentFacts(
       served === 'no_crawler'
         ? []
         : CRAWLER_REGISTRY_V2.map((e) => ({ ua: e.token, verdict: 'allowed' as const })),
-    pages: new Map(),
+    pages,
     edges: [],
     access_tests: [],
   };
 }
+
+/** The check's row for a page the crawl requested at `url` and was answered at `final_url`. */
+export const servedRow = (url: string, final_url: string): [string, PageResult] => [
+  url,
+  { url, final_url } as PageResult,
+];
 
 /** The engine's verdict on one page for the check behind `type`: readPage, then the check's judge. */
 export const engineVerdict = (type: ContentFixType, html: string): PageVerdict =>
@@ -147,6 +161,69 @@ export async function statusesOn(
     out[path] = (await runCommand(command)).status;
   }
   return out;
+}
+
+/**
+ * What each content builder's command is held to on a live site, beyond its own two states: a site
+ * that redirects the engine's spelling of a page to the slashed one, and a record whose crawled
+ * fields are hostile, run through `sh`.
+ */
+export function contentCommandOnSites(
+  type: ContentFixType,
+  pages: Record<SiteState, string>,
+): void {
+  describe(`${type}: the command on a trailing-slash site`, () => {
+    it('requests the address the page is served at, fails before the fix and passes after', async () => {
+      const serve = (html: string) => (req: IncomingMessage, res: ServerResponse) => {
+        if (req.url === '/blog/a/') return void res.end(html);
+        res.statusCode = req.url === '/blog/a' ? 301 : 404;
+        if (res.statusCode === 301) res.setHeader('location', '/blog/a/');
+        res.end('<html><body>Moved</body></html>');
+      };
+      const site = await twoStateSite({ broken: serve(pages.broken), fixed: serve(pages.fixed) });
+      open.push(site);
+      const page = `${site.base}/blog/a`;
+      const facts = contentFacts('every_crawler', null, new Map([servedRow(page, `${page}/`)]));
+      const packet = writePacket(type, contentRecord(type, { affected_urls: [page] }), facts)!;
+      expect(packet.verify.command).toContain(`'${page}/'`);
+      expect(packet.context).toContain(`Failing page: \`${page}/\`.`);
+      const run = await inBothStates(site, packet.verify.command);
+      expect(run.broken.status).not.toBe(0);
+      expect(run.fixed.status).toBe(0);
+    });
+  });
+
+  describe(`${type}: a hostile record's command, run`, () => {
+    it('makes one request for the page and nothing else, in both states', async () => {
+      const seen: string[] = [];
+      const serve = (html: string) => (req: IncomingMessage, res: ServerResponse) => {
+        seen.push(req.url ?? '');
+        res.end(html);
+      };
+      const site = await twoStateSite({ broken: serve(pages.broken), fixed: serve(pages.fixed) });
+      open.push(site);
+      const hostile = HOSTILE_FRAGMENTS.join('');
+      // a `#` would end the path: what follows it is a fragment, which no request carries
+      const page = new URL(`${site.base}/blog/${hostile.replaceAll('#', '')}?q=${hostile}`).href;
+      const record = contentRecord(type, {
+        template_key: hostile,
+        key: `x:${hostile}`,
+        affected_urls: [page],
+      });
+      const packet = writePacket(type, record, contentFacts())!;
+      for (const text of [...shownText(packet), packet.verify.command]) {
+        expect(UNSHOWN.test(text)).toBe(false);
+      }
+      const run = await inBothStates(site, packet.verify.command);
+      expect(run.broken.status).not.toBe(0);
+      expect(run.fixed.status).toBe(0);
+      expect(run.broken.stderr + run.fixed.stderr + run.broken.stdout + run.fixed.stdout).toBe('');
+      // one request per run, each for the record's page as the URL parser spells it
+      const { pathname, search } = new URL(page);
+      expect(seen.map((u) => decodeURI(u))).toEqual(Array(2).fill(decodeURI(pathname + search)));
+      expect(existsSync('pwned')).toBe(false);
+    });
+  });
 }
 
 /** A record of `type` with hostile text in each field a crawled site chooses. */

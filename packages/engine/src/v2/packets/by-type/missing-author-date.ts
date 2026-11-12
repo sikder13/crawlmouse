@@ -7,6 +7,7 @@
  */
 import type { ContentDetection } from '../../content/aggregate.js';
 import {
+  AWK_SCRIPTS,
   AWK_VISIBLE,
   CHROME_GAP,
   contentContext,
@@ -21,7 +22,7 @@ import {
   template,
 } from '../content-rule.js';
 import { line } from '../text.js';
-import type { DocSource, PacketEntry } from '../types.js';
+import type { DocSource, PacketEntry, PacketFacts } from '../types.js';
 
 /** The check's `ARTICLE`, as an alternation an awk regular expression can hold. */
 const ARTICLE_NAMES =
@@ -37,10 +38,11 @@ const HAS_CONTENT = `l~/^meta[ \\t][^>]*content=["']?[ \\t]*[^"' \\t>]/`;
  * JSON-LD block that holds an Article type, `author` (text that is not blank, an object, or a list
  * that is not empty) and `datePublished` (text with four digits in a row); a meta element with
  * content; and, outside the set-aside elements, a link with rel author, and, in the body (`b`),
- * itemprop author, itemprop datePublished, or a time element with a datetime attribute.
+ * itemprop author, itemprop datePublished, or a time element with a datetime attribute. AWK_SCRIPTS
+ * makes each script element one line first, so a `<` in a block's text does not cut the block in two.
  */
 const PROGRAM =
-  `${AWK_VISIBLE}l~/^body[ \\t>]/{b=1}` +
+  `${AWK_SCRIPTS}${AWK_VISIBLE}l~/^body[ \\t>]/{b=1}` +
   `l~/^script[^>]*application\\/ld\\+json/&&$0~/${ldType(ARTICLE_NAMES)}/` +
   `{if($0~/"author"[ \\t]*:[ \\t]*("[ \\t]*[^" \\t]|\\{|\\[[ \\t]*[^] \\t])/)a=1;if($0~/"datePublished"[ \\t]*:[ \\t]*"[^"]*[0-9][0-9][0-9][0-9]/)d=1}` +
   `l~/^meta[ \\t][^>]*name=["']?author${END}/&&${HAS_CONTENT}{a=1}` +
@@ -120,8 +122,8 @@ const WORDPRESS_SOURCES: readonly DocSource[] = [
   },
 ];
 
-const context = (fix: ContentDetection) =>
-  contentContext(fix, [
+const context = (fix: ContentDetection, facts: PacketFacts) =>
+  contentContext(fix, facts, [
     line`The check applies to a page whose JSON-LD has an Article node (${mark('Article')}, ${mark('NewsArticle')}, ${mark('BlogPosting')} and the like) and passes it when the page names both an author and a publication date in markup. The audit does not record which of the two a failing page lacks.`,
     line`As an author it reads: ${AUTHOR} on the Article node (not empty), ${mark('<meta name="author">')} with content, a link with ${BYLINE_LINK}, or an element with ${mark('itemprop="author"')}.`,
     line`As a date it reads: ${DATE} on the Article node with a four-digit year, ${mark('<meta property="article:published_time">')} with content, an element with ${mark('itemprop="datePublished"')}, or a ${TIME} element.`,
@@ -159,7 +161,8 @@ export const missingAuthorDate: PacketEntry<'missing_author_date'> = {
     wordpress: {
       write: (fix) => ({
         change: [
-          line`This body adds a visible byline, which the check reads, in a theme with PHP templates; it leaves the Article JSON-LD to the plugin or theme that prints it. In the theme template that renders ${template(fix)}, where the post is printed, print the author with ${mark('<?php the_author_posts_link(); ?>')}: it prints a link to the author's page with ${BYLINE_LINK}.`,
+          line`These steps assume a WordPress theme with PHP templates renders the page. If the front end is a separate application that reads WordPress as its data source, make the change there, as the generic steps describe.`,
+          line`They add a visible byline, which the check reads, and leave the Article JSON-LD to the plugin or theme that prints it. In the theme template that renders ${template(fix)}, where the post is printed, print the author with ${mark('<?php the_author_posts_link(); ?>')}: it prints a link to the author's page with ${BYLINE_LINK}.`,
           line`Next to it, print the date in a time element: ${mark("<time datetime=\"<?php echo get_the_time( 'c' ); ?>\"><?php the_time( 'F j, Y' ); ?></time>")}. ${mark('c')} is PHP's ISO 8601 format; use ${mark('the_time()')} for the visible date, since ${mark('the_date()')} prints a date once per day of posts.`,
           line`Print both in the post's own content area: a byline inside ${SET_ASIDE} is not read.`,
         ],

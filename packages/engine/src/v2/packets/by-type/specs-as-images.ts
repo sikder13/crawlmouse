@@ -18,7 +18,7 @@ import {
   template,
 } from '../content-rule.js';
 import { count, line } from '../text.js';
-import type { PacketEntry } from '../types.js';
+import type { PacketEntry, PacketFacts } from '../types.js';
 
 /**
  * Exits 0 when a table or a description list outside the set-aside elements (`s`) holds a `td` or
@@ -34,8 +34,8 @@ const PROGRAM =
 const TABLE = mark('<table>');
 const LIST = mark('<dl>');
 
-const context = (fix: ContentDetection) =>
-  contentContext(fix, [
+const context = (fix: ContentDetection, facts: PacketFacts) =>
+  contentContext(fix, facts, [
     line`The check applies to a page with ${mark('Product')} JSON-LD. It fails a page that shows an image of specifications and gives none as text: no ${TABLE}, no ${LIST}, and fewer than ${count(MIN_SPEC_LINES)} lines of the form ${mark('Label: value')} with a digit in the value.`,
     line`An image of specifications is an ${mark('<img>')} that is not a link to another page and whose alt text or file name matches the pattern ${mark(SPEC_IMAGE.source)} (letter case ignored).`,
     line`The audit does not record which image matched on which page, or what it shows: open the failing pages.`,

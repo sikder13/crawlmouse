@@ -8,6 +8,7 @@
  */
 import type { ContentDetection } from '../../content/aggregate.js';
 import {
+  AWK_SCRIPTS,
   contentContext,
   DOCS_READ,
   firstFailingPage,
@@ -20,7 +21,7 @@ import {
   template,
 } from '../content-rule.js';
 import { line, list } from '../text.js';
-import type { DocSource, PacketEntry } from '../types.js';
+import type { DocSource, PacketEntry, PacketFacts } from '../types.js';
 
 /** The types the packet names as examples of a node about the page itself. */
 export const PAGE_TYPES_NAMED = [
@@ -38,9 +39,10 @@ const PAGE_SUBJECT_NAMES =
 
 /**
  * Exits 0 when one JSON-LD block of the page holds both a type about the page itself and a
- * `description` whose value is a string with a character that is not a space.
+ * `description` whose value is a string with a character that is not a space. AWK_SCRIPTS makes each
+ * script element one line first, so a `<` in a block's text does not cut the block in two.
  */
-const PROGRAM = `${LD_BLOCK}&&$0~/${ldType(PAGE_SUBJECT_NAMES)}/&&$0~/"description"[ \\t]*:[ \\t]*"[ \\t]*[^" \\t]/{f=1}END{exit !f}`;
+const PROGRAM = `${AWK_SCRIPTS}${LD_BLOCK}&&$0~/${ldType(PAGE_SUBJECT_NAMES)}/&&$0~/"description"[ \\t]*:[ \\t]*"[ \\t]*[^" \\t]/{f=1}END{exit !f}`;
 
 const SCRIPT = mark('<script type="application/ld+json">');
 const DESCRIPTION = mark('description');
@@ -71,8 +73,8 @@ const NEXTJS_SOURCES: readonly DocSource[] = [
   },
 ];
 
-const context = (fix: ContentDetection) =>
-  contentContext(fix, [
+const context = (fix: ContentDetection, facts: PacketFacts) =>
+  contentContext(fix, facts, [
     line`The check passes a page when a JSON-LD node about the page itself has a ${DESCRIPTION} that is not empty. Such a node has an ${mark('@type')} like ${list(
       PAGE_TYPES_NAMED.map(mark),
       PAGE_TYPES_NAMED.length,
