@@ -96,7 +96,7 @@ export const NOTHING_WRITTEN: WriteFix = () => ({ packet: null, effort: null, be
 export const MAX_TITLE_CHARS = 300;
 
 /**
- * A fix's title on one line, with nothing invisible in it (clean-text.ts `clean`): its subject is
+ * A fix's title on one line, cleaned as clean-text.ts `clean` cleans crawled text: its subject is
  * crawled text, and the title is the first line of the packet's prompt. A title past
  * MAX_TITLE_CHARS is cut and ends in an ellipsis.
  */

@@ -12,6 +12,9 @@ export function servedAt(facts: Pick<PacketFacts, 'pages'>, url: string): string
   const final = facts.pages.get(url)?.final_url ?? null;
   if (final === null) return url;
   try {
+    // An address with credentials in it is not one to print or request.
+    const { username, password } = new URL(final);
+    if (username !== '' || password !== '') return url;
     return canonicalizeUrl(final) === url ? final : url;
   } catch {
     return url;

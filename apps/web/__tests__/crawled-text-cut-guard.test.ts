@@ -633,10 +633,6 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice of the URLs or phrases a verify command names (`listed`), bounded by count and by total length; `expect` says how many were left out. No string is cut (CC-30).',
   ],
   [
-    'packages/engine/src/v2/packets/shell.ts :: const rest = parsed.href.slice(parsed.origin.length);',
-    'STRING slice of a URL the parser serialised (`URL.href`), at the end of its origin: the origin is ASCII (a host is punycoded), so the cut falls on an ASCII boundary and cannot split a surrogate pair. Nothing is dropped: the two parts are joined again after encoding (CC-30, url).',
-  ],
-  [
     "packages/engine/src/v2/packets/shell.ts :: return quoted([...clean(crawled)].slice(0, max).join(''));",
     'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). Crawled text in a verify command, cut to its bound before it is single-quoted (CC-30, crawledWord).',
   ],

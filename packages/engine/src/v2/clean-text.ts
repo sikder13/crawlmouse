@@ -7,10 +7,11 @@
 /**
  * Code points that draw nothing or change how text is shown: removed. The Unicode categories, and
  * the letters and marks that render blank though their category says otherwise (the Hangul fillers,
- * the braille blank, the combining grapheme joiner, two Khmer inherent vowels).
+ * the braille blank, the combining grapheme joiner, two Khmer inherent vowels, the Old Chinese hook
+ * mark and a musical null notehead). The list holds the ones found so far, not a proof there are no more.
  */
 const INVISIBLE =
-  /[\p{Cf}\p{Co}\p{Cs}\p{Cn}\p{Variation_Selector}\u034F\u115F\u1160\u17B4\u17B5\u2800\u3164\uFFA0]/gu;
+  /[\p{Cf}\p{Co}\p{Cs}\p{Cn}\p{Variation_Selector}\u034F\u115F\u1160\u17B4\u17B5\u2800\u3164\uFFA0\u{16FE4}\u{1D159}]/gu;
 /** Control characters, line and paragraph separators, and every other space: each run becomes one space. */
 const BREAKS = /[\p{Cc}\p{Zl}\p{Zp}\p{Zs}]+/gu;
 

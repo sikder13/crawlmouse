@@ -41,6 +41,14 @@ describe('url', () => {
     expect(url('http://[::1]:8080/a[b]').word).toBe("'http://[::1]:8080/a%5Bb%5D'");
   });
 
+  it('keeps the host and drops the credentials of a URL that carries userinfo', () => {
+    expect(url('https://x@a.test/p/').word).toBe("'https://a.test/p/'");
+    expect(url('https://user:pw@shop.example.com/p?q=1#f').word).toBe(
+      "'https://shop.example.com/p?q=1#f'",
+    );
+    expect(url('https://a.test@evil.test/p/').word).toBe("'https://evil.test/p/'");
+  });
+
   it('refuses a scheme a record cannot hold', () => {
     expect(() => url('file:///etc/passwd')).toThrow(/http or https/);
     expect(() => url('javascript:alert(1)')).toThrow(/http or https/);

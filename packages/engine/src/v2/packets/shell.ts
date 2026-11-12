@@ -47,8 +47,12 @@ export function url(crawled: string): Word {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error('packets: a verify command requests http or https only');
   }
-  const rest = parsed.href.slice(parsed.origin.length);
-  return quoted(parsed.origin + rest.replace(URL_UNSAFE, percent).replace(/[[\]{}]/g, percent));
+  // From its parts, without the userinfo: a command carries no credentials, and `href` holds them.
+  const rest = parsed.pathname + parsed.search + parsed.hash;
+  return quoted(
+    `${parsed.protocol}//${parsed.host}` +
+      rest.replace(URL_UNSAFE, percent).replace(/[[\]{}]/g, percent),
+  );
 }
 
 /** Text of ours as a shell word. */
