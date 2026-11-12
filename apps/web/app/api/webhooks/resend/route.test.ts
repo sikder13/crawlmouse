@@ -78,6 +78,44 @@ describe('the Resend webhook: v1’s record, kept', () => {
   });
 });
 
+describe('v2 mail leaves no address in email_events (security review r1, S4)', () => {
+  const v2 = <T extends { data: object }>(
+    event: T,
+    from = 'Crawlmouse <alerts@crawlmouse.com>',
+  ) => ({
+    ...event,
+    data: { ...event.data, from },
+  });
+
+  it.each([
+    ['a delivery', v2(delivered)],
+    ['a bounce', v2(bounce('Permanent'))],
+    ['a complaint', v2(complaint)],
+    ['the bare address, in any case', v2(delivered, ' ALERTS@crawlmouse.com ')],
+  ])('stores no row for %s sent from alerts@', async (_, event) => {
+    expect((await post(signed(event))).status).toBe(200);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('still suppresses a v2 bounce, by its hash', async () => {
+    await post(signed(v2(bounce('Permanent'))));
+    expect(rpc).toHaveBeenCalledWith('record_email_suppression', {
+      p_hash: hashMailAddress(PEPPER, 'bounced+tag@example.com'),
+      p_reason: 'hard_bounce',
+      p_now: expect.any(String),
+    });
+  });
+
+  it.each([
+    ['v1’s sign-in sender', 'Crawlmouse <magic@crawlmouse.com>'],
+    ['a look-alike', 'alerts@crawlmouse.com <magic@crawlmouse.com>'],
+    ['another domain', 'Crawlmouse <alerts@crawlmouse.com.evil.example>'],
+  ])('still stores v1’s row for %s', async (_, from) => {
+    await post(signed(v2(delivered, from)));
+    expect(upsert).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('suppression (D7)', () => {
   it('a hard bounce suppresses the hash of the address as written, lower-cased, tag kept', async () => {
     expect((await post(signed(bounce('Permanent')))).status).toBe(200);

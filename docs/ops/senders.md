@@ -20,7 +20,9 @@ Both constants: `grep -n "SENDER" apps/web/lib/auth/constants.ts`.
    own.
 2. **Webhook.** Resend → Webhooks → an endpoint at `https://crawlmouse.com/api/webhooks/resend` with
    the events `email.bounced` and `email.complained` at least (a hard bounce or a complaint suppresses
-   all but account mail to that address, D7). Its signing secret is `RESEND_WEBHOOK_SECRET` (§4).
+   all but account mail to that address, D7). Its signing secret is `RESEND_WEBHOOK_SECRET` (§4). An
+   event about mail from `alerts@` is not stored in v1's `email_events` (spec 28, "The send ledger"),
+   whichever events are subscribed.
 3. **API key.** `RESEND_API_KEY`, already set in Vercel for v1. With it unset the mailer claims nothing
    and logs `mail.unconfigured` (spec 28, "The send ledger").
 
