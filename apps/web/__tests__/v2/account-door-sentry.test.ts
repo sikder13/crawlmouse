@@ -119,6 +119,10 @@ const SCRUBBER_ONLY = [
   'CHECKIDCANARY',
   'c4ec4c4e-c4ec',
   'LINKCANARY',
+  // CC-28: a Slack webhook's secret and the unsubscribe tokens.
+  'SLACKCANARY',
+  'UNSUBCANARY',
+  'UNSUBPAGECANARY',
 ];
 
 describe('the server SDK sends no door secret in an event or a transaction', () => {
@@ -154,6 +158,9 @@ describe('the server SDK sends no door secret in an event or a transaction', () 
       'CHECKIDCANARY',
       'c4ec4c4e-c4ec',
       'LINKCANARY',
+      'SLACKCANARY',
+      'UNSUBCANARY',
+      'UNSUBPAGECANARY',
     ]) {
       expect(out, canary).toContain(canary);
     }
