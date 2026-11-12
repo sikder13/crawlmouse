@@ -8,7 +8,6 @@ import type { PageResult } from '@crawlmouse/types/v2';
 import { every } from '../../../fixtures/v2/access/builders.js';
 import { blogSite, type Cells } from '../../../fixtures/v2/grade/sites.js';
 import { detectRendered } from '../detectors/rendered.js';
-import { factsFor } from '../packets/test-support/facts.js';
 import type { JsTextState } from '../render/state.js';
 import { applyFix, effectsOf, type FixRecord } from './effects.js';
 import { aiFrom, gradeCheck, type Grades } from './index.js';
