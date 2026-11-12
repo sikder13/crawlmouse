@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/registry';
-import { ACCOUNT_ELEMENTS, CC27_ELEMENTS } from './_lib/screens';
+import { ACCOUNT_ELEMENTS, CC27_ELEMENTS, CC31_ELEMENTS } from './_lib/screens';
 
 const CONTROLS = [
   'a[href]',
@@ -161,11 +161,13 @@ describe('the checker itself', () => {
 });
 
 describe('Account previews: no two controls share a name a row header does not separate', () => {
-  const elements = { ...ACCOUNT_ELEMENTS, ...CC27_ELEMENTS };
+  const elements = { ...ACCOUNT_ELEMENTS, ...CC27_ELEMENTS, ...CC31_ELEMENTS };
   const paths = Object.keys(elements);
   it('covers every account preview in the registry', () => {
     const account = PREVIEWS.map((p) => p.path).filter((p) =>
-      /\/screens\/(dashboard|site|changes-log|alerts|reports|settings|trial-end)(\/|$)/.test(p),
+      /\/screens\/(dashboard|site|changes-log|alerts|reports|settings|trial-end|agency)(\/|$)/.test(
+        p,
+      ),
     );
     expect(paths.sort()).toEqual(account.sort());
   });
@@ -176,7 +178,14 @@ describe('Account previews: no two controls share a name a row header does not s
     '/v2-preview/screens/dashboard/ambiguous',
   ]);
   it.each(paths)('%s', (path) => {
-    const html = renderToStaticMarkup(elements[path]!());
+    // A <noscript> block holds the copy of a control that a browser without script shows in place
+    // of the hidden one beside it (the account switcher's list): the two are never offered
+    // together, so the copy is not read as a second control. account-switcher.test.tsx holds the
+    // copy to the same forms as the list.
+    const html = renderToStaticMarkup(elements[path]!()).replace(
+      /<noscript>[\s\S]*?<\/noscript>/g,
+      '',
+    );
     const controls = html.match(/<a [^>]*href=|<button/g)?.length ?? 0;
     // It found the page's controls: the rail alone has seven links; the brand, one.
     expect(controls).toBeGreaterThan(NO_RAIL.has(path) ? 0 : 7);

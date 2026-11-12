@@ -234,6 +234,41 @@ export const PREVIEWS: PreviewEntry[] = [
       { name: 'opened', query: '?kind=opened', orange: 0 },
     ],
   },
+  // CC-31, the agency's workspace. The matrix's orange element is setup's next step while there is
+  // one, and "Add a client site" after it.
+  { path: '/v2-preview/screens/agency', name: 'Final-Ag-Matrix', kind: 'screen' },
+  { path: '/v2-preview/screens/agency/no-client', name: 'Clients, none yet', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/agency/not-checked',
+    name: 'Clients, one not checked yet',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/agency/first-check',
+    name: 'Clients, a first check queued',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/agency/invite', name: 'Clients, one seat', kind: 'screen' },
+  { path: '/v2-preview/screens/agency/report', name: 'Clients, no report sent', kind: 'screen' },
+  // A seat that covers one client adds none, and setup is done: nothing here is its next action.
+  {
+    path: '/v2-preview/screens/agency/scoped',
+    name: 'Clients, a seat that covers one',
+    kind: 'screen',
+    orange: 0,
+  },
+  { path: '/v2-preview/screens/agency/gate', name: 'Clients, below Agency', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/agency/open',
+    name: 'Clients, acting in another account',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/agency/client', name: 'Final-Ag-Client', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/agency/client/clean',
+    name: 'Client, nothing open',
+    kind: 'screen',
+  },
   { path: '/v2-preview/screens/map', name: 'Final-LinkMap', kind: 'screen' },
   { path: '/v2-preview/screens/map/all', name: 'Link map, every page', kind: 'screen' },
   // No fix to open from any page: the keep bar's button is the orange element.

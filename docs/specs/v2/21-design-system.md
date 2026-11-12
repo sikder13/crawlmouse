@@ -548,6 +548,17 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Settings, delete (owner ruling 12)              | `/v2-preview/screens/settings/delete`                    | screen    |                                      |
 | Final-TrialEnd                                  | `/v2-preview/screens/trial-end`                          | screen    |                                      |
 | Changes log                                     | `/v2-preview/screens/changes-log`                        | screen    | ``, `?kind=opened`                   |
+| Final-Ag-Matrix                                 | `/v2-preview/screens/agency`                             | screen    |                                      |
+| Clients, none yet                               | `/v2-preview/screens/agency/no-client`                   | screen    |                                      |
+| Clients, one not checked yet                    | `/v2-preview/screens/agency/not-checked`                 | screen    |                                      |
+| Clients, a first check queued                   | `/v2-preview/screens/agency/first-check`                 | screen    |                                      |
+| Clients, one seat                               | `/v2-preview/screens/agency/invite`                      | screen    |                                      |
+| Clients, no report sent                         | `/v2-preview/screens/agency/report`                      | screen    |                                      |
+| Clients, a seat that covers one                 | `/v2-preview/screens/agency/scoped`                      | screen    |                                      |
+| Clients, below Agency                           | `/v2-preview/screens/agency/gate`                        | screen    |                                      |
+| Clients, acting in another account              | `/v2-preview/screens/agency/open`                        | screen    |                                      |
+| Final-Ag-Client                                 | `/v2-preview/screens/agency/client`                      | screen    |                                      |
+| Client, nothing open                            | `/v2-preview/screens/agency/client/clean`                | screen    |                                      |
 | Final-LinkMap                                   | `/v2-preview/screens/map`                                | screen    |                                      |
 | Link map, every page                            | `/v2-preview/screens/map/all`                            | screen    |                                      |
 | Link map, clean bill                            | `/v2-preview/screens/map/clean`                          | screen    |                                      |

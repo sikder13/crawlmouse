@@ -45,6 +45,16 @@ import { SettingsScreen } from '../../../components/v2/screens/settings/Settings
 import { DeleteScreen } from '../../../components/v2/screens/settings/DeleteScreen';
 import { TrialEndScreen } from '../../../components/v2/screens/trial-end/TrialEndScreen';
 import { ChangesLogScreen } from '../../../components/v2/screens/changes-log/ChangesLogScreen';
+import { ClientScreen } from '../../../components/v2/screens/agency/ClientScreen';
+import { MatrixScreen } from '../../../components/v2/screens/agency/MatrixScreen';
+import {
+  AGENCY_PREVIEWS,
+  CLIENT_PREVIEWS,
+  agencyPreview,
+  clientPreview,
+  type AgencyPreview,
+  type ClientPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/agency';
 
 export const homeData = homePreview;
 
@@ -109,4 +119,24 @@ export const CC27_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/settings/free': () => <SettingsScreen data={settingsPreview('clean')} />,
   '/v2-preview/screens/settings/delete': () => <DeleteScreen data={deletePreview()} />,
   '/v2-preview/screens/trial-end': () => <TrialEndScreen data={trialEndPreview()} />,
+};
+
+/** CC-31's agency screens: each state of the client matrix, and the client page. */
+export const CC31_ELEMENTS: Record<string, () => React.ReactElement> = {
+  ...Object.fromEntries(
+    (Object.keys(AGENCY_PREVIEWS) as AgencyPreview[]).map((path) => [
+      path,
+      () => <MatrixScreen data={agencyPreview(path)} />,
+    ]),
+  ),
+  ...Object.fromEntries(
+    (Object.keys(CLIENT_PREVIEWS) as ClientPreview[]).map((path) => [
+      path,
+      () => {
+        const data = clientPreview(path);
+        if (data?.kind !== 'client') throw new Error(`${path} has no client page to render`);
+        return <ClientScreen data={data} />;
+      },
+    ]),
+  ),
 };

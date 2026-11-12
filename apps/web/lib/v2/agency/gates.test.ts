@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AGENCY_MONTHLY, PRO_MONTHLY } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
-import { gateMessage, nextTier } from './gates';
+import { agencyGateMessage, gateMessage, nextTier } from './gates';
 
 /** `gates.ts` without its block comments and its import lines (a module path may hold a digit). */
 function codeOf(source: string): string {
@@ -69,6 +69,18 @@ describe('gateMessage', () => {
     const code = codeOf(readFileSync(resolve(__dirname, 'gates.ts'), 'utf8'));
     expect(code).toContain('export function gateMessage');
     expect(code.match(/\d/g)).toBeNull();
+  });
+});
+
+describe('agencyGateMessage', () => {
+  it('names what Agency keeps and its price, from GATES and prices.ts', () => {
+    expect(agencyGateMessage()).toBe(
+      `Clients, their matrix and their pages are on Agency, which keeps ${GATES.agency.sites} sites and ${GATES.agency.seats} seats: Agency is $${AGENCY_MONTHLY} a month.`,
+    );
+    // Written out once, so a change to GATES or prices.ts shows here as a changed sentence.
+    expect(agencyGateMessage()).toBe(
+      'Clients, their matrix and their pages are on Agency, which keeps 25 sites and 5 seats: Agency is $99 a month.',
+    );
   });
 });
 

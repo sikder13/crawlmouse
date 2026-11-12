@@ -1,0 +1,31 @@
+/* The client matrix's own pieces (Final-Ag-Matrix); the rest is the account screens' shared sheet
+   and the dashboard's strip. */
+
+/* A client with no result yet: what its first check is doing, then its one action. */
+.first {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The gate, and the switch to the agency: a heading and one card, as a page with one thing to do. */
+.state {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  max-width: 640px;
+}
+
+.body {
+  margin: 0;
+  font-size: var(--v2-text-ui);
+}

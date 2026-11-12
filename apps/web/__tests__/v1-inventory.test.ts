@@ -171,6 +171,8 @@ describe('the finders see what they claim to see', () => {
       isFlagGated(join(WEB, p)),
     );
     expect(hidden).toEqual([
+      'app/agency/clients/[siteId]/page.tsx',
+      'app/agency/page.tsx',
       'app/audit/[id]/access/page.tsx',
       'app/audit/[id]/changes/page.tsx',
       'app/audit/[id]/content/page.tsx',

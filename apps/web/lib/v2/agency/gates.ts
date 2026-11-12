@@ -24,6 +24,15 @@ const sites = (n: number) => `${count(n)} ${plural(n, 'site', 'sites')}`;
 const seats = (n: number) => `${count(n)} ${plural(n, 'seat', 'seats')}`;
 
 /**
+ * What an account below Agency is told on an Agency-only page (the client matrix, a client page):
+ * what Agency keeps, and its price.
+ */
+export function agencyGateMessage(): string {
+  const g = GATES.agency;
+  return `Clients, their matrix and their pages are on ${NAME.agency}, which keeps ${sites(g.sites)} and ${seats(g.seats)}: ${NAME.agency} is ${usd(MONTHLY.agency)} a month.`;
+}
+
+/**
  * The line for `gate` on `tier`, or null when the next plan does not lift it (a Pro account sees
  * every fix and exports already; a Free account's next plan has no client reports).
  */

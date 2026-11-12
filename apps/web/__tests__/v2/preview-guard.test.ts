@@ -186,6 +186,8 @@ describe('v2 stays out of live pages', () => {
   const V2_PAGE_DIRS = [
     ...V2_REWRITES.map((r) => join(WEB_ROOT, 'app', ...r.to.split('/').filter(Boolean))),
     join(WEB_ROOT, 'app', 'sites'),
+    // CC-31: the agency's client matrix and client page.
+    join(WEB_ROOT, 'app', 'agency'),
   ];
   const inV2PageDir = (file: string) => V2_PAGE_DIRS.some((d) => file.startsWith(d + '/'));
   const allowed = (file: string) =>
@@ -218,6 +220,8 @@ describe('v2 stays out of live pages', () => {
   it('each page in the signed-in v2 page folders is a 404 with its flag off', () => {
     const pages = sources.filter((f) => inV2PageDir(f) && PAGE.test(f));
     expect(pages.map((f) => relative(WEB_ROOT, f)).sort()).toEqual([
+      'app/agency/clients/[siteId]/page.tsx',
+      'app/agency/page.tsx',
       'app/dashboard/v2/page.tsx',
       'app/sites/[id]/page.tsx',
       'app/v2-home/page.tsx',
