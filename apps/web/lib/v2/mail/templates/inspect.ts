@@ -10,6 +10,10 @@
  * `&#x68;`, and the named ones in `NAMED`) decoded. Text, comments and `<!…>` / `<?…>` are skipped,
  * so an escaped `&lt;a href=…&gt;` is text, not a link. inspect.test.ts varies each of these.
  *
+ * Not read: CSS. A `url(…)` inside a `style` attribute or a `<style>` element is not a target this
+ * finds. No template writes an outside string into CSS (layout.ts's one `<style>` is a constant), and
+ * outside-strings.test.ts renders every outside field and requires no foreign link either way.
+ *
  * Test support, imported by tests: `grep -rln "inspect'" apps/web --include='*.ts*' | grep -v '\.test\.'`
  * lists this file alone.
  */
