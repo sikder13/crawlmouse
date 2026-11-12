@@ -375,6 +375,20 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       "its rollback restores ''.",
     allowedIn: [],
   },
+  {
+    text: 'it has no required reviewer, because',
+    withdrawnIn: 'docs/ops/db-migrations.md §7, CC-COST (owner ruling Q3)',
+    truth:
+      'production has a required reviewer, the owner, enforced while the repository is public ' +
+      '(run 43067443133); a private repository on GitHub Pro does not enforce it.',
+    allowedIn: [],
+  },
+  {
+    text: 'there is no second click',
+    withdrawnIn: 'docs/ops/db-migrations.md §1 step 5, CC-COST (owner ruling Q3)',
+    truth: 'While the repository is public, apply waits for the owner to approve production.',
+    allowedIn: [],
+  },
 ];
 
 /**

@@ -1,7 +1,17 @@
 import { readFileSync } from 'node:fs';
+import { busyPerSlice, quantile } from '../../packages/timing/src/busy';
 import { recordSample } from '../../packages/timing/src/samples';
 import { fmt, median } from '../../packages/timing/src/stats';
-import { BUDGET, EXPLORER, RUNS, WINDOW_MS } from './budgets';
+import {
+  ADVISORY,
+  BUDGET,
+  EXPLORER,
+  MAP_WRITES_PER_FRAME,
+  MEAN_WORK_ADVISORY,
+  MEAN_WORK_MS,
+  RUNS,
+  WINDOW_MS,
+} from './budgets';
 import { test, expect, type Browser, type Page, type TestInfo } from './pw';
 
 /**
@@ -41,11 +51,22 @@ import { test, expect, type Browser, type Page, type TestInfo } from './pw';
  *   page only before the first report).
  * - Layout shift within a window: at most 0.001, zero within rounding. The whole replay, end
  *   included, is measured by motion.spec.ts ("layout shift over a whole replay").
- * - Frames: the 95th percentile interval at most 17.5 ms (fewer than 5% of intervals miss a vsync
- *   at 60 Hz; `missedShare` is the margin), at most 1% of intervals over 34 ms, and none over 100
- *   ms, a stall a reader sees. These two were advisory while the spec ran on React's development
- *   build, where the crawl window crossed them with no regression (runs 40933573326 and
- *   40933566313 at 00fae50); on the production build they fail again.
+ * - Twice the map's work: the gate is a count, "the crawl map, counted" below, which no machine
+ *   changes. The milliseconds here are the coarse layer beside it.
+ * - Work per frame, in milliseconds: the main thread's busy time in each 16.7 ms slice of the
+ *   traced window (one 60 Hz frame; packages/timing/src/busy.ts). Its 95th percentile, the bursts,
+ *   is at most BUDGET.p95WorkMs. Its mean, divided by the runner probe's ratio to its reference
+ *   (`meanWorkRefMs`), is held against the window's MEAN_WORK_MS, advisory while MEAN_WORK_ADVISORY
+ *   is set: across five CI runs it spread by more than 15% with the crawl screen's code unchanged
+ *   (docs/specs/v2/ci-cost.md, D3). The slices are fixed in time, so the reading is what the page
+ *   did, whatever refresh rate the runner manages. Work off the main thread (the map's layouts in
+ *   their Worker, raster) is not in it. Until CC-COST the budget was the 95th percentile interval
+ *   between frames, at most 17.5 ms: a runner that dropped to 30 fps read 33.3 ms in all five runs
+ *   with nothing in the page changed, and failed (the run of b23d4ca6), so the budget measured the
+ *   machine.
+ * - Frames: none over 100 ms, a stall a reader sees, at any refresh rate. The 95th percentile
+ *   interval and the share over 34 ms are printed and recorded for the nightly trend, not judged:
+ *   both move with the refresh rate.
  * - Median of five: a window is measured five times and each budget is judged on the median of its
  *   five readings, the rule docs/ops/ci-timing.md sets for every timing check. Each run's numbers
  *   and the medians are printed, and with PERF_SAMPLES_DIR set the samples are written there for
@@ -96,6 +117,37 @@ const WINDOWS = [
  */
 const INVALID = 'MEASUREMENT INVALID';
 
+/**
+ * The fewest frames a second an untraced pass must draw to count as having measured anything: a
+ * runner at 30 fps measures as well as one at 60. (It was 50 until CC-COST, which a runner that
+ * dropped to 30 fps failed as invalid with the page unchanged.)
+ */
+const MIN_FPS = 20;
+
+/**
+ * The runner probe's reading (packages/timing/src/probe.ts), from the file PERF_PROBE names: CI and
+ * the nightly write it before this spec runs. Locally:
+ * `pnpm --silent --filter @crawlmouse/timing exec tsx src/probe-cli.ts > /tmp/probe.json` and
+ * `PERF_PROBE=/tmp/probe.json`. Without it the crawl windows' runs are invalid, not passed.
+ */
+const PROBE: { medianMs: number; referenceMs: number } | null = (() => {
+  const path = process.env.PERF_PROBE;
+  if (!path) return null;
+  let p: { medianMs?: unknown; referenceMs?: unknown };
+  try {
+    p = JSON.parse(readFileSync(path, 'utf8')) as typeof p;
+  } catch {
+    // A file that is missing or not JSON is no reading: the runs are invalid, and say why.
+    return null;
+  }
+  return typeof p.medianMs === 'number' &&
+    p.medianMs > 0 &&
+    typeof p.referenceMs === 'number' &&
+    p.referenceMs > 0
+    ? { medianMs: p.medianMs, referenceMs: p.referenceMs }
+    : null;
+})();
+
 /** What the trace records: `toplevel` holds `RunTask`, `loading` holds `LayoutShift`. */
 const CATEGORIES = [
   'devtools.timeline',
@@ -127,6 +179,7 @@ interface TraceEvent {
   ph: string;
   pid: number;
   tid: number;
+  ts?: number;
   dur?: number;
   args?: { name?: string; data?: { score?: number; had_recent_input?: boolean } };
 }
@@ -147,8 +200,20 @@ function fromTrace(path: string) {
   const shift = events
     .filter((e) => e.name === 'LayoutShift' && !e.args?.data?.had_recent_input)
     .reduce((sum, e) => sum + (e.args?.data?.score ?? 0), 0);
+  const run = events.filter((e) => e.name === 'RunTask' && e.ph === 'X' && onMain(e));
   const tasks = events.filter((e) => e.name === 'RunTask' && onMain(e)).length;
-  return { long, shift, tasks, mainThreads: mains.size };
+  // The window is the span the main thread's tasks cover.
+  // (A reduce, not Math.min(...): a trace holds tens of thousands of tasks.)
+  const from = run.reduce((m, e) => Math.min(m, e.ts ?? Infinity), Infinity);
+  const to = run.reduce((m, e) => Math.max(m, (e.ts ?? 0) + (e.dur ?? 0)), -Infinity);
+  const busy = run.length
+    ? busyPerSlice(
+        run.map((e) => ({ ts: e.ts ?? 0, dur: e.dur ?? 0 })),
+        from,
+        to,
+      )
+    : [];
+  return { long, shift, tasks, mainThreads: mains.size, busy };
 }
 
 test.describe('crawl screen performance', () => {
@@ -177,7 +242,7 @@ test.describe('crawl screen performance', () => {
     await browser.stopTracing();
     await context.close();
     const trace = fromTrace(tracePath);
-    console.log(`[perf] control: ${JSON.stringify(trace)}`);
+    console.log(`[perf] control: ${JSON.stringify({ ...trace, busy: undefined })}`);
     expect(trace.long.length).toBeGreaterThanOrEqual(1);
     expect(trace.long.some((ms) => ms > BUDGET.stallMs)).toBe(true);
     expect(trace.shift).toBeGreaterThan(BUDGET.layoutShift);
@@ -206,9 +271,16 @@ test.describe('crawl screen performance', () => {
           { metric: 'longestTaskMs', unit: 'ms', limit: BUDGET.stallMs },
           { metric: 'longTasks', unit: 'tasks', limit: w.longTasks },
           { metric: 'layoutShift', unit: 'score', limit: BUDGET.layoutShift },
-          { metric: 'p95FrameMs', unit: 'ms', limit: BUDGET.p95FrameMs },
-          { metric: 'slowShare', unit: 'share', limit: BUDGET.slowShare },
+          {
+            metric: 'meanWorkRefMs',
+            unit: 'ms',
+            limit: meanWorkLimit(w.name),
+            advisory: MEAN_WORK_ADVISORY,
+          },
+          { metric: 'p95WorkMs', unit: 'ms', limit: BUDGET.p95WorkMs },
           { metric: 'maxFrameMs', unit: 'ms', limit: BUDGET.maxFrameMs },
+          { metric: 'p95FrameMs', unit: 'ms', limit: ADVISORY.p95FrameMs, advisory: true },
+          { metric: 'slowShare', unit: 'share', limit: ADVISORY.slowShare, advisory: true },
         ],
       );
       expect(
@@ -256,11 +328,115 @@ test.describe('crawl screen performance', () => {
   });
 });
 
-/** A budget judged on the median of a metric across the runs: at most `limit`. */
+/**
+ * The crawl map's work, counted: the gate for "the map does twice the work per frame"
+ * (docs/specs/v2/ci-cost.md, D3). Milliseconds move with the machine; this count does not.
+ *
+ * The window is replayed on Playwright's fake clock, stepped one frame at a time, with the layout
+ * Worker switched off so each layout runs on the main thread at a fixed point in replay time (a
+ * real Worker's result lands whenever its thread finishes, which no clock controls). What is
+ * counted is every DOM change inside a map (`svg[data-v2-map]`: attributes, nodes added or removed,
+ * text) and every animation started on a map element, divided by the window's length in 60 Hz
+ * frames. A second map doubles it exactly. Stepping at 30 fps replays the same events in half as
+ * many frames, and must write no more than at 60 fps. The same window counted twice must read the
+ * same number, or the run measured nothing.
+ */
+async function countMapWrites(browser: Browser, w: (typeof WINDOWS)[number], frameMs: number) {
+  const context = await browser.newContext({ viewport: { width: w.width, height: w.height } });
+  await context.addInitScript(() => {
+    Object.defineProperty(window, 'Worker', { value: undefined, configurable: true });
+  });
+  const page = await context.newPage();
+  // Paused from the start: only the steps below move time, never the page's load or a round trip.
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
+  await page.goto(`/v2-preview/screens/crawl?at=${w.at}&play`, { waitUntil: 'load' });
+  await expect(page.locator('[data-v2-replay]')).toHaveAttribute('data-v2-replay', 'playing');
+  await page.evaluate(() => {
+    const inMap = (n: Node | null) =>
+      (n instanceof Element ? n : (n?.parentElement ?? null))?.closest('svg[data-v2-map]') != null;
+    const counts = { mutations: 0, animations: 0 };
+    (window as unknown as { __mapWrites: typeof counts }).__mapWrites = counts;
+    new MutationObserver((records) => {
+      for (const r of records) if (inMap(r.target)) counts.mutations++;
+    }).observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (this: Element, ...args: Parameters<Element['animate']>) {
+      if (inMap(this)) counts.animations++;
+      return animate.apply(this, args);
+    };
+  });
+  // A whole number of frames, each ending on a whole millisecond, so a pass at either rate ends at
+  // exactly WINDOW_MS (summing 1000 / 60 seven hundred and twenty times does not).
+  const steps = Math.round(WINDOW_MS / frameMs);
+  for (let i = 1; i <= steps; i++) {
+    await page.clock.runFor(Math.round(i * frameMs) - Math.round((i - 1) * frameMs));
+  }
+  // MutationObserver delivers in a microtask; a round trip after the last step flushes it.
+  const counts = await page.evaluate(
+    () =>
+      (window as unknown as { __mapWrites: { mutations: number; animations: number } }).__mapWrites,
+  );
+  await context.close();
+  const writes = counts.mutations + counts.animations;
+  return {
+    ...counts,
+    writes,
+    steps,
+    perFrame: Number((writes / (WINDOW_MS / (1000 / 60))).toFixed(3)),
+  };
+}
+
+test.describe('the crawl map, counted', () => {
+  test.describe.configure({ timeout: 240_000 });
+  const crawl = WINDOWS[0]!;
+
+  test(`${crawl.name}: map writes per frame within MAP_WRITES_PER_FRAME, at 60 and 30 fps`, async ({
+    browser,
+  }) => {
+    const first = await countMapWrites(browser, crawl, 1000 / 60);
+    const again = await countMapWrites(browser, crawl, 1000 / 60);
+    const slow = await countMapWrites(browser, crawl, 1000 / 30);
+    console.log(`[perf] ${crawl.name}, map writes: ${JSON.stringify({ first, again, slow })}`);
+    recordSample(process.env.PERF_SAMPLES_DIR, {
+      metric: `${crawl.name}: mapWritesPerFrame`,
+      unit: 'writes',
+      median: first.perFrame,
+      limit: MAP_WRITES_PER_FRAME,
+      pass: first.perFrame <= MAP_WRITES_PER_FRAME && slow.writes <= first.writes,
+      samples: [first.perFrame, again.perFrame, slow.perFrame],
+    });
+    expect(first.writes, `${INVALID}: the window wrote nothing to the map`).toBeGreaterThan(0);
+    expect(again, `${INVALID}: the same window counted twice read two numbers`).toEqual(first);
+    expect(first.perFrame, 'map writes per frame, at 60 fps').toBeLessThanOrEqual(
+      MAP_WRITES_PER_FRAME,
+    );
+    // The same events in half as many frames: React may batch two into one commit, never split one.
+    expect(slow.writes, 'map writes at 30 fps, against 60 fps').toBeLessThanOrEqual(first.writes);
+  });
+});
+
+/** The window's mean-work limit; a window without one is a mistake in budgets.ts, not a pass. */
+function meanWorkLimit(name: string): number {
+  if (!Object.hasOwn(MEAN_WORK_MS, name))
+    throw new Error(`budgets.ts has no MEAN_WORK_MS for ${name}`);
+  return MEAN_WORK_MS[name]!;
+}
+
+/**
+ * A budget judged on the median of a metric across the runs: at most `limit`. An advisory one is
+ * printed and recorded with its limit, and never fails the test.
+ */
 interface Budgeted {
   metric: string;
   unit: string;
   limit: number;
+  advisory?: boolean;
 }
 
 /**
@@ -281,9 +457,10 @@ function judge(name: string, rows: Record<string, unknown>[], budgets: Budgeted[
       median: mid,
       limit: b.limit,
       pass,
+      ...(b.advisory ? { advisory: true } : {}),
       samples,
     });
-    if (!pass) {
+    if (!pass && !b.advisory) {
       missed.push(
         `${b.metric}: median ${fmt(mid)} > ${fmt(b.limit)} (runs ${samples.map(fmt).join(', ')})`,
       );
@@ -371,7 +548,9 @@ async function measureExplorer(browser: Browser, testInfo: TestInfo, run: number
       ? null
       : `run ${run + 1}: the selection moved ${measured.moved.join(' and ')} steps, not ${EXPLORER.minSteps}`,
     trace.tasks > 0 ? null : `run ${run + 1}: the trace holds no main-thread task`,
-    measured.frames > EXPLORER.ms / 20 ? null : `run ${run + 1}: only ${measured.frames} frames`,
+    measured.frames > (EXPLORER.ms / 1000) * MIN_FPS
+      ? null
+      : `run ${run + 1}: only ${measured.frames} frames`,
   ].filter((x): x is string => x !== null);
   return { measured, broken };
 }
@@ -425,6 +604,22 @@ async function measure(
 
   const measured = {
     tasks: trace.tasks,
+    workMs: Math.round(trace.busy.reduce((a, b) => a + b, 0)),
+    meanWorkMs: trace.busy.length
+      ? Number((trace.busy.reduce((a, b) => a + b, 0) / trace.busy.length).toFixed(3))
+      : 0,
+    // The mean in a reference runner's milliseconds: divided by the runner probe's ratio to its
+    // reference, so a slower machine reads the same page as the same work. No probe, no reading.
+    meanWorkRefMs:
+      trace.busy.length && PROBE
+        ? Number(
+            (
+              (trace.busy.reduce((a, b) => a + b, 0) / trace.busy.length) *
+              (PROBE.referenceMs / PROBE.medianMs)
+            ).toFixed(3),
+          )
+        : 0,
+    p95WorkMs: trace.busy.length ? Number(quantile(trace.busy, 0.95).toFixed(2)) : 0,
     longTasks: trace.long.length,
     longTasksMs: trace.long,
     longestTaskMs: Math.max(0, ...trace.long),
@@ -434,18 +629,23 @@ async function measure(
     // Intervals fall on the display's 16.7 ms grid, so the 95th percentile reads about 16.8 or
     // 33.3; this share is the margin behind it.
     missedShare: Number(
-      (gaps.filter((g) => g > BUDGET.p95FrameMs).length / gaps.length).toFixed(4),
+      (gaps.filter((g) => g > ADVISORY.p95FrameMs).length / gaps.length).toFixed(4),
     ),
-    slowFrames: gaps.filter((g) => g > BUDGET.slowFrameMs).length,
-    // Unrounded: the budget is a share of the intervals, and rounding would move its edge.
-    slowShare: gaps.filter((g) => g > BUDGET.slowFrameMs).length / gaps.length,
+    slowFrames: gaps.filter((g) => g > ADVISORY.slowFrameMs).length,
+    slowShare: gaps.filter((g) => g > ADVISORY.slowFrameMs).length / gaps.length,
     maxFrameMs: Number((gaps.at(-1) ?? 0).toFixed(2)),
   };
   // What says this run measured anything; it must hold on every run.
   const broken = [
-    trace.mainThreads > 0 ? null : `run ${run + 1}: the trace holds no main thread`,
+    // The busy time sums every renderer main thread into one set of slices: two would count twice.
+    trace.mainThreads === 1
+      ? null
+      : `run ${run + 1}: the trace holds ${trace.mainThreads} renderer main threads, not 1`,
     trace.tasks > 0 ? null : `run ${run + 1}: the trace holds no main-thread task`,
-    measured.frames > WINDOW_MS / 20 ? null : `run ${run + 1}: only ${measured.frames} frames`,
+    PROBE ? null : `run ${run + 1}: no runner probe reading (PERF_PROBE)`,
+    measured.frames > (WINDOW_MS / 1000) * MIN_FPS
+      ? null
+      : `run ${run + 1}: only ${measured.frames} frames`,
   ].filter((x): x is string => x !== null);
   return { measured, broken, before, after };
 }

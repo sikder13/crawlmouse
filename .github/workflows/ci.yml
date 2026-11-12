@@ -1,19 +1,43 @@
 name: CI
 
-# Pushes only: a pull request's checks are the ones its head commit's push ran. protect-main requires
-# the branch to be up to date with main before merging, so the tested head carries main's tree.
+# Every push runs the cheap jobs. The visual set (the six visual shards, security-browser and
+# zap-baseline) runs when a branch is up for merge: on main, when the branch has an open pull
+# request, when a pull request is opened, reopened or marked ready (the `pull_request` trigger, those
+# three types only), or when the workflow is dispatched by hand with `visual: true`. On any other push
+# the `changes` job defers it and the `visual` job takes another name, so the required check `visual`
+# is never reported for that commit. docs/specs/v2/ci-cost.md has the rules and their costs.
+#
+# A pull request event runs every job, not only the visual set: a job skipped by a condition reports
+# success, and a skipped twin of a required check on the head commit could stand in for one that
+# failed. It tests the pull request's merge commit, as GitHub checks it out; its checks attach to the
+# head commit. A pull request can merge only up to date with main, where the two trees are the same.
+#
+# The nightly run on main runs everything, the visual set included; a failure is red here, and
+# GitHub emails the user who last edited the schedule.
 on:
   push:
     branches: ['**']
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      visual:
+        description: Run the visual set (the shards, security-browser, ZAP) as if a pull request were open
+        type: boolean
+        default: false
+  schedule:
+    - cron: '0 3 * * *' # 03:00 UTC
 
 permissions:
   contents: read
 
-# A newer push to a branch cancels its older run. On main each commit gets its own group, so no main
-# run is cancelled or replaced: GitHub also drops a PENDING run when a newer one joins its group, and the
-# Prettier job on main checks only what that push added.
+# A newer run of a branch cancels its older run, and a pull request event its older run (its ref is
+# refs/pull/<n>/merge, so it never cancels a push run). On main each run has its own group, so no main run
+# is cancelled or replaced, not even by a dispatch or the nightly run of the same commit: GitHub also
+# drops a PENDING run when a newer one joins its group, and the Prettier job on main checks only what
+# that push added.
 concurrency:
-  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 env:
@@ -21,33 +45,65 @@ env:
   TURBO_TELEMETRY_DISABLED: '1'
 
 jobs:
-  # Whether the visual shards, security-browser and zap-baseline run: they do unless every file the
-  # branch changed is on the reviewed skip list in .github/workflows/scripts/changes.mjs. On main they
-  # always run. On a branch the whole branch is compared with its merge-base on main, not the last
-  # push: the required `visual` check attaches to the head commit, so a docs-only commit on top of a
-  # rendering change still runs the visuals. The runner's own node runs the script; nothing is
-  # installed.
+  # Whether the visual set runs. `gate` is `open` when the commit is up for merge (main, a pull
+  # request event, an open pull request for the branch, or a dispatch with `visual: true`) and
+  # `deferred` otherwise. GitHub's
+  # answer to "is a pull request open" is the one input from outside the repository; when it cannot
+  # be had, the gate opens, as the run would have before this rule. Inside an open gate the path
+  # filter decides: the visual set runs unless every file the branch changed is on the reviewed skip
+  # list in .github/workflows/scripts/changes.mjs. On main it always runs. On a branch the whole
+  # branch is compared with its merge-base on main, not the last push: the required `visual` check
+  # attaches to the head commit, so a docs-only commit on top of a rendering change still runs the
+  # visuals. The runner's own node and gh run the step; nothing is installed.
   changes:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
+      gate: ${{ steps.decide.outputs.gate }}
       visual: ${{ steps.decide.outputs.visual }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Did anything that can affect rendering change
+      - name: Is the commit up for merge, and can anything that affects rendering have changed
         id: decide
         env:
           REF: ${{ github.ref }}
+          EVENT: ${{ github.event_name }}
+          DISPATCH_VISUAL: ${{ inputs.visual }}
+          BRANCH: ${{ github.ref_name }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [ "$REF" = "refs/heads/main" ]; then
             echo "main: everything runs"
+            echo "gate=open" >> "$GITHUB_OUTPUT"
             echo "visual=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          if [ "$EVENT" = pull_request ]; then
+            echo "a pull request was opened, reopened or marked ready"
+          elif [ "$EVENT" = workflow_dispatch ] && [ "$DISPATCH_VISUAL" = true ]; then
+            echo "dispatched with visual: true"
+          elif ! open="$(gh api -X GET "repos/$REPO/pulls" -f state=open -f head="$OWNER:$BRANCH" --jq length)"; then
+            echo "::warning::could not ask GitHub for open pull requests, so the gate is open"
+          elif ! [[ "$open" =~ ^[0-9]+$ ]]; then
+            echo "::warning::GitHub answered '${open}' for open pull requests, so the gate is open"
+          elif [ "$open" -eq 0 ]; then
+            echo "no open pull request for ${BRANCH}: the visual set waits for one"
+            echo "gate=deferred" >> "$GITHUB_OUTPUT"
+            echo "visual=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          else
+            echo "${open} open pull request(s) for ${BRANCH}"
+          fi
+          echo "gate=open" >> "$GITHUB_OUTPUT"
           if ! base="$(git merge-base origin/main HEAD)"; then
             echo "::warning::no merge-base with origin/main, so everything runs"
             echo "visual=true" >> "$GITHUB_OUTPUT"
@@ -118,13 +174,52 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [engine, web, inngest, types, scripts, worker, timing]
+        package: [engine, inngest, types, scripts, worker, timing]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - run: pnpm --filter @crawlmouse/${{ matrix.package }} test
+
+  # The web suite in three vitest shards: as one job it took 13.5 minutes (run 43056751031) and was
+  # cancelled at its 15-minute limit (run 43073710281). The required check `test (web)` is the job
+  # below, so the ruleset is unchanged.
+  test-web-shard:
+    name: test (web, shard ${{ matrix.shard }}/3)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @crawlmouse/web exec vitest run --shard=${{ matrix.shard }}/3
+
+  # `test (web)` passes only when every shard passed; a shard that failed, was cancelled or was
+  # skipped fails it.
+  test-web:
+    name: test (web)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: test-web-shard
+    if: ${{ always() }}
+    permissions: {}
+    steps:
+      - name: Every shard of the web suite passed
+        env:
+          SHARDS: ${{ needs.test-web-shard.result }}
+        run: |
+          if [ "$SHARDS" = success ]; then
+            echo "every shard passed"
+            exit 0
+          fi
+          echo "::error::test-web-shard is '${SHARDS}'"
+          exit 1
 
   test-templates:
     runs-on: ubuntu-24.04
@@ -292,12 +387,14 @@ jobs:
   # security-severity 7.0 or more (high or critical) fails the job unless the reviewed baseline
   # (.github/workflows/scripts/codeql-baseline.json, by fingerprint, expiring 2026-12-08) lists it; read
   # from the SARIF by .github/workflows/scripts/sarif-gate.mjs, which also fails a scan that extracted
-  # no file. Results upload to code scanning from every run (CI runs on pushes only).
+  # no file. Results upload to code scanning from every run that scans.
   #
   # Code scanning is not available on a private repository without GitHub Advanced Security, so the
   # job runs only while the repository is public; once it is private the job is skipped, not failed.
+  # The nightly run skips it too: main's push runs scanned the same commits, and the visibility is
+  # read from the event's `repository`, which the schedule event is not relied on to carry.
   codeql:
-    if: ${{ !github.event.repository.private }}
+    if: ${{ github.event_name != 'schedule' && !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -467,6 +564,7 @@ jobs:
           set -a
           . ./.env.ci
           set +a
+          export PERF_PROBE="$RUNNER_TEMP/probe.json"
           ../../packages/timing/scripts/perf-retry.sh "$RUNNER_TEMP/probe.json" -- \
             pnpm exec playwright test -c ../../tests/visual/playwright.config.ts perf.spec.ts --workers=1
       - name: Production checks, on next start
@@ -526,9 +624,14 @@ jobs:
 
   # The check named `visual`, as before the shards, for branch protection and for a reader of the
   # PR. It passes when every shard passed, or when the shards were skipped because the `changes` job
-  # passed and found nothing that can affect rendering. Everything else fails: a shard that failed or
-  # was cancelled, and shards skipped because `changes` itself failed or was cancelled.
+  # passed and set visual=false. Everything else fails: a shard that failed or was cancelled, and
+  # shards skipped because `changes` itself failed or was cancelled.
+  #
+  # When the gate deferred the visual set the job is renamed, so a push with no open pull request
+  # reports no check named `visual` and the ruleset's requirement stays unmet. Only an explicit
+  # `deferred` renames it: a failed `changes` leaves the name `visual`, and the rule fails it.
   visual:
+    name: "${{ needs.changes.outputs.gate == 'deferred' && 'visual (deferred: no open pull request)' || 'visual' }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs: [changes, visual-shard]
@@ -540,14 +643,19 @@ jobs:
           SHARDS: ${{ needs.visual-shard.result }}
           CHANGES: ${{ needs.changes.result }}
           VISUAL: ${{ needs.changes.outputs.visual }}
+          GATE: ${{ needs.changes.outputs.gate }}
         run: |
           set -euo pipefail
-          echo "changes: $CHANGES (visual=${VISUAL}); visual-shard: $SHARDS"
+          echo "changes: $CHANGES (gate=${GATE}, visual=${VISUAL}); visual-shard: $SHARDS"
           if [ "$SHARDS" = success ]; then
             exit 0
           fi
           if [ "$SHARDS" = skipped ] && [ "$CHANGES" = success ] && [ "$VISUAL" = false ]; then
-            echo "nothing that can affect rendering changed, so the shards were skipped"
+            if [ "$GATE" = deferred ]; then
+              echo "no open pull request, so the shards wait for one; this check is not the required one"
+            else
+              echo "nothing that can affect rendering changed, so the shards were skipped"
+            fi
             exit 0
           fi
           if [ "$CHANGES" != success ]; then
@@ -627,10 +735,15 @@ jobs:
         env:
           PUSH_BEFORE: ${{ github.event.before }}
           REF: ${{ github.ref }}
+          EVENT: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          if [ "$REF" = "refs/heads/main" ]; then
+          # On main a push compares with what main was before it; a dispatched or nightly run has no
+          # `before`, so it compares with the first parent.
+          if [ "$REF" = "refs/heads/main" ] && [ "$EVENT" = push ]; then
             base="$PUSH_BEFORE"
+          elif [ "$REF" = "refs/heads/main" ]; then
+            base="$(git rev-parse HEAD^)"
           else
             base="$(git merge-base origin/main HEAD)"
           fi

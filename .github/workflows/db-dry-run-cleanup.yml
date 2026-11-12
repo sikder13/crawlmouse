@@ -16,6 +16,11 @@ on:
 permissions:
   contents: read
 
+# Queued, never cancelled: a clean-up cancelled midway leaves the branch it was deleting.
+concurrency:
+  group: db-dry-run-cleanup-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
   delete-branch:
     # As in db-dry-run.yml: Renovate's pull requests never get a branch, and never get the token.

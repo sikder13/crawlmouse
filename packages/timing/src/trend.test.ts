@@ -42,6 +42,9 @@ describe('trendLines', () => {
 
   it('marks a breach by the verdict the recorder wrote, not by comparing again', () => {
     expect(trendLines([{ ...s('a', 100), pass: true }], [])[0]).not.toContain('OVER');
+    expect(trendLines([{ ...s('a', 120), pass: false, advisory: true }], [])[0]).toBe(
+      '- a: 120 ms (limit 100, over, advisory) · no earlier nightly to compare',
+    );
     expect(trendLines([s('a', 120)], [])[0]).toBe(
       '- a: 120 ms (limit 100, OVER) · no earlier nightly to compare',
     );
