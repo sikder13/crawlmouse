@@ -86,6 +86,8 @@ export interface Delivery {
 
 export interface AlertStore {
   context(checkId: string): Promise<AlertContext | null>;
+  /** Adds the account's default rules it does not hold yet (Q13, `seed_default_alert_rules`). */
+  seedDefaultRules(accountId: string): Promise<void>;
   data(ctx: AlertContext & { accountId: string }): Promise<AlertData>;
   emailRecipients(accountId: string): Promise<{ seatId: string; email: string }[]>;
   slackUrl(accountId: string, now: Date): Promise<string | null>;
@@ -160,6 +162,8 @@ async function load(deps: AlertDeps, checkId: string): Promise<Loaded> {
   if (ctx.accountMarked) return { skip: 'marked' as const };
   if (ctx.firstCheck) return { skip: 'first_check' as const };
   const kept = ctx as Kept;
+  // A kept account's rules exist before they are read, so its first alert has rules to fire (Q13).
+  await deps.store.seedDefaultRules(kept.accountId);
   const data = await deps.store.data(kept);
   const fired = evaluateAlerts({
     siteId: kept.siteId,

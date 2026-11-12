@@ -139,6 +139,7 @@ function harness(
   const captures: unknown[] = [];
   const posts: { url: string; text: string }[] = [];
   const slackRows = new Map<string, string>();
+  const reads: string[] = [];
   const ledger = memoryLedger();
   const transport: MailTransport = o.transport ?? {
     async send(m) {
@@ -149,7 +150,13 @@ function harness(
   const deps: AlertDeps = {
     store: {
       context: async () => (o.ctx === undefined ? context() : o.ctx),
-      data: async () => o.data ?? data(),
+      seedDefaultRules: async (accountId) => {
+        reads.push(`seed:${accountId}`);
+      },
+      data: async () => {
+        reads.push('data');
+        return o.data ?? data();
+      },
       emailRecipients: async () =>
         o.recipients ?? [
           { seatId: SEAT_1, email: ADDRESSES[0]! },
@@ -190,7 +197,7 @@ function harness(
     log: (event, fields) => logs.push({ event, fields }),
     now: () => NOW,
   };
-  return { deps, sent, records, logs, captures, posts, slackRows, ledger };
+  return { deps, sent, records, logs, captures, posts, slackRows, ledger, reads };
 }
 
 /** Everything the work let out, but the transport's own message and the Slack POST. */
@@ -216,6 +223,12 @@ describe('what alerts nothing', () => {
   it('a check whose changes fire no rule', async () => {
     const h = harness({ data: data({ changes: [] }) });
     expect(await planAlert(h.deps, CHECK)).toEqual({ skip: 'nothing_fired' });
+  });
+
+  it('seeds the account’s default rules before it reads them (Q13)', async () => {
+    const h = harness();
+    await planAlert(h.deps, CHECK);
+    expect(h.reads.slice(0, 2)).toEqual([`seed:${ACCOUNT}`, 'data']);
   });
 
   it('plans the channels the firing rules name', async () => {

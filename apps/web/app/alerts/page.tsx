@@ -6,6 +6,7 @@ import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { AlertsScreen } from '@/components/v2/screens/alerts/AlertsScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { seedDefaultAlertRules } from '@/lib/v2/monitor/alert-defaults';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAlertRulePorts } from '@/lib/v2/account/alert-rules';
 import { readAccount } from '@/lib/v2/account/pages';
@@ -44,6 +45,8 @@ export default async function AlertsPage({
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
   const { account, seat } = r.viewer;
+  // The account's default rules exist before the page reads them (Q13).
+  await seedDefaultAlertRules(supabaseAdmin(), account.id);
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
   const last4 = await supabaseAlertRulePorts(supabaseAdmin()).slackLast4(account.id);
   return (

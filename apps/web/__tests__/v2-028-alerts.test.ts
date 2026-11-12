@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { applyAllMigrations, asRole, freshDb } from './helpers/pglite-migrations';
+import { applyAllMigrations, asRole, freshDb, readMigration } from './helpers/pglite-migrations';
 import {
   ROWS,
   SHA,
@@ -63,7 +63,16 @@ async function change(siteId: string, checkId: string, subject = 'crawler_access
   return id;
 }
 
+/** A rule of the account: the seeded default of that kind (Q13), or a new site override. */
 async function rule(accountId: string, siteId: string | null, kind = 'crawler_blocked') {
+  if (siteId === null) {
+    await svc(`select public.seed_default_alert_rules($1)`, [accountId]);
+    const { rows } = await db.query<{ id: string }>(
+      `select id from public.alert_rules where account_id = $1 and site_id is null and kind = $2`,
+      [accountId, kind],
+    );
+    return rows[0]!.id;
+  }
   const id = randomUUID();
   await insertRow(db, 'alert_rules', ROWS.alert_rules(id, accountId, siteId, kind));
   return id;
@@ -482,5 +491,117 @@ describe('the erasure (D9)', () => {
     await expect(
       svc(`select public.erase_mail_records($1, false)`, [['someone@example.com']]),
     ).rejects.toThrow(/64 hex/);
+  });
+});
+
+describe('the default alert rules (questions Q13)', () => {
+  const rulesOf = async (accountId: string) =>
+    (
+      await db.query<{
+        kind: string;
+        enabled: boolean;
+        threshold_points: number | null;
+        channels: string[];
+        site_id: string | null;
+      }>(
+        `select kind, enabled, threshold_points, channels, site_id from public.alert_rules
+          where account_id = $1 order by kind`,
+        [accountId],
+      )
+    ).rows;
+  const DEFAULTS = [
+    {
+      kind: 'any_change',
+      enabled: false,
+      threshold_points: null,
+      channels: ['email'],
+      site_id: null,
+    },
+    {
+      kind: 'crawler_blocked',
+      enabled: true,
+      threshold_points: null,
+      channels: ['email'],
+      site_id: null,
+    },
+    {
+      kind: 'fix_regressed',
+      enabled: true,
+      threshold_points: null,
+      channels: ['email'],
+      site_id: null,
+    },
+    {
+      kind: 'grade_letter_moved',
+      enabled: true,
+      threshold_points: null,
+      channels: ['email'],
+      site_id: null,
+    },
+    {
+      kind: 'new_orphans',
+      enabled: true,
+      threshold_points: null,
+      channels: ['email'],
+      site_id: null,
+    },
+    { kind: 'text_drop', enabled: true, threshold_points: 10, channels: ['email'], site_id: null },
+  ];
+
+  it('gives an account the six rules, by email, any_change off, on a Free account too', async () => {
+    const { accountId } = await account('free');
+    expect(await rulesOf(accountId)).toEqual([]);
+    await svc(`select public.seed_default_alert_rules($1)`, [accountId]);
+    await svc(`select public.seed_default_alert_rules($1)`, [accountId]);
+    expect(await rulesOf(accountId)).toEqual(DEFAULTS);
+  });
+
+  it('the migration’s backfill seeds an account that existed before it, and only one with no rules', async () => {
+    const own = await freshDb();
+    try {
+      await applyAllMigrations(own, undefined, (f) => f < '20261113000001_v2_028_monitoring.sql');
+      const none = await personalAccount(own, await signUp(own, `pre-${randomUUID()}@example.com`));
+      const some = await personalAccount(
+        own,
+        await signUp(own, `pre2-${randomUUID()}@example.com`),
+      );
+      await insertRow(
+        own,
+        'alert_rules',
+        ROWS.alert_rules(randomUUID(), some.accountId, null, 'new_orphans'),
+      );
+      await own.exec(readMigration('20261113000001_v2_028_monitoring.sql'));
+      const count = async (a: string) =>
+        (
+          await own.query<{ n: number }>(
+            `select count(*)::int n from public.alert_rules where account_id = $1`,
+            [a],
+          )
+        ).rows[0]!.n;
+      expect(await count(none.accountId)).toBe(6);
+      expect(await count(some.accountId)).toBe(1);
+    } finally {
+      await own.close();
+    }
+  }, 300_000);
+
+  it('leaves a rule the account already holds, and adds the missing kinds', async () => {
+    const { accountId } = await account();
+    await svc(`select public.seed_default_alert_rules($1)`, [accountId]);
+    await db.query(
+      `update public.alert_rules set enabled = false, channels = '{email,slack}' where account_id = $1 and kind = 'crawler_blocked'`,
+      [accountId],
+    );
+    await db.query(
+      `delete from public.alert_rules where account_id = $1 and kind = 'new_orphans'`,
+      [accountId],
+    );
+    await svc(`select public.seed_default_alert_rules($1)`, [accountId]);
+    const rows = await rulesOf(accountId);
+    expect(rows.find((r) => r.kind === 'crawler_blocked')).toMatchObject({
+      enabled: false,
+      channels: ['email', 'slack'],
+    });
+    expect(rows.map((r) => r.kind)).toEqual(DEFAULTS.map((d) => d.kind));
   });
 });

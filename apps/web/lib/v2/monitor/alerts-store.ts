@@ -3,6 +3,7 @@
  * tables; the recipients, the Slack URL at send time, the Slack ledger and the record go through the
  * section's functions. An error names the function or table and Postgres's code, never a value read.
  */
+import { seedDefaultAlertRules } from './alert-defaults';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Verdict } from '@crawlmouse/types/v2';
 import { z } from 'zod';
@@ -88,6 +89,7 @@ export function supabaseAlertStore(sb: SupabaseClient): AlertStore {
       return ctx;
     },
 
+    seedDefaultRules: (accountId) => seedDefaultAlertRules(sb, accountId),
     async data(ctx): Promise<AlertData> {
       const [changes, rules, checks] = await Promise.all([
         sb

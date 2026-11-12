@@ -507,8 +507,8 @@ grant execute on function public.release_scheduled_claim(uuid, timestamptz, json
 
 -- ═══ C: alerts, Slack and the weekly summary (D5, D6, D7) ═════════════════════════════════════════
 -- Granted to service_role: claim_slack_send, finish_slack_send, account_slack_webhook_url,
--- alert_email_recipients, summary_recipients, record_alert_delivery, due_summary_accounts,
--- unsubscribe_seat. Tests: apps/web/__tests__/v2-028-alerts.test.ts.
+-- seed_default_alert_rules, alert_email_recipients, summary_recipients, record_alert_delivery,
+-- due_summary_accounts, unsubscribe_seat. Tests: apps/web/__tests__/v2-028-alerts.test.ts.
 
 -- A seat's weekly summary switch (D6, D7); the unsubscribe link turns it off.
 alter table public.seats add column if not exists email_weekly_summary boolean not null default true;
@@ -792,7 +792,38 @@ begin
 end;
 $$;
 
+-- Every account starts with the alert rules the product describes (questions Q13): the five that tell
+-- you something broke, on, by email; "any change" off; the text drop at 10 points. Email only, because
+-- Slack needs a paid tier and a destination, and alert_rules_entitlement_check refuses it on Free. A
+-- rule the account already holds of a kind is left as it is (alert_rules_scope_kind_uq), so this can
+-- run again. Existing accounts get them from the backfill below; after that, alertFn seeds an
+-- account's rules before it reads them, and so does the Alerts page (apps/web/lib/v2/monitor/
+-- alerts-store.ts, apps/web/app/alerts/page.tsx). Not a trigger on accounts: a trigger would put rows
+-- under every account the signup path makes, before any product step asks for them.
+create or replace function public.seed_default_alert_rules(p_account uuid)
+returns void
+language sql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+  insert into public.alert_rules (account_id, site_id, kind, enabled, threshold_points, channels)
+  select p_account, null, d.kind, d.enabled, d.threshold, array['email']
+    from (values ('crawler_blocked', true, null::double precision),
+                 ('text_drop', true, 10::double precision),
+                 ('grade_letter_moved', true, null::double precision),
+                 ('new_orphans', true, null::double precision),
+                 ('fix_regressed', true, null::double precision),
+                 ('any_change', false, null::double precision)) d(kind, enabled, threshold)
+  on conflict do nothing;
+$$;
+
+select public.seed_default_alert_rules(a.id)
+  from public.accounts a
+ where not exists (select 1 from public.alert_rules r where r.account_id = a.id);
+
 revoke all on function public.claim_slack_send(text, uuid, timestamptz) from public, anon, authenticated;
+revoke all on function public.seed_default_alert_rules(uuid) from public, anon, authenticated;
 revoke all on function public.finish_slack_send(text, text, text, timestamptz) from public, anon, authenticated;
 revoke all on function public.account_slack_webhook_url(uuid, timestamptz) from public, anon, authenticated;
 revoke all on function public.alert_email_recipients(uuid) from public, anon, authenticated;
@@ -801,6 +832,7 @@ revoke all on function public.record_alert_delivery(jsonb) from public, anon, au
 revoke all on function public.due_summary_accounts(timestamptz) from public, anon, authenticated;
 revoke all on function public.unsubscribe_seat(uuid, text) from public, anon, authenticated;
 grant execute on function public.claim_slack_send(text, uuid, timestamptz) to service_role;
+grant execute on function public.seed_default_alert_rules(uuid) to service_role;
 grant execute on function public.finish_slack_send(text, text, text, timestamptz) to service_role;
 grant execute on function public.account_slack_webhook_url(uuid, timestamptz) to service_role;
 grant execute on function public.alert_email_recipients(uuid) to service_role;

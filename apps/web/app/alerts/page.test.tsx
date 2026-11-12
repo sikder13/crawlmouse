@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   dataset: null as unknown,
   read: [] as { accountId: string; seatId: string }[],
   slackLast4: null as string | null,
+  seeded: [] as string[],
 }));
 
 vi.mock('server-only', () => ({}));
@@ -23,10 +24,14 @@ vi.mock('@/lib/v2/account/viewer', () => ({
 vi.mock('@/lib/supabase/server', () => ({ supabaseServer: async () => ({}) }));
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
-    rpc: async (fn: string) =>
-      fn === 'account_slack_last4'
-        ? { data: h.slackLast4, error: null }
-        : { data: null, error: { message: `unexpected rpc ${fn}` } },
+    rpc: async (fn: string, args: { p_account?: string }) => {
+      if (fn === 'account_slack_last4') return { data: h.slackLast4, error: null };
+      if (fn === 'seed_default_alert_rules') {
+        h.seeded.push(`${args.p_account}@read${h.read.length}`);
+        return { data: null, error: null };
+      }
+      return { data: null, error: { message: `unexpected rpc ${fn}` } };
+    },
   }),
 }));
 vi.mock('@/lib/v2/account/pages', () => ({
@@ -65,6 +70,7 @@ beforeEach(() => {
   h.dataset = null;
   h.read.length = 0;
   h.slackLast4 = null;
+  h.seeded.length = 0;
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -101,6 +107,8 @@ describe('/alerts, signed in', () => {
     const el = await child(PAGES.alerts());
     expect(el.type).toBe(AlertsScreen);
     expect(h.read).toEqual([{ accountId: BAD, seatId: OWNER }]);
+    // The account's default rules are seeded before the read (Q13): `@read0` is the count of reads then.
+    expect(h.seeded).toEqual([`${BAD}@read0`]);
     const data = el.props.data as { fired: { rows: unknown[] }; rules: { rows: unknown[] } };
     expect(data.fired.rows.length).toBeGreaterThan(0);
     expect(data.rules.rows).toHaveLength(6);
