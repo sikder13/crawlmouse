@@ -245,12 +245,19 @@ function verifyLines(b: Pick<PacketBody, 'verify'>): string[] {
 /** The label a prompt's first line gives the fix's title under. */
 export const PROMPT_TITLE_LABEL = 'The audit’s title for this fix:';
 
+/** The marks a reader or a coding tool can take for the end of a quotation. */
+const QUOTATION_MARKS = /["“”„‟«»]/g;
+
 /**
- * The first line of a prompt: the title on one line, in double quotes, with each double quote in it
- * written as an apostrophe so the title cannot end the quotation it is in.
+ * The first line of a prompt: the title on one line, in double quotes. So that the title cannot
+ * appear to end the quotation it is in, each quotation mark in it (`QUOTATION_MARKS`) is written as
+ * an apostrophe, and backslashes at its end are dropped with the spaces among them: one left there
+ * would stand before the closing quote and read as escaping it (fixes.property.test.ts).
  */
 export const promptTitle = (title: string): string =>
-  `${PROMPT_TITLE_LABEL} "${oneLine(title).replaceAll('"', "'")}"`;
+  `${PROMPT_TITLE_LABEL} "${oneLine(title)
+    .replace(QUOTATION_MARKS, "'")
+    .replace(/[\\\s]+$/u, '')}"`;
 
 /**
  * One body of a packet as plain text, for "Copy as a prompt": the fix page, the segment and the
