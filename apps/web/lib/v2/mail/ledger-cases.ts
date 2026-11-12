@@ -6,7 +6,8 @@
  * cannot pass by being wrong the same way. Cases that need the two-minute lease are the SQL test's
  * own: the memory ledger has no clock.
  *
- * Test support only: nothing in the app imports this file.
+ * Test support, imported by tests: `grep -rln "ledger-cases'" apps/web --include='*.ts*' | grep -v '\.test\.'`
+ * lists this file alone.
  */
 import type { MailKind } from './types';
 

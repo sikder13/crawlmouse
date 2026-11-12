@@ -10,7 +10,8 @@
  * `&#x68;`, and the named ones in `NAMED`) decoded. Text, comments and `<!…>` / `<?…>` are skipped,
  * so an escaped `&lt;a href=…&gt;` is text, not a link. inspect.test.ts varies each of these.
  *
- * Test support only: nothing in the app imports this file.
+ * Test support, imported by tests: `grep -rln "inspect'" apps/web --include='*.ts*' | grep -v '\.test\.'`
+ * lists this file alone.
  */
 import { MAIL_ORIGIN } from '../links';
 import type { RenderedMail } from '../types';
