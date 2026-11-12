@@ -1,0 +1,172 @@
+/* Final-AgencyTrial: sizes and spacing from the locked screen's inline styles. */
+
+.main {
+  padding-top: 72px;
+  padding-bottom: 120px;
+  display: flex;
+  justify-content: center;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 40px;
+  max-width: 980px;
+  width: 100%;
+  align-items: start;
+}
+
+.single {
+  max-width: 560px;
+  width: 100%;
+}
+
+.lead {
+  margin: 10px 0 0;
+  font-size: 16px;
+  color: var(--v2-fg2);
+}
+
+.notice {
+  margin: 16px 0 0;
+  font-size: 14px;
+  color: var(--v2-fg2);
+  padding: 12px 14px;
+  border: 1px solid var(--v2-line);
+  border-radius: 8px;
+  background: var(--v2-s2);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 24px;
+  max-width: 440px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.mut {
+  color: var(--v2-mut);
+  font-weight: 400;
+}
+
+.wide {
+  width: 100%;
+}
+
+.signedIn {
+  font-size: 14px;
+  color: var(--v2-fg2);
+}
+
+.consent {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: var(--v2-fg2);
+}
+
+.consent input {
+  margin-top: 3px;
+  flex: 0 0 auto;
+}
+
+.help {
+  color: var(--v2-mut);
+  font-size: 12px;
+}
+
+.submit {
+  height: 48px;
+  width: 100%;
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--v2-bad);
+}
+
+.fine {
+  margin: 0;
+  font-size: 13px;
+  color: var(--v2-mut);
+}
+
+.underline {
+  text-decoration: underline;
+  color: inherit;
+}
+
+.other {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--v2-line);
+  font-size: 14px;
+  color: var(--v2-fg2);
+}
+
+.aside {
+  padding: 0;
+  overflow: hidden;
+}
+
+.asideHead {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--v2-line);
+}
+
+.asideKicker {
+  color: var(--v2-mut);
+  font-size: 13px;
+}
+
+.asideTitle {
+  font-weight: 600;
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+.table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table td {
+  text-align: left;
+  padding: var(--v2-cell-pad-y) var(--v2-cell-pad-x);
+  border-bottom: 1px solid var(--v2-line2);
+  font-size: var(--v2-text-ui);
+  vertical-align: middle;
+}
+
+.table .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--v2-mut);
+}
+
+.foot {
+  padding: 14px 24px;
+  font-size: 13px;
+  color: var(--v2-mut);
+  border-top: 1px solid var(--v2-line2);
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .main {
+    padding-top: 48px;
+    padding-bottom: 72px;
+  }
+}
