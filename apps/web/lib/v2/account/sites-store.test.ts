@@ -274,9 +274,17 @@ describe('supabaseAddSite', () => {
         schedule_cadence: 'monthly',
         schedule_iso_weekday: 3,
         schedule_hour_local: 6,
-        next_check_at: null,
+        next_check_at: expect.any(Date),
       },
     ]);
+    // Set by migration 028's trigger: the first Wednesday of a month at 06:mm in the account's zone.
+    const { rows: due } = await db.query<{ ok: boolean }>(
+      `select s.next_check_at = public.next_check_after(s.schedule_cadence, s.schedule_iso_weekday,
+                s.schedule_hour_local, s.schedule_offset_min, a.timezone, s.created_at) as ok
+         from public.sites s join public.accounts a on a.id = s.account_id where s.id = $1`,
+      [siteId],
+    );
+    expect(due[0]!.ok).toBe(true);
     expect(await statuses(siteId)).toEqual([
       { id: checkId, status: 'queued', trigger: 'first_audit' },
     ]);

@@ -318,6 +318,8 @@ describe('erase-account (B-F2)', () => {
       'reports.recipient_email nulled': 1,
       'sites.client_contact_email nulled': 1,
       'fix_email_requests deleted': 0,
+      'email_sends deleted (accounts)': 1,
+      'slack_sends deleted (accounts)': 1,
       'accounts deleted': 1,
       'sites deleted': 2,
       'checks deleted': 2,
