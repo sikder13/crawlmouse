@@ -8,6 +8,7 @@ import { resolveOrigin } from '@/lib/origin';
 import { checkoutV2, parseCheckout, supabaseCheckoutAccounts } from '@/lib/billing/checkout-v2';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { requestedAccountId } from '@/lib/billing/owner';
+import { readDefaultAccountId } from '@/lib/v2/account/viewer-read';
 import { readBody, refuse, respond } from '@/lib/billing/request-body';
 import { stripeAccount } from '@/lib/billing/stripe-account';
 import { accountCatalog } from '@/lib/billing/stripe-catalog';
@@ -27,11 +28,14 @@ export async function POST(req: Request) {
 
   if (billingV2Enabled()) {
     // CC-03 D6. The account must answer 'owner' to the caller's own session before the
-    // service-role client is made.
+    // service-role client acts on it; before that, it reads only the caller's own default account,
+    // and only when the request names none and the caller owns several (lib/billing/owner.ts).
     const body = await readBody(req);
     const input = body && parseCheckout(body);
     if (!body || !input) return refuse(400, 'invalid');
-    const target = await requestedAccountId(sb, user.id, input.accountId);
+    const target = await requestedAccountId(sb, user.id, input.accountId, () =>
+      readDefaultAccountId(supabaseAdmin(), user.id),
+    );
     if (!target.ok) return refuse(target.status, target.error);
     const { data: role, error: roleError } = await sb.rpc('member_role', {
       p_account: target.accountId,

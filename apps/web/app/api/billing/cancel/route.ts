@@ -10,13 +10,15 @@ import {
 } from '@/lib/billing/cancel';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { requestedAccountId } from '@/lib/billing/owner';
+import { readDefaultAccountId } from '@/lib/v2/account/viewer-read';
 import { readBody, refuse } from '@/lib/billing/request-body';
 import { stripeAccount } from '@/lib/billing/stripe-account';
 
 /**
  * Cancel the account's plan (CC-03 D8): the first post asks, the second (`confirm`) cancels. A 404
  * with V2_BILLING unset. The account must answer 'owner' to the caller's own session before the
- * service-role client is made.
+ * service-role client acts on it; before that, it reads only the caller's own default account, and
+ * only when the request names none and the caller owns several (lib/billing/owner.ts).
  */
 export async function POST(req: Request) {
   const sb = await supabaseServer();
@@ -29,7 +31,9 @@ export async function POST(req: Request) {
   const body = await readBody(req);
   const input = body && parseCancel(body);
   if (!body || !input) return refuse(400, 'invalid');
-  const target = await requestedAccountId(sb, user.id, input.accountId);
+  const target = await requestedAccountId(sb, user.id, input.accountId, () =>
+    readDefaultAccountId(supabaseAdmin(), user.id),
+  );
   if (!target.ok) return refuse(target.status, target.error);
   const { data: role, error: roleError } = await sb.rpc('member_role', {
     p_account: target.accountId,

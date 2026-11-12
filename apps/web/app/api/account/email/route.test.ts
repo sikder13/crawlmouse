@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   role: 'owner' as string | null,
   sessionId: null as string | null,
   log: [] as string[],
+  rpcArgs: [] as unknown[],
   emails: [] as AccountEmailEvent[],
 }));
 
@@ -32,17 +33,28 @@ vi.mock('@/lib/supabase/server', () => ({
         error: null,
       }),
     },
+    // The caller's active owner seats, as ownedAccountId's read returns them.
     from: (table: string) => {
       h.log.push(`session.from ${table}`);
-      const rows = h.user ? [{ account_id: accountOf.get(h.user.id) }] : [];
       const chain: Record<string, unknown> = {
-        then: (resolve: (v: unknown) => unknown) => resolve({ data: rows, error: null }),
+        then: (resolve: (v: unknown) => unknown) =>
+          (h.user
+            ? h.db
+                .query<{ account_id: string }>(
+                  `select account_id from public.seats
+                    where user_id = $1 and role = 'owner' and status = 'active'`,
+                  [h.user.id],
+                )
+                .then((r) => r.rows)
+            : Promise.resolve([])
+          ).then((rows) => resolve({ data: rows, error: null })),
       };
       chain.select = chain.eq = () => chain;
       return chain;
     },
-    rpc: async (fn: string) => {
+    rpc: async (fn: string, args: unknown) => {
       h.log.push(`session.rpc ${fn}`);
+      h.rpcArgs.push(args);
       return { data: h.role, error: null };
     },
   }),
@@ -50,7 +62,7 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => {
     h.log.push('supabaseAdmin');
-    return {};
+    return postgrestOver(h.db);
   },
 }));
 vi.mock('@/lib/v2/account/email-change-ports', () => ({
@@ -92,6 +104,7 @@ beforeEach(() => {
   h.role = 'owner';
   h.sessionId = null;
   h.log.length = 0;
+  h.rpcArgs.length = 0;
   h.emails.length = 0;
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -185,6 +198,26 @@ describe('POST /api/account/email', () => {
     expect(h.emails.map((e) => e.data.template)).toEqual([
       'email_change_confirm',
       'email_change_notice',
+    ]);
+  });
+
+  // Q26: the Agency trial gives its person a second owner seat; this form names no account, so it
+  // acts on their default, personal, one. The service role reads only that value before the role.
+  it('with the agency trial’s second owner seat, acts on the default account', async () => {
+    const p = await person();
+    const { rows } = await h.db.query<{ r: { account_id: string } }>(
+      `select public.start_agency_trial_account($1, 'Agency', 'client.example') r`,
+      [p.id],
+    );
+    expect(rows[0]!.r.account_id).not.toBe(p.accountId);
+    await asked(p, 'two-seats@example.org');
+    expect(h.rpcArgs).toEqual([{ p_account: p.accountId }]);
+    expect(h.log).toEqual([
+      'getUser',
+      'session.from seats',
+      'supabaseAdmin',
+      'session.rpc member_role',
+      'supabaseAdmin',
     ]);
   });
 
