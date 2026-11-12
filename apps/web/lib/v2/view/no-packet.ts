@@ -7,9 +7,13 @@
  */
 import type { OpenFixView } from './segment/fixes';
 
-/** Said of a fix whose type has a packet builder, when the stored fix holds no packet. */
-export const NOT_WRITTEN_BY_CHECK =
-  'The check that last measured this fix wrote no steps for it. The next check that finds it writes them.';
+/**
+ * Said of a fix whose type has a packet builder, when the stored fix holds no packet. A fix does
+ * not record why: its last check may have run before the type had a builder, or the builder may
+ * have had no steps to write for this record (the engine counts those in its grading summary, which
+ * the page does not read). The sentence says what holds in both cases and nothing of a later check.
+ */
+export const NOT_WRITTEN_BY_CHECK = 'The check that last measured this fix wrote no steps for it.';
 
 /** Said before the engine's reason, of a fix type the engine writes no packet for. */
 export const NO_STEPS_FOR_TYPE = 'The audit writes no steps for this kind of fix.';
@@ -19,7 +23,7 @@ export const FOUND_ABOVE = 'What the audit found is above.';
 
 /**
  * The line in the packet's place. `reason` is the engine's for the fix's type (a sentence), or
- * null when the type has a builder and this fix was stored without a packet.
+ * null when the type has a builder and this fix was stored without a packet all the same.
  */
 export const noPacketLine = (reason: string | null): string =>
   reason === null

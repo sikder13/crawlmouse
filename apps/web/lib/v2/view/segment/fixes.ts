@@ -215,22 +215,49 @@ const cleanBody = (b: PacketBody): PacketBody => ({
 export const packetParagraph = (b: Pick<PacketBody, 'context'>) =>
   b.context.filter((l) => !SITE_LINE.test(l));
 
-/** The verify lines of the segment's packet block and of the prompt. */
-const verifyLines = (b: Pick<PacketBody, 'verify'>) => [
-  'Verify (we run this after you mark done):',
-  `  ${b.verify.command}`,
-  `  → expect ${b.verify.expect}`,
-];
+/** What heads the short command of a packet that has both layers, in a block and in a prompt. */
+export const SEE_IT = 'See it (a short command that prints the evidence; it decides nothing):';
+/** What heads the strict command of such a packet. */
+export const EXACT_CHECK = 'Exact check (this command decides whether the fix has landed):';
+
+/**
+ * The verify lines of the segment's packet block and of the prompt. A body with a readable command
+ * (`verify.see`) gets two labelled layers, that command first with what it prints today and after
+ * the fix, then the strict command; a body without one gets the strict command alone.
+ */
+function verifyLines(b: Pick<PacketBody, 'verify'>): string[] {
+  const { command, expect, see } = b.verify;
+  if (see === null) {
+    return ['Verify (we run this after you mark done):', `  ${command}`, `  → expect ${expect}`];
+  }
+  return [
+    'Verify (we run the exact check after you mark done):',
+    SEE_IT,
+    `  ${see.command}`,
+    `  Today: ${see.today}`,
+    `  After the fix: ${see.after}`,
+    EXACT_CHECK,
+    `  ${command}`,
+    `  → expect ${expect}`,
+  ];
+}
 
 /** The label a prompt's first line gives the fix's title under. */
 export const PROMPT_TITLE_LABEL = 'The audit’s title for this fix:';
 
+/** The marks a reader or a coding tool can take for the end of a quotation. */
+const QUOTATION_MARKS = /["“”„‟«»]/g;
+
 /**
- * The first line of a prompt: the title on one line, in double quotes, with each double quote in it
- * written as an apostrophe so the title cannot end the quotation it is in.
+ * The first line of a prompt: the title on one line, in double quotes. So that the title cannot
+ * appear to end the quotation it is in, each quotation mark in it (`QUOTATION_MARKS`) is written as
+ * an apostrophe, and backslashes at its end are dropped with the spaces among them: one left there
+ * would stand before the closing quote and read as escaping it (fixes.property.test.ts).
  */
 export const promptTitle = (title: string): string =>
-  `${PROMPT_TITLE_LABEL} "${oneLine(title).replaceAll('"', "'")}"`;
+  `${PROMPT_TITLE_LABEL} "${oneLine(title)
+    .replace(QUOTATION_MARKS, "'")
+    .replace(/[\\\s]+$/u, '')}"`;
 
 /**
  * One body of a packet as plain text, for "Copy as a prompt": the fix page, the segment and the

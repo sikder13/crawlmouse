@@ -8,5 +8,5 @@ import type { PacketEntry } from '../types.js';
 export const jsOnlyNavigation: PacketEntry<'js_only_navigation'> = {
   kind: 'none',
   reason:
-    'Not measured: the render step records word counts only. No link of the rendered side is kept, and js_only is written false on every page and edge, so the engine opens no fix of this type.',
+    'Not measured: the audit’s rendering records word counts only. It keeps no link from the rendered page, so it cannot tell which links exist only once JavaScript has run, and the engine opens no fix of this type.',
 };

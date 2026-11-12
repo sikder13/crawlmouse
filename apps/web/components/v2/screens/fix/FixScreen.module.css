@@ -73,6 +73,34 @@
   overflow-wrap: anywhere;
 }
 
+/* A block with both verify layers: its text above and below the strict command, in the block's
+   own face, and the command on one line that scrolls sideways inside the block, so its length
+   widens neither the card nor the page. */
+.packetPart,
+.exactLine {
+  margin: 0;
+  font: inherit;
+}
+
+.packetPart {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.exact {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.exact:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+.exactLine {
+  white-space: pre;
+}
+
 .actions {
   gap: 10px;
   flex-wrap: wrap;

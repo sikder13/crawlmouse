@@ -207,13 +207,16 @@ const UNQUEUED: Record<Extract<RecheckOutcome, { queued: false }>['reason'], Not
 // ─── The packet ─────────────────────────────────────────────────────────────────────────────────
 
 /**
- * GET /api/fixes/[id]/packet once membership is established: 402 `packets` for a fix the tier does
- * not see (Free: `GATES.free.packets` is `visible_fixes_only`), decided before the packet or the
- * framework is looked at; 404 `no_packet` for a fix no packet was written for. Then, without
- * `framework`, `{packet, prompt}`: the stored packet and the prompt of its own framework's body.
- * With `framework` (the `?framework=` value as sent), `{body, prompt}` for the body written for it,
- * and 404 `no_packet_for_framework` for a value the packet holds no body for, which a value that
- * names no framework is too.
+ * GET /api/fixes/[id]/packet once membership is established. In this order:
+ * - 402 `packets` for a fix the tier does not see (Free: `GATES.free.packets` is
+ *   `visible_fixes_only`). This comes before the packet is looked at, so a fix the tier does not
+ *   open answers 402 whether or not it has a packet, with or without `framework` (route.test.ts,
+ *   "402, not no_packet, …").
+ * - 404 `no_packet` for a fix no packet was written for.
+ * - Without `framework`, `{packet, prompt}`: the stored packet and the prompt of its own
+ *   framework's body. With `framework` (the `?framework=` value as sent), `{body, prompt}` for the
+ *   body written for it, and 404 `no_packet_for_framework` for a value the packet holds no body
+ *   for, which a value that names no framework is too.
  */
 export async function packet(
   deps: FixDeps,
