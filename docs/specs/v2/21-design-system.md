@@ -555,3 +555,11 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Check-email, sign-in                         | `/v2-preview/screens/check-email/signin`                 | screen    |                                      |
 | Continue                                     | `/v2-preview/screens/continue`                           | screen    |                                      |
 | Continue, link expired                       | `/v2-preview/screens/continue/expired`                   | screen    |                                      |
+| Final-Ag-Seats (Northwind)                   | `/v2-preview/screens/seats`                              | screen    |                                      |
+| Seats, Pro with no seat free                 | `/v2-preview/screens/seats/pro-full`                     | screen    |                                      |
+| Seats, Free                                  | `/v2-preview/screens/seats/free`                         | screen    |                                      |
+| Seats, a member who is not the owner         | `/v2-preview/screens/seats/member`                       | screen    |                                      |
+| Invitation, signed out                       | `/v2-preview/screens/invite`                             | screen    |                                      |
+| Invitation, signed in                        | `/v2-preview/screens/invite/signed-in`                   | screen    |                                      |
+| Invitation, another address signed in        | `/v2-preview/screens/invite/mismatch`                    | screen    |                                      |
+| Invitation, link cannot be used              | `/v2-preview/screens/invite/gone`                        | screen    |                                      |

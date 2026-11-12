@@ -255,4 +255,34 @@ export const PREVIEWS: PreviewEntry[] = [
   },
   { path: '/v2-preview/screens/continue', name: 'Continue', kind: 'screen' },
   { path: '/v2-preview/screens/continue/expired', name: 'Continue, link expired', kind: 'screen' },
+  // CC-31, seats and invitations. Seats' orange element is "Invite someone", shown to a reader who
+  // may invite while a seat is free; the other three states offer no invitation.
+  { path: '/v2-preview/screens/seats', name: 'Final-Ag-Seats (Northwind)', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/seats/pro-full',
+    name: 'Seats, Pro with no seat free',
+    kind: 'screen',
+    orange: 0,
+  },
+  { path: '/v2-preview/screens/seats/free', name: 'Seats, Free', kind: 'screen', orange: 0 },
+  {
+    path: '/v2-preview/screens/seats/member',
+    name: 'Seats, a member who is not the owner',
+    kind: 'screen',
+    orange: 0,
+  },
+  { path: '/v2-preview/screens/invite', name: 'Invitation, signed out', kind: 'screen' },
+  { path: '/v2-preview/screens/invite/signed-in', name: 'Invitation, signed in', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/invite/mismatch',
+    name: 'Invitation, another address signed in',
+    kind: 'screen',
+  },
+  // A link that cannot be used offers nothing.
+  {
+    path: '/v2-preview/screens/invite/gone',
+    name: 'Invitation, link cannot be used',
+    kind: 'screen',
+    orange: 0,
+  },
 ];
