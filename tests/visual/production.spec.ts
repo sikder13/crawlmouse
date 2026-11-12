@@ -20,11 +20,15 @@ const LOCKED = '/v2-preview/screens/fix/locked';
 const OPEN = '/v2-preview/screens/fix';
 const LARGE = '/v2-preview/screens/map/large';
 
-interface Packet {
+interface Body {
   context: string[];
   change: string[];
   keep: string[];
   verify: { command: string; expect: string };
+}
+/** A packet: the body for its own framework, and in `packets` the bodies for the others. */
+interface Packet extends Body {
+  packets: Body[];
 }
 const FIXTURE = JSON.parse(
   readFileSync(
@@ -33,12 +37,17 @@ const FIXTURE = JSON.parse(
   ),
 ) as { fixes: { title: string; packet: Packet | null }[] };
 
-/** The packet's lines of the fix whose title the page heads with, as React escapes them in HTML. */
+/** The lines of each body of the packet of the fix whose title the page heads with. */
 function packetOf(title: string): string[] {
   const fix = FIXTURE.fixes.find((f) => `${f.title}.` === title || f.title === title);
   if (!fix?.packet) throw new Error(`No fix with a packet is titled "${title}"`);
-  const p = fix.packet;
-  return [...p.context, ...p.change, ...p.keep, p.verify.command, p.verify.expect];
+  return [fix.packet, ...fix.packet.packets].flatMap((b) => [
+    ...b.context,
+    ...b.change,
+    ...b.keep,
+    b.verify.command,
+    b.verify.expect,
+  ]);
 }
 
 const escaped = (s: string) =>
