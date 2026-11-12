@@ -111,6 +111,11 @@ webhook policy class. The page's form is sent back to `/unsubscribe` with a two-
 turned off, and the page says "Done" only with that cookie, so a crafted link cannot show it. Account mail carries
 neither.
 
+Alert and summary recipients honour a seat's client scope as `is_member_for_site` reads it (`client_scope_all`, or
+a `seat_sites` row for the site or the production site it stages): `alert_email_recipients(account, site)` answers
+only the seats that may read the site, and `summary_recipients` names each seat's sites, so a scoped seat's summary
+lists only those and a seat none of whose sites changed gets none.
+
 Slack is posted with `fetch` after the engine's `validateUrlOrThrow`, only to a `https://hooks.slack.com/services/…`
 URL, with no redirect followed and a timeout: the engine's `safeFetch` makes GET requests only. The message is
 plain text with Slack's `& < >` escapes and link previews off. `alert_events.destination_hash` is an HMAC under the
@@ -160,11 +165,21 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
   has gone out breaks those links until it is on again.
 - Slack turns a bare URL in message text into a link (a fix title naming a page on the member's site); we build no
   link and previews are off.
-- The weekly summary reads at most 5,000 changes per account-week; past that it logs `summary.read_capped` and its
-  counts are of the rows read.
+- The weekly summary reads at most 5,000 changes per account-week, a page at a time past PostgREST's 1,000-row
+  cap; past 5,000 it logs `summary.read_capped` and its counts are of the rows read.
+- The alert and summary recipients are each read in one call, so PostgREST's 1,000-row cap bounds an account's
+  recipient seats to 1,000 per message.
 - `check_finished` replayed after Inngest's 24-hour idempotency window is counted again.
+- `alert_sent` and `summary_sent` are counted by each run that completes with the mail delivered, `done`
+  included, so a send whose record failed is still counted; an event replayed after Inngest's 24-hour
+  idempotency window is counted again.
 - A fix with no packet is answered `queued` and nothing is sent.
+- `text_drop` fires on the `opened` text-without-JavaScript row a client-rendered-template fix writes. The engine
+  writes no other row of that subject, so a further drop while that fix stays open has no change to name and alerts
+  nothing, against the rule's label "drops more than N points". Closing it needs a change row for the share itself
+  (the engine's diff).
 - The Alerts page shows what `changes.notified` records; a failed or suppressed channel (`alert_events`) is not
   shown.
-- The Supabase ports for alerts and the summary (`alerts-store.ts`, `summary-store.ts`) are typechecked and their
-  SQL is tested on PGlite; the PostgREST reads themselves have not run against a real PostgREST.
+- The Supabase ports for alerts and the summary (`alerts-store.ts`, `summary-store.ts`) run in
+  `lib/v2/monitor/stores.test.ts` through a PostgREST stand-in over PGlite (`__tests__/helpers/postgrest-pglite.ts`,
+  capped at 1,000 rows as `max_rows` is), not against a real PostgREST.

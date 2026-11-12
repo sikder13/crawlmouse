@@ -22,6 +22,7 @@ import {
   type StoredChange,
 } from './alerts';
 import type { SlackResult } from './slack';
+import { ALERT_RETRIES } from '../../../../../inngest/alerts';
 
 const ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
 const SITE = '50000000-0000-4000-8000-000000000001';
@@ -105,15 +106,24 @@ const data = (o: Partial<AlertData> = {}): AlertData => ({
   ...o,
 });
 
-function memoryLedger(): MailLedger & { rows: Map<string, string> } {
+/**
+ * The ledger's rule from claim_email_send (migration 028, section A), without its two-minute lease:
+ * a sent key is done, a key that failed three times is exhausted, otherwise the next attempt goes.
+ */
+function memoryLedger(): MailLedger & { rows: Map<string, string>; attempts: Map<string, number> } {
   const rows = new Map<string, string>();
+  const attempts = new Map<string, number>();
   return {
     rows,
+    attempts,
     async claim(c): Promise<Claim> {
       const s = rows.get(c.key);
       if (s === 'sent') return { outcome: 'done' };
+      const n = attempts.get(c.key) ?? 0;
+      if (n >= 3) return { outcome: 'exhausted' };
       rows.set(c.key, 'sending');
-      return { outcome: 'go', attempt: 1 };
+      attempts.set(c.key, n + 1);
+      return { outcome: 'go', attempt: n + 1 };
     },
     async finish(f) {
       rows.set(f.key, f.status);
@@ -131,6 +141,8 @@ function harness(
     linkSecret?: string | null;
     recipients?: { seatId: string; email: string }[];
     transport?: MailTransport;
+    /** How many of the first `record` calls throw, as a database that is down for a moment. */
+    recordFailures?: number;
   } = {},
 ) {
   const sent: OutgoingMail[] = [];
@@ -139,8 +151,11 @@ function harness(
   const captures: unknown[] = [];
   const posts: { url: string; text: string }[] = [];
   const slackRows = new Map<string, string>();
+  /** Every argument the Slack ledger was given: what slack_sends would hold. */
+  const ledgerCalls: unknown[][] = [];
   const reads: string[] = [];
   const ledger = memoryLedger();
+  let recordFailures = o.recordFailures ?? 0;
   const transport: MailTransport = o.transport ?? {
     async send(m) {
       sent.push(m);
@@ -157,21 +172,33 @@ function harness(
         reads.push('data');
         return o.data ?? data();
       },
-      emailRecipients: async () =>
-        o.recipients ?? [
-          { seatId: SEAT_1, email: ADDRESSES[0]! },
-          { seatId: SEAT_2, email: ADDRESSES[1]! },
-        ],
+      emailRecipients: async (accountId, siteId) => {
+        reads.push(`recipients:${accountId}:${siteId}`);
+        return (
+          o.recipients ?? [
+            { seatId: SEAT_1, email: ADDRESSES[0]! },
+            { seatId: SEAT_2, email: ADDRESSES[1]! },
+          ]
+        );
+      },
       slackUrl: async () => (o.slackUrl === undefined ? HOOK : o.slackUrl),
-      claimSlack: async (key) => {
+      claimSlack: async (...args) => {
+        ledgerCalls.push(['claimSlack', ...args]);
+        const [key] = args;
         if (slackRows.get(key) === 'sent') return { outcome: 'done' };
         slackRows.set(key, 'sending');
         return { outcome: 'go', attempt: 1 };
       },
-      finishSlack: async (key, status) => {
+      finishSlack: async (...args) => {
+        ledgerCalls.push(['finishSlack', ...args]);
+        const [key, status] = args;
         slackRows.set(key, status);
       },
       record: async (d) => {
+        if (recordFailures > 0) {
+          recordFailures--;
+          throw new Error('record_alert_delivery: 57P01');
+        }
         records.push(d);
       },
     },
@@ -197,12 +224,15 @@ function harness(
     log: (event, fields) => logs.push({ event, fields }),
     now: () => NOW,
   };
-  return { deps, sent, records, logs, captures, posts, slackRows, ledger, reads };
+  return { deps, sent, records, logs, captures, posts, slackRows, ledgerCalls, ledger, reads };
 }
 
-/** Everything the work let out, but the transport's own message and the Slack POST. */
+/**
+ * Everything the work let out, but the transport's own message and the Slack POST: the records, the
+ * log lines, the events, and every argument given to the Slack ledger (its key and error code).
+ */
 const leaked = (h: ReturnType<typeof harness>, extra: unknown[] = []) =>
-  JSON.stringify([h.records, h.logs, h.captures, ...extra]);
+  JSON.stringify([h.records, h.logs, h.captures, h.ledgerCalls, ...extra]);
 
 describe('what alerts nothing', () => {
   it.each<[string, AlertContext | null, string]>([
@@ -259,6 +289,12 @@ describe('email (D5, D7)', () => {
     expect(h.sent[0]!.subject).toBe('shop.example: 2 changes, 1 problem');
   });
 
+  it('asks for the seats whose client scope covers this site (review r1, security S1)', async () => {
+    const h = harness();
+    await deliverAlert(h.deps, CHECK, 'email');
+    expect(h.reads).toContain(`recipients:${ACCOUNT}:${SITE}`);
+  });
+
   it('records the email channel once, with each email rule and its changes', async () => {
     const h = harness();
     await deliverAlert(h.deps, CHECK, 'email');
@@ -284,13 +320,14 @@ describe('email (D5, D7)', () => {
     ]);
   });
 
-  it('a retried step sends nobody twice and counts the send once', async () => {
+  it('a step run again after it completed (a replayed event) sends nobody twice', async () => {
     const h = harness();
     await deliverAlert(h.deps, CHECK, 'email');
     await deliverAlert(h.deps, CHECK, 'email');
     expect(h.sent).toHaveLength(2);
     expect(h.records.map((r) => r.status)).toEqual(['sent', 'sent']);
-    expect(h.captures).toHaveLength(1);
+    // Counted on each run that completes with the mail delivered (spec 28, known gaps).
+    expect(h.captures).toHaveLength(2);
   });
 
   it('lets a retryable failure retry the step', async () => {
@@ -391,17 +428,97 @@ describe('Slack (D5)', () => {
     ]);
   });
 
-  it('never puts the webhook URL in a record, a log line, an event or an answer', async () => {
+  it('never puts the webhook URL in a record, the Slack ledger, a log line, an event or an answer', async () => {
     for (const slack of [
       { ok: true } as const,
       { ok: false, code: 'slack_404', retryable: false } as const,
+      { ok: false, code: 'slack_503', retryable: true } as const,
     ]) {
       const h = harness({ slack });
-      const answer = await deliverAlert(h.deps, CHECK, 'slack');
+      const answer = await deliverAlert(h.deps, CHECK, 'slack').catch((e: unknown) => [
+        String(e),
+        (e as Error).stack,
+      ]);
+      // anti-vacuity: the ledger was given its key and, on a failure, its code
+      expect(h.ledgerCalls.map((c) => c[0])).toEqual(['claimSlack', 'finishSlack']);
       const plan = await planAlert(h.deps, CHECK);
       const out = leaked(h, [answer, plan]);
       expect(out).not.toContain('hooks.slack.com');
       expect(out).not.toContain('topSecretTokenXYZ');
     }
+  });
+});
+
+describe('a failure stops neither the other seats nor the record (review r1 B2, N4)', () => {
+  /** A transport that refuses one address retryably and sends the rest. */
+  const failing = (address: string, sent: OutgoingMail[]): MailTransport => ({
+    async send(m) {
+      if (m.to === address) return { ok: false, code: 'provider_503', retryable: true };
+      sent.push(m);
+      return { ok: true, providerId: `p${sent.length}` };
+    },
+  });
+
+  it('sends to the next seat when one seat’s send is retried, records the channel, then retries', async () => {
+    const out: OutgoingMail[] = [];
+    const h = harness({ transport: failing(ADDRESSES[0]!, out) });
+    await expect(deliverAlert(h.deps, CHECK, 'email')).rejects.toBeInstanceOf(MailRetry);
+    expect(out.map((m) => m.to)).toEqual([ADDRESSES[1]]);
+    expect(h.records.map((r) => [r.status, r.reason])).toEqual([['sent', null]]);
+    expect(h.captures).toEqual([]);
+  });
+
+  it('records a channel whose every seat is still being retried as failed, retrying', async () => {
+    const h = harness({
+      transport: { send: async () => ({ ok: false, code: 'provider_503', retryable: true }) },
+    });
+    await expect(deliverAlert(h.deps, CHECK, 'email')).rejects.toBeInstanceOf(MailRetry);
+    expect(h.records.map((r) => [r.status, r.reason])).toEqual([['failed', 'send_retrying']]);
+  });
+
+  it('gives every seat its three attempts within the step’s runs, whatever the number of seats', async () => {
+    const seats = Array.from({ length: 4 }, (_, k) => ({
+      seatId: `e0000000-0000-4000-8000-00000000001${k}`,
+      email: `seat${k}@agency.example`,
+    }));
+    let calls = 0;
+    const h = harness({
+      recipients: seats,
+      transport: {
+        send: async () => {
+          calls++;
+          return { ok: false, code: 'provider_503', retryable: true };
+        },
+      },
+    });
+    let answer: unknown = null;
+    for (let run = 0; run <= ALERT_RETRIES && answer === null; run++) {
+      answer = await deliverAlert(h.deps, CHECK, 'email').catch(() => null);
+    }
+    expect(answer).toEqual({ status: 'failed', reason: 'send_exhausted' });
+    expect(calls).toBe(seats.length * 3);
+    for (const s of seats)
+      expect(h.ledger.attempts.get(`alert:${CHECK}:email:${s.seatId}`)).toBe(3);
+    expect(h.records.at(-1)).toMatchObject({ status: 'failed', reason: 'send_exhausted' });
+  });
+
+  it('a send whose record failed counts on the retry that finds it done', async () => {
+    const h = harness({ recordFailures: 1 });
+    await expect(deliverAlert(h.deps, CHECK, 'email')).rejects.toThrow(/record_alert_delivery/);
+    expect(await deliverAlert(h.deps, CHECK, 'email')).toEqual({ status: 'sent', reason: null });
+    expect(h.sent).toHaveLength(2);
+    expect(h.captures).toEqual([
+      { accountId: ACCOUNT, properties: { channel: 'email', changes: 2 } },
+    ]);
+  });
+
+  it('a Slack post whose record failed counts on the retry that finds it done, and posts once', async () => {
+    const h = harness({ recordFailures: 1 });
+    await expect(deliverAlert(h.deps, CHECK, 'slack')).rejects.toThrow(/record_alert_delivery/);
+    expect(await deliverAlert(h.deps, CHECK, 'slack')).toEqual({ status: 'sent', reason: null });
+    expect(h.posts).toHaveLength(1);
+    expect(h.captures).toEqual([
+      { accountId: ACCOUNT, properties: { channel: 'slack', changes: 1 } },
+    ]);
   });
 });

@@ -7,16 +7,19 @@
  * (`evaluateAlerts`), so each Inngest step carries only a small answer, and the result is the same
  * on every retry because a finished check's changes do not change.
  *
- * - Email: one message per recipient seat (`alert_email_recipients`), keyed
+ * - Email: one message per recipient seat whose client scope covers the site (`alert_email_recipients`), keyed
  *   `alert:<checkId>:email:<seatId>` in the send ledger, so a retried step sends nobody twice; with
- *   List-Unsubscribe for that seat. No `EMAIL_LINK_SECRET`, no mail (Q6): the miss is logged and
+ *   List-Unsubscribe for that seat. Every seat is tried on every run (`sendEach`): a seat whose send
+ *   throws stops no other, and the step throws after the channel is recorded. No `EMAIL_LINK_SECRET`, no mail (Q6): the miss is logged and
  *   recorded `suppressed`.
  * - Slack: one message per check, claimed in `slack_sends` as `alert:<checkId>:slack`, when a firing
  *   rule names Slack and the account's tier has Slack now (`account_slack_webhook_url` answers null
  *   otherwise, recorded `suppressed`).
  *
- * Each channel ends in one `record_alert_delivery`: the rules that fired on it with their changes,
- * `sent`, `failed` or `suppressed` with a reason. `destination_hash` is an HMAC under the mail pepper:
+ * Each run of a channel's step that reaches the send calls `record_alert_delivery`, which replaces the
+ * channel's row: the rules that fired on it with their changes, `sent`, `failed` or `suppressed` with a
+ * reason (`send_retrying` while a seat's send is still being retried). `alert_sent` is counted by the
+ * run that completes with a message delivered (`sent`, or `done` from an earlier run). `destination_hash` is an HMAC under the mail pepper:
  * for email, over the recipients' address hashes, sorted; for Slack, over the webhook URL. Neither
  * an address nor the URL is stored, logged, returned or put in an event.
  */
@@ -89,7 +92,8 @@ export interface AlertStore {
   /** Adds the account's default rules it does not hold yet (Q13, `seed_default_alert_rules`). */
   seedDefaultRules(accountId: string): Promise<void>;
   data(ctx: AlertContext & { accountId: string }): Promise<AlertData>;
-  emailRecipients(accountId: string): Promise<{ seatId: string; email: string }[]>;
+  /** The seats to mail about this site: those whose client scope covers it (`alert_email_recipients`). */
+  emailRecipients(accountId: string, siteId: string): Promise<{ seatId: string; email: string }[]>;
   slackUrl(accountId: string, now: Date): Promise<string | null>;
   claimSlack(key: string, accountId: string, now: Date): Promise<Claim>;
   finishSlack(
@@ -199,17 +203,43 @@ function base(ctx: Kept, channel: Channel, fired: FiredAlert[], now: Date) {
   };
 }
 
-const DELIVERED: ReadonlySet<SendOutcome> = new Set(['sent', 'done']);
+/** A seat's send in this run: its outcome, or `retry` when its send threw (a retryable failure). */
+export type SeatOutcome = SendOutcome | 'retry';
 
-/** One status for the channel from each recipient's send. */
-function emailStatus(outcomes: readonly SendOutcome[]): Pick<Delivery, 'status' | 'reason'> {
+const DELIVERED: ReadonlySet<SeatOutcome> = new Set(['sent', 'done']);
+
+/** One status for the channel from each recipient's send in this run. */
+function emailStatus(outcomes: readonly SeatOutcome[]): Pick<Delivery, 'status' | 'reason'> {
   if (outcomes.some((o) => DELIVERED.has(o))) return { status: 'sent', reason: null };
   if (outcomes.every((o) => o === 'suppressed'))
     return { status: 'suppressed', reason: 'address_suppressed' };
   if (outcomes.every((o) => o === 'unconfigured'))
     return { status: 'suppressed', reason: 'mail_unconfigured' };
+  if (outcomes.includes('retry')) return { status: 'failed', reason: 'send_retrying' };
   const failed = outcomes.find((o) => o !== 'suppressed' && o !== 'unconfigured')!;
   return { status: 'failed', reason: `send_${failed}` };
+}
+
+/**
+ * Sends to every seat, one after another, and catches a seat's thrown send, so a seat being retried
+ * stops no other seat. Every seat therefore advances one ledger attempt per run of the step.
+ * `retry` is the first error caught, rethrown by the caller after it has recorded the channel.
+ */
+export async function sendEach<R>(
+  recipients: readonly R[],
+  sendOne: (r: R) => Promise<SendOutcome>,
+): Promise<{ outcomes: SeatOutcome[]; retry: unknown }> {
+  const outcomes: SeatOutcome[] = [];
+  let retry: unknown = null;
+  for (const r of recipients) {
+    try {
+      outcomes.push(await sendOne(r));
+    } catch (e) {
+      outcomes.push('retry');
+      retry ??= e;
+    }
+  }
+  return { outcomes, retry };
 }
 
 export async function deliverAlert(
@@ -248,7 +278,7 @@ async function deliverEmail(
     });
   }
   const secret = deps.linkSecret;
-  const recipients = await deps.store.emailRecipients(ctx.accountId);
+  const recipients = await deps.store.emailRecipients(ctx.accountId, ctx.siteId);
   if (recipients.length === 0) {
     return record({
       status: 'suppressed',
@@ -256,29 +286,28 @@ async function deliverEmail(
       destination_hash: NO_DESTINATION,
     });
   }
-  const outcomes: SendOutcome[] = [];
-  for (const r of recipients) {
+  const { outcomes, retry } = await sendEach(recipients, (r) => {
     const links = deps.unsubscribeLinks(secret, r.seatId, now);
-    outcomes.push(
-      await send(deps.mail, {
-        kind: 'alert',
-        to: r.email,
-        idempotencyKey: `alert:${ctx.checkId}:email:${r.seatId}`,
-        accountId: ctx.accountId,
-        render: async () =>
-          alertTemplate({
-            host: ctx.host,
-            checkId: ctx.checkId,
-            checkedAt: ctx.finishedAt ?? now.toISOString(),
-            zone: ctx.zone,
-            changes,
-            unsubscribeUrl: links.page,
-          }),
-        headers: () => unsubscribeHeaders({ url: links.oneClick }),
-      }),
-    );
-  }
+    return send(deps.mail, {
+      kind: 'alert',
+      to: r.email,
+      idempotencyKey: `alert:${ctx.checkId}:email:${r.seatId}`,
+      accountId: ctx.accountId,
+      render: async () =>
+        alertTemplate({
+          host: ctx.host,
+          checkId: ctx.checkId,
+          checkedAt: ctx.finishedAt ?? now.toISOString(),
+          zone: ctx.zone,
+          changes,
+          unsubscribeUrl: links.page,
+        }),
+      headers: () => unsubscribeHeaders({ url: links.oneClick }),
+    });
+  });
   const pepper = deps.mail.pepper;
+  // Recorded on every run, so the channel has a row even when the step's last retry fails; the
+  // record replaces the one before it (record_alert_delivery).
   const answer = await record({
     ...emailStatus(outcomes),
     destination_hash:
@@ -289,7 +318,9 @@ async function deliverEmail(
             recipients.map((r) => r.email),
           ),
   });
-  if (outcomes.includes('sent')) {
+  if (retry !== null) throw retry;
+  // Counted on the run that completes: a send whose record or count failed is `done` on the retry.
+  if (outcomes.some((o) => DELIVERED.has(o))) {
     await deps.capture(ctx.accountId, { channel: 'email', changes: changes.length });
   }
   return answer;
@@ -326,8 +357,12 @@ async function deliverSlack(
   const key = `alert:${ctx.checkId}:slack`;
   const claim = await deps.store.claimSlack(key, ctx.accountId, now);
   switch (claim.outcome) {
-    case 'done':
-      return record({ status: 'sent', reason: null, destination_hash });
+    case 'done': {
+      // Posted by an earlier run whose record or count failed: recorded and counted here.
+      const answer = await record({ status: 'sent', reason: null, destination_hash });
+      await deps.capture(ctx.accountId, { channel: 'slack', changes: changes.length });
+      return answer;
+    }
     case 'busy':
       throw new SlackRetry('busy');
     case 'exhausted':

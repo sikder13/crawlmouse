@@ -2,9 +2,10 @@
  * The weekly summary (CC-28 D6), as two functions:
  *
  * - `crawlmouse.summary.tick`, hourly: reads the accounts whose summary is due this hour a page at a
- *   time (each page its own step, read at the time the first step fixed, so a retried page is the
- *   same page) and sends one `summary.requested` per account, with an event id of the account and
- *   week, so a repeated tick asks once.
+ *   time, each page its own step, read at the time the first step fixed and after the last account
+ *   of the page before (keyed on the account, so a retried page is the same page), and sends one
+ *   `summary.requested` per account, with an event id of the account and week, so a repeated tick
+ *   asks once.
  * - `crawlmouse.summary.send`, on `summary.requested`: one account's summary in one step, so a
  *   failure of one account stops no other.
  *
@@ -18,7 +19,11 @@ export const SUMMARY_TICK_FN_ID = 'crawlmouse.summary.tick';
 export const SUMMARY_SEND_FN_ID = 'crawlmouse.summary.send';
 /** Accounts per page of the due list: each page's step answer stays under the step output bound. */
 export const SUMMARY_PAGE = 20;
-/** The ledger's three attempts, and one for a claim left busy by a dead worker. */
+/**
+ * Five runs of the send step, as alertFn's email step: a seat's three ledger attempts, the run whose
+ * claim answers `exhausted`, and one for a claim left busy. Every seat advances one attempt per run
+ * (`sendEach`), so the count does not depend on the number of seats.
+ */
 export const SUMMARY_RETRIES = 4;
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -30,7 +35,8 @@ export interface SummaryRequested {
 }
 
 export interface SummaryTickWork {
-  due(nowIso: string, offset: number, limit: number): Promise<SummaryRequested[]>;
+  /** Up to `limit` accounts due at `nowIso`, in account-id order, after `after` (null: the first). */
+  due(nowIso: string, after: string | null, limit: number): Promise<SummaryRequested[]>;
 }
 
 export interface SummarySendWork {
@@ -45,9 +51,11 @@ export function createSummaryTickFn(work: SummaryTickWork) {
     async ({ step }) => {
       const now = await step.run('clock', async () => new Date().toISOString());
       let requested = 0;
+      let after: string | null = null;
       for (let page = 0; ; page++) {
-        const due = await step.run(`due-${page}`, async () =>
-          sized(`due-${page}`, await work.due(now, page * SUMMARY_PAGE, SUMMARY_PAGE)),
+        const from = after;
+        const due: SummaryRequested[] = await step.run(`due-${page}`, async () =>
+          sized(`due-${page}`, await work.due(now, from, SUMMARY_PAGE)),
         );
         if (due.length > 0) {
           await step.sendEvent(
@@ -61,6 +69,7 @@ export function createSummaryTickFn(work: SummaryTickWork) {
           requested += due.length;
         }
         if (due.length < SUMMARY_PAGE) break;
+        after = due[due.length - 1]!.accountId;
       }
       return { requested };
     },

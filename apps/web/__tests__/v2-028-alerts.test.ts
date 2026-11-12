@@ -271,6 +271,123 @@ describe('record_alert_delivery (D5)', () => {
   });
 });
 
+describe('the Slack ledger: claim before post (D5; review r1, test quality B1)', () => {
+  const T0 = '2026-11-13T10:00:00.000Z';
+  const at = (minutes: number) => new Date(Date.parse(T0) + minutes * 60_000).toISOString();
+  const claimSlack = async (key: string, now: string | null, accountId: string | null = null) =>
+    (
+      await svc<{ r: { outcome: string; attempt?: number } }>(
+        `select public.claim_slack_send($1, $2, $3) r`,
+        [key, accountId, now],
+      )
+    )[0]!.r;
+  const finishSlack = async (
+    key: string,
+    status: string,
+    now: string,
+    code: string | null = null,
+  ) =>
+    (
+      await svc<{ r: boolean }>(`select public.finish_slack_send($1, $2, $3, $4) r`, [
+        key,
+        status,
+        code,
+        now,
+      ])
+    )[0]!.r;
+  const rowOf = async (key: string) =>
+    (
+      await db.query<{
+        status: string;
+        attempts: number;
+        error_code: string | null;
+        sent_at: Date | null;
+      }>(
+        `select status, attempts, error_code, sent_at from public.slack_sends where idempotency_key = $1`,
+        [key],
+      )
+    ).rows[0];
+  const key = () => `alert:${randomUUID()}:slack`;
+
+  it('lets the first claim of a key go, at attempt 1, and records it as sending', async () => {
+    const { accountId } = await account();
+    const k = key();
+    expect(await claimSlack(k, T0, accountId)).toEqual({ outcome: 'go', attempt: 1 });
+    expect(await rowOf(k)).toMatchObject({ status: 'sending', attempts: 1, sent_at: null });
+  });
+
+  it('answers busy to a second claim inside two minutes, and done once the first is posted', async () => {
+    const k = key();
+    await claimSlack(k, T0);
+    expect(await claimSlack(k, at(1.9))).toEqual({ outcome: 'busy' });
+    expect(await finishSlack(k, 'sent', at(1))).toBe(true);
+    expect(await claimSlack(k, at(2))).toEqual({ outcome: 'done' });
+    // A retried step long after: still done, so the message is not posted again.
+    expect(await claimSlack(k, at(60 * 24 * 30))).toEqual({ outcome: 'done' });
+    expect(await rowOf(k)).toMatchObject({ status: 'sent', attempts: 1, error_code: null });
+  });
+
+  it('retries a failed post at most three attempts, then answers exhausted', async () => {
+    const k = key();
+    expect(await claimSlack(k, T0)).toEqual({ outcome: 'go', attempt: 1 });
+    await finishSlack(k, 'failed', at(1), 'slack_503');
+    expect(await rowOf(k)).toMatchObject({ status: 'failed', error_code: 'slack_503' });
+    expect(await claimSlack(k, at(2))).toEqual({ outcome: 'go', attempt: 2 });
+    expect(await rowOf(k)).toMatchObject({ status: 'sending', error_code: null });
+    await finishSlack(k, 'failed', at(3), 'slack_503');
+    expect(await claimSlack(k, at(4))).toEqual({ outcome: 'go', attempt: 3 });
+    await finishSlack(k, 'failed', at(5), 'network');
+    expect(await claimSlack(k, at(6))).toEqual({ outcome: 'exhausted' });
+    expect(await claimSlack(k, at(7))).toEqual({ outcome: 'exhausted' });
+    expect(await rowOf(k)).toMatchObject({ status: 'failed', attempts: 3 });
+  });
+
+  it('takes back a claim left sending for more than two minutes (a worker that died mid-post)', async () => {
+    const k = key();
+    await claimSlack(k, T0);
+    expect(await claimSlack(k, at(1.9))).toEqual({ outcome: 'busy' });
+    expect(await claimSlack(k, at(2.1))).toEqual({ outcome: 'go', attempt: 2 });
+    // and a claim left sending on its third attempt is exhausted, not posted a fourth time
+    expect(await claimSlack(k, at(4.3))).toEqual({ outcome: 'go', attempt: 3 });
+    expect(await claimSlack(k, at(6.5))).toEqual({ outcome: 'exhausted' });
+    expect(await rowOf(k)).toMatchObject({ status: 'failed', attempts: 3 });
+  });
+
+  it('records a result only for a key that is sending', async () => {
+    const k = key();
+    expect(await finishSlack(k, 'sent', T0)).toBe(false);
+    await claimSlack(k, T0);
+    expect(await finishSlack(k, 'sent', at(1))).toBe(true);
+    expect(await finishSlack(k, 'failed', at(2), 'late')).toBe(false);
+    expect(await rowOf(k)).toMatchObject({ status: 'sent', error_code: null });
+    expect((await rowOf(k))!.sent_at!.toISOString()).toBe(at(1));
+  });
+
+  it('refuses a missing key or time, another status, and an error that is not a code', async () => {
+    await expect(claimSlack(key(), null)).rejects.toThrow(/required/);
+    const k = key();
+    await claimSlack(k, T0);
+    await expect(finishSlack(k, 'sending', at(1))).rejects.toThrow(/sent or failed/);
+    await expect(
+      finishSlack(k, 'failed', at(1), 'https://hooks.slack.com/services/T/B/x'),
+    ).rejects.toThrow(/check constraint/);
+  });
+
+  it('is executable by service_role only', async () => {
+    const { rows } = await db.query<{ fn: string; r: string; ok: boolean }>(
+      `select fn, r, has_function_privilege(r, fn, 'execute') ok
+         from unnest(array['public.claim_slack_send(text, uuid, timestamptz)',
+                           'public.finish_slack_send(text, text, text, timestamptz)']) fn,
+              unnest(array['anon', 'authenticated', 'service_role']) r
+        order by fn, r`,
+    );
+    expect(rows.filter((x) => x.ok).map((x) => [x.fn, x.r])).toEqual([
+      ['public.claim_slack_send(text, uuid, timestamptz)', 'service_role'],
+      ['public.finish_slack_send(text, text, text, timestamptz)', 'service_role'],
+    ]);
+  });
+});
+
 describe('the Slack URL at send time (D5)', () => {
   it('answers the URL for a paid account, and null once it is Free', async () => {
     const { accountId } = await account('pro');
@@ -296,6 +413,31 @@ describe('the Slack URL at send time (D5)', () => {
     ).toBeNull();
   });
 
+  it('answers null for an account marked for deletion, or deleted (review r1, test quality B2)', async () => {
+    const url = 'https://hooks.slack.com/services/T0000/B0000/markedAccount1';
+    const urlOf = async (accountId: string) =>
+      (
+        await svc<{ u: string | null }>(`select public.account_slack_webhook_url($1, now()) u`, [
+          accountId,
+        ])
+      )[0]!.u;
+    const marked = await account('pro');
+    const deleted = await account('pro');
+    for (const a of [marked, deleted]) {
+      await svc(`select public.set_account_slack_webhook($1, $2)`, [a.accountId, url]);
+      expect(await urlOf(a.accountId)).toBe(url);
+    }
+    await db.query(
+      `update public.accounts set deletion_confirmed_at = now(), purge_after = now() + interval '7 days' where id = $1`,
+      [marked.accountId],
+    );
+    await db.query(`update public.accounts set deleted_at = now() where id = $1`, [
+      deleted.accountId,
+    ]);
+    expect(await urlOf(marked.accountId)).toBeNull();
+    expect(await urlOf(deleted.accountId)).toBeNull();
+  });
+
   it('is executable by service_role only', async () => {
     const { rows } = await db.query<{ r: string; ok: boolean }>(
       `select r, has_function_privilege(r, 'public.account_slack_webhook_url(uuid, timestamptz)', 'execute') ok
@@ -312,10 +454,12 @@ describe('the Slack URL at send time (D5)', () => {
 describe('recipients and unsubscribe (D5, D6, D7)', () => {
   it('sends alerts to an active seat with email in its channels, while change notes are on', async () => {
     const { accountId, seatId, email } = await account();
+    const { siteId } = await keptCheck(accountId);
     const recips = () =>
-      svc<{ seat_id: string; email: string }>(`select * from public.alert_email_recipients($1)`, [
-        accountId,
-      ]);
+      svc<{ seat_id: string; email: string }>(
+        `select * from public.alert_email_recipients($1, $2)`,
+        [accountId, siteId],
+      );
     expect(await recips()).toEqual([{ seat_id: seatId, email }]);
     await db.query(`update public.accounts set email_change_notes = false where id = $1`, [
       accountId,
@@ -325,13 +469,16 @@ describe('recipients and unsubscribe (D5, D6, D7)', () => {
 
   it('unsubscribes one seat from one kind only', async () => {
     const { accountId, seatId, email } = await account();
+    const { siteId } = await keptCheck(accountId);
     expect(
       (await svc<{ ok: boolean }>(`select public.unsubscribe_seat($1, 'alerts') ok`, [seatId]))[0]!
         .ok,
     ).toBe(true);
-    expect(await svc(`select * from public.alert_email_recipients($1)`, [accountId])).toEqual([]);
+    expect(
+      await svc(`select * from public.alert_email_recipients($1, $2)`, [accountId, siteId]),
+    ).toEqual([]);
     expect(await svc(`select * from public.summary_recipients($1)`, [accountId])).toEqual([
-      { seat_id: seatId, email },
+      { seat_id: seatId, email, sites: null },
     ]);
     await svc(`select public.unsubscribe_seat($1, 'summary')`, [seatId]);
     expect(await svc(`select * from public.summary_recipients($1)`, [accountId])).toEqual([]);
@@ -361,15 +508,95 @@ describe('recipients and unsubscribe (D5, D6, D7)', () => {
       `update public.accounts set deletion_confirmed_at = now(), purge_after = now() + interval '7 days' where id = $1`,
       [accountId],
     );
-    expect(await svc(`select * from public.alert_email_recipients($1)`, [accountId])).toEqual([]);
+    const { siteId } = await keptCheck(accountId);
+    expect(
+      await svc(`select * from public.alert_email_recipients($1, $2)`, [accountId, siteId]),
+    ).toEqual([]);
     expect(await svc(`select * from public.summary_recipients($1)`, [accountId])).toEqual([]);
+  });
+});
+
+describe('recipients honour a seat’s client scope (review r1, security S1)', () => {
+  /** An active seat on the account for a new user, scoped to `sites` (null: every site). */
+  async function seat(accountId: string, sites: string[] | null) {
+    const email = `scoped-${randomUUID()}@example.com`;
+    const userId = await signUp(db, email);
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at,
+                                 client_scope_all)
+       values ($1, $2, $3, 'account_manager', 'active', now(), $4) returning id`,
+      [accountId, userId, email, sites === null],
+    );
+    const seatId = rows[0]!.id;
+    for (const siteId of sites ?? [])
+      await insertRow(db, 'seat_sites', ROWS.seat_sites(seatId, siteId, accountId));
+    return { seatId, email };
+  }
+
+  async function staging(accountId: string, of: string) {
+    const id = randomUUID();
+    await insertRow(db, 'sites', {
+      ...ROWS.sites(id, accountId, `staging-${id.slice(0, 8)}.example`),
+      staging_of_site_id: of,
+    });
+    return id;
+  }
+
+  const alertTo = async (accountId: string, siteId: string) =>
+    (
+      await svc<{ seat_id: string }>(`select seat_id from public.alert_email_recipients($1, $2)`, [
+        accountId,
+        siteId,
+      ])
+    ).map((r) => r.seat_id);
+
+  it('mails a site’s alert to a seat scoped to it or to the site it stages, and to no other scoped seat', async () => {
+    const owner = await account();
+    const a = (await keptCheck(owner.accountId)).siteId;
+    const b = (await keptCheck(owner.accountId)).siteId;
+    const aStaging = await staging(owner.accountId, a);
+    const toA = await seat(owner.accountId, [a]);
+    const toB = await seat(owner.accountId, [b]);
+    const all = await seat(owner.accountId, null);
+    expect(await alertTo(owner.accountId, a)).toEqual([owner.seatId, toA.seatId, all.seatId]);
+    expect(await alertTo(owner.accountId, aStaging)).toEqual([
+      owner.seatId,
+      toA.seatId,
+      all.seatId,
+    ]);
+    expect(await alertTo(owner.accountId, b)).toEqual([owner.seatId, toB.seatId, all.seatId]);
+  });
+
+  it('mails nobody for a site that is not the account’s', async () => {
+    const owner = await account();
+    const other = await account();
+    const theirs = (await keptCheck(other.accountId)).siteId;
+    expect(await alertTo(owner.accountId, theirs)).toEqual([]);
+  });
+
+  it('names, for each summary recipient, the sites it may read: null for every site', async () => {
+    const owner = await account();
+    const a = (await keptCheck(owner.accountId)).siteId;
+    const b = (await keptCheck(owner.accountId)).siteId;
+    const aStaging = await staging(owner.accountId, a);
+    const toA = await seat(owner.accountId, [a]);
+    const none = await seat(owner.accountId, []);
+    const rows = await svc<{ seat_id: string; sites: string[] | null }>(
+      `select seat_id, sites from public.summary_recipients($1)`,
+      [owner.accountId],
+    );
+    const sitesOf = (seatId: string) => rows.find((r) => r.seat_id === seatId)?.sites;
+    expect(sitesOf(owner.seatId)).toBeNull();
+    expect([...(sitesOf(toA.seatId) ?? [])].sort()).toEqual([a, aStaging].sort());
+    expect(sitesOf(toA.seatId)).not.toContain(b);
+    expect(sitesOf(none.seatId)).toEqual([]);
   });
 });
 
 describe('due_summary_accounts (D6)', () => {
   const due = (now: string) =>
     svc<{ account_id: string; week_key: string; week_start: Date }>(
-      `select * from public.due_summary_accounts($1)`,
+      `select * from public.due_summary_accounts($1, null, 1000)`,
       [now],
     );
 
@@ -381,6 +608,28 @@ describe('due_summary_accounts (D6)', () => {
     expect(hit?.week_start.toISOString()).toBe('2026-11-16T05:00:00.000Z');
     expect((await due('2026-11-16T08:30:00Z')).some((r) => r.account_id === accountId)).toBe(false);
     expect((await due('2026-11-16T14:00:00Z')).some((r) => r.account_id === accountId)).toBe(false);
+  });
+
+  it('pages in account order: at most p_limit after p_after, the limit held to 1–1000 (review r1, correctness S3)', async () => {
+    const ids: string[] = [];
+    for (let k = 0; k < 4; k++) ids.push((await account('pro', 'Asia/Tokyo')).accountId);
+    // Monday 2026-11-16 08:30 in Tokyo is 23:30 UTC on Sunday.
+    const at = '2026-11-15T23:30:00Z';
+    const page = async (after: string | null, limit: number) =>
+      (
+        await svc<{ account_id: string }>(
+          `select account_id from public.due_summary_accounts($1, $2, $3)`,
+          [at, after, limit],
+        )
+      ).map((r) => r.account_id);
+    const all = await page(null, 1000);
+    for (const id of ids) expect(all).toContain(id);
+    expect(all).toEqual([...all].sort());
+    expect(await page(null, 2)).toEqual(all.slice(0, 2));
+    expect(await page(all[1]!, 2)).toEqual(all.slice(2, 4));
+    expect(await page(all.at(-1)!, 2)).toEqual([]);
+    expect(await page(null, 0)).toEqual(all.slice(0, 1));
+    expect(await page(null, 5000)).toEqual(all);
   });
 
   it('is never due for a Free account or a marked one', async () => {

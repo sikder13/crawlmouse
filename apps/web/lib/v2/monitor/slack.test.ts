@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { MailChange } from '../mail/templates/alert';
-import { isSlackWebhook, slackAlertText, slackEscape, slackPoster, SLACK_ROWS_MAX } from './slack';
+import { promises as dnsPromises } from 'node:dns';
+import { validateUrlOrThrow } from '@crawlmouse/engine';
+import {
+  DnsUnavailable,
+  isSlackWebhook,
+  slackAlertText,
+  slackEscape,
+  slackPoster,
+  slackResolver,
+  SLACK_ROWS_MAX,
+} from './slack';
 
 const URL_A = 'https://hooks.slack.com/services/T0000/B0000/abcdWXYZsecret';
 const CHECK = 'c0000000-0000-4000-8000-000000000006';
@@ -146,6 +156,71 @@ describe('the POST', () => {
       );
       expect(out).toMatchObject({ ok: false, ...want });
       expect(JSON.stringify(out)).not.toContain('hooks.slack.com');
+    }
+  });
+
+  it('answers a lookup that failed for the moment as retryable, without a request (review r1 N5)', async () => {
+    const fetchMock = vi.fn(async () => new Response('', { status: 200 }));
+    const lookupFailed = slackResolver(async () => {
+      throw Object.assign(new Error('getaddrinfo EAI_AGAIN hooks.slack.com'), {
+        code: 'EAI_AGAIN',
+      });
+    });
+    // The guard production runs, over a lookup that fails: the poster's default wiring.
+    const post = slackPoster({
+      fetch: fetchMock as never,
+      validate: (url) => validateUrlOrThrow(url, { resolver: lookupFailed }),
+    });
+    const out = await post(URL_A, 't');
+    expect(out).toEqual({ ok: false, code: 'slack_dns', retryable: true });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('still refuses, for good, an answer the guard refuses (a private address)', async () => {
+    const fetchMock = vi.fn(async () => new Response('', { status: 200 }));
+    const post = slackPoster({
+      fetch: fetchMock as never,
+      validate: (url) =>
+        validateUrlOrThrow(url, { resolver: slackResolver(async () => [{ address: '10.0.0.7' }]) }),
+    });
+    expect(await post(URL_A, 't')).toEqual({
+      ok: false,
+      code: 'slack_url_refused',
+      retryable: false,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('turns a failed lookup into DnsUnavailable, and an answer into its addresses', async () => {
+    await expect(
+      slackResolver(async () => {
+        throw new Error('ENOTFOUND');
+      })('hooks.slack.com'),
+    ).rejects.toBeInstanceOf(DnsUnavailable);
+    await expect(slackResolver(async () => [])('hooks.slack.com')).rejects.toBeInstanceOf(
+      DnsUnavailable,
+    );
+    expect(
+      await slackResolver(async () => [{ address: '3.1.1.1' }, { address: '3.1.1.2' }])('h'),
+    ).toEqual(['3.1.1.1', '3.1.1.2']);
+  });
+
+  it('production’s poster uses that resolver: a failed lookup is retried, and nothing is sent', async () => {
+    const lookup = vi
+      .spyOn(dnsPromises, 'lookup')
+      .mockRejectedValue(Object.assign(new Error('getaddrinfo EAI_AGAIN'), { code: 'EAI_AGAIN' }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    try {
+      expect(await slackPoster()(URL_A, 't')).toEqual({
+        ok: false,
+        code: 'slack_dns',
+        retryable: true,
+      });
+      expect(lookup).toHaveBeenCalledWith('hooks.slack.com', { all: true });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      lookup.mockRestore();
+      fetchSpy.mockRestore();
     }
   });
 });

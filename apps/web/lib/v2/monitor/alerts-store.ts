@@ -10,6 +10,7 @@ import { z } from 'zod';
 import type { Claim } from '../mail/ledger';
 import type { AlertContext, AlertData, AlertStore, Delivery, StoredChange } from './alerts';
 import type { AlertFixEvent, AlertRuleInput } from './alert-rules';
+import { inLists, pagedRows } from './paged';
 
 const fail = (what: string, error: { code?: string } | null) =>
   new Error(`${what}: ${error?.code ?? 'error'}`);
@@ -91,34 +92,45 @@ export function supabaseAlertStore(sb: SupabaseClient): AlertStore {
 
     seedDefaultRules: (accountId) => seedDefaultAlertRules(sb, accountId),
     async data(ctx): Promise<AlertData> {
-      const [changes, rules, checks] = await Promise.all([
-        sb
-          .from('changes')
-          .select(CHANGE_COLUMNS)
-          .eq('check_id', ctx.checkId)
-          .eq('site_id', ctx.siteId),
-        sb
-          .from('alert_rules')
-          .select('id, site_id, kind, enabled, threshold_points, channels')
-          .eq('account_id', ctx.accountId),
+      // The check's changes, the account's rules and its fixes' events can each pass PostgREST's
+      // 1,000 rows, so each is read a page at a time (paged.ts).
+      const [rows, rules, checks] = await Promise.all([
+        pagedRows<StoredChange>('changes', (from, to) =>
+          sb
+            .from('changes')
+            .select(CHANGE_COLUMNS)
+            .eq('check_id', ctx.checkId)
+            .eq('site_id', ctx.siteId)
+            .order('id')
+            .range(from, to),
+        ),
+        pagedRows<AlertRuleInput>('alert_rules', (from, to) =>
+          sb
+            .from('alert_rules')
+            .select('id, site_id, kind, enabled, threshold_points, channels')
+            .eq('account_id', ctx.accountId)
+            .order('id')
+            .range(from, to),
+        ),
         sb
           .from('checks')
           .select('id, crawlers, without_js')
           .in('id', [ctx.checkId, ...(ctx.previousCheckId ? [ctx.previousCheckId] : [])]),
       ]);
-      if (changes.error) throw fail('changes', changes.error);
-      if (rules.error) throw fail('alert_rules', rules.error);
       if (checks.error) throw fail('checks', checks.error);
-      const rows = (changes.data ?? []) as unknown as StoredChange[];
       const fixIds = [...new Set(rows.flatMap((c) => (c.fix_id ? [c.fix_id] : [])))];
-      let fixEvents: AlertFixEvent[] = [];
-      if (fixIds.length) {
-        const ev = await sb
-          .from('fix_events')
-          .select('fix_id, kind, at, check_id')
-          .in('fix_id', fixIds);
-        if (ev.error) throw fail('fix_events', ev.error);
-        fixEvents = (ev.data ?? []) as AlertFixEvent[];
+      const fixEvents: AlertFixEvent[] = [];
+      for (const ids of inLists(fixIds)) {
+        fixEvents.push(
+          ...(await pagedRows<AlertFixEvent>('fix_events', (from, to) =>
+            sb
+              .from('fix_events')
+              .select('fix_id, kind, at, check_id')
+              .in('fix_id', ids)
+              .order('id')
+              .range(from, to),
+          )),
+        );
       }
       const byId = new Map((checks.data ?? []).map((c) => [c.id as string, c]));
       const verdicts = (id: string | null) => {
@@ -134,19 +146,17 @@ export function supabaseAlertStore(sb: SupabaseClient): AlertStore {
       };
       return {
         changes: rows,
-        rules: (rules.data ?? []) as AlertRuleInput[],
+        rules,
         verdicts: { now: verdicts(ctx.checkId) ?? {}, before: verdicts(ctx.previousCheckId) },
         textShare: { before: share(ctx.previousCheckId), now: share(ctx.checkId) },
         fixEvents,
       };
     },
 
-    async emailRecipients(accountId) {
+    async emailRecipients(accountId, siteId) {
       const rows = await rpc<{ seat_id: string; email: string }[] | null>(
         'alert_email_recipients',
-        {
-          p_account: accountId,
-        },
+        { p_account: accountId, p_site: siteId },
       );
       return (rows ?? []).map((r) => ({ seatId: r.seat_id, email: r.email }));
     },

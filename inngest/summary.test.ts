@@ -24,11 +24,13 @@ const due = (n: number): SummaryRequested[] =>
 async function tick(all: SummaryRequested[]) {
   const ids: string[] = [];
   const sent: { id: string; events: unknown[] }[] = [];
-  const asked: [string, number, number][] = [];
+  const asked: [string, string | null, number][] = [];
   const fn = createSummaryTickFn({
-    due: async (now, offset, limit) => {
-      asked.push([now, offset, limit]);
-      return all.filter((_, k) => k >= offset && k < offset + limit);
+    due: async (now, after, limit) => {
+      // A tick that never reaches a short page fails here instead of looping.
+      if (asked.length > 10) throw new Error('the tick asked for more than ten pages');
+      asked.push([now, after, limit]);
+      return all.filter((d) => after === null || d.accountId > after).slice(0, limit);
     },
   }) as unknown as { fn: (ctx: unknown) => Promise<unknown> };
   const out = await fn.fn({
@@ -59,6 +61,11 @@ describe('the summary tick (D6)', () => {
     const { out, ids, sent, asked } = await tick(all);
     expect(ids).toEqual(['clock', 'due-0', 'due-1']);
     expect(new Set(asked.map((a) => a[0])).size).toBe(1);
+    // Each page after the first starts after the last account of the page before.
+    expect(asked.map((a) => [a[1], a[2]])).toEqual([
+      [null, SUMMARY_PAGE],
+      [all[SUMMARY_PAGE - 1]!.accountId, SUMMARY_PAGE],
+    ]);
     const events = sent.flatMap((s) => s.events) as {
       name: string;
       id: string;
