@@ -467,7 +467,7 @@ describe('POST /api/reports: the answer', () => {
     expect(await reportById(body.reportId)).toMatchObject({
       file_state: 'failed',
       failed_reason: 'store_failed',
-      storage_path: null,
+      storage_path: reportPath(w.accountId, body.reportId, 'pdf'),
     });
     const form = await post({ kind: 'audit_pdf', siteId: w.site.id, checkId: w.site.first }, true);
     expect([form.status, form.headers.get('location')]).toEqual([303, '/reports']);
@@ -506,9 +506,11 @@ describe('POST /api/reports: the answer', () => {
     const pending = async (age: string) =>
       (
         await h.db.query<{ id: string }>(
-          `insert into public.reports (account_id, site_id, kind, format, status, made_by,
-                                       covers_check_ids, file_state, created_at)
-           values ($1, $2, 'audit_pdf', 'pdf', 'ready', 'user', $3, 'pending', now() - $4::interval)
+          `insert into public.reports (id, account_id, site_id, kind, format, status, made_by,
+                                       covers_check_ids, file_state, storage_path, created_at)
+           select r.id, $1, $2, 'audit_pdf', 'pdf', 'ready', 'user', $3, 'pending',
+                  public.report_file_path($1, r.id, 'pdf'), now() - $4::interval
+             from (select gen_random_uuid() as id) r
            returning id`,
           [w.accountId, w.site.id, [w.site.first], age],
         )

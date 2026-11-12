@@ -123,14 +123,14 @@ describe('the columns', () => {
   });
 
   it.each([
-    ['a path without the stored state', { storage_path: 'a/b.pdf' }, /reports_stored_path/],
+    ['a path on a report with no file state', { storage_path: 'a/b.pdf' }, /reports_file_path/],
+    ['a pending report without a path', { file_state: 'pending' }, /reports_file_path/],
+    ['the stored state without a path', { file_state: 'stored' }, /reports_file_path/],
     [
-      'a path on a pending report',
-      { file_state: 'pending', storage_path: 'a/b.pdf' },
-      /reports_stored_path/,
+      'a state the column does not list',
+      { file_state: 'ready', storage_path: 'a/b.pdf' },
+      /reports_file_state/,
     ],
-    ['the stored state without a path', { file_state: 'stored' }, /reports_stored_path/],
-    ['a state the column does not list', { file_state: 'ready' }, /reports_file_state/],
     [
       'a reason on a pending report',
       { file_state: 'pending', failed_reason: 'x' },
@@ -190,7 +190,8 @@ describe('create_report', () => {
         status: 'ready',
         made_by: 'user',
         file_state: 'pending',
-        storage_path: null,
+        // The row names its object from its first write, before any file is stored.
+        storage_path: reportPath(w.accountId, id, format),
         byte_count: null,
         failed_reason: null,
         subject_fix_id: null,
@@ -339,7 +340,10 @@ describe('finish_report', () => {
     await expect(asService(`select public.finish_report($1, null, 1)`, [id])).rejects.toMatchObject(
       { code: '22023' },
     );
-    expect(await row(id)).toMatchObject({ file_state: 'pending', storage_path: null });
+    expect(await row(id)).toMatchObject({
+      file_state: 'pending',
+      storage_path: reportPath(w.accountId, id, 'pdf'),
+    });
   });
 
   it('refuses a size that is not one, and a report that does not exist', async () => {
@@ -357,7 +361,10 @@ describe('finish_report', () => {
     const id = await create();
     await asService(`select public.fail_report($1, 'generation_failed')`, [id]);
     expect(await finish(id, reportPath(w.accountId, id, 'pdf'))).toBe(false);
-    expect(await row(id)).toMatchObject({ file_state: 'failed', storage_path: null });
+    expect(await row(id)).toMatchObject({
+      file_state: 'failed',
+      storage_path: reportPath(w.accountId, id, 'pdf'),
+    });
   });
 });
 
@@ -371,7 +378,7 @@ describe('fail_report', () => {
     expect(await row(id)).toMatchObject({
       file_state: 'failed',
       failed_reason: 'generation_failed',
-      storage_path: null,
+      storage_path: reportPath(w.accountId, id, 'pdf'),
     });
     expect(await fail(id, 'store_failed')).toBe(false);
     expect((await row(id)).failed_reason).toBe('generation_failed');
@@ -487,7 +494,7 @@ describe('the migration', () => {
         await db.query<{ conname: string }>(
           `select conname from pg_constraint
             where conrelid = 'public.reports'::regclass
-              and conname in ('reports_file_state', 'reports_stored_path', 'reports_failed_reason')
+              and conname in ('reports_file_state', 'reports_file_path', 'reports_failed_reason')
             order by 1`,
         )
       ).rows.map((r) => r.conname);
@@ -502,8 +509,8 @@ describe('the migration', () => {
       ]);
       expect(await constraints()).toEqual([
         'reports_failed_reason',
+        'reports_file_path',
         'reports_file_state',
-        'reports_stored_path',
       ]);
     };
     const stored = await create();

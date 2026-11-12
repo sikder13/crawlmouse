@@ -239,7 +239,7 @@ describe('generateReport', () => {
     expect(unverified.objects.size).toBe(0);
     expect(await row(unverified.id)).toEqual({
       file_state: 'failed',
-      storage_path: null,
+      storage_path: expect.stringContaining(unverified.id),
       byte_count: null,
       failed_reason: 'build_failed',
     });
@@ -263,7 +263,7 @@ describe('generateReport', () => {
     expect(memory.objects.size).toBe(0);
     expect(await row(id)).toMatchObject({
       file_state: 'failed',
-      storage_path: null,
+      storage_path: expect.stringContaining(id),
       failed_reason: 'store_failed',
     });
   });
@@ -281,7 +281,7 @@ describe('generateReport', () => {
     expect(memory.objects.size).toBe(0);
     expect(await row(id)).toEqual({
       file_state: 'failed',
-      storage_path: null,
+      storage_path: expect.stringContaining(id),
       byte_count: null,
       failed_reason: 'store_failed',
     });
@@ -409,7 +409,7 @@ describe('generateReport', () => {
     expect(await row(id)).toMatchObject({
       file_state: 'failed',
       failed_reason: 'abandoned',
-      storage_path: null,
+      storage_path: expect.stringContaining(id),
     });
   });
 });

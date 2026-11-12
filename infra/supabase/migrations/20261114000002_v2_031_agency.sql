@@ -590,9 +590,12 @@ grant execute on function public.remove_seat(uuid, uuid, timestamptz) to service
 -- ─── B: report files ──────────────────────────────────────────────────────────────────────────────
 -- A report's file in the private `reports` bucket. file_state is null for a report that has no file
 -- (a public link), 'pending' from create_report until the file is in the bucket, then 'stored', or
--- 'failed' with failed_reason, a short code. storage_path is set exactly while file_state is 'stored'
--- (reports_stored_path). subject_fix_id names the fix a proof page is about; it has no foreign key,
--- and create_report accepts it only for a fix of the report's site.
+-- 'failed' with failed_reason, a short code. storage_path is the object's name, and a report holds it
+-- from the row's first write, whatever its file_state (reports_file_path): a request that dies
+-- between the upload and finish_report leaves an object its row still names, which is how the
+-- erasure's storage list (20261112000002, erase_person_counts) finds it. Whether the file is there
+-- to download is file_state = 'stored'. subject_fix_id names the fix a proof page is about; it has no
+-- foreign key, and create_report accepts it only for a fix of the report's site.
 -- A client reads file_state; storage_path, failed_reason and subject_fix_id are granted to none.
 -- Functions, each security definer with search_path pg_catalog, pg_temp, owned by postgres, revoked
 -- from every client role and granted to service_role: create_report, finish_report, fail_report,
@@ -611,8 +614,9 @@ alter table public.reports drop constraint if exists reports_file_state;
 alter table public.reports add constraint reports_file_state
   check (file_state in ('pending', 'stored', 'failed'));
 alter table public.reports drop constraint if exists reports_stored_path;
-alter table public.reports add constraint reports_stored_path
-  check ((storage_path is not null) = (file_state is not distinct from 'stored'));
+alter table public.reports drop constraint if exists reports_file_path;
+alter table public.reports add constraint reports_file_path
+  check ((storage_path is not null) = (file_state is not null));
 alter table public.reports drop constraint if exists reports_failed_reason;
 alter table public.reports add constraint reports_failed_reason
   check ((failed_reason is not null) = (file_state is not distinct from 'failed')
@@ -640,7 +644,7 @@ as $$
 $$;
 
 -- Writes one report a person asked for, waiting for its file: status 'ready', made_by 'user',
--- file_state 'pending'. p holds account_id, site_id, kind, format and covers_check_ids, and may hold
+-- file_state 'pending', storage_path its own object name (report_file_path). p holds account_id, site_id, kind, format and covers_check_ids, and may hold
 -- owner_seat_id and subject_fix_id; any other key, a kind this function does not make (audit_pdf as
 -- pdf, compare as html, raw_export as csv, json or edge_list), more than two checks, two for a
 -- kind other than compare, a repeated one, or a fix without two checks of a compare raises 22023.
@@ -664,6 +668,7 @@ declare
   v_format text;
   v_checks uuid[];
   v_fix uuid;
+  v_new constant uuid := pg_catalog.gen_random_uuid();
   v_id uuid;
 begin
   if pg_catalog.jsonb_typeof(p) is distinct from 'object' then
@@ -691,10 +696,12 @@ begin
     raise exception 'create_report: not a report this function makes' using errcode = '22023';
   end if;
 
-  insert into public.reports (account_id, site_id, kind, format, status, made_by, covers_check_ids,
-                              owner_seat_id, subject_fix_id, file_state)
-  select v_account, v_site, v_kind, v_format, 'ready', 'user', v_checks,
-         (p ->> 'owner_seat_id')::uuid, v_fix, 'pending'
+  insert into public.reports (id, account_id, site_id, kind, format, status, made_by,
+                              covers_check_ids, owner_seat_id, subject_fix_id, file_state,
+                              storage_path)
+  select v_new, v_account, v_site, v_kind, v_format, 'ready', 'user', v_checks,
+         (p ->> 'owner_seat_id')::uuid, v_fix, 'pending',
+         public.report_file_path(v_account, v_new, v_format)
    where exists (select 1 from public.sites s where s.id = v_site and s.account_id = v_account)
      and (select pg_catalog.count(*)
             from public.checks c
@@ -712,9 +719,9 @@ begin
 end;
 $$;
 
--- Records that a pending report's file is in the bucket: file_state 'stored', its path and size.
--- p_path must be the report's own name (report_file_path), and p_bytes zero or more; otherwise
--- 22023. No such report raises P0002. Returns true when it stored the path, false when the report
+-- Records that a pending report's file is in the bucket: file_state 'stored' and its size.
+-- p_path must be the report's own name (report_file_path, which the row holds), and p_bytes zero or
+-- more; otherwise 22023. No such report raises P0002. Returns true when it stored the path, false when the report
 -- was not pending (a second call for the same report changes nothing).
 create or replace function public.finish_report(p_report uuid, p_path text, p_bytes bigint)
 returns boolean
@@ -746,7 +753,7 @@ begin
     return false;
   end if;
   update public.reports r
-     set file_state = 'stored', storage_path = p_path, byte_count = p_bytes
+     set file_state = 'stored', byte_count = p_bytes
    where r.id = p_report;
   return true;
 end;

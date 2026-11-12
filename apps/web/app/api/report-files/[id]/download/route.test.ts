@@ -76,7 +76,7 @@ async function report(
       format,
       [checkId],
       state,
-      state === 'stored' ? reportPath(accountId, id, format) : null,
+      reportPath(accountId, id, format),
       state === 'stored' ? 1234 : null,
       state === 'failed' ? 'build_failed' : null,
     ],

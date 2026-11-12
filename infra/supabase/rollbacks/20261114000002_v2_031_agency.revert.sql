@@ -5,15 +5,24 @@
 -- ─── B ────────────────────────────────────────────────────────────────────────────────────────────
 -- Report files: the functions, then the three columns (the grant on file_state goes with it).
 -- storage_path is 003's column and stays, so a stored file keeps its path; a pending or failed
--- report becomes a row with no file state.
+-- report becomes a row with no file state and no path.
 drop function if exists public.fail_abandoned_reports(uuid, timestamptz);
 drop function if exists public.fail_report(uuid, text);
 drop function if exists public.finish_report(uuid, text, bigint);
 drop function if exists public.create_report(jsonb);
 drop function if exists public.report_file_path(uuid, uuid, text);
 alter table public.reports drop constraint if exists reports_failed_reason;
-alter table public.reports drop constraint if exists reports_stored_path;
+alter table public.reports drop constraint if exists reports_file_path;
 alter table public.reports drop constraint if exists reports_file_state;
+-- A pending or failed report names an object that is not a stored file: its path goes with its
+-- state, so a re-apply (which reads a path without a state as a stored file) finds stored files only.
+do $$ begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'reports' and column_name = 'file_state') then
+    update public.reports set storage_path = null
+     where storage_path is not null and file_state is distinct from 'stored';
+  end if;
+end $$;
 alter table public.reports drop column if exists subject_fix_id;
 alter table public.reports drop column if exists failed_reason;
 alter table public.reports drop column if exists file_state;

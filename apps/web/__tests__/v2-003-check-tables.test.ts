@@ -1026,7 +1026,7 @@ const RULE_CASES: Record<
     table: 'reports',
     row: async () => ({ ...(await freshRow('reports')), covers_check_ids: [] }),
   },
-  reports_stored_path: {
+  reports_file_path: {
     table: 'reports',
     row: async () => ({ ...(await freshRow('reports')), storage_path: 'a/b.pdf' }),
   },
@@ -1337,7 +1337,7 @@ const OTHER_WAY: {
     row: async () => ({ ...(await freshRow('reports')), public_slug: `r-${randomUUID()}` }),
   },
   {
-    constraint: 'reports_stored_path',
+    constraint: 'reports_file_path',
     table: 'reports',
     label: 'a stored file with no path',
     row: async () => ({ ...(await freshRow('reports')), file_state: 'stored' }),
@@ -1346,7 +1346,11 @@ const OTHER_WAY: {
     constraint: 'reports_failed_reason',
     table: 'reports',
     label: 'a failed file with no reason',
-    row: async () => ({ ...(await freshRow('reports')), file_state: 'failed' }),
+    row: async () => ({
+      ...(await freshRow('reports')),
+      file_state: 'failed',
+      storage_path: 'a/b.pdf',
+    }),
   },
   {
     constraint: 'fix_events_kind_fields',

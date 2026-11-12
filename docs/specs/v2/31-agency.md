@@ -397,16 +397,18 @@ reads; `storage_path`, `failed_reason` and `subject_fix_id` are granted to no cl
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b-reports.test.ts`.
 
 A report has one object. Its name is `<account id>/<report id>.<extension>` (`reportPath`), it is
-put over whatever is at that name, and `finish_report` stores no other name for a report.
+put over whatever is at that name, and `finish_report` accepts no other name for a report.
 
-The bucket holds a report's object only while its row names it, because the erasure finds a report's
-file by `reports.storage_path`. When the row does not come to name the object (a throw while putting
-it or while marking the row stored, or a row that stopped being pending while the file was made),
-`generateReport` reads the row again, keeps an object the row does name, and otherwise removes the
-object before it marks the row `store_failed`. When the removal throws, the row is marked
-`object_left`: an object may remain at the report's own name with no row naming it, and that reason
-is the record of it (`select id, account_id, format from reports where failed_reason =
-'object_left'`). Each case is a test in `lib/v2/reports/generate-run.test.ts`.
+A report's row holds that name in `reports.storage_path` from its first write (`create_report`),
+whatever its `file_state`, because the erasure finds a report's object by that column: an object a
+dead request left behind is still one a row names. Whether the file is there to download is
+`file_state = 'stored'`. A report that does not come to be stored is left without an object where
+that can be done: after a throw while putting it or while marking the row stored, or when the row
+stopped being pending while the file was made, `generateReport` reads the row again, keeps the
+object of a row that is stored, and otherwise removes the object before it marks the row
+`store_failed`. When the removal throws, the row is marked `object_left`. Each case is a test in
+`lib/v2/reports/generate-run.test.ts`; the path and the CHECK that holds it (`reports_file_path`) in
+`__tests__/v2-031-b-reports.test.ts`.
 
 ### What a document holds
 
@@ -540,7 +542,8 @@ covers the name turns it red. The fix is one more column in rule 30's action, wh
 `erase_rules()`.
 
 The storage list (`erase_person_counts`) names a report's file as bucket `reports` and object name
-`reports.storage_path`. A file stored under another name or bucket is not listed.
+`reports.storage_path`, which a report row holds from its first write (§9), so the object of a
+pending or failed report is listed too. A file stored under another name or bucket is not listed.
 
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-c-erasure.test.ts`
 
