@@ -75,10 +75,12 @@ export function listMark(later: string): string {
   return `/${segment}/`;
 }
 
-/** What the content half of the command proves, and what it leaves to the next check. */
+/** What the content half of the command compares, and what it leaves to the next check. */
 const LINKS_NOT_HASH = ours(
-  'A later page that repeats the first has every link the first has, so it does not pass. The command compares links; the content hash the audit measures is measured again on the next check.',
+  'The command compares links, not the content hash the audit measures, which the next check measures again.',
 );
+/** What the canonical half of the command does not read. */
+const NOT_READ = ours('A canonical sent in an HTTP Link header is not read.');
 
 export const duplicatePagination: PacketEntry<'duplicate_pagination'> = {
   kind: 'builder',
@@ -152,20 +154,18 @@ export const duplicatePagination: PacketEntry<'duplicate_pagination'> = {
         ? ''
         : ' The command reads the first of the later pages; the others are measured again on the next check.',
     );
-    const head = ours(
-      'The command reads the <head> of the HTML: a canonical sent in an HTTP Link header is not read.',
-    );
     if (canonical !== null && content !== null) {
       return {
         command: command(both(canonical, content)),
-        expect: line`Exit status 0 once the <head> of ${code(own)} holds one <link rel="canonical">, naming its own URL (today it names ${code(first)}), and ${code(own)} and ${code(firstAt)} each link to a page the other does not link to, links to the list's own pages left out. ${LINKS_NOT_HASH} ${head}${others}`,
+        // short, and with each URL once: a line past its bound is cut, and the limits are at its end
+        expect: line`Exit status 0 once the <head> of ${code(own)} holds one <link rel="canonical">, naming its own URL (today: ${code(first)}), and that page and the first page each link to a page the other does not link to, the list's own pages left out. ${LINKS_NOT_HASH} ${NOT_READ}${others}`,
         ua: one.ua,
       };
     }
     if (canonical !== null) {
       return {
         command: command(canonical),
-        expect: line`Exit status 0 once the <head> of ${code(own)} holds one <link rel="canonical">, naming its own URL in full or from the root; today it names ${code(first)}. ${head}${others}`,
+        expect: line`Exit status 0 once the <head> of ${code(own)} holds one <link rel="canonical">, naming its own URL in full or from the root; today it names ${code(first)}. ${NOT_READ}${others}`,
         ua: one.ua,
       };
     }
@@ -174,7 +174,7 @@ export const duplicatePagination: PacketEntry<'duplicate_pagination'> = {
     }
     return {
       command: command(content),
-      expect: line`Exit status 0 once ${code(own)} and ${code(firstAt)} each link to a page the other does not link to, links to the list's own pages left out. ${LINKS_NOT_HASH}${others}`,
+      expect: line`Exit status 0 once ${code(own)} and ${code(firstAt)} each link to a page the other does not link to, the list's own pages left out: a later page that repeats the first has every link the first has. ${LINKS_NOT_HASH}${others}`,
       ua: one.ua,
     };
   },

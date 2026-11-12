@@ -273,9 +273,7 @@ function nextjs(r: Reading, facts: PacketFacts): Change | null {
 }
 
 /** What the canonical half of the command does not read. */
-const NOT_READ = ours(
-  'The command reads the <head> of the HTML: a canonical sent in an HTTP Link header is not read.',
-);
+const NOT_READ = ours('A canonical sent in an HTTP Link header is not read.');
 
 export const canonicalMismatch: PacketEntry<'canonical_mismatch'> = {
   kind: 'builder',
@@ -325,7 +323,8 @@ export const canonicalMismatch: PacketEntry<'canonical_mismatch'> = {
     if (canonical !== null && moved !== null) {
       return {
         command: command(both(canonical, moved.fragment)),
-        expect: line`Exit status 0 once the <head> of ${code(r.own)} holds one <link rel="canonical">, naming ${code(expected)} (today: ${code(r.declared)}), and ${code(moved.from)} links to ${code(moved.to)} and no longer to ${code(r.own)}. A URL counts in full or from the root. ${NOT_READ}${more}`,
+        // short, and with each URL once: a line past its bound is cut, and the limits are at its end
+        expect: line`Exit status 0 once the <head> of ${code(r.own)} holds one <link rel="canonical">, naming ${code(expected)} (today: ${code(r.declared)}), and ${code(moved.from)} links to that URL and no longer to this page. A URL counts in full or from the root. ${NOT_READ}${more}`,
         ua: own.ua,
       };
     }

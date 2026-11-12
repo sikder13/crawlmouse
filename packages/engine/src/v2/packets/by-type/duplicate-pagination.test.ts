@@ -223,7 +223,7 @@ describe('the duplicate_pagination packet', () => {
     const p = packetFor(listSite(base, 'content'));
     expect([...p.change, ...p.keep].join(' ')).not.toMatch(/404/);
     expect(p.verify.expect).toBe(
-      "Exit status 0 once `https://a.test/collections/tents?page=2` and `https://a.test/collections/tents` each link to a page the other does not link to, links to the list's own pages left out. A later page that repeats the first has every link the first has, so it does not pass. The command compares links; the content hash the audit measures is measured again on the next check.",
+      "Exit status 0 once `https://a.test/collections/tents?page=2` and `https://a.test/collections/tents` each link to a page the other does not link to, the list's own pages left out: a later page that repeats the first has every link the first has. The command compares links, not the content hash the audit measures, which the next check measures again.",
     );
   });
 

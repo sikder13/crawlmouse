@@ -405,7 +405,7 @@ describe('the canonical_mismatch packet, on what a search engine reads', () => {
     const { broken, fixed } = await inBothStates(served, p.verify.command);
     expect(broken.status).not.toBe(0);
     expect(fixed.status === 0).toBe(passes);
-    expect(p.verify.expect).toContain('a canonical sent in an HTTP Link header is not read');
+    expect(p.verify.expect).toContain('A canonical sent in an HTTP Link header is not read.');
   });
 
   it('on a site that serves its pages with a trailing slash, requests and names the served address', async () => {
