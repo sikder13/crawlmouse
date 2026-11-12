@@ -171,6 +171,28 @@ describe('POST /api/billing/portal, V2_BILLING=1', () => {
     expect(h.log).toEqual(['getUser', `rpc member_role {"p_account":"${OTHER}"}`]);
   });
 
+  it('an owner of two accounts naming neither acts on the one their switcher names, and on neither when it names a third', async () => {
+    h.state.seats = [{ account_id: ACCOUNT }, { account_id: OTHER }];
+    const withChoice = (accountId: string) =>
+      POST(
+        new Request(`${SITE}/api/billing/portal`, {
+          method: 'POST',
+          headers: {
+            origin: SITE,
+            'content-type': 'application/x-www-form-urlencoded',
+            cookie: `theme=dark; cm_account=${accountId}`,
+          },
+          body: '',
+        }),
+      );
+    await withChoice(OTHER);
+    expect(h.log).toContain(`rpc member_role {"p_account":"${OTHER}"}`);
+    h.log.length = 0;
+    const third = await withChoice('9a1e2d3c-4b5a-4c6d-8e7f-0a1b2c3d4e5f');
+    expect([third.status, await third.json()]).toEqual([409, { error: 'account_ambiguous' }]);
+    expect(h.log.filter((l) => l.startsWith('rpc member_role'))).toEqual([]);
+  });
+
   it('409 account_ambiguous for an owner of two accounts naming neither', async () => {
     h.state.seats = [{ account_id: ACCOUNT }, { account_id: OTHER }];
     const res = await post('');

@@ -8,6 +8,7 @@ import { resolveOrigin } from '@/lib/origin';
 import { checkoutV2, parseCheckout, supabaseCheckoutAccounts } from '@/lib/billing/checkout-v2';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { requestedAccountId } from '@/lib/billing/owner';
+import { chosenInHeader } from '@/lib/v2/account/viewer-cookie';
 import { readBody, refuse, respond } from '@/lib/billing/request-body';
 import { stripeAccount } from '@/lib/billing/stripe-account';
 import { accountCatalog } from '@/lib/billing/stripe-catalog';
@@ -31,7 +32,12 @@ export async function POST(req: Request) {
     const body = await readBody(req);
     const input = body && parseCheckout(body);
     if (!body || !input) return refuse(400, 'invalid');
-    const target = await requestedAccountId(sb, user.id, input.accountId);
+    const target = await requestedAccountId(
+      sb,
+      user.id,
+      input.accountId,
+      chosenInHeader(req.headers.get('cookie')),
+    );
     if (!target.ok) return refuse(target.status, target.error);
     const { data: role, error: roleError } = await sb.rpc('member_role', {
       p_account: target.accountId,

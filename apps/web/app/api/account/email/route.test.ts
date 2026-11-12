@@ -34,11 +34,15 @@ vi.mock('@/lib/supabase/server', () => ({
     },
     from: (table: string) => {
       h.log.push(`session.from ${table}`);
-      const rows = h.user ? [{ account_id: accountOf.get(h.user.id) }] : [];
+      // The caller's one owner seat, and its account, which is their personal one.
+      const account = h.user ? accountOf.get(h.user.id) : undefined;
+      const rows = account
+        ? [table === 'accounts' ? { id: account } : { account_id: account }]
+        : [];
       const chain: Record<string, unknown> = {
         then: (resolve: (v: unknown) => unknown) => resolve({ data: rows, error: null }),
       };
-      chain.select = chain.eq = () => chain;
+      chain.select = chain.eq = chain.in = () => chain;
       return chain;
     },
     rpc: async (fn: string) => {
@@ -179,6 +183,7 @@ describe('POST /api/account/email', () => {
     expect(h.log).toEqual([
       'getUser',
       'session.from seats',
+      'session.from accounts',
       'session.rpc member_role',
       'supabaseAdmin',
     ]);

@@ -10,6 +10,7 @@ import {
 } from '@/lib/billing/cancel';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { requestedAccountId } from '@/lib/billing/owner';
+import { chosenInHeader } from '@/lib/v2/account/viewer-cookie';
 import { readBody, refuse } from '@/lib/billing/request-body';
 import { stripeAccount } from '@/lib/billing/stripe-account';
 
@@ -29,7 +30,12 @@ export async function POST(req: Request) {
   const body = await readBody(req);
   const input = body && parseCancel(body);
   if (!body || !input) return refuse(400, 'invalid');
-  const target = await requestedAccountId(sb, user.id, input.accountId);
+  const target = await requestedAccountId(
+    sb,
+    user.id,
+    input.accountId,
+    chosenInHeader(req.headers.get('cookie')),
+  );
   if (!target.ok) return refuse(target.status, target.error);
   const { data: role, error: roleError } = await sb.rpc('member_role', {
     p_account: target.accountId,

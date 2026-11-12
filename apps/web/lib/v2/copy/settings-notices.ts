@@ -25,6 +25,8 @@ export const REFUSAL_SENTENCES: Readonly<Record<string, string>> = {
   role_refused: 'Only the account’s owner or an account manager can change these settings.',
   not_owner: 'Only the account’s owner can delete it.',
   email_change_owner_only: 'Only the account’s owner can change the sign-in address.',
+  personal_account_only:
+    'Your sign-in address and deleting your account belong to your own account. Switch to it, then try again.',
   upgrade_required: 'Slack alerts need Pro or Agency.',
   // What was sent
   invalid: 'Something in the form was not accepted. Check it and save again.',

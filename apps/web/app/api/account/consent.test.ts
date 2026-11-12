@@ -59,7 +59,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 vi.mock('@/lib/v2/account/viewer', () => ({
   loadViewer: async () => ({
     kind: 'viewer',
-    viewer: { account: { id: 'a0000000-0000-4000-8000-000000000001' } },
+    viewer: { account: { id: 'a0000000-0000-4000-8000-000000000001', kind: 'personal' } },
   }),
 }));
 

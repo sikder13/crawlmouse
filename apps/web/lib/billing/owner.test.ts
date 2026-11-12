@@ -4,6 +4,7 @@ import { ownedAccountId, requestedAccountId } from './owner';
 
 const A = '0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11';
 const B = '7d2f1c4a-9e3b-4b8a-8c1d-5e6f7a8b9c0d';
+const C = '9a1e2d3c-4b5a-4c6d-8e7f-0a1b2c3d4e5f';
 
 /** The caller's session client: records the seats query, then answers it with `result`. */
 function session(result: { data: unknown; error: unknown }) {
@@ -58,6 +59,21 @@ describe('ownedAccountId', () => {
     });
   });
 
+  it('with two owner seats, is the one the switcher names; a choice that is neither stays ambiguous', async () => {
+    const two = { data: [{ account_id: A }, { account_id: B }], error: null };
+    expect(await ownedAccountId(session(two).sb, 'u1', B)).toEqual({ ok: true, accountId: B });
+    expect(await ownedAccountId(session(two).sb, 'u1', C)).toEqual({
+      ok: false,
+      status: 409,
+      error: 'account_ambiguous',
+    });
+  });
+
+  it('a choice the caller does not own is not followed: their one owned account is read', async () => {
+    const { sb } = session({ data: [{ account_id: A }], error: null });
+    expect(await ownedAccountId(sb, 'u1', C)).toEqual({ ok: true, accountId: A });
+  });
+
   it('throws when the read fails, rather than answering as if there were no seat', async () => {
     const { sb } = session({ data: null, error: { message: 'boom' } });
     await expect(ownedAccountId(sb, 'u1')).rejects.toThrow('seats read failed: boom');
@@ -69,6 +85,11 @@ describe('requestedAccountId', () => {
     const { sb, calls } = session({ data: [{ account_id: A }], error: null });
     expect(await requestedAccountId(sb, 'u1', B)).toEqual({ ok: true, accountId: B });
     expect(calls).toEqual([]);
+  });
+
+  it('passes the switcher’s choice on when the request names no account', async () => {
+    const { sb } = session({ data: [{ account_id: A }, { account_id: B }], error: null });
+    expect(await requestedAccountId(sb, 'u1', undefined, B)).toEqual({ ok: true, accountId: B });
   });
 
   it("is the caller's owned account when the request names none", async () => {
