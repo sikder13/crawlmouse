@@ -5,6 +5,8 @@
  * undefined and see every flag off.
  */
 
+import { billingV2Enabled } from '../billing/flags';
+
 type Env = Readonly<Record<string, string | undefined>>;
 
 /**
@@ -42,5 +44,5 @@ export function checksPublicEnabled(env: Env = process.env): boolean {
  * its own page's flag (lib/v2/social-card.tsx).
  */
 export function v2PublicPagesEnabled(env: Env = process.env): boolean {
-  return checksPublicEnabled(env) || env.V2_BILLING?.trim() === '1';
+  return checksPublicEnabled(env) || billingV2Enabled(env);
 }
