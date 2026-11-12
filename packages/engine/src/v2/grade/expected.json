@@ -1,6 +1,6 @@
 {
   "grade_version": "2.0.0",
-  "source_digest": "01598ededc99e01ec3c20840b1ed7bba7dfd83f442914b8eef70fc32d8c3222b",
+  "source_digest": "42d5548e024d975971bdbf31ef878634f2bf91ee893bc0aa81310ab0b91194d4",
   "cases": {
     "blog: no post names its author, 6 of 13 lack a page description, no question headings": {
       "technical_seo": {
