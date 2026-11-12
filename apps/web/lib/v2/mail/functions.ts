@@ -11,6 +11,7 @@ import {
   createCheckFinishedEventFn,
   createCheckNotifyFn,
   createFixToDeveloperFn,
+  createSeatInviteFn,
   type MailHandlers,
 } from '../../../../../inngest/mail';
 import { captureServerEvent } from '../../analytics-server';
@@ -53,5 +54,6 @@ export function mailFunctions(env: Env = process.env): InngestFunction.Like[] {
     createCheckNotifyFn(handlers),
     createFixToDeveloperFn(handlers),
     createCheckFinishedEventFn(handlers),
+    createSeatInviteFn(handlers),
   ];
 }
