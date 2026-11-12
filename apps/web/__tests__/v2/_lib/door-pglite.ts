@@ -165,6 +165,7 @@ export function pgliteDoorStore(db: PGlite): DoorStore {
                   a.timezone
              from public.users u
              join public.accounts a on a.id = u.default_account_id and a.deleted_at is null
+                                   and a.deletion_confirmed_at is null
              join public.seats s on s.account_id = a.id and s.user_id = u.id
                                 and s.role = 'owner' and s.status = 'active'
             where u.id = $1`,

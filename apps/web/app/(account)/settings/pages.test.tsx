@@ -32,6 +32,8 @@ vi.mock('@/lib/v2/pipeline/load', () => ({
 }));
 
 import { DELETE_COPY, REFUND_POLICY } from '@/lib/v2/copy/deletion';
+import { SETTINGS_COPY } from '@/lib/v2/copy/settings';
+import { hashMailAddress } from '@/lib/v2/mail/address-hash';
 import { REFUSAL_SENTENCES, SETTINGS_NOTICES } from '@/lib/v2/copy/settings-notices';
 import { DeleteScreen } from '@/components/v2/screens/settings/DeleteScreen';
 import { PlanScreen } from '@/components/v2/screens/settings/PlanScreen';
@@ -254,6 +256,30 @@ describe('/settings', () => {
   it('is a 404 for a developer', async () => {
     as(developer);
     await expect(SettingsPage(q())).rejects.toMatchObject(notFoundError);
+  });
+
+  it('says when mail to the reader’s own address is suppressed, and names that address (CC-28 D7)', async () => {
+    const PEPPER = 'a-settings-test-pepper-of-32-chars-';
+    await (h.db as PGlite).query(
+      `insert into public.email_suppressions (address_hash, reason, first_at, last_at)
+       values ($1, 'complaint', now(), now())`,
+      [hashMailAddress(PEPPER, manager.email)],
+    );
+    const text = async (u: { id: string; email: string }) => {
+      as(u);
+      vi.stubEnv('TRIAL_LEDGER_PEPPER', PEPPER);
+      return renderToStaticMarkup(screen(await SettingsPage(q())));
+    };
+    const line = renderToStaticMarkup(
+      <>{SETTINGS_COPY.undeliverable(manager.email, 'complaint')}</>,
+    );
+    expect(await text(manager)).toContain(line);
+    // The owner's own address is not suppressed: no line on their page, though they share the account.
+    expect(await text(owner)).not.toContain('reported as spam');
+    // With no pepper the hash cannot be made: nothing is said either way.
+    as(manager);
+    vi.stubEnv('TRIAL_LEDGER_PEPPER', '');
+    expect(renderToStaticMarkup(screen(await SettingsPage(q())))).not.toContain(line);
   });
 });
 

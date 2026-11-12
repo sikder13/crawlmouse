@@ -357,6 +357,12 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     reason: "the restore link's token, from its HttpOnly cookie, is the credential (D4)",
     origin: 'strict',
   },
+  {
+    route: 'api/sites/[id]/alert-rules',
+    methods: ['POST', 'PUT'],
+    class: 'member',
+    origin: 'strict',
+  },
 ];
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

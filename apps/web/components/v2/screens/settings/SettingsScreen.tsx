@@ -125,6 +125,11 @@ export function SettingsScreen({
               }))}
             />
             <div className={shared.foot}>{email.foot}</div>
+            {email.undeliverable ? (
+              <p className={`${styles.notice} ${styles.noticeError}`} data-v2-addition="">
+                {email.undeliverable}
+              </p>
+            ) : null}
           </Card>
 
           <Card as="section" className={shared.panel}>
