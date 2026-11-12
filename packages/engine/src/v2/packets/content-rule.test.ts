@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { CHROME } from '../content/thresholds.js';
 import {
@@ -10,10 +11,18 @@ import {
   gradeLine,
   mark,
   tagProbe,
+  template,
   URL_CHARS,
 } from './content-rule.js';
 import { commandOf } from './shell.js';
-import { contentFacts, contentRecord, FIRST_TESTABLE, servedRow } from './test-support/content.js';
+import {
+  contentFacts,
+  contentRecord,
+  FIRST_TESTABLE,
+  hostileRecord,
+  servedRow,
+} from './test-support/content.js';
+import { outsideCodeSpans, UNSHOWN } from './test-support/hostile.js';
 import { runCommand, twoStateSite } from './test-support/verify.js';
 import { line, textOf } from './text.js';
 
@@ -177,5 +186,43 @@ describe('AWK_SCRIPTS', () => {
       'script>a',
       'script src="x">',
     ]);
+  });
+});
+
+describe('content-rule over hostile records (properties)', () => {
+  const CUT = / \(cut from \d+ characters\)/g;
+  const plain = contentRecord('quotable_opening', { template_key: '/t' });
+
+  it('shows the template key and each failing page in a code span, with nothing that draws nothing', () => {
+    fc.assert(
+      fc.property(hostileRecord('quotable_opening'), (record) => {
+        const facts = contentFacts();
+        const calm = {
+          ...plain,
+          affected_urls: record.affected_urls.map((_, i) => `https://a.test/${i}`),
+          extent: record.extent,
+        };
+        const shown = [...contentContext(record, facts, []), line`In ${template(record)}.`];
+        const expected = [...contentContext(calm, contentFacts(), []), line`In ${template(calm)}.`];
+        for (const l of shown) expect(UNSHOWN.test(textOf(l))).toBe(false);
+        expect(shown.map((l) => outsideCodeSpans(textOf(l)).replace(CUT, ''))).toEqual(
+          expected.map((l) => outsideCodeSpans(textOf(l))),
+        );
+      }),
+    );
+  });
+
+  it('puts a hostile page address in the command as one quoted word', () => {
+    fc.assert(
+      fc.property(hostileRecord('quotable_opening'), (record) => {
+        const command = commandOf(
+          tagProbe(contentFacts('no_crawler'), firstFailingPage(record), 'END{exit 1}').command,
+        );
+        expect(UNSHOWN.test(command)).toBe(false);
+        expect(command).toMatch(
+          /^curl -sS '[^']*' \| tr '\\r\\n<' ' {2}\\n' \| awk 'END\{exit 1\}'$/,
+        );
+      }),
+    );
   });
 });
