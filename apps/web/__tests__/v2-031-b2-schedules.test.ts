@@ -546,7 +546,9 @@ describe('set_report_schedule and clear_report_schedule', () => {
 
   it('raises 22023 for a missing key, a stray key, on_deploy, and a value out of range', async () => {
     const c = await client();
-    const { send_when_unchanged: _dropped, ...missing } = WEEKLY;
+    const missing = Object.fromEntries(
+      Object.entries(WEEKLY).filter(([key]) => key !== 'send_when_unchanged'),
+    );
     for (const p of [
       missing,
       { ...WEEKLY, open_tracking: true },
