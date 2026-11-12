@@ -147,7 +147,10 @@ const SLACK_CHANNEL = /^#[a-z0-9_-]+$/;
 
 type Kept = AlertContext & { accountId: string };
 
-async function load(deps: AlertDeps, checkId: string) {
+type Skip = Exclude<Extract<PlanAnswer, { skip: string }>['skip'], 'nothing_fired'>;
+type Loaded = { skip: Skip } | { ctx: Kept; data: AlertData; fired: FiredAlert[] };
+
+async function load(deps: AlertDeps, checkId: string): Promise<Loaded> {
   const ctx = await deps.store.context(checkId);
   if (ctx === null) return { skip: 'no_check' as const };
   if (!ctx.finished) return { skip: 'not_finished' as const };

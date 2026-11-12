@@ -39,7 +39,8 @@ export interface AlertFixEvent {
   fix_id: string;
   kind: FixEvent['kind'];
   at: string;
-  check_id: string | null;
+  /** The check that measured it; marked_done has none. */
+  check_id?: string | null;
 }
 
 export interface AlertInput {

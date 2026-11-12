@@ -38,6 +38,7 @@ import { checksPublicEnabled, pipelineEnabled } from '../../auth/flags';
 import { billingFunctions } from '../../billing/inngest-functions';
 import { deletionFunctions } from '../account/deletion-ports';
 import { workerClientFromEnv } from '../../worker-client/client';
+import { monitorFunctions } from '../monitor/functions';
 import { CRAWL_USER_AGENT } from './discover';
 import { supabaseEvidenceStore } from './evidence';
 import { expireUnkept, settleKept, type ExpireDeps } from './expire';
@@ -129,6 +130,8 @@ export function inngestFunctions(
     }),
     ...billing,
     ...deletion,
+    // CC-28's alerts and weekly summary, with V2_CHECKS_PUBLIC=1 as well (lib/v2/monitor/functions.ts).
+    ...(checksPublicEnabled(env) ? monitorFunctions(env) : []),
   ];
 }
 
