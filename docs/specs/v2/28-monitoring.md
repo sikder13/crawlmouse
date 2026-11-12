@@ -140,8 +140,12 @@ URL, with no redirect followed and a timeout: the engine's `safeFetch` makes GET
 plain text with Slack's `& < >` escapes and link previews off. `alert_events.destination_hash` is an HMAC under the
 mail pepper of the sorted recipient hashes (email) or of the URL (Slack).
 
-Every account has the six default rules (Q13): seeded by the migration's backfill, and again, for any kind missing,
-before alertFn evaluates and before the Alerts page reads.
+The six default rules (Q13) are seeded by the migration's backfill, for the accounts that exist when it runs, and
+again, for any kind missing, in three places: before alertFn evaluates a check that is not a site's first
+(`lib/v2/monitor/alerts.ts` `load`), before the Alerts page reads (`app/alerts/page.tsx`), and before a site's page
+reads (`app/sites/[id]/page.tsx`). An account made after the migration that none of these has reached holds no rule
+yet; the trial-ended screen reads the rules without seeding them (`lib/v2/view/trial-end.ts`, known gaps). Verify:
+`grep -rn "seedDefaultAlertRules\|seedDefaultRules(" apps/web/app apps/web/lib --include=*.ts --include=*.tsx | grep -v test`.
 
 ## Erasure (D9)
 
@@ -204,6 +208,15 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
   (the engine's diff).
 - The Alerts page shows what `changes.notified` records; a failed or suppressed channel (`alert_events`) is not
   shown.
+- The trial-ended screen reads the account's rules without seeding them (`lib/v2/view/trial-end.ts`, the
+  `alertsByEmail` line), so an account made after the migration that never reached a seeding place (the six
+  defaults, above) is told its email alerts are off.
+- `sendSummary` does not read the tier again: `due_summary_accounts` filters on `account_effective_tier` when the
+  tick runs, and `store.account` reads the zone and the deletion mark only. An account that drops to Free between
+  the tick and a retried send (`SUMMARY_RETRIES`, with Inngest's backoff) still gets that week's summary.
+- The account's zone is resolved twice: `due_summary_accounts` reads `pg_timezone_names` to find the Monday 08:00
+  that makes an account due, and `zoneOrUtc` reads the runtime's Intl to render the week. A zone one of them knows
+  and the other does not puts the due hour and the rendered week in different zones (one of them UTC).
 - The Supabase ports for alerts and the summary (`alerts-store.ts`, `summary-store.ts`) run in
   `lib/v2/monitor/stores.test.ts` through a PostgREST stand-in over PGlite (`__tests__/helpers/postgrest-pglite.ts`,
   capped at 1,000 rows as `max_rows` is), not against a real PostgREST.
