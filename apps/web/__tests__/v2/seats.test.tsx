@@ -183,6 +183,24 @@ describe('seatsView: the other readers', () => {
   });
 });
 
+describe('seatsView: a reader whose seat covers some clients', () => {
+  it('is shown their own seat and the owner’s, and no count of seats they cannot read', () => {
+    const p = SEATS_PREVIEWS[OWNER];
+    const d = p.data();
+    const priya = d.seats.find((s) => s.name === 'Priya')!;
+    expect(priya.client_scope).not.toBe('all');
+    const v = seatsView(d, { ...p.viewer(), seatId: priya.id });
+    expect(v.people.rows.map((r) => r.person)).toEqual(['Alex', 'You, Priya']);
+    expect(v.header.line).toBe(
+      'Your seat and the owner’s. A seat that covers some clients is not shown the others.',
+    );
+    expect(v.people.title).toBe('People');
+    expect(v.people.foot).toBeNull();
+    expect(`${v.header.line} ${v.people.title}`).not.toMatch(/\d/);
+    expect([v.header.invite, v.invite, v.buy]).toEqual([null, null, null]);
+  });
+});
+
 describe('the screens, as their previews render them', () => {
   const entries = PREVIEWS.filter((p) => /\/screens\/(seats|invite)(\/|$)/.test(p.path));
 

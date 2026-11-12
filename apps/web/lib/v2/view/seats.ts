@@ -3,7 +3,9 @@
  *
  * The People table is the account's seats that are not removed, invitations among them: a seat with
  * no `accepted_at` is an invitation. Counts are of those rows; the seat limit is the one the page
- * passes (the viewer's, with the trial and past-due clocks read) or the account's own. The role table
+ * passes (the viewer's, with the trial and past-due clocks read) or the account's own. A reader
+ * whose seat covers some clients is shown their own seat and the owner's by row security (spec 31
+ * §4), so for them the table is those two and no count or free seat is stated. The role table
  * is rendered from `SEAT_GUARD` through `ROLE_ROWS`. Prices are `prices.ts`'s and the plans' limits
  * `GATES`'s; a line about a limit is `gateMessage`'s.
  *
@@ -92,8 +94,11 @@ export interface SeatsView {
     title: string;
     sub: string;
     rows: SeatRowView[];
-    /** "One seat free. Beyond five, $12 a seat a month.", or the plan's gate message. */
-    foot: string;
+    /**
+     * "One seat free. Beyond five, $12 a seat a month.", or the plan's gate message; null for a
+     * reader who is not shown every seat.
+     */
+    foot: string | null;
     mailNote: string;
   };
   roles: {
@@ -174,6 +179,8 @@ export function seatsView(
       a.invited_at.localeCompare(b.invited_at) ||
       a.id.localeCompare(b.id),
   );
+  const partial = v.seatId !== null && mine !== null && mine.client_scope !== 'all';
+  const shown = partial ? seats.filter((s) => s.id === mine.id || s.role === 'owner') : seats;
   const limit = seatLimit ?? v.account.limits.seats;
   const used = seats.length;
   const free = Math.max(0, limit - used);
@@ -181,7 +188,7 @@ export function seatsView(
   const mayChange = role !== null && roleMay(role, 'change_seat');
   const mayBuy = role !== null && roleMay(role, 'buy_seats');
 
-  const rows: SeatRowView[] = seats.map((s) => {
+  const rows: SeatRowView[] = shown.map((s) => {
     const own = mine !== null && s.id === mine.id;
     const person = own ? (s.name ? `${COPY.you}, ${s.name}` : COPY.you) : (s.name ?? s.email);
     const invited = s.accepted_at === null;
@@ -226,17 +233,19 @@ export function seatsView(
     shell: accountShellView(v, null, { role: role ?? 'developer' }),
     header: {
       title: COPY.title,
-      line: `${count(used)} of ${count(limit)} used · ${roleCounts(seats)}`,
+      line: partial
+        ? COPY.partialLine
+        : `${count(used)} of ${count(limit)} used · ${roleCounts(seats)}`,
       invite:
         mayInvite && v.tier !== 'free' && free > 0
           ? { label: COPY.invite, href: `#${INVITE_ANCHOR}` }
           : null,
     },
     people: {
-      title: `${COPY.people} · ${count(used)} of ${count(limit)} seats`,
+      title: partial ? COPY.people : `${COPY.people} · ${count(used)} of ${count(limit)} seats`,
       sub: COPY.peopleSub,
       rows,
-      foot,
+      foot: partial ? null : foot,
       mailNote: COPY.mailNote,
     },
     roles: {

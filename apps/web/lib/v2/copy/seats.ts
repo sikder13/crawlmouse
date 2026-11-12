@@ -19,6 +19,9 @@ export const SEATS_COPY = {
     actions: 'Actions',
     can: 'Can',
   },
+  /** For a reader whose seat covers some clients: row security shows them two seats, not the count. */
+  partialLine:
+    'Your seat and the owner’s. A seat that covers some clients is not shown the others.',
   you: 'You',
   /** A seat's role as the People table writes it. */
   roleLine: {

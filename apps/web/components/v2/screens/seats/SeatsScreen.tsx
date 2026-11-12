@@ -79,7 +79,7 @@ export function SeatsScreen({
             ],
           }))}
         />
-        <div className={shared.foot}>{people.foot}</div>
+        {people.foot ? <div className={shared.foot}>{people.foot}</div> : null}
         <p className={styles.mailNote}>{people.mailNote}</p>
       </Card>
 
