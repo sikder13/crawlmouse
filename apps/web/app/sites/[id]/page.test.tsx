@@ -302,6 +302,25 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
       }
     });
 
+    it('a developer’s seat, acting in the site’s account, is shown neither Keep nor a billing link', async () => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+      const db = h.db as PGlite;
+      const email = `dev-${randomUUID().slice(0, 8)}@example.com`;
+      const devId = await signUp(db, email);
+      await db.query(
+        `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+         values ($1, $2, $3, 'developer', 'active', now())`,
+        [ownId, devId, email],
+      );
+      h.chosen = ownId;
+      for (const site of [kept, empty]) {
+        // The owner, on the same pages, is offered one of the two (the case above).
+        const shell = shellOf(children(await open(site, devId)));
+        expect(shell.switcher).toMatchObject({ visiting: null });
+        expect(shell.trial).toMatchObject({ keep: null, billing: null });
+      }
+    });
+
     it('acting in another account: the rail offers the switch to the site’s, with no Keep and no billing link', async () => {
       vi.stubEnv('V2_CHECKS_PUBLIC', '1');
       // The person acts in the agency and opens their personal account's sites by address: one

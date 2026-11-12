@@ -22,6 +22,7 @@ import {
   primarySite,
   primarySites,
   resultChecks,
+  readerRole,
   viewAt,
   type AccountDataset,
   type Viewer,
@@ -215,7 +216,7 @@ export function reportsView(
   const branding = v.gates.agencyBranding ? v.account.branding : null;
 
   return {
-    shell: accountShellView(v, 'Reports'),
+    shell: accountShellView(v, 'Reports', { role: readerRole(v) ?? 'developer' }),
     header: { title: COPY.title, line },
     make: {
       title: COPY.makeTitle,

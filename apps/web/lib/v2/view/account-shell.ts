@@ -318,15 +318,15 @@ export function accountShellView(
   {
     plan = 'rail',
     billingEnd = null,
-    role = 'owner',
+    role,
     accounts,
     actingIn,
   }: {
     /**
-     * The reader's seat role: the rail's Billing and Keep are offered to the owner only. Defaults to
-     * the owner, as every caller read before the option existed.
+     * The reader's seat role: the rail's Billing and Keep are offered to the owner only. It has no
+     * default, so a page cannot show a member the owner's rail by leaving it out.
      */
-    role?: SeatRole;
+    role: SeatRole;
     plan?: PlanPlace;
     /** A subscription set to cancel at its period's end: a card trial's card is then not charged. */
     billingEnd?: string | null;
@@ -334,7 +334,7 @@ export function accountShellView(
     accounts?: readonly SwitcherAccount[];
     /** The account the reader acts in, where it may not be this one (`withSwitcher`). */
     actingIn?: string;
-  } = {},
+  },
 ): ShellView {
   const seat = readerSeat(v);
   const shell: ShellView = {

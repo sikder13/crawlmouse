@@ -234,7 +234,7 @@ describe('verdict copy guard', () => {
             renderToStaticMarkup(
               <SiteScreen
                 data={siteView(d, viewer, outfitter)}
-                shell={accountShellView(viewAt(d, viewer), 'Sites')}
+                shell={accountShellView(viewAt(d, viewer), 'Sites', { role: 'owner' })}
               />,
             ),
           ];

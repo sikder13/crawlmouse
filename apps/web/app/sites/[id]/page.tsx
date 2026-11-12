@@ -12,7 +12,7 @@ import { isId } from '@/lib/v2/account/route';
 import { readAccount, siteOfCaller } from '@/lib/v2/account/pages';
 import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { chosenFromRequest, readViewer } from '@/lib/v2/account/viewer';
-import { viewAt } from '@/lib/v2/view/account';
+import { readerRole, viewAt } from '@/lib/v2/view/account';
 import { accountShellView, withSwitcher } from '@/lib/v2/view/account-shell';
 import { sitePage } from '@/lib/v2/view/site';
 import { noticeLine } from '@/lib/v2/copy/notices';
@@ -70,12 +70,16 @@ export default async function SitePage({
   // The scheduler's own column (CC-28 D8), read once the caller's seat is established.
   const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]));
   const notice = noticeLine(await searchParams, d.accounts[0]!.timezone);
+  const account = viewAt(d, viewer);
   return (
     <LiveActions>
       {page.kind === 'site' ? (
         <SiteScreen
           data={page.site}
-          shell={accountShellView(viewAt(d, viewer), 'Sites', reader ?? {})}
+          shell={accountShellView(account, 'Sites', {
+            role: readerRole(account) ?? 'developer',
+            ...reader,
+          })}
           notice={notice}
         />
       ) : (

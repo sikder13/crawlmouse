@@ -13,7 +13,7 @@ import { accountShellView, isFirstRun, newChanges } from './account-shell';
 const bad = fixture('bad-site');
 const BAD = 'a0000000-0000-4000-8000-000000000001';
 const shellOf = (name: keyof typeof ACCOUNT_VIEWERS, d = bad) =>
-  accountShellView(viewAt(d, ACCOUNT_VIEWERS[name]()), 'Sites');
+  accountShellView(viewAt(d, ACCOUNT_VIEWERS[name]()), 'Sites', { role: 'owner' });
 
 describe('the rail', () => {
   it('counts the sites and the new changes on day 9: five sites, three changes', () => {
@@ -41,7 +41,7 @@ describe('the rail', () => {
   it('marks the page the frame is for', () => {
     const v = viewAt(bad, ACCOUNT_VIEWERS.home());
     expect(
-      accountShellView(v, 'Alerts')
+      accountShellView(v, 'Alerts', { role: 'owner' })
         .nav.filter((n) => n.current)
         .map((n) => n.label),
     ).toEqual(['Alerts']);
@@ -79,7 +79,8 @@ describe('the trial card', () => {
   it('promises the reminder only until it is due: three days before the end, at the same time', () => {
     // The trial ends 8 Nov 02:41Z, so the reminder is due 5 Nov 02:41Z (Wed 4 Nov 21:41 in Indiana).
     const at = (now: string) =>
-      accountShellView(viewAt(bad, { accountId: BAD, now }), 'Sites').trial!.note;
+      accountShellView(viewAt(bad, { accountId: BAD, now }), 'Sites', { role: 'owner' }).trial!
+        .note;
     expect(at('2026-11-05T02:40:59Z')).toMatch(/We'll email you three days before\.$/);
     expect(at('2026-11-05T02:41:00Z')).toBe(
       'Then Free: example-outfitter.com keeps monthly checks; the other three sites pause until you choose Pro or remove them. Nothing you can see is deleted.',
@@ -88,7 +89,7 @@ describe('the trial card', () => {
 
   it('leaves the plan to a page that carries it: no Keep, and only what the card on file means', () => {
     const v = viewAt(bad, { accountId: BAD, now: '2026-11-05T02:41:00Z' });
-    expect(accountShellView(v, 'Sites', { plan: 'page' }).trial).toEqual({
+    expect(accountShellView(v, 'Sites', { role: 'owner', plan: 'page' }).trial).toEqual({
       title: 'Pro, trial · ends Sat 7 Nov',
       left: '3 days left',
       note: 'No card on file. Nothing is charged unless you choose Pro.',
@@ -101,7 +102,7 @@ describe('the trial card', () => {
       accountId: 'a0000000-0000-4000-8000-0000000000ca',
       now: fixture('challenged-site').as_of,
     });
-    expect(accountShellView(kestrel, 'Sites', { plan: 'page' }).trial!.note).toBe(
+    expect(accountShellView(kestrel, 'Sites', { role: 'owner', plan: 'page' }).trial!.note).toBe(
       'The card ending 4242 is charged on Mon 16 Nov unless you cancel.',
     );
   });

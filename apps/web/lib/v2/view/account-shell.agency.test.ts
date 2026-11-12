@@ -102,20 +102,20 @@ describe('switcherView', () => {
 
 describe('accountShellView, the switcher', () => {
   it('has none unless the reader’s accounts are given', () => {
-    expect(accountShellView(view('home'), 'Sites').switcher).toBeNull();
+    expect(accountShellView(view('home'), 'Sites', { role: 'owner' }).switcher).toBeNull();
   });
 
   it('acts in the view’s own account', () => {
     const accounts = [PERSONAL, account('c9', 'agency', 'Northwind')];
     expect(accounts[1]!.id).toBe(NORTHWIND_ACCOUNT_ID);
-    expect(accountShellView(view('withheld'), 'Clients', { accounts }).switcher).toEqual(
-      switcherView(accounts, NORTHWIND_ACCOUNT_ID),
-    );
+    expect(
+      accountShellView(view('withheld'), 'Clients', { role: 'owner', accounts }).switcher,
+    ).toEqual(switcherView(accounts, NORTHWIND_ACCOUNT_ID));
   });
 
   it('withSwitcher adds it to a screen’s data and changes nothing else', () => {
     const v = view('home');
-    const data = { shell: accountShellView(v, 'Sites'), other: 1 };
+    const data = { shell: accountShellView(v, 'Sites', { role: 'owner' }), other: 1 };
     const accounts = [{ ...PERSONAL, id: v.account.id }, SUMMIT];
     expect(withSwitcher(data, accounts, v.account.id)).toEqual({
       other: 1,
@@ -127,15 +127,15 @@ describe('accountShellView, the switcher', () => {
   it('on a page of an account not acted in, the frame keeps no Keep and no link to billing', () => {
     // bad-site on day 9 of its Pro trial: the rail's card has Keep, which posts to the checkout.
     const v = view('home');
-    const shell = accountShellView(v, 'Sites');
+    const shell = accountShellView(v, 'Sites', { role: 'owner' });
     expect(shell.trial!.keep).not.toBeNull();
     const accounts = [{ ...PERSONAL, id: v.account.id }, SUMMIT];
-    const visiting = accountShellView(v, 'Sites', { accounts, actingIn: SUMMIT.id });
+    const visiting = accountShellView(v, 'Sites', { role: 'owner', accounts, actingIn: SUMMIT.id });
     expect(visiting.switcher!.visiting!.switchTo.fields).toEqual({ accountId: v.account.id });
     expect(visiting.trial).toEqual({ ...shell.trial, keep: null, billing: null });
     expect(withSwitcher({ shell }, accounts, v.account.id, SUMMIT.id).shell).toEqual(visiting);
 
-    const day0 = accountShellView(view('day0'), 'Sites');
+    const day0 = accountShellView(view('day0'), 'Sites', { role: 'owner' });
     expect(day0.trial!.billing).not.toBeNull();
     const d0 = [{ ...PERSONAL, id: view('day0').account.id }, SUMMIT];
     expect(
@@ -145,9 +145,10 @@ describe('accountShellView, the switcher', () => {
 });
 
 describe('accountShellView, the rail', () => {
-  const links = (v: AccountView) => accountShellView(v, null).nav.map((n) => [n.label, n.href]);
+  const links = (v: AccountView) =>
+    accountShellView(v, null, { role: 'owner' }).nav.map((n) => [n.label, n.href]);
   const current = (v: AccountView, label: Parameters<typeof accountShellView>[1]) =>
-    accountShellView(v, label)
+    accountShellView(v, label, { role: 'owner' })
       .nav.filter((n) => n.current)
       .map((n) => n.label);
 
@@ -156,7 +157,10 @@ describe('accountShellView, the rail', () => {
       const v = view(name);
       expect(v.tier).not.toBe('agency');
       expect(links(v)).toEqual(ACCOUNT_NAV.map((n) => [n.label, n.href]));
-      expect(accountShellView(v, 'Sites')).toMatchObject({ plan: null, badge: null });
+      expect(accountShellView(v, 'Sites', { role: 'owner' })).toMatchObject({
+        plan: null,
+        badge: null,
+      });
     }
   });
 
@@ -172,19 +176,19 @@ describe('accountShellView, the rail', () => {
       ['Settings', '/settings'],
     ]);
     expect(links(v)).toEqual(AGENCY_NAV.map((n) => [n.label, n.href]));
-    expect(accountShellView(v, null).badge).toBe('Agency');
+    expect(accountShellView(v, null, { role: 'owner' }).badge).toBe('Agency');
   });
 
   it('counts the clients the reader’s records hold, staging copies left out', () => {
     const v = view('withheld');
-    expect(accountShellView(v, 'Clients').nav[0]).toMatchObject({
+    expect(accountShellView(v, 'Clients', { role: 'owner' }).nav[0]).toMatchObject({
       label: 'Clients',
       count: '2',
       current: true,
     });
     const copy = { ...v.d.sites[0]!, id: 'copy', staging_of_site_id: v.d.sites[0]!.id };
     const withCopy = { ...v, d: { ...v.d, sites: [...v.d.sites, copy] } };
-    expect(accountShellView(withCopy, 'Clients').nav[0]!.count).toBe('2');
+    expect(accountShellView(withCopy, 'Clients', { role: 'owner' }).nav[0]!.count).toBe('2');
   });
 
   it('marks Clients on a page that sits under Sites, and nothing for a page the rail does not hold', () => {
@@ -212,7 +216,7 @@ describe('accountShellView, the Agency plan card', () => {
 
   it('reads its price from prices.ts, and the plan’s sites and seats from the account’s limits', () => {
     const v = paying({ billing_period_months: 1 });
-    const plan = accountShellView(v, 'Clients').plan!;
+    const plan = accountShellView(v, 'Clients', { role: 'owner' }).plan!;
     expect(plan.title).toBe(`Agency · $${AGENCY_MONTHLY} a month`);
     expect(plan.counts).toBe(
       `${v.account.limits.sites} client sites · ${v.account.limits.seats} seats`,
@@ -221,15 +225,16 @@ describe('accountShellView, the Agency plan card', () => {
   });
 
   it('gives the yearly price to an account billed by the year', () => {
-    expect(accountShellView(paying({ billing_period_months: 12 }), 'Clients').plan!.title).toBe(
-      `Agency · $${AGENCY_YEARLY} a year`,
-    );
+    expect(
+      accountShellView(paying({ billing_period_months: 12 }), 'Clients', { role: 'owner' }).plan!
+        .title,
+    ).toBe(`Agency · $${AGENCY_YEARLY} a year`);
   });
 
   it('tells the owner when it renews and on which card, where the account holds both', () => {
     const both = { renews_at: '2026-12-01T14:00:00Z', card_last4: '4242' };
-    const shell = (over: Partial<AccountView['account']>, role?: 'owner' | 'developer') =>
-      accountShellView(paying(over), 'Clients', role ? { role } : {});
+    const shell = (over: Partial<AccountView['account']>, role: 'owner' | 'developer' = 'owner') =>
+      accountShellView(paying(over), 'Clients', { role });
     expect(shell(both).plan).toMatchObject({
       note: 'Renews 1 Dec. Card ending 4242.',
       billing: { href: '/settings/plan', label: 'Billing' },
@@ -242,7 +247,7 @@ describe('accountShellView, the Agency plan card', () => {
   it('says nothing of a renewal while a payment is past due', () => {
     const v = view('withheld');
     expect(v.account.state).toBe('past_due');
-    expect(accountShellView(v, 'Clients').plan).toMatchObject({
+    expect(accountShellView(v, 'Clients', { role: 'owner' }).plan).toMatchObject({
       title: `Agency · $${AGENCY_MONTHLY} a month`,
       note: null,
     });
@@ -254,7 +259,7 @@ describe('accountShellView, the Agency plan card', () => {
       trial_ends_at: '2026-11-20T14:00:00Z',
       state_history: [{ state: 'agency_trial', since: '2026-10-01T14:00:00Z' }],
     });
-    const shell = accountShellView(trial, 'Clients');
+    const shell = accountShellView(trial, 'Clients', { role: 'owner' });
     expect(shell.plan).toBeNull();
     expect(shell.trial).not.toBeNull();
   });

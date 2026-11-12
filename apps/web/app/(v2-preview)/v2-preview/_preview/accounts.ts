@@ -81,7 +81,9 @@ export const DATASET = {
 
 /** The account frame each preview renders: the rail, its trial card and theme. */
 export function shellPreview(name: keyof typeof ACCOUNT_VIEWERS) {
-  return accountShellView(viewAt(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]()), 'Sites');
+  return accountShellView(viewAt(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]()), 'Sites', {
+    role: 'owner',
+  });
 }
 
 /** The dashboard each preview renders. */
@@ -214,8 +216,6 @@ export function switcherPreview(name: keyof typeof SWITCHER_PREVIEWS): ShellView
   return accountShellView(
     viewAt(fixture(DATASET[p.viewer]), ACCOUNT_VIEWERS[p.viewer]()),
     p.current,
-    {
-      accounts: p.accounts,
-    },
+    { role: 'owner', accounts: p.accounts },
   );
 }
