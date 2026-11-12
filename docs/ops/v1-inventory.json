@@ -394,11 +394,11 @@
       "reason": "public reports; old snapshots keep rendering with the v1 component until re-minted",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "checks": {
-        "input": "pass — slug is only an .eq('slug') filter in readReportRow (lib/reports.ts:44); unknown or garbage slug → null → notFound() (app/r/[slug]/page.tsx:40), measured 404 on next start",
-        "output": "pass — selects only render columns, never minted_by or audit_id (lib/reports.ts:29-30); the client island gets slug, domain and claimed only (app/r/[slug]/page.tsx:65); ownership state comes from /api/reports/[slug]/mine after hydration",
+        "input": "pass — slug is only an .eq('slug') filter in readReportRow (lib/reports.ts:30); unknown or garbage slug → null → notFound() (app/r/[slug]/page.tsx:40), measured 404 on next start",
+        "output": "pass — selects only render columns, never minted_by or audit_id (lib/report-row.ts:26-28); the client island gets slug, domain and claimed only (app/r/[slug]/page.tsx:65); ownership state comes from /api/reports/[slug]/mine after hydration",
         "cache": "pass — revalidate=300 (app/r/[slug]/page.tsx:17) is safe because the page reads no cookies or session; owner state is fetched client-side with no-store (app/api/reports/[slug]/mine/route.ts:23)",
         "redirect": "n/a — no redirect or next param",
-        "errors": "pass — a read error returns null (lib/reports.ts:43-50) and renders the 404 page, no upstream text",
+        "errors": "pass — a read error returns null (lib/reports.ts:23-42) and renders the 404 page, no upstream text",
         "escaping": "pass — crawled domain, titles and URLs are JSX text in server components (crawled titles and URLs render as JSX text at components/report/sections.tsx:81 and components/report/AiReadinessReportSection.tsx:125); no crawled href; the white-label logo src is built from our storage base plus a logoPath constrained to `${slug}/[A-Za-z0-9._-]+` (lib/report-brand.ts:23-27, app/api/reports/[slug]/white-label/route.ts:54-60); brandName is JSX text (components/report/ReportBrandHeader.tsx:26)",
         "abuse": "n/a — read only"
       },
@@ -597,11 +597,11 @@
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "checks": {
         "input": "pass — slug through getPublicReport (cached .eq read)",
-        "output": "pass — buildOgReportModel decides what is drawn; a gone report draws the placeholder (app/r/[slug]/opengraph-image.tsx:30-33)",
-        "cache": "pass — revalidate=3600, purged on hide/takedown/claim (lib/reports.ts:72-80); no cookies",
+        "output": "pass — buildOgReportModel decides what is drawn; a gone report draws the placeholder (app/r/[slug]/opengraph-image.tsx:36-39)",
+        "cache": "pass — revalidate=3600, purged on hide/takedown/claim (lib/reports.ts:63-74); no cookies",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "n/a — no error path of its own",
-        "escaping": "pass — domain, grade and white-label brand are satori text nodes, not HTML (:51,54,57); no image is fetched",
+        "escaping": "pass — domain, grade and white-label brand are satori text nodes, not HTML (:66,78,89); no image is fetched",
         "abuse": "n/a — no action that costs money or sends mail"
       }
     },
@@ -741,7 +741,7 @@
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — fixed codes",
         "escaping": "n/a — JSON",
-        "abuse": "finding — minor (A-11): per-IP 10/day and per-email 5/day before the write (app/api/audits/[id]/notify/route.ts:27, lib/limits.ts:53), but anyone holding the audit id can replace notify_email on a running audit, so the owner's address is overwritten and an arbitrary address gets mail carrying the /audit/<id> link (app/api/audits/[id]/notify/route.ts:36, inngest/notify.ts:43); IPs rotate"
+        "abuse": "finding — minor (A-11): per-IP 10/day and per-email 5/day before the write (app/api/audits/[id]/notify/route.ts:27, lib/limits.ts:56), but anyone holding the audit id can replace notify_email on a running audit, so the owner's address is overwritten and an arbitrary address gets mail carrying the /audit/<id> link (app/api/audits/[id]/notify/route.ts:36, inngest/notify.ts:43); IPs rotate"
       }
     },
     {
@@ -771,7 +771,7 @@
       "replacedBy": "/api/checks/* (CC-22), behind a 90-day alias for cached clients",
       "redirect": "alias",
       "checks": {
-        "input": "finding — minor (A-1): id is not validated; a garbage or unknown id gets no snapshot and the function polls the DB every 2.5 s until the 250 s self-close (app/api/audits/[id]/stream/route.ts:253-293, lib/limits.ts:65,71), so open connections to random ids hold functions open; retire item, lead follow-up (validate uuid and close on a missing row)",
+        "input": "finding — minor (A-1): id is not validated; a garbage or unknown id gets no snapshot and the function polls the DB every 2.5 s until the 250 s self-close (app/api/audits/[id]/stream/route.ts:253-293, lib/limits.ts:68,74), so open connections to random ids hold functions open; retire item, lead follow-up (validate uuid and close on a missing row)",
         "output": "pass — every event goes through projectAuditForClient (lib/audit-stream-projection.ts:245-275), no user_id or anonymous_session_id; Pro-only fields are owner-scoped (:82-88)",
         "cache": "finding — minor (A-1): 'no-cache, no-transform' (:309) without 'private' on an owner-dependent body; Vercel does not cache it (no s-maxage), so hardening only",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
@@ -923,7 +923,7 @@
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — fixed codes (:40-41)",
         "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
-        "abuse": "pass — per-IP 30/day (:22-26); capability is the audit UUID, which /r/ never exposes (lib/reports.ts:29-30 select no audit_id)"
+        "abuse": "pass — per-IP 30/day (:22-26); capability is the audit UUID, which /r/ never exposes (lib/report-row.ts:26-28 select no audit_id)"
       }
     },
     {
@@ -933,13 +933,13 @@
       "reason": "/api/reports/* kept as is",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "checks": {
-        "input": "pass — zod uuid auditId (:15)",
-        "output": "pass — slug only; minted_by stored, never returned (:102-107)",
+        "input": "pass — zod uuid auditId (:18)",
+        "output": "pass — slug only; minted_by stored, never returned (:142-148)",
         "cache": "pass — POST",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
-        "errors": "pass — fixed strings (:104)",
+        "errors": "pass — fixed strings (:144-145)",
         "escaping": "n/a — JSON; snapshot is built from persisted data (lib/mint-snapshot.ts)",
-        "abuse": "pass — per-user 20/day or per-IP 10/day, Turnstile on exhaustion, Turnstile required with no IP (:64-77)"
+        "abuse": "pass — per-user 20/day or per-IP 10/day, Turnstile on exhaustion, Turnstile required with no IP (:93-110)"
       }
     },
     {
@@ -955,7 +955,7 @@
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — fixed codes",
         "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
-        "abuse": "pass — per-user 20/h (:31, lib/limits.ts:40) and verified-domain ownership (:42)"
+        "abuse": "pass — per-user 20/h (:31, lib/limits.ts:43) and verified-domain ownership (:42)"
       }
     },
     {
@@ -971,7 +971,7 @@
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — storage message logged, not returned (:86-87)",
         "escaping": "pass — our detected content type, never the client's (:76)",
-        "abuse": "pass — auth, Pro, ownership, 10 uploads/h per user (:43, lib/limits.ts:49)"
+        "abuse": "pass — auth, Pro, ownership, 10 uploads/h per user (:43, lib/limits.ts:52)"
       }
     },
     {
@@ -1003,7 +1003,7 @@
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — fixed codes (:62-65)",
         "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
-        "abuse": "pass — per-user 60/h (:36, lib/limits.ts:43) and ownership (:44)"
+        "abuse": "pass — per-user 60/h (:36, lib/limits.ts:46) and ownership (:44)"
       }
     },
     {
@@ -1018,8 +1018,8 @@
         "cache": "pass — POST",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — fixed codes",
-        "escaping": "pass — brandName rendered as JSX text (components/report/ReportBrandHeader.tsx:26) and satori text (app/r/[slug]/opengraph-image.tsx:51)",
-        "abuse": "pass — per-user 30/h (:62, lib/limits.ts:46), Pro, ownership"
+        "escaping": "pass — brandName rendered as JSX text (components/report/ReportBrandHeader.tsx:26) and satori text (app/r/[slug]/opengraph-image.tsx:66)",
+        "abuse": "pass — per-user 30/h (:62, lib/limits.ts:49), Pro, ownership"
       }
     },
     {
@@ -1035,7 +1035,7 @@
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — fixed codes",
         "escaping": "n/a — stored for the ops queue",
-        "abuse": "finding — minor (A-5): Turnstile only when a token is sent (:44); the per-domain bucket (3/day, lib/limits.ts:56) is spent before the report check (:39-61), so anyone can use a domain's three daily submissions and the owner's form gets 429 until the next day (email takedown@ still works). No mail is sent. Lead follow-up"
+        "abuse": "finding — minor (A-5): Turnstile only when a token is sent (:44); the per-domain bucket (3/day, lib/limits.ts:59) is spent before the report check (:39-61), so anyone can use a domain's three daily submissions and the owner's form gets 429 until the next day (email takedown@ still works). No mail is sent. Lead follow-up"
       }
     },
     {
