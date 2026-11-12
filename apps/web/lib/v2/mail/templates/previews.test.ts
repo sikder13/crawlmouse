@@ -7,9 +7,7 @@ import { MAIL_PREVIEWS, mailPreview } from './previews';
 describe('the mail preview registry (D2)', () => {
   it('previews every kind that has a template, under unique, path-safe slugs', () => {
     const kinds = new Set(MAIL_PREVIEWS.map((p) => p.kind));
-    // `alert` and `weekly_summary` are WS-C's templates; they join this list with them.
-    const pending = new Set(['alert', 'weekly_summary']);
-    expect(MAIL_KINDS.filter((k) => !kinds.has(k) && !pending.has(k))).toEqual([]);
+    expect(MAIL_KINDS.filter((k) => !kinds.has(k))).toEqual([]);
     const slugs = MAIL_PREVIEWS.map((p) => p.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
     for (const s of slugs) expect(s).toMatch(/^[a-z0-9-]+$/);

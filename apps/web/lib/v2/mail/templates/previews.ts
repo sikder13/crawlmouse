@@ -9,9 +9,11 @@ import { fixture } from '../../fixtures';
 import { packetPrompt } from '../../view/segment/fixes';
 import type { MailKind, RenderedMail } from '../types';
 import { accountDelete, emailChangeConfirm, emailChangeNotice } from './account-links';
+import { alertTemplate } from './alert';
 import { checkNotify } from './check-notify';
 import { fixToDeveloper } from './fix-to-developer';
 import { trialReminder } from './trial-reminder';
+import { weeklySummaryTemplate } from './weekly-summary';
 
 export interface MailPreview {
   /** The page's path segment: `/mail-preview/<slug>`. */
@@ -24,11 +26,16 @@ export interface MailPreview {
 /** Stand-in link tokens: the shape `issue_account_link` returns, minted by nothing. */
 const TOKEN = 'PREVIEWtokenPREVIEWtokenPREVIEWtokenPREVIEW';
 const RESTORE = 'RESTOREtokenRESTOREtokenRESTOREtokenRESTORE';
+/** A stand-in unsubscribe page link: the shape `unsubscribeLinks` builds, signed by nothing. */
+const UNSUBSCRIBE = 'https://crawlmouse.com/unsubscribe?t=PREVIEW.token';
 
 const bad = () => fixture('bad-site');
 const badHost = () => bad().sites[0]!.host;
 const badCheck = () => bad().checks[0]!.id;
 const badFix = () => bad().fixes.find((f) => f.packet !== null)!;
+/** bad-site's changes found by its newest check: what one alert lists. */
+const badChanges = () =>
+  bad().changes.filter((c) => c.check_id === badCheck() && c.kind !== 'baseline');
 
 export const MAIL_PREVIEWS: readonly MailPreview[] = [
   {
@@ -85,6 +92,33 @@ export const MAIL_PREVIEWS: readonly MailPreview[] = [
     name: 'Account deletion, confirm and restore',
     kind: 'account_delete',
     render: () => accountDelete({ confirmToken: TOKEN, restoreToken: RESTORE }),
+  },
+  {
+    slug: 'alert',
+    name: 'Alert',
+    kind: 'alert',
+    render: () =>
+      alertTemplate({
+        host: badHost(),
+        checkId: badCheck(),
+        checkedAt: bad().checks[0]!.finished_at ?? '2026-11-09T06:00:00.000Z',
+        zone: 'America/Indiana/Indianapolis',
+        changes: badChanges(),
+        unsubscribeUrl: UNSUBSCRIBE,
+      }),
+  },
+  {
+    slug: 'weekly-summary',
+    name: 'Weekly summary',
+    kind: 'weekly_summary',
+    render: () =>
+      weeklySummaryTemplate({
+        since: '2026-11-02T05:00:00.000Z',
+        until: '2026-11-09T05:00:00.000Z',
+        zone: 'America/Indiana/Indianapolis',
+        sites: [{ siteId: bad().sites[0]!.id, host: badHost(), changes: badChanges() }],
+        unsubscribeUrl: UNSUBSCRIBE,
+      }),
   },
 ];
 
