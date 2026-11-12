@@ -108,7 +108,7 @@ drop trigger if exists accounts_timezone_reschedule on public.accounts;
 drop trigger if exists sites_schedule_next on public.sites;
 drop function if exists public.accounts_timezone_reschedule();
 drop function if exists public.sites_schedule_next();
-drop function if exists public.release_scheduled_claim(uuid, timestamptz, jsonb, timestamptz);
+drop function if exists public.release_scheduled_claim(uuid, timestamptz, timestamptz, jsonb, timestamptz);
 drop function if exists public.claim_due_sites(timestamptz, integer, jsonb);
 drop function if exists public.next_check_after(text, smallint, smallint, smallint, text, timestamptz);
 drop function if exists public.account_effective_tier(uuid, timestamptz);

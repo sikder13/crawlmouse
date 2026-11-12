@@ -333,7 +333,12 @@ async function makeDue(id: string, at = '2026-11-01T06:00:00Z') {
 
 async function claim(now: string, limit: number, s: Slot) {
   return asRole(db, 'service_role', null, async (tx) => {
-    const { rows } = await tx.query<{ site_id: string; account_id: string; slot: Date }>(
+    const { rows } = await tx.query<{
+      site_id: string;
+      account_id: string;
+      slot: Date;
+      next_at: Date;
+    }>(
       `select * from public.claim_due_sites($1, $2, $3)`,
       [now, limit, JSON.stringify(s)],
     );
@@ -358,9 +363,9 @@ describe('claim_due_sites', () => {
     await makeDue(id, '2026-11-09T06:00:00Z');
     const s = slot();
     const got = await claim(NOW, 50, s);
-    expect(got.map((r) => [r.site_id, r.account_id, r.slot.toISOString()])).toEqual([
-      [id, acc, '2026-11-09T06:00:00.000Z'],
-    ]);
+    expect(
+      got.map((r) => [r.site_id, r.account_id, r.slot.toISOString(), r.next_at.toISOString()]),
+    ).toEqual([[id, acc, '2026-11-09T06:00:00.000Z', '2026-11-16T06:00:00.000Z']]);
     expect((await siteRow(id)).next_check_at!.toISOString()).toBe('2026-11-16T06:00:00.000Z');
     expect(await countOf(s)).toBe(1);
     expect(await claim(NOW, 50, s)).toEqual([]);
@@ -503,7 +508,7 @@ describe('account_effective_tier', () => {
 });
 
 describe('release_scheduled_claim (owner ruling Q9)', () => {
-  const release = (site: string, at: string, s: Slot, now = NOW) =>
+  const release = (site: string, at: string, claimedNext: string, s: Slot, now = NOW) =>
     asRole(
       db,
       'service_role',
@@ -511,11 +516,13 @@ describe('release_scheduled_claim (owner ruling Q9)', () => {
       async (tx) =>
         (
           await tx.query<{ r: { restored: boolean; slot_released: boolean } }>(
-            `select public.release_scheduled_claim($1, $2, $3, $4) r`,
-            [site, at, JSON.stringify(s), now],
+            `select public.release_scheduled_claim($1, $2, $3, $4, $5) r`,
+            [site, at, claimedNext, JSON.stringify(s), now],
           )
         ).rows[0]!.r,
     );
+  // Monday 2026-11-09 06:00 claimed at NOW moves to the Monday after.
+  const CLAIMED_NEXT = '2026-11-16T06:00:00.000Z';
 
   it('after a request that never ran: the site is due again on the next tick and the slot count is back', async () => {
     await settle();
@@ -524,7 +531,7 @@ describe('release_scheduled_claim (owner ruling Q9)', () => {
     const s = slot();
     const [claimed] = await claim(NOW, 50, s);
     expect(await countOf(s)).toBe(1);
-    expect(await release(id, claimed!.slot.toISOString(), s)).toEqual({
+    expect(await release(id, claimed!.slot.toISOString(), claimed!.next_at.toISOString(), s)).toEqual({
       restored: true,
       slot_released: true,
     });
@@ -535,7 +542,7 @@ describe('release_scheduled_claim (owner ruling Q9)', () => {
 
   it('gives back one slot when called twice', async () => {
     await settle();
-    const id = await site(await account());
+    const id = await site(await account(), { weekday: 1, hour: 6, offset: 0 });
     await makeDue(id, '2026-11-09T06:00:00Z');
     const s = slot();
     await claim(NOW, 50, s);
@@ -543,8 +550,8 @@ describe('release_scheduled_claim (owner ruling Q9)', () => {
       `update public.rate_limits set request_count = 5 where bucket_key = $1 and window_start = $2`,
       [s.bucket, s.window_start],
     );
-    await release(id, '2026-11-09T06:00:00Z', s);
-    expect(await release(id, '2026-11-09T06:00:00Z', s)).toEqual({
+    await release(id, '2026-11-09T06:00:00Z', CLAIMED_NEXT, s);
+    expect(await release(id, '2026-11-09T06:00:00Z', CLAIMED_NEXT, s)).toEqual({
       restored: false,
       slot_released: false,
     });
@@ -553,26 +560,76 @@ describe('release_scheduled_claim (owner ruling Q9)', () => {
 
   it('restores the due time but keeps the count once the slot’s day has ended', async () => {
     await settle();
-    const id = await site(await account());
+    const id = await site(await account(), { weekday: 1, hour: 6, offset: 0 });
     await makeDue(id, '2026-11-09T06:00:00Z');
     const s = slot();
     await claim(NOW, 50, s);
-    expect(await release(id, '2026-11-09T06:00:00Z', s, '2026-11-14T00:00:00.000Z')).toEqual({
+    expect(
+      await release(id, '2026-11-09T06:00:00Z', CLAIMED_NEXT, s, '2026-11-14T00:00:00.000Z'),
+    ).toEqual({
       restored: true,
       slot_released: false,
     });
     expect(await countOf(s)).toBe(1);
   });
 
-  it('leaves a site whose schedule was saved again since the claim (next_check_at not past the slot)', async () => {
+  it('leaves a site whose next_check_at is before the slot it is told of', async () => {
     await settle();
     const id = await site(await account());
     await makeDue(id, '2026-11-20T06:00:00Z');
     const s = slot();
-    expect(await release(id, '2026-11-25T06:00:00Z', s)).toEqual({
+    expect(await release(id, '2026-11-25T06:00:00Z', '2026-12-02T06:00:00Z', s)).toEqual({
       restored: false,
       slot_released: false,
     });
     expect((await siteRow(id)).next_check_at!.toISOString()).toBe('2026-11-20T06:00:00.000Z');
+  });
+
+  it('leaves a schedule saved since the claim as it was saved, and the slot spent', async () => {
+    await settle();
+    const id = await site(await account(), { weekday: 1, hour: 6, offset: 0 });
+    await makeDue(id, '2026-11-09T06:00:00Z');
+    const s = slot();
+    const [claimed] = await claim(NOW, 50, s);
+    expect(claimed!.next_at.toISOString()).toBe(CLAIMED_NEXT);
+    // The member moves the check to Wednesdays: the trigger computes a time later than the slot.
+    await db.query(`update public.sites set schedule_iso_weekday = 3 where id = $1`, [id]);
+    const saved = (await siteRow(id)).next_check_at!.toISOString();
+    expect(Date.parse(saved)).toBeGreaterThan(Date.parse('2026-11-09T06:00:00Z'));
+    expect(saved).not.toBe(CLAIMED_NEXT);
+    expect(await release(id, claimed!.slot.toISOString(), CLAIMED_NEXT, s)).toEqual({
+      restored: false,
+      slot_released: false,
+    });
+    expect((await siteRow(id)).next_check_at!.toISOString()).toBe(saved);
+    expect(await countOf(s)).toBe(1);
+  });
+
+  it('leaves a site removed since the claim removed, and the slot spent', async () => {
+    await settle();
+    const id = await site(await account(), { weekday: 1, hour: 6, offset: 0 });
+    await makeDue(id, '2026-11-09T06:00:00Z');
+    const s = slot();
+    const [claimed] = await claim(NOW, 50, s);
+    await db.query(`update public.sites set removed_at = now() where id = $1`, [id]);
+    expect(await release(id, claimed!.slot.toISOString(), CLAIMED_NEXT, s)).toEqual({
+      restored: false,
+      slot_released: false,
+    });
+    expect((await siteRow(id)).next_check_at).toBeNull();
+    expect(await countOf(s)).toBe(1);
+  });
+
+  it('refuses a call without the claimed next time', async () => {
+    await expect(
+      asRole(db, 'service_role', null, (tx) =>
+        tx.query(`select public.release_scheduled_claim($1, $2, null, $3, $4)`, [
+          randomUUID(),
+          '2026-11-09T06:00:00Z',
+          JSON.stringify(slot()),
+          NOW,
+        ]),
+      ),
+    ).rejects.toThrow(/claimed next time/);
   });
 });

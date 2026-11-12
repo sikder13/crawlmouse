@@ -33,9 +33,8 @@ export interface SchedulePorts {
   env: Env;
 }
 
-const Claimed = z.array(
-  z.object({ site_id: z.uuid(), slot: z.string().refine((s) => !Number.isNaN(Date.parse(s))) }),
-);
+const instant = z.string().refine((s) => !Number.isNaN(Date.parse(s)));
+const Claimed = z.array(z.object({ site_id: z.uuid(), slot: instant, next_at: instant }));
 
 const Released = z.strictObject({ restored: z.boolean(), slot_released: z.boolean() });
 
@@ -59,7 +58,7 @@ export function scheduleDeps(p: SchedulePorts): ScheduleDeps {
       );
       return {
         global: { bucket: slot.bucket, window_start: slot.window_start },
-        sites: rows.map((r) => ({ siteId: r.site_id, slot: iso(r.slot) })),
+        sites: rows.map((r) => ({ siteId: r.site_id, slot: iso(r.slot), next: iso(r.next_at) })),
       };
     },
 
@@ -87,6 +86,7 @@ export function scheduleDeps(p: SchedulePorts): ScheduleDeps {
         await p.rpc('release_scheduled_claim', {
           p_site: site.siteId,
           p_slot: site.slot,
+          p_claimed_next: site.next,
           p_global: global,
           p_now: new Date(p.now()).toISOString(),
         }),

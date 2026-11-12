@@ -31,10 +31,10 @@ export const SCHEDULE_TICK_FN_ID = 'crawlmouse.schedule.tick';
  * Sites per claim, so a page's step output stays under STEP_OUTPUT_BYTES: schedule.test.ts measures
  * the longest page there can be (a uuid and a `toISOString()` have fixed lengths).
  */
-export const SCHEDULE_PAGE = 40;
+export const SCHEDULE_PAGE = 30;
 
-/** Claims per tick: 200 sites an hour, 4,800 a day, under the daily ceiling of 5,000. */
-export const SCHEDULE_ROUNDS = 5;
+/** Claims per tick: SCHEDULE_PAGE × SCHEDULE_ROUNDS = 180 sites an hour, 4,320 a day. */
+export const SCHEDULE_ROUNDS = 6;
 
 /** Attempts a step gets after its first. */
 const RETRIES = 3;
@@ -45,10 +45,14 @@ export interface GlobalSlot {
   window_start: string;
 }
 
-/** A claimed site and the time it was due (ISO, `toISOString()`), which keys its request. */
+/**
+ * A claimed site, the time it was due (ISO, `toISOString()`), which keys its request, and the
+ * next_check_at the claim set (`next`), which a release compares against.
+ */
 export interface ClaimedSite {
   siteId: string;
   slot: string;
+  next: string;
 }
 
 export interface Claim {
@@ -71,7 +75,7 @@ export interface ScheduleDeps {
   /** `release_scheduled_claim` at the time now, against the row the claim counted into. */
   release(site: ClaimedSite, global: GlobalSlot): Promise<Released>;
   /** Tells Sentry a claim was released. Called with the site id and slot and nothing else. */
-  report(site: ClaimedSite): void;
+  report(site: Pick<ClaimedSite, 'siteId' | 'slot'>): void;
 }
 
 export type TickOutput =

@@ -19,6 +19,7 @@ const GLOBAL: GlobalSlot = {
   window_start: '2026-11-13T00:00:00.000Z',
 };
 const SLOT = '2026-11-09T06:00:00.000Z';
+const NEXT = '2026-11-16T06:00:00.000Z';
 
 /**
  * Runs a handler as Inngest does, closely enough for these tests (past-due-sweep.test.ts's harness,
@@ -120,7 +121,7 @@ describe('scheduleTickFn config (D4)', () => {
 
 describe('scheduleTickFn steps (D4)', () => {
   it('with CRAWL_PAUSED, returns before claiming', async () => {
-    const deps = fakeDeps([{ global: GLOBAL, sites: [{ siteId: A, slot: SLOT }] }], {
+    const deps = fakeDeps([{ global: GLOBAL, sites: [{ siteId: A, slot: SLOT, next: NEXT }] }], {
       paused: () => true,
     });
     const run = inngestLike();
@@ -132,8 +133,8 @@ describe('scheduleTickFn steps (D4)', () => {
 
   it('claims, then requests each claimed site in its own step, with the slot it was due at', async () => {
     const sites = [
-      { siteId: A, slot: SLOT },
-      { siteId: B, slot: '2026-11-09T07:00:00.000Z' },
+      { siteId: A, slot: SLOT, next: NEXT },
+      { siteId: B, slot: '2026-11-09T07:00:00.000Z', next: NEXT },
     ];
     const deps = fakeDeps([{ global: GLOBAL, sites }]);
     const run = inngestLike();
@@ -154,11 +155,11 @@ describe('scheduleTickFn steps (D4)', () => {
 
   it('the pause gate is a step: a pause set after the claim does not strand the claimed sites', async () => {
     let paused = false;
-    const deps = fakeDeps([{ global: GLOBAL, sites: [{ siteId: A, slot: SLOT }] }], {
+    const deps = fakeDeps([{ global: GLOBAL, sites: [{ siteId: A, slot: SLOT, next: NEXT }] }], {
       paused: () => paused,
       claim: async () => {
         paused = true;
-        return { global: GLOBAL, sites: [{ siteId: A, slot: SLOT }] };
+        return { global: GLOBAL, sites: [{ siteId: A, slot: SLOT, next: NEXT }] };
       },
     });
     const run = inngestLike();
@@ -169,8 +170,8 @@ describe('scheduleTickFn steps (D4)', () => {
 
   it('a request step that fails every retry releases that claim once, reports it once, and the tick goes on', async () => {
     const sites = [
-      { siteId: A, slot: SLOT },
-      { siteId: B, slot: '2026-11-09T07:00:00.000Z' },
+      { siteId: A, slot: SLOT, next: NEXT },
+      { siteId: B, slot: '2026-11-09T07:00:00.000Z', next: NEXT },
     ];
     const deps = fakeDeps([{ global: GLOBAL, sites }], {
       request: async (s) => {
@@ -183,7 +184,7 @@ describe('scheduleTickFn steps (D4)', () => {
       out: { claimed: 2, requested: 1, released: 1 },
     });
     expect(run.tries.get(`request:${A}:${SLOT}`)).toBe(3);
-    expect(deps.release.mock.calls).toEqual([[{ siteId: A, slot: SLOT }, GLOBAL]]);
+    expect(deps.release.mock.calls).toEqual([[{ siteId: A, slot: SLOT, next: NEXT }, GLOBAL]]);
     expect(deps.report.mock.calls).toEqual([[{ siteId: A, slot: SLOT }]]);
     // Site id and slot only: no host, no account, no error text.
     expect(Object.keys(deps.report.mock.calls[0]![0]).sort()).toEqual(['siteId', 'slot']);
@@ -193,7 +194,7 @@ describe('scheduleTickFn steps (D4)', () => {
 
   it('a request that succeeds on a retry releases nothing', async () => {
     let n = 0;
-    const deps = fakeDeps([{ global: GLOBAL, sites: [{ siteId: A, slot: SLOT }] }], {
+    const deps = fakeDeps([{ global: GLOBAL, sites: [{ siteId: A, slot: SLOT, next: NEXT }] }], {
       request: async () => {
         n += 1;
         if (n < 2) throw new Error('blip');
@@ -214,6 +215,7 @@ describe('scheduleTickFn steps (D4)', () => {
       sites: Array.from({ length: SCHEDULE_PAGE }, (_, i) => ({
         siteId: `00000000-0000-4000-8000-${String(n * 1000 + i).padStart(12, '0')}`,
         slot: SLOT,
+        next: NEXT,
       })),
     });
     const deps = fakeDeps(Array.from({ length: SCHEDULE_ROUNDS + 2 }, (_, i) => page(i)));
@@ -231,8 +233,8 @@ describe('scheduleTickFn steps (D4)', () => {
 
   it('stops claiming after a page that is not full', async () => {
     const deps = fakeDeps([
-      { global: GLOBAL, sites: [{ siteId: A, slot: SLOT }] },
-      { global: GLOBAL, sites: [{ siteId: B, slot: SLOT }] },
+      { global: GLOBAL, sites: [{ siteId: A, slot: SLOT, next: NEXT }] },
+      { global: GLOBAL, sites: [{ siteId: B, slot: SLOT, next: NEXT }] },
     ]);
     await inngestLike().execute(handlerOf(deps));
     expect(deps.claim).toHaveBeenCalledTimes(1);
@@ -244,9 +246,10 @@ describe('scheduleTickFn steps (D4)', () => {
       sites: Array.from({ length: SCHEDULE_PAGE }, (_, i) => ({
         siteId: i === 0 ? A : `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
         slot: SLOT,
+        next: NEXT,
       })),
     };
-    const deps = fakeDeps([full, { global: GLOBAL, sites: [{ siteId: A, slot: SLOT }] }], {
+    const deps = fakeDeps([full, { global: GLOBAL, sites: [{ siteId: A, slot: SLOT, next: NEXT }] }], {
       request: async (s) => {
         if (s.siteId === A) throw new Error('down');
         return { checkId: 'x', created: true };
@@ -262,6 +265,7 @@ describe('scheduleTickFn steps (D4)', () => {
     const sites: ClaimedSite[] = Array.from({ length: SCHEDULE_PAGE }, () => ({
       siteId: 'ffffffff-ffff-4fff-bfff-ffffffffffff',
       slot: '2026-11-09T06:00:00.000Z',
+      next: '2026-11-16T06:00:00.000Z',
     }));
     const page: Claim = { global: GLOBAL, sites };
     expect(Buffer.byteLength(JSON.stringify(page))).toBeLessThan(STEP_OUTPUT_BYTES);
@@ -276,7 +280,8 @@ describe('scheduleTickFn steps (D4)', () => {
 /**
  * The Q9 ruling end to end over a fake of the two SQL functions' contract (the SQL itself is pinned
  * in apps/web/__tests__/v2-028-schedule.test.ts): a claim takes a slot and moves the site's due time
- * past now; a release puts the due time back and returns the slot while its day is open.
+ * past now; a release that finds the due time the claim set puts it back and returns the slot while its
+ * day is open.
  */
 function fakeSchedule(now: string) {
   const site = { id: A, next: SLOT };
@@ -287,15 +292,15 @@ function fakeSchedule(now: string) {
       if (Date.parse(site.next) > Date.parse(now)) return { global: GLOBAL, sites: [] };
       count += 1;
       const slot = site.next;
-      site.next = '2026-11-16T06:00:00.000Z';
-      return { global: GLOBAL, sites: [{ siteId: site.id, slot }] };
+      site.next = NEXT;
+      return { global: GLOBAL, sites: [{ siteId: site.id, slot, next: NEXT }] };
     },
     request: async () => {
       if (requestFails) throw new Error('down');
       return { checkId: 'x', created: true };
     },
     release: async (s, g) => {
-      if (Date.parse(site.next) <= Date.parse(s.slot)) {
+      if (site.next !== s.next) {
         return { restored: false, slot_released: false };
       }
       site.next = s.slot;
@@ -321,7 +326,7 @@ describe('owner ruling Q9: a request that fails every retry gives back what its 
     expect(await inngestLike().execute(handlerOf(second))).toEqual({
       out: { claimed: 1, requested: 1, released: 0 },
     });
-    expect(next.request.mock.calls).toEqual([[{ siteId: A, slot: SLOT }]]);
+    expect(next.request.mock.calls).toEqual([[{ siteId: A, slot: SLOT, next: NEXT }]]);
     expect(f.count()).toBe(1);
   });
 });

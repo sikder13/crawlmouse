@@ -65,14 +65,18 @@ has passed, of accounts neither deleted nor marked for deletion, whose tier allo
 paid tier; on Free, the first live primary site in `apply_entitlement_transition`'s order, run monthly
 whatever its saved cadence (Q4). Rows another transaction holds are skipped. Each claim takes a
 `global:audits:day` slot in a block rolled back on refusal; a refusal ends the claim and leaves the rest due.
-A claimed site's `next_check_at` moves to the first due time after `now` in the same statement, and the
-claim returns the time it was due, which keys the request (`check:<site>:scheduled:<iso>`), so a retried
-request step makes the same check.
+A claimed site's `next_check_at` moves to the first due time after `now` in the same statement. The claim
+returns, per site, `site_id`, `account_id`, `slot` (the time it was due, which keys the request,
+`check:<site>:scheduled:<iso>`, so a retried request step makes the same check) and `next_at` (the
+`next_check_at` it set).
 
 When a site's request step fails every retry, `scheduleTickFn` catches it per site and runs a `release` step that calls `release_scheduled_claim` (owner ruling Q9):
 `next_check_at` goes back to the claimed time, so the next tick claims the site again, and the slot is given
-back while its 24-hour window is open. It acts only while `next_check_at` is still past the claimed time, so
-a second call, or a schedule saved since, gives nothing back twice. Sentry is told the site id and the slot.
+back while its 24-hour window is open. It acts only while `next_check_at` still holds the claim's `next_at`
+(to the millisecond). A schedule saved since the claim keeps the time the save computed, a site removed since
+keeps its null, and a second call finds the restored slot; in each, nothing is given back, so the slot of a
+site saved or removed between its claim and its release stays spent for that day. Sentry is told the site id
+and the slot.
 
 ## The mail the product sends (D2, D3, D7, D11)
 
