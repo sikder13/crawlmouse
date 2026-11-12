@@ -182,6 +182,7 @@ describe('the finders see what they claim to see', () => {
       'app/audit/[id]/structure/page.tsx',
       'app/dashboard/v2/page.tsx',
       'app/sites/[id]/page.tsx',
+      'app/unsubscribe/page.tsx',
       'app/v2-home/page.tsx',
       'app/api/account/delete/confirm/route.ts',
       'app/api/account/email/confirm/route.ts',
@@ -205,6 +206,7 @@ describe('the finders see what they claim to see', () => {
       'app/api/sites/[id]/checks/route.ts',
       'app/api/sites/[id]/route.ts',
       'app/api/sites/route.ts',
+      'app/api/unsubscribe/route.ts',
       'app/api/webhooks/stripe-account/route.ts',
     ]);
   });

@@ -31,9 +31,9 @@ describe('shouldSendEvent', () => {
 });
 
 describe('FUNNEL_EVENTS list-drift lock', () => {
-  it('has exactly the 50 funnel events (7 launch + 9 conversion-spine + 10 SPEC 04 viral loop + 7 SPEC 05 AI + 2 CC-25 account door + 6 CC-22b public check flow + 2 CC-26b + 5 CC-27b + 2 CC-28 monitoring) with no duplicates', () => {
-    expect(FUNNEL_EVENTS.length).toBe(50);
-    expect(new Set(FUNNEL_EVENTS).size).toBe(50);
+  it('has exactly the 51 funnel events (7 launch + 9 conversion-spine + 10 SPEC 04 viral loop + 7 SPEC 05 AI + 2 CC-25 account door + 6 CC-22b public check flow + 2 CC-26b + 5 CC-27b + 3 CC-28 monitoring) with no duplicates', () => {
+    expect(FUNNEL_EVENTS.length).toBe(51);
+    expect(new Set(FUNNEL_EVENTS).size).toBe(51);
     for (const e of [
       'trial_started',
       'site_added',
@@ -46,6 +46,7 @@ describe('FUNNEL_EVENTS list-drift lock', () => {
       'account_purged',
       'alert_sent',
       'summary_sent',
+      'unsubscribed',
     ]) {
       expect(FUNNEL_EVENTS).toContain(e);
     }

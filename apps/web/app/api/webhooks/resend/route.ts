@@ -1,6 +1,8 @@
 import { Webhook } from 'svix';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { parseResendEvent } from '@/lib/billing/resend-event';
+import { mailPepper } from '@/lib/v2/mail/address-hash';
+import { recordSuppressions } from '@/lib/v2/mail/suppression';
 
 export const runtime = 'nodejs';
 
@@ -33,12 +35,40 @@ export async function POST(req: Request) {
     return new Response('ignored', { status: 202 });
   }
 
-  const { error } = await supabaseAdmin().from('email_events').upsert(
-    { resend_event_id: headers['svix-id'], email_address: e.email, event_type: e.eventType, bounce_type: e.bounceType, payload },
-    { onConflict: 'resend_event_id', ignoreDuplicates: true },
-  );
+  const { error } = await supabaseAdmin()
+    .from('email_events')
+    .upsert(
+      {
+        resend_event_id: headers['svix-id'],
+        email_address: e.email,
+        event_type: e.eventType,
+        bounce_type: e.bounceType,
+        payload,
+      },
+      { onConflict: 'resend_event_id', ignoreDuplicates: true },
+    );
   if (error) {
     console.error('[resend-webhook] email_events upsert failed:', error.message);
+    return new Response('db error', { status: 500 });
+  }
+
+  // CC-28 D7: a hard bounce or a complaint stops non-account mail to the address, by its hash.
+  try {
+    await recordSuppressions(payload, {
+      pepper: mailPepper(),
+      record: async (hash, reason, at) => {
+        const r = await supabaseAdmin().rpc('record_email_suppression', {
+          p_hash: hash,
+          p_reason: reason,
+          p_now: at.toISOString(),
+        });
+        if (r.error) throw new Error(`record_email_suppression: ${r.error.code ?? 'error'}`);
+      },
+      now: () => new Date(),
+      log: (event, fields) => console.error(JSON.stringify({ event, ...fields })),
+    });
+  } catch (e) {
+    console.error('[resend-webhook] suppression failed:', e instanceof Error ? e.message : 'error');
     return new Response('db error', { status: 500 });
   }
   return new Response('ok');
