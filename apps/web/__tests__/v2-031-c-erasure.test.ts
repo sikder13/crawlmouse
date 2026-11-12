@@ -145,6 +145,7 @@ async function storedReport(accountId: string, siteId: string, checkId: string, 
   const id = randomUUID();
   await insertRow(db, 'reports', {
     ...ROWS.reports(id, accountId, siteId, checkId),
+    file_state: 'stored',
     storage_path: path,
   });
   await db.query(`insert into storage.objects (bucket_id, name) values ('reports', $1)`, [path]);
@@ -373,8 +374,9 @@ describe('(c) the owner of an agency with invited seats, stored reports, share l
       const kept = await keptSite(other, account);
       const path = `${account}/${randomUUID()}.pdf`;
       await other.query(
-        `insert into public.reports (account_id, site_id, kind, format, status, made_by, covers_check_ids, storage_path)
-         values ($1, $2, 'audit_pdf', 'pdf', 'ready', 'user', array[gen_random_uuid()], $3)`,
+        `insert into public.reports (account_id, site_id, kind, format, status, made_by, covers_check_ids,
+                                     file_state, storage_path)
+         values ($1, $2, 'audit_pdf', 'pdf', 'ready', 'user', array[gen_random_uuid()], 'stored', $3)`,
         [account, kept.id, path],
       );
       await other.query(`insert into storage.objects (bucket_id, name) values ('reports', $1)`, [
