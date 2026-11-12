@@ -203,6 +203,9 @@ describe('v2 stays out of live pages', () => {
     inV2PageDir(file) ||
     file.startsWith(join(WEB_ROOT, 'components', 'v2') + '/') ||
     file.startsWith(join(WEB_ROOT, '__tests__', 'v2') + '/') ||
+    // CC-31: a report's document prints a verdict's word as the screens do. It imports
+    // components/v2/verdicts.ts, which is data: a type import and no style.
+    file === join(WEB_ROOT, 'lib', 'v2', 'reports', 'generate-doc.ts') ||
     // A test beside the code it tests; the next case holds that no other module imports one.
     /\.test\.tsx?$/.test(file);
 

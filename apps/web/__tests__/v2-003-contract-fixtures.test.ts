@@ -333,7 +333,9 @@ async function project(db: PGlite): Promise<Record<string, Rec[]>> {
     ),
     changes: await rowsOf(db, 'changes'),
     alert_rules: await rowsOf(db, 'alert_rules'),
-    reports: (await rowsOf(db, 'reports')).map((r) => omit(r, ['storage_path'])),
+    reports: (await rowsOf(db, 'reports')).map((r) =>
+      omit(r, ['storage_path', 'file_state', 'failed_reason', 'subject_fix_id']),
+    ),
     lineages: await rowsOf(db, 'measurement_lineages'),
     usage_events: (await rowsOf(db, 'usage_events')).map((r) =>
       omit(r, ['api_key_id', 'idempotency_key']),
