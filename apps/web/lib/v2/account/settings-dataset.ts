@@ -35,7 +35,8 @@ import {
   siteFromRow,
 } from '../pipeline/rows';
 import type { CheckReader } from '../pipeline/types';
-import { accountFromRow, seatFromRow } from './rows';
+import { sitesInScope } from '../agency/guard';
+import { accountFromRow, seatsFromRows } from './rows';
 
 export interface SettingsDatasetDeps {
   /** The caller's own client: row security applies. */
@@ -132,7 +133,7 @@ export async function loadSettingsDataset(
   );
   if (accountRow === null) throw new Error(`loadSettingsDataset: no account ${accountId}`);
 
-  const [seatRows, scopeRows, liveSites, accountRules] = await Promise.all([
+  const [seatRows, scopeRows, siteIds, accountRules] = await Promise.all([
     rows(
       'seats read',
       session
@@ -145,10 +146,7 @@ export async function loadSettingsDataset(
       'seat_sites read',
       session.from('seat_sites').select('seat_id, site_id').eq('account_id', accountId),
     ),
-    rows(
-      'sites read',
-      session.from('sites').select('id').eq('account_id', accountId).is('removed_at', null),
-    ),
+    sitesInScope(session, accountId),
     rows(
       'alert_rules read',
       session
@@ -182,7 +180,6 @@ export async function loadSettingsDataset(
   );
   if (ownerUser === null) throw new Error(`loadSettingsDataset: no user for ${accountId}'s owner`);
 
-  const siteIds = liveSites.map((s) => s.id as string);
   const [siteRows, schedules, checkRows, fixRows, changeRows, siteRules, reportRows] =
     siteIds.length > 0
       ? await Promise.all([
@@ -210,8 +207,6 @@ export async function loadSettingsDataset(
     : [];
 
   const scheduleOf = new Map(schedules.map((r) => [r.site_id, r]));
-  const sitesOf = (seatId: unknown) =>
-    scopeRows.filter((r) => r.seat_id === seatId).map((r) => r.site_id as string);
   const asOf = now.toISOString();
   const d: AccountRecords = {
     provenance: 'measured',
@@ -227,7 +222,7 @@ export async function loadSettingsDataset(
         brand: null,
       }),
     ],
-    seats: seatRows.map((s) => seatFromRow(s, sitesOf(s.id))),
+    seats: seatsFromRows(seatRows, scopeRows),
     sites: siteRows.map((s) =>
       siteFromRow({ ...s, report_schedules: scheduleOf.get(s.id) ?? null }),
     ),

@@ -157,6 +157,18 @@ export function seatFromRow(row: Row, siteIds: readonly string[]): Seat {
   });
 }
 
+/**
+ * An account's seats from the `seats` rows and `seat_sites` rows the caller reads. Row security
+ * shows a seat scoped to some clients its own seat and the owner's, with the scope rows of the sites
+ * it covers (migration 20261114000002, section S), so each seat that arrives here arrives with its
+ * whole scope.
+ */
+export function seatsFromRows(seatRows: readonly Row[], scopeRows: readonly Row[]): Seat[] {
+  const sitesOf = (seatId: unknown) =>
+    scopeRows.filter((r) => r.seat_id === seatId).map((r) => r.site_id as string);
+  return seatRows.map((s) => seatFromRow(s, sitesOf(s.id)));
+}
+
 /** An alert rule: its columns are the contract's fields. */
 export function alertRuleFromRow(row: Row): AlertRule {
   return AlertRuleSchema.parse({

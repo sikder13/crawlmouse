@@ -19,9 +19,10 @@ export const dynamic = 'force-dynamic';
  * Add a site to the account the caller acts in (CC-26b D6, ARCH-2 §5 "First-run dashboard"):
  * `{url}`. A 404 with V2_CHECKS_PUBLIC unset; 503 while crawls are paused or the pipeline is off,
  * since adding a site requests its first audit, and 503 `capacity` when the day's
- * `global:audits:day` ceiling is reached, with nothing written. The caller's seat on the account
- * must be the owner's or an account manager's, and unscoped, so a manager scoped to some clients
- * cannot add a site they would not then see (questions.md Q12). The host is canonicalised and
+ * `global:audits:day` ceiling is reached, with nothing written. The caller's role must be one
+ * `seat_may` lets add a site (the owner or an account manager: docs/specs/v2/31-agency.md §3), and
+ * their seat unscoped, so a manager scoped to some clients cannot add a site they would not then see
+ * (questions.md Q12). The host is canonicalised and
  * admitted by the engine's SSRF guard. The slot count, the per-day bound on first audits, the
  * ceiling, v1's per-domain hourly bucket (Free only, as v1 counts it) and the insert are one SQL
  * transaction (`add_site`). A form is answered with a 303 to the new site's page, JSON with its ids.
@@ -43,10 +44,12 @@ export async function POST(req: Request) {
   if (viewer.kind === 'ambiguous') return refuseTo(req, BACK, 409, 'account_ambiguous');
   const { account, seat, tier, limits } = viewer.viewer;
 
-  const { data: role, error: roleError } = await sb.rpc('member_role', { p_account: account.id });
-  if (roleError) throw new Error(`member_role failed: ${roleError.message}`);
-  if (role !== 'owner' && role !== 'account_manager')
-    return refuseTo(req, BACK, 403, 'role_refused');
+  const { data: allowed, error: guardError } = await sb.rpc('seat_may', {
+    p_account: account.id,
+    p_action: 'add_site',
+  });
+  if (guardError) throw new Error(`seat_may failed: ${guardError.message}`);
+  if (allowed !== true) return refuseTo(req, BACK, 403, 'role_refused');
   const scope = await sb.from('seats').select('client_scope_all').eq('id', seat.id).maybeSingle();
   if (scope.error) throw new Error(`seats read failed: ${scope.error.message}`);
   if ((scope.data as { client_scope_all?: unknown } | null)?.client_scope_all !== true) {
