@@ -78,22 +78,26 @@ table refuses gets 403 `role_refused`.
 
 Which client makes each read of a site, check, fix, packet, alert, change or report, and what bounds it.
 
-| Read                                                                        | Where                                                      | Client                               | Bound by                                      |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------ | --------------------------------------------- |
-| The account, its seats, subscription, keys, brand, account-wide alert rules | `lib/v2/account/dataset.ts`, `settings-dataset.ts`         | caller                               | row security, `is_member`                     |
-| The ids of the account's live sites                                         | `sitesInScope` (`lib/v2/agency/guard.ts`)                  | caller                               | `sites`' policy, `is_member_for_site`         |
-| `seat_sites`                                                                | both datasets                                              | caller                               | a row is visible when its site is (section S) |
-| Site rows, schedules, checks, fixes, fix events, changes                    | both datasets                                              | service role                         | the ids `sitesInScope` returned               |
-| Site alert rules, reports                                                   | both datasets                                              | caller                               | row security, `is_member_for_site`            |
-| A site page's site                                                          | `siteOfCaller` (`lib/v2/account/pages.ts`)                 | caller                               | `is_member_for_site`                          |
-| Edit, remove a site                                                         | `app/api/sites/[id]/route.ts`                              | caller, then service role by site id | `is_member_for_site`, `seat_may`              |
-| Add a site                                                                  | `app/api/sites/route.ts`                                   | caller, then service role            | `seat_may`, an unscoped seat                  |
-| Re-check                                                                    | `app/api/sites/[id]/checks/route.ts`                       | caller, then service role by site id | `is_member_for_site`                          |
-| Mark done, packet, email a developer                                        | `app/api/fixes/[id]/*/route.ts`, `lib/v2/account/fixes.ts` | caller, then service role by fix id  | `is_member_for_fix`                           |
-| A check's pages, stream, cancel, notify                                     | `readableCheck` (`lib/v2/pipeline/public.ts`)              | service role, then caller            | the caller's `sites` read for a kept site     |
+| Read                                                                        | Where                                                                     | Client                                     | Bound by                                               |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------ |
+| The account, its seats, subscription, keys, brand, account-wide alert rules | `lib/v2/account/dataset.ts`, `settings-dataset.ts`                        | caller                                     | row security, `is_member`                              |
+| The ids of the account's live sites                                         | `sitesInScope` (`lib/v2/agency/guard.ts`)                                 | caller                                     | `sites`' policy, `is_member_for_site`                  |
+| `seat_sites`                                                                | both datasets                                                             | caller                                     | a row is visible when its site is (section S)          |
+| Site rows, schedules, checks, fixes, fix events, changes                    | both datasets                                                             | service role                               | the ids `sitesInScope` returned                        |
+| Site alert rules, reports                                                   | both datasets                                                             | caller                                     | row security, `is_member_for_site`                     |
+| A site page's site                                                          | `siteOfCaller` (`lib/v2/account/pages.ts`)                                | caller                                     | `is_member_for_site`                                   |
+| Edit, remove a site                                                         | `app/api/sites/[id]/route.ts`                                             | caller, then service role by site id       | `is_member_for_site`, `seat_may`                       |
+| Add a site                                                                  | `app/api/sites/route.ts`                                                  | caller, then service role                  | `seat_may`, an unscoped seat                           |
+| Re-check                                                                    | `app/api/sites/[id]/checks/route.ts`                                      | caller, then service role by site id       | `is_member_for_site`                                   |
+| Mark done, packet, email a developer                                        | `app/api/fixes/[id]/*/route.ts`, `lib/v2/account/fixes.ts`                | caller, then service role by fix id        | `is_member_for_fix`                                    |
+| A check's pages, stream, cancel, notify                                     | `readableCheck` (`lib/v2/pipeline/public.ts`)                             | service role, then caller                  | the caller's `sites` read for a kept site              |
+| The Alerts page, the Changes log                                            | `app/alerts/page.tsx`, `app/changes/page.tsx`                             | as the dashboard's dataset                 | the ids `sitesInScope` returned                        |
+| A site's alert switch                                                       | `app/api/sites/[id]/alert-rules/route.ts`                                 | caller, then service role by site id       | `is_member_for_site`                                   |
+| A site's next check                                                         | `readNextChecks` (`lib/v2/account/sites-store.ts`)                        | service role                               | ids the dataset or `siteOfCaller` returned             |
+| Making and downloading a report                                             | `app/api/reports/route.ts`, `app/api/report-files/[id]/download/route.ts` | caller, then service role by the row's ids | `is_member_for_site`, `seat_may`, the `reports` policy |
 
 Each row is run as owner, account manager, developer in scope, developer out of scope, removed seat
-and stranger: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-scope.test.ts __tests__/v2-031-scope-routes.test.ts`.
+and stranger: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-scope.test.ts __tests__/v2-031-scope-routes.test.ts __tests__/v2-031-scope-monitoring.test.ts`; the report routes in their own tests (`app/api/reports/route.test.ts`, `app/api/report-files/[id]/download/route.test.ts`).
 
 **Found open and closed here.**
 
