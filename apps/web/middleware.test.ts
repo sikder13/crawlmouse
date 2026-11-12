@@ -341,6 +341,7 @@ describe('a state-changing API request from another site is refused before the r
       'api/me',
       'api/reports/[slug]/claim',
       'api/reports/[slug]/logo',
+      'api/reports/[slug]/view',
       'api/reports/[slug]/visibility',
       'api/reports/[slug]/white-label',
       'api/sites',
