@@ -15,6 +15,17 @@ export const SETTINGS_NOTICES = {
     'That did not go through. Try again; if it keeps happening, write to support@crawlmouse.com.',
 } as const;
 
+/**
+ * Settings of an account that is not the reader's own personal account (CC-31 D2b): what the page
+ * says where it would offer the sign-in address change and Delete, which belong to that account
+ * (the routes answer `personal_account_only`, below).
+ */
+export const OWN_ACCOUNT_COPY = {
+  address: 'Your sign-in address belongs to your own account. Switch to it to change the address.',
+  deletion: 'Deleting your account is done from your own account. Switch to it to delete.',
+  switchTo: 'Switch to your own account',
+} as const;
+
 export const REFUSAL_SENTENCES: Readonly<Record<string, string>> = {
   // Who may act
   auth_required: 'Your session has ended. Sign in again, then try once more.',

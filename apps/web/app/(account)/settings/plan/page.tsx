@@ -4,6 +4,7 @@ import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { PlanScreen } from '@/components/v2/screens/settings/PlanScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { readSettingsPage } from '@/lib/v2/account/settings-pages';
+import { withSwitcher } from '@/lib/v2/view/account-shell';
 import { settingsView } from '@/lib/v2/view/settings';
 
 // Not indexed, not in the sitemap and rendered per request: the (account) layout says so for
@@ -23,11 +24,15 @@ export default async function PlanPage() {
   return (
     <LiveActions>
       <PlanScreen
-        data={settingsView(page.d, page.viewer, {
-          billingEnd: page.billingEnd,
-          role: page.role,
-          subscriptionStatus: page.subscriptionStatus,
-        })}
+        data={withSwitcher(
+          settingsView(page.d, page.viewer, {
+            billingEnd: page.billingEnd,
+            role: page.role,
+            subscriptionStatus: page.subscriptionStatus,
+          }),
+          page.accounts,
+          page.viewer.accountId,
+        )}
       />
     </LiveActions>
   );
