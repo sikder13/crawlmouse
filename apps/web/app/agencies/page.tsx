@@ -3,16 +3,18 @@ import { notFound } from 'next/navigation';
 import { AgenciesScreen } from '@/components/v2/screens/agencies/AgenciesScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
+import { socialMetadata } from '@/lib/v2/social-metadata';
 import { agenciesView } from '@/lib/v2/view/agencies';
 import '@/styles/v2/tokens.css';
 
 const view = agenciesView();
 
-/** Indexable (the root layout's robots apply); canonical to its own address. */
+/** Indexable (the root layout's robots apply); canonical to its own address, and shared as itself. */
 export const metadata: Metadata = {
   title: view.title,
   description: view.description,
   alternates: { canonical: '/agencies' },
+  ...socialMetadata({ path: '/agencies', title: view.title, description: view.description }),
 };
 
 /**

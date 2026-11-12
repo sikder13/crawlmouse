@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { CheckPageScreen } from '@/components/v2/screens/check/CheckPageScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { CHECK_COPY, CHECK_QUESTIONS, isCheckQuestion } from '@/lib/v2/copy/check-pages';
+import { socialMetadata } from '@/lib/v2/social-metadata';
 import { checkPageView } from '@/lib/v2/view/check-pages';
 import '@/styles/v2/tokens.css';
 
@@ -15,15 +16,20 @@ export function generateStaticParams() {
   return CHECK_QUESTIONS.map((question) => ({ question }));
 }
 
-/** Each page's own title, description and canonical; indexable (the root layout's robots apply). */
+/**
+ * Each page's own title, description, canonical and social metadata; indexable (the root layout's
+ * robots apply).
+ */
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { question } = await params;
   if (!isCheckQuestion(question)) return {};
   const copy = CHECK_COPY[question];
+  const canonical = checkPageView(question).canonical;
   return {
     title: copy.title,
     description: copy.description,
-    alternates: { canonical: checkPageView(question).canonical },
+    alternates: { canonical },
+    ...socialMetadata({ path: canonical, title: copy.title, description: copy.description }),
   };
 }
 
