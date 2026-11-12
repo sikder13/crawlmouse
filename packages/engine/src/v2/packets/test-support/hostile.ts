@@ -46,7 +46,8 @@ export const hostileText = (maxParts = 8): fc.Arbitrary<string> =>
     .map((parts) => parts.join(''));
 
 /** What no packet string may hold: a line break, a control character, or a code point that draws nothing. */
-export const UNSHOWN = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Co}\p{Cs}\p{Cn}\p{Variation_Selector}]/u;
+export const UNSHOWN =
+  /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Co}\p{Cs}\p{Cn}\p{Variation_Selector}\u034F\u115F\u1160\u17B4\u17B5\u2800\u3164\uFFA0]/u;
 
 /** `text` with its code spans removed: what is left is what this repository wrote. */
 export const outsideCodeSpans = (text: string): string => text.replace(/`[^`]*`/g, '');

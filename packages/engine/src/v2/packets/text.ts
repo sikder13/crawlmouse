@@ -17,8 +17,13 @@
  * `line` refuses a line break in them.
  */
 
-/** Code points that draw nothing or change how text is shown: removed. */
-const INVISIBLE = /[\p{Cf}\p{Co}\p{Cs}\p{Cn}\p{Variation_Selector}]/gu;
+/**
+ * Code points that draw nothing or change how text is shown: removed. The Unicode categories, and
+ * the letters and marks that render blank though their category says otherwise (the Hangul fillers,
+ * the braille blank, the combining grapheme joiner, two Khmer inherent vowels).
+ */
+const INVISIBLE =
+  /[\p{Cf}\p{Co}\p{Cs}\p{Cn}\p{Variation_Selector}\u034F\u115F\u1160\u17B4\u17B5\u2800\u3164\uFFA0]/gu;
 /** Control characters, line and paragraph separators, and every other space: each run becomes one space. */
 const BREAKS = /[\p{Cc}\p{Zl}\p{Zp}\p{Zs}]+/gu;
 
@@ -43,7 +48,7 @@ function safe(text: string): Safe {
   return value;
 }
 
-/** Crawled text with nothing invisible in it, no line break, and no backtick. */
+/** Crawled text without the code points `INVISIBLE` lists, with no line break and no backtick. */
 export function clean(crawled: string): string {
   return crawled.replace(INVISIBLE, '').replace(BREAKS, ' ').replaceAll('`', "'").trim();
 }

@@ -5,7 +5,7 @@
  * them is a single-quoted shell word made here, so nothing in a value is read by the shell:
  *
  *   - `url`: a crawled URL, re-serialised by the URL parser, with every character outside
- *     `URL_SAFE` percent-encoded. An apostrophe, a backtick, a space and a `$` are outside it.
+ *     `URL_UNSAFE` matches percent-encoded, and curl's globbing characters after the origin too.
  *   - `word`: text of ours (a user-agent string from the registry, a pattern we wrote). An apostrophe
  *     in it is written `'\''`; a control or invisible character throws.
  *   - `crawledWord`: crawled text that is not a URL, cleaned as a packet line cleans it (text.ts
@@ -37,13 +37,18 @@ const encoder = new TextEncoder();
 const percent = (ch: string) =>
   [...encoder.encode(ch)].map((b) => `%${b.toString(16).toUpperCase().padStart(2, '0')}`).join('');
 
-/** A crawled http or https URL as a shell word. Anything else throws: a record holds no other URL. */
+/**
+ * A crawled http or https URL as a shell word. Anything else throws: a record holds no other URL.
+ * After the origin, `[`, `]`, `{` and `}` are percent-encoded too: curl reads them as a range or a
+ * set of URLs to request (its URL globbing), and an IPv6 host's brackets are in the origin.
+ */
 export function url(crawled: string): Word {
   const parsed = new URL(crawled);
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error('packets: a verify command requests http or https only');
   }
-  return quoted(parsed.href.replace(URL_UNSAFE, percent));
+  const rest = parsed.href.slice(parsed.origin.length);
+  return quoted(parsed.origin + rest.replace(URL_UNSAFE, percent).replace(/[[\]{}]/g, percent));
 }
 
 /** Text of ours as a shell word. */

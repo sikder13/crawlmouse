@@ -3,7 +3,7 @@
  *
  * A builder is a pure function of one fix's own record and `PacketFacts`: the check's stack, each
  * crawler's site verdict, and the check's rows for the pages, links and access tests the record names. The same
- * record and facts give the same packet (compose.property.test.ts).
+ * record and facts give the same packet (compose.test.ts).
  */
 import type { AccessTest, Check, Fix, FixType, LinkEdge, PageResult } from '@crawlmouse/types/v2';
 import type { AccessDetection, AccessFixType, CrawlerAccess } from '../access/types.js';

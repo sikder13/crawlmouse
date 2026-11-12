@@ -34,6 +34,13 @@ describe('url', () => {
     expect(url("https://a.test/it's?q=`x` y").word).toBe("'https://a.test/it%27s?q=%60x%60%20y'");
   });
 
+  it('percent-encodes what curl would read as a range or a set, and leaves an IPv6 host alone', () => {
+    expect(url('https://a.test/list/p[1-3]?x={a,b}').word).toBe(
+      "'https://a.test/list/p%5B1-3%5D?x=%7Ba,b%7D'",
+    );
+    expect(url('http://[::1]:8080/a[b]').word).toBe("'http://[::1]:8080/a%5Bb%5D'");
+  });
+
   it('refuses a scheme a record cannot hold', () => {
     expect(() => url('file:///etc/passwd')).toThrow(/http or https/);
     expect(() => url('javascript:alert(1)')).toThrow(/http or https/);
