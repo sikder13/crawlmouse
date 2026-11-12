@@ -217,16 +217,30 @@ const verifyLines = (b: Pick<PacketBody, 'verify'>) => [
   `  → expect ${b.verify.expect}`,
 ];
 
+/** The label a prompt's first line gives the fix's title under. */
+export const PROMPT_TITLE_LABEL = 'The audit’s title for this fix:';
+
+/**
+ * The first line of a prompt: the title on one line, in double quotes, with each double quote in it
+ * written as an apostrophe so the title cannot end the quotation it is in.
+ */
+export const promptTitle = (title: string): string =>
+  `${PROMPT_TITLE_LABEL} "${oneLine(title).replaceAll('"', "'")}"`;
+
 /**
  * One body of a packet as plain text, for "Copy as a prompt": the fix page, the segment and the
  * packet route copy this, so the same fix is handed over in the same words wherever it is copied
  * from. The title and each string of the body are put on one line here (`oneLine`), so the prompt
  * has one line per string, whatever a stored string holds (fixes.property.test.ts).
+ *
+ * A fix's title holds text a crawled site chose (a URL, a template key), and the first line of a
+ * prompt is where a coding tool looks for what it is asked to do. So the title is given as a quoted
+ * string under a label of ours (`promptTitle`), not as a line of its own.
  */
 export function packetPrompt(f: Pick<Fix, 'title'>, body: PacketBody): string {
   const b = cleanBody(body);
   return [
-    oneLine(f.title),
+    promptTitle(f.title),
     '',
     ...b.context,
     '',
