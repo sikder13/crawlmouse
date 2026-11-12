@@ -21,6 +21,11 @@ describe('sh', () => {
     expect(() => sh`curl ${{ word: '$(reboot)' } as Word}`).toThrow(/only words made by/);
   });
 
+  it('refuses a whole command as a value', () => {
+    const inner = sh`curl -sS ${url('https://a.test/')}`;
+    expect(() => sh`${inner as unknown as Word} | wc -c`).toThrow(/only words made by/);
+  });
+
   it('refuses a line break in our own words', () => {
     expect(
       () => sh`curl

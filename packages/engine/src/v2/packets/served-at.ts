@@ -32,10 +32,26 @@ export function readAt(facts: Pick<PacketFacts, 'pages'>, url: string): string {
   const final = page?.final_url ?? null;
   if (final === null || page?.status_code !== 200) return servedAt(facts, url);
   try {
-    const { username, password, protocol } = new URL(final);
-    const web = protocol === 'http:' || protocol === 'https:';
-    return web && username === '' && password === '' ? final : servedAt(facts, url);
+    return sameSite(new URL(final), new URL(url)) ? final : servedAt(facts, url);
   } catch {
     return servedAt(facts, url);
   }
+}
+
+const bare = (host: string) => host.replace(/^www\./, '');
+
+/**
+ * `landed` is an address of the page's own site: http or https with no credentials, on the page's
+ * host give or take a leading `www.`, and on its port. A command a developer runs with a crawler's
+ * user agent requests no other host, whatever a row holds.
+ */
+function sameSite(landed: URL, page: URL): boolean {
+  const web = landed.protocol === 'http:' || landed.protocol === 'https:';
+  return (
+    web &&
+    landed.username === '' &&
+    landed.password === '' &&
+    bare(landed.hostname) === bare(page.hostname) &&
+    landed.port === page.port
+  );
 }

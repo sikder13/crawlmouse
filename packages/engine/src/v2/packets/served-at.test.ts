@@ -49,6 +49,26 @@ describe('readAt', () => {
     expect(readAt(row('https://a.test/p', null, 200), 'https://a.test/p')).toBe('https://a.test/p');
   });
 
+  it('follows the page to its www or bare twin, and from http to https', () => {
+    expect(readAt(row('https://a.test', 'https://www.a.test/', 200), 'https://a.test')).toBe(
+      'https://www.a.test/',
+    );
+    expect(readAt(row('http://www.a.test/p', 'https://a.test/p', 200), 'http://www.a.test/p')).toBe(
+      'https://a.test/p',
+    );
+  });
+
+  it.each([
+    'https://evil.test/landing',
+    'https://a.test.evil.test/p',
+    'https://a.test:8443/p',
+    'https://sub.a.test/p',
+  ])('never returns an address on another host or port: %s', (final) => {
+    expect(readAt(row('https://a.test/p', final, 200), 'https://a.test/p')).toBe(
+      'https://a.test/p',
+    );
+  });
+
   it('never returns an address with credentials or another scheme', () => {
     expect(readAt(row('https://a.test/p', 'https://x@b.test/p', 200), 'https://a.test/p')).toBe(
       'https://a.test/p',

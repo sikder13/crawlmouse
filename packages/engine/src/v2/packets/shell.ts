@@ -17,6 +17,7 @@ import { clean, MAX_CRAWLED_CHARS } from './text.js';
 const URL_UNSAFE = /[^A-Za-z0-9\-._~:/?#[\]@!$&()*+,;=%]/gu;
 
 const made = new WeakSet<object>();
+const commands = new WeakSet<object>();
 
 /** One single-quoted shell word. */
 export interface Word {
@@ -91,12 +92,12 @@ export function sh(parts: TemplateStringsArray, ...values: readonly Word[]): Com
     }
   });
   const value = Object.freeze({ command: command.trim() });
-  made.add(value);
+  commands.add(value);
   return value;
 }
 
 /** The text of a command `sh` made; anything else throws. */
 export function commandOf(value: Command): string {
-  if (!made.has(value)) throw new Error('packets: not a command made by `sh`');
+  if (!commands.has(value)) throw new Error('packets: not a command made by `sh`');
   return value.command;
 }
