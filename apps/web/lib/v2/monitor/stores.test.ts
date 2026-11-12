@@ -11,6 +11,7 @@ import {
   signUp,
 } from '../../../__tests__/helpers/v2-check-tables';
 import { supabaseAlertStore } from './alerts-store';
+import { sendSummary, type SummaryDeps } from './summary';
 import { supabaseSummaryStore } from './summary-store';
 
 /**
@@ -159,6 +160,58 @@ describe('supabaseSummaryStore.account', () => {
       a.accountId,
     ]);
     expect((await supabaseSummaryStore(client(), () => {}).account(a.accountId))?.zone).toBe('UTC');
+  });
+});
+
+describe('supabaseSummaryStore.sites: a baseline is not a change (S2, D6)', () => {
+  it('answers a week holding only a baseline as no change, and sendSummary sends nothing', async () => {
+    const store = supabaseSummaryStore(client(), () => {});
+    const a = await paidAccount();
+    const s = await site(a.accountId);
+    const c = await check(s);
+    await insertRow(db, 'changes', {
+      ...ROWS.changes(randomUUID(), s, c),
+      kind: 'baseline',
+      severity: null,
+      subject: 'content',
+      summary: 'First check: the baseline',
+      where: 'all pages',
+      ua: null,
+      detected_at: '2026-11-10T00:00:00.000Z',
+    });
+    const week = ['2026-11-09T00:00:00.000Z', '2026-11-16T00:00:00.000Z'] as const;
+    expect(await store.sites(a.accountId, ...week)).toEqual([
+      { siteId: s, host: `${s.slice(0, 8)}.example`, changes: [] },
+    ]);
+    const unused = () => {
+      throw new Error('reached past the empty-week rule');
+    };
+    const answer = await sendSummary(
+      {
+        store,
+        mail: {
+          ledger: unused,
+          transport: unused,
+          pepper: 'p',
+          now: () => new Date(),
+          log: () => {},
+        },
+        linkSecret: 's'.repeat(40),
+        unsubscribeLinks: unused,
+        capture: unused,
+        log: () => {},
+        now: () => new Date(),
+      } as unknown as SummaryDeps,
+      { accountId: a.accountId, weekKey: '2026-W46', weekStart: week[1] },
+    );
+    expect(answer).toEqual({ skip: 'empty' });
+    // The control: an opened row the same week is a change, and is read.
+    await insertRow(db, 'changes', {
+      ...ROWS.changes(randomUUID(), s, c),
+      detected_at: '2026-11-11T00:00:00.000Z',
+    });
+    const read = await store.sites(a.accountId, ...week);
+    expect(read[0]!.changes.map((x) => x.kind)).toEqual(['opened']);
   });
 });
 

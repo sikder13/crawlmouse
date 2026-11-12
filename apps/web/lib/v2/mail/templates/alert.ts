@@ -63,7 +63,10 @@ export const GRADE_NAMES: Record<GradeName, string> = {
   ai_readability: 'AI readability',
 };
 
-/** A problem: a row opened, or a grade that fell. */
+/**
+ * A problem: a row opened, or a grade that fell. The one predicate behind a row's `Problem` label
+ * (`rowText`), its place in the order, and every problem count a message states (B1).
+ */
 export function isProblem(c: MailChange): boolean {
   return c.kind === 'opened' || c.grade_deltas.some((g) => g.to_score < g.from_score);
 }
@@ -84,6 +87,7 @@ export function problemsFirst<T extends MailChange>(changes: readonly T[]): T[] 
     .map((x) => x.c);
 }
 
+/** A row's label by kind; any row `isProblem` holds for reads `Problem`, so the label and the counts agree. */
 const LABEL: Record<Change['kind'], string> = {
   opened: 'Problem',
   resolved: 'Resolved',
@@ -137,7 +141,7 @@ export function rowText(c: MailChange): RowText {
   const named =
     ua === '' || (summary.startsWith(ua) && /^(?:[\s:]|$)/.test(summary.slice(ua.length)));
   return {
-    label: LABEL[c.kind],
+    label: isProblem(c) ? LABEL.opened : LABEL[c.kind],
     line: named ? summary : `${ua}: ${summary}`,
     detail: [wherePhrase(c.where), pages, ...c.grade_deltas.map(gradeMove)].join(' · '),
     fix: null,

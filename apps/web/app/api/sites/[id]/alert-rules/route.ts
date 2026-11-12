@@ -64,7 +64,7 @@ async function update(req: Request, { params }: Context, method: 'PUT' | null) {
   const body = await readBody(req);
   if (body === null) return refuseTo(req, back, 400, 'invalid');
   const meant = meantMethod(req, body);
-  if ((method ?? meant.method) !== 'PUT') return refuse(405, 'method_not_allowed');
+  if ((method ?? meant.method) !== 'PUT') return refuseTo(req, back, 405, 'method_not_allowed');
   const decision = decideSiteAlertRule(
     { kind: body.kind, fields: meant.fields },
     entitlement.gates,

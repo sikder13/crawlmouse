@@ -68,3 +68,30 @@ describe('the site page’s header', () => {
     expect(siteView(bad, home, NAHLTECH, next([])).header.line).not.toContain('next');
   });
 });
+
+describe('a next check already due (N2)', () => {
+  // The column left in the past: a site the global ceiling or CRAWL_PAUSED left waiting.
+  const past = new Date(Date.parse(bad.as_of) - 2 * 86_400_000).toISOString();
+
+  it('reads as due now on the dashboard, with no time in the past', () => {
+    const line = dashboardView(bad, home, next([[OUTFITTER, past]])).header.line;
+    expect(line).toContain('next check due now');
+    expect(line).not.toContain('around');
+  });
+
+  it('reads as due now on the site page, at the column’s exact instant too', () => {
+    expect(siteView(bad, home, NAHLTECH, next([[NAHLTECH, past]])).header.line).toContain(
+      'next due now',
+    );
+    expect(siteView(bad, home, NAHLTECH, next([[NAHLTECH, bad.as_of]])).header.line).toContain(
+      'next due now',
+    );
+  });
+
+  it('a time still ahead is named as before', () => {
+    const ahead = new Date(Date.parse(bad.as_of) + 60_000).toISOString();
+    expect(siteView(bad, home, NAHLTECH, next([[NAHLTECH, ahead]])).header.line).not.toContain(
+      'due now',
+    );
+  });
+});

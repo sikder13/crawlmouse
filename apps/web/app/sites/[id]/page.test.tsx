@@ -147,6 +147,34 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
     expect(hourMinute(at, rows[0]!.tz)).toMatch(/:41$/);
   });
 
+  it('lists the account’s six default rules for an account that never opened /alerts (S4, Q13)', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const db = h.db as PGlite;
+    const userId = await signUp(db, `rules-${randomUUID().slice(0, 8)}@example.com`);
+    const { accountId } = await personalAccount(db, userId);
+    const site = randomUUID();
+    await db.query(
+      `insert into public.sites (id, account_id, host) values ($1, $2, 'rules.example')`,
+      [site, accountId],
+    );
+    const before = await db.query(`select 1 from public.alert_rules where account_id = $1`, [
+      accountId,
+    ]);
+    expect(before.rows).toHaveLength(0);
+    // Read before the first check finishes, too: the rules exist either way.
+    expect(children(await open(site, userId)).type).toBe(FirstCheckScreen);
+    const after = await db.query<{ kind: string }>(
+      `select kind from public.alert_rules where account_id = $1 and site_id is null order by kind`,
+      [accountId],
+    );
+    expect(after.rows).toHaveLength(6);
+    // The owner's account (made after the migrations, so the backfill never saw it) shows them.
+    const page = children(await open(kept)) as unknown as ReactElement<{
+      data: { alerts: { rows: unknown[] } };
+    }>;
+    expect(page.props.data.alerts.rows).toHaveLength(6);
+  });
+
   it('renders a site with no check yet as the first-check screen', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
     const page = children(await open(empty));

@@ -66,6 +66,7 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   rate_limited: (at) =>
     `Too many emails were asked for in a short time, so nothing was recorded.${at ? ` Ask again from ${at}.` : ''}`,
   invalid: () => 'That request was not understood, so nothing was changed.',
+  method_not_allowed: () => 'That form could not be sent that way. Reload the page and try again.',
 };
 
 /** The line for a page's search params, or null when they carry no notice of ours. */

@@ -25,6 +25,19 @@ Both constants: `grep -n "SENDER" apps/web/lib/auth/constants.ts`.
    whichever events are subscribed.
 3. **API key.** `RESEND_API_KEY`, already set in Vercel for v1. With it unset the mailer claims nothing
    and logs `mail.unconfigured` (spec 28, "The send ledger").
+4. **Replies to `alerts@` (Cloudflare Email Routing, owner action, not applied).** The product's mail
+   carries no `Reply-To` (`buildOutgoing` in `apps/web/lib/v2/mail/headers.ts` refuses any header outside `EXTRA_HEADERS`), so a reply
+   goes to `alerts@crawlmouse.com`. Cloudflare Email Routing receives for the zone, and
+   `scripts/configure-cloudflare.sh` creates no rule for `alerts@`:
+   `grep -n "FORWARDED_PREFIXES=" scripts/configure-cloudflare.sh`. Without a rule, a reply to an alert,
+   a summary, a check note or an account email bounces. Before switch-on, add one of:
+   - Cloudflare → `crawlmouse.com` → Email → Email Routing → Routing rules → _Create address_
+     `alerts@crawlmouse.com`, action _Send to an email_, destination the verified inbox the other
+     addresses forward to; or
+   - `"alerts"` appended to `FORWARDED_PREFIXES` in `scripts/configure-cloudflare.sh`, then the script
+     run with the owner's `CLOUDFLARE_API_TOKEN` (it adds only the rules missing).
+
+   Check it took: send a mail to `alerts@crawlmouse.com` from any outside address and see it arrive.
 
 ## 3. Supabase Auth (sign-in sender)
 
