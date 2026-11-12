@@ -743,6 +743,712 @@ grant execute on function public.open_share_link(text, timestamptz) to service_r
 grant execute on function public.read_share_link(text, timestamptz) to service_role;
 grant execute on function public.revoke_share_links(uuid, timestamptz) to service_role;
 
+-- Client report schedules (CC-31 D8; docs/specs/v2/31-agency.md §10). A client's report goes to the
+-- client's contact, sites.client_contact_email, one address a site. report_schedules gains what the
+-- double opt-in and the recipient's pause need: the sha256 of the confirmation link's token with the
+-- time it was issued, the time the contact confirmed, and the sha256 of the pause link's token. The
+-- four columns are granted to no client role (003 grants authenticated SELECT column by column).
+--
+-- The functions are granted to service_role alone. A route calls set_client, set_report_schedule,
+-- clear_report_schedule and resume_report_schedule only after the caller's own session has answered
+-- is_member_for_site and seat_may; the two links' tokens are the recipient's credential.
+--
+-- What these comments say about outcomes, grants and re-running is tested by:
+--   pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts
+alter table public.report_schedules add column if not exists recipient_confirm_hash text;
+alter table public.report_schedules add column if not exists recipient_confirm_sent_at timestamptz;
+alter table public.report_schedules add column if not exists recipient_confirmed_at timestamptz;
+alter table public.report_schedules add column if not exists pause_token_hash text;
+alter table public.report_schedules drop constraint if exists report_schedules_link_hashes;
+alter table public.report_schedules add constraint report_schedules_link_hashes check (
+  (recipient_confirm_hash is null
+   or (recipient_confirm_hash ~ '^[0-9a-f]{64}$' and recipient_confirm_sent_at is not null))
+  and (pause_token_hash is null or pause_token_hash ~ '^[0-9a-f]{64}$'));
+create unique index if not exists report_schedules_confirm_hash_uq
+  on public.report_schedules (recipient_confirm_hash) where recipient_confirm_hash is not null;
+create unique index if not exists report_schedules_pause_hash_uq
+  on public.report_schedules (pause_token_hash) where pause_token_hash is not null;
+
+-- A link token as issue_account_link mints one: 32 bytes from two gen_random_uuid() values,
+-- base64url, 43 characters.
+create or replace function public.report_link_token()
+returns text
+language sql
+volatile
+set search_path = pg_catalog, pg_temp
+as $$
+  select pg_catalog.rtrim(pg_catalog.translate(pg_catalog.encode(pg_catalog.decode(
+           pg_catalog.replace(pg_catalog.gen_random_uuid()::text || pg_catalog.gen_random_uuid()::text,
+                              '-', ''), 'hex'), 'base64'), '+/', '-_'), '=');
+$$;
+
+-- When a schedule runs next after p_after: the first moment later than p_after that is p_time_local
+-- on weekday p_iso_weekday (1 Monday to 7 Sunday) in p_timezone; for 'monthly', on the first such
+-- weekday of a calendar month. A zone PostgreSQL does not know raises 22023.
+create or replace function public.report_schedule_next(
+  p_cadence text, p_iso_weekday smallint, p_time_local text, p_timezone text, p_after timestamptz)
+returns timestamptz
+language plpgsql
+stable
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_day date := (p_after at time zone p_timezone)::date;
+  v_next timestamptz;
+begin
+  if p_cadence = 'weekly' then
+    v_day := v_day + ((p_iso_weekday - pg_catalog.date_part('isodow', v_day)::integer + 7) % 7);
+    v_next := (v_day + p_time_local::time) at time zone p_timezone;
+    if v_next <= p_after then
+      v_next := (v_day + 7 + p_time_local::time) at time zone p_timezone;
+    end if;
+    return v_next;
+  end if;
+  if p_cadence <> 'monthly' then
+    raise exception 'report_schedule_next: a client report is weekly or monthly' using errcode = '22023';
+  end if;
+  v_day := pg_catalog.date_trunc('month', v_day)::date;
+  for i in 1..2 loop
+    v_next := (v_day + ((p_iso_weekday - pg_catalog.date_part('isodow', v_day)::integer + 7) % 7)
+               + p_time_local::time) at time zone p_timezone;
+    exit when v_next > p_after;
+    v_day := (v_day + interval '1 month')::date;
+  end loop;
+  return v_next;
+end;
+$$;
+
+-- The one writer of a client's name, contact address and owning seat. p holds any of client_name,
+-- client_contact_email and owner_seat_id: a key present is written (null clears it), a key absent is
+-- left, and any other key raises 22023, so sites.client_contact_name is not written here. The
+-- address is trimmed and put in lower case. A contact address that changes clears the schedule's
+-- confirmation, its two link hashes and the recipient's pause in the same statement that writes the
+-- site: the next report waits for the new address to confirm.
+-- Answers {outcome}: 'saved' with contact_changed; 'not_found' (no live site p_site of p_account
+-- that is not a staging copy, or the account is deleted or marked for deletion); 'invalid_owner'
+-- (owner_seat_id is not an active seat of the account that covers the site). Raises 22023 for an
+-- address that is not one.
+create or replace function public.set_client(p_site uuid, p_account uuid, p jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_keys constant text[] := array['client_name', 'client_contact_email', 'owner_seat_id'];
+  v_old text;
+  v_new text;
+  v_owner uuid;
+  v_changed boolean;
+begin
+  if pg_catalog.jsonb_typeof(p) is distinct from 'object'
+     or not (array(select pg_catalog.jsonb_object_keys(p)) <@ v_keys) then
+    raise exception 'set_client: p holds a key set_client does not set' using errcode = '22023';
+  end if;
+  select st.client_contact_email into v_old
+    from public.sites st
+    join public.accounts a on a.id = st.account_id
+   where st.id = p_site
+     and st.account_id = p_account
+     and st.removed_at is null
+     and st.staging_of_site_id is null
+     and a.deleted_at is null
+     and a.deletion_confirmed_at is null
+     for update of st;
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'not_found');
+  end if;
+
+  v_new := v_old;
+  if p ? 'client_contact_email' then
+    v_new := nullif(pg_catalog.lower(pg_catalog.btrim(p ->> 'client_contact_email')), '');
+    if v_new is not null and v_new !~ '^[^@[:space:]]+@[^@[:space:]]+$' then
+      raise exception 'set_client: client_contact_email is not an address' using errcode = '22023';
+    end if;
+  end if;
+  if p ? 'owner_seat_id' and (p ->> 'owner_seat_id') is not null then
+    v_owner := (p ->> 'owner_seat_id')::uuid;
+    if not exists (select 1
+                     from public.seats s
+                    where s.id = v_owner
+                      and s.account_id = p_account
+                      and s.status = 'active'
+                      and (s.client_scope_all
+                           or exists (select 1 from public.seat_sites ss
+                                       where ss.seat_id = s.id and ss.site_id = p_site))) then
+      return pg_catalog.jsonb_build_object('outcome', 'invalid_owner');
+    end if;
+  end if;
+  v_changed := v_new is distinct from pg_catalog.lower(v_old);
+
+  with site as (
+    update public.sites st
+       set client_name = case when p ? 'client_name'
+                              then nullif(pg_catalog.btrim(p ->> 'client_name'), '')
+                              else st.client_name end,
+           client_contact_email = v_new,
+           owner_seat_id = case when p ? 'owner_seat_id' then v_owner else st.owner_seat_id end,
+           updated_at = pg_catalog.now()
+     where st.id = p_site
+    returning st.id
+  )
+  update public.report_schedules rs
+     set recipient_confirm_hash = null,
+         recipient_confirm_sent_at = null,
+         recipient_confirmed_at = null,
+         pause_token_hash = null,
+         paused_by_recipient_at = null,
+         updated_at = pg_catalog.now()
+    from site
+   where rs.site_id = site.id and v_changed;
+  return pg_catalog.jsonb_build_object('outcome', 'saved', 'contact_changed', v_changed);
+end;
+$$;
+
+-- Writes a client site's report schedule, one row a site. p holds cadence ('weekly' or 'monthly'),
+-- iso_weekday, time_local, timezone and send_when_unchanged, each required; any other key raises
+-- 22023, as does a value the table's CHECKs or report_schedule_next refuse. next_run_at is the
+-- first run after p_now. A schedule that exists keeps its confirmation, its pause and its last run.
+-- Answers {outcome}: 'saved' with next_run_at; 'not_found' (as set_client).
+create or replace function public.set_report_schedule(
+  p_site uuid, p_account uuid, p jsonb, p_now timestamptz)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_keys constant text[] :=
+    array['cadence', 'iso_weekday', 'time_local', 'timezone', 'send_when_unchanged'];
+  v_cadence text;
+  v_weekday smallint;
+  v_time text;
+  v_zone text;
+  v_unchanged boolean;
+  v_next timestamptz;
+begin
+  if p_now is null then
+    raise exception 'set_report_schedule: p_now is null' using errcode = '22004';
+  end if;
+  if pg_catalog.jsonb_typeof(p) is distinct from 'object'
+     or not (array(select pg_catalog.jsonb_object_keys(p)) <@ v_keys)
+     or not (p ?& v_keys) then
+    raise exception 'set_report_schedule: p holds the five keys of a schedule and no other'
+      using errcode = '22023';
+  end if;
+  v_cadence := p ->> 'cadence';
+  v_time := p ->> 'time_local';
+  v_zone := p ->> 'timezone';
+  if v_cadence is null or v_cadence not in ('weekly', 'monthly')
+     or v_time is null or v_time !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+     or v_zone is null
+     or pg_catalog.jsonb_typeof(p -> 'iso_weekday') is distinct from 'number'
+     or pg_catalog.jsonb_typeof(p -> 'send_when_unchanged') is distinct from 'boolean'
+     or (p ->> 'iso_weekday') !~ '^[1-7]$' then
+    raise exception 'set_report_schedule: a value is not one a schedule holds' using errcode = '22023';
+  end if;
+  v_weekday := (p ->> 'iso_weekday')::smallint;
+  v_unchanged := (p ->> 'send_when_unchanged')::boolean;
+
+  perform 1
+     from public.sites st
+     join public.accounts a on a.id = st.account_id
+    where st.id = p_site
+      and st.account_id = p_account
+      and st.removed_at is null
+      and st.staging_of_site_id is null
+      and a.deleted_at is null
+      and a.deletion_confirmed_at is null
+      for update of st;
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'not_found');
+  end if;
+
+  v_next := public.report_schedule_next(v_cadence, v_weekday, v_time, v_zone, p_now);
+  insert into public.report_schedules (
+    site_id, account_id, cadence, iso_weekday, time_local, timezone, send_when_unchanged,
+    page_slug, next_run_at, created_at, updated_at)
+  values (p_site, p_account, v_cadence, v_weekday, v_time, v_zone, v_unchanged,
+          'c-' || pg_catalog.replace(p_site::text, '-', ''), v_next, p_now, p_now)
+  on conflict (site_id) do update
+     set cadence = excluded.cadence,
+         iso_weekday = excluded.iso_weekday,
+         time_local = excluded.time_local,
+         timezone = excluded.timezone,
+         send_when_unchanged = excluded.send_when_unchanged,
+         next_run_at = excluded.next_run_at,
+         updated_at = excluded.updated_at;
+  return pg_catalog.jsonb_build_object('outcome', 'saved', 'next_run_at', v_next);
+end;
+$$;
+
+-- Removes a site's report schedule, with its confirmation and its links.
+-- Answers {outcome}: 'cleared'; 'not_found' (no schedule for p_site on p_account).
+create or replace function public.clear_report_schedule(p_site uuid, p_account uuid)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  delete from public.report_schedules rs where rs.site_id = p_site and rs.account_id = p_account;
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'not_found');
+  end if;
+  return pg_catalog.jsonb_build_object('outcome', 'cleared');
+end;
+$$;
+
+-- The mailer's call when it sends the confirmation mail of p_site's schedule: mints the link's
+-- token, stores its sha256 with p_now as the time it was issued, and returns the token once with
+-- what the mail says and where it goes. Calling it again replaces the stored hash, so the link sent
+-- before stops working. The link is used within seven days of p_now (confirm_report_recipient).
+-- Answers {outcome}: 'issued' with token, email, host and account_name; 'none' when the site has no
+-- schedule or no contact address, the contact has confirmed, the site is removed, or its account is
+-- deleted or marked for deletion.
+create or replace function public.issue_recipient_confirmation(p_site uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_email text;
+  v_host text;
+  v_name text;
+  v_raw text;
+begin
+  if p_now is null then
+    raise exception 'issue_recipient_confirmation: p_now is null' using errcode = '22004';
+  end if;
+  select st.client_contact_email, st.host, a.name into v_email, v_host, v_name
+    from public.report_schedules rs
+    join public.sites st on st.id = rs.site_id
+    join public.accounts a on a.id = st.account_id
+   where rs.site_id = p_site
+     and rs.recipient_confirmed_at is null
+     and st.client_contact_email is not null
+     and st.removed_at is null
+     and a.deleted_at is null
+     and a.deletion_confirmed_at is null
+     for update of rs;
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'none');
+  end if;
+  v_raw := public.report_link_token();
+  update public.report_schedules rs
+     set recipient_confirm_hash =
+           pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(v_raw, 'UTF8')), 'hex'),
+         recipient_confirm_sent_at = p_now
+   where rs.site_id = p_site;
+  return pg_catalog.jsonb_build_object(
+    'outcome', 'issued', 'token', v_raw, 'email', v_email, 'host', v_host, 'account_name', v_name);
+end;
+$$;
+
+-- What a recipient's link page says before its button is pressed, for a token hash: whether it is a
+-- confirmation link or a pause link, the site the reports are about and the name of the account
+-- that sends them. It changes nothing and returns no address.
+-- Answers {outcome}: 'confirm' or 'pause' with host and account_name; 'gone' for a hash no schedule
+-- holds, a confirmation link issued more than seven days before p_now, a removed site, and a
+-- deleted or marked account.
+create or replace function public.read_report_link(p_token_hash text, p_now timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+  select coalesce(
+    (select pg_catalog.jsonb_build_object(
+              'outcome',
+              case when rs.pause_token_hash = p_token_hash then 'pause' else 'confirm' end,
+              'host', st.host, 'account_name', a.name)
+       from public.report_schedules rs
+       join public.sites st on st.id = rs.site_id
+       join public.accounts a on a.id = st.account_id
+      where (rs.pause_token_hash = p_token_hash
+             or (rs.recipient_confirm_hash = p_token_hash
+                 and rs.recipient_confirm_sent_at > p_now - interval '7 days'))
+        and st.removed_at is null
+        and a.deleted_at is null
+        and a.deletion_confirmed_at is null),
+    pg_catalog.jsonb_build_object('outcome', 'gone'));
+$$;
+
+-- The contact confirms: the schedule whose confirmation link hashes to p_token_hash, issued within
+-- the seven days before p_now, is marked confirmed at p_now and the hash is cleared, so the link
+-- works once. Answers {outcome}: 'confirmed'; 'gone' (as read_report_link).
+create or replace function public.confirm_report_recipient(p_token_hash text, p_now timestamptz)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if p_token_hash is null or p_now is null then
+    raise exception 'confirm_report_recipient: a required argument is null' using errcode = '22004';
+  end if;
+  update public.report_schedules rs
+     set recipient_confirmed_at = p_now,
+         recipient_confirm_hash = null,
+         updated_at = pg_catalog.now()
+    from public.sites st
+    join public.accounts a on a.id = st.account_id
+   where rs.recipient_confirm_hash = p_token_hash
+     and rs.recipient_confirm_sent_at > p_now - interval '7 days'
+     and st.id = rs.site_id
+     and st.removed_at is null
+     and a.deleted_at is null
+     and a.deletion_confirmed_at is null;
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'gone');
+  end if;
+  return pg_catalog.jsonb_build_object('outcome', 'confirmed');
+end;
+$$;
+
+-- The mailer's call when it sends a report of p_site's schedule: mints the pause link's token,
+-- stores its sha256 and returns the token once with the address the report goes to. Calling it again
+-- replaces the stored hash: the pause link that works is the one in the latest report sent.
+-- Answers {outcome}: 'issued' with token and email; 'none' when the site has no schedule, its
+-- contact has not confirmed, the schedule is paused, the site is removed, or its account is deleted
+-- or marked for deletion.
+create or replace function public.issue_report_pause(p_site uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_email text;
+  v_raw text;
+begin
+  if p_now is null then
+    raise exception 'issue_report_pause: p_now is null' using errcode = '22004';
+  end if;
+  select st.client_contact_email into v_email
+    from public.report_schedules rs
+    join public.sites st on st.id = rs.site_id
+    join public.accounts a on a.id = st.account_id
+   where rs.site_id = p_site
+     and rs.recipient_confirmed_at is not null
+     and rs.paused_by_recipient_at is null
+     and st.client_contact_email is not null
+     and st.removed_at is null
+     and a.deleted_at is null
+     and a.deletion_confirmed_at is null
+     for update of rs;
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'none');
+  end if;
+  v_raw := public.report_link_token();
+  update public.report_schedules rs
+     set pause_token_hash =
+           pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(v_raw, 'UTF8')), 'hex')
+   where rs.site_id = p_site;
+  return pg_catalog.jsonb_build_object('outcome', 'issued', 'token', v_raw, 'email', v_email);
+end;
+$$;
+
+-- The recipient pauses: the schedule whose pause link hashes to p_token_hash is paused from p_now.
+-- A schedule already paused keeps the time it was first paused, and the link keeps answering.
+-- Answers {outcome}: 'paused'; 'gone' for a hash no schedule holds.
+create or replace function public.pause_report_schedule(p_token_hash text, p_now timestamptz)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if p_token_hash is null or p_now is null then
+    raise exception 'pause_report_schedule: a required argument is null' using errcode = '22004';
+  end if;
+  update public.report_schedules rs
+     set paused_by_recipient_at = coalesce(rs.paused_by_recipient_at, p_now),
+         updated_at = pg_catalog.now()
+   where rs.pause_token_hash = p_token_hash;
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'gone');
+  end if;
+  return pg_catalog.jsonb_build_object('outcome', 'paused');
+end;
+$$;
+
+-- The account resumes a schedule its recipient paused: the pause is cleared and next_run_at is the
+-- first run after p_now, so a schedule paused for a month does not send at once for the weeks missed.
+-- Answers {outcome}: 'resumed' with next_run_at; 'not_paused'; 'not_found' (no schedule for p_site on
+-- p_account).
+create or replace function public.resume_report_schedule(
+  p_site uuid, p_account uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v public.report_schedules%rowtype;
+  v_next timestamptz;
+begin
+  if p_now is null then
+    raise exception 'resume_report_schedule: p_now is null' using errcode = '22004';
+  end if;
+  select rs.* into v
+    from public.report_schedules rs
+   where rs.site_id = p_site and rs.account_id = p_account
+     for update;
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'not_found');
+  end if;
+  if v.paused_by_recipient_at is null then
+    return pg_catalog.jsonb_build_object('outcome', 'not_paused');
+  end if;
+  v_next := public.report_schedule_next(v.cadence, v.iso_weekday, v.time_local, v.timezone, p_now);
+  update public.report_schedules rs
+     set paused_by_recipient_at = null, next_run_at = v_next, updated_at = pg_catalog.now()
+   where rs.site_id = p_site;
+  return pg_catalog.jsonb_build_object('outcome', 'resumed', 'next_run_at', v_next);
+end;
+$$;
+
+-- The schedules to run at p_now, earliest first, at most p_limit: not paused, next_run_at at or
+-- before p_now, of a live site that is not removed and an account neither deleted nor marked for
+-- deletion. Each as a jsonb object, with what the runner decides on and no address:
+--   site_id, account_id, slot (the schedule's next_run_at), send_when_unchanged;
+--   has_contact, confirmed, confirmation_requested (a confirmation link was issued);
+--   contact_is_owner (the contact address is the account owner's own, compared in lower case);
+--   the account's state, tier, past_due_tier, past_due_since, trial_variant and trial_ends_at, from
+--   which the runner reads the plan and whether the account is in its Agency trial;
+--   check_id, the site's latest finished or partial check, or null;
+--   changed, whether a change other than a baseline was detected at the site after the last client
+--   report sent for it (true when none was sent).
+create or replace function public.due_report_schedules(p_now timestamptz, p_limit integer)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+  select coalesce(pg_catalog.jsonb_agg(d.o order by d.slot, d.site_id), '[]'::jsonb)
+    from (
+      select rs.next_run_at as slot, rs.site_id,
+             pg_catalog.jsonb_build_object(
+               'site_id', rs.site_id,
+               'account_id', rs.account_id,
+               'slot', rs.next_run_at,
+               'send_when_unchanged', rs.send_when_unchanged,
+               'has_contact', st.client_contact_email is not null,
+               'confirmed', rs.recipient_confirmed_at is not null,
+               'confirmation_requested', rs.recipient_confirm_sent_at is not null,
+               'contact_is_owner', coalesce(
+                 (select pg_catalog.lower(u.email) = pg_catalog.lower(st.client_contact_email)
+                    from public.seats o
+                    join public.users u on u.id = o.user_id
+                   where o.account_id = rs.account_id and o.role = 'owner' and o.status = 'active'),
+                 false),
+               'state', a.state,
+               'tier', a.tier,
+               'past_due_tier', a.past_due_tier,
+               'past_due_since', a.past_due_since,
+               'trial_variant', a.trial_variant,
+               'trial_ends_at', a.trial_ends_at,
+               'check_id', (select c.id
+                              from public.checks c
+                             where c.site_id = rs.site_id and c.status in ('finished', 'partial')
+                             order by c.finished_at desc, c.id
+                             limit 1),
+               'changed', coalesce(
+                 (select exists (select 1
+                                   from public.changes ch
+                                  where ch.site_id = rs.site_id
+                                    and ch.kind <> 'baseline'
+                                    and ch.detected_at > last.sent_at)
+                    from (select pg_catalog.max(r.sent_at) as sent_at
+                            from public.reports r
+                           where r.site_id = rs.site_id and r.kind = 'client_report'
+                             and r.status = 'sent') last
+                   where last.sent_at is not null),
+                 true)) as o
+        from public.report_schedules rs
+        join public.sites st on st.id = rs.site_id
+        join public.accounts a on a.id = rs.account_id
+       where rs.paused_by_recipient_at is null
+         and rs.next_run_at <= p_now
+         and st.removed_at is null
+         and a.deleted_at is null
+         and a.deletion_confirmed_at is null
+       order by rs.next_run_at, rs.site_id
+       limit p_limit
+    ) d;
+$$;
+
+-- The runner is done with p_site's schedule for the run at p_now, whether or not it sent:
+-- last_run_at is p_now and next_run_at the first run after it. Returns the new next_run_at, or
+-- null when the site has no schedule.
+create or replace function public.mark_report_schedule_run(p_site uuid, p_now timestamptz)
+returns timestamptz
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_next timestamptz;
+begin
+  if p_now is null then
+    raise exception 'mark_report_schedule_run: p_now is null' using errcode = '22004';
+  end if;
+  update public.report_schedules rs
+     set last_run_at = p_now,
+         next_run_at = public.report_schedule_next(
+           rs.cadence, rs.iso_weekday, rs.time_local, rs.timezone, p_now),
+         updated_at = pg_catalog.now()
+   where rs.site_id = p_site
+  returning rs.next_run_at into v_next;
+  return v_next;
+end;
+$$;
+
+-- The client report of p_site's schedule for the run at p_slot: a reports row of kind
+-- 'client_report' and status 'scheduled', made by the schedule, covering p_check, for the site's
+-- contact address as it is now and its owning seat. One row a site and slot: a second call for the
+-- same slot writes nothing and answers with the row the first wrote, so a run that is retried does
+-- not send twice.
+-- Answers {outcome}: 'written' or 'exists', each with report_id and status; 'none' when the site has
+-- no contact address, or p_check is not a finished or partial check of it.
+create or replace function public.write_client_report(
+  p_site uuid, p_slot timestamptz, p_check uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_account uuid;
+  v_email text;
+  v_owner uuid;
+  v_report uuid;
+  v_status text;
+begin
+  if p_slot is null or p_now is null then
+    raise exception 'write_client_report: a required argument is null' using errcode = '22004';
+  end if;
+  select st.account_id, st.client_contact_email, st.owner_seat_id into v_account, v_email, v_owner
+    from public.sites st
+   where st.id = p_site and st.account_id is not null and st.removed_at is null
+     for update;
+  if not found or v_email is null
+     or not exists (select 1 from public.checks c
+                     where c.id = p_check and c.site_id = p_site
+                       and c.status in ('finished', 'partial')) then
+    return pg_catalog.jsonb_build_object('outcome', 'none');
+  end if;
+  select r.id, r.status into v_report, v_status
+    from public.reports r
+   where r.site_id = p_site and r.kind = 'client_report' and r.made_by = 'report_schedule'
+     and r.scheduled_for = p_slot;
+  if found then
+    return pg_catalog.jsonb_build_object('outcome', 'exists', 'report_id', v_report, 'status', v_status);
+  end if;
+  insert into public.reports (account_id, site_id, kind, format, status, made_by, created_at,
+                              covers_check_ids, scheduled_for, recipient_email, owner_seat_id)
+  values (v_account, p_site, 'client_report', 'html', 'scheduled', 'report_schedule', p_now,
+          array[p_check], p_slot, v_email, v_owner)
+  returning id into v_report;
+  return pg_catalog.jsonb_build_object('outcome', 'written', 'report_id', v_report, 'status', 'scheduled');
+end;
+$$;
+
+-- A client report's mail was sent: the row becomes 'sent' at p_now. first is true when the account
+-- had sent no client report before this one.
+-- Answers {outcome}: 'sent' with account_id and first; 'already' (the row is sent); 'not_found' (no
+-- client report p_report waiting to be sent).
+create or replace function public.mark_client_report_sent(p_report uuid, p_now timestamptz)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_account uuid;
+  v_status text;
+  v_first boolean;
+begin
+  if p_now is null then
+    raise exception 'mark_client_report_sent: p_now is null' using errcode = '22004';
+  end if;
+  select r.account_id, r.status into v_account, v_status
+    from public.reports r
+   where r.id = p_report and r.kind = 'client_report'
+     for update;
+  if not found or v_status not in ('scheduled', 'sent') then
+    return pg_catalog.jsonb_build_object('outcome', 'not_found');
+  end if;
+  if v_status = 'sent' then
+    return pg_catalog.jsonb_build_object('outcome', 'already');
+  end if;
+  perform 1 from public.accounts a where a.id = v_account for update;
+  v_first := not exists (select 1 from public.reports r
+                          where r.account_id = v_account and r.kind = 'client_report'
+                            and r.status = 'sent');
+  update public.reports r set status = 'sent', sent_at = p_now where r.id = p_report;
+  return pg_catalog.jsonb_build_object('outcome', 'sent', 'account_id', v_account, 'first', v_first);
+end;
+$$;
+
+revoke all on function public.report_link_token() from public, anon, authenticated;
+revoke all on function public.report_schedule_next(text, smallint, text, text, timestamptz)
+  from public, anon, authenticated;
+revoke all on function public.set_client(uuid, uuid, jsonb) from public, anon, authenticated;
+revoke all on function public.set_report_schedule(uuid, uuid, jsonb, timestamptz)
+  from public, anon, authenticated;
+revoke all on function public.clear_report_schedule(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.issue_recipient_confirmation(uuid, timestamptz)
+  from public, anon, authenticated;
+revoke all on function public.read_report_link(text, timestamptz) from public, anon, authenticated;
+revoke all on function public.confirm_report_recipient(text, timestamptz)
+  from public, anon, authenticated;
+revoke all on function public.issue_report_pause(uuid, timestamptz) from public, anon, authenticated;
+revoke all on function public.pause_report_schedule(text, timestamptz)
+  from public, anon, authenticated;
+revoke all on function public.resume_report_schedule(uuid, uuid, timestamptz)
+  from public, anon, authenticated;
+revoke all on function public.due_report_schedules(timestamptz, integer)
+  from public, anon, authenticated;
+revoke all on function public.mark_report_schedule_run(uuid, timestamptz)
+  from public, anon, authenticated;
+revoke all on function public.write_client_report(uuid, timestamptz, uuid, timestamptz)
+  from public, anon, authenticated;
+revoke all on function public.mark_client_report_sent(uuid, timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.report_link_token() to service_role;
+grant execute on function public.report_schedule_next(text, smallint, text, text, timestamptz)
+  to service_role;
+grant execute on function public.set_client(uuid, uuid, jsonb) to service_role;
+grant execute on function public.set_report_schedule(uuid, uuid, jsonb, timestamptz) to service_role;
+grant execute on function public.clear_report_schedule(uuid, uuid) to service_role;
+grant execute on function public.issue_recipient_confirmation(uuid, timestamptz) to service_role;
+grant execute on function public.read_report_link(text, timestamptz) to service_role;
+grant execute on function public.confirm_report_recipient(text, timestamptz) to service_role;
+grant execute on function public.issue_report_pause(uuid, timestamptz) to service_role;
+grant execute on function public.pause_report_schedule(text, timestamptz) to service_role;
+grant execute on function public.resume_report_schedule(uuid, uuid, timestamptz) to service_role;
+grant execute on function public.due_report_schedules(timestamptz, integer) to service_role;
+grant execute on function public.mark_report_schedule_run(uuid, timestamptz) to service_role;
+grant execute on function public.write_client_report(uuid, timestamptz, uuid, timestamptz)
+  to service_role;
+grant execute on function public.mark_client_report_sent(uuid, timestamptz) to service_role;
+
 -- ═══ end B ════════════════════════════════════════════════════════════════════════════════════════
 
 -- ═══ C: erasure and mail kinds ════════════════════════════════════════════════════════════════════
