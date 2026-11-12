@@ -1,5 +1,15 @@
 import { test, expect, type Page } from './pw';
-import { HEIGHT, PREVIEWS, SCHEMES, WIDTHS, fitViewportToPage, openPreview } from './pages';
+import {
+  HEIGHT,
+  MAIL_HEIGHT,
+  MAIL_PREVIEWS,
+  MAIL_WIDTHS,
+  PREVIEWS,
+  SCHEMES,
+  WIDTHS,
+  fitViewportToPage,
+  openPreview,
+} from './pages';
 
 /**
  * The footer renders the current year, so a baseline would move every 1 January. Screenshots show
@@ -40,6 +50,24 @@ for (const width of WIDTHS) {
         await fitViewportToPage(page);
         await expect(page.locator('footer')).toHaveScreenshot(`footer-${width}-${colorScheme}.png`);
       });
+    });
+  }
+}
+
+// Each email template's preview at a mail client's widths, light and dark (CC-28 D2): the message's
+// HTML in its frame, between its subject and its text part.
+for (const width of MAIL_WIDTHS) {
+  for (const colorScheme of SCHEMES) {
+    test.describe(`mail ${width}px ${colorScheme}`, () => {
+      test.use({ viewport: { width, height: MAIL_HEIGHT[width] }, colorScheme });
+
+      for (const p of MAIL_PREVIEWS) {
+        test(`${p.name}`, async ({ page }) => {
+          await openPreview(page, p.path);
+          await fitViewportToPage(page);
+          await expect(page).toHaveScreenshot(`${p.slug}-${width}-${colorScheme}.png`);
+        });
+      }
     });
   }
 }

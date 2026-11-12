@@ -95,3 +95,43 @@ describe('the SDK options that run the scrubber', () => {
     expect(inits[0]).not.toMatch(/beforeSend/);
   });
 });
+
+describe('scrubDoorSecrets, a Slack webhook in any shape the stored URL may take (CC-28)', () => {
+  it.each([
+    [
+      'today’s shape',
+      'https://hooks.slack.com/services/T0001/B0002/SLACKSECRETabc123',
+      'https://hooks.slack.com/services/[Filtered]',
+    ],
+    [
+      'underscore and dash in the secret',
+      'https://hooks.slack.com/services/T0001/B0002/SLACK_SECRET-x',
+      'https://hooks.slack.com/services/[Filtered]',
+    ],
+    [
+      'a team id not starting with T',
+      'https://hooks.slack.com/services/E0001/B0002/SLACKSECRET',
+      'https://hooks.slack.com/services/[Filtered]',
+    ],
+    [
+      'no team or bot segments',
+      'https://hooks.slack.com/services/SLACKSECRET',
+      'https://hooks.slack.com/services/[Filtered]',
+    ],
+    [
+      'more segments',
+      'https://hooks.slack.com/services/T1/B2/C3/SLACK-SECRET_x',
+      'https://hooks.slack.com/services/[Filtered]',
+    ],
+    [
+      'encoded slashes',
+      'https%3A%2F%2Fhooks.slack.com%2Fservices%2FT1%2FB2%2FSLACK-SECRET',
+      'https%3A%2F%2Fhooks.slack.com%2Fservices%2F[Filtered]',
+    ],
+  ])('%s', (_, url, scrubbed) => {
+    // The whole path after `/services/` goes, and nothing after the marker is left.
+    const out = scrubDoorSecrets({ url, breadcrumbs: [{ data: { url } }] });
+    expect(out.url).toBe(scrubbed);
+    expect(out.breadcrumbs[0]!.data.url).toBe(scrubbed);
+  });
+});

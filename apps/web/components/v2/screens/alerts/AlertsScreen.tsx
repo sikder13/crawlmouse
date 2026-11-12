@@ -4,11 +4,13 @@ import { Switch } from '../../Switch';
 import { Table } from '../../Table';
 import { VisuallyHidden } from '../../VisuallyHidden';
 import { ALERTS_TABLES } from '../../../../lib/v2/copy/alerts';
+import type { Notice } from '../../../../lib/v2/copy/settings-notices';
 import type { AlertsView } from '../../../../lib/v2/view/alerts';
 import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
 import { CardHead } from '../account/parts';
 import shared from '../account/AccountScreen.module.css';
+import { NoticeLine } from '../settings/NoticeLine';
 import settings from '../settings/SettingsTable.module.css';
 import styles from './AlertsScreen.module.css';
 
@@ -16,9 +18,16 @@ const T = ALERTS_TABLES;
 
 /**
  * Final-Alerts: what was sent, newest first, one row per change (D4); where alerts go; and the
- * account's rules. The one orange action opens the fix for the block that is still open.
+ * account's rules. The one orange action opens the fix for the block that is still open. `notice` is
+ * the line for a form the live page was sent back with (`settingsNotice(query, 'alerts')`).
  */
-export function AlertsScreen({ data }: { data: AlertsView }) {
+export function AlertsScreen({
+  data,
+  notice = null,
+}: {
+  data: AlertsView;
+  notice?: Notice | null;
+}) {
   const { header, fired, channels, rules } = data;
   return (
     <AccountFrame shell={data.shell}>
@@ -37,6 +46,7 @@ export function AlertsScreen({ data }: { data: AlertsView }) {
           </div>
         ) : null}
       </header>
+      <NoticeLine notice={notice} />
 
       <Card as="section" className={shared.panel}>
         <CardHead title={fired.title} sub={fired.sub} />

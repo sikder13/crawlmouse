@@ -7,11 +7,11 @@ import { canonicalizeUrl, GRADE_VERSION } from '@crawlmouse/engine/v2/pipeline';
 import type { Check } from '@crawlmouse/types/v2';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { bucketedKey, checkIdOfKey, freshKey } from './ids';
-import { ANONYMOUS_EXPIRY_HOURS, DEFAULT_PAGE_CAP } from './limits';
+import { ANONYMOUS_EXPIRY_HOURS, DEFAULT_PAGE_CAP, MANUAL_BUCKET_S } from './limits';
 import type { PipelineStore } from './store';
 
 export interface RequestDeps {
-  store: Pick<PipelineStore, 'requestSite' | 'insertQueued'>;
+  store: Pick<PipelineStore, 'requestSite' | 'insertQueued' | 'checkStatus'>;
   send(event: { id: string; name: 'check.requested'; data: CheckRequested }): Promise<unknown>;
   /** Milliseconds since the epoch. */
   now(): number;
@@ -48,12 +48,20 @@ export async function requestCheck(
   const now = deps.now();
   const kept = site.account_id !== null;
   const keyed = { siteId: site.id, kept };
-  const bucketed = bucketedKey({
-    ...keyed,
-    trigger: req.trigger,
-    now,
-    nextCheckAt: site.next_check_at,
-  });
+  const key = (at: number) =>
+    bucketedKey({ ...keyed, trigger: req.trigger, now: at, nextCheckAt: site.next_check_at });
+  let bucketed = key(now);
+  // D11: a re-check whose bucket's check has left `queued` (started or ended) goes to the next
+  // bucket, so asking again is a new check rather than the one already under way. Only when the
+  // store reads statuses (`checkStatus`); without it the bucket is kept.
+  if (
+    bucketed !== null &&
+    (req.trigger === 'manual' || req.trigger === 'fix_recheck') &&
+    deps.store.checkStatus !== undefined
+  ) {
+    const status = await deps.store.checkStatus(checkIdOfKey(bucketed));
+    if (status !== null && status !== 'queued') bucketed = key(now + MANUAL_BUCKET_S * 1000);
+  }
   const checkId = bucketed === null ? deps.newId() : checkIdOfKey(bucketed);
   const at = new Date(now).toISOString();
   const created = await deps.store.insertQueued({

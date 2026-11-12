@@ -197,6 +197,23 @@ describe('claimCheck', () => {
     });
   });
 
+  it('an account marked for deletion is a 409 no_account, and its site stays unowned (spec 27b)', async () => {
+    const user = await signUp(db, 'leaving@example.com');
+    const a = await accountOf(db, user);
+    await db.query(
+      `update public.accounts set deletion_confirmed_at = $2, purge_after = $2::timestamptz + interval '7 days'
+        where id = $1`,
+      [a.id, NOW],
+    );
+    const { checkId, siteId } = await anonymousCheck(db, 'leaving.example.com', LATER);
+    expect(await claimCheck(deps(), { checkId, userId: user })).toEqual({
+      ok: false,
+      status: 409,
+      code: 'no_account',
+    });
+    expect((await site(siteId)).account_id).toBeNull();
+  });
+
   it('an expired no-card trial claims as Free: one site, whatever its stored limit', async () => {
     const user = await signUp(db, 'lapsed@example.com');
     const a = await accountOf(db, user);

@@ -18,6 +18,7 @@ import { CHECK_REAPER_FN_ID } from '../../../../../inngest/check-reaper';
 import { inngest } from '../../../../../inngest/client';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { PLAN_CONCURRENCY_CAP } from '../../../../../inngest/concurrency';
+import { SCHEDULE_TICK_FN_ID } from '../../../../../inngest/schedule';
 import { recordedInput } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { workerClientFromEnv } from '../../worker-client/client';
 import { CRAWL_USER_AGENT } from './discover';
@@ -248,6 +249,24 @@ describe('registration with V2_PIPELINE=1 (D3)', () => {
     ]);
   });
 
+  it('registers the scheduler (CC-28 D4) only with V2_PIPELINE=1 and V2_CHECKS_PUBLIC=1', () => {
+    const tick = `crawlmouse-${SCHEDULE_TICK_FN_ID}`;
+    for (const [env, registered] of [
+      [{}, false],
+      [{ V2_PIPELINE: '1' }, false],
+      [{ V2_CHECKS_PUBLIC: '1' }, false],
+      [{ V2_PIPELINE: '1', V2_CHECKS_PUBLIC: '0' }, false],
+      [{ V2_PIPELINE: 'true', V2_CHECKS_PUBLIC: '1' }, false],
+      [{ V2_PIPELINE: '1', V2_CHECKS_PUBLIC: '1' }, true],
+    ] as const) {
+      const ids = configsOf(inngestFunctions(env)).map((c) => c.id);
+      expect(
+        ids.filter((id) => id === tick),
+        JSON.stringify(env),
+      ).toHaveLength(registered ? 1 : 0);
+    }
+  });
+
   it('registers no expiry with V2_PIPELINE unset', () => {
     expect(configsOf(inngestFunctions({})).map((c) => c.id)).not.toContain(
       `crawlmouse-${CHECK_EXPIRY_FN_ID}`,
@@ -297,7 +316,39 @@ const limitsOf = (configs: readonly Config[]): number[] =>
     return (Array.isArray(k) ? k : [k]).map((o) => o.limit);
   });
 
+/** CC-28's mail functions, registered with V2_CHECKS_PUBLIC=1 only (lib/v2/mail/functions.ts). */
+const MAIL_IDS = [
+  'crawlmouse-crawlmouse.mail.account',
+  'crawlmouse-crawlmouse.mail.check-notify',
+  'crawlmouse-crawlmouse.mail.fix-to-developer',
+  'crawlmouse-crawlmouse.events.check-finished',
+];
 const SWEEP = [undefined, '', '0', '-1', '2', '5', '6', '50', '1000', 'abc', '5.5'] as const;
+
+/** CC-28's alert and summary functions: registered with V2_PIPELINE and V2_CHECKS_PUBLIC both set. */
+const MONITOR_IDS = [
+  'crawlmouse-crawlmouse.alert.dispatch',
+  'crawlmouse-crawlmouse.summary.tick',
+  'crawlmouse-crawlmouse.summary.send',
+];
+
+describe('CC-28’s monitoring functions (D5, D6)', () => {
+  it('register with V2_PIPELINE and V2_CHECKS_PUBLIC both set, and with neither alone', () => {
+    const ids = (env: Record<string, string>) => configsOf(inngestFunctions(env)).map((c) => c.id);
+    expect(ids({ V2_PIPELINE: '1', V2_CHECKS_PUBLIC: '1' })).toEqual(
+      expect.arrayContaining(MONITOR_IDS),
+    );
+    const envs: Record<string, string>[] = [
+      {},
+      { V2_PIPELINE: '1' },
+      { V2_CHECKS_PUBLIC: '1' },
+      { V2_BILLING: '1' },
+    ];
+    for (const env of envs) {
+      for (const id of MONITOR_IDS) expect(ids(env), JSON.stringify(env)).not.toContain(id);
+    }
+  });
+});
 
 describe('no registered function can declare a concurrency limit above the plan cap (D4)', () => {
   afterEach(() => {
@@ -323,15 +374,23 @@ describe('no registered function can declare a concurrency limit above the plan 
               vi.stubEnv('INNGEST_CHECK_CONCURRENCY', check);
               const configs = configsOf(fresh.inngestFunctions(process.env));
               expect(configs.length).toBe(
-                (flag === '1' ? 10 : 5) + (billing === '1' ? 2 : 0) + (pub === '1' ? 3 : 0),
+                (flag === '1' ? 10 : 5) +
+                  (billing === '1' ? 2 : 0) +
+                  (pub === '1' ? 3 + MAIL_IDS.length : 0) +
+                  // CC-28's scheduler tick, and its alert and summary functions.
+                  (pub === '1' && flag === '1' ? 1 + MONITOR_IDS.length : 0),
               );
+              for (const id of MONITOR_IDS)
+                expect(configs.map((c) => c.id).includes(id), id).toBe(pub === '1' && flag === '1');
               const deletionIds = [
                 'crawlmouse-crawlmouse.account.deletion-cancel',
                 'crawlmouse-crawlmouse.account.deletion-resume',
                 'crawlmouse-crawlmouse.account.purge-deleted',
               ];
               const ids = configs.map((c) => c.id);
-              for (const id of deletionIds) expect(ids.includes(id), id).toBe(pub === '1');
+              for (const id of [...deletionIds, ...MAIL_IDS]) {
+                expect(ids.includes(id), id).toBe(pub === '1');
+              }
               if (billing === '1') {
                 expect(configs.map((c) => c.id)).toEqual(
                   expect.arrayContaining([

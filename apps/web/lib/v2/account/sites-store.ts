@@ -9,10 +9,13 @@
  * `requestCheck` reaches its send, so a refused request sends nothing.
  */
 import { randomUUID } from 'node:crypto';
+import { AlertRuleKindSchema, ChannelSchema, type AlertRuleKind } from '@crawlmouse/types/v2';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { inngest } from '../../../../../inngest/client';
 import type { SiteSchedule } from '../../auth/schedule';
+import type { RequestBody } from '../../billing/request-body';
+import type { TierGates } from '../../entitlement-v2';
 import { normalizeDomain } from '../../domain';
 import { DOMAIN_AUDITS_PER_HOUR, GLOBAL_AUDITS_BUCKET, GLOBAL_AUDITS_PER_DAY } from '../../limits';
 import { MAX_RATE_LIMIT_WINDOW_MS, rateLimitWindowStart } from '../../rate-limit-window';
@@ -89,7 +92,9 @@ class NotQueued extends Error {
  * `request_capped_check` as its insert. Its bucketed check id makes a repeat inside the 2-minute
  * bucket find the row it wrote: while that check is queued the event is sent again with the same id
  * (Inngest drops the duplicate, and a send that failed the first time gets its retry); once it has
- * started the request is answered `check_running` and nothing is sent.
+ * started or ended, the request moves to the next 2-minute bucket (CC-28 D11) and is capped there like
+ * any other. `check_running` and `recently_checked` remain for a next bucket whose check has also left
+ * `queued`.
  */
 export function supabaseRequestRecheck(
   admin: SupabaseClient,
@@ -100,6 +105,8 @@ export function supabaseRequestRecheck(
     const deps: RequestDeps = {
       store: {
         requestSite: (siteId) => pipeline.requestSite(siteId),
+        // CC-28 D11: a bucket whose check has started gives way to the next bucket (request.ts).
+        checkStatus: (checkId) => pipeline.checkStatus!(checkId),
         insertQueued: async (row: QueuedCheck) => {
           const a = await call(
             admin,
@@ -322,4 +329,175 @@ export async function removeSite(
   siteId: string,
 ): Promise<RemoveSiteOutcome> {
   return call(admin, 'remove_site', { p_site: siteId }, RemoveAnswer);
+}
+
+// ── A site's alert rules (CC-28 D8, `PUT /api/sites/[id]/alert-rules`) ──────────────────────────────
+
+type Channel = z.infer<typeof ChannelSchema>;
+
+/**
+ * What a site's rule switch asks for: the kind it overrides, and its switch, its channels or both.
+ * A form carries the switch as `true`/`false` and the channels comma-separated (`email,slack`).
+ */
+export interface SiteRulePlan {
+  kind: AlertRuleKind;
+  enabled?: boolean;
+  channels?: Channel[];
+}
+
+export type SiteRuleDecision =
+  | { ok: true; plan: SiteRulePlan }
+  | { ok: false; status: 400; code: 'invalid' }
+  | { ok: false; status: 402; code: 'upgrade_required'; gate: 'slack' };
+
+const Channels = z
+  .array(ChannelSchema)
+  .min(1)
+  .refine((c) => new Set(c).size === c.length);
+
+const siteRuleBody = (kind: RequestBody['kind']) =>
+  z
+    .strictObject({
+      rule: AlertRuleKindSchema,
+      enabled: (kind === 'json'
+        ? z.boolean()
+        : z.enum(['true', 'false']).transform((v) => v === 'true')
+      ).optional(),
+      channels: (kind === 'json'
+        ? Channels
+        : z
+            .string()
+            .max(20)
+            .transform((v) => v.split(','))
+            .pipe(Channels)
+      ).optional(),
+    })
+    .refine((b) => b.enabled !== undefined || b.channels !== undefined);
+
+/** What the body asks for, under the gates of the site's account's tier now. */
+export function decideSiteAlertRule(
+  body: RequestBody,
+  gates: Readonly<TierGates>,
+): SiteRuleDecision {
+  const parsed = siteRuleBody(body.kind).safeParse(body.fields);
+  if (!parsed.success) return { ok: false, status: 400, code: 'invalid' };
+  const { rule, enabled, channels } = parsed.data;
+  if (channels?.includes('slack') && !gates.slack) {
+    return { ok: false, status: 402, code: 'upgrade_required', gate: 'slack' };
+  }
+  return {
+    ok: true,
+    plan: {
+      kind: rule,
+      ...(enabled === undefined ? {} : { enabled }),
+      ...(channels === undefined ? {} : { channels }),
+    },
+  };
+}
+
+export interface SiteRuleState {
+  kind: AlertRuleKind;
+  enabled: boolean;
+  channels: Channel[];
+}
+
+export type SiteRuleOutcome =
+  | { ok: true; rule: SiteRuleState }
+  | { ok: false; status: 404; code: 'not_found' };
+
+const RuleRow = z.object({
+  id: z.string(),
+  enabled: z.boolean(),
+  threshold_points: z.number().nullable(),
+  channels: z.array(ChannelSchema),
+});
+
+/**
+ * Writes `siteId`'s override of the rule `plan.kind` (a per-site row of `alert_rules`, which the
+ * alerts read in place of the account's rule of that kind). The first override of a kind starts from
+ * the account's rule of that kind, its threshold and channels, with Slack left out on a tier without
+ * it (the table's trigger refuses a new row that adds Slack on Free); an account with no rule of that
+ * kind has nothing to override, a 404. Every read and write names the account and the site, so
+ * another account's rows are never reached.
+ */
+export async function setSiteAlertRule(
+  admin: SupabaseClient,
+  accountId: string,
+  siteId: string,
+  plan: SiteRulePlan,
+  gates: Readonly<TierGates>,
+): Promise<SiteRuleOutcome> {
+  const COLUMNS = 'id, enabled, threshold_points, channels';
+  const read = async (site: string | null) => {
+    const q = admin
+      .from('alert_rules')
+      .select(COLUMNS)
+      .eq('account_id', accountId)
+      .eq('kind', plan.kind);
+    const { data, error } = await (
+      site === null ? q.is('site_id', null) : q.eq('site_id', site)
+    ).maybeSingle();
+    if (error) throw new Error(`alert_rules read failed: ${error.message}`);
+    return data === null ? null : RuleRow.parse(data);
+  };
+  const own = await read(siteId);
+  if (own !== null) {
+    const { error } = await admin
+      .from('alert_rules')
+      .update({
+        ...(plan.enabled === undefined ? {} : { enabled: plan.enabled }),
+        ...(plan.channels === undefined ? {} : { channels: plan.channels }),
+      })
+      .eq('id', own.id)
+      .eq('account_id', accountId)
+      .eq('site_id', siteId);
+    if (error) throw new Error(`alert_rules update failed: ${error.message}`);
+  } else {
+    const base = await read(null);
+    if (base === null) return { ok: false, status: 404, code: 'not_found' };
+    const allowed = base.channels.filter((c) => c !== 'slack' || gates.slack);
+    const { error } = await admin.from('alert_rules').insert({
+      account_id: accountId,
+      site_id: siteId,
+      kind: plan.kind,
+      enabled: plan.enabled ?? base.enabled,
+      threshold_points: base.threshold_points,
+      channels: plan.channels ?? (allowed.length > 0 ? allowed : ['email']),
+    });
+    // Another request made the override first (alert_rules_scope_kind_uq): write to that one.
+    if (error?.code === '23505') return setSiteAlertRule(admin, accountId, siteId, plan, gates);
+    if (error) throw new Error(`alert_rules insert failed: ${error.message}`);
+  }
+  const written = await read(siteId);
+  if (written === null) throw new Error('alert_rules: the override just written is not there');
+  return {
+    ok: true,
+    rule: { kind: plan.kind, enabled: written.enabled, channels: written.channels },
+  };
+}
+
+/**
+ * Each site's `next_check_at`, the time the scheduler's trigger set (CC-28 D4), by site id; null for a
+ * site with none. Over the service role, for site ids the page has already read through the caller's
+ * session.
+ */
+export async function readNextChecks(
+  admin: SupabaseClient,
+  siteIds: readonly string[],
+): Promise<Map<string, string | null>> {
+  if (siteIds.length === 0) return new Map();
+  const { data, error } = await admin
+    .from('sites')
+    .select('id, next_check_at')
+    .in('id', [...siteIds]);
+  if (error) throw new Error(`sites read failed: ${error.message}`);
+  const rows = z
+    .array(z.object({ id: z.string(), next_check_at: z.string().nullable() }))
+    .parse(data);
+  return new Map(
+    rows.map((r) => [
+      r.id,
+      r.next_check_at === null ? null : new Date(r.next_check_at).toISOString(),
+    ]),
+  );
 }

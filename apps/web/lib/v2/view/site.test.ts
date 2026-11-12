@@ -103,6 +103,26 @@ describe('Site page, example-outfitter.com at as_of', () => {
   });
 });
 
+describe('Site: a rule the site overrides (CC-28 D8)', () => {
+  it('shows the site’s own row of a kind in place of the account’s, once, and switches that one', () => {
+    const d = structuredClone(bad);
+    const anyChange = d.alert_rules.find((r) => r.site_id === null && r.kind === 'any_change')!;
+    const override = {
+      ...anyChange,
+      id: 'a1e40000-0000-4000-8000-000000000001',
+      site_id: OUTFITTER,
+      enabled: true,
+    };
+    d.alert_rules.push(override);
+    const v = siteView(d, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER);
+    expect(v.alerts.rows).toHaveLength(6);
+    const row = v.alerts.rows.at(-1)!;
+    expect([row.key, row.on]).toEqual([override.id, true]);
+    expect(row.toggle.href).toBe(`/api/sites/${OUTFITTER}/alert-rules`);
+    expect(row.toggle.fields).toEqual({ _method: 'PUT', rule: 'any_change', enabled: 'false' });
+  });
+});
+
 describe('Site, withheld: granitepeak.example as Northwind Digital', () => {
   const c = fixture('challenged-site');
   const v = siteView(c, { accountId: C9, now: c.as_of }, GRANITEPEAK);

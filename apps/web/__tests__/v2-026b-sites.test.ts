@@ -380,8 +380,15 @@ describe('add_site', () => {
          from public.sites where id = $1`,
       [s.id],
     );
+    // next_check_at is migration 028's trigger's: the schedule's first time after the insert.
+    const { rows: due } = await db.query<{ due: Date | null }>(
+      `select public.next_check_after(s.schedule_cadence, s.schedule_iso_weekday, s.schedule_hour_local,
+                                      s.schedule_offset_min, a.timezone, s.created_at) as due
+         from public.sites s join public.accounts a on a.id = s.account_id where s.id = $1`,
+      [s.id],
+    );
     expect(rows).toEqual([
-      { ...s, staging_of_site_id: null, removed_at: null, next_check_at: null },
+      { ...s, staging_of_site_id: null, removed_at: null, next_check_at: due[0]!.due },
     ]);
     expect(await checksOf(s.id)).toEqual([
       { id: check.id, status: 'queued', trigger: 'first_audit' },

@@ -49,7 +49,6 @@ import {
   bothGrades,
   crawlerOrder,
   move,
-  nextCheck,
   readRuns,
   scheduleCell,
   seoOf,
@@ -58,6 +57,7 @@ import {
   type GradeCell,
 } from './checks';
 import { points, type DoorView } from './result';
+import { nextCheckLine, type NextChecks } from './site';
 import { GRADES, PILL, SUBJECTS } from './segment/changes';
 import { effortText } from './segment/fixes';
 import { action, type ActionView } from './account-actions';
@@ -787,7 +787,7 @@ function noSiteView(v: AccountView): DashboardView {
   const adds = addsSites(v);
   const trial = v.account.state === 'pro_trial' || v.account.state === 'agency_trial';
   return {
-    shell: accountShellView(v, 'Sites'),
+    shell: accountShellView(v, 'Sites', { role: readerRole(v) ?? 'developer' }),
     firstRun: true,
     header: {
       title: adds ? COPY.noSiteTitle : COPY.noSiteSeatTitle,
@@ -819,7 +819,11 @@ function noSiteView(v: AccountView): DashboardView {
   };
 }
 
-export function dashboardView(d: AccountDataset, viewer: Viewer): DashboardView {
+/**
+ * `next` is each site's `sites.next_check_at` as the live page reads it (`NextChecks`); a preview
+ * passes none and the header keeps its weekly stand-in (`nextCheckLine`).
+ */
+export function dashboardView(d: AccountDataset, viewer: Viewer, next?: NextChecks): DashboardView {
   const v = viewAt(d, viewer);
   if (primarySites(v).length === 0) return noSiteView(v);
   const zone = zoneOf(v);
@@ -842,7 +846,10 @@ export function dashboardView(d: AccountDataset, viewer: Viewer): DashboardView 
 
   const fixes = result ? fixesAsOf(v.d, result) : [];
   const first = fixes[0];
-  const next = nextCheck(primary, v, (ts) => dayDate(ts, zone));
+  const nextAt = nextCheckLine(primary, v, next, (ts) => dayDate(ts, zone));
+  // The live column's time is the scheduler's, whatever the saved cadence (on Free the first site
+  // runs monthly, Q4), so it is named without one; the preview's stand-in is weekly by construction.
+  const nextText = nextAt ? `${next ? 'next check' : 'next weekly check'} ${nextAt}` : null;
   const trialEnds = trial ? `trial ends ${dayDate(v.account.trial_ends_at!, zone)}` : null;
   const flight = v.inFlight.filter((f) => f.siteId === primary.id).map((f) => `check ${f.status}`);
   const sitesWord = `${v.d.sites.length} ${plural(v.d.sites.length, 'site', 'sites')}`;
@@ -862,7 +869,7 @@ export function dashboardView(d: AccountDataset, viewer: Viewer): DashboardView 
           sitesWord,
           result ? `audited ${hourMinute(result.finished_at!, zone)}` : null,
           ...flight,
-          next ? `next weekly check ${next}` : null,
+          nextText,
           trialEnds,
         ]
           .filter(Boolean)
@@ -889,7 +896,7 @@ export function dashboardView(d: AccountDataset, viewer: Viewer): DashboardView 
           sitesWord,
           `last check ${whenAgo((result ?? newestResult(v))!.finished_at!, v)}`,
           ...flight,
-          next ? `next weekly check ${next}` : null,
+          nextText,
           trialEnds,
         ]
           .filter(Boolean)
@@ -949,7 +956,7 @@ export function dashboardView(d: AccountDataset, viewer: Viewer): DashboardView 
   const daysLeft = trial ? calendarDays(v.now, v.account.trial_ends_at!, zone) : null;
 
   return {
-    shell: accountShellView(v, 'Sites'),
+    shell: accountShellView(v, 'Sites', { role: readerRole(v) ?? 'developer' }),
     firstRun,
     header,
     strip,

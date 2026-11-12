@@ -80,7 +80,7 @@ const DECISIONS: [string, string, string][] = [
   ],
   [
     'D8',
-    'Copy corrections carried from earlier steps: “AI readability”; Agency at $99 from `prices.ts`; dates in the account’s zone; the sign-in sender magic@ until CC-28. Each is a copy-registry row.',
+    'Copy corrections carried from earlier steps: “AI readability”; Agency at $99 from `prices.ts`; dates in the account’s zone; the sign-in sender `SIGNIN_SENDER` until the owner moves it to signin@ at switch-on (CC-28 Q5, `docs/ops/senders.md`). Each is a copy-registry row.',
     'Consistency with CC-25 and CC-26.',
   ],
   [

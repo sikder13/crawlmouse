@@ -211,6 +211,12 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
       const { accountId } = await personalAccount(db, owner);
       return ROWS.account_slack_destinations(accountId, randomUUID());
     }
+    case 'email_sends':
+      return ROWS.email_sends(randomUUID(), world.accountId);
+    case 'email_suppressions':
+      return ROWS.email_suppressions(hex);
+    case 'slack_sends':
+      return ROWS.slack_sends(randomUUID(), world.accountId);
   }
 }
 
@@ -305,6 +311,9 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   pending_erasures: null,
   deletion_cancellations: null,
   account_slack_destinations: null,
+  email_sends: null,
+  email_suppressions: null,
+  slack_sends: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -363,6 +372,9 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
     expectedTable.service_role = 'arwd';
   // 027b keeps the Slack destination from service_role too: its functions are the only way in.
   if (table === 'account_slack_destinations') delete expectedTable.service_role;
+  // 028 lets service_role read its ledgers and suppressions; its functions write them.
+  if (['email_sends', 'email_suppressions', 'slack_sends'].includes(table))
+    expectedTable.service_role = 'r';
   const actualTable = Object.fromEntries(tableAcl.map((a) => [a.grantee, sorted(a.privileges)]));
   for (const g of new Set([...Object.keys(expectedTable), ...Object.keys(actualTable)])) {
     if ((actualTable[g] ?? '') !== sorted(expectedTable[g] ?? ''))
@@ -981,6 +993,10 @@ const RULE_CASES: Record<
   alert_rules_threshold: {
     table: 'alert_rules',
     row: async () => ({ ...(await freshRow('alert_rules')), threshold_points: 5 }),
+  },
+  alert_events_reason: {
+    table: 'alert_events',
+    row: async () => ({ ...(await freshRow('alert_events')), reason: 'provider_500' }),
   },
   alert_rules_fired_pair: {
     table: 'alert_rules',

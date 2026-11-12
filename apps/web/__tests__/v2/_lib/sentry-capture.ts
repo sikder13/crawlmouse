@@ -4,7 +4,8 @@
  * argv[2], handle one request carrying every door cookie, v1's anonymous-session cookie and a
  * session cookie, and a second to the claim route, whose path and Referer hold a check id; inside
  * the handler make an outgoing PostgREST-shaped request (an `id=eq.` filter, which becomes a
- * breadcrumb), finish a forced transaction, and capture a message; then print what reached the
+ * breadcrumb) and a POST to a Slack-webhook-shaped path, finish a forced transaction, and capture a
+ * message; two more requests carry an unsubscribe token in their URLs; then print what reached the
  * transport.
  */
 import { createRequire } from 'node:module';
@@ -43,12 +44,17 @@ async function capturedWith(options: Record<string, unknown>): Promise<string> {
   });
   let port = 0;
   const server = createServer((req, res) => {
-    if (req.url?.startsWith('/rest/')) {
+    if (req.url?.startsWith('/rest/') || req.url?.startsWith('/services/')) {
       res.end('[]');
       return;
     }
     void (async () => {
       await fetch(`http://127.0.0.1:${port}/rest/v1/checks?select=id&id=eq.CHECKIDCANARY`);
+      // alertFn's Slack POST: the webhook's secret is in its path (CC-28).
+      await fetch(`http://127.0.0.1:${port}/services/T0CANARY/B0CANARY/SLACKCANARY0secret`, {
+        method: 'POST',
+        body: 'x',
+      });
       Sentry.startSpan({ name: 'door-transaction', forceTransaction: true }, () => {});
       Sentry.captureMessage('auth.landing-failed');
       res.end('ok');
@@ -91,6 +97,20 @@ async function capturedWith(options: Record<string, unknown>): Promise<string> {
       },
     ).end(),
   );
+  // An unsubscribe link's one-click POST and its page (CC-28 D7): the token is in the URL.
+  // Real-shaped tokens: a base64url payload, a dot, a 43-character signature.
+  const SIG = 'S'.repeat(43);
+  for (const path of [
+    `/api/unsubscribe?t=UNSUBCANARYpayload.${SIG}`,
+    `/unsubscribe?t=UNSUBPAGECANARYpayload.${SIG}`,
+  ]) {
+    await new Promise<void>((resolve) =>
+      request({ port, path, method: 'POST' }, (res) => {
+        res.resume();
+        res.on('end', resolve);
+      }).end(),
+    );
+  }
   await new Promise<void>((resolve) =>
     request({ port, path: `/account/delete/${LINK_TOKEN}`, method: 'GET' }, (res) => {
       res.resume();
