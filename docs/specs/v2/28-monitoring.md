@@ -129,7 +129,9 @@ before alertFn evaluates and before the Alerts page reads.
 `erase.ts` adds the mail step to the sequence: the plan gains `erase_mail_records(hashes, false)`'s counts, the
 apply is followed by `erase_mail_records(hashes, true)`, and the recount reads them again. The hashes are the plan's
 addresses under the mail pepper; with no pepper the plan refuses (`mail_pepper`) rather than skip the step. Both
-port sets implement it: `deletion-ports.ts` (the purge) and `scripts/ops/erase-account.ts`.
+port sets implement it: `deletion-ports.ts` (the purge) and `scripts/ops/erase-account.ts`. The hash is of each
+address as the plan holds it, so a send to a tagged variant someone else typed (`person+x@`) is not reached; such a
+row holds only that HMAC, the kind and the times.
 
 ## Owner rulings
 
