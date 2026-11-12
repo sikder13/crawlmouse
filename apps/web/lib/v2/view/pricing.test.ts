@@ -2,6 +2,7 @@ import { AccountStateSchema } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
 import { checkoutRefusal } from '../../billing/checkout-refusal';
 import { portalRefusal } from '../../billing/portal-v2';
+import { AGENCY_PLUS_INBOX } from '../mail/templates/agency-plus-contact';
 import { FREE_START, trialRefusal, type EntitlementSnapshot } from '../../billing/state-machine';
 import type { Tier } from '../../entitlement-v2';
 import {
@@ -421,5 +422,17 @@ describe('the interval', () => {
     [['year'], 'month'],
   ] as const)('?interval=%j reads as %s', (raw, want) => {
     expect(intervalFrom(raw as string | string[] | undefined)).toBe(want);
+  });
+});
+
+// Security R3-1: the Agency Plus form posts to a route served only with V2_CHECKS_PUBLIC; without it
+// the card names the inbox the form would have mailed.
+describe('the Agency Plus contact', () => {
+  it('offers the form with V2_CHECKS_PUBLIC, and the sales inbox without it', () => {
+    for (const flags of FLAGS) {
+      const plus = pricingView({ kind: 'signed_out' }, 'month', NOW, flags).agencyPlus;
+      expect(plus.form).toBe(flags.checksPublic);
+      expect(plus.inbox.address).toBe(AGENCY_PLUS_INBOX);
+    }
   });
 });

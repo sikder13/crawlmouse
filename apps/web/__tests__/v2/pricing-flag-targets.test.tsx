@@ -4,7 +4,8 @@
  *
  * Each target is resolved to its file under apps/web/app (route groups entered, the preview group
  * left out, a dynamic segment matched by any value), with each layout above it. A file that answers
- * 404 behind a flag says so as `if (!<flag>()) … notFound()` or `refuse(404`; those flag functions
+ * 404 behind a flag says so as `if (!<flag>()) return` then `notFound()`, a helper called with 404
+ * first (`refuse(404`, `answer(404`) or `new Response(null, { status: 404 })` (GATE); those flag functions
  * are read from the files themselves and evaluated against the environment the page was built from.
  * A target that resolves to no file fails. What it cannot see: a 404 decided another way, such as
  * middleware's rewrite targets, which these pages do not link to.
@@ -238,6 +239,11 @@ describe('the reader', () => {
     expect(signup.at(-1)).toMatch(/\(account\)\/signup\/page\.tsx$/);
     expect(signup.flatMap(gatesOf)).toEqual(['accountDoorEnabled']);
     expect(resolve('/api/billing/pro-trial/start')!.flatMap(gatesOf)).toEqual([
+      'checksPublicEnabled',
+    ]);
+    // A route that answers 404 through its own helper (`answer(404, …)`).
+    expect(resolve('/api/contact/agency-plus')!.flatMap(gatesOf)).toEqual([
+      'billingV2Enabled',
       'checksPublicEnabled',
     ]);
     expect(resolve('/no-such-page')).toBeNull();

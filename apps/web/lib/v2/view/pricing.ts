@@ -115,7 +115,7 @@ export interface PricingView {
      * as V2_BILLING (the mailer runs under the former). Without it the card gives the inbox to write to.
      */
     form: boolean;
-    inbox: string;
+    inbox: { before: string; address: string; after: string };
   };
   after: {
     title: string;
@@ -311,7 +311,11 @@ export function pricingView(
       formTitle: COPY.agencyPlus.formTitle,
       reply: tagged(COPY.agencyPlus.reply),
       form: flags.checksPublic,
-      inbox: COPY.agencyPlus.inbox,
+      inbox: {
+        before: COPY.agencyPlus.inboxBefore,
+        address: COPY.agencyPlus.inbox,
+        after: COPY.agencyPlus.inboxAfter,
+      },
     },
     after: {
       title: COPY.after.title(pro.trial),

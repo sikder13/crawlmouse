@@ -148,8 +148,11 @@ export function PricingScreen({ view, contact }: { view: PricingView; contact?: 
               </>
             ) : (
               <p>
-                Write to <a href={`mailto:${view.agencyPlus.inbox}`}>{view.agencyPlus.inbox}</a>{' '}
-                with your agency’s name and how many client sites you run.
+                {view.agencyPlus.inbox.before}{' '}
+                <a href={`mailto:${view.agencyPlus.inbox.address}`}>
+                  {view.agencyPlus.inbox.address}
+                </a>{' '}
+                {view.agencyPlus.inbox.after}
               </p>
             )}
           </Card>

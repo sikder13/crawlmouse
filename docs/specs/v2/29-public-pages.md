@@ -39,9 +39,10 @@ Where an artboard's figure disagrees with `prices.ts` (Agency $69, $9 a seat), t
 - `contact_requests (id, email, sites, note, created_at, sent_at)`: RLS on, all revoked from anon and
   authenticated. It holds an address and no user id. `purge_contact_requests(p_now)` (security
   invoker, service_role only) deletes the rows sent more than 30 days before `p_now`, and the unsent
-  rows made more than 30 days before it, so no submitted address is kept past 30 days (the table's
-  30-day TTL, rulings-3 Q38;
-  `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-029-public-pages.test.ts`).
+  rows made more than 30 days before it (the table's 30-day TTL, rulings-3 Q38). It runs once a day, so a
+  row lives up to 31 days, and only while `V2_CHECKS_PUBLIC` is on: rows stored before that flag is
+  switched off wait for it to be on again
+  (`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-029-public-pages.test.ts`).
 - `email_sends_kind_check` is replaced by the same list plus `agency_plus_contact`; the rollback deletes
   that kind's ledger rows and restores CC-28's list. `email_kind_suppressible` is unchanged, so it
   answers false for the new kind. `email_events.kind` (v2_005) is not touched: v2 mail writes no

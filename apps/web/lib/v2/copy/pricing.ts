@@ -29,6 +29,8 @@ import { CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS } from './settings';
 import { capitalise, count, numberWord, plural } from '../words';
 
 /** FACTS A3: the Agency Plus anchor row. A contact form only; nothing is built behind it. */
+import { SUPPORT_ADDRESS } from './email-change';
+
 export const AGENCY_PLUS = Object.freeze({ sites: 100, seats: 15, fromMonthly: 249 });
 
 /** FACTS L6: an annual subscriber is emailed this many days before the renewal. */
@@ -309,8 +311,10 @@ export const PRICING_COPY = {
     price: () => `from ${usd(AGENCY_PLUS.fromMonthly)} a month`,
     link: 'Send a request',
     formTitle: 'Tell us about your agency',
-    /** Offered in place of the form while its route is not served. */
-    inbox: 'support@crawlmouse.com',
+    /** Offered in place of the form while its route is not served: write to the inbox the form mails. */
+    inbox: SUPPORT_ADDRESS,
+    inboxBefore: 'Write to',
+    inboxAfter: 'with your agency’s name and how many client sites you run.',
     /** The request is mailed to this inbox (`agency_plus_contact`, AGENCY_PLUS_INBOX). */
     reply: {
       text: 'We reply from support@crawlmouse.com.',
