@@ -67,7 +67,12 @@ function resolve(path: string): string[] | null {
   return walk(APP, segments, []);
 }
 
-const GATE = /if\s*\(\s*!\s*(\w+)\(\)\s*\)\s*(?:return\s+)?(?:notFound\(\)|refuse\(\s*404)/g;
+/**
+ * `if (!flag()) return <a 404>`, where the 404 is `notFound()`, a helper called with 404 first
+ * (`refuse(404, …)`, `answer(404, …)`), or `new Response(null, { status: 404 })`.
+ */
+const GATE =
+  /if\s*\(\s*!\s*(\w+)\(\)\s*\)\s*(?:return\s+)?(?:notFound\(\)|\w+\(\s*404\b|new Response\(null,\s*\{\s*status:\s*404)/g;
 
 /** The flag functions a file answers 404 behind. */
 const gatesOf = (file: string) => [...readFileSync(file, 'utf8').matchAll(GATE)].map((m) => m[1]!);
