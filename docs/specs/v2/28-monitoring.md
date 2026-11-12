@@ -58,21 +58,28 @@ after)`: weekly, the next ISO weekday at that local time; monthly, the first suc
 time the clocks skip runs an hour later; a local time that happens twice runs once, at the later instant
 (`__tests__/v2-028-schedule.test.ts` pins both for New York and London). `sites.next_check_at` is written by
 a trigger on `sites` (schedule columns, `account_id`, `removed_at`) and one on `accounts.timezone`, for every
-writer (owner ruling Q3); a site with no `schedule_offset_min` gets one from its id.
+writer (owner ruling Q3); a site with no `schedule_offset_min` gets one from its id. A zone change moves only the
+next checks still ahead of now (a site already due keeps its time, so the next tick claims it), by the saved
+cadence on a paid tier and monthly on any other, as the claim advances.
 
 `claim_due_sites(now, limit, slot)` claims kept, live, unpaused weekly or monthly sites whose `next_check_at`
 has passed, of accounts neither deleted nor marked for deletion, whose tier allows it at `now`: any site of a
 paid tier; on Free, the first live primary site in `apply_entitlement_transition`'s order, run monthly
 whatever its saved cadence (Q4). Rows another transaction holds are skipped. Each claim takes a
 `global:audits:day` slot in a block rolled back on refusal; a refusal ends the claim and leaves the rest due.
-A claimed site's `next_check_at` moves to the first due time after `now` in the same statement, and the
-claim returns the time it was due, which keys the request (`check:<site>:scheduled:<iso>`), so a retried
-request step makes the same check.
+A claimed site's `next_check_at` moves to the first due time after `now` in the same statement. The claim
+returns, per site, `site_id`, `account_id`, `slot` (the time it was due, which keys the request,
+`check:<site>:scheduled:<iso>`, so a retried request step makes the same check) and `next_at` (the
+`next_check_at` it set).
 
 When a site's request step fails every retry, `scheduleTickFn` catches it per site and runs a `release` step that calls `release_scheduled_claim` (owner ruling Q9):
 `next_check_at` goes back to the claimed time, so the next tick claims the site again, and the slot is given
-back while its 24-hour window is open. It acts only while `next_check_at` is still past the claimed time, so
-a second call, or a schedule saved since, gives nothing back twice. Sentry is told the site id and the slot.
+back while its 24-hour window is open. It acts only while `next_check_at` still holds the claim's `next_at`
+(to the millisecond). A schedule saved since the claim keeps the time the save computed, a site removed since
+keeps its null, and a second call finds the restored slot; in each, nothing is given back, so the slot of a
+site saved or removed between its claim and its release stays spent for that day. Sentry is told the site id
+and the slot. A release step that fails every retry as well is reported to Sentry (`schedule.claim_release_failed`,
+site id and slot) and the tick goes on to the next site; that site keeps its moved due time and its slot is spent.
 
 ## The mail the product sends (D2, D3, D7, D11)
 
@@ -131,6 +138,8 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
   step's retry claims the next due sites, and the first set waits for its next due time (one cadence lost,
   one slot spent). Making the claim idempotent needs a claim keyed on the run (questions Q12).
 - A site removed between its claim and its request step still gets its queued `scheduled` check.
+- A claim whose request and release both fail every retry is not undone: the site waits for its next due time
+  (one cadence lost, one slot spent), and Sentry has its id and slot.
 - The unsubscribe page and route answer 404 while `V2_CHECKS_PUBLIC` is off, so turning the flag off after mail
   has gone out breaks those links until it is on again.
 - Slack turns a bare URL in message text into a link (a fix title naming a page on the member's site); we build no

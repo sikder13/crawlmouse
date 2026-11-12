@@ -236,8 +236,9 @@ grant execute on function public.account_link_recipient(uuid) to service_role;
 
 -- ═══ B: the scheduler (D4) ════════════════════════════════════════════════════════════════════════
 -- Granted to service_role: account_effective_tier, next_check_after, claim_due_sites,
--- release_scheduled_claim. The trigger
--- functions to no role. Tests: apps/web/__tests__/v2-028-schedule.test.ts; two ticks racing,
+-- release_scheduled_claim. The trigger functions to no role; they are not security definer, so they run
+-- as the writer of the row (service_role, or a definer function's owner) and call next_check_after and
+-- account_effective_tier with its grants. Tests: apps/web/__tests__/v2-028-schedule.test.ts; two ticks racing,
 -- scripts/db/monitoring-race.test.ts.
 
 -- The tier an account has at p_now, as effectiveTier() in apps/web/lib/entitlement-v2.ts computes it
@@ -328,7 +329,6 @@ $$;
 create or replace function public.sites_schedule_next()
 returns trigger
 language plpgsql
-security definer
 set search_path = pg_catalog, pg_temp
 as $$
 begin
@@ -359,19 +359,22 @@ drop trigger if exists sites_schedule_next on public.sites;
 create trigger sites_schedule_next before insert or update on public.sites
   for each row execute function public.sites_schedule_next();
 
--- An account's zone moves its sites' next checks.
+-- An account's zone moves its sites' next checks that are still ahead of now. A site already due
+-- keeps its time, so the next tick claims it, as claim_due_sites would have. The cadence is the one
+-- claim_due_sites would advance by: the saved one on a paid tier, monthly on any other (Q4).
 create or replace function public.accounts_timezone_reschedule()
 returns trigger
 language plpgsql
-security definer
 set search_path = pg_catalog, pg_temp
 as $$
+declare
+  v_paid boolean := public.account_effective_tier(new.id, pg_catalog.now()) in ('pro', 'agency');
 begin
   update public.sites s
-     set next_check_at = public.next_check_after(s.schedule_cadence, s.schedule_iso_weekday,
-                                                 s.schedule_hour_local, s.schedule_offset_min,
-                                                 new.timezone, pg_catalog.now())
-   where s.account_id = new.id and s.next_check_at is not null;
+     set next_check_at = public.next_check_after(
+           case when v_paid then s.schedule_cadence else 'monthly' end, s.schedule_iso_weekday,
+           s.schedule_hour_local, s.schedule_offset_min, new.timezone, pg_catalog.now())
+   where s.account_id = new.id and s.next_check_at > pg_catalog.now();
   return null;
 end;
 $$;
@@ -390,9 +393,10 @@ create trigger accounts_timezone_reschedule after update of timezone on public.a
 -- the platform's daily ceiling is taken (p_global, as take_rate_slot takes it) in a block rolled back
 -- when refused; a refused slot ends the claim, leaving that site and the rest due. A claimed site's
 -- next_check_at moves past p_now in the same statement. Returns each claimed site with the slot it
--- was due at, which keys its request (apps/web/lib/v2/pipeline/ids.ts).
+-- was due at, which keys its request (apps/web/lib/v2/pipeline/ids.ts), and next_at, the
+-- next_check_at the claim set, which release_scheduled_claim compares against.
 create or replace function public.claim_due_sites(p_now timestamptz, p_limit integer, p_global jsonb)
-returns table (site_id uuid, account_id uuid, slot timestamptz)
+returns table (site_id uuid, account_id uuid, slot timestamptz, next_at timestamptz)
 language plpgsql
 volatile
 security definer
@@ -400,6 +404,7 @@ set search_path = pg_catalog, pg_temp
 as $$
 declare
   v record;
+  v_next timestamptz;
 begin
   if p_now is null or p_limit is null or p_limit < 1 or p_limit > 500 then
     raise exception 'claim_due_sites: p_now and a p_limit of 1 to 500 are required' using errcode = '22023';
@@ -433,29 +438,33 @@ begin
     exception when sqlstate 'CMCAP' then
       return;
     end;
-    update public.sites s
-       set next_check_at = public.next_check_after(
-             case when v.tier in ('pro', 'agency') then v.schedule_cadence else 'monthly' end,
-             v.schedule_iso_weekday, v.schedule_hour_local, v.schedule_offset_min, v.timezone,
-             greatest(v.next_check_at, p_now))
-     where s.id = v.id;
+    v_next := public.next_check_after(
+                case when v.tier in ('pro', 'agency') then v.schedule_cadence else 'monthly' end,
+                v.schedule_iso_weekday, v.schedule_hour_local, v.schedule_offset_min, v.timezone,
+                greatest(v.next_check_at, p_now));
+    update public.sites s set next_check_at = v_next where s.id = v.id;
     site_id := v.id;
     account_id := v.account_id;
     slot := v.next_check_at;
+    next_at := v_next;
     return next;
   end loop;
 end;
 $$;
 
--- Undoes one claim whose request never reached the pipeline (owner ruling Q9): the scheduler's
--- onFailure calls it when the request step has failed every retry. In one transaction, with the site
--- row locked: when next_check_at is still past p_slot (the claim's advance, not a later save that
--- moved it back, and not an earlier call of this function), it is set back to p_slot, so the next tick
--- claims the site again; and in that case only, the slot the claim took is given back, when p_global's
--- window (24 hours from its window_start, the global:audits:day bucket) has not ended at p_now. The
--- give-back takes one from that bucket row, never below zero. Calling it twice gives back one slot.
+-- Undoes one claim whose request never reached the pipeline (owner ruling Q9): inngest/schedule.ts
+-- calls it when the request step has failed every retry. In one transaction, with the site row
+-- locked: when next_check_at still holds p_claimed_next, the value the claim set (claim_due_sites's
+-- next_at), compared to the millisecond as the scheduler carries it, it is set back to p_slot, so the
+-- next tick claims the site again; and in that case only, the slot the claim took is given back, when
+-- p_global's window (24 hours from its window_start, the global:audits:day bucket) has not ended at
+-- p_now. The give-back takes one from that bucket row, never below zero. Any other next_check_at is
+-- left as it is and nothing is given back: a schedule saved since the claim (the save's time stands),
+-- a site removed or unkept since (null), and an earlier call of this function (p_slot), so calling it
+-- twice gives back one slot. The slot of a site saved or removed since its claim stays spent.
 -- Returns {"restored": bool, "slot_released": bool}.
-create or replace function public.release_scheduled_claim(p_site uuid, p_slot timestamptz, p_global jsonb,
+create or replace function public.release_scheduled_claim(p_site uuid, p_slot timestamptz,
+                                                          p_claimed_next timestamptz, p_global jsonb,
                                                           p_now timestamptz)
 returns jsonb
 language plpgsql
@@ -468,14 +477,16 @@ declare
   v_window timestamptz;
   v_released boolean := false;
 begin
-  if p_site is null or p_slot is null or p_now is null
+  if p_site is null or p_slot is null or p_claimed_next is null or p_now is null
      or pg_catalog.jsonb_typeof(p_global -> 'bucket') is distinct from 'string'
      or pg_catalog.jsonb_typeof(p_global -> 'window_start') is distinct from 'string' then
-    raise exception 'release_scheduled_claim: site, slot, time and a {bucket, window_start} are required'
+    raise exception 'release_scheduled_claim: site, slot, claimed next time, time and a {bucket, window_start} are required'
       using errcode = '22023';
   end if;
   select s.next_check_at into v_next from public.sites s where s.id = p_site for update;
-  if v_next is null or v_next <= p_slot then
+  if v_next is null
+     or pg_catalog.date_trunc('milliseconds', v_next)
+        <> pg_catalog.date_trunc('milliseconds', p_claimed_next) then
     return pg_catalog.jsonb_build_object('restored', false, 'slot_released', false);
   end if;
   update public.sites s set next_check_at = p_slot where s.id = p_site;
@@ -490,7 +501,7 @@ end;
 $$;
 
 revoke all on function public.account_effective_tier(uuid, timestamptz) from public, anon, authenticated;
-revoke all on function public.release_scheduled_claim(uuid, timestamptz, jsonb, timestamptz)
+revoke all on function public.release_scheduled_claim(uuid, timestamptz, timestamptz, jsonb, timestamptz)
   from public, anon, authenticated;
 revoke all on function public.next_check_after(text, smallint, smallint, smallint, text, timestamptz)
   from public, anon, authenticated;
@@ -501,7 +512,7 @@ grant execute on function public.account_effective_tier(uuid, timestamptz) to se
 grant execute on function public.next_check_after(text, smallint, smallint, smallint, text, timestamptz)
   to service_role;
 grant execute on function public.claim_due_sites(timestamptz, integer, jsonb) to service_role;
-grant execute on function public.release_scheduled_claim(uuid, timestamptz, jsonb, timestamptz) to service_role;
+grant execute on function public.release_scheduled_claim(uuid, timestamptz, timestamptz, jsonb, timestamptz) to service_role;
 
 -- ═══ end B ════════════════════════════════════════════════════════════════════════════════════════
 
