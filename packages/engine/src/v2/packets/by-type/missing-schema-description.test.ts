@@ -39,7 +39,7 @@ describe('missing_schema_description: what the packet says', () => {
 
   it('states the extent and the failing pages from the record', () => {
     expect(packet.context[0]).toBe(
-      'The check `schema_with_description` fails on 2 of the 13 pages of the template `/blog/{slug}` it was decided on.',
+      'The check for structured data with a description fails on 2 of the 13 pages of the template `/blog/{slug}` it was decided on.',
     );
     expect(packet.context).toContain(
       'Failing pages: `https://shop.test/blog/a`, `https://shop.test/blog/b`.',
@@ -86,7 +86,7 @@ describe('missing_schema_description: what the packet says', () => {
 
   it('requests the first failing page as a crawler the site serves', () => {
     expect(packet.verify.ua).toBe(FIRST_TESTABLE.token);
-    expect(packet.verify.command.startsWith('curl -sS -A ')).toBe(true);
+    expect(packet.verify.command.startsWith('curl -sSf --compressed -A ')).toBe(true);
     expect(packet.verify.command).toContain("'https://shop.test/blog/a'");
     expect(packet.verify.command).not.toContain('/blog/b');
   });
@@ -110,7 +110,7 @@ describe('missing_schema_description: the command and the engine’s check agree
 
   it('requests as no crawler when the audit recorded none that is served, and says so', async () => {
     const run = await commandOn(TYPE, { broken: BROKEN, fixed: FIXED }, 'no_crawler');
-    expect(run.command.startsWith("curl -sS 'http://127.0.0.1")).toBe(true);
+    expect(run.command.startsWith("curl -sSf --compressed 'http://127.0.0.1")).toBe(true);
     expect(run.broken.status).not.toBe(0);
     expect(run.fixed.status).toBe(0);
     expect(run.userAgents.every((ua) => ua.startsWith('curl/'))).toBe(true);
@@ -226,4 +226,12 @@ describe('missing_schema_description: stack bodies', () => {
 });
 
 contentPacketProperties(TYPE);
-contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED });
+contentCommandOnSites(
+  TYPE,
+  { broken: BROKEN, fixed: FIXED },
+  {
+    printed: /^"description": ?"How to pitch a tent on flat ground\."$/m,
+    today: /found no JSON-LD node about the page itself with a description/,
+    after: /`"description": "…"`/,
+  },
+);

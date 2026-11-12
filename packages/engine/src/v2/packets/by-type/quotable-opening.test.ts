@@ -49,7 +49,7 @@ describe('quotable_opening: what the packet says', () => {
 
   it('quotes nothing from the pages: the record holds no page text', () => {
     expect(packet.context[0]).toBe(
-      'The check `direct_answer_150` fails on 2 of the 13 pages of the template `/blog/{slug}` it was decided on.',
+      'The check for a quotable opening sentence fails on 2 of the 13 pages of the template `/blog/{slug}` it was decided on.',
     );
     expect(packet.keep.join(' ')).toMatch(/already says/);
   });
@@ -154,4 +154,12 @@ describe('quotable_opening: the command and the engine’s check agree', () => {
 });
 
 contentPacketProperties(TYPE);
-contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED });
+contentCommandOnSites(
+  TYPE,
+  { broken: BROKEN, fixed: FIXED },
+  {
+    printed: /two crossed poles hold its shape\./,
+    today: /^The markup that follows the page’s H1, up to 600 characters\. .* found no block there/,
+    after: /a sentence of \d+ to \d+ words that ends in a full stop/,
+  },
+);

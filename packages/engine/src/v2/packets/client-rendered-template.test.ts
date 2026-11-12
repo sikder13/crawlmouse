@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import fc from 'fast-check';
 import { afterEach, describe, expect, it } from 'vitest';
 import { FixPacketSchema, type PageResult } from '@crawlmouse/types/v2';
@@ -15,6 +16,7 @@ import {
 } from './by-type/client-rendered-template.js';
 import { jsOnlyNavigation } from './by-type/js-only-navigation.js';
 import { compose } from './compose.js';
+import { identifiersIn, pluralsAtOne } from './test-support/content.js';
 import { NO_STACK } from './test-support/facts.js';
 import { hostileText, outsideCodeSpans, UNSHOWN } from './test-support/hostile.js';
 import {
@@ -73,7 +75,13 @@ function detected(base: string, rendered: [number, number][], more = 0): Rendere
 }
 
 const allText = (p: ReturnType<typeof compose>) =>
-  [p, ...p.packets].flatMap((b) => [...b.context, ...b.change, ...b.keep, b.verify.expect]);
+  [p, ...p.packets].flatMap((b) => [
+    ...b.context,
+    ...b.change,
+    ...b.keep,
+    b.verify.expect,
+    ...(b.verify.see ? [b.verify.see.today, b.verify.see.after] : []),
+  ]);
 
 describe('the client-rendered template packet, from its record', () => {
   it('states the template, the pages rendered of the pages graded, and the words of each rendered page', () => {
@@ -103,6 +111,13 @@ describe('the client-rendered template packet, from its record', () => {
       'Find what adds the content of the pages of `/guides/{slug}` in the browser. The audit measured the words, not what adds them.',
     );
     for (const body of p.packets) expect(body.change[0], body.framework).toMatch(/^Find what adds/);
+  });
+
+  it('shows no identifier of ours: every value is said in words', () => {
+    for (const crawlers of [SERVED, []]) {
+      const p = compose(builder, detected('https://a.test', [[41, 312]], 3), factsOf(crawlers));
+      for (const text of allText(p)) expect(identifiersIn(text), text).toEqual([]);
+    }
   });
 
   it('says one page in the singular, and two in the plural', () => {
@@ -139,6 +154,26 @@ describe('the client-rendered template packet, from its record', () => {
       ).context;
     expect(shownPlus(1)).toContain('1 more rendered page is not shown.');
     expect(shownPlus(2)).toContain('2 more rendered pages are not shown.');
+  });
+
+  it('says 1 of anything in the singular: each count at 1 and at 2 (property)', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(1, 2, PAGES_SHOWN + 1, PAGES_SHOWN + 2),
+        fc.constantFrom(0, 1, 2),
+        fc.constantFrom<[number, number]>([1, 2], [1, 100], [2, 100], [0, 1]),
+        fc.constantFrom<PacketFacts['crawlers']>(SERVED, []),
+        (rendered, more, words, crawlers) => {
+          const record = detected(
+            'https://a.test',
+            Array.from({ length: rendered }, () => words),
+            more,
+          );
+          const p = compose(builder, record, factsOf(crawlers));
+          for (const text of allText(p)) expect(pluralsAtOne(text), text).toEqual([]);
+        },
+      ),
+    );
   });
 
   it('gives the same packet whatever order the record lists its rendered pages in', () => {
@@ -183,9 +218,11 @@ describe('the client-rendered template packet, from its record', () => {
   it('names no URL its record does not hold, and verifies on a rendered page of the record', () => {
     const record = detected('https://a.test', [[41, 312]], 3);
     const p = compose(builder, record, factsOf());
-    const command = p.verify.command.replace(/-A '[^']*'/, '');
-    const urls = [...allText(p), command].flatMap((t) => t.match(/https?:\/\/[^\s`']+/g) ?? []);
-    expect(urls.length).toBeGreaterThan(1);
+    const commands = [p.verify.command, p.verify.see!.command].map((c) =>
+      c.replace(/-A '[^']*'/, ''),
+    );
+    const urls = [...allText(p), ...commands].flatMap((t) => t.match(/https?:\/\/[^\s`']+/g) ?? []);
+    expect(urls.length).toBeGreaterThan(2);
     for (const u of urls)
       expect(
         record.evidence.pages.map((x) => x.url),
@@ -203,11 +240,14 @@ describe('the client-rendered template packet, from its record', () => {
     expect(next.change.join('\n')).toMatch(/getStaticProps.*getServerSideProps/);
     // ssr: false is often there for a reason: the step says what to do when it cannot be removed
     expect(next.change.join('\n')).toMatch(
-      /Remove the option if the component can render on the server\. If it cannot, because it uses a browser-only API such as window, leave it as it is and render the content's text in a Server Component/,
+      /Remove the option if the component can render on the server\. If it cannot, because it uses a browser-only API such as window, leave it as it is and render the content's text in a Server Component placed beside it, not inside it\./,
     );
-    expect(builder.stacks.nextjs!.sources.map((s) => s.supports).join('\n')).toMatch(
-      /browser-only APIs such as window.*passed to a Client Component as children is rendered on the server/,
-    );
+    // with ssr: false the component is not prerendered, and neither is what is passed into it
+    expect(next.change.join('\n')).not.toMatch(/children/);
+    const supports = builder.stacks.nextjs!.sources.map((s) => s.supports).join('\n');
+    expect(supports).toMatch(/browser-only APIs such as window/);
+    expect(supports).toMatch(/ssr: false disables prerendering for a Client Component/);
+    expect(supports).not.toMatch(/children/);
     expect(p.packets.find((b) => b.framework === 'shopify_hydrogen')!.change.join('\n')).toMatch(
       /loader/,
     );
@@ -237,7 +277,7 @@ describe('the client-rendered template packet, from its record', () => {
     const record = detected('https://a.test', [[41, 312]]);
     const served = compose(builder, record, factsOf());
     expect(served.verify.ua).toBe('OAI-SearchBot');
-    expect(served.verify.command).toMatch(/^curl -sS -A '[^']*OAI-SearchBot/);
+    expect(served.verify.command).toMatch(/^curl -sSf --compressed -A '[^']*OAI-SearchBot/);
     expect(served.context.join('\n')).not.toMatch(/No tested AI crawler/);
     const none = compose(
       builder,
@@ -245,7 +285,9 @@ describe('the client-rendered template packet, from its record', () => {
       factsOf([{ ua: 'OAI-SearchBot', verdict: 'blocked_by_ua_rule' }]),
     );
     expect(none.verify.ua).toBe(null);
-    expect(none.verify.command).toMatch(/^curl -sS 'https:\/\/a\.test\/guides\/g-0' \|/);
+    expect(none.verify.command).toMatch(
+      /^curl -sSf --compressed 'https:\/\/a\.test\/guides\/g-0' \|/,
+    );
     expect(none.context.at(-1)).toBe(
       'No tested AI crawler is served by the site today, so the check below requests the page with no crawler’s user agent.',
     );
@@ -257,7 +299,7 @@ describe('the client-rendered template packet, from its record', () => {
     const { verify } = compose(builder, record, factsOf());
     expect(verify.command).toContain("need='250'");
     expect(verify.expect).toBe(
-      'Prints its count of the words in the HTML response and exits 0 at 250 or more: 80% of the 312 the audit counted once rendered (it counted 41 without JavaScript). The command counts all text outside `script`, `style`, `noscript`, `template`, `svg`, `title`, `nav`, `footer`, `aside` elements: its count differs a little from the audit’s, and a page with that much text outside its main content passes unfixed. The audit’s next check closes the fix sooner: once every rendered page of the template has more than 45% of its rendered words in the HTML response.',
+      'Prints its count of the words in the HTML response and exits 0 at 250 or more: 80% of the 312 the audit counted once rendered (it counted 41 without JavaScript). An error status does not pass. The command counts all text outside `script`, `style`, `noscript`, `template`, `svg`, `title`, `nav`, `footer`, `aside` elements: its count differs a little from the audit’s, and a page with that much text outside its main content passes unfixed. The audit’s next check closes the fix sooner: once every rendered page of the template has more than 45% of its rendered words in the HTML response.',
     );
     expect(Math.round(EMPTY_SHELL_LEAVES_ABOVE * 100)).toBe(45);
     // the largest counts a page can have leave the line under the packet's bound
@@ -368,6 +410,48 @@ describe('the client-rendered template verify command', () => {
     ).toBe(true);
   });
 
+  it('the readable command prints a rough count: not below the audit’s today, higher by the gained words once fixed', async () => {
+    site = await twoStateSite({ broken: html(SHELL), fixed: html(SERVER_RENDERED) });
+    const record = measured(site.base);
+    const page = record.evidence.pages[0]!;
+    const { verify } = compose(builder, record, factsOf());
+    expect(verify.see!.command).toMatch(
+      new RegExp(
+        `^curl -sS --compressed -A '[^']*OAI-SearchBot[^']*' '${page.url}' \\| sed 's/<\\[\\^>\\]\\*>/ /g' \\| wc -w$`,
+      ),
+    );
+    const { broken, fixed } = await inBothStates(site, verify.see!.command);
+    const before = Number(broken.stdout);
+    const after = Number(fixed.stdout);
+    // today: the audit's own count is named, and the rough count is not below it
+    expect(verify.see!.today).toBe(
+      `The audit counted ${page.raw_words} words in this page’s HTML response. This rough count also takes the text of scripts, styles and menus, which the audit and the exact check leave out, so it is usually higher.`,
+    );
+    expect(before).toBeGreaterThanOrEqual(page.raw_words);
+    // after: higher by about the words the page gains
+    expect(verify.see!.after).toBe(
+      `A number higher by about the words the page gains: the audit counted ${page.rendered_words} once rendered in a browser, ${page.rendered_words - page.raw_words} more.`,
+    );
+    expect(Math.abs(after - before - (page.rendered_words - page.raw_words))).toBeLessThanOrEqual(
+      5,
+    );
+  });
+
+  it('the readable command says one word in the singular, and requests as the exact check does', () => {
+    const one = compose(builder, detected('https://a.test', [[1, 2]]), factsOf([])).verify;
+    expect(one.see!.today).toMatch(/^The audit counted 1 word in this page’s HTML response\./);
+    expect(one.see!.after).toMatch(/counted 2 once rendered in a browser, 1 more\.$/);
+    expect(one.see!.command).toBe(
+      "curl -sS --compressed 'https://a.test/guides/g-0' | sed 's/<[^>]*>/ /g' | wc -w",
+    );
+    const url = 'https://a.test/guides/g-0';
+    const pages = new Map([
+      [url, { url, final_url: 'https://a.test/en/g-0', status_code: 200 } as PageResult],
+    ]);
+    const moved = compose(builder, detected('https://a.test', [[1, 2]]), factsOf(SERVED, pages));
+    expect(moved.verify.see!.command).toContain(" 'https://a.test/en/g-0' | sed ");
+  });
+
   it('counts within a few words of the audit’s own count on both sides', async () => {
     site = await twoStateSite({ broken: html(SHELL), fixed: html(SERVER_RENDERED) });
     const record = measured(site.base);
@@ -416,6 +500,117 @@ describe('the client-rendered template verify command', () => {
     // without the row's served address the command counts the redirect's own body, in both states
     const slashless = compose(builder, record, factsOf()).verify.command;
     expect((await runCommand(slashless)).status).not.toBe(0);
+  });
+
+  it('on a site whose page answers 301 to another address: requests the address that answered 200', async () => {
+    const at =
+      (body: string) =>
+      (
+        req: { url?: string },
+        res: { statusCode: number; setHeader(n: string, v: string): void; end(b: string): void },
+      ) => {
+        if (req.url === '/en/guides/winter') return html(body)(req, res);
+        res.statusCode = 301;
+        res.setHeader('location', '/en/guides/winter');
+        res.end('<html><body>Moved</body></html>');
+      };
+    site = await twoStateSite({ broken: at(SHELL), fixed: at(SERVER_RENDERED) });
+    const record = measured(site.base);
+    const url = record.evidence.pages[0]!.url;
+    const landed = `${site.base}/en/guides/winter`;
+    const pages = new Map([[url, { url, final_url: landed, status_code: 200 } as PageResult]]);
+    const p = compose(builder, record, factsOf(SERVED, pages));
+    expect(p.verify.command).toContain(`'${landed}'`);
+    // the page keeps its own address where the packet names it
+    expect(p.context[1]).toMatch(new RegExp(`^\`${url}\`: `));
+    const { broken, fixed } = await inBothStates(site, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    // requested at its own address the command counts the redirect's body, fixed or not
+    const own = compose(builder, record, factsOf()).verify.command;
+    expect((await runCommand(own)).status).not.toBe(0);
+  });
+
+  it('reads a page from a server that gzips whatever the request accepts', async () => {
+    const gzipped =
+      (body: string) =>
+      (_req: unknown, res: { setHeader(n: string, v: string): void; end(b: Buffer): void }) => {
+        res.setHeader('content-encoding', 'gzip');
+        res.end(gzipSync(body));
+      };
+    site = await twoStateSite({ broken: gzipped(SHELL), fixed: gzipped(SERVER_RENDERED) });
+    const record = measured(site.base);
+    const { broken, fixed } = await inBothStates(
+      site,
+      compose(builder, record, factsOf()).verify.command,
+    );
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    expect(Number(fixed.stdout)).toBeGreaterThanOrEqual(wordsNeeded(record.evidence.pages[0]!));
+  });
+
+  it('does not pass on an error page that holds the text', async () => {
+    site = await twoStateSite({
+      broken: html(SHELL),
+      fixed: (_req, res) => {
+        res.statusCode = 404;
+        res.end(SERVER_RENDERED);
+      },
+    });
+    const { verify } = compose(builder, measured(site.base), factsOf());
+    site.use('fixed');
+    const ran = await runCommand(verify.command);
+    expect(ran.status).not.toBe(0);
+    expect(ran.stderr).toMatch(/404/);
+    expect(verify.expect).toContain('An error status does not pass.');
+  });
+
+  it('passes on a server-rendered page with a script closed by `</script >`', async () => {
+    const spaced = (page: string) => {
+      const out = page.replace('</script>', '</script >').replace('</script>', '</SCRIPT\t>');
+      expect(out).not.toBe(page);
+      return out;
+    };
+    site = await twoStateSite({
+      broken: html(spaced(SHELL)),
+      fixed: html(spaced(SERVER_RENDERED)),
+    });
+    const record = measured(site.base);
+    const { broken, fixed } = await inBothStates(
+      site,
+      compose(builder, record, factsOf()).verify.command,
+    );
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    // the same counts as with the tags closed plainly
+    site.use('broken');
+    expect(
+      Math.abs(Number(broken.stdout) - record.evidence.pages[0]!.raw_words),
+    ).toBeLessThanOrEqual(5);
+  });
+
+  it('does not count commented-out markup, on one line or across tags', async () => {
+    const need = wordsNeeded(measured('https://a.test').evidence.pages[0]!);
+    const commented = guidePage({
+      body: `<!-- ${words(need, 'old')} --><!--<p>${words(need, 'gone')}</p><script>x</script>-->`,
+    });
+    site = await twoStateSite({
+      broken: html(commented),
+      fixed: html(SERVER_RENDERED.replace('<main>', '<main><!-- a <b>note</b> --><!---->')),
+    });
+    const record = measured(site.base);
+    const { broken, fixed } = await inBothStates(
+      site,
+      compose(builder, record, factsOf()).verify.command,
+    );
+    expect(broken.status).not.toBe(0);
+    expect(
+      Math.abs(Number(broken.stdout) - record.evidence.pages[0]!.raw_words),
+    ).toBeLessThanOrEqual(5);
+    expect(fixed.status).toBe(0);
+    expect(
+      Math.abs(Number(fixed.stdout) - record.evidence.pages[0]!.rendered_words),
+    ).toBeLessThanOrEqual(5);
   });
 
   it('passes on a server-rendered page whose head is not closed', async () => {
@@ -540,7 +735,12 @@ describe('the client-rendered template packet over hostile records (properties)'
         const ours = (t: string) =>
           outsideCodeSpans(t).replace(/ \((line )?cut from \d+ characters\)/g, '');
         expect(allText(p).map(ours)).toEqual(allText(q).map(ours));
-        for (const t of [...allText(p), p.verify.command]) expect(UNSHOWN.test(t)).toBe(false);
+        for (const t of [...allText(p), p.verify.command, p.verify.see!.command]) {
+          expect(UNSHOWN.test(t)).toBe(false);
+        }
+        // the readable command is the same words whatever the site put in its record
+        const words = (command: string) => command.replace(/ 'https?:[^']*' \|/, ' URL |');
+        expect(words(p.verify.see!.command)).toBe(words(q.verify.see!.command));
       }),
     );
   });

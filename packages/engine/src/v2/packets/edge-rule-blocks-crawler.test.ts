@@ -1,6 +1,11 @@
 import fc from 'fast-check';
 import { afterEach, describe, expect, it } from 'vitest';
-import { FixPacketSchema, type AccessTest, type PageResult } from '@crawlmouse/types/v2';
+import {
+  AccessCauseSchema,
+  FixPacketSchema,
+  type AccessTest,
+  type PageResult,
+} from '@crawlmouse/types/v2';
 import { MITIGATION_HEADERS } from '../../../../worker/src/verdict/response.js';
 import { accessRow } from '../../../fixtures/v2/build/rows.js';
 import type { AccessDetection } from '../access/types.js';
@@ -14,6 +19,7 @@ import {
 } from './by-type/edge-rule-blocks-crawler.js';
 import { compose } from './compose.js';
 import { userAgentOf } from './crawler.js';
+import { identifiersIn, pluralsAtOne } from './test-support/content.js';
 import { NO_STACK } from './test-support/facts.js';
 import { hostileText, outsideCodeSpans, UNSHOWN } from './test-support/hostile.js';
 import type { RequestListener } from 'node:http';
@@ -104,7 +110,13 @@ const CLOUDFLARE: PacketFacts['stack'] = {
 
 const SITE_PAGES = Array.from({ length: 8 }, (_, i) => `https://a.test/p/${i}`);
 const allText = (p: ReturnType<typeof compose>) =>
-  [p, ...p.packets].flatMap((b) => [...b.context, ...b.change, ...b.keep, b.verify.expect]);
+  [p, ...p.packets].flatMap((b) => [
+    ...b.context,
+    ...b.change,
+    ...b.keep,
+    b.verify.expect,
+    ...(b.verify.see ? [b.verify.see.today, b.verify.see.after] : []),
+  ]);
 
 describe('the edge-rule packet, from its record', () => {
   it('states the crawler, the pages refused of the pages judged, and what the rows show', () => {
@@ -136,6 +148,34 @@ describe('the edge-rule packet, from its record', () => {
     expect(context.join('\n')).not.toMatch(/Crawlmouse tag|no product/);
   });
 
+  it.each(AccessCauseSchema.options)('says the cause %s in words', (cause) => {
+    const { record, rows } = detected({
+      crawler: 'PerplexityBot',
+      pages: SITE_PAGES.slice(0, 2),
+      cause,
+      signatures: ['cf-ray', 'server: cloudflare'],
+    });
+    for (const stack of [NO_STACK, CLOUDFLARE]) {
+      const p = compose(builder, record, factsOf(rows, stack));
+      const named = p.context.find((l) => l.startsWith('Cause the responses name: '))!;
+      expect(named).not.toContain('`');
+      for (const text of allText(p)) expect(identifiersIn(text), text).toEqual([]);
+    }
+  });
+
+  it('says each cause once', () => {
+    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES.slice(0, 3) });
+    const causes = ['rate_limit_429', 'cloudflare_1020', 'rate_limit_429'] as const;
+    const { context } = compose(
+      builder,
+      { ...record, evidence: { ...record.evidence, causes: [...causes] } },
+      factsOf(rows),
+    );
+    expect(context).toContain(
+      'Causes the responses name: Cloudflare’s error 1020, a rate limit (status 429).',
+    );
+  });
+
   it('names no URL its record does not hold', () => {
     // few enough pages that the list shows them all, so nothing hides in "more pages not shown"
     const { record, rows } = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES.slice(0, 3) });
@@ -146,9 +186,11 @@ describe('the edge-rule packet, from its record', () => {
     );
     const p = compose(builder, record, factsOf([others[0]!, ...rows, others[1]!], CLOUDFLARE));
     // the user-agent word is the registry's, and holds the operator's own URL
-    const command = p.verify.command.replace(/-A '[^']*'/, '');
-    const urls = [...allText(p), command].flatMap((t) => t.match(/https?:\/\/[^\s`']+/g) ?? []);
-    expect(urls.length).toBe(record.affected_urls.length + 1);
+    const commands = [p.verify.command, p.verify.see!.command].map((c) =>
+      c.replace(/-A '[^']*'/, ''),
+    );
+    const urls = [...allText(p), ...commands].flatMap((t) => t.match(/https?:\/\/[^\s`']+/g) ?? []);
+    expect(urls.length).toBe(record.affected_urls.length + 2);
     for (const u of urls) expect(record.affected_urls, u).toContain(u.replace(/\/$/, ''));
   });
 
@@ -194,6 +236,69 @@ describe('the edge-rule packet, from its record', () => {
     expect(compose(builder, { ...two.record, extent: null }, factsOf(two.rows)).context[0]).toBe(
       '`PerplexityBot` was refused on 2 sampled pages by a rule that matches its user agent.',
     );
+  });
+
+  it('says 1 of anything in the singular: each count at 1 and at 2 (property)', () => {
+    const oneOrTwo = fc.constantFrom(1, 2);
+    fc.assert(
+      fc.property(
+        fc.constantFrom(1, 2, PAGES_SHOWN + 1, PAGES_SHOWN + 2),
+        fc.constantFrom(0, 1, 2),
+        fc.constantFrom(0, 1, 2, 5, 6),
+        oneOrTwo,
+        oneOrTwo,
+        fc.constantFrom(NO_STACK, CLOUDFLARE),
+        fc.boolean(),
+        (refused, served, headers, statuses, witnessed, stack, noExtent) => {
+          const { record, rows } = detected({
+            crawler: 'PerplexityBot',
+            pages: SITE_PAGES.slice(0, refused),
+            judged: refused + served,
+            signatures: Array.from({ length: headers }, (_, i) => `x-h${i}: v`),
+          });
+          const shaped = rows.map((t, i) => ({
+            ...t,
+            raw_status: i < statuses ? 403 + i : 403,
+            witness: i < witnessed ? t.witness : null,
+          }));
+          const p = compose(
+            builder,
+            noExtent ? { ...record, extent: null } : record,
+            factsOf(shaped, stack),
+          );
+          for (const text of allText(p)) expect(pluralsAtOne(text), text).toEqual([]);
+        },
+      ),
+    );
+  });
+
+  it('names one status, one cause and one header in the singular', () => {
+    const { record, rows } = detected({
+      crawler: 'PerplexityBot',
+      pages: SITE_PAGES.slice(0, 1),
+      cause: 'cloudflare_1020',
+      signatures: ['cf-ray'],
+    });
+    const one = compose(builder, record, factsOf(rows)).context;
+    expect(one).toContain('Status of the refused request: 403.');
+    expect(one).toContain('Cause the response names: Cloudflare’s error 1020.');
+    expect(one).toContain('Response header: `cf-ray`.');
+    const two = detected({
+      crawler: 'PerplexityBot',
+      pages: SITE_PAGES.slice(0, 2),
+      signatures: ['cf-ray', 'server: cloudflare'],
+    });
+    const causes = ['cloudflare_1020', 'rate_limit_429'] as const;
+    const both = compose(
+      builder,
+      { ...two.record, evidence: { ...two.record.evidence, causes: [...causes] } },
+      factsOf(two.rows),
+    ).context;
+    expect(both).toContain('Status of the refused requests: 403 (2 requests).');
+    expect(both).toContain(
+      'Causes the responses name: Cloudflare’s error 1020, a rate limit (status 429).',
+    );
+    expect(both).toContain('Response headers: `cf-ray`, `server: cloudflare`.');
   });
 
   it('gives the same packet whatever order the record lists its pages, causes and headers in', () => {
@@ -364,6 +469,83 @@ describe('the edge-rule verify command', () => {
     expect((await runCommand(slashless)).status).not.toBe(0);
   });
 
+  it('on a site whose page answers 301 to another address: requests the address that answered 200', async () => {
+    const ua = userAgentOf(entryOf('PerplexityBot'));
+    const serve =
+      (refuse: boolean): RequestListener =>
+      (req, res) => {
+        if (req.url === '/') {
+          res.statusCode = 301;
+          res.setHeader('location', '/en/');
+        } else if (refuse && String(req.headers['user-agent']).includes(ua)) {
+          res.statusCode = 403;
+        }
+        res.end('<html><body>page</body></html>');
+      };
+    site = await twoStateSite({ broken: serve(true), fixed: serve(false) });
+    const page = site.base;
+    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: [page] });
+    const pages = new Map([
+      [page, { url: page, final_url: `${page}/en/`, status_code: 200 } as PageResult],
+    ]);
+    const p = compose(builder, record, factsOf(rows, NO_STACK, pages));
+    expect(p.verify.command).toContain(`'${page}/en/'`);
+    // the page keeps its own address where the packet names it
+    expect(p.context).toContain(`Page refused: \`${page}\`.`);
+    const { broken, fixed } = await inBothStates(site, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    // requested at its own address the command reads the redirect, fixed or not
+    const own = compose(builder, record, factsOf(rows)).verify.command;
+    site.use('fixed');
+    expect((await runCommand(own)).status).not.toBe(0);
+  });
+
+  it('the readable command prints the status: the audit’s today, 200 once served', async () => {
+    site = await siteRefusing('PerplexityBot');
+    const { record, rows } = detected({
+      crawler: 'PerplexityBot',
+      pages: [`${site.base}/products/b`, `${site.base}/products/a`],
+    });
+    const { verify } = compose(builder, record, factsOf(rows));
+    const ua = userAgentOf(entryOf('PerplexityBot'));
+    expect(verify.see!.command).toBe(
+      `curl -sS -o /dev/null -w '%{http_code}\\n' -A '${ua}' '${site.base}/products/a'`,
+    );
+    const { broken, fixed } = await inBothStates(site, verify.see!.command);
+    expect(broken.stdout).toBe('403\n');
+    expect(fixed.stdout).toBe('200\n');
+    expect(verify.see!.today).toBe(
+      '`403`: the status the audit’s request for this page as `PerplexityBot` was answered with.',
+    );
+    expect(verify.see!.after).toBe(
+      '`200`. The exact check below also requires that no challenge header comes with it.',
+    );
+    expect(site.userAgents()).toEqual(Array(2).fill(ua));
+  });
+
+  it('the readable command’s `today` says so when the rows hold no status for the page', () => {
+    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: ['https://a.test/p'] });
+    const none = compose(builder, record, factsOf([{ ...rows[0]!, raw_status: null }])).verify;
+    expect(none.see!.today).toBe(
+      'The audit recorded no status for its request for this page as `PerplexityBot`.',
+    );
+    // the readable command requests the address the exact check requests
+    const pages = new Map([
+      [
+        'https://a.test/p',
+        {
+          url: 'https://a.test/p',
+          final_url: 'https://a.test/en/',
+          status_code: 200,
+        } as PageResult,
+      ],
+    ]);
+    const moved = compose(builder, record, factsOf(rows, NO_STACK, pages)).verify;
+    expect(moved.command).toContain(" 'https://a.test/en/' | ");
+    expect(moved.see!.command).toMatch(/ 'https:\/\/a\.test\/en\/'$/);
+  });
+
   it('passes behind 103 Early Hints once fixed: the last status line decides', async () => {
     const ua = userAgentOf(CRAWLER_REGISTRY_V2.find((e) => e.token === 'PerplexityBot')!);
     const serve =
@@ -492,7 +674,12 @@ describe('the edge-rule packet over hostile records (properties)', () => {
           // a line compose cut ends where the cut fell; compose.test.ts holds its code span closed
           if (!cut.test(t)) expect(ours(t)).toBe(ours(allText(q)[i]!));
         });
-        for (const t of [...allText(p), p.verify.command]) expect(UNSHOWN.test(t)).toBe(false);
+        for (const t of [...allText(p), p.verify.command, p.verify.see!.command]) {
+          expect(UNSHOWN.test(t)).toBe(false);
+        }
+        // the readable command is the same words whatever the site put in its record
+        const words = (command: string) => command.replace(/ 'https?:[^']*'$/, ' URL');
+        expect(words(p.verify.see!.command)).toBe(words(q.verify.see!.command));
       }),
     );
   });

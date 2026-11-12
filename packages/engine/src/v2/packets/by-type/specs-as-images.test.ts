@@ -115,4 +115,12 @@ describe('specs_as_images: the command and the engine’s check', () => {
 });
 
 contentPacketProperties(TYPE);
-contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED });
+contentCommandOnSites(
+  TYPE,
+  { broken: BROKEN, fixed: FIXED },
+  {
+    printed: /<td>/,
+    today: /found no table and no description list/,
+    after: /One line per cell/,
+  },
+);

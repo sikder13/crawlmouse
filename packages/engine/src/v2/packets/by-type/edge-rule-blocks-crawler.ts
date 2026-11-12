@@ -10,16 +10,19 @@
  * Cloudflare's page for error 1020 says which rules answer with it, so a record whose rows name that
  * cause gets the steps that page supports and no other.
  *
- * Verify: the first affected page, requested at the address it is served at (served-at.ts) with the
- * crawler's user agent, must answer 200 without a header of MITIGATION, the response headers the
- * crawl worker reads a challenge from. A redirect is not followed, so a rule that redirects the
- * crawler to a challenge does not pass. The body is not read: `expect` says so.
+ * Verify: the first affected page, requested at the address the crawl read it at (served-at.ts
+ * `readAt`) with the crawler's user agent, must answer 200 without a header of MITIGATION, the
+ * response headers the crawl worker reads a challenge from. A redirect is not followed, so a rule
+ * that redirects the crawler to a challenge does not pass. The body is not read: `expect` says so.
+ *
+ * The readable command above it makes the same request and prints the status alone: what the audit's
+ * row for the page holds today, and 200 once the crawler is served.
  */
 import type { AccessCause, AccessTest } from '@crawlmouse/types/v2';
 import type { AccessDetection } from '../../access/types.js';
 import { CRAWLER_REGISTRY_V2 } from '../../crawler-registry.js';
 import { userAgentOf, verifyCrawler } from '../crawler.js';
-import { servedAt } from '../served-at.js';
+import { readAt, servedAt } from '../served-at.js';
 import { sh, url, word } from '../shell.js';
 import { code, count, line, list, ours, type Line } from '../text.js';
 import type { DocSource, PacketEntry, PacketFacts } from '../types.js';
@@ -78,9 +81,17 @@ export const EDGE_VENDOR_SOURCES: readonly DocSource[] = [
   },
 ];
 
-/** A cause the rows name, in words; a cause with no entry is shown as recorded. */
-const CAUSE_TEXT: Readonly<Partial<Record<AccessCause, string>>> = {
+/** Each cause a row can name, in words: a cause the contract adds does not compile without its own. */
+const CAUSE_TEXT: Readonly<Record<AccessCause, string>> = {
   cloudflare_1020: 'Cloudflare’s error 1020',
+  bot_fight_mode: 'a Bot Fight Mode challenge',
+  client_rendered_template: 'a template whose text is added in the browser',
+  robots_txt_disallow: 'a Disallow rule in robots.txt',
+  automation_challenge: 'a challenge the edge serves to automated requests of any user agent',
+  rate_limit_429: 'a rate limit (status 429)',
+  pay_per_crawl_402: 'a request for payment to crawl (status 402)',
+  cross_host_redirect: 'a redirect to another host',
+  verified_bot_only: 'a rule that admits the crawler only from its verified addresses',
 };
 
 /**
@@ -136,20 +147,26 @@ function context(record: AccessDetection, facts: PacketFacts): Line[] {
     const shown = [...statuses]
       .sort(([a], [b]) => byOrder(a, b))
       .map(([status, n]) => ours(`${status} (${plural(n, 'request')})`));
-    lines.push(line`Status of the refused requests: ${list(shown, shown.length, 'status')}.`);
+    const [only] = [...statuses.keys()];
+    lines.push(
+      rows.length === 1 && only !== undefined
+        ? line`Status of the refused request: ${count(only)}.`
+        : line`Status of the refused requests: ${list(shown, shown.length, 'status')}.`,
+    );
   }
 
-  const causes = [...new Set(record.evidence.causes)]
-    .sort(byOrder)
-    .map((c) => (Object.hasOwn(CAUSE_TEXT, c) ? ours(CAUSE_TEXT[c]!) : code(c)));
+  const responses = ours(rows.length === 1 ? 'response names' : 'responses name');
+  const causes = [...new Set(record.evidence.causes)].sort(byOrder).map((c) => ours(CAUSE_TEXT[c]));
   lines.push(
     causes.length > 0
-      ? line`Cause the responses name: ${list(causes, causes.length, 'cause')}.`
-      : line`The responses name no product: the audit did not identify what holds the rule.`,
+      ? line`${ours(causes.length === 1 ? 'Cause' : 'Causes')} the ${responses}: ${list(causes, causes.length, 'cause')}.`
+      : line`The ${responses} no product: the audit did not identify what holds the rule.`,
   );
   if (record.evidence.signatures.length > 0) {
     const shown = [...record.evidence.signatures].sort(byOrder).map((s) => code(s, 80));
-    lines.push(line`Response headers: ${list(shown, SIGNATURES_SHOWN, 'header')}.`);
+    lines.push(
+      line`Response ${ours(shown.length === 1 ? 'header' : 'headers')}: ${list(shown, SIGNATURES_SHOWN, 'header')}.`,
+    );
   }
 
   const witnessed = rows.flatMap((t) => (t.witness === null ? [] : [t.witness.ua]));
@@ -253,8 +270,19 @@ export const edgeRuleBlocksCrawler: PacketEntry<'edge_rule_blocks_crawler'> = {
     const pass = ours(
       `Exits 0 when the page answers status 200 to this user agent with no challenge header (${headers.text}), and prints nothing. A redirect is not followed and does not pass. The command reads the status and those headers, not the body: a block page served with status 200 and none of those headers passes.`,
     );
+    const agent = word(userAgentOf(entry));
+    const address = url(readAt(facts, page));
+    const crawler = code(record.crawler);
     return {
-      command: sh`curl -sS -o /dev/null -D - -A ${word(userAgentOf(entry))} ${url(servedAt(facts, page))} | awk ${word(SERVED_UNCHALLENGED)}`,
+      command: sh`curl -sS -o /dev/null -D - -A ${agent} ${address} | awk ${word(SERVED_UNCHALLENGED)}`,
+      see: {
+        command: sh`curl -sS -o /dev/null -w ${word('%{http_code}\\n')} -A ${agent} ${address}`,
+        today:
+          today === null
+            ? line`The audit recorded no status for its request for this page as ${crawler}.`
+            : line`${ours(`\`${today}\``)}: the status the audit’s request for this page as ${crawler} was answered with.`,
+        after: line`${ours('`200`')}. The exact check below also requires that no challenge header comes with it.`,
+      },
       expect:
         today === null
           ? line`${pass}`

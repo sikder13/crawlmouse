@@ -14,10 +14,12 @@ import {
   AWK_VISIBLE,
   CHROME_GAP,
   contentContext,
+  firstFailing,
   firstFailingPage,
   KEEP_PAGE,
   mark,
   RECHECK,
+  seeMarkup,
   SET_ASIDE,
   tagProbe,
   template,
@@ -40,7 +42,7 @@ const MARKS_PATTERN = QUESTION_MARKS.map((m) => (m === '?' ? '\\?' : m)).join('|
  */
 const PROGRAM =
   `${AWK_VISIBLE}!c&&l~/^h1[ \\t>]/{s=1}` +
-  `l~/^\\/h[23]>/{if(h&&t~/(${MARKS_PATTERN})([ \\t]|$)/)f=1;h=0}` +
+  `l~/^\\/h[23][ \\t>]/{if(h&&t~/(${MARKS_PATTERN})([ \\t]|$)/)f=1;h=0}` +
   `h{${AWK_TEXT};t=t x}` +
   `l~/^h[23][ \\t>]/{h=s&&!c;${AWK_TEXT};t=x}` +
   `END{exit !f}`;
@@ -78,10 +80,16 @@ export const noQuestionHeadings: PacketEntry<'no_question_headings'> = {
   }),
   stacks: {},
   verify: (fix, facts) => {
-    const probe = tagProbe(facts, firstFailingPage(fix), PROGRAM);
+    const page = firstFailingPage(fix);
+    const probe = tagProbe(facts, page, PROGRAM);
     return {
       command: probe.command,
       ua: probe.ua,
+      see: {
+        command: seeMarkup(facts, page, '<h[23][^>]*>(<[^>]*>)*[^<]*'),
+        today: line`The page’s ${mark('<h2>')} and ${mark('<h3>')} headings, one per line, each with its text up to the next tag. The audit keeps no headings; its check found none after the H1 with a clause that ends in a question mark. ${firstFailing(fix)}`,
+        after: line`The same headings, one of them after the H1 with a clause that ends in a question mark.`,
+      },
       expect: line`Exit status 0 when an ${mark('<h2>')} or ${mark('<h3>')} after the first ${mark('<h1>')} of the first failing page holds a question mark at the end of a clause; the audit's check failed that page. ${probe.sender} ${CHROME_GAP} ${RECHECK}`,
     };
   },

@@ -5,6 +5,7 @@
  */
 import { existsSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { gzipSync } from 'node:zlib';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
@@ -18,8 +19,10 @@ import { CONTENT_CHECKS, type PageVerdict } from '../../content/checks.js';
 import { readPage } from '../../content/read.js';
 import { CRAWLER_REGISTRY_V2 } from '../../crawler-registry.js';
 import { PACKET_BOUNDS } from '../compose.js';
+import { EXAMPLE_PAGES } from '../content-rule.js';
 import { userAgentOf } from '../crawler.js';
 import { writePacket } from '../registry.js';
+import { url } from '../shell.js';
 import { clean } from '../text.js';
 import type { FixPacket, PacketFacts, PacketFramework } from '../types.js';
 import { NO_STACK } from './facts.js';
@@ -62,6 +65,22 @@ export function contentRecord(
   };
 }
 
+/** The nouns the packets count. */
+const COUNTED =
+  'pages|words|requests|crawlers|headers|statuses|causes|identities|characters|lines|elements|links|redirects|hops|rewrites';
+
+/**
+ * Each place `text` says 1 of something in the plural, outside its code spans: "1 pages", and with a
+ * word or two between, "1 sampled pages". "1 of those pages" is one of several, and stays.
+ */
+export function pluralsAtOne(text: string): string[] {
+  const ours = outsideCodeSpans(text).replace(/\b1 of those pages\b/g, '');
+  return [
+    ...(ours.match(/\b1 [a-z]+s\b/g) ?? []),
+    ...(ours.match(new RegExp(`\\b1 (?:[a-z]+ ){1,2}(?:${COUNTED})\\b`, 'g')) ?? []),
+  ];
+}
+
 /** The first testable crawler of the registry: the one a command requests as when every crawler is served. */
 export const FIRST_TESTABLE = CRAWLER_REGISTRY_V2.find((e) => e.testable)!;
 export const FIRST_TESTABLE_UA = userAgentOf(FIRST_TESTABLE);
@@ -97,18 +116,46 @@ export function contentFacts(
 }
 
 /** The check's row for a page the crawl requested at `url` and was answered at `final_url`. */
-export const servedRow = (url: string, final_url: string): [string, PageResult] => [
-  url,
-  { url, final_url } as PageResult,
-];
+export const servedRow = (
+  url: string,
+  final_url: string,
+  status_code?: number,
+): [string, PageResult] => [url, { url, final_url, status_code } as PageResult];
 
 /** The engine's verdict on one page for the check behind `type`: readPage, then the check's judge. */
 export const engineVerdict = (type: ContentFixType, html: string): PageVerdict =>
   CONTENT_CHECKS[checkOf(type)].judge(readPage(html));
 
-/** Every string of a packet a reader is shown, over its own body and its other stacks' bodies. */
+/**
+ * Every string of a packet a reader is shown, over its own body and its other stacks' bodies: the
+ * sections, `expect`, and what the readable command prints today and after the fix.
+ */
 export const shownText = (p: FixPacket): string[] =>
-  [p, ...p.packets].flatMap((b) => [...b.context, ...b.change, ...b.keep, b.verify.expect]);
+  [p, ...p.packets].flatMap((b) => [
+    ...b.context,
+    ...b.change,
+    ...b.keep,
+    b.verify.expect,
+    ...(b.verify.see ? [b.verify.see.today, b.verify.see.after] : []),
+  ]);
+
+/** Names a platform gave its own markup or API, which a packet prints as the platform spells them. */
+const PLATFORM_NAMES = [
+  'the_author_posts_link',
+  'article:published_time',
+  'get_the_time',
+  'the_time',
+  'the_date',
+];
+
+/**
+ * The snake_case words of `text`, the shape of this repository's enum values and keys, less the
+ * platform's own names. A packet shows none: each is said in words.
+ */
+export function identifiersIn(text: string): string[] {
+  const ours = PLATFORM_NAMES.reduce((t, name) => t.replaceAll(name, ''), text);
+  return ours.match(/[a-z]+_[a-z_]+/g) ?? [];
+}
 
 const open: TwoStateSite[] = [];
 
@@ -163,6 +210,13 @@ export async function statusesOn(
   return out;
 }
 
+/** What a builder's readable command prints once the fix has landed and not before, and what its packet says of it. */
+export interface SeeEvidence {
+  printed: RegExp;
+  today: RegExp;
+  after: RegExp;
+}
+
 /**
  * What each content builder's command is held to on a live site, beyond its own two states: a site
  * that redirects the engine's spelling of a page to the slashed one, and a record whose crawled
@@ -171,7 +225,65 @@ export async function statusesOn(
 export function contentCommandOnSites(
   type: ContentFixType,
   pages: Record<SiteState, string>,
+  see: SeeEvidence,
 ): void {
+  describe(`${type}: the readable command`, () => {
+    const serve = (html: string) => (_req: IncomingMessage, res: ServerResponse) =>
+      void res.end(html);
+
+    it('prints the evidence: without it before the fix, as `today` says, and with it after, as `after` says', async () => {
+      const site = await twoStateSite({ broken: serve(pages.broken), fixed: serve(pages.fixed) });
+      open.push(site);
+      const record = contentRecord(type, {
+        affected_urls: [`${site.base}/blog/a`, `${site.base}/blog/b`],
+        extent: { failing: 2, of: 13, unread: 0 },
+      });
+      const { verify } = writePacket(type, record, contentFacts())!;
+      const run = await inBothStates(site, verify.see!.command);
+      expect(run.fixed.stdout).not.toBe(run.broken.stdout);
+      expect(run.broken.stdout).not.toMatch(see.printed);
+      expect(run.fixed.stdout).toMatch(see.printed);
+      expect(run.broken.stderr + run.fixed.stderr).toBe('');
+      expect(verify.see!.today).toMatch(see.today);
+      expect(verify.see!.today).toMatch(
+        /It is the first of the template’s failing pages \(2 of 13 decided\)\.$/,
+      );
+      expect(verify.see!.after).toMatch(see.after);
+      // the same request as the exact check: the same crawler, the same address
+      expect(site.userAgents()).toEqual(Array(2).fill(FIRST_TESTABLE_UA));
+      expect(verify.see!.command).toContain(
+        ` -A '${FIRST_TESTABLE_UA.replaceAll("'", `'\\''`)}' '${site.base}/blog/a' | `,
+      );
+    });
+
+    it('is short, and is not the check: it carries no awk program', () => {
+      for (const served of ['every_crawler', 'no_crawler'] as const) {
+        const { verify } = writePacket(type, contentRecord(type), contentFacts(served))!;
+        const command = verify.see!.command;
+        expect(command).toMatch(/^curl -sS --compressed /);
+        expect(command).not.toMatch(/awk|ARGV/);
+        const besides = command
+          .replace("'https://shop.test/blog/a'", '')
+          .replace(`'${FIRST_TESTABLE_UA.replaceAll("'", `'\\''`)}'`, '');
+        expect(besides.length).toBeLessThan(200);
+        expect(verify.ua === null).toBe(served === 'no_crawler');
+        expect(command.includes(' -A ')).toBe(served === 'every_crawler');
+      }
+    });
+
+    it('requests the address the page was read at, as the exact check does', () => {
+      const page = 'https://shop.test/blog/a';
+      const facts = contentFacts(
+        'every_crawler',
+        null,
+        new Map([servedRow(page, 'https://shop.test/en/blog/a', 200)]),
+      );
+      const { verify } = writePacket(type, contentRecord(type, { affected_urls: [page] }), facts)!;
+      expect(verify.command).toContain(" 'https://shop.test/en/blog/a' | ");
+      expect(verify.see!.command).toContain(" 'https://shop.test/en/blog/a' | ");
+    });
+  });
+
   describe(`${type}: the command on a trailing-slash site`, () => {
     it('requests the address the page is served at, fails before the fix and passes after', async () => {
       const serve = (html: string) => (req: IncomingMessage, res: ServerResponse) => {
@@ -190,6 +302,66 @@ export function contentCommandOnSites(
       const run = await inBothStates(site, packet.verify.command);
       expect(run.broken.status).not.toBe(0);
       expect(run.fixed.status).toBe(0);
+    });
+  });
+
+  describe(`${type}: the command on a site whose page answers 301 to another address`, () => {
+    it('requests the address that answered 200, fails before the fix and passes after', async () => {
+      const serve = (html: string) => (req: IncomingMessage, res: ServerResponse) => {
+        if (req.url === '/en/blog/a') return void res.end(html);
+        res.statusCode = 301;
+        res.setHeader('location', '/en/blog/a');
+        res.end('<html><body>Moved</body></html>');
+      };
+      const site = await twoStateSite({ broken: serve(pages.broken), fixed: serve(pages.fixed) });
+      open.push(site);
+      const page = `${site.base}/blog/a`;
+      const landed = `${site.base}/en/blog/a`;
+      const facts = contentFacts('every_crawler', null, new Map([servedRow(page, landed, 200)]));
+      const packet = writePacket(type, contentRecord(type, { affected_urls: [page] }), facts)!;
+      expect(packet.verify.command).toContain(`'${landed}'`);
+      // the page keeps its own address where the packet names it
+      expect(packet.context).toContain(`Failing page: \`${page}\`.`);
+      const run = await inBothStates(site, packet.verify.command);
+      expect(run.broken.status).not.toBe(0);
+      expect(run.fixed.status).toBe(0);
+      // requested at its own address the command reads the redirect's body, fixed or not
+      const own = writePacket(
+        type,
+        contentRecord(type, { affected_urls: [page] }),
+        contentFacts(),
+      )!;
+      expect((await runCommand(own.verify.command)).status).not.toBe(0);
+    });
+  });
+
+  describe(`${type}: the command and how the page is answered`, () => {
+    const run = async (
+      serve: (html: string) => (req: IncomingMessage, res: ServerResponse) => void,
+    ) => {
+      const site = await twoStateSite({ broken: serve(pages.broken), fixed: serve(pages.fixed) });
+      open.push(site);
+      const record = contentRecord(type, { affected_urls: [`${site.base}/blog/a`] });
+      return inBothStates(site, writePacket(type, record, contentFacts())!.verify.command);
+    };
+
+    it('reads a page from a server that gzips whatever the request accepts', async () => {
+      const { broken, fixed } = await run((html) => (_req, res) => {
+        res.setHeader('content-encoding', 'gzip');
+        res.end(gzipSync(html));
+      });
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).toBe(0);
+    });
+
+    it('does not pass on an error page that carries the fixed markup', async () => {
+      const { broken, fixed } = await run((html) => (_req, res) => {
+        res.statusCode = 404;
+        res.end(html);
+      });
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).not.toBe(0);
+      expect(fixed.stderr).toMatch(/404/);
     });
   });
 
@@ -218,9 +390,13 @@ export function contentCommandOnSites(
       expect(run.broken.status).not.toBe(0);
       expect(run.fixed.status).toBe(0);
       expect(run.broken.stderr + run.fixed.stderr + run.broken.stdout + run.fixed.stdout).toBe('');
+      const readable = packet.verify.see!.command;
+      expect(UNSHOWN.test(readable)).toBe(false);
+      const seeing = await inBothStates(site, readable);
+      expect(seeing.broken.stderr + seeing.fixed.stderr).toBe('');
       // one request per run, each for the record's page as the URL parser spells it
       const { pathname, search } = new URL(page);
-      expect(seen.map((u) => decodeURI(u))).toEqual(Array(2).fill(decodeURI(pathname + search)));
+      expect(seen.map((u) => decodeURI(u))).toEqual(Array(4).fill(decodeURI(pathname + search)));
       expect(existsSync('pwned')).toBe(false);
     });
   });
@@ -268,6 +444,46 @@ export function contentPacketProperties(type: ContentFixType): void {
   const framework = fc.constantFrom(null, ...PacketFrameworkSchema.options);
   const served = fc.constantFrom('every_crawler' as const, 'no_crawler' as const);
 
+  describe(`${type}: no identifier of ours in the text`, () => {
+    it.each([null, ...PacketFrameworkSchema.options])(
+      'says the check and every value in words (stack: %s)',
+      (f) => {
+        for (const s of ['every_crawler', 'no_crawler'] as const) {
+          const p = writePacket(type, contentRecord(type), contentFacts(s, f))!;
+          for (const text of shownText(p)) expect(identifiersIn(text), text).toEqual([]);
+        }
+      },
+    );
+  });
+
+  describe(`${type}: each count at 1 and at 2`, () => {
+    it('says 1 of anything in the singular', () => {
+      const count = fc.constantFrom(1, 2);
+      fc.assert(
+        fc.property(
+          count,
+          fc.constantFrom(0, 1, 2),
+          fc.constantFrom(0, 1, 2),
+          fc.constantFrom(0, 1, 2),
+          framework,
+          served,
+          (failing, passing, unread, unnamed, f, s) => {
+            const affected_urls = Array.from(
+              { length: unnamed === 0 ? failing : EXAMPLE_PAGES + unnamed },
+              (_, i) => `https://shop.test/blog/${i}`,
+            );
+            const record = contentRecord(type, {
+              affected_urls,
+              extent: { failing: affected_urls.length, of: affected_urls.length + passing, unread },
+            });
+            const p = writePacket(type, record, contentFacts(s, f))!;
+            for (const text of shownText(p)) expect(pluralsAtOne(text), text).toEqual([]);
+          },
+        ),
+      );
+    });
+  });
+
   describe(`${type}: properties over hostile records`, () => {
     it('gives the same packet, byte for byte, for the same record and facts', () => {
       fc.assert(
@@ -299,9 +515,16 @@ export function contentPacketProperties(type: ContentFixType): void {
         fc.property(hostileRecord(type), framework, served, (r, f, s) => {
           const hostile = writePacket(type, r, contentFacts(s, f))!;
           const plain = writePacket(type, calm(r), contentFacts(s, f))!;
-          for (const text of [...shownText(hostile), hostile.verify.command]) {
+          for (const text of [
+            ...shownText(hostile),
+            hostile.verify.command,
+            hostile.verify.see!.command,
+          ]) {
             expect(UNSHOWN.test(text)).toBe(false);
           }
+          // the readable command is the same words whatever the site put in its record
+          const words = (command: string) => command.replace(/ 'https?:[^']*' /, ' URL ');
+          expect(words(hostile.verify.see!.command)).toBe(words(plain.verify.see!.command));
           // What stands outside the code spans is the same whatever the site put in its record.
           expect(shownText(hostile).map((t) => outsideCodeSpans(t).replace(CUT_NOTE, ''))).toEqual(
             shownText(plain).map((t) => outsideCodeSpans(t)),
@@ -328,6 +551,11 @@ export function contentPacketProperties(type: ContentFixType): void {
               ).toBe(true);
             }
             expect(outsideCodeSpans(text)).not.toMatch(/https?:\/\//);
+          }
+          // both commands request one address: the record's first failing page
+          const first = url(r.affected_urls[0]!).word;
+          for (const command of [p.verify.command, p.verify.see!.command]) {
+            expect(command.replace(/ -A '[^']*'/, '').match(/'https?:[^']*'/g)).toEqual([first]);
           }
         }),
       );
