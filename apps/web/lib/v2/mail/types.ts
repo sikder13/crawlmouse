@@ -1,6 +1,7 @@
 /**
  * The mailer's shared types (CC-28 D1, D2). Every v2 email is one of `MAIL_KINDS`; the list is the
- * `email_sends.kind` check of migration 20261113000001, and `types.test.ts` reads it from there.
+ * `email_sends.kind` check, set last by migration 20261114000001 (CC-29 adds `agency_plus_contact`),
+ * and send.test.ts's "the kinds" reads it from there.
  */
 
 export const MAIL_KINDS = [
@@ -12,6 +13,7 @@ export const MAIL_KINDS = [
   'account_delete',
   'alert',
   'weekly_summary',
+  'agency_plus_contact',
 ] as const;
 export type MailKind = (typeof MAIL_KINDS)[number];
 
@@ -25,6 +27,13 @@ export const ACCOUNT_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
   'email_change_notice',
   'account_delete',
 ]);
+
+/**
+ * Mail to our own inbox (CC-29: an Agency Plus request, to the sales inbox). Like account mail it
+ * carries no unsubscribe and a suppression does not stop it: `email_kind_suppressible` answers false
+ * for it, so a bounce recorded against that inbox cannot silence the requests sent to it.
+ */
+export const OWN_INBOX_KINDS: ReadonlySet<MailKind> = new Set<MailKind>(['agency_plus_contact']);
 
 /** The kinds that carry List-Unsubscribe (D7), and what the link turns off. */
 export const UNSUBSCRIBE_KIND = {

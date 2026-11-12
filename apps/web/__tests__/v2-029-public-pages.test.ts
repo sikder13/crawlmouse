@@ -12,6 +12,7 @@ import { postgrestOver } from './helpers/postgrest-pglite';
 import { personalAccount, signUp } from './helpers/v2-check-tables';
 import { agencyCheckouts } from '../app/api/agency-trial/_lib/checkouts';
 import { readUsedAgencyTrial } from '../lib/v2/pricing/used-trial';
+import { supabaseMailStore } from '../lib/v2/mail/store';
 
 /**
  * Migration 20261114000001 (CC-29): start_agency_trial_account, contact_requests and one public report
@@ -291,6 +292,93 @@ describe('contact_requests', () => {
   });
 });
 
+describe('contact_requests: the mail store reads, marks and deletes them (CC-29, rulings Q38)', () => {
+  const store = () => supabaseMailStore(postgrestOver(db));
+  const DAY = 86_400_000;
+  const NOW = new Date('2026-12-01T12:00:00.000Z');
+
+  const request = async (sentAt: Date | null, note: string | null = 'A note.') => {
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.contact_requests (email, sites, note, sent_at)
+       values ($1, 40, $2, $3) returning id`,
+      [`buyer-${randomUUID()}@agency.example`, note, sentAt?.toISOString() ?? null],
+    );
+    return rows[0]!.id;
+  };
+  const exists = async (id: string) =>
+    (await db.query('select 1 from public.contact_requests where id = $1', [id])).rows.length === 1;
+
+  it('reads a request by id, and null for none', async () => {
+    const id = await request(null, null);
+    expect(await store().contactRequest(id)).toMatchObject({
+      sites: 40,
+      note: null,
+      sentAt: null,
+    });
+    expect((await store().contactRequest(id))!.email).toMatch(/^buyer-.*@agency\.example$/);
+    expect(await store().contactRequest(randomUUID())).toBeNull();
+  });
+
+  it('marks a request sent once: a second mark leaves the first time', async () => {
+    const id = await request(null);
+    await store().markContactSent(id, NOW);
+    await store().markContactSent(id, new Date(NOW.getTime() + DAY));
+    expect((await store().contactRequest(id))!.sentAt).toBe(NOW.toISOString());
+  });
+
+  it('deletes the requests sent more than 30 days before now, and keeps the rest', async () => {
+    const old = await request(new Date(NOW.getTime() - 30 * DAY - 1000));
+    const edge = await request(new Date(NOW.getTime() - 30 * DAY));
+    const recent = await request(new Date(NOW.getTime() - 29 * DAY));
+    const unsentOld = await request(null);
+    await db.query(`update public.contact_requests set created_at = $2 where id = $1`, [
+      unsentOld,
+      new Date(NOW.getTime() - 400 * DAY).toISOString(),
+    ]);
+    const deleted = await store().purgeSentContacts(NOW);
+    expect(deleted).toBeGreaterThanOrEqual(1);
+    expect(await exists(old)).toBe(false);
+    expect(await exists(edge)).toBe(true);
+    expect(await exists(recent)).toBe(true);
+    expect(await exists(unsentOld)).toBe(true);
+    expect(await store().purgeSentContacts(NOW)).toBe(0);
+  });
+
+  it.each(['anon', 'authenticated'] as const)('%s cannot run the deletion', async (role) => {
+    await expect(
+      asRole(db, role, null, (tx) => tx.query('select public.purge_sent_contact_requests(now())')),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('email_sends: the agency_plus_contact kind', () => {
+  const claim = (key: string, kind: string) =>
+    asRole(db, 'service_role', null, async (tx) => {
+      const { rows } = await tx.query<{ r: { outcome: string } }>(
+        'select public.claim_email_send($1, $2, $3, null, now()) as r',
+        [key, kind, 'a'.repeat(64)],
+      );
+      return rows[0]!.r;
+    });
+
+  it('the ledger takes the kind, and still refuses one it does not name', async () => {
+    expect(await claim(`agency_plus_contact:${randomUUID()}`, 'agency_plus_contact')).toEqual({
+      outcome: 'go',
+      attempt: 1,
+    });
+    await expect(claim(`x:${randomUUID()}`, 'agency_plus_other')).rejects.toThrow(
+      /email_sends_kind_check/,
+    );
+  });
+
+  it('a suppression does not stop it', async () => {
+    const { rows } = await db.query<{ s: boolean }>(
+      `select public.email_kind_suppressible('agency_plus_contact') as s`,
+    );
+    expect(rows[0]!.s).toBe(false);
+  });
+});
+
 describe('public_reports_check_uq', () => {
   it('holds one report per check, and any number with no check', async () => {
     const { rows } = await db.query<{ indexdef: string }>(
@@ -311,6 +399,10 @@ describe('the rollback', () => {
         (
           await own.query<{ n: number }>(
             `select (select count(*) from pg_proc where proname = 'start_agency_trial_account')
+                  + (select count(*) from pg_proc where proname = 'purge_sent_contact_requests')
+                  + (select count(*) from pg_constraint
+                      where conname = 'email_sends_kind_check'
+                        and pg_get_constraintdef(oid) like '%agency_plus_contact%')
                   + (select count(*) from pg_tables where tablename = 'contact_requests')
                   + (select count(*) from pg_indexes where indexname = 'public_reports_check_uq')
                   + (select count(*) from information_schema.columns
@@ -320,13 +412,26 @@ describe('the rollback', () => {
                                             'agency_trial_consent_at')) as n`,
           )
         ).rows[0]!.n;
-      expect(Number(await present())).toBe(7);
+      expect(Number(await present())).toBe(9);
+      await own.query(
+        `insert into public.email_sends (idempotency_key, kind, address_hash, status, attempts,
+                                         claimed_at, updated_at)
+         values ('agency_plus_contact:r', 'agency_plus_contact', $1, 'sending', 1, now(), now())`,
+        ['b'.repeat(64)],
+      );
       await own.exec(readRollback(ROLLBACK));
       await own.exec(readRollback(ROLLBACK));
       expect(Number(await present())).toBe(0);
+      // CC-28's eight-kind check is back, with exactly one email_sends kind check in force.
+      const checks = await own.query<{ def: string }>(
+        `select pg_get_constraintdef(oid) as def from pg_constraint
+          where conrelid = 'public.email_sends'::regclass and conname = 'email_sends_kind_check'`,
+      );
+      expect(checks.rows).toHaveLength(1);
+      expect(checks.rows[0]!.def).toContain('weekly_summary');
       await own.exec(readMigration(MIGRATION));
       await own.exec(readMigration(MIGRATION));
-      expect(Number(await present())).toBe(7);
+      expect(Number(await present())).toBe(9);
     } finally {
       await own.close();
     }

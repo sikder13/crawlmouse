@@ -10,6 +10,7 @@ import { packetPrompt } from '../../view/segment/fixes';
 import type { MailKind, RenderedMail } from '../types';
 import { MAIL_PREVIEW_INDEX, type MailPreviewSlug } from './preview-index';
 import { accountDelete, emailChangeConfirm, emailChangeNotice } from './account-links';
+import { agencyPlusContact } from './agency-plus-contact';
 import { alertTemplate } from './alert';
 import { checkNotify } from './check-notify';
 import { fixToDeveloper } from './fix-to-developer';
@@ -116,6 +117,12 @@ const RENDERS: Record<MailPreviewSlug, (opts?: PreviewOptions) => RenderedMail> 
       zone: 'America/Indiana/Indianapolis',
       sites: [{ siteId: badSite(), host: badHost(), changes: siteChanges() }],
       unsubscribeUrl: opts?.unsubscribeUrl ?? UNSUBSCRIBE,
+    }),
+  'agency-plus-contact': () =>
+    agencyPlusContact({
+      email: 'ops@summit-digital.example',
+      sites: 40,
+      note: 'We look after 40 client sites, most on WordPress.\nWe would want SSO for our team.',
     }),
 };
 

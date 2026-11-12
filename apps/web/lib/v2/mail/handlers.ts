@@ -8,6 +8,7 @@
  *   trial reminder  trial_reminder:<accountId>:<trialEndsAt>  (one per trial end)
  *   check notify    check_notify:<checkId>
  *   fix to a dev    fix_to_developer:<requestId>
+ *   Agency Plus     agency_plus_contact:<contactId>           (recipient: the sales inbox, always)
  *
  * A database read that fails before anything is claimed throws `MailRetry`: nothing was sent and
  * nothing claimed, so the step can safely try again. What happens from the claim to the ledger's
@@ -20,6 +21,7 @@ import { checkRef } from '../pipeline/public';
 import { MailRetry, send, type MailDeps } from './send';
 import type { MailStore } from './store';
 import { accountDelete, emailChangeConfirm, emailChangeNotice } from './templates/account-links';
+import { AGENCY_PLUS_INBOX, agencyPlusContact } from './templates/agency-plus-contact';
 import { checkNotify } from './templates/check-notify';
 import { fixToDeveloper } from './templates/fix-to-developer';
 import { trialReminder } from './templates/trial-reminder';
@@ -46,6 +48,7 @@ const LINK_KIND = {
 } as const;
 
 const ENDED = new Set(['finished', 'partial', 'failed']);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const TRIAL_STATES = { pro_trial: 'pro', agency_trial: 'agency' } as const;
 
 /** A read before any claim: a failure is retried, since nothing has been sent or claimed. */
@@ -114,8 +117,36 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
     });
   }
 
+  /**
+   * An Agency Plus request: to the sales inbox, never to the address the form was given, which is
+   * data in the body. A row already marked sent, or none, sends nothing; `sent_at` is set after the
+   * send as the fix email's is.
+   */
+  async function agencyPlus(contactId: string): Promise<string> {
+    if (!UUID.test(contactId)) return 'not_found';
+    const r = await read(store.contactRequest(contactId));
+    if (r === null) return 'not_found';
+    if (r.sentAt !== null) return 'already_sent';
+    const outcome = await send(mail, {
+      kind: 'agency_plus_contact',
+      to: AGENCY_PLUS_INBOX,
+      idempotencyKey: `agency_plus_contact:${contactId}`,
+      accountId: null,
+      render: async () => agencyPlusContact({ email: r.email, sites: r.sites, note: r.note }),
+    });
+    if (outcome === 'sent' || outcome === 'done') {
+      try {
+        await store.markContactSent(contactId, mail.now());
+      } catch {
+        throw new MailRetry('mark_sent_failed');
+      }
+    }
+    return outcome;
+  }
+
   return {
     async accountEmail(data) {
+      if (data.template === 'agency_plus_contact') return agencyPlus(data.contactId);
       return data.template === 'trial_reminder' ? trial(data.accountId) : accountLink(data);
     },
 

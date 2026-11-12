@@ -1,7 +1,7 @@
 /**
  * The mailer's Inngest functions as production wires them (inngest/mail.ts over handlers.ts), for
  * the serve route's list (lib/v2/pipeline/functions.ts), which registers them only with
- * V2_CHECKS_PUBLIC=1. Everything is built when a function runs, not when the route loads: with no
+ * V2_CHECKS_PUBLIC=1. The last is CC-29's daily deletion of sent Agency Plus requests. Everything is built when a function runs, not when the route loads: with no
  * RESEND_API_KEY or no pepper `send()` claims nothing and logs `mail.unconfigured`.
  */
 import { createClient } from '@supabase/supabase-js';
@@ -10,6 +10,7 @@ import {
   createAccountMailFn,
   createCheckFinishedEventFn,
   createCheckNotifyFn,
+  createContactPurgeFn,
   createFixToDeveloperFn,
   type MailHandlers,
 } from '../../../../../inngest/mail';
@@ -53,5 +54,13 @@ export function mailFunctions(env: Env = process.env): InngestFunction.Like[] {
     createCheckNotifyFn(handlers),
     createFixToDeveloperFn(handlers),
     createCheckFinishedEventFn(handlers),
+    // CC-29: sent Agency Plus requests are deleted 30 days after they were sent.
+    createContactPurgeFn(() =>
+      supabaseMailStore(
+        createClient(env.NEXT_PUBLIC_SUPABASE_URL ?? '', env.SUPABASE_SERVICE_ROLE_KEY ?? '', {
+          auth: { persistSession: false },
+        }),
+      ).purgeSentContacts(new Date()),
+    ),
   ];
 }

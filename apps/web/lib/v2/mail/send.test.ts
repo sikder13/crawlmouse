@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { hashMailAddress } from './address-hash';
@@ -13,7 +13,7 @@ import type { MailLedger } from './ledger';
 import { memoryLedger, type MemoryLedger } from './memory';
 import { keyRef, MailRetry, send, type MailDeps, type SendRequest } from './send';
 import { resendTransport, type MailTransport, type TransportResult } from './transport';
-import { ACCOUNT_KINDS, MAIL_KINDS, type OutgoingMail } from './types';
+import { ACCOUNT_KINDS, MAIL_KINDS, OWN_INBOX_KINDS, type OutgoingMail } from './types';
 
 const PEPPER = 'p'.repeat(40);
 const NOW = new Date('2026-11-13T10:00:00.000Z');
@@ -441,19 +441,29 @@ describe('resendTransport', () => {
 });
 
 describe('the kinds', () => {
-  it('are the migration’s email_sends.kind list, and its suppressible kinds are the non-account ones', () => {
-    const sql = readFileSync(
-      resolve(
-        __dirname,
-        '../../../../../infra/supabase/migrations/20261113000001_v2_028_monitoring.sql',
-      ),
-      'utf8',
+  // The migrations in order: the last that sets `email_sends.kind`'s check, or redefines
+  // `email_kind_suppressible`, is the one in force (CC-29's 20261114000001 widens the first).
+  const MIGRATIONS = resolve(__dirname, '../../../../../infra/supabase/migrations');
+  const lastMatch = (re: RegExp): string => {
+    let found: string | undefined;
+    for (const f of readdirSync(MIGRATIONS)
+      .filter((n) => n.endsWith('.sql'))
+      .sort()) {
+      for (const m of readFileSync(resolve(MIGRATIONS, f), 'utf8').matchAll(re))
+        found = m[1] ?? m[2];
+    }
+    return found!;
+  };
+  const quoted = (list: string) => [...list.matchAll(/'(\w+)'/g)].map((m) => m[1]);
+
+  it('are the email_sends.kind check in force, and its suppressible kinds are neither account nor own-inbox mail', () => {
+    const list = lastMatch(
+      /create table if not exists public\.email_sends \([^;]*?kind text not null check \(kind in \(([^)]*)\)\)|constraint email_sends_kind_check\s+check \(kind in \(([^)]*)\)\)/g,
     );
-    const list = /kind text not null check \(kind in \(([^)]*)\)\)/.exec(sql)![1]!;
-    expect([...list.matchAll(/'(\w+)'/g)].map((m) => m[1])).toEqual([...MAIL_KINDS]);
-    const supp = /select p_kind in \(([^)]*)\)/.exec(sql)![1]!;
-    expect([...supp.matchAll(/'(\w+)'/g)].map((m) => m[1]).sort()).toEqual(
-      MAIL_KINDS.filter((k) => !ACCOUNT_KINDS.has(k)).sort(),
+    expect(quoted(list)).toEqual([...MAIL_KINDS]);
+    const supp = lastMatch(/select p_kind in \(([^)]*)\)/g);
+    expect(quoted(supp).sort()).toEqual(
+      MAIL_KINDS.filter((k) => !ACCOUNT_KINDS.has(k) && !OWN_INBOX_KINDS.has(k)).sort(),
     );
   });
 });
