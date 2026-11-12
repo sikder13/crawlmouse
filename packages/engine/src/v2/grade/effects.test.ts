@@ -19,11 +19,16 @@ import { round } from './numbers.js';
 import { crawlability, technicalSeo } from './technical-seo.js';
 import { aiFrom, gradeCheck, type Grades } from './index.js';
 import { detectorOutcomes } from './outcomes.js';
+import { factsFor } from '../packets/test-support/facts.js';
+import { writtenFrom } from '../packets/written.js';
 
 function blog(n: number, unanswered: number, cells: Cells = {}, extra: PageSpec[] = []) {
   const { input, access } = blogSite(n, unanswered, cells, extra);
   const grades = gradeCheck(input);
-  return { grades, ...detectorOutcomes(grades, access, input.structure) };
+  return {
+    grades,
+    ...detectorOutcomes(grades, access, input.structure, writtenFrom(factsFor(input))),
+  };
 }
 
 /** Quotable as it will read once a check counts: one check passing on every page, 20. */
@@ -35,7 +40,10 @@ function scored(n: number, unanswered: number, cells: Cells = {}, extra: PageSpe
   const g = gradeCheck(input);
   const inputs = { ...g.inputs, ai: { ...g.inputs.ai, quotable: QUOTABLE_SCORED } };
   const grades: Grades = { ...g, inputs, ai_readability: aiFrom(inputs.ai) };
-  return { grades, ...detectorOutcomes(grades, access, input.structure) };
+  return {
+    grades,
+    ...detectorOutcomes(grades, access, input.structure, writtenFrom(factsFor(input))),
+  };
 }
 
 /** The structure records gradeCheck was given: whole records, which its input type narrows. */
@@ -141,7 +149,12 @@ describe('the author and date fix, end to end', () => {
     );
     const grades = gradeCheck({ ...input, content });
     expect(grades.ai_readability.components.quotable.score).toBe(null);
-    const { outcomes } = detectorOutcomes(grades, access, input.structure);
+    const { outcomes } = detectorOutcomes(
+      grades,
+      access,
+      input.structure,
+      writtenFrom(factsFor(input)),
+    );
     const [fix] = fixes(outcomes).filter((f) => f.type === 'missing_author_date');
     expect(fix).toMatchObject({
       template_key: '/blog/{slug}',
@@ -593,7 +606,12 @@ describe('the structure counterfactuals, by hand', () => {
     const fixed = gradeCheck(blogSite(13, 0, {}, [], menu).input).technical_seo;
     expect(technicalSeo(after.seo).score).toBe(fixed.score);
     expect(technicalSeo(after.seo).breakdown).toEqual(fixed.breakdown);
-    const { overview } = detectorOutcomes(grades, access, input.structure);
+    const { overview } = detectorOutcomes(
+      grades,
+      access,
+      input.structure,
+      writtenFrom(factsFor(input)),
+    );
     expect(overview.technical_seo).toBe(round(fixed.score! - grades.technical_seo.score!));
   });
 
@@ -944,7 +962,12 @@ describe('the outcomes', () => {
       [{ path: '/old-1' }, { path: '/gone', status: 404 }],
     );
     const grades = gradeCheck(input);
-    const { outcomes } = detectorOutcomes(grades, access, input.structure);
+    const { outcomes } = detectorOutcomes(
+      grades,
+      access,
+      input.structure,
+      writtenFrom(factsFor(input)),
+    );
     const respected = access.filter((r) => r.state === 'detected' && !r.opens_fix);
     expect(respected.length).toBeGreaterThan(0);
     const expected = [

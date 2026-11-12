@@ -6,6 +6,10 @@
  *
  * A robots.txt disallow is the site's stated intent (`opens_fix: false`): it opens no fix, so a
  * detected robots record has no outcome at all, and no counterfactual in the effects.
+ *
+ * What is written for a fix (its packet, its effort and its before and after) is the caller's
+ * `written`, so the code the grades are computed from does not import the packet builders
+ * (fixtures/v2/grade/guard.ts digests that code). The check builder passes packets/written.ts.
  */
 import type { Confidence, Effect, FixType, RecommendationClass } from '@crawlmouse/types/v2';
 import type { AccessDetection } from '../access/types.js';
@@ -15,7 +19,9 @@ import type { DetectorOutcome, FixDraft } from '../diff/types.js';
 import { namesOnePage, templateNoun } from '../build/template-noun.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
 import type { Detection } from '../detectors/types.js';
+import { clean } from '../packets/text.js';
 import { effectsOf, type FixRecord } from './effects.js';
+
 import type { Grades } from './index.js';
 
 type StructureType = Detection['type'];
@@ -58,12 +64,37 @@ export const TITLES: Readonly<Partial<Record<FixType, (subject: string) => strin
   no_question_headings: (k) => `Phrase a section heading on ${templateNoun(k)} as a question`,
 };
 
-function draft(f: FixRecord, effect: Effect, rank: number, absorbed_by: string | null): FixDraft {
+/** What is written for one fix besides its label and its effect. */
+export type WriteFix = (fix: FixRecord) => Pick<FixDraft, 'packet' | 'effort' | 'before_after'>;
+
+/** Nothing written: a grade computed without the check builder (the guard's example sites). */
+export const NOTHING_WRITTEN: WriteFix = () => ({ packet: null, effort: null, before_after: [] });
+
+/** The longest title, in code points. A title names a crawled URL or template, so it is bounded. */
+export const MAX_TITLE_CHARS = 300;
+
+/**
+ * A fix's title on one line, with nothing invisible in it (packets/text.ts `clean`): its subject is
+ * crawled text, and the title is the first line of the packet's prompt. A title past
+ * MAX_TITLE_CHARS is cut and ends in an ellipsis.
+ */
+export function titleOf(type: FixType, subject: string): string {
+  const points = [...clean(TITLES[type]!(subject))];
+  return points.length <= MAX_TITLE_CHARS
+    ? points.join('')
+    : `${points.slice(0, MAX_TITLE_CHARS).join('')}…`;
+}
+
+function draft(
+  f: FixRecord,
+  effect: Effect,
+  rank: number,
+  absorbed_by: string | null,
+  written: WriteFix,
+): FixDraft {
   const base = {
     detail: null,
-    effort: null,
-    before_after: [],
-    packet: null,
+    ...written(f),
     effect,
     rank,
     absorbed_by_fingerprint: absorbed_by,
@@ -74,7 +105,7 @@ function draft(f: FixRecord, effect: Effect, rank: number, absorbed_by: string |
       ...base,
       type: r.type,
       section: FIX_SECTION[r.type],
-      title: TITLES[r.type]!(r.crawler),
+      title: titleOf(r.type, r.crawler),
       recommendation_class: r.recommendation_class,
       confidence: r.confidence,
       affected_pages: r.affected_urls.length,
@@ -88,7 +119,7 @@ function draft(f: FixRecord, effect: Effect, rank: number, absorbed_by: string |
       ...base,
       type: r.type,
       section: FIX_SECTION[r.type],
-      title: TITLES[r.type]!(r.template_key),
+      title: titleOf(r.type, r.template_key),
       recommendation_class: r.recommendation_class,
       // set per check by hand (checks.ts): inconclusive while the check does not count in Quotable
       confidence: CONTENT_CHECKS[r.check].confidence,
@@ -103,7 +134,7 @@ function draft(f: FixRecord, effect: Effect, rank: number, absorbed_by: string |
     ...base,
     type,
     section: FIX_SECTION[type],
-    title: TITLES[type]!(subjectOfKey(r.key)),
+    title: titleOf(type, subjectOfKey(r.key)),
     recommendation_class: STRUCTURE_CLASS[type]!,
     confidence: CRAWL_CONFIDENCE,
     affected_pages: r.affected_urls.length,
@@ -122,6 +153,7 @@ export function detectorOutcomes(
   grades: Grades,
   access: readonly AccessDetection[],
   structure: readonly Detection[],
+  written: WriteFix,
 ): Outcomes {
   const records: FixRecord[] = [
     ...structure.map((record) => ({ family: 'structure' as const, record })),
@@ -136,7 +168,7 @@ export function detectorOutcomes(
     const { fingerprint, state } = f.record;
     if (state === 'detected') {
       const { effect, rank, absorbed_by } = byFix.get(fingerprint)!;
-      return { fingerprint, state, fix: draft(f, effect, rank, absorbed_by) };
+      return { fingerprint, state, fix: draft(f, effect, rank, absorbed_by, written) };
     }
     if (state === 'not_detected') return { fingerprint, state };
     return { fingerprint, state, gone: f.family === 'structure' ? f.record.page_gone : null };

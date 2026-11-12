@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { every } from '../access/builders.js';
 import { simhashAway, u } from '../detectors/builders.js';
-import { detectorOutcomes } from '../../../src/v2/grade/outcomes.js';
+import { detectorOutcomes, NOTHING_WRITTEN } from '../../../src/v2/grade/outcomes.js';
 import { gradeCheck, type GradeInput } from '../../../src/v2/grade/index.js';
 import type { AccessDetection } from '../../../src/v2/access/types.js';
 import { fingerprintOf } from '../../../src/v2/detectors/fingerprint.js';
@@ -143,7 +143,7 @@ export const readerDigest = (): string => digestOf(closureOf(['v2/content/read.t
 
 function outcomeOf(input: GradeInput, access: AccessDetection[] = []) {
   const g = gradeCheck(input);
-  const { outcomes, overview } = detectorOutcomes(g, access, input.structure);
+  const { outcomes, overview } = detectorOutcomes(g, access, input.structure, NOTHING_WRITTEN);
   return {
     technical_seo: g.technical_seo,
     ai_readability: g.ai_readability,

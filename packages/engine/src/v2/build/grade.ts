@@ -21,7 +21,10 @@ import type { Detection } from '../detectors/types.js';
 import type { DetectorOutcome } from '../diff/types.js';
 import { gradeCheck, type Grades } from '../grade/index.js';
 import { detectorOutcomes } from '../grade/outcomes.js';
+import type { PacketFacts } from '../packets/types.js';
+import { writtenFrom } from '../packets/written.js';
 import type { Assembled } from './assemble.js';
+import { stackOf } from './record.js';
 import type { BuildInput } from './types.js';
 
 export interface Graded {
@@ -76,7 +79,16 @@ export function gradeAssembled(
     robots_txt,
     refusal: assembled.refusal,
   });
-  const { outcomes } = detectorOutcomes(grades, access.detections, structure);
+  // What a fix's packet is written from besides its own record (packets/types.ts).
+  const facts: PacketFacts = {
+    homepage_url: assembled.homepage_url,
+    stack: stackOf(assembled),
+    crawlers: access.crawlers,
+    pages: new Map(withOrphans.map((p) => [p.url, p])),
+    edges: assembled.edges,
+    access_tests: assembled.access_tests,
+  };
+  const { outcomes } = detectorOutcomes(grades, access.detections, structure, writtenFrom(facts));
   const pages = withOrphans.map((p) => ({
     ...p,
     content_failures: grades.content_failures.get(p.url) ?? null,
