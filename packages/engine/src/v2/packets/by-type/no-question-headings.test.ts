@@ -128,8 +128,12 @@ describe('no_question_headings: the command and the engine’s check agree', () 
 });
 
 contentPacketProperties(TYPE);
-contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED }, {
-  printed: /^<h[23]>[^<]*\?$/m,
-  today: /found none after the H1 with a clause that ends in a question mark/,
-  after: /one of them .* question mark/,
-});
+contentCommandOnSites(
+  TYPE,
+  { broken: BROKEN, fixed: FIXED },
+  {
+    printed: /^<h[23]>[^<]*\?$/m,
+    today: /found none after the H1 with a clause that ends in a question mark/,
+    after: /one of them .* question mark/,
+  },
+);

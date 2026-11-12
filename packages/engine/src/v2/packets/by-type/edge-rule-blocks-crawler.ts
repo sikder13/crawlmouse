@@ -156,9 +156,7 @@ function context(record: AccessDetection, facts: PacketFacts): Line[] {
   }
 
   const responses = ours(rows.length === 1 ? 'response names' : 'responses name');
-  const causes = [...new Set(record.evidence.causes)]
-    .sort(byOrder)
-    .map((c) => ours(CAUSE_TEXT[c]));
+  const causes = [...new Set(record.evidence.causes)].sort(byOrder).map((c) => ours(CAUSE_TEXT[c]));
   lines.push(
     causes.length > 0
       ? line`${ours(causes.length === 1 ? 'Cause' : 'Causes')} the ${responses}: ${list(causes, causes.length, 'cause')}.`

@@ -245,11 +245,15 @@ export function contentCommandOnSites(
       expect(run.fixed.stdout).toMatch(see.printed);
       expect(run.broken.stderr + run.fixed.stderr).toBe('');
       expect(verify.see!.today).toMatch(see.today);
-      expect(verify.see!.today).toMatch(/It is the first of the template’s failing pages \(2 of 13 decided\)\.$/);
+      expect(verify.see!.today).toMatch(
+        /It is the first of the template’s failing pages \(2 of 13 decided\)\.$/,
+      );
       expect(verify.see!.after).toMatch(see.after);
       // the same request as the exact check: the same crawler, the same address
       expect(site.userAgents()).toEqual(Array(2).fill(FIRST_TESTABLE_UA));
-      expect(verify.see!.command).toContain(` -A '${FIRST_TESTABLE_UA.replaceAll("'", `'\\''`)}' '${site.base}/blog/a' | `);
+      expect(verify.see!.command).toContain(
+        ` -A '${FIRST_TESTABLE_UA.replaceAll("'", `'\\''`)}' '${site.base}/blog/a' | `,
+      );
     });
 
     it('is short, and is not the check: it carries no awk program', () => {
@@ -322,13 +326,19 @@ export function contentCommandOnSites(
       expect(run.broken.status).not.toBe(0);
       expect(run.fixed.status).toBe(0);
       // requested at its own address the command reads the redirect's body, fixed or not
-      const own = writePacket(type, contentRecord(type, { affected_urls: [page] }), contentFacts())!;
+      const own = writePacket(
+        type,
+        contentRecord(type, { affected_urls: [page] }),
+        contentFacts(),
+      )!;
       expect((await runCommand(own.verify.command)).status).not.toBe(0);
     });
   });
 
   describe(`${type}: the command and how the page is answered`, () => {
-    const run = async (serve: (html: string) => (req: IncomingMessage, res: ServerResponse) => void) => {
+    const run = async (
+      serve: (html: string) => (req: IncomingMessage, res: ServerResponse) => void,
+    ) => {
       const site = await twoStateSite({ broken: serve(pages.broken), fixed: serve(pages.fixed) });
       open.push(site);
       const record = contentRecord(type, { affected_urls: [`${site.base}/blog/a`] });

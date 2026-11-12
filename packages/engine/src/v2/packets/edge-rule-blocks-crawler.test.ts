@@ -534,7 +534,11 @@ describe('the edge-rule verify command', () => {
     const pages = new Map([
       [
         'https://a.test/p',
-        { url: 'https://a.test/p', final_url: 'https://a.test/en/', status_code: 200 } as PageResult,
+        {
+          url: 'https://a.test/p',
+          final_url: 'https://a.test/en/',
+          status_code: 200,
+        } as PageResult,
       ],
     ]);
     const moved = compose(builder, record, factsOf(rows, NO_STACK, pages)).verify;

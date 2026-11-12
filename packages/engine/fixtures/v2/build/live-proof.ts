@@ -10,10 +10,10 @@
  * the guides' filled-in side. Nothing is written to disk and no recorded batch is read.
  *
  * The check is built under the fixture's own name (recorded.ts HOST), as the recorded fixture is, so
- * the output does not change with the server's port. Each packet's two commands are then run against
- * the server, which still serves the site as audited, with HOST in the command replaced by the
- * server's address: what the readable command printed and the exact check's exit status are their
- * own, on the site before any fix.
+ * the output does not change with the server's port. A packet's exact check, and its readable command
+ * where it has one, are then run against the server, which still serves the site as audited, with
+ * HOST in the command replaced by the server's address: what the readable command printed and the
+ * exact check's exit status are their own, on the site before any fix.
  */
 import { startServer } from '../../../../worker/src/test-support/http.js';
 import { buildCheck, type BuiltCheck } from '../../../src/v2/build/index.js';
@@ -31,7 +31,7 @@ const VARIANT: SiteVariant = { linkRedirectTarget: false, guidesWithIntro: true 
 type Fix = BuiltCheck['fixes'][number];
 type Body = NonNullable<Fix['packet']>['packets'][number];
 
-/** Each framework a body is written for, in words: the labels the fix page shows, and the generic body by what it is. */
+/** The framework a body is written for, in words. */
 const FRAMEWORK: Readonly<Record<Body['framework'], string>> = {
   nextjs: 'Next.js',
   shopify_liquid: 'Shopify (Liquid)',
@@ -94,7 +94,8 @@ function bodyOf(body: Body): string[] {
 function printed(stdout: string, base: string): string[] {
   const lines = stdout.replaceAll(base, HOST).split('\n');
   while (lines.at(-1) === '') lines.pop();
-  if (lines.length === 0) return ['Run against the local server, before any fix, it printed nothing.'];
+  if (lines.length === 0)
+    return ['Run against the local server, before any fix, it printed nothing.'];
   const rest = lines.length - OUTPUT_LINES;
   const shown = lines.slice(0, OUTPUT_LINES).map((l) => {
     const points = [...l];

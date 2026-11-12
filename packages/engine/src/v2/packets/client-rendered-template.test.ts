@@ -285,7 +285,9 @@ describe('the client-rendered template packet, from its record', () => {
       factsOf([{ ua: 'OAI-SearchBot', verdict: 'blocked_by_ua_rule' }]),
     );
     expect(none.verify.ua).toBe(null);
-    expect(none.verify.command).toMatch(/^curl -sSf --compressed 'https:\/\/a\.test\/guides\/g-0' \|/);
+    expect(none.verify.command).toMatch(
+      /^curl -sSf --compressed 'https:\/\/a\.test\/guides\/g-0' \|/,
+    );
     expect(none.context.at(-1)).toBe(
       'No tested AI crawler is served by the site today, so the check below requests the page with no crawler’s user agent.',
     );
@@ -430,7 +432,9 @@ describe('the client-rendered template verify command', () => {
     expect(verify.see!.after).toBe(
       `A number higher by about the words the page gains: the audit counted ${page.rendered_words} once rendered in a browser, ${page.rendered_words - page.raw_words} more.`,
     );
-    expect(Math.abs(after - before - (page.rendered_words - page.raw_words))).toBeLessThanOrEqual(5);
+    expect(Math.abs(after - before - (page.rendered_words - page.raw_words))).toBeLessThanOrEqual(
+      5,
+    );
   });
 
   it('the readable command says one word in the singular, and requests as the exact check does', () => {
@@ -567,7 +571,10 @@ describe('the client-rendered template verify command', () => {
       expect(out).not.toBe(page);
       return out;
     };
-    site = await twoStateSite({ broken: html(spaced(SHELL)), fixed: html(spaced(SERVER_RENDERED)) });
+    site = await twoStateSite({
+      broken: html(spaced(SHELL)),
+      fixed: html(spaced(SERVER_RENDERED)),
+    });
     const record = measured(site.base);
     const { broken, fixed } = await inBothStates(
       site,
@@ -577,7 +584,9 @@ describe('the client-rendered template verify command', () => {
     expect(fixed.status).toBe(0);
     // the same counts as with the tags closed plainly
     site.use('broken');
-    expect(Math.abs(Number(broken.stdout) - record.evidence.pages[0]!.raw_words)).toBeLessThanOrEqual(5);
+    expect(
+      Math.abs(Number(broken.stdout) - record.evidence.pages[0]!.raw_words),
+    ).toBeLessThanOrEqual(5);
   });
 
   it('does not count commented-out markup, on one line or across tags', async () => {
@@ -595,9 +604,9 @@ describe('the client-rendered template verify command', () => {
       compose(builder, record, factsOf()).verify.command,
     );
     expect(broken.status).not.toBe(0);
-    expect(Math.abs(Number(broken.stdout) - record.evidence.pages[0]!.raw_words)).toBeLessThanOrEqual(
-      5,
-    );
+    expect(
+      Math.abs(Number(broken.stdout) - record.evidence.pages[0]!.raw_words),
+    ).toBeLessThanOrEqual(5);
     expect(fixed.status).toBe(0);
     expect(
       Math.abs(Number(fixed.stdout) - record.evidence.pages[0]!.rendered_words),
