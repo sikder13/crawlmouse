@@ -839,3 +839,9 @@ jobs:
           TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
           TRIAL_RACE_REQUIRED: '1'
         run: pnpm exec vitest run db/fixes-race.test.ts --passWithNoTests=false
+      - name: Two transactions race in the mail and schedule claims (CC-28)
+        working-directory: scripts
+        env:
+          TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          TRIAL_RACE_REQUIRED: '1'
+        run: pnpm exec vitest run db/monitoring-race.test.ts --passWithNoTests=false
