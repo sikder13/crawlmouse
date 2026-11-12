@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { robotsTxt } from '../lib/robots-txt';
 import sitemap from '../app/sitemap';
 import { allPostSlugs } from '../lib/blog/posts';
+import { V2_REWRITES } from '../lib/v2/rewrites';
 
 // The sitemap is now async + DB-backed: it appends a CLAIM-GATED /r/ section (SPEC 04 §8) — claimed +
 // indexable reports are listed; unclaimed mints (indexable=false) never are. We stub the report source
@@ -37,6 +38,10 @@ const SITEMAP_EXCLUDE = [
   '/login',
   '/api/',
   '/compare/',
+  // CC-29: the Agency trial form (noindex), and every v2 rewrite target, which has no address of its
+  // own (lib/v2/rewrites.ts): /v2-home, /dashboard/v2, /v2-pricing, /v2-developers, /v2-report.
+  '/agency-trial',
+  ...V2_REWRITES.map((r) => r.to.split('/:')[0]!),
 ];
 
 describe('robots.txt', () => {
@@ -114,6 +119,25 @@ describe('sitemap.ts', () => {
         urls.some((u) => u.includes(bad)),
         `sitemap must NOT include ${bad}`,
       ).toBe(false);
+    }
+  });
+
+  it('excludes them with both v2 flags on too, when the flag-gated pages are listed', async () => {
+    vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    try {
+      const lit = (await sitemap()).map((e) => e.url);
+      expect(lit).toContain('https://crawlmouse.com/agencies');
+      expect(SITEMAP_EXCLUDE).toEqual(
+        expect.arrayContaining(['/agency-trial', '/v2-pricing', '/v2-developers', '/v2-report']),
+      );
+      for (const bad of SITEMAP_EXCLUDE)
+        expect(
+          lit.some((u) => u.includes(bad)),
+          `sitemap must NOT include ${bad}`,
+        ).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 

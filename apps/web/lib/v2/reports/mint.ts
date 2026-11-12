@@ -12,11 +12,12 @@
  *
  * Then, with the service role: the report already minted for the check is answered with its slug;
  * otherwise the check is read back and its snapshot built (`buildPublicSnapshot`), and one row is
- * inserted. The row sets neither `listed` nor `indexable`, so the column defaults make it unlisted
+ * inserted, its `domain` the snapshot's host through `normalizeDomain`. The row sets neither `listed` nor `indexable`, so the column defaults make it unlisted
  * and noindex (`mint.db.test.ts` reads them back). A unique violation on the check
  * (`public_reports_check_uq`, a concurrent mint) answers the first report's slug; one on the slug is
  * retried with a fresh slug. A new report sends `report_minted {kind: 'v2'}`.
  */
+import { normalizeDomain } from '../../domain';
 import { isUndefinedColumnError } from '../../pg-errors';
 import type { PublicSnapshotV2 } from './snapshot';
 
@@ -111,7 +112,9 @@ export async function mintV2(
       check_id: checkId,
       site_id: check.siteId,
       account_id: accountId,
-      domain: snapshot.host,
+      // The key claim, visibility and the badge compare with `domain_verifications.domain`, which
+      // `/api/verify/start` stores through normalizeDomain; the snapshot keeps the host it shows.
+      domain: normalizeDomain(snapshot.host),
       report_snapshot: snapshot,
       minted_by: user.id,
     });

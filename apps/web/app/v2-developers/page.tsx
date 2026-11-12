@@ -4,6 +4,7 @@ import { DevelopersScreen } from '@/components/v2/screens/developers/DevelopersS
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { developersView } from '@/lib/v2/view/developers';
+import { socialMetadata } from '@/lib/v2/social-metadata';
 import '@/styles/v2/tokens.css';
 
 const view = developersView();
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
   title: view.title,
   description: view.description,
   alternates: { canonical: '/developers' },
+  ...socialMetadata({ path: '/developers', title: view.title, description: view.description }),
 };
 
 /**

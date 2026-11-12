@@ -1,9 +1,11 @@
 /**
  * The words of the three `/check` pages (CC-29 D8, DECISION A10): one search question each, answered
- * by the home's audit. Every paragraph names the files it rests on (`sources`, paths from the repo
- * root), and `check-pages.test.ts` fails on a source that does not exist. A sentence that states
- * what the example audit measured is built from the fixture in `lib/v2/view/check-pages.ts`, not
- * written here.
+ * by the home's audit. Every paragraph and table names what it rests on (`sources`): files in this
+ * repository, by path from its root, or a vendor's documentation page from `VENDOR_DOCS`.
+ * `check-pages.test.ts` fails on a file that does not exist, on a link outside `VENDOR_DOCS`, and on
+ * a crawler named in a block that no cited file names. The vendor pages were read on
+ * 2026-11-12. A sentence that states what the sample audit measured is built from the fixture in
+ * `lib/v2/view/check-pages.ts`, not written here.
  *
  * The titles and descriptions keep "AI visibility" as the search term (FACTS K7); the pages
  * themselves say "AI readability", the grade's name (FACTS A1).
@@ -30,6 +32,20 @@ export const SOURCE = {
   jsGuide: 'apps/web/lib/blog/content/can-ai-crawlers-see-javascript.tsx',
   operatingRules: 'docs/OPERATING-RULES.md',
 } as const;
+
+/** The vendors' own crawler documentation, cited where a sentence reports what a vendor says. */
+export const VENDOR_DOCS = {
+  openAi: 'https://developers.openai.com/api/docs/bots',
+  anthropic:
+    'https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler',
+  perplexity: 'https://docs.perplexity.ai/guides/bots',
+} as const;
+
+/**
+ * The crawlers the JavaScript guide's quick answer names as reading only the raw HTML, in its order.
+ * The guide rests that on the Vercel and MERJ study; `check-pages.test.ts` reads the guide for both.
+ */
+export const JS_GUIDE_CRAWLERS = ['GPTBot', 'OAI-SearchBot', 'ClaudeBot', 'PerplexityBot'] as const;
 
 export interface Paragraph {
   text: string;
@@ -64,18 +80,18 @@ export const CHECK_COPY: Readonly<Record<CheckQuestion, CheckPageCopy>> = {
       'Find out whether GPTBot, OAI-SearchBot and ChatGPT-User can reach your site, and which of them your AI visibility depends on. Free, about two minutes, nothing to install.',
     h1: 'Is GPTBot blocked on your site?',
     sub: 'Crawlmouse requests pages from your site as GPTBot and the other AI crawlers, and shows you what each one got back.',
-    heading: 'GPTBot is one of three OpenAI crawlers, and blocking it is your choice.',
+    heading: 'GPTBot is one of OpenAI’s crawlers, and blocking it is your choice.',
     paragraphs: [
       {
-        text: 'GPTBot collects pages for OpenAI’s model training. Blocking it keeps your pages out of that training, and OpenAI’s documentation says it does not take you out of ChatGPT search: that is OAI-SearchBot’s job.',
-        sources: [SOURCE.aiBots, SOURCE.robotsGuide],
+        text: 'GPTBot collects pages for OpenAI’s model training. Disallowing it tells OpenAI your pages should not be used in that training, and OpenAI’s documentation says each of its crawler settings is independent: blocking GPTBot does not take you out of ChatGPT search, which is OAI-SearchBot’s job.',
+        sources: [SOURCE.aiBots, SOURCE.robotsGuide, VENDOR_DOCS.openAi],
       },
       {
         text: 'A block is not always written in robots.txt. A firewall rule can answer GPTBot with a 403 (on Cloudflare, error 1020) while robots.txt allows it. So the audit reads robots.txt and also requests pages as each crawler, and keeps the answer: status, headers, first bytes.',
         sources: [SOURCE.facts, SOURCE.home],
       },
       {
-        text: 'Each request carries the crawler’s user agent, tagged "Crawlmouse/2.0 (+https://crawlmouse.com/bot)", from published IPs. A rule that matches the whole string exactly will not fire on the tagged version, so a block can be under-reported.',
+        text: 'Each request carries the crawler’s user agent, tagged "Crawlmouse/2.0 (+https://crawlmouse.com/bot)". A rule that matches the whole string exactly will not fire on the tagged version, so a block can be under-reported.',
         sources: [SOURCE.facts],
       },
     ],
@@ -119,12 +135,18 @@ export const CHECK_COPY: Readonly<Record<CheckQuestion, CheckPageCopy>> = {
         sources: [SOURCE.robotsGuide],
       },
       {
-        text: 'Training and answers are separate switches. Disallowing GPTBot or ClaudeBot keeps your pages out of future training; disallowing OAI-SearchBot, Claude-SearchBot or PerplexityBot takes you out of their answers.',
-        sources: [SOURCE.robotsGuide, SOURCE.aiBots],
+        text: 'Training and answers are separate switches. Disallowing GPTBot or ClaudeBot asks them to leave your pages out of future training. Disallowing OAI-SearchBot, Claude-SearchBot or PerplexityBot concerns their search answers, and it is not a clean exit: OpenAI says a site that blocks OAI-SearchBot is not shown in ChatGPT search answers but can still appear as a navigational link, Anthropic says blocking Claude-SearchBot may reduce your visibility in its search results, and Perplexity recommends allowing PerplexityBot for your site to appear in its results.',
+        sources: [
+          SOURCE.robotsGuide,
+          SOURCE.aiBots,
+          VENDOR_DOCS.openAi,
+          VENDOR_DOCS.anthropic,
+          VENDOR_DOCS.perplexity,
+        ],
       },
       {
-        text: 'Some fetches sit outside it: OpenAI says robots.txt rules may not apply to ChatGPT-User, which fetches a page when a person asks about it. A change is not instant either: OpenAI says about 24 hours for its search crawler, and Perplexity up to 24 hours.',
-        sources: [SOURCE.registry],
+        text: 'Some fetches sit outside it: OpenAI says robots.txt rules may not apply to ChatGPT-User, which fetches a page when a person asks about it, and Perplexity says Perplexity-User generally ignores them. A change is not instant either: OpenAI says about 24 hours for its search crawler, and Perplexity up to 24 hours.',
+        sources: [SOURCE.registry, SOURCE.aiBots, VENDOR_DOCS.openAi, VENDOR_DOCS.perplexity],
       },
       {
         text: 'What robots.txt cannot show is a firewall, a bot manager or a CDN default refusing a crawler it allows. Cloudflare has blocked AI crawlers by default on newly onboarded domains since 1 July 2025. That is why the audit also requests pages as each AI crawler; Googlebot and Bingbot are shown by robots.txt only.',
@@ -140,9 +162,9 @@ export const CHECK_DATA_COPY = {
   scored: (names: string) =>
     `Because blocking GPTBot is a choice, Crawlmouse shows it and does not count it towards your AI readability grade. The grade counts ${names}.`,
   scoredSources: [SOURCE.facts],
-  /** gptbot: the table of OpenAI's crawlers. */
+  /** gptbot: the OpenAI crawlers the audit tests (OpenAI documents more; the label says which these are). */
   openAiTable: {
-    label: 'OpenAI’s crawlers',
+    label: 'The OpenAI crawlers the audit tests',
     crawler: 'Crawler',
     does: 'What it does',
     grade: 'In the AI readability grade',
@@ -150,11 +172,11 @@ export const CHECK_DATA_COPY = {
     notCounted: 'shown, not counted',
   },
   openAiSources: [SOURCE.aiBots, SOURCE.facts],
-  /** javascript: the AI crawlers the audit tests, from the fixture's check. */
+  /** javascript: `names` lists `JS_GUIDE_CRAWLERS`. */
   noJs: (names: string) =>
-    `${names} read the HTML your server returns and do not run JavaScript, as our guide found when it checked each of them in July 2026.`,
+    `As of July 2026, ${names} read only the HTML your server returns and do not run JavaScript. Our guide reports this from Vercel and MERJ’s study of AI crawler fetches, which found none of them running it.`,
   noJsSources: [SOURCE.jsGuide],
-  /** javascript: what the example audit measured on one product page. */
+  /** javascript: what the sample audit, of the made-up site the home replays, measured on one page. */
   example: (p: {
     path: string;
     browser: string;
@@ -164,6 +186,6 @@ export const CHECK_DATA_COPY = {
     pages: string;
     noun: string;
   }) =>
-    `In the example audit, ${p.path} shows ${p.browser} words in a browser and ${p.botWords} to ${p.bot}, ${p.share}%. ${p.pages} ${p.noun} pages share its template.`,
+    `In a sample audit of a made-up site, ${p.path} shows ${p.browser} words in a browser and ${p.botWords} to ${p.bot}, ${p.share}%. ${p.pages} ${p.noun} pages share its template.`,
   exampleSources: [SOURCE.facts],
 } as const;

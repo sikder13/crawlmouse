@@ -5,6 +5,7 @@ import { LivePublicReport } from '@/components/v2/screens/public-report/LivePubl
 import { ReportViewBeacon } from '@/components/v2/screens/public-report/ReportViewBeacon';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { getPublicReport } from '@/lib/reports';
+import { socialMetadata } from '@/lib/v2/social-metadata';
 import { publicReportTitle, reportPageOf } from '@/lib/v2/view/public-report';
 
 /**
@@ -25,11 +26,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const page = reportPageOf(await getPublicReport(slug));
   if (page.kind !== 'v2') return v1Metadata({ params });
+  // The words a share shows come from the snapshot: its host and its headline.
+  const title = publicReportTitle(page.view.host);
   return {
-    title: { absolute: publicReportTitle(page.view.host) },
+    title: { absolute: title },
+    description: page.view.headline,
     robots: { index: page.index, follow: true },
     alternates: { canonical: `/r/${slug}` },
-    openGraph: { images: [{ url: `/r/${slug}/opengraph-image` }] },
+    ...socialMetadata({
+      path: `/r/${slug}`,
+      title,
+      absolute: true,
+      description: page.view.headline,
+      image: `/r/${slug}/opengraph-image`,
+    }),
   };
 }
 

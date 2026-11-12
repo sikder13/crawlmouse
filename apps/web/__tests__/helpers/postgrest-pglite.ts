@@ -7,8 +7,10 @@
  * `maybeSingle` as the one row, null for none, PGRST116 for more.
  *
  * Modelled: `from(table)` with `select`, `insert`, `upsert` (`onConflict` required,
- * `ignoreDuplicates`) and `update`; the filters `eq`, `is`, `not(column, 'is' | 'eq', value)` and
- * `in`; `order`, `limit`, `range` and `maybeSingle` after a `select`; and `rpc(fn, args)` for a
+ * `ignoreDuplicates`) and `update`, each optionally followed by `select(columns)`, which returns the
+ * written rows as PostgREST's `return=representation` does; the filters `eq`, `is`,
+ * `not(column, 'is' | 'eq', value)`, `filter(column, 'is' | 'not.is', value)` and `in`; `order`, `limit`, `range` after a `select` that reads,
+ * and `maybeSingle` after either kind of `select`; and `rpc(fn, args)` for a
  * function that returns one value. `maxRows` caps every read as PostgREST's `db-max-rows` does. The builders carry no other method, so a call a port adds throws in its test
  * until it is modelled here.
  *
@@ -121,6 +123,8 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
     let single = false;
     let reads = false;
     let statement = '';
+    /** The columns a write returns (`select` after it), or null for a write that returns none. */
+    let returning: string | null = null;
 
     const param = (v: unknown) => {
       params.push(sqlValue(v));
@@ -137,10 +141,10 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
           (ordering.length > 0 ? ` order by ${ordering.join(', ')}` : '') +
           (capped(limit) === null ? '' : ` limit ${capped(limit)}`) +
           (offset === 0 ? '' : ` offset ${offset}`)
-        : `${statement}${whereSql()}`;
+        : `${statement}${whereSql()}${returning === null ? '' : ` returning ${returning}`}`;
       const r = await send(calls, sql, params);
       if ('error' in r) return { data: null, error: r.error };
-      if (!reads) return { data: null, error: null };
+      if (!reads && returning === null) return { data: null, error: null };
       if (!single) return { data: r.rows, error: null };
       if (r.rows.length > 1) {
         return {
@@ -180,6 +184,16 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
         }
         return filters;
       },
+      /** `filter(column, 'is' | 'not.is', null | boolean)`, PostgREST's raw operator form. */
+      filter(column: string, operator: string, value: unknown) {
+        calls.push(['filter', column, operator, value]);
+        if (value !== null && typeof value !== 'boolean')
+          throw new Error('the stand-in models filter with is / not.is only');
+        if (operator === 'is') where.push(`${ident(column)} is ${String(value)}`);
+        else if (operator === 'not.is') where.push(`${ident(column)} is not ${String(value)}`);
+        else throw new Error(`the stand-in does not model filter ${operator}`);
+        return filters;
+      },
       in(column: string, values: readonly unknown[]) {
         calls.push(['in', column, values]);
         where.push(`${ident(column)} = any(${param([...values])})`);
@@ -207,9 +221,17 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
         limit = to - from + 1;
         return filters;
       },
+      /** After a write: the written rows, `columns` of each. */
+      select(list = '*') {
+        calls.push(['select', list]);
+        if (reads || statement === '')
+          throw new Error('the stand-in models select here after a write');
+        returning = columnsOf(list);
+        return filters;
+      },
       maybeSingle() {
         calls.push(['maybeSingle']);
-        readOnly('maybeSingle');
+        if (returning === null) readOnly('maybeSingle');
         single = true;
         return filters;
       },

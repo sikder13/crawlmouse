@@ -4,7 +4,7 @@ import { checksPublicEnabled } from '@/lib/auth/flags';
 import { getClientIp } from '@/lib/client-ip';
 import { REPORT_VIEWS_PER_IP_PER_HOUR } from '@/lib/limits';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { isReportGone } from '@/lib/report-visibility';
+import { isReportGoneEitherKind } from '@/lib/report-visibility';
 import { getPublicReport } from '@/lib/reports';
 import { isV2Snapshot } from '@/lib/v2/reports/snapshot';
 
@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   if (!rl.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
 
   const report = await getPublicReport(slug);
-  if (report === null || isReportGone(report)) return new Response(null, { status: 404 });
+  if (report === null || isReportGoneEitherKind(report)) return new Response(null, { status: 404 });
 
   await captureServerEvent(req.headers.get('cookie'), {
     event: 'report_viewed',

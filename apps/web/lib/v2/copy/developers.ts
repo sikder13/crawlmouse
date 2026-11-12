@@ -6,8 +6,9 @@
  *
  * Changes from the artboard, and why:
  * - The artboard says the read-only API exists today ("A read-only API today", "Available now, on
- *   Pro"). It does not: no route serves it and no key can be created (`developers.test.ts` holds
- *   that). The heading, the intro and the sample's heading say it is coming, and the sample's card
+ *   Pro"). It does not: no route serves it and no key can be created. `developers.test.ts` holds
+ *   what it can read of that: no route under a `v1` or `latest` path, no file under `app/` naming
+ *   the key prefix, and no source or migration inserting an `api_keys` row. The heading, the intro and the sample's heading say it is coming, and the sample's card
  *   carries the "coming" mark.
  * - "unsubscribe in one click" is cut from the developer list's promise: the list has no unsubscribe
  *   link today.

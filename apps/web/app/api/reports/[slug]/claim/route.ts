@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { readReportRow, purgePublicReport } from '@/lib/reports';
-import { isReportGone } from '@/lib/report-visibility';
+import { isReportGoneEitherKind } from '@/lib/report-visibility';
 import { isDomainVerifiedForUser } from '@/lib/report-ownership';
 import { isUndefinedColumnError } from '@/lib/pg-errors';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -24,7 +24,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ slug: 
   const { slug } = await params;
 
   const sbUser = await supabaseServer();
-  const { data: { user } } = await sbUser.auth.getUser();
+  const {
+    data: { user },
+  } = await sbUser.auth.getUser();
   if (!user) return NextResponse.json({ error: 'auth_required' }, { status: 401 });
 
   // Per-user throttle (defense-in-depth; the real gate is domain verification below).
@@ -35,7 +37,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ slug: 
   const report = await readReportRow(sb, slug);
   if (!report) return NextResponse.json({ error: 'not found' }, { status: 404 });
   // A hidden / taken-down / ungradeable report is not a claimable artifact.
-  if (isReportGone(report)) return NextResponse.json({ error: 'not found' }, { status: 404 });
+  if (isReportGoneEitherKind(report))
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
 
   // Ownership: the caller must hold a VERIFIED domain_verifications row for the report's domain — the
   // mandatory-verification wall relocated from mint to claim (§3/§9), re-checked server-side.
@@ -53,7 +56,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ slug: 
     .maybeSingle();
 
   if (error) {
-    if (isUndefinedColumnError(error)) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+    if (isUndefinedColumnError(error))
+      return NextResponse.json({ error: 'unavailable' }, { status: 503 });
     return NextResponse.json({ error: 'could not claim' }, { status: 500 });
   }
 
@@ -62,7 +66,9 @@ export async function POST(_req: Request, { params }: { params: Promise<{ slug: 
   // "claimed" and the badge RESOLVES off claimed public_reports, so a failed link degrades gracefully
   // (view counts just don't accrue until a row exists). Never fail the claim on it.
   try {
-    await sb.from('embed_badges').upsert({ user_id: user.id, domain: report.domain }, { onConflict: 'user_id,domain' });
+    await sb
+      .from('embed_badges')
+      .upsert({ user_id: user.id, domain: report.domain }, { onConflict: 'user_id,domain' });
   } catch {
     // best-effort owner link — swallowed by design
   }

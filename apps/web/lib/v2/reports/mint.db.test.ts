@@ -6,22 +6,44 @@
  * existing report came before the other's insert.
  */
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyAllMigrations, asRole, freshDb } from '../../../__tests__/helpers/pglite-migrations';
+import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
 import { insertRow, seedWorld, type World } from '../../../__tests__/helpers/v2-check-tables';
 import { fixture } from '../fixtures';
 import { FIRST_AUDIT } from '../view/segment/test-helpers';
 import { buildPublicSnapshot } from './build-snapshot';
+import { normalizeDomain } from '../../domain';
 import { mintV2, type MintV2Deps } from './mint';
+
+// The claim route's own modules, for the claim below: the session is `claimant`, its service-role
+// client is the PostgREST stand-in over this database, and its caches are inert.
+const session = vi.hoisted(() => ({ claimant: '' }));
+vi.mock('@/lib/supabase/server', () => ({
+  supabaseServer: async () => ({
+    auth: { getUser: async () => ({ data: { user: { id: session.claimant } } }) },
+  }),
+}));
+vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => postgrestOver(db) }));
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: async () => ({ allowed: true, remaining: 1, resetAt: new Date() }),
+}));
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: () => unknown) => fn,
+  revalidatePath: () => {},
+  revalidateTag: () => {},
+}));
 
 let db: PGlite;
 let mine: World;
 let theirs: World;
+let wwwSite: World;
 beforeAll(async () => {
   db = await freshDb();
   await applyAllMigrations(db);
   mine = await seedWorld(db, 'mint');
   theirs = await seedWorld(db, 'other');
+  wwwSite = await seedWorld(db, 'www');
 }, 300_000);
 afterAll(async () => {
   await db?.close();
@@ -167,5 +189,44 @@ describe('mintV2 on Postgres', () => {
     expect(out).toEqual({ status: 404, body: { error: 'not_found' } });
     const after = await db.query('select count(*)::int as n from public.public_reports');
     expect(after.rows).toEqual(before.rows);
+  });
+});
+
+describe('a v2 report of a www. site (correctness B4)', () => {
+  it('is claimed by the verified owner of the bare domain, through the claim route', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    try {
+      // The snapshot shows the host as the site has it, www. included.
+      const shown = { ...snapshot, host: 'www.example-outfitter.com' };
+      const out = await mintV2(
+        deps(wwwSite.ownerId, wwwSite, {
+          snapshotOf: async () => ({ snapshot: shown, accountId: wwwSite.accountId }),
+        }),
+        { checkId: checkOf(wwwSite, 'site1') },
+        '9.9.9.9',
+      );
+      const slug = (out.body as { slug: string }).slug;
+      // Verification stores the domain as `/api/verify/start` does, through normalizeDomain.
+      await db.query(
+        `insert into public.domain_verifications (user_id, domain, method, verification_token, verified_at)
+         values ($1, $2, 'dns_txt', 'token-www', now())`,
+        [wwwSite.ownerId, normalizeDomain('https://www.example-outfitter.com/')],
+      );
+
+      session.claimant = wwwSite.ownerId;
+      const { POST } = await import('../../../app/api/reports/[slug]/claim/route');
+      const res = await POST(new Request(`http://localhost/api/reports/${slug}/claim`), {
+        params: Promise.resolve({ slug }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ ok: true, slug, alreadyClaimed: false });
+      const row = await reportRow(slug);
+      expect(row).toMatchObject({ listed: true, indexable: true });
+      expect(row!.claimed_at).not.toBeNull();
+      expect((row!.report_snapshot as { host: string }).host).toBe('www.example-outfitter.com');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

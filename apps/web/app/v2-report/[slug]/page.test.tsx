@@ -132,9 +132,7 @@ describe('app/v2-report/[slug]', () => {
     expect(text).toContain('· 10 more in the full audit');
     expect(text).toContain('allowed by robots.txt');
     expect(text).toContain('verified bot, not fetched');
-    expect(text).toContain(
-      'Tested with tagged user agents from published IPs — crawlmouse.com/bot.',
-    );
+    expect(text).toContain('Tested with tagged user agents — crawlmouse.com/bot.');
     expect(text).not.toContain('this link works until');
     expect(markup.match(/data-v2-primary=""/g)).toHaveLength(1);
     expect(markup.match(/<h1/g)).toHaveLength(1);
@@ -170,12 +168,24 @@ describe('generateMetadata', () => {
   const meta = (slug = 'abc123') => route.generateMetadata(props(slug));
 
   it('titles a v2 report as the artboard does, canonical /r/<slug>, with its own OG image', async () => {
-    store.row = rowWith(snapshotOf('bad-site'));
+    const snapshot = snapshotOf('bad-site');
+    store.row = rowWith(snapshot);
+    const title = 'example-outfitter.com audit — shared by Crawlmouse';
     expect(await meta()).toEqual({
-      title: { absolute: 'example-outfitter.com audit — shared by Crawlmouse' },
+      title: { absolute: title },
+      description: snapshot.headline,
       robots: { index: false, follow: true },
       alternates: { canonical: '/r/abc123' },
-      openGraph: { images: [{ url: '/r/abc123/opengraph-image' }] },
+      openGraph: {
+        type: 'website',
+        siteName: 'Crawlmouse',
+        locale: 'en_US',
+        url: '/r/abc123',
+        title,
+        description: snapshot.headline,
+        images: [{ url: '/r/abc123/opengraph-image' }],
+      },
+      twitter: { card: 'summary_large_image', title, description: snapshot.headline },
     });
   });
 

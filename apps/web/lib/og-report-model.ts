@@ -22,8 +22,9 @@ import { whiteLabelBrandName } from './report-brand';
  * of those is forbidden by the approved refusal copy: never a dash where a letter goes, and a refusal
  * is never styled as an F.
  *
- * That path was not reachable — `isReportGone` already returns true when the grade is null, and a
- * refused audit cannot be minted at all — but it was LOADED: the fallbacks would have started printing
+ * That path was not reachable — `isReportGone` returns true when the grade is null, a v2 report's
+ * row included (pinned in `app/r/[slug]/page.v2-row.test.tsx`), and a refused audit cannot be minted
+ * at all — but it was LOADED: the fallbacks would have started printing
  * a fabricated verdict the moment anyone loosened the gone check, onto a card that is public,
  * permanent, and cached for an hour at a URL other people paste. So the invariant is made structural
  * here rather than left resting on a gate two modules away.

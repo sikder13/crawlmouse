@@ -22,7 +22,9 @@ export interface BadgeReportRow {
  * Extracted here, pure, because a route handler cannot be unit-tested — this returns the payload the
  * badge HTML is built from, so it is the assertable boundary.
  */
-export function badgeVerdict(report: BadgeReportRow | null): { slug: string; grade: string; score: number } | null {
+export function badgeVerdict(
+  report: BadgeReportRow | null,
+): { slug: string; grade: string; score: number } | null {
   if (!report || !report.grade) return null;
   if (report.score === null || report.score === '') return null;
   const score = typeof report.score === 'number' ? report.score : Number(report.score);
@@ -37,10 +39,28 @@ export function badgeVerdict(report: BadgeReportRow | null): { slug: string; gra
 // to the takedown-only query — behavior-preserving, since every pre-existing report was minted under
 // mandatory verification (= claimed) and nothing can be hidden yet. A transient error → null (no
 // badge), never a wrong badge.
-export async function readLatestVisibleReport(sb: SupabaseClient, domain: string): Promise<BadgeReportRow | null> {
-  const base = () => sb.from('public_reports').select('slug, grade, score').eq('domain', domain).is('takedown_requested_at', null);
+export async function readLatestVisibleReport(
+  sb: SupabaseClient,
+  domain: string,
+): Promise<BadgeReportRow | null> {
+  const base = () =>
+    sb
+      .from('public_reports')
+      .select('slug, grade, score')
+      .eq('domain', domain)
+      .is('takedown_requested_at', null);
 
-  const gated = await base().not('claimed_at', 'is', null).is('hidden_at', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
+  // `grade` not null: v1 reports only. A v2 report (CC-29) has no grade of its own (the insert trigger
+  // copies it from `audits`, and a v2 row names no audit), so until the badge has a v2 form a claimed
+  // v2 report must not stand in for the domain's v1 badge (lib/badge-report.db.test.ts). The grade
+  // rather than `check_id`, because 20261102000002 leaves filling `check_id` on v1 rows to a backfill.
+  const gated = await base()
+    .not('claimed_at', 'is', null)
+    .is('hidden_at', null)
+    .not('grade', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
   if (!gated.error) return (gated.data as BadgeReportRow) ?? null;
   if (isUndefinedColumnError(gated.error)) {
     const legacy = await base().order('created_at', { ascending: false }).limit(1).maybeSingle();
