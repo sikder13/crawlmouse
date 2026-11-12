@@ -68,7 +68,7 @@ describe('Pricing names only capabilities it can account for', () => {
   });
 
   it('the emails question names the renewal reminders, as FACTS does', () => {
-    const emails = PRICING_COPY.faq.items().find((i) => i.q === 'Which emails will I get?')!;
+    const emails = PRICING_COPY.faq.items(true).find((i) => i.q === 'Which emails will I get?')!;
     expect(emails.a.text).toMatch(/Three kinds and no others/);
     expect(emails.a.text).toMatch(/renewal reminders 45 and 20 days before/);
   });

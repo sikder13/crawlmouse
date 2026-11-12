@@ -96,8 +96,12 @@ const renders = (tier: Tier): PlanRow => ({
   capabilities: ['renders'],
 });
 
-/** The three plan columns (A2: Pro has two seats; K9: renders; K10: the seat and site prices). */
-export function planCopy(interval: Interval): Record<Tier, PlanCopy> {
+/**
+ * The three plan columns (A2: Pro has two seats; K9: renders; K10: the seat and site prices).
+ * `proTrial`: whether the page offers Pro's no-card trial (`pricingView` decides it from Pro's
+ * button and the flags); without it, Pro's tag says the card is required (SEO R2-N1).
+ */
+export function planCopy(interval: Interval, proTrial: boolean): Record<Tier, PlanCopy> {
   const { free, pro, agency } = GATES;
   return {
     free: {
@@ -132,7 +136,7 @@ export function planCopy(interval: Interval): Record<Tier, PlanCopy> {
     },
     pro: {
       name: 'Pro',
-      tag: `free for ${trialDays}, no card`,
+      tag: proTrial ? `free for ${trialDays}, no card` : 'card required',
       description: {
         text: `Freelancers and in-house developers watching up to ${pro.sites} sites. ${capitalise(numberWord(pro.seats))} ${plural(pro.seats, 'seat', 'seats')}.`,
         capabilities: ['sites', 'weekly_checks', 'seats'],
@@ -257,6 +261,11 @@ export const PRICING_COPY = {
       note: (interval: Interval) =>
         `Sign in first; ${usd(priceOf('pro', interval))} ${per(interval)}, the card taken by Stripe`,
     },
+    /** V2_ACCOUNT_DOOR off, V2_CHECKS_PUBLIC on: v1's sign-in, then this page offers the trial. */
+    proSignInTrial: {
+      label: `Start with ${trialDays} of Pro`,
+      note: `Sign in first; then ${trialDays} of Pro, no card`,
+    },
     proTrial: {
       label: `Start with ${trialDays} of Pro`,
       note: (interval: Interval) =>
@@ -315,7 +324,11 @@ export const PRICING_COPY = {
     } as Record<string, string>,
   },
   after: {
-    title: `What happens when the ${trialDays} end`,
+    /** Without Pro's trial on offer, the section is the Agency trial's (`proTrial`, SEO R2-N1). */
+    title: (proTrial: boolean) =>
+      proTrial
+        ? `What happens when the ${trialDays} end`
+        : `What happens when the Agency trial’s ${trialDays} end`,
     /** FACTS A6 (long form) and A8. */
     lead: (): Tagged[] => [
       {
@@ -374,13 +387,18 @@ export const PRICING_COPY = {
   },
   faq: {
     title: 'Questions people ask before paying',
-    items: (): { q: string; a: Tagged }[] => {
+    /** `proTrial`: whether the page offers Pro's no-card trial (SEO R2-N1). */
+    items: (proTrial: boolean): { q: string; a: Tagged }[] => {
       const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
+      const agencyCard =
+        'Agency’s trial takes a card at the start, and the plan is charged when the trial ends unless you cancel.';
       return [
         {
           q: 'Do I need a card for Pro?',
           a: {
-            text: `No. The ${trialDays} start with your email. Agency’s trial takes a card at the start, and the plan is charged when the trial ends unless you cancel.`,
+            text: proTrial
+              ? `No. The ${trialDays} start with your email. ${agencyCard}`
+              : `Yes: Pro starts when Stripe takes the card. ${agencyCard}`,
             capabilities: ['agency_trial', 'cancel'],
           },
         },

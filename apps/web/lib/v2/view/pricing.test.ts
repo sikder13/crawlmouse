@@ -83,9 +83,10 @@ describe('signed out', () => {
   });
 
   // Q24/Q31: Sign-up is a 404 without V2_ACCOUNT_DOOR; v1 sends people to its sign-in, which creates
-  // the account and starts no trial, so the trial is not promised there.
-  it('with V2_ACCOUNT_DOOR off, Free and Pro go to v1’s sign-in, and no trial is promised', () => {
-    const off = { accountDoor: false, checksPublic: true };
+  // the account and starts no trial. Signed in, this page then offers the Pro trial only while
+  // V2_CHECKS_PUBLIC serves its route, so Pro's note says which (SEO R2-N1).
+  it('with V2_ACCOUNT_DOOR off, Free and Pro go to v1’s sign-in, and no trial is promised there', () => {
+    const off = { accountDoor: false, checksPublic: false };
     expect(action(out, 'free', 'month', off)).toEqual({
       kind: 'link',
       href: '/login',
@@ -98,6 +99,17 @@ describe('signed out', () => {
       href: '/login',
       label: 'Choose Pro',
       note: 'Sign in first; $190 a year, the card taken by Stripe',
+      primary: true,
+    });
+  });
+
+  it('with V2_ACCOUNT_DOOR off and V2_CHECKS_PUBLIC on, Pro signs in and comes back to the trial', () => {
+    const off = { accountDoor: false, checksPublic: true };
+    expect(action(out, 'pro', 'year', off)).toEqual({
+      kind: 'link',
+      href: '/login?next=%2Fpricing%3Finterval%3Dyear',
+      label: 'Start with 14 days of Pro',
+      note: 'Sign in first; then 14 days of Pro, no card',
       primary: true,
     });
   });

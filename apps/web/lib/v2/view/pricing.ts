@@ -174,32 +174,61 @@ function freeAction(viewer: PricingViewer, flags: PricingFlags): Unranked {
   return { kind: 'note', note: COPY.buttons.freeBelow.note };
 }
 
+/**
+ * Pro's button, and whether the page offers Pro's no-card trial (`trial`), which Pro's tag, the
+ * card question and the trial section follow (SEO R2-N1):
+ * - the button starts the trial (Sign-up, or the trial route), or signs in to v1's sign-in while
+ *   V2_CHECKS_PUBLIC serves the trial route this page then offers: offered;
+ * - the button takes a card (Checkout, the portal) or signs in with no trial route: not offered;
+ * - no button (the plan held, or not the owner): offered while either flag serves a way to start it.
+ */
 function proAction(
   viewer: PricingViewer,
   interval: Interval,
   now: Date,
   flags: PricingFlags,
-): Unranked {
+): { action: Unranked; trial: boolean } {
   const trial = { label: COPY.buttons.proTrial.label, note: COPY.buttons.proTrial.note(interval) };
   const account = viewer.kind === 'signed_in' ? viewer.account : null;
   if (account === null) {
-    return flags.accountDoor
-      ? link(SIGNUP, trial)
-      : link(LOGIN, {
-          label: COPY.buttons.proSignIn.label,
-          note: COPY.buttons.proSignIn.note(interval),
-        });
+    if (flags.accountDoor) return { action: link(SIGNUP, trial), trial: true };
+    return flags.checksPublic
+      ? {
+          // Back to this page after the sign-in, where the trial is then offered.
+          action: link(
+            `${LOGIN}?next=${encodeURIComponent(pricingHref(interval))}`,
+            COPY.buttons.proSignInTrial,
+          ),
+          trial: true,
+        }
+      : {
+          action: link(LOGIN, {
+            label: COPY.buttons.proSignIn.label,
+            note: COPY.buttons.proSignIn.note(interval),
+          }),
+          trial: false,
+        };
   }
-  if (account.tier === 'pro') return { kind: 'current', ...COPY.buttons.current };
-  if (account.tier === 'agency') return { kind: 'current', ...COPY.buttons.included };
-  if (!account.owner) return { kind: 'note', note: COPY.buttons.notOwner.note };
+  const offered = flags.accountDoor || flags.checksPublic;
+  if (account.tier === 'pro') {
+    return { action: { kind: 'current', ...COPY.buttons.current }, trial: offered };
+  }
+  if (account.tier === 'agency') {
+    return { action: { kind: 'current', ...COPY.buttons.included }, trial: offered };
+  }
+  if (!account.owner) {
+    return { action: { kind: 'note', note: COPY.buttons.notOwner.note }, trial: offered };
+  }
   if (flags.checksPublic && trialRefusal(account.snapshot, now) === null) {
-    return form(PRO_TRIAL_START, { accountId: account.id }, trial);
+    return { action: form(PRO_TRIAL_START, { accountId: account.id }, trial), trial: true };
   }
-  return paidAction(account, 'pro', interval, {
-    label: COPY.buttons.proBuy.label,
-    note: COPY.buttons.proBuy.note(interval),
-  });
+  return {
+    action: paidAction(account, 'pro', interval, {
+      label: COPY.buttons.proBuy.label,
+      note: COPY.buttons.proBuy.note(interval),
+    }),
+    trial: false,
+  };
 }
 
 function agencyAction(viewer: PricingViewer, interval: Interval): Unranked {
@@ -235,10 +264,11 @@ export function pricingView(
   now: Date,
   flags: PricingFlags,
 ): PricingView {
-  const copy = planCopy(interval);
+  const pro = proAction(viewer, interval, now, flags);
+  const copy = planCopy(interval, pro.trial);
   const actions = ranked({
     free: freeAction(viewer, flags),
-    pro: proAction(viewer, interval, now, flags),
+    pro: pro.action,
     agency: agencyAction(viewer, interval),
   });
   const tiers: Tier[] = ['free', 'pro', 'agency'];
@@ -273,7 +303,7 @@ export function pricingView(
       reply: tagged(COPY.agencyPlus.reply),
     },
     after: {
-      title: COPY.after.title,
+      title: COPY.after.title(pro.trial),
       lead: COPY.after.lead().map(tagged),
       columns: COPY.after.columns,
       rows: COPY.after.rows(interval).map(([what, happens]) => [what, tagged(happens)]),
@@ -281,7 +311,7 @@ export function pricingView(
     why: { title: COPY.why.title, text: COPY.why.text().map(tagged) },
     faq: {
       title: COPY.faq.title,
-      items: COPY.faq.items().map(({ q, a }) => ({ q, a: tagged(a) })),
+      items: COPY.faq.items(pro.trial).map(({ q, a }) => ({ q, a: tagged(a) })),
     },
     comingLabel: AGENCIES_COPY.coming,
   };
