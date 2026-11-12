@@ -320,7 +320,7 @@ A tinted pill: a status glyph and a short label (rule 7).
 
 An on/off setting: a native button with role="switch" and aria-checked, inside a POST form. A
 native button is in the tab order and answers Enter and Space, so it needs no key handling of its
-own. The routes are not built yet (CC-27b), so the submit is stopped; the switch still flips.
+own. A preview stops the submit and the switch still flips; under `LiveActions` the form submits.
 
 The form posts the state the switch moves to, `!checked`. The browser reads the form after the
 click's handlers and React's re-render, so the switch flips in a later task: flipped in the click

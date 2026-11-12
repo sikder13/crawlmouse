@@ -14,6 +14,7 @@ import { doorDb, pgliteEntitlementStore } from '../../__tests__/v2/_lib/door-pgl
 import {
   applyClockEvent,
   billingClock,
+  supabaseDeletionState,
   supabaseSweepReads,
   sweepCandidates,
   type ClockDeps,
@@ -182,9 +183,39 @@ function deps(now: number, over: Partial<ClockDeps> = {}): ClockDeps {
     reads: supabaseSweepReads(postgrestOver(db)),
     sinks: sinks().sinks,
     now: () => now,
+    deletion: supabaseDeletionState(postgrestOver(db)),
     ...over,
   };
 }
+
+describe('supabaseDeletionState (CC-27b)', () => {
+  it('reads live, marked, and gone from the account row', async () => {
+    const read = supabaseDeletionState(postgrestOver(db));
+    const id = await noCardTrial();
+    expect(await read(id)).toBe('live');
+    await db.query(
+      `update public.accounts set deletion_confirmed_at = now(), purge_after = now() + interval '7 days' where id = $1`,
+      [id],
+    );
+    expect(await read(id)).toBe('marked');
+    expect(await read('00000000-0000-4000-8000-00000000dead')).toBe('gone');
+  });
+
+  it('rejects when the read fails, rather than calling the account gone (R2 item 8)', async () => {
+    const failing = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            limit: async () => ({ data: null, error: { message: 'connection refused' } }),
+          }),
+        }),
+      }),
+    } as unknown as SupabaseClient;
+    await expect(
+      supabaseDeletionState(failing)('00000000-0000-4000-8000-000000000001'),
+    ).rejects.toThrow(/accounts read failed: connection refused/);
+  });
+});
 
 describe('applyClockEvent on the real schema', () => {
   it('the reminder of a no-card trial plans one email.requested, keyed by the trial’s end, and writes nothing', async () => {

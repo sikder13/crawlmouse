@@ -336,16 +336,22 @@ describe('Change notes name one sender', () => {
 });
 
 describe('Who builds each account route', () => {
-  it('the account pages CC-27 previews are wired by CC-27b, as the CC-27 brief says', () => {
+  it('the account pages CC-27 previews are wired by the steps the owner named', () => {
     const cc27b = Object.entries(ACCOUNT_ACTIONS)
       .filter(([, a]) => a.owner === 'CC-27b')
       .map(([key]) => key)
       .sort();
-    expect(cc27b).toEqual(
-      ['alertRules', 'changeLog', 'emailSettings', 'integrations', 'plan', 'reports'].sort(),
-    );
+    // CC-27b D10 moved `reports` to wave 2; owner ruling Q15 gave the change log and the per-site
+    // rules to CC-28, and Integrations a later page of its own.
+    expect(cc27b).toEqual(['emailSettings', 'plan']);
+    expect(ACCOUNT_ACTIONS.reports.owner).toBe('wave 2');
+    expect([ACCOUNT_ACTIONS.changeLog.owner, ACCOUNT_ACTIONS.alertRules.owner]).toEqual([
+      'CC-28',
+      'CC-28',
+    ]);
+    expect(ACCOUNT_ACTIONS.integrations.owner).toBe('later');
     expect(new Set(Object.values(ACCOUNT_ACTIONS).map((a) => a.owner))).toEqual(
-      new Set(['CC-26b', 'CC-27b', 'built']),
+      new Set(['CC-26b', 'CC-27b', 'CC-28', 'wave 2', 'later', 'built']),
     );
   });
 });

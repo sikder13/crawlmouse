@@ -63,6 +63,14 @@ export const FUNNEL_EVENTS = [
   // verifies a fix. Its re-checks and first checks send CC-22b's `check_started {trigger, check_ref}`.
   'fix_marked_done',
   'fix_closed',
+  // CC-27b — the account's identity and exit. Sent from the server (lib/v2/account/account-events.ts),
+  // keyed by the account's id, with no address: the email change applied, and a deletion requested,
+  // confirmed, restored and purged.
+  'account_email_changed',
+  'account_deletion_requested',
+  'account_deletion_confirmed',
+  'account_restored',
+  'account_purged',
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];

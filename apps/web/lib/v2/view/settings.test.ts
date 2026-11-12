@@ -119,7 +119,7 @@ describe('Settings, the danger zone', () => {
   it('counts every site the deletion removes, staging included, and says how long it can be undone', () => {
     const d = home().danger;
     expect(d.text).toBe(
-      'Removes all five sites, their history and reports. Takes effect after a confirmation link. For seven days the sign-in email can undo it; after that nothing is kept.',
+      'Removes all five sites, their history and reports. Takes effect after a confirmation link. For seven days the restore link in that email undoes it; after that the account is erased, apart from the few things the confirmation page lists.',
     );
     // "Delete…" opens the confirmation step, where the owner re-types the hostname.
     expect(d.action).toMatchObject({ label: 'Delete…', href: '/settings/delete', method: 'get' });

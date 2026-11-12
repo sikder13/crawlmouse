@@ -1434,7 +1434,7 @@
       "id": "B-F2",
       "severity": "major",
       "items": ["public.users", "app/privacy/page.tsx", "app/terms/page.tsx"],
-      "evidence": "infra/supabase/migrations/20261109000003_users_auth_cascade.sql:14; scripts/ops/erase-account.ts:331",
+      "evidence": "infra/supabase/migrations/20261109000003_users_auth_cascade.sql:14; scripts/ops/erase-account.ts:105",
       "what": "/privacy and /terms promise erasure on request; no code deletes public.users, public.users has no FK to auth.users, and the email also sits unlinked in rate_limits keys, email_events, audits.notify_email, waitlist and takedown_requests. Erasure is possible by hand in SQL; what is missing is the process and the cascade. Fixed by the users_id_auth_fkey cascade, scripts/ops/erase-account.ts and docs/ops/erasure.md.",
       "fixedIn": "66f8d04e"
     },

@@ -118,6 +118,7 @@ const SCRUBBER_ONLY = [
   'URLCANARY',
   'CHECKIDCANARY',
   'c4ec4c4e-c4ec',
+  'LINKCANARY',
 ];
 
 describe('the server SDK sends no door secret in an event or a transaction', () => {
@@ -152,6 +153,7 @@ describe('the server SDK sends no door secret in an event or a transaction', () 
       'URLCANARY',
       'CHECKIDCANARY',
       'c4ec4c4e-c4ec',
+      'LINKCANARY',
     ]) {
       expect(out, canary).toContain(canary);
     }
@@ -205,6 +207,28 @@ describe('scrubDoorSecrets, inside strings', () => {
     expect(out.breadcrumbs[0]!.message).toBe('next=%2Fapi%2Fchecks%2F[Filtered]%2Fclaim');
     // An id that is not in a check path is not a claim right: a user id stays readable.
     expect(out.user.id).toBe(id);
+  });
+
+  it('replaces an emailed account link’s token in each of the four paths, plain and URL-encoded', () => {
+    const token = 'Ab3_-'.repeat(8) + 'xyz';
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    for (const flow of ['delete', 'restore', 'email', 'email-undo']) {
+      const out = scrubDoorSecrets({
+        transaction: `GET /account/${flow}/${token}`,
+        request: { url: `https://crawlmouse.com/account/${flow}/${token}?x=1` },
+        breadcrumbs: [{ message: `to=%2Faccount%2F${flow}%2F${token}` }],
+      });
+      expect(out.transaction).toBe(`GET /account/${flow}/[Filtered]`);
+      expect(out.request.url).toBe(`https://crawlmouse.com/account/${flow}/[Filtered]?x=1`);
+      expect(out.breadcrumbs[0]!.message).toBe(`to=%2Faccount%2F${flow}%2F[Filtered]`);
+    }
+    // URL-encoding may spell the slash in lowercase.
+    const lower = scrubDoorSecrets({ message: `to=%2faccount%2fdelete%2f${token}` });
+    expect(lower.message).toBe('to=%2faccount%2fdelete%2f[Filtered]');
+    // The pages the links land on carry no token and are left as they are.
+    expect(scrubDoorSecrets({ transaction: 'GET /account/delete' }).transaction).toBe(
+      'GET /account/delete',
+    );
   });
 
   it('replaces a post_login_next value in a cookie header string', () => {

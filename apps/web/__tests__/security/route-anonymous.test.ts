@@ -64,6 +64,9 @@ const ANONYMOUS: Record<
   string,
   { status: number; body?: unknown; location?: string; reads?: string[] }
 > = {
+  'api/account': { status: 401, body: { code: 'auth_required' } },
+  'api/account/email': { status: 401, body: { code: 'auth_required' } },
+  'api/alert-rules': { status: 401, body: { code: 'auth_required' } },
   'api/audits/[id]/export': { status: 401, body: { error: 'auth_required' } },
   'api/audits/[id]/llms-txt': { status: 401, body: { error: 'auth_required' } },
   // authorizeReaudit decides with the audit row in hand, so the row is read first.
@@ -102,8 +105,8 @@ const ID = '6f1c2a8e-0000-4000-8000-000000000000';
 beforeEach(() => {
   calls.length = 0;
   vi.stubEnv('V2_ACCOUNT_DOOR', '1');
-  // The CC-26b routes answer 404 with V2_CHECKS_PUBLIC unset, and the two that request a check
-  // answer 503 before the session with V2_PIPELINE unset.
+  // The CC-26b routes answer 404 with V2_CHECKS_PUBLIC unset (so do CC-27b's account routes), and
+  // the two that request a check answer 503 before the session with V2_PIPELINE unset.
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
   vi.stubEnv('V2_PIPELINE', '1');
   vi.stubEnv('CRAWL_PAUSED', '');

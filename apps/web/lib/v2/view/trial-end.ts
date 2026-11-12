@@ -29,12 +29,14 @@ import {
   primarySites,
   resultChecks,
   viewAt,
+  type AccountView,
   type Viewer,
 } from './account';
 import { ACCOUNT_NAV, action, type ActionView } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { freeFixes } from './free-fixes';
 import { GRADES } from './segment/changes';
+import type { SeatRole } from '../account/profile';
 
 export interface TrialRowView {
   what: string;
@@ -55,9 +57,10 @@ export interface TrialEndView {
   /**
    * `keep`: on a trial with no card, the checkout that keeps the plan (the page's orange action);
    * null on a trial with a card, which becomes the plan at its end unless it is cancelled. `end`:
-   * leaving it to end (no card), or cancelling it (a card).
+   * leaving it to end (no card, or a card trial already set to cancel), or cancelling it (a card).
+   * Both are null for a seat that is not the owner's: the choice is the owner's to make.
    */
-  banner: { title: string; sub: string; keep: ActionView | null; end: ActionView };
+  banner: { title: string; sub: string; keep: ActionView | null; end: ActionView | null };
   staysTitle: string;
   stays: TrialRowView[];
   pausesTitle: string;
@@ -89,7 +92,19 @@ function numbersText(numbers: readonly number[]): string {
     : listOf(numbers.map(String));
 }
 
-export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
+/** What a live page knows beyond the dataset: the subscription set to end, and the reader's seat. */
+export interface TrialReading {
+  /** When a subscription set to cancel at its period's end ends; null when it is not set to. */
+  billingEnd?: string | null;
+  /** The reader's seat role: only the owner is offered the plan's checkout or its cancel. */
+  role?: SeatRole;
+}
+
+export function trialEndView(
+  d: FixtureDataset,
+  viewer: Viewer,
+  { billingEnd = null, role = 'owner' }: TrialReading = {},
+): TrialEndView {
   const v = viewAt(d, viewer);
   const a = v.account;
   if (a.state !== 'pro_trial' && a.state !== 'agency_trial') {
@@ -103,10 +118,9 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
   const price = v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY;
   const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
   const card = a.card_last4;
-  const site = primarySite(v);
-  const others = primarySites(v).filter((s) => s.id !== site.id);
-  const staging = v.d.sites.filter((s) => s.staging_of_site_id !== null);
-  const free = FREE_SCHEDULE[GATES.free.schedule];
+  // A card trial set to cancel at its end is not charged: it ends as a trial with no card does.
+  const cancelled = card !== null && billingEnd !== null;
+  const owner = role === 'owner';
   const hostOf = new Map(v.d.sites.map((s) => [s.id, s.host]));
   const checkSite = new Map(v.d.checks.map((c) => [c.id, c.site_id]));
 
@@ -127,90 +141,32 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
 
   // ── the banner ──
   const reminder = daysBefore(end, TRIAL_REMINDER_DAYS_BEFORE_END, zone);
-  const sent =
-    a.email_prefs.trial_reminder && at(reminder) <= at(v.now)
-      ? sameDay(reminder, v.now, zone)
-        ? COPY.sentToday
-        : COPY.sentOn(dayDate(reminder, zone))
+  // Nothing records a send (CC-28 sends it): the line says when the reminder is due, from its day
+  // until that day is over in the account's zone, and nothing after.
+  const reminderLine =
+    a.email_prefs.trial_reminder && (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
+      ? COPY.reminderDue(dayDate(reminder, zone))
       : null;
-  const cardLine = card === null ? COPY.noCard : COPY.card(card, dayDate(end, zone));
+  const cardLine =
+    card === null
+      ? COPY.noCard
+      : cancelled
+        ? COPY.cardCancelled(card, dayDate(end, zone))
+        : COPY.card(card, dayDate(end, zone));
   const dashboard = ACCOUNT_NAV[0];
 
-  // ── the fixes at the primary site's latest result ──
-  const latest = resultChecks(v, site.id).at(-1);
-  const open = latest ? fixesAsOf(v.d, latest) : [];
-  const freeThree = latest ? freeFixes(v.d, latest) : [];
-  const freeIds = new Set(freeThree.map((f) => f.id));
-  const onPro = open
-    .filter((f) => !freeIds.has(f.id))
-    .map((f) => f.number)
-    .sort((x, y) => x - y);
-  const withPacket = open.filter((f) => f.packet !== null);
-  const freeWithPacket = withPacket.filter((f) => freeIds.has(f.id));
-  const closedPackets = withPacket.length - freeWithPacket.length;
-
-  // ── what stays and what pauses ──
-  const emails = a.email_prefs.change_notes;
-  const alertsByEmail =
-    emails && v.d.alert_rules.some((r) => r.enabled && r.channels.includes('email'));
-  const stays: TrialRowView[] = [
-    { what: site.host, how: COPY.stays.site(free, alertsByEmail) },
-    { what: COPY.stays.evidence, how: COPY.stays.kept(EVIDENCE_CONDENSED_AFTER_DAYS) },
-    ...(freeThree.length
-      ? [
-          {
-            what: COPY.stays.freeFixes(freeThree.map((f) => f.number).sort((x, y) => x - y)),
-            how: COPY.stays.packetsOpen,
-          },
-        ]
-      : []),
-    ...(v.d.reports.some((r) => r.kind === 'public_link' && r.site_id === site.id)
-      ? [{ what: COPY.stays.publicLink, how: COPY.stays.keepsWorking }]
-      : []),
-    ...(alertsByEmail
-      ? [{ what: COPY.stays.alerts(site.host), how: COPY.stays.alertsBy(free) }]
-      : []),
-  ];
-  const slack = a.integrations.some((i) => i.kind === 'slack' && i.connected);
-  const features = [
-    ...(GATES.free.schedule !== 'weekly' && v.d.sites.some((s) => s.schedule?.cadence === 'weekly')
-      ? [COPY.pauses.features.weekly]
-      : []),
-    ...(!GATES.free.slack && slack ? [COPY.pauses.features.slack] : []),
-    ...(GATES.free.competitorsPerSite === 0 && v.d.sites.some((s) => s.competitor_hosts.length)
-      ? [COPY.pauses.features.competitor]
-      : []),
-    ...(!GATES.free.exports &&
-    v.d.reports.some(
-      (r) => r.kind === 'audit_pdf' || r.kind === 'compare' || r.kind === 'raw_export',
-    )
-      ? [COPY.pauses.features.exports]
-      : []),
-  ];
-  const pauses: TrialRowView[] = [
-    ...(others.length
-      ? [{ what: listOf(others.map((s) => s.host)), how: COPY.pauses.sitesHow }]
-      : []),
-    ...(staging.length && !GATES.free.stagingAndDeployHooks
-      ? [{ what: listOf(staging.map((s) => s.host)), how: COPY.pauses.stagingHow }]
-      : []),
-    ...(onPro.length
-      ? [
-          {
-            what: COPY.pauses.fixes(numbersText(onPro), onPro.length, plan),
-            how: COPY.pauses.fixesHow(closedPackets),
-          },
-        ]
-      : []),
-    ...(features.length
-      ? [
-          {
-            what: features.join(', '),
-            how: alertsByEmail ? COPY.pauses.featuresHow : COPY.pauses.featuresOff,
-          },
-        ]
-      : []),
-  ];
+  const {
+    site,
+    others,
+    staging,
+    free,
+    freeThree,
+    open,
+    withPacket,
+    freeWithPacket,
+    stays,
+    pauses,
+  } = staysAndPauses(v, plan);
 
   // ── what Pro did, between the trial's start and now ──
   // From the trial's start; `viewAt` already keeps nothing later than `now`.
@@ -260,7 +216,7 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
 
   return {
     // Reached from the dashboard's banner: it sits under Sites, as Final-TrialEnd marks it.
-    shell: accountShellView(v, 'Sites', { plan: 'page' }),
+    shell: accountShellView(v, 'Sites', { plan: 'page', billingEnd, role }),
     header: {
       title: COPY.title(days, plan),
       line,
@@ -268,9 +224,9 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
     },
     banner: {
       title: COPY.bannerTitle(plan, dayDate(end, zone)),
-      sub: [sent, cardLine].filter(Boolean).join(' '),
+      sub: [reminderLine, cardLine].filter(Boolean).join(' '),
       keep:
-        card === null
+        owner && card === null
           ? action(
               'keepPlan',
               COPY.keepNoCard(plan, price),
@@ -281,8 +237,9 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
               },
             )
           : null,
-      end:
-        card === null
+      end: !owner
+        ? null
+        : card === null || cancelled
           ? {
               label: COPY.letItEnd(dayDate(end, zone)),
               route: dashboard.href,
@@ -357,23 +314,206 @@ export function trialEndView(d: FixtureDataset, viewer: Viewer): TrialEndView {
     keepText: [
       card === null
         ? COPY.keepNoCardText(price, yearly)
-        : COPY.keepCardText(
-            card,
-            a.billing_period_months === 12 ? yearly : price,
-            dayDate(end, zone),
-            a.billing_period_months === 12 ? 'year' : 'month',
-          ),
+        : cancelled
+          ? COPY.cancelledKeepText(card, dayDate(end, zone))
+          : COPY.keepCardText(
+              card,
+              a.billing_period_months === 12 ? yearly : price,
+              dayDate(end, zone),
+              a.billing_period_months === 12 ? 'year' : 'month',
+            ),
       COPY.terms(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
     ].join(' '),
-    endTitle: card === null ? COPY.endTitle : COPY.cancelTitle,
+    endTitle: card === null || cancelled ? COPY.endTitle : COPY.cancelTitle,
     endText: [
-      card === null
+      card === null || cancelled
         ? COPY.endNothing(dayDate(end, zone))
         : COPY.endCancel(dayDate(end, zone), CANCEL_CLICKS),
       COPY.endKeeps(site.host, free, freeThree.length, others.length, staging.length > 0, plan),
     ].join(' '),
     tables: COPY.tables,
     columns: COPY.columns,
+  };
+}
+
+export interface TrialEndedView {
+  shell: ShellView;
+  header: { title: string; line: string };
+  /** `keep`: the checkout for the plan the trial was of, the page's orange action; the owner's only. */
+  banner: { title: string; sub: string; keep: ActionView | null };
+  staysTitle: string;
+  stays: TrialRowView[];
+  pausesTitle: string;
+  pauses: TrialRowView[];
+  tables: typeof COPY.tables;
+  columns: typeof COPY.columns;
+}
+
+const TRIAL_TIER = { pro_trial: 'pro', agency_trial: 'agency' } as const;
+
+/**
+ * Trial ending after the end (CC-27b D8): an account on Free whose state before was a trial. What
+ * stays and what is paused are read as before the end, now on Free. Null for any other account, and
+ * for one with no primary site.
+ */
+export function trialEndedView(
+  d: FixtureDataset,
+  viewer: Viewer,
+  { role = 'owner' }: Pick<TrialReading, 'role'> = {},
+): TrialEndedView | null {
+  const v = viewAt(d, viewer);
+  const a = v.account;
+  const before = a.state_history.at(-2)?.state;
+  if (a.state !== 'free' || (before !== 'pro_trial' && before !== 'agency_trial')) return null;
+  if (primarySites(v).length === 0) return null;
+  const tier = TRIAL_TIER[before];
+  const plan = PLAN_NAMES[tier];
+  const zone = a.timezone;
+  const { stays, pauses } = staysAndPauses(v, plan);
+  return {
+    shell: accountShellView(v, 'Sites', { plan: 'page', role }),
+    header: {
+      title: COPY.ended.title(plan),
+      line: [dayDate(v.now, zone), COPY.sites(v.d.sites.length)].join(' · '),
+    },
+    banner: {
+      title: COPY.ended.banner(plan, dayDate(a.state_history.at(-1)!.since, zone)),
+      sub: COPY.ended.sub(plan),
+      keep:
+        role !== 'owner'
+          ? null
+          : action(
+              'keepPlan',
+              COPY.ended.choose(plan, tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY),
+              {},
+              { primary: true, fields: { plan: tier, interval: 'month' } },
+            ),
+    },
+    staysTitle: COPY.staysTitle,
+    stays,
+    pausesTitle: COPY.ended.pausesTitle(plan),
+    pauses,
+    tables: COPY.tables,
+    columns: COPY.columns,
+  };
+}
+
+/**
+ * What `GET /trial-ended` shows (spec 27 "Trial ending", one page for both states): the trial still
+ * running, read at `now`; the account back on Free after one; null for an account with no trial to
+ * show, or with no primary site to show it of.
+ */
+export function trialPage(
+  d: FixtureDataset,
+  viewer: Viewer,
+  reading: TrialReading = {},
+): { kind: 'before'; view: TrialEndView } | { kind: 'after'; view: TrialEndedView } | null {
+  const v = viewAt(d, viewer);
+  if (primarySites(v).length === 0) return null;
+  if (v.account.state === 'pro_trial' || v.account.state === 'agency_trial')
+    return { kind: 'before', view: trialEndView(d, viewer, reading) };
+  const view = trialEndedView(d, viewer, { role: reading.role });
+  return view === null ? null : { kind: 'after', view };
+}
+
+/**
+ * What stays on Free and what pauses until the plan, for the trial's `plan`: the oldest primary
+ * site with its free three, public link and email alerts stay; the other primary sites, the staging
+ * copies, the fixes beyond the three and the paid features the account uses pause. Trial ending reads
+ * it before the end, and Trial ended after it.
+ */
+function staysAndPauses(v: AccountView, plan: string) {
+  const site = primarySite(v);
+  const others = primarySites(v).filter((s) => s.id !== site.id);
+  const staging = v.d.sites.filter((s) => s.staging_of_site_id !== null);
+  const free = FREE_SCHEDULE[GATES.free.schedule];
+  // ── the fixes at the primary site's latest result ──
+  const latest = resultChecks(v, site.id).at(-1);
+  const open = latest ? fixesAsOf(v.d, latest) : [];
+  const freeThree = latest ? freeFixes(v.d, latest) : [];
+  const freeIds = new Set(freeThree.map((f) => f.id));
+  const onPro = open
+    .filter((f) => !freeIds.has(f.id))
+    .map((f) => f.number)
+    .sort((x, y) => x - y);
+  const withPacket = open.filter((f) => f.packet !== null);
+  const freeWithPacket = withPacket.filter((f) => freeIds.has(f.id));
+  const closedPackets = withPacket.length - freeWithPacket.length;
+
+  // ── what stays and what pauses ──
+  const emails = v.account.email_prefs.change_notes;
+  const alertsByEmail =
+    emails && v.d.alert_rules.some((r) => r.enabled && r.channels.includes('email'));
+  const stays: TrialRowView[] = [
+    { what: site.host, how: COPY.stays.site(free, alertsByEmail) },
+    { what: COPY.stays.evidence, how: COPY.stays.kept(EVIDENCE_CONDENSED_AFTER_DAYS) },
+    ...(freeThree.length
+      ? [
+          {
+            what: COPY.stays.freeFixes(freeThree.map((f) => f.number).sort((x, y) => x - y)),
+            how: COPY.stays.packetsOpen,
+          },
+        ]
+      : []),
+    ...(v.d.reports.some((r) => r.kind === 'public_link' && r.site_id === site.id)
+      ? [{ what: COPY.stays.publicLink, how: COPY.stays.keepsWorking }]
+      : []),
+    ...(alertsByEmail
+      ? [{ what: COPY.stays.alerts(site.host), how: COPY.stays.alertsBy(free) }]
+      : []),
+  ];
+  const slack = v.account.integrations.some((i) => i.kind === 'slack' && i.connected);
+  const features = [
+    ...(GATES.free.schedule !== 'weekly' && v.d.sites.some((s) => s.schedule?.cadence === 'weekly')
+      ? [COPY.pauses.features.weekly]
+      : []),
+    ...(!GATES.free.slack && slack ? [COPY.pauses.features.slack] : []),
+    ...(GATES.free.competitorsPerSite === 0 && v.d.sites.some((s) => s.competitor_hosts.length)
+      ? [COPY.pauses.features.competitor]
+      : []),
+    ...(!GATES.free.exports &&
+    v.d.reports.some(
+      (r) => r.kind === 'audit_pdf' || r.kind === 'compare' || r.kind === 'raw_export',
+    )
+      ? [COPY.pauses.features.exports]
+      : []),
+  ];
+  const pauses: TrialRowView[] = [
+    ...(others.length
+      ? [{ what: listOf(others.map((s) => s.host)), how: COPY.pauses.sitesHow }]
+      : []),
+    ...(staging.length && !GATES.free.stagingAndDeployHooks
+      ? [{ what: listOf(staging.map((s) => s.host)), how: COPY.pauses.stagingHow }]
+      : []),
+    ...(onPro.length
+      ? [
+          {
+            what: COPY.pauses.fixes(numbersText(onPro), onPro.length, plan),
+            how: COPY.pauses.fixesHow(closedPackets),
+          },
+        ]
+      : []),
+    ...(features.length
+      ? [
+          {
+            what: features.join(', '),
+            how: alertsByEmail ? COPY.pauses.featuresHow : COPY.pauses.featuresOff,
+          },
+        ]
+      : []),
+  ];
+
+  return {
+    site,
+    others,
+    staging,
+    free,
+    freeThree,
+    open,
+    withPacket,
+    freeWithPacket,
+    stays,
+    pauses,
   };
 }
 
