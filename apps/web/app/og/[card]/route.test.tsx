@@ -20,13 +20,23 @@ vi.mock('next/og', () => ({
   },
 }));
 
+// The card module as it is, with its response function watched: the route's own gate answers before it.
+vi.mock('@/lib/v2/social-card', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/v2/social-card')>();
+  return { ...real, socialCardResponse: vi.fn(real.socialCardResponse) };
+});
+
 const { GET } = await import('./route');
-const { CARD_TOKENS, SOCIAL_CARDS, socialCardPath } = await import('@/lib/v2/social-card');
+const { CARD_TOKENS, SOCIAL_CARDS, socialCardPath, socialCardResponse } =
+  await import('@/lib/v2/social-card');
 const { AGENCIES_COPY } = await import('@/lib/v2/copy/agencies');
 const { CHECK_COPY } = await import('@/lib/v2/copy/check-pages');
 const { DEVELOPERS_COPY } = await import('@/lib/v2/copy/developers');
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.mocked(socialCardResponse).mockClear();
+});
 
 const get = (card: string) =>
   GET(new Request(`https://crawlmouse.com/og/${card}`), {
@@ -92,6 +102,18 @@ describe('GET /og/<card>', () => {
       'public, immutable, no-transform, max-age=31536000',
     );
     expect(real.headers.get('content-type')).toBe('image/png');
+  });
+
+  it('with both flags off, a 404 for every card without asking the card table', async () => {
+    vi.stubEnv('V2_BILLING', '');
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    for (const card of [...Object.keys(SOCIAL_CARDS), 'home']) {
+      expect((await get(card)).status).toBe(404);
+    }
+    expect(socialCardResponse).not.toHaveBeenCalled();
+    vi.stubEnv('V2_BILLING', '1');
+    await get('pricing');
+    expect(socialCardResponse).toHaveBeenCalledWith('pricing');
   });
 
   it.each(['', 'home', 'v2-pricing', 'check-other', '__proto__', 'constructor', 'toString'])(
