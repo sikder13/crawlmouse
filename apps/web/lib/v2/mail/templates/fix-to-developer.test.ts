@@ -45,6 +45,13 @@ describe('fix-to-developer (D2)', () => {
     expect(m.subject).not.toMatch(/[\r\n]/);
   });
 
+  it('folds the title to one line and cuts it at TITLE_MAX in the subject, not only at the subject’s bound', () => {
+    const m = fixToDeveloper({ ...input, fixTitle: `Line one\r\n\tBcc: x\n${'w'.repeat(300)}` });
+    // Worked by hand: breaks and tabs become one space, then 119 code points and an ellipsis.
+    expect(TITLE_MAX).toBe(120);
+    expect(m.subject).toBe(`A fix for example.com: Line one Bcc: x ${'w'.repeat(103)}…`);
+  });
+
   it('bounds the title and the packet, saying when the packet was cut', () => {
     const m = fixToDeveloper({
       host: 'h'.repeat(500),
