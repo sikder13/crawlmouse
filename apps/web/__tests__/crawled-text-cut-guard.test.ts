@@ -633,6 +633,38 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice of the URLs or phrases a verify command names (`listed`), bounded by count and by total length; `expect` says how many were left out. No string is cut (CC-30).',
   ],
   [
+    'packages/engine/src/v2/packets/by-type/generic-anchor-text.ts :: const seen = named.slice(0, MAX_SEEN);',
+    'ARRAY slice of the generic link texts the readable command names, to bound it; the line counts the rest. No string is cut (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/html-checks.ts :: .slice(1)',
+    'STRING slice of `URL.search`, to drop its leading ASCII `?` before the query is sorted for comparison. Used to compare two URLs in the engine only; never persisted or rendered (CC-30, compared).',
+  ],
+  [
+    "packages/engine/src/v2/packets/html-checks.ts :: const wordUrl = (target: string): string => url(target).word.slice(1, -1).replaceAll(`'\\\\''`, \"'\");",
+    'STRING slice of a URL already written by `url` (packets/shell.ts): ASCII only, every other character percent-encoded, so no cut can split a surrogate pair. It removes the two ASCII quotes around the shell word (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/html-checks.ts :: text.replace(/%([0-9A-Fa-f]{2})/g, (_, hex: string) =>',
+    'NOT A CUT: a `{2}` quantifier matching the two hex digits of one percent-escape, to decode it for comparing two URLs. Nothing is truncated, and the result is compared, never persisted or rendered (CC-30, compared).',
+  ],
+  [
+    'packages/engine/src/v2/packets/structure.ts :: const path = written.slice(new URL(written).origin.length);',
+    'STRING slice of a URL already written by `url` (packets/shell.ts): ASCII only, every other character percent-encoded, so no cut can split a surrogate pair. It drops the origin, which ends on an ASCII boundary (CC-30, pathOf).',
+  ],
+  [
+    "packages/engine/src/v2/packets/structure.ts :: const written = urlWord(target).word.slice(1, -1).replaceAll(`'\\\\''`, \"'\");",
+    'STRING slice of a URL already written by `url` (packets/shell.ts): ASCII only, every other character percent-encoded, so no cut can split a surrogate pair. It removes the two ASCII quotes around the shell word (CC-30, pathOf).',
+  ],
+  [
+    "packages/engine/src/v2/packets/test-support/content.ts :: ...(ours.match(new RegExp(`\\\\b1 (?:[a-z]+ ){1,2}(?:${COUNTED})\\\\b`, 'g')) ?? []),",
+    'NOT A CUT: a `{1,2}` quantifier in a test helper’s pattern for "1 <plural>" wording; it matches, it does not truncate, and nothing is persisted (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/test-support/structure.ts :: res.writeHead(301, { location: body.slice(MOVED.length) }).end('moved');",
+    'STRING slice in a test server: the redirect target after a fixed ASCII marker the test itself wrote. Test support only (CC-30).',
+  ],
+  [
     "packages/engine/src/v2/packets/shell.ts :: return quoted([...clean(crawled)].slice(0, max).join(''));",
     'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). Crawled text in a verify command, cut to its bound before it is single-quoted (CC-30, crawledWord).',
   ],

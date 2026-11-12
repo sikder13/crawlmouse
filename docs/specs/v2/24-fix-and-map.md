@@ -94,7 +94,7 @@ The last three of the packet’s own cases add “If yours is listed under “Ch
 
 A packet body’s `verify.see` is a short command that prints the evidence, with what it prints today and after the fix (`{ command, today, after }`), or null (owner rulings 1 and Q8). Where it is not null, the block (`packetBlock` in `apps/web/lib/v2/view/fix.ts`), the segment’s open fix and the prompt (`verifyLines` in `apps/web/lib/v2/view/segment/fixes.ts`) show two layers: “See it”, then “Exact check” with the strict command. “Download as .md” saves the prompt. Where it is null, the verify section is the strict command and what to expect, as before.
 
-Of the packets in the contract fixtures, 4 have a readable command. The example below is the bad site’s fix 2 with a hand-made one (`withSee` in `apps/web/lib/v2/view/test-support/multi-body.ts`): first the block’s Verify section, then the prompt’s.
+Of the packets in the contract fixtures, 11 have a readable command. The example below is the bad site’s fix 2 with a hand-made one (`withSee` in `apps/web/lib/v2/view/test-support/multi-body.ts`): first the block’s Verify section, then the prompt’s.
 
 ```text
 Verify

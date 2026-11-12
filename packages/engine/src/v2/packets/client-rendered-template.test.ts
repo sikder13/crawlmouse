@@ -313,7 +313,9 @@ describe('js_only_navigation', () => {
     expect(jsOnlyNavigation.kind).toBe('none');
     if (jsOnlyNavigation.kind !== 'none') return;
     expect(jsOnlyNavigation.reason).toMatch(/word counts/);
-    expect(jsOnlyNavigation.reason).toMatch(/No link of the rendered side is kept/);
+    expect(jsOnlyNavigation.reason).toMatch(/keeps no link from the rendered page/);
+    // the page prints this reason: no field name or enum value in it
+    expect(jsOnlyNavigation.reason).not.toMatch(/[a-z]+_[a-z_]+/);
   });
 });
 
