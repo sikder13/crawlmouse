@@ -665,6 +665,18 @@ const INVENTORY: [entry: string, why: string][] = [
     'STRING slice in a test server: the redirect target after a fixed ASCII marker the test itself wrote. Test support only (CC-30).',
   ],
   [
+    "packages/engine/src/v2/packets/structure.ts :: const tail = [...path].slice(-PATH_TAIL_CHARS).join('');",
+    'CODE-POINT cut, not a char-index one: the receiver is `[...path]`, an array of whole code points, so the cut cannot split a surrogate pair. The end of a long path, kept so a readable command stays short (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/test-support/structure.ts :: ...(ours.match(new RegExp(`\\\\b1 (?:[a-z]+ ){1,2}(?:${COUNTED})\\\\b`, 'g')) ?? []),",
+    'NOT A CUT: a `{1,2}` quantifier in a test helper’s pattern for "1 <plural>" wording; it matches, it does not truncate, and nothing is persisted (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/test-support/structure.ts :: const list = u('list').slice(0, -8);",
+    'STRING slice in a test helper, of an ASCII URL the test itself builds, to make a second URL of the same length. Test support only (CC-30).',
+  ],
+  [
     "packages/engine/src/v2/packets/shell.ts :: return quoted([...clean(crawled)].slice(0, max).join(''));",
     'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). Crawled text in a verify command, cut to its bound before it is single-quoted (CC-30, crawledWord).',
   ],
