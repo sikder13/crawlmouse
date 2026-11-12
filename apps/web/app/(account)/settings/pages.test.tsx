@@ -356,6 +356,20 @@ describe('/trial-ended', () => {
     expect(renderToStaticMarkup(el)).toContain('Back on Free: the Pro trial ended');
   });
 
+  it('seeds the account’s default alert rules before it reads them, so alerts by email read as on (Q13)', async () => {
+    const db = h.db as PGlite;
+    await db.query(`delete from public.alert_rules where account_id = $1`, [ended.accountId]);
+    as(ended);
+    const html = renderToStaticMarkup(screen(await TrialEndedPage()));
+    const { rows } = await db.query<{ n: number }>(
+      `select count(*)::int n from public.alert_rules where account_id = $1 and site_id is null`,
+      [ended.accountId],
+    );
+    expect(rows[0]!.n).toBe(6);
+    // "What stays": email alerts are listed only while an enabled rule sends by email.
+    expect(html).toContain('still sent by email');
+  });
+
   it('an account with no trial is sent to the plan card, a non-owner to the dashboard', async () => {
     as(owner);
     await expect(TrialEndedPage()).rejects.toMatchObject(redirectTo('/settings/plan'));

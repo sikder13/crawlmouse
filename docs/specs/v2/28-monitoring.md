@@ -141,10 +141,11 @@ plain text with Slack's `& < >` escapes and link previews off. `alert_events.des
 mail pepper of the sorted recipient hashes (email) or of the URL (Slack).
 
 The six default rules (Q13) are seeded by the migration's backfill, for the accounts that exist when it runs, and
-again, for any kind missing, in three places: before alertFn evaluates a check that is not a site's first
-(`lib/v2/monitor/alerts.ts` `load`), before the Alerts page reads (`app/alerts/page.tsx`), and before a site's page
-reads (`app/sites/[id]/page.tsx`). An account made after the migration that none of these has reached holds no rule
-yet; the trial-ended screen reads the rules without seeding them (`lib/v2/view/trial-end.ts`, known gaps). Verify:
+again, for any kind missing, in four places: before alertFn evaluates a check that is not a site's first
+(`lib/v2/monitor/alerts.ts` `load`), before the Alerts page reads (`app/alerts/page.tsx`), before a site's page
+reads (`app/sites/[id]/page.tsx`), and before Settings and the trial screen read (`readSettingsPage`,
+`lib/v2/account/settings-pages.ts`). An account made after the migration that none of these has reached holds no
+rule yet. Verify:
 `grep -rn "seedDefaultAlertRules\|seedDefaultRules(" apps/web/app apps/web/lib --include=*.ts --include=*.tsx | grep -v test`.
 
 ## Erasure (D9)
@@ -208,9 +209,6 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
   (the engine's diff).
 - The Alerts page shows what `changes.notified` records; a failed or suppressed channel (`alert_events`) is not
   shown.
-- The trial-ended screen reads the account's rules without seeding them (`lib/v2/view/trial-end.ts`, the
-  `alertsByEmail` line), so an account made after the migration that never reached a seeding place (the six
-  defaults, above) is told its email alerts are off.
 - `sendSummary` does not read the tier again: `due_summary_accounts` filters on `account_effective_tier` when the
   tick runs, and `store.account` reads the zone and the deletion mark only. An account that drops to Free between
   the tick and a retried send (`SUMMARY_RETRIES`, with Inngest's backoff) still gets that week's summary.

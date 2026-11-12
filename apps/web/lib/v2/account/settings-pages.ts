@@ -3,6 +3,7 @@
  * D8): the caller, the account they act in, their role on it, and that account's records. The role
  * is the session's own `member_role`, read before any service-role read of the account's records.
  */
+import { seedDefaultAlertRules } from '../monitor/alert-defaults';
 import 'server-only';
 import { supabaseAdmin } from '../../supabase/admin';
 import { supabaseServer } from '../../supabase/server';
@@ -48,6 +49,9 @@ export async function readSettingsPage(now = new Date()): Promise<SettingsPageRe
   if (error) throw new Error(`settings page: member_role failed: ${error.message}`);
   if (role !== 'owner' && role !== 'account_manager' && role !== 'developer')
     return { kind: 'none' };
+  // The account's default alert rules exist before Settings or the trial screen reads them (Q13):
+  // trial-ended says whether alerts by email stay on.
+  await seedDefaultAlertRules(admin, accountId);
   const { d, billingEnd, subscriptionStatus } = await loadSettingsDataset(
     { session, admin, records: supabaseCheckReader(admin) },
     accountId,
