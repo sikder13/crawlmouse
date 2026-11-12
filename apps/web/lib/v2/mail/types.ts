@@ -1,0 +1,56 @@
+/**
+ * The mailer's shared types (CC-28 D1, D2). Every v2 email is one of `MAIL_KINDS`; the list is the
+ * `email_sends.kind` check of migration 20261113000001, and `types.test.ts` reads it from there.
+ */
+
+export const MAIL_KINDS = [
+  'check_notify',
+  'fix_to_developer',
+  'trial_reminder',
+  'email_change_confirm',
+  'email_change_notice',
+  'account_delete',
+  'alert',
+  'weekly_summary',
+] as const;
+export type MailKind = (typeof MAIL_KINDS)[number];
+
+/**
+ * Account mail (D7): about the person's own account, so it carries no unsubscribe and a suppression
+ * does not stop it. The others are what `email_kind_suppressible` in the migration answers true for.
+ */
+export const ACCOUNT_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
+  'trial_reminder',
+  'email_change_confirm',
+  'email_change_notice',
+  'account_delete',
+]);
+
+/** The kinds that carry List-Unsubscribe (D7), and what the link turns off. */
+export const UNSUBSCRIBE_KIND = {
+  alert: 'alerts',
+  weekly_summary: 'summary',
+} as const satisfies Partial<Record<MailKind, string>>;
+export type UnsubscribeKind = (typeof UNSUBSCRIBE_KIND)[keyof typeof UNSUBSCRIBE_KIND];
+
+/** What a template renders: a pure function of its input (D2). */
+export interface RenderedMail {
+  subject: string;
+  text: string;
+  html: string;
+}
+
+export type Template<I> = (input: I) => RenderedMail;
+
+/** A message as the transport sends it: headers already validated (headers.ts). */
+export interface OutgoingMail {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  /** Extra headers, each name and value validated. */
+  headers: Readonly<Record<string, string>>;
+  /** The ledger key, sent to the provider as its idempotency key. */
+  idempotencyKey: string;
+}
