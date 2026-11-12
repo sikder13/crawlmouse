@@ -17,7 +17,7 @@ export const REPORTS_BUCKET = 'reports';
 export const RAW_EXPORT_FORMATS = ['csv', 'json', 'edge_list'] as const;
 
 /**
- * `POST /api/reports`: one of four requests. `compare` sets `checkId` (the later check) beside the
+ * `POST /api/reports`: one of three requests. `compare` sets `checkId` (the later check) beside the
  * earlier one (`previousCheckId`, the name the Reports screen posts it under), or beside a fix the
  * later check verified; with neither it is the baseline page of that one check.
  */
@@ -36,7 +36,6 @@ export const ReportRequestSchema = z.discriminatedUnion('kind', [
     checkId: Id,
     format: z.enum(RAW_EXPORT_FORMATS),
   }),
-  z.strictObject({ kind: z.literal('prospect_one_pager'), url: z.string().min(1).max(2048) }),
 ]);
 
 export type ReportRequest = z.infer<typeof ReportRequestSchema>;

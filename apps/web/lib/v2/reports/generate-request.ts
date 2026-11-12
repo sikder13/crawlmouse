@@ -6,9 +6,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { ReportRequestSchema, type ReportFormat, type ReportRequest } from './generate';
 
-/** A request for a report made from a site's checks: every kind but the prospect's one-pager. */
-export type CheckReportRequest = Exclude<ReportRequest, { kind: 'prospect_one_pager' }>;
-
 /**
  * The request a body holds, or null: not one of the route's requests, or a compare that names both
  * an earlier check and a fix (one comparison is of two checks, the other of a fix across the two
@@ -23,7 +20,7 @@ export function parseReportRequest(fields: unknown): ReportRequest | null {
 }
 
 /** The format of the file each kind of request makes. */
-export function formatOf(request: CheckReportRequest): ReportFormat {
+export function formatOf(request: ReportRequest): ReportFormat {
   switch (request.kind) {
     case 'audit_pdf':
       return 'pdf';

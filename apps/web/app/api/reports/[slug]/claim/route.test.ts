@@ -30,17 +30,24 @@ type Filter = [string, ...unknown[]];
 const updateFilters: Filter[] = [];
 
 vi.mock('@/lib/supabase/server', () => ({
-  supabaseServer: () => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user } }) } }),
+  supabaseServer: () =>
+    Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user } }) } }),
 }));
 vi.mock('@/lib/rate-limit', () => ({
-  checkRateLimit: (key: string) => { rlCalls.push(key); return Promise.resolve({ allowed: rlAllowed, remaining: 0, resetAt: new Date() }); },
+  checkRateLimit: (key: string) => {
+    rlCalls.push(key);
+    return Promise.resolve({ allowed: rlAllowed, remaining: 0, resetAt: new Date() });
+  },
 }));
 vi.mock('@/lib/reports', () => ({
   readReportRow: () => Promise.resolve(reportRow),
   purgePublicReport: (s: string) => purgeMock(s),
 }));
 vi.mock('@/lib/report-ownership', () => ({
-  isDomainVerifiedForUser: (_sb: unknown, uid: string, domain: string) => { ownershipArgs.push([uid, domain]); return Promise.resolve(owns); },
+  isDomainVerifiedForUser: (_sb: unknown, uid: string, domain: string) => {
+    ownershipArgs.push([uid, domain]);
+    return Promise.resolve(owns);
+  },
 }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidateMock(p) }));
 vi.mock('@/lib/supabase/admin', () => ({
@@ -48,15 +55,32 @@ vi.mock('@/lib/supabase/admin', () => ({
     from: (table: string) => {
       fromTables.push(table);
       if (table === 'embed_badges') {
-        return { upsert: (payload: unknown, opts: unknown) => { upsertMock(payload, opts); return upsertError ? Promise.reject(upsertError) : Promise.resolve({ error: null }); } };
+        return {
+          upsert: (payload: unknown, opts: unknown) => {
+            upsertMock(payload, opts);
+            return upsertError ? Promise.reject(upsertError) : Promise.resolve({ error: null });
+          },
+        };
       }
       // public_reports — a recording chain so the filter args are asserted, not just the arity.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const chain: any = {
-        update: (payload: unknown) => { updateMock(payload); return chain; },
-        eq: (...a: unknown[]) => { updateFilters.push(['eq', ...a]); return chain; },
-        is: (...a: unknown[]) => { updateFilters.push(['is', ...a]); return chain; },
-        select: (...a: unknown[]) => { updateFilters.push(['select', ...a]); return chain; },
+        update: (payload: unknown) => {
+          updateMock(payload);
+          return chain;
+        },
+        eq: (...a: unknown[]) => {
+          updateFilters.push(['eq', ...a]);
+          return chain;
+        },
+        is: (...a: unknown[]) => {
+          updateFilters.push(['is', ...a]);
+          return chain;
+        },
+        select: (...a: unknown[]) => {
+          updateFilters.push(['select', ...a]);
+          return chain;
+        },
         maybeSingle: () => Promise.resolve(updateResult),
       };
       return chain;
@@ -67,17 +91,32 @@ vi.mock('@/lib/supabase/admin', () => ({
 import { POST } from './route';
 
 const SLUG = 'slug-xyz';
-const call = (slug = SLUG) => POST(new Request(`http://localhost/api/reports/${slug}/claim`, { method: 'POST' }), { params: Promise.resolve({ slug }) });
+const call = (slug = SLUG) =>
+  POST(new Request(`http://localhost/api/reports/${slug}/claim`, { method: 'POST' }), {
+    params: Promise.resolve({ slug }),
+  });
 
 beforeEach(() => {
   user = { id: 'u-1' };
   rlAllowed = true;
-  reportRow = { domain: 'ex.com', grade: 'C', hidden_at: null, takedown_requested_at: null, claimed_at: null };
+  reportRow = {
+    domain: 'ex.com',
+    grade: 'C',
+    hidden_at: null,
+    takedown_requested_at: null,
+    claimed_at: null,
+  };
   owns = true;
   updateResult = { data: { slug: SLUG }, error: null };
   upsertError = null;
-  rlCalls.length = 0; ownershipArgs.length = 0; fromTables.length = 0; updateFilters.length = 0;
-  updateMock.mockClear(); upsertMock.mockClear(); purgeMock.mockClear(); revalidateMock.mockClear();
+  rlCalls.length = 0;
+  ownershipArgs.length = 0;
+  fromTables.length = 0;
+  updateFilters.length = 0;
+  updateMock.mockClear();
+  upsertMock.mockClear();
+  purgeMock.mockClear();
+  revalidateMock.mockClear();
 });
 
 describe('POST /api/reports/[slug]/claim (V14)', () => {
@@ -95,7 +134,13 @@ describe('POST /api/reports/[slug]/claim (V14)', () => {
   });
 
   it('404 when the report is gone (hidden/taken-down/ungradeable) — cannot claim it', async () => {
-    reportRow = { domain: 'ex.com', grade: 'C', hidden_at: '2026-07-08T00:00:00Z', takedown_requested_at: null, claimed_at: null };
+    reportRow = {
+      domain: 'ex.com',
+      grade: 'C',
+      hidden_at: '2026-07-08T00:00:00Z',
+      takedown_requested_at: null,
+      claimed_at: null,
+    };
     expect((await call()).status).toBe(404);
     expect(updateMock).not.toHaveBeenCalled();
   });
@@ -121,7 +166,10 @@ describe('POST /api/reports/[slug]/claim (V14)', () => {
     // the idempotency/gating predicate is value-pinned (a same-arity column swap must fail here)
     expect(updateFilters).toContainEqual(['eq', 'slug', SLUG]);
     expect(updateFilters).toContainEqual(['is', 'claimed_at', null]);
-    expect(upsertMock).toHaveBeenCalledWith({ user_id: 'u-1', domain: 'ex.com' }, { onConflict: 'user_id,domain' });
+    expect(upsertMock).toHaveBeenCalledWith(
+      { user_id: 'u-1', domain: 'ex.com' },
+      { onConflict: 'user_id,domain' },
+    );
     expect(purgeMock).toHaveBeenCalledWith(SLUG);
     expect(revalidateMock).toHaveBeenCalledWith('/sitemap.xml');
   });
@@ -130,13 +178,19 @@ describe('POST /api/reports/[slug]/claim (V14)', () => {
     updateResult = { data: null, error: null };
     const res = await call();
     expect(res.status).toBe(200);
-    expect((await res.json())).toMatchObject({ ok: true, alreadyClaimed: true });
+    expect(await res.json()).toMatchObject({ ok: true, alreadyClaimed: true });
     expect(upsertMock).toHaveBeenCalled();
     expect(purgeMock).toHaveBeenCalledWith(SLUG);
   });
 
   it('503 deploy-order fail-soft on an undefined-column write error (PGRST204 AND 42703) — no badge link', async () => {
-    updateResult = { data: null, error: { code: 'PGRST204', message: "Could not find the 'claimed_at' column of 'public_reports' in the schema cache" } };
+    updateResult = {
+      data: null,
+      error: {
+        code: 'PGRST204',
+        message: "Could not find the 'claimed_at' column of 'public_reports' in the schema cache",
+      },
+    };
     expect((await call()).status).toBe(503);
     updateResult = { data: null, error: { code: '42703' } };
     expect((await call()).status).toBe(503);

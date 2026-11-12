@@ -202,12 +202,12 @@ describe('POST /api/reports: who is answered', () => {
     await expectNothingDone(before);
   });
 
-  it('a prospect’s one-pager: 501 not_available, with nothing read', async () => {
+  it('a prospect’s one-pager is not a request this route takes: 400 invalid, with nothing read', async () => {
     as(w.owner);
     const before = await countReports();
     expect(await answer(await post({ kind: 'prospect_one_pager', url: 'example.com' }))).toEqual([
-      501,
-      { code: 'not_available' },
+      400,
+      { code: 'invalid' },
     ]);
     expect(h.log).toEqual(['supabaseServer']);
     await expectNothingDone(before);

@@ -16,7 +16,10 @@ let rlAllowed = true;
 let proUntil: string | null = FUTURE;
 let reportRow: Record<string, unknown> | null = null;
 let owns = true;
-let updateResult: { data: unknown; error: unknown } = { data: { slug: 'slug-xyz', white_label: null, listed: false, indexable: false }, error: null };
+let updateResult: { data: unknown; error: unknown } = {
+  data: { slug: 'slug-xyz', white_label: null, listed: false, indexable: false },
+  error: null,
+};
 
 const rlCalls: string[] = [];
 const updateMock = vi.fn();
@@ -27,10 +30,14 @@ type Filter = [string, ...unknown[]];
 const updateFilters: Filter[] = [];
 
 vi.mock('@/lib/supabase/server', () => ({
-  supabaseServer: () => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user } }) } }),
+  supabaseServer: () =>
+    Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user } }) } }),
 }));
 vi.mock('@/lib/rate-limit', () => ({
-  checkRateLimit: (key: string) => { rlCalls.push(key); return Promise.resolve({ allowed: rlAllowed, remaining: 0, resetAt: new Date() }); },
+  checkRateLimit: (key: string) => {
+    rlCalls.push(key);
+    return Promise.resolve({ allowed: rlAllowed, remaining: 0, resetAt: new Date() });
+  },
 }));
 vi.mock('@/lib/reports', () => ({
   readReportRow: () => Promise.resolve(reportRow),
@@ -46,14 +53,32 @@ vi.mock('@/lib/supabase/admin', () => ({
       fromTables.push(table);
       if (table === 'users') {
         // The Pro-gate read: users.select('pro_until').eq('id', user.id).maybeSingle()
-        return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { pro_until: proUntil }, error: null }) }) }) };
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({ data: { pro_until: proUntil }, error: null }),
+            }),
+          }),
+        };
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const chain: any = {
-        update: (payload: unknown) => { updateMock(payload); return chain; },
-        eq: (...a: unknown[]) => { updateFilters.push(['eq', ...a]); return chain; },
-        not: (...a: unknown[]) => { updateFilters.push(['not', ...a]); return chain; },
-        select: (...a: unknown[]) => { updateFilters.push(['select', ...a]); return chain; },
+        update: (payload: unknown) => {
+          updateMock(payload);
+          return chain;
+        },
+        eq: (...a: unknown[]) => {
+          updateFilters.push(['eq', ...a]);
+          return chain;
+        },
+        not: (...a: unknown[]) => {
+          updateFilters.push(['not', ...a]);
+          return chain;
+        },
+        select: (...a: unknown[]) => {
+          updateFilters.push(['select', ...a]);
+          return chain;
+        },
         maybeSingle: () => Promise.resolve(updateResult),
       };
       return chain;
@@ -65,17 +90,41 @@ import { POST } from './route';
 
 const SLUG = 'slug-xyz';
 const call = (body: unknown, slug = SLUG) =>
-  POST(new Request(`http://localhost/api/reports/${slug}/white-label`, { method: 'POST', body: JSON.stringify(body) }), { params: Promise.resolve({ slug }) });
+  POST(
+    new Request(`http://localhost/api/reports/${slug}/white-label`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    { params: Promise.resolve({ slug }) },
+  );
 
 beforeEach(() => {
   user = { id: 'u-1' };
   rlAllowed = true;
   proUntil = FUTURE;
-  reportRow = { domain: 'ex.com', grade: 'C', hidden_at: null, takedown_requested_at: null, claimed_at: '2026-01-01T00:00:00Z' };
+  reportRow = {
+    domain: 'ex.com',
+    grade: 'C',
+    hidden_at: null,
+    takedown_requested_at: null,
+    claimed_at: '2026-01-01T00:00:00Z',
+  };
   owns = true;
-  updateResult = { data: { slug: SLUG, white_label: { brandName: 'Acme', logoPath: null }, listed: false, indexable: false }, error: null };
-  rlCalls.length = 0; fromTables.length = 0; updateFilters.length = 0;
-  updateMock.mockClear(); purgeMock.mockClear(); revalidateMock.mockClear();
+  updateResult = {
+    data: {
+      slug: SLUG,
+      white_label: { brandName: 'Acme', logoPath: null },
+      listed: false,
+      indexable: false,
+    },
+    error: null,
+  };
+  rlCalls.length = 0;
+  fromTables.length = 0;
+  updateFilters.length = 0;
+  updateMock.mockClear();
+  purgeMock.mockClear();
+  revalidateMock.mockClear();
 });
 
 describe('POST /api/reports/[slug]/white-label (§5, V9)', () => {
@@ -105,7 +154,13 @@ describe('POST /api/reports/[slug]/white-label (§5, V9)', () => {
   it('404 when the report is missing or gone (hidden/takedown)', async () => {
     reportRow = null;
     expect((await call({ enabled: true, brandName: 'Acme' })).status).toBe(404);
-    reportRow = { domain: 'ex.com', grade: 'C', hidden_at: '2026-07-08T00:00:00Z', takedown_requested_at: null, claimed_at: 'x' };
+    reportRow = {
+      domain: 'ex.com',
+      grade: 'C',
+      hidden_at: '2026-07-08T00:00:00Z',
+      takedown_requested_at: null,
+      claimed_at: 'x',
+    };
     expect((await call({ enabled: true, brandName: 'Acme' })).status).toBe(404);
     expect(updateMock).not.toHaveBeenCalled();
   });
@@ -143,7 +198,11 @@ describe('POST /api/reports/[slug]/white-label (§5, V9)', () => {
     expect(res.status).toBe(200);
     const payload = updateMock.mock.calls[0]![0] as Record<string, unknown>;
     // white-label defaults the report to unlisted + noindex (client deliverable, §5); snapshot untouched
-    expect(payload).toEqual({ white_label: { brandName: 'Acme Agency', logoPath: null }, listed: false, indexable: false });
+    expect(payload).toEqual({
+      white_label: { brandName: 'Acme Agency', logoPath: null },
+      listed: false,
+      indexable: false,
+    });
     expect(updateFilters).toContainEqual(['eq', 'slug', SLUG]);
     expect(updateFilters).toContainEqual(['not', 'claimed_at', 'is', null]);
     expect(purgeMock).toHaveBeenCalledWith(SLUG);
@@ -154,28 +213,50 @@ describe('POST /api/reports/[slug]/white-label (§5, V9)', () => {
   it('200 enable with a slug-scoped logo path', async () => {
     const res = await call({ enabled: true, brandName: 'Acme', logoPath: `${SLUG}/logo.png` });
     expect(res.status).toBe(200);
-    expect(updateMock.mock.calls[0]![0]).toEqual({ white_label: { brandName: 'Acme', logoPath: `${SLUG}/logo.png` }, listed: false, indexable: false });
+    expect(updateMock.mock.calls[0]![0]).toEqual({
+      white_label: { brandName: 'Acme', logoPath: `${SLUG}/logo.png` },
+      listed: false,
+      indexable: false,
+    });
   });
 
   it('200 re-enable (already white-labeled: a brand/logo EDIT) preserves listed/indexable — no visibility reset', async () => {
     // The report is ALREADY white-labeled (and the owner may have deliberately re-listed it). Editing
     // the brand must NOT silently force it back to unlisted+noindex — the §5 default is the OFF→ON
     // transition only.
-    reportRow = { domain: 'ex.com', grade: 'C', hidden_at: null, takedown_requested_at: null, claimed_at: '2026-01-01T00:00:00Z', white_label: { brandName: 'Old Brand', logoPath: null } };
+    reportRow = {
+      domain: 'ex.com',
+      grade: 'C',
+      hidden_at: null,
+      takedown_requested_at: null,
+      claimed_at: '2026-01-01T00:00:00Z',
+      white_label: { brandName: 'Old Brand', logoPath: null },
+    };
     const res = await call({ enabled: true, brandName: 'New Brand' });
     expect(res.status).toBe(200);
-    expect(updateMock.mock.calls[0]![0]).toEqual({ white_label: { brandName: 'New Brand', logoPath: null } }); // listed/indexable untouched
+    expect(updateMock.mock.calls[0]![0]).toEqual({
+      white_label: { brandName: 'New Brand', logoPath: null },
+    }); // listed/indexable untouched
   });
 
   it('200 disable: clears white_label (null) WITHOUT touching listed/indexable', async () => {
-    updateResult = { data: { slug: SLUG, white_label: null, listed: true, indexable: true }, error: null };
+    updateResult = {
+      data: { slug: SLUG, white_label: null, listed: true, indexable: true },
+      error: null,
+    };
     const res = await call({ enabled: false });
     expect(res.status).toBe(200);
     expect(updateMock.mock.calls[0]![0]).toEqual({ white_label: null });
   });
 
   it('503 deploy-order fail-soft on an undefined-column error (PGRST204 AND 42703)', async () => {
-    updateResult = { data: null, error: { code: 'PGRST204', message: "Could not find the 'white_label' column of 'public_reports' in the schema cache" } };
+    updateResult = {
+      data: null,
+      error: {
+        code: 'PGRST204',
+        message: "Could not find the 'white_label' column of 'public_reports' in the schema cache",
+      },
+    };
     expect((await call({ enabled: true, brandName: 'Acme' })).status).toBe(503);
     updateResult = { data: null, error: { code: '42703' } };
     expect((await call({ enabled: true, brandName: 'Acme' })).status).toBe(503);

@@ -19,7 +19,9 @@ const HOUR_MS = 60 * 60 * 1000;
 // The bucket is owner-provisioned (Runbook C) and may not exist yet. A missing bucket is a
 // deploy-order state → fail soft (503, "unavailable"), NOT a 500. Distinguish it from a genuine storage
 // error by the not-found signal so a real outage still surfaces as 500.
-function isBucketMissing(error: { message?: unknown; statusCode?: unknown; status?: unknown } | null): boolean {
+function isBucketMissing(
+  error: { message?: unknown; statusCode?: unknown; status?: unknown } | null,
+): boolean {
   if (!error) return false;
   const msg = typeof error.message === 'string' ? error.message.toLowerCase() : '';
   // Match the specific "bucket not found" signal (+ a 404 status, string or numeric) — NOT a bare
@@ -37,7 +39,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const { slug } = await params;
 
   const sbUser = await supabaseServer();
-  const { data: { user } } = await sbUser.auth.getUser();
+  const {
+    data: { user },
+  } = await sbUser.auth.getUser();
   if (!user) return NextResponse.json({ error: 'auth_required' }, { status: 401 });
 
   const rl = await checkRateLimit(`report-logo:${user.id}`, LOGO_UPLOADS_PER_HOUR, HOUR_MS);
@@ -46,14 +50,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const sb = supabaseAdmin();
 
   // Paid entitlement, server-side (pro_until only — the `tier` seam column isn't in this DB yet).
-  const { data: me } = await sb.from('users').select('pro_until').eq('id', user.id).maybeSingle<{ pro_until: string | null }>();
+  const { data: me } = await sb
+    .from('users')
+    .select('pro_until')
+    .eq('id', user.id)
+    .maybeSingle<{ pro_until: string | null }>();
   const proUntil = me?.pro_until ?? null;
   if (!entitlementFor(deriveTier({ pro_until: proUntil }), proUntil).canWhiteLabel) {
     return NextResponse.json({ error: 'pro_required' }, { status: 402 });
   }
 
   const report = await readReportRow(sb, slug);
-  if (!report || isReportGone(report)) return NextResponse.json({ error: 'not found' }, { status: 404 });
+  if (!report || isReportGone(report))
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
 
   const owns = await isDomainVerifiedForUser(sb, user.id, report.domain);
   if (!owns) return NextResponse.json({ error: 'verification_required' }, { status: 403 });
@@ -67,7 +76,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const v = validateLogo(bytes);
-  if (!v.ok) return NextResponse.json({ error: 'invalid_image', reason: v.reason }, { status: 400 });
+  if (!v.ok)
+    return NextResponse.json({ error: 'invalid_image', reason: v.reason }, { status: 400 });
 
   const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 16);
   const logoPath = `${slug}/${hash}.${v.ext}`;
@@ -80,7 +90,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   if (up.error) {
     const err = up.error as { message?: unknown; statusCode?: unknown; status?: unknown };
     if (isBucketMissing(err)) {
-      console.error(`logo upload: bucket "${LOGO_BUCKET}" missing (Runbook C not applied) — failing soft 503`);
+      console.error(
+        `logo upload: bucket "${LOGO_BUCKET}" missing (Runbook C not applied) — failing soft 503`,
+      );
       return NextResponse.json({ error: 'unavailable' }, { status: 503 });
     }
     console.error(`logo upload failed for ${logoPath}: ${String(err.message ?? 'unknown')}`);

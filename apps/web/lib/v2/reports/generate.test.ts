@@ -11,7 +11,7 @@ const A = '0b1f6c1e-5a55-4d6e-9d2c-3f1c1b7a9e10';
 const B = '1c2f6c1e-5a55-4d6e-9d2c-3f1c1b7a9e11';
 
 describe('ReportRequestSchema', () => {
-  it('takes the four requests the route makes', () => {
+  it('takes the requests the route makes', () => {
     const ok = [
       { kind: 'audit_pdf', siteId: A, checkId: B },
       { kind: 'compare', siteId: A, checkId: B },
@@ -19,7 +19,6 @@ describe('ReportRequestSchema', () => {
       { kind: 'compare', siteId: A, checkId: B, fixId: A },
       { kind: 'raw_export', siteId: A, checkId: B, format: 'csv' },
       { kind: 'raw_export', siteId: A, checkId: B, format: 'edge_list' },
-      { kind: 'prospect_one_pager', url: 'example.com' },
     ];
     expect(ok.filter((r) => !ReportRequestSchema.safeParse(r).success)).toEqual([]);
   });
@@ -33,8 +32,7 @@ describe('ReportRequestSchema', () => {
       { kind: 'audit_pdf', siteId: A, checkId: B, accountId: A },
       { kind: 'audit_pdf', siteId: A.toUpperCase(), checkId: B },
       { kind: 'audit_pdf', siteId: `${A}/../x`, checkId: B },
-      { kind: 'prospect_one_pager', url: '' },
-      { kind: 'prospect_one_pager', url: 'x'.repeat(2049) },
+      { kind: 'prospect_one_pager', url: 'example.com' },
     ];
     expect(bad.filter((r) => ReportRequestSchema.safeParse(r).success)).toEqual([]);
   });

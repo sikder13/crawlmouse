@@ -18,7 +18,7 @@ Migration: `infra/supabase/migrations/20261114000002_v2_031_agency.sql`, revert 
 | D3  | Seats and invitations: a single-use token, 7 days, stored as its hash; accepted only by the signed-in user whose email matches; the limit is checked in the statement that writes the seat.                                                                      |
 | D4  | Seats and sites beyond the plan are bought through CC-03's catalog and Stripe client; limits follow the subscription the webhook confirms.                                                                                                                       |
 | D5  | `/agency` is the client matrix; `/agency/clients/[siteId]` the client page.                                                                                                                                                                                      |
-| D6  | `POST /api/reports` makes `audit_pdf`, `compare`, `raw_export` and `prospect_one_pager`, server-side from stored data, into the private `reports` bucket.                                                                                                        |
+| D6  | `POST /api/reports` makes `audit_pdf`, `compare` and `raw_export` (the prospect's one-pager is not built, §9), server-side from stored data, into the private `reports` bucket.                                                                                  |
 | D6b | A `compare` report is a before-and-after page (`format: html`), with a baseline version for a site with nothing wrong.                                                                                                                                           |
 | D7  | Download is a 10-minute signed URL. A share link is a 22-character token stored as its sha256, good for 30 days, revocable, 410 once gone.                                                                                                                       |
 | D8  | Client report schedules are stored and edited here; an external recipient confirms their address before any report is sent to it.                                                                                                                                |
@@ -52,7 +52,7 @@ action and compares the answers with `SEAT_GUARD` and with the table below writt
 | -------------------------------------------------------------------- | ----- | --------------- | --------- | -------------------------- |
 | see audits and packets, mark a fix done, run a check                 | yes   | yes             | yes       | `is_member_for_site` alone |
 | `export_report`                                                      | yes   | yes             | yes       | + `is_member_for_site`     |
-| `share_report`, `schedule_report`, `prospect_report`                 | yes   | yes             | no        | + `is_member_for_site`     |
+| `share_report`, `schedule_report`                                    | yes   | yes             | no        | + `is_member_for_site`     |
 | `add_site` (an unscoped seat), `edit_site`, `remove_site`            | yes   | yes             | no        | + `is_member_for_site`     |
 | `edit_account_alerts` (the account-wide rules and the Slack webhook) | yes   | yes             | no        | the account                |
 | `invite_seat`, `change_seat`, `remove_seat`                          | yes   | no              | no        | the account                |
@@ -368,16 +368,15 @@ before-and-after pairs, as strings.
 
 ### What `POST /api/reports` makes
 
-| Request | Row (`kind`, `format`) | File in the `reports` bucket |
-|---|---|---|
-| `audit_pdf` of one check | `audit_pdf`, `pdf` | the audit document as a PDF |
-| `compare` of one check | `compare`, `html` | the baseline document, as JSON |
-| `compare` with `previousCheckId` | `compare`, `html` | the before-and-after document of the two checks, as JSON |
-| `compare` with `fixId` | `compare`, `html`, `subject_fix_id` | the document of a fix the check verified, beside the check it was compared with, as JSON |
-| `raw_export` as `csv` | `raw_export`, `csv` | one record per page response |
-| `raw_export` as `edge_list` | `raw_export`, `edge_list` | `from,to,anchor`, one record per link |
-| `raw_export` as `json` | `raw_export`, `json` | the check and its pages, links and crawler tests |
-| `prospect_one_pager` | none | none: answered 501 `not_available` (not built, below) |
+| Request                          | Row (`kind`, `format`)              | File in the `reports` bucket                                                             |
+| -------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------- |
+| `audit_pdf` of one check         | `audit_pdf`, `pdf`                  | the audit document as a PDF                                                              |
+| `compare` of one check           | `compare`, `html`                   | the baseline document, as JSON                                                           |
+| `compare` with `previousCheckId` | `compare`, `html`                   | the before-and-after document of the two checks, as JSON                                 |
+| `compare` with `fixId`           | `compare`, `html`, `subject_fix_id` | the document of a fix the check verified, beside the check it was compared with, as JSON |
+| `raw_export` as `csv`            | `raw_export`, `csv`                 | one record per page response                                                             |
+| `raw_export` as `edge_list`      | `raw_export`, `edge_list`           | `from,to,anchor`, one record per link                                                    |
+| `raw_export` as `json`           | `raw_export`, `json`                | the check and its pages, links and crawler tests                                         |
 
 A `compare` names its earlier check as `previousCheckId`, the field the Reports screen posts. The
 route's answers, in order, are in the comment on `POST` in `apps/web/app/api/reports/route.ts`, and
@@ -484,10 +483,10 @@ sizes are the same on each run. The times are a machine's and moved with its loa
 of times is one run at 16:28 with nothing else running; the second is the range of three runs of the
 final tree between 17:07 and 17:10, while other suites kept the load average near 15.
 
-| Check | `auditDoc` + `renderPdf`, quiet | under load | PDF | CSV | Edge list | JSON |
-|---|---|---|---|---|---|---|
-| the engine's recorded site (60 pages, 150 links, 400 crawler tests, 11 fixes) | 193 ms | 611 to 835 ms | 35,918 bytes, 4 pages | 20,800 bytes | 16,468 bytes | 1,309,952 bytes |
-| a generated check of 500 pages (1,359 links, 168 crawler tests, no fix) | 114 ms | 442 to 458 ms | 31,504 bytes, 3 pages | 147,930 bytes | 124,319 bytes | 911,442 bytes |
+| Check                                                                         | `auditDoc` + `renderPdf`, quiet | under load    | PDF                   | CSV           | Edge list     | JSON            |
+| ----------------------------------------------------------------------------- | ------------------------------- | ------------- | --------------------- | ------------- | ------------- | --------------- |
+| the engine's recorded site (60 pages, 150 links, 400 crawler tests, 11 fixes) | 193 ms                          | 611 to 835 ms | 35,918 bytes, 4 pages | 20,800 bytes  | 16,468 bytes  | 1,309,952 bytes |
+| a generated check of 500 pages (1,359 links, 168 crawler tests, no fix)       | 114 ms                          | 442 to 458 ms | 31,504 bytes, 3 pages | 147,930 bytes | 124,319 bytes | 911,442 bytes   |
 
 Each raw export took 7 ms or less in those runs. The audit document does not list pages, so its cost
 does not grow with them: the larger time is the recorded site's, which has fixes and more crawler
@@ -508,9 +507,9 @@ is made in the request (`maxDuration` 60) and no Inngest function makes one.
 
 ### Not built: the prospect's one-pager
 
-`ReportRequestSchema` names `prospect_one_pager`, and the route answers it 501 `not_available`
-before it reads anything. `create_report` refuses the kind (22023). Nothing writes a prospect's
-site, and no document is built for one.
+D6 names a fourth kind, a one-pager about a prospect's site that holds no site slot. It is not built
+(questions.md Q18). `POST /api/reports` does not take the request (400 `invalid`), `create_report`
+refuses the kind (22023), and no function writes a prospect's site.
 
 ## 10. Download, share and schedules
 

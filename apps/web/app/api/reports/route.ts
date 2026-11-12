@@ -40,7 +40,7 @@ const ABANDONED_AFTER_MS = 15 * 60 * 1000;
  * a proof page's document, or a raw export.
  *
  * In order: 404 with V2_CHECKS_PUBLIC unset; 401 signed out; 400 `invalid` for a body that is not
- * one of the requests; 501 `not_available` for a prospect's one-pager, which is not built; 404 for
+ * one of the requests; 404 for
  * a site the caller's seat does not cover or a removed one, and for a check (or the fix) that is
  * not a result of that site as the caller's own session reads it; 403 `role_refused` for a role
  * `seat_may` refuses `export_report`; 402 `exports` when the site's account's tier has no exports;
@@ -61,7 +61,6 @@ export async function POST(req: Request) {
   const body = await readBody(req);
   const request = body === null ? null : parseReportRequest(body.fields);
   if (body === null || request === null) return refuse(400, 'invalid');
-  if (request.kind === 'prospect_one_pager') return refuse(501, 'not_available');
 
   const { siteId } = request;
   const { data: member, error: memberError } = await sb.rpc('is_member_for_site', {

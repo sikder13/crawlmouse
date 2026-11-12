@@ -37,13 +37,18 @@ export async function POST(req: Request) {
     .maybeSingle();
 
   if (error) {
-    if (isUndefinedColumnError(error)) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+    if (isUndefinedColumnError(error))
+      return NextResponse.json({ error: 'unavailable' }, { status: 503 });
     return NextResponse.json({ error: 'could not hide' }, { status: 500 });
   }
   if (!data) {
     // 0 rows matched the `hidden_at is null` guard: either no report exists for this audit (404) or
     // it is ALREADY hidden — a re-hide is idempotent (200), not an error.
-    const { data: existing } = await sb.from('public_reports').select('slug').eq('audit_id', parsed.data.auditId).maybeSingle();
+    const { data: existing } = await sb
+      .from('public_reports')
+      .select('slug')
+      .eq('audit_id', parsed.data.auditId)
+      .maybeSingle();
     if (existing) {
       purgePublicReport(existing.slug); // defense-in-depth: ensure the cache reflects the hidden state
       return NextResponse.json({ ok: true, alreadyHidden: true });

@@ -37,7 +37,6 @@ const ARTBOARD: Record<SeatAction, Role[]> = {
   // "Edit and send client reports"
   share_report: ['owner', 'account_manager'],
   schedule_report: ['owner', 'account_manager'],
-  prospect_report: ['owner', 'account_manager'],
   // "Add or remove client sites"
   add_site: ['owner', 'account_manager'],
   edit_site: ['owner', 'account_manager'],
