@@ -47,6 +47,12 @@ import { TrialEndScreen } from '../../../components/v2/screens/trial-end/TrialEn
 import { ChangesLogScreen } from '../../../components/v2/screens/changes-log/ChangesLogScreen';
 import { InviteScreen } from '../../../components/v2/screens/invite/InviteScreen';
 import { SeatsScreen } from '../../../components/v2/screens/seats/SeatsScreen';
+import { ProofScreen } from '../../../components/v2/screens/proof/ProofScreen';
+import {
+  PROOF_PREVIEWS,
+  proofPreview,
+  type ProofPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/proof';
 import {
   INVITE_PREVIEWS,
   SEATS_PREVIEWS,
@@ -119,6 +125,14 @@ export const CC27_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/settings/delete': () => <DeleteScreen data={deletePreview()} />,
   '/v2-preview/screens/trial-end': () => <TrialEndScreen data={trialEndPreview()} />,
 };
+
+/** CC-31 workstream B2: the proof page, by registry path. */
+export const CC31_PROOF_ELEMENTS: Record<string, () => React.ReactElement> = Object.fromEntries(
+  (Object.keys(PROOF_PREVIEWS) as ProofPreview[]).map((path) => [
+    path,
+    () => <ProofScreen data={proofPreview(path)} />,
+  ]),
+);
 
 /** CC-31 workstream A: the Seats screen and the invitation page, by registry path. */
 export const CC31_SEAT_ELEMENTS: Record<string, () => React.ReactElement> = {

@@ -285,4 +285,24 @@ export const PREVIEWS: PreviewEntry[] = [
     kind: 'screen',
     orange: 0,
   },
+  // CC-31, the proof page: a report's document, read by a client. Nothing on it is the reader's
+  // action, so it shows no orange element.
+  {
+    path: '/v2-preview/screens/proof',
+    name: 'Proof, two grades moved',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/proof/fix',
+    name: 'Proof, a fix verified',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/proof/baseline',
+    name: 'Proof, baseline',
+    kind: 'screen',
+    orange: 0,
+  },
 ];
