@@ -53,11 +53,11 @@ const LINK_ROWS: Record<string, { kind: string; recipient: string; tokens: strin
 };
 
 const store: MailStore = {
-  accountLinkRecipient: async (tokenId) => {
+  accountLinkRecipient: async (tokenId: string) => {
     const r = LINK_ROWS[tokenId];
     return r ? { kind: r.kind, recipient: r.recipient } : null;
   },
-  issueAccountLink: async (tokenId) =>
+  issueAccountLink: async (tokenId: string) =>
     LINK_ROWS[tokenId]!.tokens.map((kind) => ({ kind, token: 'R'.repeat(43) })),
   trialAccount: async () => ({
     state: 'pro_trial',
