@@ -158,15 +158,17 @@ export function tagProbe(facts: PacketFacts, page: string, program: string): Tag
 }
 
 /**
- * awk rules that undo `tagProbe`'s split inside a script element, for a program that reads one: from
- * a script's opening tag to its closing tag the lines are joined with the `<` the split took (`J`),
- * and the rules after these see the element as one line. So a `<` in a JSON-LD block's text does not
- * end the block, and a tag's name in a script's text is not read as a tag. `Q` marks the joined line,
- * so it is not taken for an opening tag again. A script that is not closed gives no line.
+ * awk rules that undo `tagProbe`'s split inside a script element, for a program that reads JSON-LD.
+ * From a JSON-LD script's opening tag to its closing tag the lines are joined with the `<` the split
+ * took (`J`), and the rules after these see the element as one line: a `<` in a block's text does not
+ * end the block. `Q` marks the joined line, so it is not taken for an opening tag again. The lines
+ * of any other script are dropped up to its closing tag (`S`), so a tag's name in a script's text is
+ * not read as a tag, and a long script costs one pass. A script that is not closed gives no line.
  */
 export const AWK_SCRIPTS =
   '{Q=0}J!=""{if(tolower($0)~/^\\/script[ \\t>]/){$0=J;J="";Q=1}else{J=J"<"$0;next}}' +
-  '!Q&&tolower($0)~/^script[ \\t>]/{J=$0;next}';
+  'S{if(tolower($0)~/^\\/script[ \\t>]/)S=0;next}' +
+  '!Q&&tolower($0)~/^script[ \\t>]/{if(tolower($0)~/^script[^>]*application\\/ld\\+json/)J=$0;else S=1;next}';
 
 /** awk, after `tagProbe`'s split and AWK_SCRIPTS: this line is a JSON-LD script block. */
 export const LD_BLOCK = 'tolower($0)~/^script[^>]*application\\/ld\\+json/';

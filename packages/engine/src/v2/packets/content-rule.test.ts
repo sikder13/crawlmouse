@@ -186,7 +186,7 @@ describe('AWK_SCRIPTS', () => {
     }
   };
 
-  it('gives each script element as one line, with the `<` of its text put back', async () => {
+  it('gives a JSON-LD script element as one line, with the `<` of its text put back', async () => {
     expect(
       await linesOf(
         '<p>a</p><script type="application/ld+json">{"h":"a < b","t":"<nav>"}</SCRIPT ><nav>m</nav>',
@@ -200,10 +200,16 @@ describe('AWK_SCRIPTS', () => {
     ]);
   });
 
-  it('keeps two scripts apart, and gives no line for one that is not closed', async () => {
-    expect(await linesOf('<script>a</script><script src="x"></script><script>b <i>c')).toEqual([
-      'script>a',
-      'script src="x">',
+  it('gives no line for a script that is not JSON-LD, or for one that is not closed', async () => {
+    expect(
+      await linesOf(
+        '<script>a <b</script><script type="application/ld+json">{"a":1}</script>' +
+          '<script src="x"></script><p>t</p><script>b <i>c',
+      ),
+    ).toEqual(['script type="application/ld+json">{"a":1}', 'p>t', '/p>']);
+    expect(await linesOf('<p>t</p><script type="application/ld+json">{"a": "<i>')).toEqual([
+      'p>t',
+      '/p>',
     ]);
   });
 });
