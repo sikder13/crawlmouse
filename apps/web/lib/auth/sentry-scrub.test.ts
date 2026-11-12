@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { isShareToken } from '../v2/reports/share';
 import { scrubDoorSecrets, sentryBrowserOptions, sentryServerOptions } from './sentry-scrub';
 
 const ID = '0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11';
@@ -90,6 +91,38 @@ describe('scrubDoorSecrets, a seat invitation’s token in its link', () => {
       '/invite?notice=invite_gone',
       `/invite/${TOKEN}x`,
       '/invite/short',
+    ]) {
+      expect(scrubDoorSecrets({ text }).text).toBe(text);
+    }
+  });
+});
+
+describe('scrubDoorSecrets, a share link’s token in its path', () => {
+  const TOKEN = 'kJ8sT2mQ9x_p4VnR7bWc-A';
+
+  it('the sample is shaped as the tokens are: 22 base64url characters', () => {
+    expect(isShareToken(TOKEN)).toBe(true);
+  });
+
+  it.each([
+    ['the link', `/s/${TOKEN}`, '/s/[Filtered]'],
+    ['a transaction name', `GET /s/${TOKEN}`, 'GET /s/[Filtered]'],
+    ['a full address with a query', `${ORIGIN}/s/${TOKEN}?x=1`, `${ORIGIN}/s/[Filtered]?x=1`],
+    ['encoded slashes', `to=%2Fs%2F${TOKEN}`, 'to=%2Fs%2F[Filtered]'],
+    ['lower-case encoding', `to=%2fs%2f${TOKEN}`, 'to=%2fs%2f[Filtered]'],
+    ['upper case', `/S/${TOKEN}`, '/S/[Filtered]'],
+    ['a Referer header', `referer: ${ORIGIN}/s/${TOKEN}`, `referer: ${ORIGIN}/s/[Filtered]`],
+  ])('%s', (_, text, scrubbed) => {
+    expect(scrubDoorSecrets({ text }).text).toBe(scrubbed);
+  });
+
+  it('leaves the proof page’s address, and a segment that is not a token', () => {
+    for (const text of [
+      `/s/view/${ID}`,
+      'GET /s/view/[reportId]',
+      `/s/${TOKEN}x`,
+      '/s/short',
+      `/reports/${TOKEN}`,
     ]) {
       expect(scrubDoorSecrets({ text }).text).toBe(text);
     }
