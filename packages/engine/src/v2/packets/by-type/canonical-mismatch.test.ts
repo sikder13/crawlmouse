@@ -9,7 +9,9 @@ import {
   detected,
   expectDeterministic,
   expectHostileSafe,
+  hostile,
   hostileUrl,
+  NOT_A_URL,
   packetOf,
   pageAsRead,
   pageAt,
@@ -282,41 +284,38 @@ describe('a canonical no fault is proven of, on a page the site links to', () =>
     `<html><head><link rel="canonical" href="${canonical}"></head><body></body></html>`;
 
   // the round 1 security review's inputs: the worker stores each as { href, url: null }
-  describe.each(['http://', '//', 'http://[', 'https://exa mple.com/x'])(
-    'declared as %s, which is no URL',
-    (href) => {
-      const input = linkedSite(base, href);
-      const record = detected(detectCanonicalMismatch(input), `${base}/p`);
+  describe.each(NOT_A_URL)('declared as %s, which is no URL', (href) => {
+    const input = linkedSite(base, href);
+    const record = detected(detectCanonicalMismatch(input), `${base}/p`);
 
-      it('is written a packet that asks for the page’s own URL and moves no link', () => {
-        expect(record.conditions).toEqual(['linked_under_non_canonical']);
-        expect(input.pages.find((p) => p.url === `${base}/p`)!.canonical_declared).toEqual({
-          href,
-          url: null,
-        });
-        const p = packetOf('canonical_mismatch', record, factsFor(input, SERVED));
-        expect(p.context.at(-1)).toBe(
-          `\`${href}\` is not an http or https URL, so it names no page.`,
-        );
-        expect(p.change[0]).toMatch(
-          /^Set the rel="canonical" of `https:\/\/a\.test\/p` to its own URL, or check /,
-        );
-        expect(p.change.join(' ')).not.toContain('Change the links');
-        expect(p.verify.command.endsWith(`' 'https://a.test' 'https://a.test/p'`)).toBe(true);
+    it('is written a packet that asks for the page’s own URL and moves no link', () => {
+      expect(record.conditions).toEqual(['linked_under_non_canonical']);
+      expect(input.pages.find((p) => p.url === `${base}/p`)!.canonical_declared).toEqual({
+        href,
+        url: null,
       });
+      const p = packetOf('canonical_mismatch', record, factsFor(input, SERVED));
+      expect(p.context.at(-1)).toBe(
+        `\`${href}\` is not an http or https URL, so it names no page.`,
+      );
+      expect(p.change[0]).toMatch(
+        /^Set the rel="canonical" of `https:\/\/a\.test\/p` to its own URL, or check /,
+      );
+      expect(p.change.join(' ')).not.toContain('Change the links');
+      expect(p.verify.command.endsWith(`' 'https://a.test' 'https://a.test/p'`)).toBe(true);
+    });
 
-      it('verify fails on the declared canonical and passes on the page’s own', async () => {
-        served = await servedSite({
-          broken: { '/p': head(href) },
-          fixed: { '/p': head('/p') },
-        });
-        const p = packetFor(linkedSite(served.base, href), served.base);
-        const { broken, fixed } = await inBothStates(served, p.verify.command);
-        expect(broken.status).not.toBe(0);
-        expect(fixed.status).toBe(0);
+    it('verify fails on the declared canonical and passes on the page’s own', async () => {
+      served = await servedSite({
+        broken: { '/p': head(href) },
+        fixed: { '/p': head('/p') },
       });
-    },
-  );
+      const p = packetFor(linkedSite(served.base, href), served.base);
+      const { broken, fixed } = await inBothStates(served, p.verify.command);
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).toBe(0);
+    });
+  });
 
   it.each<[string, PageSpec[], string]>([
     [
@@ -467,13 +466,15 @@ describe('the canonical_mismatch packet over hostile records (properties)', () =
   ];
   const arb = fc.record({
     page: hostileUrl(),
-    declared: hostileUrl('https://b.test'),
+    // a URL, an href the worker stores unresolved, or any text at all
+    declared: fc.oneof(hostileUrl('https://b.test'), fc.constantFrom(...NOT_A_URL), hostile()),
     onward: hostileUrl(),
     target: fc.option(fc.constantFrom(...TARGET), { nil: null }),
     linking: fc.uniqueArray(hostileUrl(), { maxLength: 10 }),
     framework: fc.constantFrom(null, 'nextjs' as const),
   });
   type Rec = typeof arb extends fc.Arbitrary<infer T> ? T : never;
+  const isUrl = (text: string) => URL.canParse(text) && /^https?:/.test(text);
   const build = ({ page, declared, onward, target, linking, framework }: Rec) => {
     const input = canonicalSite('https://a.test', 'linked');
     const record = { ...detected(detectCanonicalMismatch(input), 'https://a.test/p') };
@@ -508,15 +509,24 @@ describe('the canonical_mismatch packet over hostile records (properties)', () =
             },
       ),
       pages: new Map([
-        [page, pageAt(page, { canonical_declared: { href: declared, url: declared } })],
         [
-          declared,
-          pageAt(declared, {
-            status_code: target === 'canonical_target_gone' ? 404 : 200,
-            final_url: onward,
-            canonical_declared: { href: onward, url: onward },
+          page,
+          pageAt(page, {
+            canonical_declared: { href: declared, url: isUrl(declared) ? declared : null },
           }),
         ],
+        ...(isUrl(declared)
+          ? ([
+              [
+                declared,
+                pageAt(declared, {
+                  status_code: target === 'canonical_target_gone' ? 404 : 200,
+                  final_url: onward,
+                  canonical_declared: { href: onward, url: onward },
+                }),
+              ],
+            ] as const)
+          : []),
         [onward, pageAt(onward, { canonical_declared: { href: null, url: null } })],
       ]),
     };
