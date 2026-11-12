@@ -61,3 +61,16 @@ describe('signup.html', () => {
     expect(occurrences).toBeGreaterThanOrEqual(2);
   });
 });
+
+// The sender is Supabase Auth's SMTP setting (`smtp_admin_email`), not the template's: a template that
+// named magic@ or signin@ would be wrong the day the owner moves it (docs/ops/senders.md). The one
+// address they name is the support inbox.
+describe('the sender is not in the templates (CC-28 D10)', () => {
+  it.each([
+    ['magic-link.html', magicLink],
+    ['signup.html', signup],
+  ])('%s names no crawlmouse.com address but support@', (_name, html) => {
+    const named = new Set(html.match(/[a-z0-9._+-]+@crawlmouse\.com/gi) ?? []);
+    expect([...named]).toEqual(['support@crawlmouse.com']);
+  });
+});

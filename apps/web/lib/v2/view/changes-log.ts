@@ -9,7 +9,7 @@ import { instant, type Change } from '@crawlmouse/types/v2';
 import { CHANGES_LOG_COPY as COPY } from '../copy/changes-log';
 import { findCheck } from '../fixtures';
 import { dayDate, hourMinute } from '../format';
-import { viewAt, type AccountDataset, type AccountView, type Viewer } from './account';
+import { readerRole, viewAt, type AccountDataset, type AccountView, type Viewer } from './account';
 import { accountShellView, newChanges, type ShellView } from './account-shell';
 import { rowOf, type ChangeRowView } from './segment/changes';
 
@@ -126,7 +126,7 @@ export function changesLogView(
   const sitesShown = new Set(rows.map((r) => r.site)).size;
 
   return {
-    shell: accountShellView(v, 'Changes'),
+    shell: accountShellView(v, 'Changes', { role: readerRole(v) ?? 'developer' }),
     title: COPY.title,
     headline: filtered
       ? COPY.filtered(rows.length, all.length, named)

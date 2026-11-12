@@ -14,6 +14,8 @@ const h = vi.hoisted(() => ({
   rewritten: true,
   viewer: { kind: 'signed_out' } as Record<string, unknown>,
   dataset: null as unknown,
+  nextRead: [] as string[][],
+  nextAt: null as string | null,
 }));
 
 vi.mock('server-only', () => ({}));
@@ -25,6 +27,13 @@ vi.mock('@/lib/v2/account/viewer', () => ({
   },
 }));
 vi.mock('@/lib/supabase/server', () => ({ supabaseServer: async () => ({}) }));
+vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({}) }));
+vi.mock('@/lib/v2/account/sites-store', () => ({
+  readNextChecks: async (_admin: unknown, ids: readonly string[]) => {
+    h.nextRead.push([...ids]);
+    return new Map(ids.map((id) => [id, h.nextAt]));
+  },
+}));
 vi.mock('@/lib/v2/account/pages', () => ({
   readAccount: async (_s: unknown, accountId: string, seatId: string, now: Date) => ({
     d: h.dataset,
@@ -69,6 +78,8 @@ beforeEach(() => {
   h.rewritten = true;
   h.viewer = { kind: 'signed_out' };
   h.dataset = null;
+  h.nextRead = [];
+  h.nextAt = null;
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -148,6 +159,19 @@ describe('/dashboard/v2', () => {
     };
     expect(await notice('free')).toBe(gateMessage('sites', 'free'));
     expect(await notice('pro')).toBe(gateMessage('sites', 'pro'));
+  });
+
+  it('shows the first site’s next check from sites.next_check_at (CC-28 D8)', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const bad = fixture('bad-site');
+    h.viewer = viewerOn(BAD, bad.seats[0]!.id, 'America/Indiana/Indianapolis');
+    h.dataset = bad;
+    h.nextAt = '2026-11-13T11:37:00.000Z';
+    const el = (await render()).props as unknown as {
+      children: ReactElement<{ data: { header: { line: string } } }>;
+    };
+    expect(h.nextRead).toEqual([bad.sites.map((s) => s.id)]);
+    expect(el.children.props.data.header.line).toContain('next check Fri 13 Nov around 06:37');
   });
 
   it('with the flag on, reads the viewer: signed out goes to /login', async () => {

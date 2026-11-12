@@ -14,7 +14,7 @@ export interface RouteSpec {
    * `wave 2`: moved out of CC-27b to the agency workspace's step (CC-27b D10). `later`: a page of its
    * own in a step not yet named (owner ruling, CC-27b Q15).
    */
-  owner: 'CC-26b' | 'CC-27b' | 'CC-28' | 'wave 2' | 'later' | 'built';
+  owner: 'CC-26b' | 'CC-27b' | 'wave 2' | 'later' | 'built';
   /** What the handler must check before acting (ARCH-2 §5, DECISION-LOG E6). */
   guard: string;
 }
@@ -88,7 +88,7 @@ export const ACCOUNT_ACTIONS = {
     owner: 'CC-26b',
     guard: 'Signed-in member of the site’s account.',
   },
-  changeLog: { verb: 'GET', route: '/changes', owner: 'CC-28', guard: 'Signed-in member.' },
+  changeLog: { verb: 'GET', route: '/changes', owner: 'built', guard: 'Signed-in member.' },
   keepPlan: {
     verb: 'POST',
     route: '/api/billing/checkout',
@@ -126,7 +126,7 @@ export const ACCOUNT_ACTIONS = {
   alertRules: {
     verb: 'PUT',
     route: '/api/sites/[id]/alert-rules',
-    owner: 'CC-28',
+    owner: 'built',
     guard: 'Signed-in member; Slack needs a paid tier.',
   },
   publicReport: {

@@ -5,12 +5,20 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedWorld } from '../../apps/web/__tests__/helpers/v2-check-tables';
 import { migratedDb, pgliteDb } from '../db/test-support';
+import { hashMailAddress } from '../../apps/web/lib/v2/mail/address-hash';
+import {
+  MAIL_KEPT_KEY,
+  MAIL_PEPPER_REFUSAL,
+  MAIL_SENDS_KEY,
+  planWithMail,
+} from '../../apps/web/lib/v2/account/erase';
 import {
   REDACTED_EMAIL,
   adminApiDelete,
-  executeErasure,
+  executeErasure as executeWithPepper,
   planErasure,
   sameProject,
+  scriptPorts,
   type DeleteAuthUser,
 } from './erase-account';
 
@@ -23,6 +31,16 @@ const db = () => pgliteDb(pglite);
 const sqlDelete: DeleteAuthUser = async (id) => {
   await pglite.query(`delete from auth.users where id = $1`, [id]);
 };
+/** The app's pepper, as the script reads it from TRIAL_LEDGER_PEPPER. */
+const PEPPER = 'an-erasure-test-pepper-32-chars-long';
+const executeErasure = (
+  d: ReturnType<typeof db>,
+  target: { email?: string; userId?: string },
+  deleteAuthUser: DeleteAuthUser,
+) => executeWithPepper(d, target, deleteAuthUser, PEPPER);
+/** The dry run the command line prints: the SQL plan with the rows found by address hash. */
+const dryRun = (target: { email?: string; userId?: string }, pepper: string | null = PEPPER) =>
+  planWithMail(scriptPorts(db(), sqlDelete, pepper), target);
 
 beforeAll(async () => {
   pglite = await migratedDb();
@@ -318,6 +336,8 @@ describe('erase-account (B-F2)', () => {
       'reports.recipient_email nulled': 1,
       'sites.client_contact_email nulled': 1,
       'fix_email_requests deleted': 0,
+      'email_sends deleted (accounts)': 1,
+      'slack_sends deleted (accounts)': 1,
       'accounts deleted': 1,
       'sites deleted': 2,
       'checks deleted': 2,
@@ -344,7 +364,7 @@ describe('erase-account (B-F2)', () => {
     );
     expect(await everything()).toBe(withObjects);
     await removeObjects(listed.storage);
-    const dry = await planErasure(db(), { email: p.email });
+    const dry = await dryRun({ email: p.email });
     expect(dry.refusals).toEqual([]);
     // Supabase Auth logs the deletion itself, naming the address, after the transaction.
     const authLogsIt: DeleteAuthUser = async (userId) => {
@@ -900,6 +920,124 @@ describe('the rules 027b adds (D5)', () => {
     await executeErasure(db(), { email: visitor }, sqlDelete);
     expect(await left(addressed)).toBe(0);
   }, 120_000);
+});
+
+describe('the mail ledgers CC-28 adds (D9)', () => {
+  /** A person alone on their account, with no Storage objects left, and a bystander's account. */
+  async function mailed() {
+    const tag = `m${++serial}`;
+    const world = await seedWorld(pglite, tag);
+    await pglite.query(`delete from public.seats where id = $1`, [world.scopedSeatId]);
+    const bystander = await seedWorld(pglite, `${tag}b`);
+    const email = (
+      await pglite.query<{ email: string }>(`select email from auth.users where id = $1`, [
+        world.ownerId,
+      ])
+    ).rows[0]!.email;
+    await removeObjects((await planErasure(db(), { userId: world.ownerId })).storage);
+    return { tag, world, bystander, email, id: world.ownerId };
+  }
+  const send = (key: string, hash: string, account: string | null, kind = 'check_notify') =>
+    pglite.query(
+      `insert into public.email_sends (idempotency_key, kind, address_hash, account_id, status,
+                                       attempts, claimed_at, updated_at)
+       values ($1, $2, $3, $4, 'failed', 1, now(), now())`,
+      [key, kind, hash, account],
+    );
+  const slack = (key: string, account: string) =>
+    pglite.query(
+      `insert into public.slack_sends (idempotency_key, account_id, status, attempts, claimed_at, updated_at)
+       values ($1, $2, 'failed', 1, now(), now())`,
+      [key, account],
+    );
+  const keyed = (table: string, key: string) =>
+    n(`select count(*) from public.${table} where idempotency_key = $1`, [key]);
+  const hashOf = (address: string) => hashMailAddress(PEPPER, address);
+
+  it('email_sends of the person’s accounts go, whatever address they went to; a bystander’s stay', async () => {
+    const p = await mailed();
+    // seedWorld gives each account one row of each ledger already.
+    const seeded = (await dryRun({ userId: p.id })).counts['email_sends deleted (accounts)']!;
+    expect(seeded).toBe(1);
+    await send(`${p.tag}-own`, hashOf(`teammate-${p.tag}@example.com`), p.world.accountId, 'alert');
+    await send(
+      `${p.tag}-by`,
+      hashOf(`teammate-${p.tag}@example.com`),
+      p.bystander.accountId,
+      'alert',
+    );
+    const dry = await dryRun({ userId: p.id });
+    expect(dry.counts['email_sends deleted (accounts)']).toBe(seeded + 1);
+    const { after } = await executeErasure(db(), { userId: p.id }, sqlDelete);
+    expect(after.counts['email_sends deleted (accounts)']).toBe(0);
+    expect(await keyed('email_sends', `${p.tag}-own`)).toBe(0);
+    expect(await keyed('email_sends', `${p.tag}-by`)).toBe(1);
+  });
+
+  it('email_sends to the person’s address go by its hash, from any account or none; another address’s stay', async () => {
+    const p = await mailed();
+    // A visitor's check mail (no account), a developer email from the bystander's account, sent
+    // to the person's address in another spelling of the same mailbox, and the bystander's own.
+    await send(`${p.tag}-visit`, hashOf(p.email), null);
+    await send(
+      `${p.tag}-fix`,
+      hashOf(p.email.toUpperCase()),
+      p.bystander.accountId,
+      'fix_to_developer',
+    );
+    await send(`${p.tag}-other`, hashOf(`someone-${p.tag}@example.com`), null);
+    const dry = await dryRun({ email: p.email });
+    expect(dry.counts[MAIL_SENDS_KEY]).toBe(2);
+    const { before, after } = await executeErasure(db(), { email: p.email }, sqlDelete);
+    expect(before.counts[MAIL_SENDS_KEY]).toBe(2);
+    expect(after.counts[MAIL_SENDS_KEY]).toBe(0);
+    expect(await keyed('email_sends', `${p.tag}-visit`)).toBe(0);
+    expect(await keyed('email_sends', `${p.tag}-fix`)).toBe(0);
+    expect(await keyed('email_sends', `${p.tag}-other`)).toBe(1);
+  });
+
+  it('slack_sends of the person’s accounts go; a bystander’s stay', async () => {
+    const p = await mailed();
+    const seeded = (await dryRun({ userId: p.id })).counts['slack_sends deleted (accounts)']!;
+    expect(seeded).toBe(1);
+    await slack(`${p.tag}-own`, p.world.accountId);
+    await slack(`${p.tag}-by`, p.bystander.accountId);
+    const dry = await dryRun({ userId: p.id });
+    expect(dry.counts['slack_sends deleted (accounts)']).toBe(seeded + 1);
+    const { after } = await executeErasure(db(), { userId: p.id }, sqlDelete);
+    expect(after.counts['slack_sends deleted (accounts)']).toBe(0);
+    expect(await keyed('slack_sends', `${p.tag}-own`)).toBe(0);
+    expect(await keyed('slack_sends', `${p.tag}-by`)).toBe(1);
+  });
+
+  it('a suppression on the person’s address is counted as kept and stays', async () => {
+    const p = await mailed();
+    await pglite.query(
+      `insert into public.email_suppressions (address_hash, reason, first_at, last_at)
+       values ($1, 'hard_bounce', now(), now())`,
+      [hashOf(p.email)],
+    );
+    const dry = await dryRun({ userId: p.id });
+    expect(dry.kept[MAIL_KEPT_KEY]).toBe(1);
+    await executeErasure(db(), { userId: p.id }, sqlDelete);
+    expect(
+      await n(`select count(*) from public.email_suppressions where address_hash = $1`, [
+        hashOf(p.email),
+      ]),
+    ).toBe(1);
+  });
+
+  it('with no pepper the dry run says why, and --yes refuses and changes nothing', async () => {
+    const p = await mailed();
+    await send(`${p.tag}-visit`, hashOf(p.email), null);
+    const dry = await dryRun({ userId: p.id }, null);
+    expect(dry.refusals).toEqual([MAIL_PEPPER_REFUSAL]);
+    const snapshot = await everything();
+    await expect(executeWithPepper(db(), { userId: p.id }, sqlDelete, null)).rejects.toThrow(
+      MAIL_PEPPER_REFUSAL,
+    );
+    expect(await everything()).toBe(snapshot);
+  });
 });
 
 describe('sameProject', () => {

@@ -17,6 +17,7 @@ import {
   domainSlot,
   editSite,
   globalSlot,
+  readNextChecks,
   removeSite,
   supabaseAddSite,
   supabaseRequestRecheck,
@@ -148,29 +149,33 @@ describe('supabaseRequestRecheck', () => {
     expect(await statuses(s.id)).toHaveLength(1);
   });
 
-  it('a bucket check that has started is check_running, with nothing sent', async () => {
+  it('a bucket check that has started gives way to the next bucket: a new check is queued and sent (D11)', async () => {
     pinBucket();
     const a = await account();
     const s = await site(a.accountId);
     const send = vi.fn(async () => undefined);
     const recheck = supabaseRequestRecheck(adminOver(db), send);
-    const first = (await recheck({
+    const req = {
       siteId: s.id,
-      trigger: 'fix_recheck',
+      trigger: 'fix_recheck' as const,
       cap: 10,
       requestedByUserId: a.userId,
-    })) as { checkId: string };
+    };
+    const first = (await recheck(req)) as { checkId: string };
     await db.query(`select public.claim_check($1, 'run-1', '{"phase":"crawl"}'::jsonb)`, [
       first.checkId,
     ]);
     send.mockClear();
-    expect(
-      await recheck({ siteId: s.id, trigger: 'fix_recheck', cap: 10, requestedByUserId: a.userId }),
-    ).toEqual({ queued: false, reason: 'check_running', checkId: first.checkId });
-    expect(send).not.toHaveBeenCalled();
+    const next = (await recheck(req)) as { queued: boolean; checkId: string; created: boolean };
+    expect(next).toEqual({ queued: true, checkId: expect.any(String), created: true });
+    expect(next.checkId).not.toBe(first.checkId);
+    const bucket = Math.floor(Date.now() / 120_000);
+    const [[event]] = send.mock.calls as unknown as [[{ id: string }]];
+    expect(event.id).toBe(`check:${s.id}:recheck:${bucket + 1}`);
+    expect(checkIdOfKey(event.id)).toBe(next.checkId);
   });
 
-  it('a bucket check that has already ended is recently_checked until the bucket ends, with nothing sent', async () => {
+  it('a bucket check that has ended, failed or deferred, gives way to the next bucket too (D11)', async () => {
     pinBucket();
     const a = await account();
     const s = await site(a.accountId);
@@ -192,15 +197,37 @@ describe('supabaseRequestRecheck', () => {
         );
       }
       send.mockClear();
-      const bucketEnd = new Date((Math.floor(Date.now() / 120_000) + 1) * 120_000).toISOString();
-      expect(await recheck(req), ended).toEqual({
-        queued: false,
-        reason: 'recently_checked',
-        nextAllowedAt: bucketEnd,
-      });
-      expect(send).not.toHaveBeenCalled();
-      await db.query(`delete from public.checks where id = $1`, [first.checkId]);
+      const next = (await recheck(req)) as { queued: boolean; checkId: string };
+      expect(next.queued, ended).toBe(true);
+      expect(next.checkId, ended).not.toBe(first.checkId);
+      expect(send, ended).toHaveBeenCalledTimes(1);
+      await db.query(`delete from public.checks where site_id = $1`, [s.id]);
     }
+  });
+
+  it('a next bucket whose check has also started (the first having ended) is check_running, with nothing sent', async () => {
+    pinBucket();
+    const a = await account();
+    const s = await site(a.accountId);
+    const send = vi.fn(async () => undefined);
+    const recheck = supabaseRequestRecheck(adminOver(db), send);
+    const req = { siteId: s.id, trigger: 'manual' as const, cap: 10, requestedByUserId: a.userId };
+    const first = (await recheck(req)) as { checkId: string };
+    await db.query(`select public.claim_check($1, 'run-1', '{"phase":"crawl"}'::jsonb)`, [
+      first.checkId,
+    ]);
+    await db.query(`select public.fail_check($1, 'internal')`, [first.checkId]);
+    const second = (await recheck(req)) as { checkId: string };
+    await db.query(`select public.claim_check($1, 'run-2', '{"phase":"crawl"}'::jsonb)`, [
+      second.checkId,
+    ]);
+    send.mockClear();
+    expect(await recheck(req)).toEqual({
+      queued: false,
+      reason: 'check_running',
+      checkId: second.checkId,
+    });
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('a removed site and a paused one are refused, with nothing sent', async () => {
@@ -274,9 +301,17 @@ describe('supabaseAddSite', () => {
         schedule_cadence: 'monthly',
         schedule_iso_weekday: 3,
         schedule_hour_local: 6,
-        next_check_at: null,
+        next_check_at: expect.any(Date),
       },
     ]);
+    // Set by migration 028's trigger: the first Wednesday of a month at 06:mm in the account's zone.
+    const { rows: due } = await db.query<{ ok: boolean }>(
+      `select s.next_check_at = public.next_check_after(s.schedule_cadence, s.schedule_iso_weekday,
+                s.schedule_hour_local, s.schedule_offset_min, a.timezone, s.created_at) as ok
+         from public.sites s join public.accounts a on a.id = s.account_id where s.id = $1`,
+      [siteId],
+    );
+    expect(due[0]!.ok).toBe(true);
     expect(await statuses(siteId)).toEqual([
       { id: checkId, status: 'queued', trigger: 'first_audit' },
     ]);
@@ -510,5 +545,36 @@ describe('the daily ceiling and the per-domain bucket', () => {
     });
     expect((await add(false)).outcome).toBe('created');
     expect(await countIn(d.bucket, d.window_start)).toBe(5);
+  });
+});
+
+describe('readNextChecks (CC-28 D8)', () => {
+  it('answers each site’s next_check_at as the scheduler’s trigger set it, null for an unscheduled one', async () => {
+    const { accountId } = await account();
+    const timed = await site(accountId);
+    const untimed = await site(accountId);
+    await db.query(
+      `update public.sites set schedule_cadence = 'weekly', schedule_iso_weekday = 3,
+              schedule_hour_local = 6 where id = $1`,
+      [timed.id],
+    );
+    await db.query(
+      `update public.sites set schedule_cadence = null, schedule_iso_weekday = null,
+              schedule_hour_local = null where id = $1`,
+      [untimed.id],
+    );
+    const { rows } = await db.query<{ at: Date }>(
+      `select next_check_at as at from public.sites where id = $1`,
+      [timed.id],
+    );
+    expect(rows[0]!.at).toBeInstanceOf(Date);
+    const next = await readNextChecks(adminOver(db), [timed.id, untimed.id]);
+    expect(next).toEqual(
+      new Map([
+        [timed.id, rows[0]!.at.toISOString()],
+        [untimed.id, null],
+      ]),
+    );
+    expect(await readNextChecks(adminOver(db), [])).toEqual(new Map());
   });
 });

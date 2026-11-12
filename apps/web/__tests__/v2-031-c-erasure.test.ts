@@ -23,6 +23,7 @@ import {
   type ErasurePlan,
   type ErasurePorts,
   type ErasureTarget,
+  type MailRecordCounts,
   type StorageObject,
 } from '../lib/v2/account/erase';
 import {
@@ -100,6 +101,16 @@ function ports(calls: string[]): ErasurePorts {
           [p.userId, p.emails, p.accounts],
         )
       ).rows[0]!.r,
+    // The mailer's records of the person's address hashes (CC-28): the real function, with a pepper
+    // of the test's own.
+    mailPepper: 'cc31-erasure-test-pepper',
+    mailRecords: async (hashes, apply) =>
+      (
+        await db.query<{ r: MailRecordCounts }>(
+          `select public.erase_mail_records($1::text[], $2) as r`,
+          [[...hashes], apply],
+        )
+      ).rows[0]!.r,
   };
 }
 
@@ -156,10 +167,12 @@ describe('(a) a person invited to another account’s agency, not yet accepted',
   beforeAll(async () => {
     invitee = await person(db, 'invitee');
     seat = randomUUID();
-    // As an invitation is stored: no user yet, the address as the owner typed it, a token's hash.
+    // As an invitation is stored: no user yet, the address as the owner typed it, a token's hash
+    // and its expiry.
     await db.query(
-      `insert into public.seats (id, account_id, invited_email, role, status, client_scope_all, invite_token_hash)
-       values ($1, $2, $3, 'developer', 'invited', false, $4)`,
+      `insert into public.seats (id, account_id, invited_email, role, status, client_scope_all,
+                                 invite_token_hash, invite_expires_at)
+       values ($1, $2, $3, 'developer', 'invited', false, $4, now() + interval '7 days')`,
       [seat, world.accountId, invitee.email.toUpperCase(), sha(`invite-${seat}`)],
     );
     await insertRow(db, 'seat_sites', ROWS.seat_sites(seat, world.site1.id, world.accountId));
@@ -262,8 +275,9 @@ describe('(c) the owner of an agency with invited seats, stored reports, share l
       [site, contact],
     );
     await db.query(
-      `insert into public.seats (account_id, invited_email, role, status, invite_token_hash)
-       values ($1, $2, 'account_manager', 'invited', $3)`,
+      `insert into public.seats (account_id, invited_email, role, status, invite_token_hash,
+                                 invite_expires_at)
+       values ($1, $2, 'account_manager', 'invited', $3, now() + interval '7 days')`,
       [agencyId, invited, sha(`invite-${agencyId}`)],
     );
     const check = randomUUID();

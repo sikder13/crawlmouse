@@ -1,8 +1,9 @@
 /**
- * What /settings and /settings/delete say when a form sends the reader back (CC-27b review, item 6):
- * `?saved=1` or `?email=sent` on Settings, `?sent=1` on the delete step, and `?error=<code>` on both,
- * with a sentence for each code the routes behind them answer (settings-notices.test.ts reads the
- * codes from the routes' sources). A code with no sentence here gets the generic one.
+ * What /settings, /settings/delete and /alerts say when a form sends the reader back (CC-27b review,
+ * item 6; CC-28 D8): `?saved=1` or `?email=sent` on Settings, `?sent=1` on the delete step, and
+ * `?error=<code>` on all three, with a sentence for each code the routes behind them answer
+ * (settings-notices.test.ts reads the codes from the routes' sources). A code with no sentence here
+ * gets the generic one. Alerts has no success line: its route sends a form back with none.
  */
 
 export const SETTINGS_NOTICES = {
@@ -81,7 +82,10 @@ export interface Notice {
 type Query = Readonly<Record<string, string | string[] | undefined>>;
 
 /** The line a page shows for its query, or null. An error code is read ahead of a success line. */
-export function settingsNotice(query: Query, page: 'settings' | 'delete'): Notice | null {
+export function settingsNotice(
+  query: Query,
+  page: 'settings' | 'delete' | 'alerts',
+): Notice | null {
   const error = query.error;
   if (error !== undefined) {
     const known = typeof error === 'string' && Object.hasOwn(REFUSAL_SENTENCES, error);
@@ -92,5 +96,6 @@ export function settingsNotice(query: Query, page: 'settings' | 'delete'): Notic
     if (query.saved === '1') return { tone: 'ok', text: SETTINGS_NOTICES.saved };
     return null;
   }
+  if (page === 'alerts') return null;
   return query.sent === '1' ? { tone: 'ok', text: SETTINGS_NOTICES.deleteSent } : null;
 }

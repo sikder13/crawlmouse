@@ -84,7 +84,11 @@ export interface SweepRow {
   at: Date;
 }
 
-/** The sweep's narrowing reads. Each answers at most `limit` rows, oldest `at` first. */
+/**
+ * The sweep's narrowing reads. Each answers at most `limit` rows, oldest `at` first, and leaves out an
+ * account marked for deletion (`deletion_confirmed_at` set, CC-27b), which the purge ends instead
+ * (`lib/v2/account/deletion-purge.ts`).
+ */
 export interface SweepReads {
   /** `past_due` accounts whose `past_due_since` is before `before`. */
   pastDueBefore(before: Date, limit: number): Promise<SweepRow[]>;
@@ -107,6 +111,7 @@ export function supabaseSweepReads(sb: SupabaseClient): SweepReads {
         .from('accounts')
         .select('id, past_due_since')
         .eq('state', 'past_due')
+        .is('deletion_confirmed_at', null)
         .lt('past_due_since', before.toISOString())
         .order('past_due_since', { ascending: true })
         .order('id', { ascending: true })
@@ -119,6 +124,7 @@ export function supabaseSweepReads(sb: SupabaseClient): SweepReads {
         .select('id, trial_ends_at')
         .eq('state', 'pro_trial')
         .eq('trial_variant', 'no_card')
+        .is('deletion_confirmed_at', null)
         .lte('trial_ends_at', by.toISOString())
         .order('trial_ends_at', { ascending: true })
         .order('id', { ascending: true })

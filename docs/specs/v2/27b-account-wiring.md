@@ -87,15 +87,10 @@ No page here shares a path with a v1 page, so `V2_REWRITES` gains no row.
 - The rail's trial card offers Billing and Keep to the owner only when its page passes the reader's
   role (`accountShellView(…, { role })`). This step's pages do: `/settings`, `/settings/plan`,
   `/settings/delete`, `/trial-ended`. The callers that pass none read every member as the owner:
-  `dashboard.ts` and `site.ts` and the page `app/sites/[id]/page.tsx` (CC-26b), `alerts.ts`,
-  `changes-log.ts` and `reports.ts` (CC-28 and the agency-workspace step), and the preview, which
-  renders fixtures. Each can pass `readerRole(v)` (`lib/v2/view/account.ts`), which CC-26b added.
+  the page `app/sites/[id]/page.tsx` (CC-26b), `reports.ts` (the agency-workspace step), and the
+  preview, which renders fixtures. CC-28 passes the role from `alerts.ts`, `changes-log.ts`,
+  `dashboard.ts` and `site.ts`. Each can pass `readerRole(v)` (`lib/v2/view/account.ts`), which CC-26b added.
   Callers: `grep -rn "accountShellView(" apps/web/lib apps/web/app --include=*.ts --include=*.tsx | grep -v test`.
-- Nothing is emailed until CC-28's mailer handles `email.requested` for the three account templates and calls
-  `issue_account_link`. Until then a request creates its link rows and they expire unused.
-- The scheduler of v2 checks does not exist yet (CC-28): it must skip accounts with `deletion_confirmed_at` set.
-- The past-due sweep (`lib/billing/clock.ts`) and `lib/auth/stores.ts` `loadMember` do not read the deletion mark;
-  both are for the next step that edits those files (Q11, and the ledger in the step's notes).
 - An access token issued before a deletion's confirm stays valid to its expiry (at most an hour) against v1 tables,
   whose policies read `auth.uid()` alone; v2 tables refuse it through the membership functions.
 - Before the first apply, on the dry-run branch, the owner re-checks the prechecks recorded under Owner rulings
@@ -108,8 +103,6 @@ No page here shares a path with a v1 page, so `V2_REWRITES` gains no row.
 - No seat can be added in this tree, so an account marked for deletion gains no member during its window. CC-31's
   invitations must refuse a marked account; the purge's check that it erases only marked accounts (`accounts_changed`)
   assumes so.
-- `PUT /api/alert-rules` sends a refused form back to `/alerts?error=<code>`; there is no live Alerts page yet, and
-  CC-28's must read the code as Settings does (`lib/v2/copy/settings-notices.ts`).
 - `PATCH /api/account`: when the owner's email change is accepted and the profile write after it then fails, the
   answer is a 500 while the change's links are already created.
 - The erasure's `v1_subscription` refusal reads `users.pro_until` in SQL (`erase_person_refusals`); migration 009,

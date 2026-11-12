@@ -1005,6 +1005,8 @@ const WRITERS: Readonly<Record<string, readonly string[]>> = {
   'apps/web/lib/v2/account/fixes-store.ts': ['mark_fix_done'],
   'infra/supabase/migrations/20261112000001_v2_026b_sites_fixes.sql': PERSIST_BODY,
   'infra/supabase/rollbacks/20261112000001_v2_026b_sites_fixes.revert.sql': PERSIST_BODY,
+  // CC-28: record_alert_delivery sets changes.notified when an alert is sent, and no other column.
+  'infra/supabase/migrations/20261113000001_v2_028_monitoring.sql': ['changes'],
 };
 
 const named = (names: Set<string>) => `(?:"?public"?\\s*\\.\\s*)?"?(${[...names].join('|')})"?\\b`;

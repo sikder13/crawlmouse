@@ -126,6 +126,11 @@ function postgrestOver(pg: PGlite): SupabaseClient {
           return builder;
         },
         eq: filter('='),
+        is(column: string, value: null) {
+          if (value !== null) throw new Error('is() takes null only here');
+          where.push(`${ident(column)} is null`);
+          return builder;
+        },
         lt: filter('<'),
         lte: filter('<='),
         order(column: string, opts: { ascending: boolean }) {
@@ -338,6 +343,26 @@ describe('the sweep’s narrowing read (supabaseSweepReads through PostgREST’s
     expect(await candidatesAt(Date.parse(TRIAL_END) + 30 * DAY)).toEqual([]);
   });
 
+  it('leaves out accounts marked for deletion, of both kinds (spec 27b)', async () => {
+    const lapsing = await pastDue();
+    const ended = await noCardTrial();
+    const mark = (id: string) =>
+      db.query(
+        `update public.accounts set deletion_confirmed_at = now(), purge_after = now() + interval '7 days'
+          where id = $1`,
+        [id],
+      );
+    const sweepAt = Date.parse(TRIAL_END) + DAY;
+    expect(await candidatesAt(sweepAt)).toEqual([
+      { accountId: lapsing, kind: 'lapse' },
+      { accountId: ended, kind: 'expire' },
+    ]);
+    await mark(lapsing);
+    expect(await candidatesAt(sweepAt)).toEqual([{ accountId: ended, kind: 'expire' }]);
+    await mark(ended);
+    expect(await candidatesAt(sweepAt)).toEqual([]);
+  });
+
   it('lists the longest overdue first, across both kinds, at most `limit`', async () => {
     // At T + 30 days: `early`'s grace ended at T + 8 days, the trial at T + 14, `late`'s grace at T + 17.
     const late = await pastDue(at(10 * DAY));
@@ -360,6 +385,7 @@ describe('the sweep’s narrowing read (supabaseSweepReads through PostgREST’s
       from: () => ({
         select: () => broken.from(),
         eq: () => broken.from(),
+        is: () => broken.from(),
         lt: () => broken.from(),
         lte: () => broken.from(),
         order: () => broken.from(),

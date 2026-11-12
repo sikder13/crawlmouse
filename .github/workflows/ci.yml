@@ -486,15 +486,17 @@ jobs:
   # --update-snapshots and uploads them as proposed baselines, next to the diffs; nothing is
   # committed from CI. tests/visual/README.md says how to accept them.
   #
-  # Six shards, each under its own 45 minutes: one runner ran past that limit once the segment
-  # previews were added (owner ruling, CC-23).
+  # Six shards, each under its own 90 minutes. One runner ran past 45 minutes once the segment
+  # previews were added (owner ruling, CC-23). In run 43280365648 shard 1 took 55.7 min and shard 6
+  # reached its 60-minute limit: 45.4 min of checks, then "Propose baselines" cancelled at 13.8 min,
+  # so the run left no artifact (CC-28, owner ruling 4).
   #
   # Skipped when the `changes` job finds nothing on the branch that can affect rendering.
   visual-shard:
     needs: changes
     if: needs.changes.outputs.visual == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
     strategy:
@@ -839,6 +841,12 @@ jobs:
           TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
           TRIAL_RACE_REQUIRED: '1'
         run: pnpm exec vitest run db/fixes-race.test.ts --passWithNoTests=false
+      - name: Two transactions race in the mail and schedule claims (CC-28)
+        working-directory: scripts
+        env:
+          TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          TRIAL_RACE_REQUIRED: '1'
+        run: pnpm exec vitest run db/monitoring-race.test.ts --passWithNoTests=false
       - name: Two transactions race for an account's last seat (CC-31)
         working-directory: scripts
         env:

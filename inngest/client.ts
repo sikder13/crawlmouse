@@ -78,6 +78,9 @@ type Events = {
   // event names the seat and the invitation's number, never an address or a token: the handler
   // reads both through issue_seat_invite.
   'seat.invite.requested': { data: { seat_id: string; seq: number } };
+  // CC-28 D6: one account's weekly summary is due (inngest/summary.ts). Names the account and the
+  // week only; the recipients are read when it is sent.
+  'summary.requested': { data: { accountId: string; weekKey: string; weekStart: string } };
 };
 
 export const inngest = new Inngest({

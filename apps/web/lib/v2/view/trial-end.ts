@@ -141,8 +141,9 @@ export function trialEndView(
 
   // ── the banner ──
   const reminder = daysBefore(end, TRIAL_REMINDER_DAYS_BEFORE_END, zone);
-  // Nothing records a send (CC-28 sends it): the line says when the reminder is due, from its day
-  // until that day is over in the account's zone, and nothing after.
+  // This page reads no record of the send (CC-28's mailer keeps one in email_sends): the line says
+  // when the reminder is due, from its day until that day is over in the account's zone, and nothing
+  // after.
   const reminderLine =
     a.email_prefs.trial_reminder && (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
       ? COPY.reminderDue(dayDate(reminder, zone))

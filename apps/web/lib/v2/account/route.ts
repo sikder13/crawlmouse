@@ -139,6 +139,8 @@ export const NOTICE_CODES = [
   'billing_unavailable',
   // any body the route could not read
   'invalid',
+  // a form posted without the method it means (`meantMethod`)
+  'method_not_allowed',
 ] as const;
 
 export type NoticeCode = (typeof NOTICE_CODES)[number];

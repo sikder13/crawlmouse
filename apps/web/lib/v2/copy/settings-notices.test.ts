@@ -149,6 +149,19 @@ describe('settingsNotice', () => {
       });
   });
 
+  it('Alerts reads the error code `PUT /api/alert-rules` sends a refused form back with, and no success line (CC-28 D8)', () => {
+    expect(settingsNotice({ error: 'upgrade_required' }, 'alerts')).toEqual({
+      tone: 'error',
+      text: REFUSAL_SENTENCES.upgrade_required,
+    });
+    expect(settingsNotice({ error: 'no_such_code' }, 'alerts')).toEqual({
+      tone: 'error',
+      text: SETTINGS_NOTICES.unknown,
+    });
+    for (const q of [{ saved: '1' }, { email: 'sent' }, { sent: '1' }, {}])
+      expect(settingsNotice(q, 'alerts')).toBeNull();
+  });
+
   it('nothing in the query: no line', () => {
     expect(settingsNotice({}, 'settings')).toBeNull();
     expect(settingsNotice({ saved: '0', email: 'x' }, 'settings')).toBeNull();

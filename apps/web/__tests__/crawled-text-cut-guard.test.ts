@@ -609,6 +609,57 @@ const INVENTORY: [entry: string, why: string][] = [
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
   [
+    "apps/web/lib/v2/mail/escape.ts :: return points.length <= max ? clean : `${points.slice(0, Math.max(0, max - 1)).join('')}…`;",
+    'ARRAY slice of the code points of a string spread with `[...clean]` (CC-28 D3): each element is a ' +
+      'whole code point, so the cut cannot split a surrogate pair. This is the bound mail templates use.',
+  ],
+  [
+    "apps/web/lib/v2/mail/unsubscribe-token.ts :: body = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));",
+    'NOT A CUT. Decodes the whole base64url payload of an unsubscribe token we signed (CC-28 D7); nothing ' +
+      'is dropped, and the payload holds a seat id, a kind and a time, no crawled text.',
+  ],
+  [
+    "apps/web/lib/v2/mail/transport.ts :: providerId: typeof body?.id === 'string' ? body.id.slice(0, 200) : null,",
+    "STRING slice of Resend's message id, bounded to the ledger column's 200 characters (CC-28 D1). " +
+      'An id the provider issued, not crawled text.',
+  ],
+  [
+    'apps/web/lib/v2/mail/headers.ts :: const local = value.slice(0, at);',
+    'An address split at its one `@` after `isPlainAddress` accepted it (CC-28 security r1 N2): the address is the recipient, not crawled text, and is neither persisted nor rendered; the split point is an ASCII character.',
+  ],
+  [
+    'apps/web/lib/v2/mail/headers.ts :: return at > 0 && local.length <= 64 && LOCAL.test(local) && DOMAIN.test(value.slice(at + 1));',
+    'An address split at its one `@` after `isPlainAddress` accepted it (CC-28 security r1 N2): the address is the recipient, not crawled text, and is neither persisted nor rendered; the split point is an ASCII character.',
+  ],
+  [
+    "apps/web/lib/v2/mail/send.ts :: createHash('sha256').update(key).digest('hex').slice(0, 16);",
+    'The first 16 hex characters of a SHA-256 of the ledger key, for a log line (CC-28 test-quality r1): hex is ASCII, no crawled text.',
+  ],
+  [
+    'apps/web/lib/v2/mail/templates/inspect.ts :: const attr = html.slice(i, k).toLowerCase();',
+    'NOT crawled text: the HTML a template rendered, read by the test-support inspector (templates/inspect.ts, imported only by tests) to find link targets; nothing it cuts is persisted or rendered.',
+  ],
+  [
+    'apps/web/lib/v2/mail/templates/inspect.ts :: const n = hex ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10);',
+    'NOT crawled text: the HTML a template rendered, read by the test-support inspector (templates/inspect.ts, imported only by tests) to find link targets; nothing it cuts is persisted or rendered.',
+  ],
+  [
+    'apps/web/lib/v2/mail/templates/inspect.ts :: const name = html.slice(i, j).toLowerCase();',
+    'NOT crawled text: the HTML a template rendered, read by the test-support inspector (templates/inspect.ts, imported only by tests) to find link targets; nothing it cuts is persisted or rendered.',
+  ],
+  [
+    'apps/web/lib/v2/mail/templates/inspect.ts :: value = html.slice(i + 1, end === -1 ? n : end);',
+    'NOT crawled text: the HTML a template rendered, read by the test-support inspector (templates/inspect.ts, imported only by tests) to find link targets; nothing it cuts is persisted or rendered.',
+  ],
+  [
+    'apps/web/lib/v2/mail/templates/inspect.ts :: value = html.slice(i, e);',
+    'NOT crawled text: the HTML a template rendered, read by the test-support inspector (templates/inspect.ts, imported only by tests) to find link targets; nothing it cuts is persisted or rendered.',
+  ],
+  [
+    "apps/web/lib/v2/mail/templates/alert.ts :: ua === '' || (summary.startsWith(ua) && /^(?:[\\s:]|$)/.test(summary.slice(ua.length)));",
+    'NOT A CUT that is kept: the rest of a change summary after a crawler name it starts with, only tested for a word boundary to decide whether to name the crawler again (CC-28 copy pass); nothing cut is rendered or persisted.',
+  ],
+  [
     "packages/engine/src/v2/grade/outcomes.ts :: : `${points.slice(0, MAX_TITLE_CHARS).join('')}…`;",
     'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). A fix title past MAX_TITLE_CHARS, marked with an ellipsis (CC-30, titleOf).',
   ],

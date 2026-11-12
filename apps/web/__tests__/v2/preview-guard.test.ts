@@ -191,6 +191,9 @@ describe('v2 stays out of live pages', () => {
     join(WEB_ROOT, 'app', 'invite'),
     // CC-31: the agency's client matrix and client page.
     join(WEB_ROOT, 'app', 'agency'),
+    // CC-28: the Alerts page and the changes log.
+    join(WEB_ROOT, 'app', 'alerts'),
+    join(WEB_ROOT, 'app', 'changes'),
   ];
   const inV2PageDir = (file: string) => V2_PAGE_DIRS.some((d) => file.startsWith(d + '/'));
   const allowed = (file: string) =>
@@ -225,6 +228,8 @@ describe('v2 stays out of live pages', () => {
     expect(pages.map((f) => relative(WEB_ROOT, f)).sort()).toEqual([
       'app/agency/clients/[siteId]/page.tsx',
       'app/agency/page.tsx',
+      'app/alerts/page.tsx',
+      'app/changes/page.tsx',
       'app/dashboard/v2/page.tsx',
       'app/invite/page.tsx',
       'app/seats/page.tsx',

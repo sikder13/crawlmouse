@@ -18,6 +18,7 @@ import {
   calendarDays,
   dayDate,
   dayMonth,
+  hourMinute,
   listOf,
   percent,
   weekday,
@@ -31,6 +32,8 @@ const BLOCKING_VERDICTS: Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rul
 import { capitalise, count, numberWord, plural } from '../words';
 import {
   PLAN_NAMES,
+  primarySite,
+  readerRole,
   resultChecks,
   runsSites,
   viewAt,
@@ -394,7 +397,39 @@ function scheduleValue(s: Site, zone: string): string {
   return `${scheduleCell(s)} around ${String(sch.hour_local).padStart(2, '0')}:00, ${zone}`;
 }
 
-export function siteView(d: AccountDataset, viewer: Viewer, siteId: string): SiteView {
+/** Each site's `sites.next_check_at` (CC-28 D4's column), by site id, as a live page reads it. */
+export type NextChecks = ReadonlyMap<string, string | null>;
+
+/**
+ * When a site's next scheduled check is due, "Fri 13 Nov around 06:37", or null. A live page passes
+ * `next`, the scheduler's own column, and the time is read from it and nowhere else; it is shown only
+ * for a site the scheduler claims (claim_due_sites: not paused, and on Free the first site only, its
+ * other sites waiting, owner ruling Q4). A time at or before the viewer's now reads `due now`. A
+ * preview's fixture holds no such column, so with no `next`
+ * the line is `nextCheck`'s weekly stand-in from the saved schedule.
+ */
+export function nextCheckLine(
+  site: Site,
+  v: AccountView,
+  next: NextChecks | undefined,
+  dayDateOf: (ts: string) => string,
+): string | null {
+  if (next === undefined) return nextCheck(site, v, dayDateOf);
+  const at = next.get(site.id) ?? null;
+  if (at === null || site.paused) return null;
+  if (v.gates.schedule === 'monthly_first_site_only' && site.id !== primarySite(v).id) return null;
+  // A time already reached (the global ceiling or CRAWL_PAUSED left the site waiting) is not named
+  // as a past date: the check is due now.
+  if (instant(at) <= instant(v.now)) return 'due now';
+  return `${dayDateOf(at)} around ${hourMinute(at, zoneOf(v))}`;
+}
+
+export function siteView(
+  d: AccountDataset,
+  viewer: Viewer,
+  siteId: string,
+  next?: NextChecks,
+): SiteView {
   const v = viewAt(d, viewer);
   const zone = zoneOf(v);
   const site = v.d.sites.find((s) => s.id === siteId);
@@ -424,13 +459,13 @@ export function siteView(d: AccountDataset, viewer: Viewer, siteId: string): Sit
     .filter((c) => c.site_id === site.id)
     .sort((a, b) => instant(a.finished_at!) - instant(b.finished_at!))
     .at(-1);
-  const next = nextCheck(site, v, (ts) => dayDate(ts, zone));
+  const nextAt = nextCheckLine(site, v, next, (ts) => dayDate(ts, zone));
   const line = [
     dayDate(v.now, zone),
     `last check ${whenAgo(result.finished_at!, v)}`,
     ended && ended !== result && ended.status === 'failed' ? 'latest check failed' : null,
     ...v.inFlight.filter((f) => f.siteId === site.id).map((f) => `check ${f.status}`),
-    next ? `next ${next}` : null,
+    nextAt ? `next ${nextAt}` : null,
     result.coverage ? `${count(result.coverage.pages_crawled)} pages` : null,
     fixLine,
   ]
@@ -658,33 +693,47 @@ export function siteView(d: AccountDataset, viewer: Viewer, siteId: string): Sit
       ],
     },
     alerts: {
-      rows: v.d.alert_rules
-        .filter((r) => r.site_id === null || r.site_id === site.id)
-        .map((r) => ({
-          key: r.id,
-          label: ALERT_LABELS[r.kind](r.threshold_points),
-          verdicts: r.kind === 'crawler_blocked' ? BLOCKING_VERDICTS : [],
-          on: r.enabled,
-          fired:
-            r.last_fired_at && r.last_fired_check_id && siteChecks.has(r.last_fired_check_id)
-              ? `fired ${weekdayTime(r.last_fired_at, zone)}`
-              : null,
-          extra:
-            !r.enabled && r.kind === 'any_change' && contentNow.length
-              ? contentNow.map((c) => `${c.summary}, ${weekday(c.detected_at, zone)}`).join('; ')
-              : null,
-          toggle: action(
-            'alertRules',
-            ALERT_LABELS[r.kind](r.threshold_points),
-            { id: site.id },
-            {
-              fields: { rule: r.kind, enabled: String(!r.enabled) },
-            },
-          ),
-        })),
+      rows: siteRules(v.d.alert_rules, site.id).map((r) => ({
+        key: r.id,
+        label: ALERT_LABELS[r.kind](r.threshold_points),
+        verdicts: r.kind === 'crawler_blocked' ? BLOCKING_VERDICTS : [],
+        on: r.enabled,
+        fired:
+          r.last_fired_at && r.last_fired_check_id && siteChecks.has(r.last_fired_check_id)
+            ? `fired ${weekdayTime(r.last_fired_at, zone)}`
+            : null,
+        extra:
+          !r.enabled && r.kind === 'any_change' && contentNow.length
+            ? contentNow.map((c) => `${c.summary}, ${weekday(c.detected_at, zone)}`).join('; ')
+            : null,
+        toggle: action(
+          'alertRules',
+          ALERT_LABELS[r.kind](r.threshold_points),
+          { id: site.id },
+          {
+            fields: { rule: r.kind, enabled: String(!r.enabled) },
+          },
+        ),
+      })),
       foot: SITE_COPY.alertsFoot(to),
     },
   };
+}
+
+/**
+ * The rules that apply to one site: each account-level rule, or in its place the site's own row of
+ * that kind (CC-28 D8, `PUT /api/sites/[id]/alert-rules`), then any kind the site alone has.
+ */
+function siteRules<R extends { site_id: string | null; kind: string }>(
+  rules: readonly R[],
+  siteId: string,
+): R[] {
+  const own = rules.filter((r) => r.site_id === siteId);
+  const account = rules.filter((r) => r.site_id === null);
+  return [
+    ...account.map((r) => own.find((o) => o.kind === r.kind) ?? r),
+    ...own.filter((o) => !account.some((r) => r.kind === o.kind)),
+  ];
 }
 
 /** A site whose first check has not ended with a result, as its page shows it (D8). */
@@ -707,11 +756,17 @@ export type SitePageView =
  * The site page: the site's view once a check has ended with a result, otherwise its first check
  * as it stands at `viewer.now`, read from that check's own record.
  */
-export function sitePage(d: AccountDataset, viewer: Viewer, siteId: string): SitePageView {
+export function sitePage(
+  d: AccountDataset,
+  viewer: Viewer,
+  siteId: string,
+  next?: NextChecks,
+): SitePageView {
   const v = viewAt(d, viewer);
   const site = v.d.sites.find((s) => s.id === siteId);
   if (!site) throw new Error(`Site ${siteId} is not the viewer’s at ${viewer.now}`);
-  if (resultChecks(v, site.id).length) return { kind: 'site', site: siteView(d, viewer, siteId) };
+  if (resultChecks(v, site.id).length)
+    return { kind: 'site', site: siteView(d, viewer, siteId, next) };
 
   const zone = zoneOf(v);
   const t = instant(viewer.now);
@@ -742,7 +797,7 @@ export function sitePage(d: AccountDataset, viewer: Viewer, siteId: string): Sit
   return {
     kind: 'first_check',
     first: {
-      shell: accountShellView(v, 'Sites'),
+      shell: accountShellView(v, 'Sites', { role: readerRole(v) ?? 'developer' }),
       title: site.host,
       line,
       state,

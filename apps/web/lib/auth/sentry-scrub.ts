@@ -18,8 +18,8 @@
  *   keys at any depth; and replaces a `token_hash` or `code` query value (URL-encoded or not), a
  *   `post_login_next=` value, a PostgREST `=eq.` filter value, the id after `/check/`,
  *   `/checks/`, `/audit/` or `/audits/` in a path, an emailed account link's token in its
- *   `/account/…/` path, and a seat invitation's token in its `/invite/` path, wherever a string
- *   holds one.
+ *   `/account/…/` path, a seat invitation's token in its `/invite/` path, a Slack webhook's secret
+ *   in its `/services/…` path, and an unsubscribe link's `t=` token, wherever a string holds one.
  *
  * The browser SDK runs `scrubDoorSecrets` too (`sentryBrowserOptions`, instrumentation-client.ts):
  * a check's pages are at `/audit/<id>/…`, so the browser's own URL, its navigation and fetch
@@ -79,6 +79,31 @@ const INVITE_LINK_PATH = new RegExp(
   'gi',
 );
 /**
+ * A Slack incoming-webhook URL's path (`/services/T…/B…/<secret>`, CC-28 D5): anyone holding it posts
+ * into the member's Slack. alertFn POSTs to it with `fetch`, which the SDK records as a span and a
+ * breadcrumb. Everything after `/services/` goes, in the characters the stored URL may hold
+ * (`SLACK_WEBHOOK`, lib/v2/monitor/slack.ts), with the slashes as CHECK_PATH reads them.
+ */
+const SLACK_WEBHOOK_PATH = new RegExp(
+  `(${SLASH}services${SLASH})[A-Za-z0-9_-]+(?:${SLASH}[A-Za-z0-9_-]+)*`,
+  'gi',
+);
+/**
+ * An unsubscribe link's token (`/unsubscribe?t=…`, `/api/unsubscribe?t=…`, CC-28 D7): it changes one
+ * seat's mail without a sign-in, so it goes from a request's URL like a sign-in token.
+ */
+const UNSUBSCRIBE_TOKEN = new RegExp(
+  `(${SLASH}unsubscribe(?:\\?|%3F)t(?:=|%3D))[^&#;\\s"%]*`,
+  'gi',
+);
+/**
+ * The same token where no path names it (an event's `query_string`): a `t=` value of a signed
+ * token's shape, a base64url payload, a dot and a 43-character base64url HMAC
+ * (`lib/v2/mail/unsubscribe-token.ts`).
+ */
+const SIGNED_TOKEN_QUERY =
+  /((?:^|[?&;]|%3F|%26)t(?:=|%3D))[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
+/**
  * The SDK's own processing state, which holds the live scope and client: never part of what is
  * sent, and not ours to walk (a getter-only property on it throws when assigned).
  */
@@ -98,7 +123,10 @@ function scrub(value: unknown, seen: WeakSet<object>): unknown {
       .replace(POSTGREST_FILTER, '$1[Filtered]')
       .replace(CHECK_PATH, '$1[Filtered]')
       .replace(ACCOUNT_LINK_PATH, '$1[Filtered]')
-      .replace(INVITE_LINK_PATH, '$1[Filtered]');
+      .replace(INVITE_LINK_PATH, '$1[Filtered]')
+      .replace(SLACK_WEBHOOK_PATH, '$1[Filtered]')
+      .replace(UNSUBSCRIBE_TOKEN, '$1[Filtered]')
+      .replace(SIGNED_TOKEN_QUERY, '$1[Filtered]');
   }
   if (value === null || typeof value !== 'object') return value;
   if (seen.has(value)) return value;

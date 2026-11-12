@@ -1,5 +1,6 @@
 import { expect, type Page } from './pw';
 import { PREVIEWS as REGISTRY } from '../../apps/web/app/(v2-preview)/v2-preview/_preview/registry';
+import { MAIL_PREVIEW_INDEX as MAIL_REGISTRY } from '../../apps/web/lib/v2/mail/templates/preview-index';
 
 /** '/v2-preview/screens/home' -> 'screen-home'; '/v2-preview/button' -> 'button'. */
 export const slugOf = (path: string) =>
@@ -23,6 +24,18 @@ export const PREVIEWS = REGISTRY.flatMap((p) =>
       }))
     : [{ ...p, slug: slugOf(p.path), orange: p.orange ?? (p.kind === 'screen' ? 1 : null) }],
 );
+
+/**
+ * Every email template's preview page (`apps/web/lib/v2/mail/templates/preview-index.ts`), screenshotted at
+ * a mail client's widths: 600 px, the layout's column, and 390 px, a phone.
+ */
+export const MAIL_PREVIEWS = MAIL_REGISTRY.map((p) => ({
+  path: `/mail-preview/${p.slug}`,
+  name: `Mail: ${p.name}`,
+  slug: `mail-${p.slug}`,
+}));
+export const MAIL_WIDTHS = [600, 390] as const;
+export const MAIL_HEIGHT = { 600: 900, 390: 844 } as const;
 
 export const WIDTHS = [1280, 390] as const;
 /** The layout checks add 1000px, the narrowest desktop width DESIGN-LOCK §7.1 renders. */

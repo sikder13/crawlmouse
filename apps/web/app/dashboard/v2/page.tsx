@@ -4,8 +4,10 @@ import { checksPublicEnabled } from '@/lib/auth/flags';
 import { AccountStateScreen } from '@/components/v2/screens/account/AccountStateScreen';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { DashboardScreen } from '@/components/v2/screens/dashboard/DashboardScreen';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { readAccount } from '@/lib/v2/account/pages';
+import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { reachedByRewrite } from '@/lib/v2/rewrite-target';
 import { withSwitcher } from '@/lib/v2/view/account-shell';
@@ -40,10 +42,15 @@ export default async function V2Dashboard({
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
   const { account, seat, accounts, tier } = r.viewer;
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
+  // The scheduler's own column (CC-28 D8), for the sites the caller's session read.
+  const next = await readNextChecks(
+    supabaseAdmin(),
+    d.sites.map((s) => s.id),
+  );
   return (
     <LiveActions>
       <DashboardScreen
-        data={withSwitcher(dashboardView(d, viewer), accounts, account.id)}
+        data={withSwitcher(dashboardView(d, viewer, next), accounts, account.id)}
         // The form a plan's limit refuses here is the add-site form: its notice names the limit.
         notice={noticeLine(await searchParams, account.timezone, tier)}
       />
