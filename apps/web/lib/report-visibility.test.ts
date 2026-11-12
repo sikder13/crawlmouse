@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { reportRobotsIndex, isReportGone, isReportClaimed } from './report-visibility';
+import {
+  reportRobotsIndex,
+  isReportGone,
+  isReportGoneEitherKind,
+  isReportClaimed,
+} from './report-visibility';
 import type { PublicReportRow } from './reports';
 import { fixture } from './v2/fixtures';
 import { buildPublicSnapshot } from './v2/reports/build-snapshot';
@@ -70,7 +75,7 @@ describe('isReportClaimed', () => {
   });
 });
 
-describe('isReportGone — a v2 report (CC-29)', () => {
+describe('isReportGoneEitherKind — a v2 report (CC-29)', () => {
   const v2 = {
     domain: 'example-outfitter.com',
     grade: null,
@@ -89,24 +94,49 @@ describe('isReportGone — a v2 report (CC-29)', () => {
   } satisfies PublicReportRow;
   afterEach(() => vi.unstubAllEnvs());
 
-  it('is gone with V2_CHECKS_PUBLIC off, so no v1 surface renders it', () => {
+  it('is gone for v1’s reading (isReportGone) whatever the flag, as a row with no grade', () => {
+    for (const flag of ['', '1']) {
+      vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+      expect(isReportGone(v2)).toBe(true);
+    }
+  });
+
+  it('is gone with V2_CHECKS_PUBLIC off', () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
-    expect(isReportGone(v2)).toBe(true);
+    expect(isReportGoneEitherKind(v2)).toBe(true);
   });
 
   it('is live with the flag on, although its grade column is null', () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
-    expect(isReportGone(v2)).toBe(false);
+    expect(isReportGoneEitherKind(v2)).toBe(false);
   });
 
   it('is gone when hidden or taken down, flag on', () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
-    expect(isReportGone({ ...v2, hidden_at: '2026-11-12T19:00:00Z' })).toBe(true);
-    expect(isReportGone({ ...v2, takedown_requested_at: '2026-11-12T19:00:00Z' })).toBe(true);
+    expect(isReportGoneEitherKind({ ...v2, hidden_at: '2026-11-12T19:00:00Z' })).toBe(true);
+    expect(isReportGoneEitherKind({ ...v2, takedown_requested_at: '2026-11-12T19:00:00Z' })).toBe(
+      true,
+    );
   });
 
   it('a v1 row with no grade stays gone with the flag on', () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
-    expect(isReportGone({ ...v2, report_snapshot: null })).toBe(true);
+    expect(isReportGoneEitherKind({ ...v2, report_snapshot: null })).toBe(true);
+  });
+
+  it('reads a row without a v2 snapshot exactly as isReportGone does, flag on or off', () => {
+    const v1 = { ...v2, report_snapshot: null, grade: 'B' };
+    const rows = [
+      v1,
+      { ...v1, grade: null },
+      { ...v1, hidden_at: '2026-11-12T19:00:00Z' },
+      { ...v1, takedown_requested_at: '2026-11-12T19:00:00Z' },
+      null,
+    ];
+    for (const flag of ['', '1']) {
+      vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+      for (const r of rows) expect(isReportGoneEitherKind(r)).toBe(isReportGone(r));
+    }
+    expect(isReportGoneEitherKind(v1)).toBe(false);
   });
 });

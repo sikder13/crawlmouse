@@ -11,7 +11,7 @@
 import { VerdictSchema, type Verdict } from '@crawlmouse/types/v2';
 import type { PublicReportRow } from '../../report-row';
 import { checksPublicEnabled } from '../../auth/flags';
-import { isReportGone, reportRobotsIndex } from '../../report-visibility';
+import { isReportGoneEitherKind, reportRobotsIndex } from '../../report-visibility';
 import { dateTimeUtc } from '../format';
 import { isLetter, toneOf } from '../letters';
 import { isV2Snapshot, type PublicSnapshotV2 } from '../reports/snapshot';
@@ -133,7 +133,7 @@ export type ReportPage =
 
 export function reportPageOf(row: PublicReportRow | null): ReportPage {
   if (row === null || !isV2Snapshot(row.report_snapshot)) return { kind: 'v1' };
-  if (isReportGone(row)) return { kind: 'gone' };
+  if (isReportGoneEitherKind(row)) return { kind: 'gone' };
   return { kind: 'v2', view: publicReportView(row.report_snapshot), index: reportRobotsIndex(row) };
 }
 
@@ -167,5 +167,5 @@ export function publicReportCard(s: PublicSnapshotV2): PublicReportCard {
  */
 export function reportCardOf(row: PublicReportRow | null): PublicReportCard | null {
   if (!checksPublicEnabled() || row === null || !isV2Snapshot(row.report_snapshot)) return null;
-  return isReportGone(row) ? null : publicReportCard(row.report_snapshot);
+  return isReportGoneEitherKind(row) ? null : publicReportCard(row.report_snapshot);
 }
