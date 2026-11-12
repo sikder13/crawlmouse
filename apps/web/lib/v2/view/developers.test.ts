@@ -206,4 +206,10 @@ describe('the roadmap', () => {
     expect(status('MCP server')).toBe('planned');
     for (const r of rows) expect(`${r.item} ${r.status}`).not.toMatch(/\b20\d\d\b|\bQ[1-4]\b/);
   });
+
+  it('no sentence on the page says any of it is being built', () => {
+    const view = developersView();
+    const words = [view.title, view.description, view.h1, view.intro, view.roadmap.title].join(' ');
+    expect(words).not.toMatch(/being built|\bbuilding\b/i);
+  });
 });

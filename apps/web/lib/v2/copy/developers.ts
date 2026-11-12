@@ -22,10 +22,10 @@ export const READ_API = { requestsPerMinute: 60, keyPrefix: 'cm_ro_' } as const;
 export const DEVELOPERS_COPY = {
   title: 'Developers',
   description:
-    'A read-only API for your Crawlmouse audits is being built for Pro: the latest audit of each of your sites as JSON. See the response it will return, what comes after it, and join the developer list.',
+    'A read-only API for your Crawlmouse audits is planned for Pro: the latest audit of each of your sites as JSON. See the response it will return, what comes after it, and join the developer list.',
   h1: 'A read-only API for your audits, then the audit as a tool your agent can call.',
   intro:
-    'Pro accounts will create a read-only key and pull the latest audit of any of their sites as JSON: grades, the crawler table, fixes with packets, the link map as an edge list. That comes first. The write side — start an audit, mark a fix done, re-check — and an MCP server, a CLI and a GitHub check are being built after it. This page says what exists now and what does not.',
+    'Pro accounts will create a read-only key and pull the latest audit of any of their sites as JSON: grades, the crawler table, fixes with packets, the link map as an edge list. That comes first. The write side — start an audit, mark a fix done, re-check — and an MCP server, a CLI and a GitHub check are planned after it, with no dates. This page says what exists now and what does not.',
   sample: {
     title: 'The read-only API, on Pro',
     coming: 'coming',
@@ -38,7 +38,7 @@ export const DEVELOPERS_COPY = {
     notes: `Rate limit ${READ_API.requestsPerMinute} requests a minute. Keys will be created and revoked in Settings; the field reference is the sample above. Read-only means exactly that: nothing you send changes an audit.`,
   },
   roadmap: {
-    title: 'Being built, in this order, top first',
+    title: 'Planned, in this order, top first',
     sub: 'No dates. Each ships when it is as reliable as the web app.',
     rows: [
       // Owner ruling (rulings-3 Q37): planned, with no date. MCP is after v1 (OPERATING-RULES §8).
