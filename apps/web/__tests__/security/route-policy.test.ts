@@ -299,6 +299,7 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/fixes/[id]/done',
       'api/fixes/[id]/email-developer',
       'api/me',
+      'api/reports',
       'api/reports/[slug]/claim',
       'api/reports/[slug]/logo',
       'api/reports/[slug]/visibility',
