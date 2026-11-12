@@ -16,8 +16,7 @@ let owns = true;
 let proUntil: string | null = FUTURE;
 
 vi.mock('@/lib/supabase/server', () => ({
-  supabaseServer: () =>
-    Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user } }) } }),
+  supabaseServer: () => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user } }) } }),
 }));
 vi.mock('@/lib/reports', () => ({ readReportRow: () => Promise.resolve(reportRow) }));
 vi.mock('@/lib/report-ownership', () => ({ isDomainVerifiedForUser: () => Promise.resolve(owns) }));
@@ -25,13 +24,7 @@ vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
     from: (table: string) => {
       if (table === 'users') {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: () => Promise.resolve({ data: { pro_until: proUntil }, error: null }),
-            }),
-          }),
-        };
+        return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { pro_until: proUntil }, error: null }) }) }) };
       }
       return {};
     },
@@ -42,22 +35,11 @@ import { GET } from './route';
 
 const SLUG = 'slug-xyz';
 const call = (slug = SLUG) =>
-  GET(new Request(`http://localhost/api/reports/${slug}/mine`), {
-    params: Promise.resolve({ slug }),
-  });
+  GET(new Request(`http://localhost/api/reports/${slug}/mine`), { params: Promise.resolve({ slug }) });
 
 beforeEach(() => {
   user = { id: 'u-1' };
-  reportRow = {
-    domain: 'ex.com',
-    grade: 'C',
-    hidden_at: null,
-    takedown_requested_at: null,
-    claimed_at: '2026-01-01T00:00:00Z',
-    listed: true,
-    indexable: true,
-    white_label: null,
-  };
+  reportRow = { domain: 'ex.com', grade: 'C', hidden_at: null, takedown_requested_at: null, claimed_at: '2026-01-01T00:00:00Z', listed: true, indexable: true, white_label: null };
   owns = true;
   proUntil = FUTURE;
 });
@@ -87,12 +69,7 @@ describe('GET /api/reports/[slug]/mine — ownership probe (U1)', () => {
     const res = await call();
     expect(res.headers.get('cache-control')).toContain('no-store');
     expect(await res.json()).toEqual({
-      owned: true,
-      claimed: true,
-      canWhiteLabel: true,
-      listed: true,
-      indexable: true,
-      whiteLabel: null,
+      owned: true, claimed: true, canWhiteLabel: true, listed: true, indexable: true, whiteLabel: null,
     });
   });
 
@@ -104,23 +81,9 @@ describe('GET /api/reports/[slug]/mine — ownership probe (U1)', () => {
   });
 
   it('reflects the report visibility + white-label state so the toggles initialize correctly', async () => {
-    reportRow = {
-      domain: 'ex.com',
-      grade: 'B',
-      hidden_at: null,
-      takedown_requested_at: null,
-      claimed_at: 'x',
-      listed: false,
-      indexable: false,
-      white_label: { brandName: 'Acme', logoPath: null },
-    };
+    reportRow = { domain: 'ex.com', grade: 'B', hidden_at: null, takedown_requested_at: null, claimed_at: 'x', listed: false, indexable: false, white_label: { brandName: 'Acme', logoPath: null } };
     expect(await (await call()).json()).toEqual({
-      owned: true,
-      claimed: true,
-      canWhiteLabel: true,
-      listed: false,
-      indexable: false,
-      whiteLabel: { brandName: 'Acme', logoPath: null },
+      owned: true, claimed: true, canWhiteLabel: true, listed: false, indexable: false, whiteLabel: { brandName: 'Acme', logoPath: null },
     });
   });
 });

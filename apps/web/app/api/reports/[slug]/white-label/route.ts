@@ -39,9 +39,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const { slug } = await params;
 
   const sbUser = await supabaseServer();
-  const {
-    data: { user },
-  } = await sbUser.auth.getUser();
+  const { data: { user } } = await sbUser.auth.getUser();
   if (!user) return NextResponse.json({ error: 'auth_required' }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
@@ -61,11 +59,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     }
   }
 
-  const rl = await checkRateLimit(
-    `report-white-label:${user.id}`,
-    WHITE_LABEL_UPDATES_PER_HOUR,
-    HOUR_MS,
-  );
+  const rl = await checkRateLimit(`report-white-label:${user.id}`, WHITE_LABEL_UPDATES_PER_HOUR, HOUR_MS);
   if (!rl.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
 
   const sb = supabaseAdmin();
@@ -74,11 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   // Reads only pro_until: the `tier`/agency seam column isn't in this DB yet (selecting it would
   // 42703), and pro_until fully covers the Pro case (`entitlementFor` makes canWhiteLabel true for any
   // paid tier after the §5 flip). No 'agency' is producible in this phase.
-  const { data: me } = await sb
-    .from('users')
-    .select('pro_until')
-    .eq('id', user.id)
-    .maybeSingle<{ pro_until: string | null }>();
+  const { data: me } = await sb.from('users').select('pro_until').eq('id', user.id).maybeSingle<{ pro_until: string | null }>();
   const proUntil = me?.pro_until ?? null;
   const ent = entitlementFor(deriveTier({ pro_until: proUntil }), proUntil);
   if (!ent.canWhiteLabel) return NextResponse.json({ error: 'pro_required' }, { status: 402 });
@@ -102,14 +92,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   // are never in the patch (immutability §4/§12).
   let patch: { white_label: WhiteLabelConfig | null; listed?: boolean; indexable?: boolean };
   if (parsed.data.enabled) {
-    const cfg: WhiteLabelConfig = {
-      brandName: parsed.data.brandName,
-      logoPath: parsed.data.logoPath ?? null,
-    };
+    const cfg: WhiteLabelConfig = { brandName: parsed.data.brandName, logoPath: parsed.data.logoPath ?? null };
     const alreadyWhiteLabeled = whiteLabelBrandName(report.white_label) != null;
-    patch = alreadyWhiteLabeled
-      ? { white_label: cfg }
-      : { white_label: cfg, listed: false, indexable: false };
+    patch = alreadyWhiteLabeled ? { white_label: cfg } : { white_label: cfg, listed: false, indexable: false };
   } else {
     patch = { white_label: null };
   }
@@ -123,8 +108,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     .maybeSingle();
 
   if (error) {
-    if (isUndefinedColumnError(error))
-      return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+    if (isUndefinedColumnError(error)) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
     return NextResponse.json({ error: 'could not update' }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: 'not claimed' }, { status: 409 });
@@ -134,10 +118,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   purgePublicReport(slug);
   revalidatePath('/sitemap.xml');
   const row = data as { white_label: WhiteLabelConfig | null; listed: boolean; indexable: boolean };
-  return NextResponse.json({
-    ok: true,
-    whiteLabel: row.white_label,
-    listed: row.listed,
-    indexable: row.indexable,
-  });
+  return NextResponse.json({ ok: true, whiteLabel: row.white_label, listed: row.listed, indexable: row.indexable });
 }

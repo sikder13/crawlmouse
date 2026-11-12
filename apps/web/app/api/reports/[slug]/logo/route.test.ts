@@ -20,32 +20,19 @@ const rlCalls: string[] = [];
 const uploadMock = vi.fn();
 
 vi.mock('@/lib/supabase/server', () => ({
-  supabaseServer: () =>
-    Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user } }) } }),
+  supabaseServer: () => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user } }) } }),
 }));
 vi.mock('@/lib/rate-limit', () => ({
-  checkRateLimit: (key: string) => {
-    rlCalls.push(key);
-    return Promise.resolve({ allowed: rlAllowed, remaining: 0, resetAt: new Date() });
-  },
+  checkRateLimit: (key: string) => { rlCalls.push(key); return Promise.resolve({ allowed: rlAllowed, remaining: 0, resetAt: new Date() }); },
 }));
 vi.mock('@/lib/reports', () => ({ readReportRow: () => Promise.resolve(reportRow) }));
 vi.mock('@/lib/report-ownership', () => ({ isDomainVerifiedForUser: () => Promise.resolve(owns) }));
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () => Promise.resolve({ data: { pro_until: proUntil }, error: null }),
-        }),
-      }),
-    }),
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { pro_until: proUntil }, error: null }) }) }) }),
     storage: {
       from: (bucket: string) => ({
-        upload: (path: string, _bytes: unknown, opts: unknown) => {
-          uploadMock(bucket, path, opts);
-          return Promise.resolve(uploadResult);
-        },
+        upload: (path: string, _bytes: unknown, opts: unknown) => { uploadMock(bucket, path, opts); return Promise.resolve(uploadResult); },
       }),
     },
   }),
@@ -58,54 +45,21 @@ const SLUG = 'slug-xyz';
 const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const be32 = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
 function png(w: number, h: number): Uint8Array {
-  return Uint8Array.from([
-    ...PNG_SIG,
-    0,
-    0,
-    0,
-    13,
-    ...'IHDR'.split('').map((c) => c.charCodeAt(0)),
-    ...be32(w),
-    ...be32(h),
-    8,
-    6,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-  ]);
+  return Uint8Array.from([...PNG_SIG, 0, 0, 0, 13, ...'IHDR'.split('').map((c) => c.charCodeAt(0)), ...be32(w), ...be32(h), 8, 6, 0, 0, 0, 0, 0, 0, 0]);
 }
 
-function upload(
-  fileBytes: Uint8Array,
-  o: { type?: string; name?: string; field?: string; slug?: string } = {},
-) {
+function upload(fileBytes: Uint8Array, o: { type?: string; name?: string; field?: string; slug?: string } = {}) {
   const fd = new FormData();
-  fd.append(
-    o.field ?? 'logo',
-    new File([fileBytes as BlobPart], o.name ?? 'logo.png', { type: o.type ?? 'image/png' }),
-  );
+  fd.append(o.field ?? 'logo', new File([fileBytes as BlobPart], o.name ?? 'logo.png', { type: o.type ?? 'image/png' }));
   const slug = o.slug ?? SLUG;
-  return POST(
-    new Request(`http://localhost/api/reports/${slug}/logo`, { method: 'POST', body: fd }),
-    { params: Promise.resolve({ slug }) },
-  );
+  return POST(new Request(`http://localhost/api/reports/${slug}/logo`, { method: 'POST', body: fd }), { params: Promise.resolve({ slug }) });
 }
 
 beforeEach(() => {
   user = { id: 'u-1' };
   rlAllowed = true;
   proUntil = FUTURE;
-  reportRow = {
-    domain: 'ex.com',
-    grade: 'C',
-    hidden_at: null,
-    takedown_requested_at: null,
-    claimed_at: '2026-01-01T00:00:00Z',
-  };
+  reportRow = { domain: 'ex.com', grade: 'C', hidden_at: null, takedown_requested_at: null, claimed_at: '2026-01-01T00:00:00Z' };
   owns = true;
   uploadResult = { data: { path: `${SLUG}/abc.png` }, error: null };
   rlCalls.length = 0;
@@ -138,13 +92,7 @@ describe('POST /api/reports/[slug]/logo (§5/§11, V10)', () => {
   it('404 when the report is missing or gone', async () => {
     reportRow = null;
     expect((await upload(png(100, 40))).status).toBe(404);
-    reportRow = {
-      domain: 'ex.com',
-      grade: 'C',
-      hidden_at: '2026-07-08T00:00:00Z',
-      takedown_requested_at: null,
-      claimed_at: 'x',
-    };
+    reportRow = { domain: 'ex.com', grade: 'C', hidden_at: '2026-07-08T00:00:00Z', takedown_requested_at: null, claimed_at: 'x' };
     expect((await upload(png(100, 40))).status).toBe(404);
     expect(uploadMock).not.toHaveBeenCalled();
   });
@@ -158,10 +106,7 @@ describe('POST /api/reports/[slug]/logo (§5/§11, V10)', () => {
   it('400 when no file field is present', async () => {
     const fd = new FormData();
     fd.append('notlogo', 'hello');
-    const res = await POST(
-      new Request(`http://localhost/api/reports/${SLUG}/logo`, { method: 'POST', body: fd }),
-      { params: Promise.resolve({ slug: SLUG }) },
-    );
+    const res = await POST(new Request(`http://localhost/api/reports/${SLUG}/logo`, { method: 'POST', body: fd }), { params: Promise.resolve({ slug: SLUG }) });
     expect(res.status).toBe(400);
     expect(uploadMock).not.toHaveBeenCalled();
   });
@@ -172,9 +117,7 @@ describe('POST /api/reports/[slug]/logo (§5/§11, V10)', () => {
   });
 
   it('400 for an invalid image (SVG / text passed off as a logo) — no upload', async () => {
-    const svg = Uint8Array.from(
-      '<svg onload=alert(1)></svg>'.split('').map((c) => c.charCodeAt(0)),
-    );
+    const svg = Uint8Array.from('<svg onload=alert(1)></svg>'.split('').map((c) => c.charCodeAt(0)));
     const res = await upload(svg, { type: 'image/svg+xml', name: 'logo.svg' });
     expect(res.status).toBe(400);
     expect(uploadMock).not.toHaveBeenCalled();
@@ -186,11 +129,7 @@ describe('POST /api/reports/[slug]/logo (§5/§11, V10)', () => {
     const json = await res.json();
     expect(json.ok).toBe(true);
     expect(json.logoPath).toMatch(new RegExp(`^${SLUG}/[0-9a-f]{16}\\.png$`)); // slug-scoped + content hash
-    const [bucket, path, opts] = uploadMock.mock.calls[0] as [
-      string,
-      string,
-      Record<string, unknown>,
-    ];
+    const [bucket, path, opts] = uploadMock.mock.calls[0] as [string, string, Record<string, unknown>];
     expect(bucket).toBe('report-logos');
     expect(path).toMatch(new RegExp(`^${SLUG}/`));
     expect(opts).toMatchObject({ contentType: 'image/png', upsert: true });

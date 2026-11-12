@@ -26,9 +26,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   const { slug } = await params;
 
   const sbUser = await supabaseServer();
-  const {
-    data: { user },
-  } = await sbUser.auth.getUser();
+  const { data: { user } } = await sbUser.auth.getUser();
   // Anon short-circuits before any report read — no ownership signal, no existence leak.
   if (!user) return NextResponse.json({ owned: false }, { headers: NO_STORE });
 
@@ -46,11 +44,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
 
   // Entitlement recomputed SERVER-SIDE from the owner's own pro_until (mirrors the white-label route so
   // the island's locked/enabled state matches what the write route enforces).
-  const { data: me } = await sb
-    .from('users')
-    .select('pro_until')
-    .eq('id', user.id)
-    .maybeSingle<{ pro_until: string | null }>();
+  const { data: me } = await sb.from('users').select('pro_until').eq('id', user.id).maybeSingle<{ pro_until: string | null }>();
   const proUntil = me?.pro_until ?? null;
   const canWhiteLabel = entitlementFor(deriveTier({ pro_until: proUntil }), proUntil).canWhiteLabel;
 

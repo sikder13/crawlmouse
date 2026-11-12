@@ -42,11 +42,7 @@ async function insertReportWithRetry(
     if (isUndefinedColumnError(error)) return { error: 'minting_unavailable', status: 503 };
     if (error.code !== '23505') return { error: 'could not mint', status: 500 };
     // Unique violation: if it's the audit_id constraint, a report already exists — return it.
-    const { data: existing } = await sb
-      .from('public_reports')
-      .select('slug')
-      .eq('audit_id', auditId)
-      .maybeSingle();
+    const { data: existing } = await sb.from('public_reports').select('slug').eq('audit_id', auditId).maybeSingle();
     if (existing) return { slug: existing.slug, alreadyPublic: true };
     // Otherwise it was a slug PK collision: loop and try a fresh slug.
   }
@@ -60,9 +56,7 @@ export async function POST(req: Request) {
 
   const ip = getClientIp(req);
   const sbUser = await supabaseServer();
-  const {
-    data: { user },
-  } = await sbUser.auth.getUser();
+  const { data: { user } } = await sbUser.auth.getUser();
 
   // Abuse gate (mirrors audits/start): a coarse per-user (authed) / per-IP (anon) daily cap, with
   // Turnstile as the on-demand escalation once the cap is exhausted. Auth is NOT required — possession
@@ -77,12 +71,8 @@ export async function POST(req: Request) {
     capExhausted = true; // anon with no client IP → require Turnstile (can't cap otherwise)
   }
   if (capExhausted) {
-    if (!parsed.data.turnstileToken)
-      return NextResponse.json({ error: 'captcha_required' }, { status: 429 });
-    const ok = await verifyTurnstileToken(
-      parsed.data.turnstileToken,
-      ip === 'unknown' ? undefined : ip,
-    );
+    if (!parsed.data.turnstileToken) return NextResponse.json({ error: 'captcha_required' }, { status: 429 });
+    const ok = await verifyTurnstileToken(parsed.data.turnstileToken, ip === 'unknown' ? undefined : ip);
     if (!ok) return NextResponse.json({ error: 'captcha_failed' }, { status: 429 });
   }
 
@@ -90,14 +80,11 @@ export async function POST(req: Request) {
   // Capability read: possession of the audit UUID authorizes minting (no ownership/verification check).
   const { data: audit } = await sb
     .from('audits')
-    .select(
-      'id, url, status, grade, score, cms_detected, page_count, confidence, coverage_pct, confidence_band, projected_score, projected_grade, ai_readiness',
-    )
+    .select('id, url, status, grade, score, cms_detected, page_count, confidence, coverage_pct, confidence_band, projected_score, projected_grade, ai_readiness')
     .eq('id', parsed.data.auditId)
     .maybeSingle();
   if (!audit) return NextResponse.json({ error: 'not found' }, { status: 404 });
-  if (audit.status !== 'completed')
-    return NextResponse.json({ error: 'audit not complete' }, { status: 400 });
+  if (audit.status !== 'completed') return NextResponse.json({ error: 'audit not complete' }, { status: 400 });
   // An ungradeable completed audit (e.g. a JS-rendered / blocked crawl) has no client-ready report;
   // minting it would produce a null-grade row that immediately 404s. Reject up front with a clear message.
   if (!audit.grade) return NextResponse.json({ error: 'audit not gradeable' }, { status: 400 });
@@ -105,11 +92,7 @@ export async function POST(req: Request) {
   const domain = normalizeDomain(audit.url);
 
   // Already public? (fast path; the retry below also covers the double-submit race.)
-  const { data: existing } = await sb
-    .from('public_reports')
-    .select('slug')
-    .eq('audit_id', audit.id)
-    .maybeSingle();
+  const { data: existing } = await sb.from('public_reports').select('slug').eq('audit_id', audit.id).maybeSingle();
   if (existing) return NextResponse.json({ slug: existing.slug, alreadyPublic: true });
 
   // Build the FROZEN, FREE snapshot from the audit's persisted data (the gated cure columns are never
@@ -118,8 +101,7 @@ export async function POST(req: Request) {
 
   const result = await insertReportWithRetry(sb, audit.id, domain, snapshot, user?.id ?? null);
   if ('error' in result) {
-    const msg =
-      result.status === 503 ? 'Minting is being set up — please try again shortly.' : result.error;
+    const msg = result.status === 503 ? 'Minting is being set up — please try again shortly.' : result.error;
     return NextResponse.json({ error: msg }, { status: result.status });
   }
   return NextResponse.json({ slug: result.slug, alreadyPublic: result.alreadyPublic ?? false });
