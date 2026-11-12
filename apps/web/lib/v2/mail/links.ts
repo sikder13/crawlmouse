@@ -3,6 +3,7 @@
  * we serve, and an id or token of a shape we know. No template puts a string it was given into an
  * href. `unsubscribeUrl` is the one C's alert and weekly-summary templates and their senders call.
  */
+import { auditHref } from '../view/audit-hrefs';
 import { LINK_FLOWS, type LinkFlow } from '../account/link-cookie';
 import { isToken } from '../account/tokens';
 import { signUnsubscribe } from './unsubscribe-token';
@@ -21,7 +22,7 @@ export function mailUrl(path: `/${string}`): string {
 /** The page a check is read at: the audit route, whose id is the capability (CC-22b). */
 export function checkUrl(checkId: string): string {
   if (!UUID.test(checkId)) throw new RangeError('not a check id');
-  return mailUrl(`/audit/${checkId}`);
+  return mailUrl(auditHref(checkId) as `/${string}`);
 }
 
 /** The kinds of `account_tokens` row (027b), and the link route each lands on. */
