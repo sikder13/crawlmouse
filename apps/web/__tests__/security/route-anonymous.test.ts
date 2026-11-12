@@ -78,6 +78,7 @@ const ANONYMOUS: Record<
   'api/billing/cancel': { status: 401, body: { error: 'auth_required' } },
   'api/billing/checkout': { status: 401, body: { error: 'auth_required' } },
   'api/billing/portal': { status: 401, body: { error: 'auth_required' } },
+  'api/agency-trial': { status: 401, body: { error: 'auth_required' } },
   'api/billing/pro-trial/start': { status: 401, body: { code: 'auth_required' } },
   'api/billing/status': { status: 401, body: { pro: false } },
   'api/checks/[id]/claim': { status: 401, body: { code: 'auth_required' } },

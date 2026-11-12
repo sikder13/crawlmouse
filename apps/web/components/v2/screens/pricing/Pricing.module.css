@@ -1,0 +1,257 @@
+/* Final-Pricing: sizes and spacing from the locked screen's inline styles. */
+
+.hero {
+  padding-top: 72px;
+}
+
+.title {
+  max-width: 760px;
+}
+
+.lead {
+  font-size: 18px;
+  color: var(--v2-fg2);
+  max-width: 620px;
+  margin: 16px 0 0;
+}
+
+.intervals {
+  margin-top: 28px;
+  gap: 8px;
+}
+
+.plans {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.plan {
+  padding: 24px 26px;
+  display: flex;
+  flex-direction: column;
+}
+
+.planHead {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tag {
+  color: var(--v2-mut);
+  font-size: 13px;
+}
+
+.priceRow {
+  gap: 8px;
+  align-items: flex-end;
+  margin-top: 12px;
+}
+
+.price {
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.per {
+  color: var(--v2-mut);
+  padding-bottom: 4px;
+}
+
+.description {
+  font-size: 14px;
+  color: var(--v2-fg2);
+  margin-top: 8px;
+  min-height: 42px;
+}
+
+.rows {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--v2-line2);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.rowLabel {
+  flex: 0 0 92px;
+  color: var(--v2-fg);
+  font-size: 13px;
+  font-weight: 500;
+  padding-top: 1px;
+}
+
+.rowText {
+  font-size: 14px;
+  color: var(--v2-fg2);
+}
+
+.actionArea {
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+.action {
+  width: 100%;
+  height: 46px;
+  box-sizing: border-box;
+}
+
+.actionNote {
+  color: var(--v2-mut);
+  font-size: 13px;
+  margin-top: 8px;
+  text-align: center;
+  min-height: 40px;
+}
+
+.footnote {
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--v2-mut);
+}
+
+.footnote p {
+  margin: 0 0 6px;
+}
+
+.plus {
+  margin-top: 16px;
+}
+
+.contact {
+  margin-top: 16px;
+  padding: 22px 24px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  max-width: 440px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.mut {
+  color: var(--v2-mut);
+  font-weight: 400;
+}
+
+.wide {
+  width: 100%;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 88px;
+  height: auto;
+  padding-top: 10px;
+  resize: vertical;
+}
+
+.message {
+  margin: 0;
+  font-size: 13px;
+  color: var(--v2-fg2);
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--v2-bad);
+}
+
+.section {
+  margin-top: 72px;
+}
+
+.cardFlush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.cardHead {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--v2-line);
+}
+
+.cardLead {
+  color: var(--v2-mut);
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.pair {
+  margin-top: 72px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pairCard {
+  padding: 22px 24px;
+}
+
+.text {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--v2-fg2);
+}
+
+.faq {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--v2-fg2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.faq dt {
+  color: var(--v2-fg);
+  font-weight: 500;
+}
+
+.faq dd {
+  margin: 2px 0 0;
+}
+
+.bottom {
+  padding-bottom: 24px;
+}
+
+@media (max-width: 960px) {
+  .plans {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .hero {
+    padding-top: 48px;
+  }
+
+  .pair {
+    grid-template-columns: 1fr;
+  }
+}

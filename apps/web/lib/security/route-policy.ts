@@ -134,6 +134,16 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     origin: 'strict',
   },
   { route: 'api/billing/status', methods: ['GET'], class: 'user', origin: 'any' },
+  // CC-29: the Agency trial's step before Checkout, and the Agency Plus contact form.
+  { route: 'api/agency-trial', methods: ['POST'], class: 'user', origin: 'strict' },
+  {
+    route: 'api/contact/agency-plus',
+    methods: ['POST'],
+    class: 'public',
+    reason: 'the Agency Plus contact form; Turnstile when enforced and a per-IP limit',
+    origin: 'lenient',
+    jsonBody: true,
+  },
   {
     route: 'api/checks/[id]/cancel',
     methods: ['POST'],

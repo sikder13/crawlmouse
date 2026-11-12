@@ -18,7 +18,12 @@ const PREVIEW = join(GROUP, 'v2-preview');
  * check's pages, which sit under v1's audit route with no layout of their own, and the page `/` is
  * rewritten to. `__tests__/v1-inventory.test.ts` holds the list of flag-gated page files.
  */
-const V2_LIVE = [join(WEB_ROOT, 'app', 'audit', '[id]'), join(WEB_ROOT, 'app', 'v2-home')];
+const V2_LIVE = [
+  join(WEB_ROOT, 'app', 'audit', '[id]'),
+  join(WEB_ROOT, 'app', 'v2-home'),
+  // CC-29: the Agency trial page, a 404 while V2_BILLING is off.
+  join(WEB_ROOT, 'app', 'agency-trial'),
+];
 
 function walk(dir: string, out: string[] = []): string[] {
   if (!existsSync(dir)) return out;
@@ -221,6 +226,7 @@ describe('v2 stays out of live pages', () => {
       'app/dashboard/v2/page.tsx',
       'app/sites/[id]/page.tsx',
       'app/v2-home/page.tsx',
+      'app/v2-pricing/page.tsx',
     ]);
     for (const page of pages) expect(isFlagGated(page), relative(WEB_ROOT, page)).toBe(true);
   });

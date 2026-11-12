@@ -1,0 +1,67 @@
+/**
+ * Fixtures for the Pricing and Agency trial previews (CC-29): the views as the pages build them, for a
+ * fixed moment, so the visual set does not move with the clock.
+ */
+import { FREE_START } from '../../../../lib/billing/state-machine';
+import {
+  agencyStanding,
+  agencyTrialView,
+  type AgencyAccountRow,
+} from '../../../../lib/v2/view/agency-trial';
+import { pricingView } from '../../../../lib/v2/view/pricing';
+
+/** The fixture's dashboard sample day (FACTS: the trial ends Sun 8 Nov). */
+const AT = new Date('2026-10-25T15:00:00Z');
+const ACCOUNT = 'a0000000-0000-4000-8000-00000000000a';
+
+/** Signed out: Free and Pro go to Sign-up, Agency to the Agency trial. */
+export const pricingSignedOut = () => pricingView({ kind: 'signed_out' }, 'month', AT);
+
+/** Signed in on a Free account whose Pro trial was used: Pro is the paid checkout. */
+export const pricingSignedIn = () =>
+  pricingView(
+    {
+      kind: 'signed_in',
+      account: {
+        id: ACCOUNT,
+        owner: true,
+        tier: 'free',
+        snapshot: { ...FREE_START, trialUsedAt: new Date('2026-10-01T00:00:00Z') },
+      },
+      agency: { held: false, trialUsedAccountId: null },
+    },
+    'year',
+    AT,
+  );
+
+const agencyRow = (over: Partial<AgencyAccountRow>): AgencyAccountRow => ({
+  id: 'a0000000-0000-4000-8000-00000000000b',
+  role: 'owner',
+  name: 'Summit Digital',
+  state: 'free',
+  tier: 'free',
+  pastDueTier: null,
+  pastDueSince: null,
+  trialVariant: null,
+  trialEndsAt: null,
+  trialUsedAt: null,
+  subscriptionId: null,
+  firstSite: 'example-outfitter.com',
+  ...over,
+});
+
+const trial = (rows: AgencyAccountRow[]) =>
+  agencyTrialView(
+    {
+      email: 'owner@summitdigital.co',
+      interval: 'month',
+      timeZone: 'UTC',
+      standing: agencyStanding(rows, AT),
+    },
+    AT,
+  );
+
+export const agencyTrialNew = () => trial([]);
+export const agencyTrialReturning = () => trial([agencyRow({})]);
+export const agencyTrialUsed = () =>
+  trial([agencyRow({ trialUsedAt: new Date('2026-10-01T10:00:00Z') })]);
