@@ -76,7 +76,8 @@ back while its 24-hour window is open. It acts only while `next_check_at` still 
 (to the millisecond). A schedule saved since the claim keeps the time the save computed, a site removed since
 keeps its null, and a second call finds the restored slot; in each, nothing is given back, so the slot of a
 site saved or removed between its claim and its release stays spent for that day. Sentry is told the site id
-and the slot.
+and the slot. A release step that fails every retry as well is reported to Sentry (`schedule.claim_release_failed`,
+site id and slot) and the tick goes on to the next site; that site keeps its moved due time and its slot is spent.
 
 ## The mail the product sends (D2, D3, D7, D11)
 
@@ -135,6 +136,8 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
   step's retry claims the next due sites, and the first set waits for its next due time (one cadence lost,
   one slot spent). Making the claim idempotent needs a claim keyed on the run (questions Q12).
 - A site removed between its claim and its request step still gets its queued `scheduled` check.
+- A claim whose request and release both fail every retry is not undone: the site waits for its next due time
+  (one cadence lost, one slot spent), and Sentry has its id and slot.
 - The unsubscribe page and route answer 404 while `V2_CHECKS_PUBLIC` is off, so turning the flag off after mail
   has gone out breaks those links until it is on again.
 - Slack turns a bare URL in message text into a link (a fix title naming a page on the member's site); we build no

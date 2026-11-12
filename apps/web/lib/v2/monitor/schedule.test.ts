@@ -153,11 +153,13 @@ describe('scheduleDeps.release: release_scheduled_claim (owner ruling Q9)', () =
 });
 
 describe('scheduleDeps.report', () => {
-  it('tells Sentry the site id and the slot, and nothing else', () => {
+  it('tells Sentry what happened, the site id and the slot, and nothing else', () => {
     const h = ports();
-    scheduleDeps(h.p).report({ siteId: SITE, slot: SLOT });
+    scheduleDeps(h.p).report({ siteId: SITE, slot: SLOT }, 'released');
+    scheduleDeps(h.p).report({ siteId: SITE, slot: SLOT }, 'release_failed');
     expect(h.capture.mock.calls).toEqual([
       ['schedule.claim_released', { siteId: SITE, slot: SLOT }],
+      ['schedule.claim_release_failed', { siteId: SITE, slot: SLOT }],
     ]);
   });
 });

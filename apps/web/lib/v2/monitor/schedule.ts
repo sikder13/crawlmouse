@@ -93,8 +93,8 @@ export function scheduleDeps(p: SchedulePorts): ScheduleDeps {
       );
     },
 
-    report: (site) =>
-      p.capture('schedule.claim_released', { siteId: site.siteId, slot: site.slot }),
+    report: (site, outcome) =>
+      p.capture(`schedule.claim_${outcome}`, { siteId: site.siteId, slot: site.slot }),
   };
 }
 
@@ -116,7 +116,7 @@ export function serviceSchedulePorts(env: Env): SchedulePorts {
     capture: (message, extra) =>
       Sentry.captureMessage(message, {
         level: 'error',
-        tags: { signal: 'schedule-claim-released' },
+        tags: { signal: 'schedule-claim' },
         extra,
       }),
     env,

@@ -139,7 +139,7 @@ describe('scheduleTickFn steps (D4)', () => {
     const deps = fakeDeps([{ global: GLOBAL, sites }]);
     const run = inngestLike();
     expect(await run.execute(handlerOf(deps))).toEqual({
-      out: { claimed: 2, requested: 2, released: 0 },
+      out: { claimed: 2, requested: 2, released: 0, unreleased: 0 },
     });
     expect(deps.claim).toHaveBeenCalledTimes(1);
     expect(deps.claim).toHaveBeenCalledWith(SCHEDULE_PAGE);
@@ -164,7 +164,7 @@ describe('scheduleTickFn steps (D4)', () => {
     });
     const run = inngestLike();
     const out = await run.execute(handlerOf(deps));
-    expect(out).toEqual({ out: { claimed: 1, requested: 1, released: 0 } });
+    expect(out).toEqual({ out: { claimed: 1, requested: 1, released: 0, unreleased: 0 } });
     expect(deps.request).toHaveBeenCalledTimes(1);
   });
 
@@ -181,15 +181,74 @@ describe('scheduleTickFn steps (D4)', () => {
     });
     const run = inngestLike(3);
     expect(await run.execute(handlerOf(deps))).toEqual({
-      out: { claimed: 2, requested: 1, released: 1 },
+      out: { claimed: 2, requested: 1, released: 1, unreleased: 0 },
     });
     expect(run.tries.get(`request:${A}:${SLOT}`)).toBe(3);
     expect(deps.release.mock.calls).toEqual([[{ siteId: A, slot: SLOT, next: NEXT }, GLOBAL]]);
-    expect(deps.report.mock.calls).toEqual([[{ siteId: A, slot: SLOT }]]);
+    expect(deps.report.mock.calls).toEqual([[{ siteId: A, slot: SLOT }, 'released']]);
     // Site id and slot only: no host, no account, no error text.
     expect(Object.keys(deps.report.mock.calls[0]![0]).sort()).toEqual(['siteId', 'slot']);
     expect(deps.request.mock.calls.filter(([s]) => s.siteId === B)).toHaveLength(1);
     expect(run.ran).toContain(`release:${A}:${SLOT}`);
+  });
+
+  it('a release step that fails every retry is reported once, and the tick goes on to the next site', async () => {
+    const full: Claim = {
+      global: GLOBAL,
+      sites: Array.from({ length: SCHEDULE_PAGE }, (_, i) => ({
+        siteId: i === 0 ? A : `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+        slot: SLOT,
+        next: NEXT,
+      })),
+    };
+    const deps = fakeDeps([full, full], {
+      request: async (s) => {
+        if (s.siteId === A) throw new Error('database unavailable');
+        return { checkId: 'x', created: true };
+      },
+      release: async () => {
+        throw new Error('database unavailable');
+      },
+    });
+    const run = inngestLike(3);
+    expect(await run.execute(handlerOf(deps))).toEqual({
+      out: { claimed: SCHEDULE_PAGE, requested: SCHEDULE_PAGE - 1, released: 0, unreleased: 1 },
+    });
+    expect(run.tries.get(`release:${A}:${SLOT}`)).toBe(3);
+    expect(deps.report.mock.calls).toEqual([[{ siteId: A, slot: SLOT }, 'release_failed']]);
+    // Every other site of the page is still requested; no further page is claimed.
+    expect(deps.request.mock.calls.filter(([s]) => s.siteId !== A)).toHaveLength(SCHEDULE_PAGE - 1);
+    expect(deps.claim).toHaveBeenCalledTimes(1);
+  });
+
+  it('a reporter that throws after a failed release does not stop the tick', async () => {
+    const deps = fakeDeps(
+      [
+        {
+          global: GLOBAL,
+          sites: [
+            { siteId: A, slot: SLOT, next: NEXT },
+            { siteId: B, slot: SLOT, next: NEXT },
+          ],
+        },
+      ],
+      {
+        request: async (s) => {
+          if (s.siteId === A) throw new Error('down');
+          return { checkId: 'x', created: true };
+        },
+        release: async () => {
+          throw new Error('down');
+        },
+        report: () => {
+          throw new Error('sentry down');
+        },
+      },
+    );
+    expect(await inngestLike(3).execute(handlerOf(deps))).toEqual({
+      out: { claimed: 2, requested: 1, released: 0, unreleased: 1 },
+    });
+    expect(deps.report).toHaveBeenCalledTimes(1);
   });
 
   it('a request that succeeds on a retry releases nothing', async () => {
@@ -203,7 +262,7 @@ describe('scheduleTickFn steps (D4)', () => {
     });
     const run = inngestLike(3);
     expect(await run.execute(handlerOf(deps))).toEqual({
-      out: { claimed: 1, requested: 1, released: 0 },
+      out: { claimed: 1, requested: 1, released: 0, unreleased: 0 },
     });
     expect(deps.release).not.toHaveBeenCalled();
     expect(deps.report).not.toHaveBeenCalled();
@@ -227,6 +286,7 @@ describe('scheduleTickFn steps (D4)', () => {
         claimed: SCHEDULE_ROUNDS * SCHEDULE_PAGE,
         requested: SCHEDULE_ROUNDS * SCHEDULE_PAGE,
         released: 0,
+        unreleased: 0,
       },
     });
   });
@@ -272,8 +332,8 @@ describe('scheduleTickFn steps (D4)', () => {
   });
 
   it('stays under Inngest’s 1,000 steps a run at the most it can do', () => {
-    // pause gate + one claim a round + a request and a release per site.
-    expect(1 + SCHEDULE_ROUNDS + 2 * SCHEDULE_ROUNDS * SCHEDULE_PAGE).toBeLessThan(1000);
+    // pause gate + one claim a round + a request, a release and a release-failed report per site.
+    expect(1 + SCHEDULE_ROUNDS + 3 * SCHEDULE_ROUNDS * SCHEDULE_PAGE).toBeLessThan(1000);
   });
 });
 
@@ -324,7 +384,7 @@ describe('owner ruling Q9: a request that fails every retry gives back what its 
     const next = fakeDeps([]);
     const second = { ...f.deps(false), request: next.request };
     expect(await inngestLike().execute(handlerOf(second))).toEqual({
-      out: { claimed: 1, requested: 1, released: 0 },
+      out: { claimed: 1, requested: 1, released: 0, unreleased: 0 },
     });
     expect(next.request.mock.calls).toEqual([[{ siteId: A, slot: SLOT, next: NEXT }]]);
     expect(f.count()).toBe(1);

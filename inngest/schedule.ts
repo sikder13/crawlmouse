@@ -13,13 +13,17 @@
  * Owner ruling Q9. A request step that has failed every retry is caught here, per site, and
  * `release:<site>:<slot>` gives back what the claim took (`release_scheduled_claim`: the due time,
  * and the slot while its day is open) and reports the site id and slot. The release is a step, so a
- * replay returns its recorded result and does not call it again; the SQL acts once besides. Chosen
- * over one function per site fanned out by event: here no claimed site can sit between a claim and a
- * send that failed, which a fan-out would need a second release for. The cost is that one site's
- * retries delay the sites after it in the same tick (past-due-sweep.ts makes the same trade).
+ * replay returns its recorded result and does not call it again; the SQL acts once besides. A release
+ * step that has failed every retry too is caught as well: `release-failed:<site>:<slot>` reports it,
+ * and the tick goes on to the next site. That site stays claimed: its due time stays moved on and its
+ * slot spent until its next due time, and Sentry has its id and slot. Chosen over one function per
+ * site fanned out by event, which would need a second release for a claim whose event never sent. The
+ * cost is that one site's retries delay the sites after it in the same tick (past-due-sweep.ts makes
+ * the same trade).
  *
  * A page that comes back full is followed by another claim, up to SCHEDULE_ROUNDS; a page that is not
- * full, or a release, ends the claiming, so a site released in this run is claimed by the next one.
+ * full, or a request that failed every retry, ends the claiming, so a site released in this run is
+ * claimed by the next one.
  */
 import { sized } from './check';
 import { inngest } from './client';
@@ -74,13 +78,13 @@ export interface ScheduleDeps {
   request(site: ClaimedSite): Promise<{ checkId: string; created: boolean }>;
   /** `release_scheduled_claim` at the time now, against the row the claim counted into. */
   release(site: ClaimedSite, global: GlobalSlot): Promise<Released>;
-  /** Tells Sentry a claim was released. Called with the site id and slot and nothing else. */
-  report(site: Pick<ClaimedSite, 'siteId' | 'slot'>): void;
+  /** Tells Sentry a claim was released, or that its release failed, with the site id and slot only. */
+  report(site: Pick<ClaimedSite, 'siteId' | 'slot'>, outcome: 'released' | 'release_failed'): void;
 }
 
 export type TickOutput =
   | { paused: true }
-  | { claimed: number; requested: number; released: number };
+  | { claimed: number; requested: number; released: number; unreleased: number };
 
 export function createScheduleTickFn(deps: () => ScheduleDeps) {
   return inngest.createFunction(
@@ -94,37 +98,50 @@ export function createScheduleTickFn(deps: () => ScheduleDeps) {
       const paused = await step.run('pause-gate', async () => deps().paused());
       if (paused) return { paused: true };
 
-      const done = { claimed: 0, requested: 0, released: 0 };
+      const done = { claimed: 0, requested: 0, released: 0, unreleased: 0 };
       for (let round = 0; round < SCHEDULE_ROUNDS; round += 1) {
         const id = `claim-${round}`;
         const claim = (await step.run(id, async () =>
           sized(id, await deps().claim(SCHEDULE_PAGE)),
         )) as Claim;
         done.claimed += claim.sites.length;
-        let releasedThisRound = false;
+        let failedThisRound = false;
         for (const site of claim.sites) {
           const at = `${site.siteId}:${site.slot}`;
+          const ids = { siteId: site.siteId, slot: site.slot };
           try {
             await step.run(`request:${at}`, async () => {
               await deps().request(site);
             });
             done.requested += 1;
+            continue;
           } catch {
+            failedThisRound = true;
+          }
+          try {
             await step.run(`release:${at}`, async () => {
               const d = deps();
               const out = await d.release(site, claim.global);
               try {
-                d.report({ siteId: site.siteId, slot: site.slot });
+                d.report(ids, 'released');
               } catch {
                 // A reporter that throws must not repeat the release.
               }
               return out;
             });
             done.released += 1;
-            releasedThisRound = true;
+          } catch {
+            await step.run(`release-failed:${at}`, async () => {
+              try {
+                deps().report(ids, 'release_failed');
+              } catch {
+                // Nothing is left to undo; a reporter that throws must not end the tick.
+              }
+            });
+            done.unreleased += 1;
           }
         }
-        if (releasedThisRound || claim.sites.length < SCHEDULE_PAGE) break;
+        if (failedThisRound || claim.sites.length < SCHEDULE_PAGE) break;
       }
       return done;
     },
