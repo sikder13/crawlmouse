@@ -555,3 +555,5 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Check-email, sign-in                         | `/v2-preview/screens/check-email/signin`                 | screen    |                                      |
 | Continue                                     | `/v2-preview/screens/continue`                           | screen    |                                      |
 | Continue, link expired                       | `/v2-preview/screens/continue/expired`                   | screen    |                                      |
+| Final-Public                                 | `/v2-preview/screens/public-report`                      | screen    |                                      |
+| Public report, withheld                      | `/v2-preview/screens/public-report/withheld`             | screen    |                                      |
