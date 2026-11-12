@@ -96,6 +96,7 @@ const ANONYMOUS: Record<
   'api/seats/accept': { status: 401, body: { code: 'auth_required' } },
   'api/seats/id/[id]': { status: 401, body: { code: 'auth_required' } },
   'api/seats/id/[id]/resend': { status: 401, body: { code: 'auth_required' } },
+  'api/report-files/[id]/share': { status: 401, body: { code: 'auth_required' } },
   'api/sites': { status: 401, body: { code: 'auth_required' } },
   'api/sites/[id]': { status: 401, body: { code: 'auth_required' } },
   'api/sites/[id]/checks': { status: 401, body: { code: 'auth_required' } },

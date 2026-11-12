@@ -369,6 +369,22 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     reason: 'an emailed link: moves its token into a cookie and redirects; changes nothing',
     origin: 'any',
   },
+  // CC-31 workstream B2: share links (D7). Making and revoking one is a member's, for a report their
+  // seat covers; opening one needs no account.
+  {
+    route: 'api/report-files/[id]/share',
+    methods: ['DELETE', 'POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  {
+    route: 's/[token]',
+    methods: ['GET'],
+    class: 'public',
+    reason:
+      'a share link: the token in its path is the credential, stored as its sha256; per-IP limit; it counts the view and redirects (CC-31 D7)',
+    origin: 'any',
+  },
 ];
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
