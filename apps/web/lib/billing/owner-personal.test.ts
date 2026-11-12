@@ -62,14 +62,14 @@ describe('ownedAccountId, for a person who owns two accounts', () => {
     });
   });
 
-  it('does not follow a choice naming an account the caller only manages', async () => {
+  it('acting in an account the caller only manages is 403, not one of the two they own', async () => {
     const p = await agencyOwner('manager-elsewhere');
     const other = await person(db, 'other-owner');
     await addSeat(db, other.accountId, p, 'account_manager');
     expect(await ownedAccountId(sessionOver(db, p), p.id, other.accountId)).toEqual({
       ok: false,
-      status: 409,
-      error: 'account_ambiguous',
+      status: 403,
+      error: 'not_owner',
     });
   });
 });

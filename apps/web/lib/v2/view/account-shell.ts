@@ -190,7 +190,7 @@ function trialCard(
             'keepPlan',
             `Keep ${PLAN_NAMES[tier]}, $${price} a month`,
             {},
-            { fields: { plan: tier, interval: 'month' } },
+            { fields: { plan: tier, interval: 'month', accountId: v.account.id } },
           ),
   };
 }

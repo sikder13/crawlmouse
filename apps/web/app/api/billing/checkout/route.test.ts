@@ -9,7 +9,7 @@ const h = vi.hoisted(() => {
   const log: string[] = [];
   const state = {
     user: { id: 'u1', email: 'owner@example.com' } as unknown,
-    seats: [{ account_id: ACCOUNT }] as unknown[],
+    seats: [{ account_id: ACCOUNT, role: 'owner' }] as unknown[],
     role: 'owner' as unknown,
     snapshot: null as unknown,
   };
@@ -126,7 +126,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_BASE_URL = SITE;
   h.log.length = 0;
   h.state.user = { id: 'u1', email: 'owner@example.com' };
-  h.state.seats = [{ account_id: ACCOUNT }];
+  h.state.seats = [{ account_id: ACCOUNT, role: 'owner' }];
   h.state.role = 'owner';
   h.state.snapshot = FREE_START;
   h.capture.mockReset();
@@ -219,7 +219,10 @@ describe('POST /api/billing/checkout, V2_BILLING=1', () => {
     });
 
     it('an owner of two accounts naming neither acts on the one their switcher names, and on neither when it names a third', async () => {
-      h.state.seats = [{ account_id: ACCOUNT }, { account_id: OTHER }];
+      h.state.seats = [
+        { account_id: ACCOUNT, role: 'owner' },
+        { account_id: OTHER, role: 'owner' },
+      ];
       const withChoice = (accountId: string) =>
         POST(
           new Request(`${SITE}/api/billing/checkout`, {
@@ -241,7 +244,10 @@ describe('POST /api/billing/checkout, V2_BILLING=1', () => {
     });
 
     it('409 account_ambiguous for an owner of two accounts naming neither', async () => {
-      h.state.seats = [{ account_id: ACCOUNT }, { account_id: OTHER }];
+      h.state.seats = [
+        { account_id: ACCOUNT, role: 'owner' },
+        { account_id: OTHER, role: 'owner' },
+      ];
       const res = await form('plan=pro&interval=month');
       expect([res.status, await res.json()]).toEqual([409, { error: 'account_ambiguous' }]);
       expect(stripeWrites()).toEqual([]);

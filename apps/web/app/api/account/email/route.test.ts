@@ -37,7 +37,7 @@ vi.mock('@/lib/supabase/server', () => ({
       // The caller's one owner seat, and its account, which is their personal one.
       const account = h.user ? accountOf.get(h.user.id) : undefined;
       const rows = account
-        ? [table === 'accounts' ? { id: account } : { account_id: account }]
+        ? [table === 'accounts' ? { id: account } : { account_id: account, role: 'owner' }]
         : [];
       const chain: Record<string, unknown> = {
         then: (resolve: (v: unknown) => unknown) => resolve({ data: rows, error: null }),

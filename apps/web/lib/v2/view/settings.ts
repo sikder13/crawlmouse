@@ -385,7 +385,7 @@ export function settingsView(
           'keepPlan',
           COPY.keep(plan, monthly),
           {},
-          { fields: { plan: v.tier, interval: 'month' } },
+          { fields: { plan: v.tier, interval: 'month', accountId: v.account.id } },
         )
       : v.tier === 'free' && !pastDue
         ? action(
@@ -393,13 +393,16 @@ export function settingsView(
             COPY.choose(PLAN_NAMES.pro, PRO_MONTHLY),
             {},
             {
-              fields: { plan: 'pro', interval: 'month' },
+              fields: { plan: 'pro', interval: 'month', accountId: v.account.id },
             },
           )
         : null;
   const keepShown = keep !== null;
-  const cancel = owner ? routeAction('cancelPlan', COPY.cancelAction) : null;
-  const portal = owner ? routeAction('billingPortal', COPY.portalAction) : null;
+  // Each billing form names the account it was rendered for, so it is acted on in that account
+  // whichever one the reader has switched to since.
+  const billing = { fields: { accountId: v.account.id } };
+  const cancel = owner ? routeAction('cancelPlan', COPY.cancelAction, {}, billing) : null;
+  const portal = owner ? routeAction('billingPortal', COPY.portalAction, {}, billing) : null;
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
