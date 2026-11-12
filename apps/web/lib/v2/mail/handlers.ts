@@ -10,7 +10,9 @@
  *   fix to a dev    fix_to_developer:<requestId>
  *
  * A database read that fails before anything is claimed throws `MailRetry`: nothing was sent and
- * nothing claimed, so the step can safely try again. What happens after the claim is `send()`'s.
+ * nothing claimed, so the step can safely try again. What happens from the claim to the ledger's
+ * record is `send()`'s, which answers a failure there with `MailRetry` too; a fix email's `sent_at`
+ * write that fails after the send is retried the same way.
  */
 import type { EmailRequestedData, MailHandlers } from '../../../../../inngest/mail';
 import { packetPrompt } from '../view/segment/fixes';
@@ -153,9 +155,14 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
             packet: packetPrompt(r.fix, packet),
           }),
       });
-      // `done`: sent by an earlier run that stopped before recording it.
+      // `done`: sent by an earlier run that stopped before recording it. A failed write is retried:
+      // the ledger already answers `done`, so the retry records the time and sends nothing.
       if (outcome === 'sent' || outcome === 'done') {
-        await store.markFixEmailSent(requestId, mail.now());
+        try {
+          await store.markFixEmailSent(requestId, mail.now());
+        } catch {
+          throw new MailRetry('mark_sent_failed');
+        }
       }
       return outcome;
     },

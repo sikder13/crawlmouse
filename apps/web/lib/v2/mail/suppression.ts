@@ -8,6 +8,7 @@
  * 2026-11-12 (resend.com/docs/webhooks/emails/bounced, /complained): `data.to` is an array of the
  * affected recipients; a bounce's `data.bounce.type` is e.g. `Permanent` or `Temporary`.
  */
+import { ALERTS_SENDER } from '../../auth/constants';
 import { hashMailAddress } from './address-hash';
 import { isPlainAddress } from './headers';
 
@@ -66,4 +67,18 @@ export async function recordSuppressions(payload: unknown, deps: SuppressionDeps
     await deps.record(hashMailAddress(deps.pepper, address), s.reason, deps.now());
   }
   return s.addresses.length;
+}
+
+/**
+ * Whether a webhook event is about v2 mail: its `data.from` (Resend's payload names the sender, e.g.
+ * `Crawlmouse <alerts@crawlmouse.com>`) is the v2 sender, ALERTS_SENDER (D10). The webhook stores no
+ * raw row in v1's `email_events` for such an event, so v2 mail leaves no plain address there: what a
+ * v2 bounce or complaint leaves is its suppression hash (security review r1, S4). An event with no
+ * readable `from` is not v2 mail by this test, and is stored as v1 stored every event.
+ */
+export function isV2MailEvent(payload: unknown): boolean {
+  const from = (payload as { data?: { from?: unknown } } | null)?.data?.from;
+  if (typeof from !== 'string') return false;
+  const address = (/<([^<>]*)>\s*$/.exec(from)?.[1] ?? from).trim().toLowerCase();
+  return address === ALERTS_SENDER;
 }

@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { UNSUBSCRIBE_COPY, unsubscribePageView } from '@/lib/v2/mail/unsubscribe';
+import {
+  UNSUBSCRIBE_COPY,
+  UNSUBSCRIBE_DONE_COOKIE,
+  unsubscribePageView,
+} from '@/lib/v2/mail/unsubscribe';
 
 // The link's token is in this page's URL: no index, and no Referer carries it on.
 export const metadata: Metadata = {
@@ -15,8 +20,8 @@ const one = (v: string | string[] | undefined) => (typeof v === 'string' ? v : u
 
 /**
  * Where an alert or summary email's footer link lands (CC-28 D7). Works signed out. It reads the
- * token and shows the choice; only the form's POST to /api/unsubscribe changes anything. A 404 until
- * V2_CHECKS_PUBLIC=1.
+ * token and shows the choice; only the form's POST to /api/unsubscribe changes anything, and the POST's
+ * cookie is what makes it say "Done" (lib/v2/mail/unsubscribe.ts). A 404 until V2_CHECKS_PUBLIC=1.
  */
 export default async function UnsubscribePage({
   searchParams,
@@ -25,8 +30,10 @@ export default async function UnsubscribePage({
 }) {
   if (!checksPublicEnabled()) return notFound();
   const q = await searchParams;
+  const done = (await cookies()).get(UNSUBSCRIBE_DONE_COOKIE)?.value;
   const view = unsubscribePageView(
-    { t: one(q.t), done: one(q.done), error: one(q.error) },
+    { t: one(q.t), error: one(q.error) },
+    done,
     process.env,
     new Date(),
   );

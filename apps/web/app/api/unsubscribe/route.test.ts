@@ -66,10 +66,13 @@ describe('POST /api/unsubscribe (D7)', () => {
     expect(rpc).toHaveBeenCalledWith('unsubscribe_seat', { p_seat: SEAT, p_kind: 'summary' });
   });
 
-  it('the page’s form goes back to the page, which says it is done', async () => {
+  it('the page’s form goes back to the page with the done cookie, which says it is done', async () => {
     const res = await post(form(token('summary')));
     expect(res.status).toBe(303);
-    expect(res.headers.get('location')).toBe('https://crawlmouse.com/unsubscribe?done=summary');
+    expect(res.headers.get('location')).toBe('https://crawlmouse.com/unsubscribe');
+    expect(res.headers.get('set-cookie')).toBe(
+      'cm_unsubscribed=summary; Path=/unsubscribe; Max-Age=120; HttpOnly; Secure; SameSite=Lax',
+    );
     expect(rpc).toHaveBeenCalledWith('unsubscribe_seat', { p_seat: SEAT, p_kind: 'summary' });
   });
 
@@ -88,6 +91,7 @@ describe('POST /api/unsubscribe (D7)', () => {
     expect(click.status).toBe(400);
     const back = await post(form(t));
     expect(back.headers.get('location')).toBe(`https://crawlmouse.com/unsubscribe?error=${code}`);
+    expect(back.headers.get('set-cookie')).toBeNull();
     expect(rpc).not.toHaveBeenCalled();
     expect(capture).not.toHaveBeenCalled();
   });

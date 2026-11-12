@@ -9,6 +9,7 @@ import {
   readRollback,
 } from './helpers/pglite-migrations';
 import { SHA, personalAccount, signUp } from './helpers/v2-check-tables';
+import { LEDGER_CASES } from '../lib/v2/mail/ledger-cases';
 
 /**
  * Migration 028, section A (docs/specs/v2/28-monitoring.md, D1 and D7): the mailer's send ledger and
@@ -145,6 +146,40 @@ describe('claim before send (D1)', () => {
   });
 });
 
+describe('the ledger cases (ledger-cases.ts, also run on memoryLedger)', () => {
+  it.each(LEDGER_CASES.map((c) => [c.name, c] as const))('%s', async (_, c) => {
+    const { key, hash } = fresh();
+    let minute = 0;
+    // Every step lands inside the two-minute lease: the lease's own cases are above.
+    const next = () => at((minute += 0.1));
+    for (const step of c.steps) {
+      if ('suppress' in step) await call('record_email_suppression', [hash, 'hard_bounce', next()]);
+      else if ('claim' in step) {
+        expect(await claim(key, step.kind ?? c.kind, hash, next())).toEqual(step.claim);
+      } else {
+        const provider = step.finish === 'sent' ? 'm1' : null;
+        expect(await finish(key, step.finish, next(), provider, step.code ?? null)).toBe(
+          step.answer,
+        );
+      }
+    }
+    const row = await rowOf(key);
+    expect({ status: row!.status, errorCode: row!.error_code }).toEqual(c.row);
+  });
+
+  it('suppresses a stale claim of a worker that died, once a bounce is recorded', async () => {
+    const { key, hash } = fresh();
+    await claim(key, 'alert', hash, T0);
+    await call('record_email_suppression', [hash, 'hard_bounce', at(1)]);
+    expect(await claim(key, 'alert', hash, at(2.1))).toEqual({ outcome: 'suppressed' });
+    expect(await rowOf(key)).toMatchObject({
+      status: 'failed',
+      error_code: 'suppressed',
+      attempts: 1,
+    });
+  });
+});
+
 describe('suppression (D7)', () => {
   it('records a hard bounce, and a complaint outranks it; the first time stays', async () => {
     const hash = SHA(9001);
@@ -208,16 +243,25 @@ describe('what the clients can reach', () => {
       ...readMigration(MIGRATION).matchAll(/create or replace function (public\.\w+)\(/g),
     ].map((m) => m[1]!);
     expect(fns.length).toBeGreaterThan(0);
+    // The name match finds every function the file adds: a match that finds none could not fail below.
+    const found = await db.query<{ n: number }>(
+      `select count(distinct n.nspname || '.' || p.proname)::int n
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname || '.' || p.proname = any($1)`,
+      [fns],
+    );
+    expect(found.rows[0]!.n).toBe(new Set(fns).size);
     const { rows } = await db.query<{ fn: string; role: string }>(
       `select p.oid::regprocedure::text fn, r role
          from pg_proc p cross join unnest(array['anon', 'authenticated']) r
-        where p.oid::regproc::text = any($1) and has_function_privilege(r, p.oid, 'execute')`,
+         join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname || '.' || p.proname = any($1) and has_function_privilege(r, p.oid, 'execute')`,
       [fns],
     );
     expect(rows).toEqual([]);
   });
 
-  it('keeps the address out of the ledger: no column holds text that is not a hash, key or code', async () => {
+  it('names no column of the three ledgers after an address, a recipient, a subject or a body', async () => {
     const { rows } = await db.query<{ column_name: string }>(
       `select column_name from information_schema.columns
         where table_schema = 'public' and table_name in ('email_sends', 'email_suppressions', 'slack_sends')

@@ -78,7 +78,10 @@ $$;
 --   {"outcome": "go", "attempt": n}  send now; this is attempt n (1 to 3)
 --   {"outcome": "done"}              the key was sent
 --   {"outcome": "busy"}              another worker claimed it under 2 minutes ago
---   {"outcome": "suppressed"}        the address is suppressed for this kind; recorded, never sent
+--   {"outcome": "suppressed"}        the address is suppressed for this kind; recorded, never sent.
+--                                    Read on every claim of a key not yet sent, so a retry after a
+--                                    bounce recorded since the first attempt is not sent either; the
+--                                    row is then `failed` with error_code `suppressed`.
 --   {"outcome": "exhausted"}         three attempts failed; nothing more is tried
 -- A row whose claim is older than 2 minutes and still `sending` is taken to be a worker that died
 -- mid-send and may be claimed again; the transport sends the key as Resend's Idempotency-Key, so a
@@ -127,6 +130,11 @@ begin
     return pg_catalog.jsonb_build_object('outcome', 'suppressed');
   elsif v.status = 'sending' and v.claimed_at > p_now - interval '2 minutes' then
     return pg_catalog.jsonb_build_object('outcome', 'busy');
+  elsif public.email_kind_suppressible(v.kind)
+        and exists (select 1 from public.email_suppressions s where s.address_hash = p_hash) then
+    update public.email_sends e set status = 'failed', error_code = 'suppressed', updated_at = p_now
+     where e.id = v.id;
+    return pg_catalog.jsonb_build_object('outcome', 'suppressed');
   elsif v.attempts >= 3 then
     update public.email_sends e set status = 'failed', updated_at = p_now
      where e.id = v.id and e.status <> 'failed';

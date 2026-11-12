@@ -2,7 +2,7 @@ import { Webhook } from 'svix';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { parseResendEvent } from '@/lib/billing/resend-event';
 import { mailPepper } from '@/lib/v2/mail/address-hash';
-import { recordSuppressions } from '@/lib/v2/mail/suppression';
+import { isV2MailEvent, recordSuppressions } from '@/lib/v2/mail/suppression';
 
 export const runtime = 'nodejs';
 
@@ -35,19 +35,23 @@ export async function POST(req: Request) {
     return new Response('ignored', { status: 202 });
   }
 
-  const { error } = await supabaseAdmin().from('email_events').upsert(
-    {
-      resend_event_id: headers['svix-id'],
-      email_address: e.email,
-      event_type: e.eventType,
-      bounce_type: e.bounceType,
-      payload,
-    },
-    { onConflict: 'resend_event_id', ignoreDuplicates: true },
-  );
-  if (error) {
-    console.error('[resend-webhook] email_events upsert failed:', error.message);
-    return new Response('db error', { status: 500 });
+  // v1's record of every event, address and payload as received. v2 mail (from alerts@) is left out:
+  // its ledger holds no address by design (CC-28 D1), and its bounces are kept as a hash below.
+  if (!isV2MailEvent(payload)) {
+    const { error } = await supabaseAdmin().from('email_events').upsert(
+      {
+        resend_event_id: headers['svix-id'],
+        email_address: e.email,
+        event_type: e.eventType,
+        bounce_type: e.bounceType,
+        payload,
+      },
+      { onConflict: 'resend_event_id', ignoreDuplicates: true },
+    );
+    if (error) {
+      console.error('[resend-webhook] email_events upsert failed:', error.message);
+      return new Response('db error', { status: 500 });
+    }
   }
 
   // CC-28 D7: a hard bounce or a complaint stops non-account mail to the address, by its hash.
