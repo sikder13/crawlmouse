@@ -79,7 +79,7 @@ describe('noticeLine', () => {
     ],
     [
       'email_requested',
-      'Recorded. Nothing has been sent: the fix goes to that address once email sending is switched on.',
+      'Recorded. The fix will be emailed to that address from alerts@crawlmouse.com.',
     ],
     ['invalid_email', 'That is not an email address, so nothing was recorded.'],
     [

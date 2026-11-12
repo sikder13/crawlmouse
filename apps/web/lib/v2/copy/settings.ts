@@ -2,6 +2,7 @@
  * Settings' written sentences (Final-Settings): every number a parameter or a named constant. The
  * lock corrections for the artboard follow.
  */
+import { SIGNIN_SENDER, SIGNIN_SENDER_LOCKED } from '../../auth/constants';
 import type { Addition, CopyChange } from '../copy-registry';
 import { listOf } from '../format';
 import { capitalise, count, numberWord, plural } from '../words';
@@ -202,14 +203,19 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     source:
       'The fixture’s account address is you@company.com: the locked page shows an edit in progress, which the preview, filled from the account, does not',
   },
-  {
-    screen: 'settings',
-    kind: 'facts',
-    locked: 'signin@crawlmouse.com',
-    rendered: 'magic@crawlmouse.com',
-    source:
-      'FACTS correction (CC-25 ruling 8, CC-27 D8): the sign-in link is sent from magic@ until CC-28 moves the Supabase template to signin@; the page names SIGNIN_SENDER',
-  },
+  // The locked sender, corrected while the sign-in link comes from another.
+  ...(SIGNIN_SENDER === SIGNIN_SENDER_LOCKED
+    ? []
+    : [
+        {
+          screen: 'settings' as const,
+          kind: 'facts' as const,
+          locked: SIGNIN_SENDER_LOCKED,
+          rendered: SIGNIN_SENDER,
+          source:
+            'FACTS correction (CC-25 ruling 8, CC-27 D8; CC-28 Q5): the page names SIGNIN_SENDER, Supabase’s SMTP sender, until the owner moves it to signin@ at switch-on (docs/ops/senders.md)',
+        },
+      ]),
   {
     screen: 'settings',
     kind: 'facts',

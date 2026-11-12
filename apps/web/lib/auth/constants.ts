@@ -11,12 +11,21 @@ export const AUTH_LINK_MINUTES = 15;
 export const AUTH_LINK_SECONDS = AUTH_LINK_MINUTES * 60;
 
 /**
- * The address the sign-in link comes from. The Supabase email template sends it from magic@ today;
- * CC-28 moves the template to signin@crawlmouse.com and changes this constant in the same step.
+ * The address the sign-in link comes from: Supabase Auth's SMTP sender (`smtp_admin_email`, set by
+ * `scripts/configure-supabase-smtp.sh`), which is magic@. The locked screens name SIGNIN_SENDER_LOCKED;
+ * moving to it is the owner's settings change at switch-on, then this one line (owner ruling CC-28 Q5,
+ * docs/ops/senders.md). The pages and the copy registry read this constant, so nothing else changes.
  */
-export const SIGNIN_SENDER = 'magic@crawlmouse.com';
+// Typed `string`, not the literal: the copy registry compares it with SIGNIN_SENDER_LOCKED.
+export const SIGNIN_SENDER: string = 'magic@crawlmouse.com';
 
-/** The address change notes will come from. Nothing sends from it before CC-28. */
+/** The sign-in sender the locked screens name. */
+export const SIGNIN_SENDER_LOCKED = 'signin@crawlmouse.com';
+
+/**
+ * The address the product's own mail comes from: alerts, the weekly summary and the other templates
+ * of CC-28's mailer (`MAIL_FROM`, lib/v2/mail/headers.ts).
+ */
 export const ALERTS_SENDER = 'alerts@crawlmouse.com';
 
 /** How long a first audit takes, as the Check-email page says it. Shown only with V2_CHECKS_PUBLIC=1. */
