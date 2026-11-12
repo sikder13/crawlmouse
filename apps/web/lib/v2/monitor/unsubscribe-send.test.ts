@@ -209,7 +209,10 @@ describe.each<[string, () => Promise<OutgoingMail>, UnsubscribeKind]>([
       }),
     );
     expect(res.status).toBe(303);
-    expect(res.headers.get('location')).toBe('https://crawlmouse.com/unsubscribe');
+    // Back to the same link, whose done cookie names this seat and kind (unsubscribe.ts).
+    expect(res.headers.get('location')).toBe(
+      `https://crawlmouse.com/unsubscribe?t=${encodeURIComponent(t)}`,
+    );
     expect(rpc).toHaveBeenCalledWith('unsubscribe_seat', { p_seat: SEAT, p_kind: kind });
   });
 });

@@ -655,6 +655,10 @@ const INVENTORY: [entry: string, why: string][] = [
     'apps/web/lib/v2/mail/templates/inspect.ts :: value = html.slice(i, e);',
     'NOT crawled text: the HTML a template rendered, read by the test-support inspector (templates/inspect.ts, imported only by tests) to find link targets; nothing it cuts is persisted or rendered.',
   ],
+  [
+    "apps/web/lib/v2/mail/templates/alert.ts :: ua === '' || (summary.startsWith(ua) && /^(?:[\\s:]|$)/.test(summary.slice(ua.length)));",
+    'NOT A CUT that is kept: the rest of a change summary after a crawler name it starts with, only tested for a word boundary to decide whether to name the crawler again (CC-28 copy pass); nothing cut is rendered or persisted.',
+  ],
 ];
 
 function sourceFiles(dir: string, out: string[] = []): string[] {

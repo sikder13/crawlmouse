@@ -812,6 +812,7 @@ describe('scheduleTickFn over claim_due_sites and release_scheduled_claim (owner
       claimed: 1,
       requested: 0,
       released: 1,
+      stale: 0,
       unreleased: 0,
     });
     expect((await siteRow(id)).next_check_at!.toISOString()).toBe('2026-11-09T06:00:00.000Z');
