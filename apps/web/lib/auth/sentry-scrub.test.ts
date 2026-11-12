@@ -129,6 +129,33 @@ describe('scrubDoorSecrets, a share link’s token in its path', () => {
   });
 });
 
+describe('scrubDoorSecrets, a report recipient’s token in its link', () => {
+  const TOKEN = 'Ab3_-'.repeat(8) + 'xyz';
+
+  it.each([
+    ['the confirmation link', `/s/confirm/${TOKEN}`, '/s/confirm/[Filtered]'],
+    ['the pause link', `/s/pause/${TOKEN}`, '/s/pause/[Filtered]'],
+    ['a one-click POST', `POST /s/pause/${TOKEN}`, 'POST /s/pause/[Filtered]'],
+    ['a full address', `${ORIGIN}/s/confirm/${TOKEN}?x=1`, `${ORIGIN}/s/confirm/[Filtered]?x=1`],
+    ['encoded slashes', `to=%2Fs%2Fpause%2F${TOKEN}`, 'to=%2Fs%2Fpause%2F[Filtered]'],
+    ['upper case', `/S/PAUSE/${TOKEN}`, '/S/PAUSE/[Filtered]'],
+  ])('%s', (_, text, scrubbed) => {
+    expect(scrubDoorSecrets({ text }).text).toBe(scrubbed);
+  });
+
+  it('leaves the pages the links land on, and a segment that is not a token', () => {
+    for (const text of [
+      'GET /s/confirm',
+      '/s/pause?notice=report_paused',
+      `/s/confirm/${TOKEN}x`,
+      '/s/pause/short',
+      `/s/other/${TOKEN}`,
+    ]) {
+      expect(scrubDoorSecrets({ text }).text).toBe(text);
+    }
+  });
+});
+
 describe('the SDK options that run the scrubber', () => {
   const event = () => ({ request: { url: `${ORIGIN}/audit/${ID}/overview` } });
   const scrubbedEvent = { request: { url: `${ORIGIN}/audit/[Filtered]/overview` } };
