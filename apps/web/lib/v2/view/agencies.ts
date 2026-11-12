@@ -220,7 +220,8 @@ function onePager(): AgenciesView['onePager'] {
   const check = findCheck(d, CHECKS.badFirstAudit);
   const s = buildPublicSnapshot(d, check.id, check.finished_at!);
   const o = COPY.onePager;
-  const slug = s.host.split('.').slice(0, -1).join('.');
+  // The client report page's path: the host without its last label (example-outfitter.com → example-outfitter).
+  const slug = s.host.replace(/\.[^.]+$/, '');
   return {
     title: tagged(o.title),
     sub: tagged(o.sub),
