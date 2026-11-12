@@ -112,7 +112,12 @@ export const FIX_ADDITIONS: Addition[] = [
   },
   {
     screen: 'fix',
-    what: 'An open fix with no packet: one sentence in the packet card saying why (the engine’s reason for a fix type it writes no packet for; otherwise that the check that last measured the fix wrote none)',
-    source: 'CC-22b D11; CC-30 D9',
+    what: 'An open fix with no packet: one sentence in the packet card saying why (the engine’s reason for a fix type it writes no packet for; otherwise that the check that last measured the fix wrote none, with nothing said of a later check: a fix does not record whether its type had no builder yet or the builder had no steps to write for this record)',
+    source: 'CC-22b D11; CC-30 D9; round-2 correctness finding 4',
+  },
+  {
+    screen: 'fix',
+    what: 'A packet with a readable command (`verify.see`): under Verify, “See it” with that command and what it prints today and after the fix, then “Exact check” with the strict command on one line that scrolls sideways; the last line then says “We run the exact check …”. No contract fixture’s packet has one, so the locked comparison’s page has neither heading',
+    source: 'CC-30 owner ruling 1 (rulings.md) and Q8 (rulings-2.md)',
   },
 ];

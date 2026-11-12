@@ -23,7 +23,7 @@ describe('noPacketReason', () => {
     }
   });
 
-  it('is null for a type that has a builder: a stored fix without a packet predates it', () => {
+  it('is null for a type that has a builder, whatever left the stored fix without a packet', () => {
     expect(noPacketReason('orphan_pages', registryWith('orphan_pages'))).toBeNull();
     expect(noPacketReason('deep_pages', registryWith('deep_pages'))).toBeNull();
   });
@@ -50,10 +50,14 @@ describe('noPacketLine', () => {
     );
   });
 
-  it('says the last check wrote no steps when the type has a builder', () => {
+  it('says the last check wrote no steps when the type has a builder, and promises no later ones', () => {
     expect(noPacketLine(null)).toBe(`${NOT_WRITTEN_BY_CHECK} ${FOUND_ABOVE}`);
     expect(noPacketLine(null)).toBe(
-      'The check that last measured this fix wrote no steps for it. The next check that finds it writes them. What the audit found is above.',
+      'The check that last measured this fix wrote no steps for it. What the audit found is above.',
     );
+    // The page cannot tell a fix measured before its type had a builder from a record the builder
+    // could not write steps for, and the next check writes none for the second: so it says nothing
+    // of the next check.
+    expect(noPacketLine(null)).not.toMatch(/next check|writes them|will/i);
   });
 });
