@@ -49,7 +49,7 @@ export const CC27B_ROUTES = {
     route: '/api/alert-rules',
     owner: 'CC-27b',
     guard:
-      'Signed-in member; the account’s rules (`site_id` null); Slack needs a paid tier, and its URL is kept in Vault and never answered back (its last four characters are). ARCH-2 §5 has only the per-site route: this one is CC-27b’s contract (owner ruling 6).',
+      'The owner or an account manager (`seat_may`, spec 31 §3); the account’s rules (`site_id` null); Slack needs a paid tier, and its URL is kept in Vault and never answered back (its last four characters are). ARCH-2 §5 has only the per-site route: this one is CC-27b’s contract (owner ruling 6).',
   },
   account: {
     verb: 'PATCH',
