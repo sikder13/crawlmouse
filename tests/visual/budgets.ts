@@ -27,8 +27,8 @@ export const ADVISORY = {
  * runner's milliseconds (divided by the runner probe's ratio to its reference). The coarse layer
  * beside MAP_WRITES_PER_FRAME: it would catch a large regression, not a third more work.
  *
- * Advisory (owner ruling, 2026-11-11): across five CI readings of the crawl window, and four of the
- * other two, the normalised readings spread by 27%, 21% and 59% with the crawl screen's own code unchanged, over the
+ * Advisory (owner ruling, 2026-11-11): across six CI readings of the crawl window (five runs), and five of each
+ * of the other two, the normalised readings spread by 27%, 21% and 59% with the crawl screen's own code unchanged, over the
  * 15% the ruling allows a judged limit (docs/specs/v2/ci-cost.md, D3). The limits are about 1.2
  * times the highest reading, for the nightly trend's "over, advisory".
  */

@@ -57,7 +57,7 @@ import { test, expect, type Browser, type Page, type TestInfo } from './pw';
  *   traced window (one 60 Hz frame; packages/timing/src/busy.ts). Its 95th percentile, the bursts,
  *   is at most BUDGET.p95WorkMs. Its mean, divided by the runner probe's ratio to its reference
  *   (`meanWorkRefMs`), is held against the window's MEAN_WORK_MS, advisory while MEAN_WORK_ADVISORY
- *   is set: across five CI readings it spread by more than 15% with the crawl screen's code unchanged
+ *   is set: across five CI runs it spread by more than 15% with the crawl screen's code unchanged
  *   (docs/specs/v2/ci-cost.md, D3). The slices are fixed in time, so the reading is what the page
  *   did, whatever refresh rate the runner manages. Work off the main thread (the map's layouts in
  *   their Worker, raster) is not in it. Until CC-COST the budget was the 95th percentile interval
@@ -133,8 +133,17 @@ const MIN_FPS = 20;
 const PROBE: { medianMs: number; referenceMs: number } | null = (() => {
   const path = process.env.PERF_PROBE;
   if (!path) return null;
-  const p = JSON.parse(readFileSync(path, 'utf8')) as { medianMs?: unknown; referenceMs?: unknown };
-  return typeof p.medianMs === 'number' && p.medianMs > 0 && typeof p.referenceMs === 'number'
+  let p: { medianMs?: unknown; referenceMs?: unknown };
+  try {
+    p = JSON.parse(readFileSync(path, 'utf8')) as typeof p;
+  } catch {
+    // A file that is missing or not JSON is no reading: the runs are invalid, and say why.
+    return null;
+  }
+  return typeof p.medianMs === 'number' &&
+    p.medianMs > 0 &&
+    typeof p.referenceMs === 'number' &&
+    p.referenceMs > 0
     ? { medianMs: p.medianMs, referenceMs: p.referenceMs }
     : null;
 })();
@@ -329,8 +338,8 @@ test.describe('crawl screen performance', () => {
  * counted is every DOM change inside a map (`svg[data-v2-map]`: attributes, nodes added or removed,
  * text) and every animation started on a map element, divided by the window's length in 60 Hz
  * frames. A second map doubles it exactly. Stepping at 30 fps replays the same events in half as
- * many frames: React may then batch two events into one commit, so the count can only stay or
- * fall. The same window counted twice must read the same number, or the run measured nothing.
+ * many frames, and must write no more than at 60 fps. The same window counted twice must read the
+ * same number, or the run measured nothing.
  */
 async function countMapWrites(browser: Browser, w: (typeof WINDOWS)[number], frameMs: number) {
   const context = await browser.newContext({ viewport: { width: w.width, height: w.height } });
@@ -362,11 +371,9 @@ async function countMapWrites(browser: Browser, w: (typeof WINDOWS)[number], fra
       return animate.apply(this, args);
     };
   });
-  let steps = 0;
-  for (let t = 0; t < WINDOW_MS; t += frameMs) {
-    await page.clock.runFor(frameMs);
-    steps++;
-  }
+  // A whole number of frames, so a pass at either rate replays exactly WINDOW_MS.
+  const steps = Math.round(WINDOW_MS / frameMs);
+  for (let i = 0; i < steps; i++) await page.clock.runFor(frameMs);
   // MutationObserver delivers in a microtask; a round trip after the last step flushes it.
   const counts = await page.evaluate(
     () =>
@@ -406,9 +413,8 @@ test.describe('the crawl map, counted', () => {
     expect(first.perFrame, 'map writes per frame, at 60 fps').toBeLessThanOrEqual(
       MAP_WRITES_PER_FRAME,
     );
-    expect(slow.perFrame, 'map writes per frame, at 30 fps').toBeLessThanOrEqual(
-      MAP_WRITES_PER_FRAME,
-    );
+    // The same events in half as many frames: React may batch two into one commit, never split one.
+    expect(slow.writes, 'map writes at 30 fps, against 60 fps').toBeLessThanOrEqual(first.writes);
   });
 });
 
