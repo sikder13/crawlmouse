@@ -222,4 +222,8 @@ describe('missing_author_date: stack bodies', () => {
 });
 
 contentPacketProperties(TYPE);
-contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED });
+contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED }, {
+  printed: /"author"[^]*"datePublished"|"datePublished"[^]*"author"/,
+  today: /does not name both an author and a publication date/,
+  after: /`author`.*`datePublished`/,
+});

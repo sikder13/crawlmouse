@@ -9,10 +9,12 @@ import {
   AWK_VISIBLE,
   CHROME_GAP,
   contentContext,
+  firstFailing,
   firstFailingPage,
   KEEP_PAGE,
   mark,
   RECHECK,
+  seeMarkup,
   SET_ASIDE,
   tagProbe,
   template,
@@ -59,10 +61,16 @@ export const specsAsImages: PacketEntry<'specs_as_images'> = {
   }),
   stacks: {},
   verify: (fix, facts) => {
-    const probe = tagProbe(facts, firstFailingPage(fix), PROGRAM);
+    const page = firstFailingPage(fix);
+    const probe = tagProbe(facts, page, PROGRAM);
     return {
       command: probe.command,
       ua: probe.ua,
+      see: {
+        command: seeMarkup(facts, page, '<(th|td|dt|dd)[^>]*>[^<]*'),
+        today: line`The cells of the page’s tables and description lists (${mark('<th>')}, ${mark('<td>')}, ${mark('<dt>')}, ${mark('<dd>')}), one per line, each with its text up to the next tag. The audit found no table and no description list outside ${SET_ASIDE} on the page, so today it prints nothing from the page’s own content. ${firstFailing(fix)}`,
+        after: line`One line per cell: the label and the value of each specification.`,
+      },
       expect: line`Exit status 0 when a ${TABLE} or ${LIST} of the first failing page holds a ${mark('<td>')} or ${mark('<dd>')} with text; the audit's check failed that page. ${probe.sender} A page that gives its specifications as labelled lines without a table also passes the check, and not this command. ${CHROME_GAP} ${RECHECK}`,
     };
   },

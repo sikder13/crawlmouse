@@ -12,11 +12,13 @@ import {
   CHROME_GAP,
   contentContext,
   DOCS_READ,
+  firstFailing,
   firstFailingPage,
   KEEP_PAGE,
   ldType,
   mark,
   RECHECK,
+  seeMarkup,
   SET_ASIDE,
   tagProbe,
   template,
@@ -52,6 +54,14 @@ const PROGRAM =
   `!c&&b&&l~/^[a-z0-9]+[ \\t][^>]*itemprop=["']?datepublished${END}/{d=1}` +
   `!c&&b&&l~/^time[ \\t][^>]*datetime/{d=1}` +
   `END{exit !(a&&d)}`;
+
+/**
+ * What the readable command prints: a JSON-LD `author` or `datePublished` key with the characters
+ * after it, and a tag that carries a byline attribute. It is looser than the check: a tag that only
+ * mentions an author in a URL is printed too.
+ */
+const SEE_PATTERN =
+  '"(author|datePublished)" *:.{0,80}|<[a-z]+ [^>]*(author|datetime|datePublished|published_time)[^>]*>';
 
 const AUTHOR = mark('author');
 const DATE = mark('datePublished');
@@ -172,10 +182,16 @@ export const missingAuthorDate: PacketEntry<'missing_author_date'> = {
     },
   },
   verify: (fix, facts) => {
-    const probe = tagProbe(facts, firstFailingPage(fix), PROGRAM);
+    const page = firstFailingPage(fix);
+    const probe = tagProbe(facts, page, PROGRAM);
     return {
       command: probe.command,
       ua: probe.ua,
+      see: {
+        command: seeMarkup(facts, page, SEE_PATTERN),
+        today: line`The author and date markup in the page’s source, one match per line: each ${AUTHOR} and ${DATE} key of its JSON-LD with the 80 characters after it, and each tag that carries a byline attribute. The audit found that the page does not name both an author and a publication date in markup its check reads, and does not record which is missing. ${firstFailing(fix)}`,
+        after: line`Both an author and a date: ${AUTHOR} and ${DATE} on the Article node, or a link with ${BYLINE_LINK} and a ${TIME} element.`,
+      },
       expect: line`Exit status 0 when the first failing page names an author and a publication date in markup the check reads (the JSON-LD block of its Article node, a meta element, ${BYLINE_LINK}, ${mark('itemprop')}, ${TIME}); the audit's check failed that page. ${probe.sender} ${CHROME_GAP} ${RECHECK}`,
     };
   },

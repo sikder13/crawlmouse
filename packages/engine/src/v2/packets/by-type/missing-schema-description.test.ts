@@ -226,4 +226,8 @@ describe('missing_schema_description: stack bodies', () => {
 });
 
 contentPacketProperties(TYPE);
-contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED });
+contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED }, {
+  printed: /^"description": ?"How to pitch a tent on flat ground\."$/m,
+  today: /found no JSON-LD node about the page itself with a description/,
+  after: /`"description": "…"`/,
+});

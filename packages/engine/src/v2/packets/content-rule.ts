@@ -123,7 +123,7 @@ export const CHROME_GAP = ours(
 
 /** For `expect`: an error status fails; the command reads one page, and the audit's next check is the full proof. */
 export const RECHECK = ours(
-  "A page answered with an error status does not pass. The audit's next check applies the full rule to every page of the template.",
+  "An error status does not pass. The audit's next check applies the full rule to every page of the template.",
 );
 
 /**
@@ -156,6 +156,29 @@ export function tagProbe(facts: PacketFacts, page: string, program: string): Tag
     sender: ours(`It requests as ${entry.token}, which the site serves today.`),
   };
 }
+
+/**
+ * The readable command of a content packet (types.ts `See`): the same request as `tagProbe`'s, the
+ * response put on one line, and each match of `pattern` (an extended regular expression of ours,
+ * letter case ignored) printed on a line of its own. It is there to be read and to show the markup;
+ * its exit status proves nothing.
+ */
+export function seeMarkup(facts: PacketFacts, page: string, pattern: string): Command {
+  const entry = verifyCrawler(facts);
+  const address = url(readAt(facts, page));
+  const from = word('\\n');
+  const to = word(' ');
+  const find = word(pattern);
+  return entry === null
+    ? sh`curl -sS --compressed ${address} | tr ${from} ${to} | grep -aioE ${find}`
+    : sh`curl -sS --compressed -A ${word(userAgentOf(entry))} ${address} | tr ${from} ${to} | grep -aioE ${find}`;
+}
+
+/** For `today`: which page the readable command requests, by the record's extent. */
+export const firstFailing = (fix: ContentDetection): Safe =>
+  ours(
+    `It is the first of the template’s failing pages (${fix.extent.failing} of ${fix.extent.of} decided).`,
+  );
 
 /**
  * awk rules that undo `tagProbe`'s split inside a script element, for a program that reads JSON-LD.

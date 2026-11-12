@@ -11,12 +11,14 @@ import {
   AWK_SCRIPTS,
   contentContext,
   DOCS_READ,
+  firstFailing,
   firstFailingPage,
   KEEP_PAGE,
   LD_BLOCK,
   ldType,
   mark,
   RECHECK,
+  seeMarkup,
   tagProbe,
   template,
 } from '../content-rule.js';
@@ -117,10 +119,17 @@ export const missingSchemaDescription: PacketEntry<'missing_schema_description'>
     },
   },
   verify: (fix, facts) => {
-    const probe = tagProbe(facts, firstFailingPage(fix), PROGRAM);
+    const page = firstFailingPage(fix);
+    const probe = tagProbe(facts, page, PROGRAM);
+    const pair = mark('"description": "…"');
     return {
       command: probe.command,
       ua: probe.ua,
+      see: {
+        command: seeMarkup(facts, page, '"description" *: *"[^"]*"'),
+        today: line`Each ${pair} pair in the page’s source, one per line. The audit found no JSON-LD node about the page itself with a description that is not empty, so what it prints today, if anything, is not one: a description on another node (${mark('WebSite')}, ${mark('Organization')}), an empty one, or one outside JSON-LD. ${firstFailing(fix)}`,
+        after: line`A ${pair} line with the page’s own summary, from the node about the page itself.`,
+      },
       expect: line`Exit status 0 when one JSON-LD block of the first failing page holds a type about the page itself and a ${DESCRIPTION} that is not empty; the audit's check failed that page. ${probe.sender} The command does not tell which node of the block the description is on. ${RECHECK}`,
     };
   },

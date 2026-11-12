@@ -15,10 +15,12 @@ import {
   AWK_VISIBLE,
   CHROME_GAP,
   contentContext,
+  firstFailing,
   firstFailingPage,
   KEEP_PAGE,
   mark,
   RECHECK,
+  seeMarkup,
   SET_ASIDE,
   tagProbe,
   template,
@@ -43,6 +45,9 @@ const PROGRAM =
   `l~/^\\/?(${[...OPENING_BLOCKS].join('|')})[ \\t>]/{e();if(!c&&l!~/^\\//){match(l,/^[a-z0-9]+/);b=substr(l,1,RLENGTH)}}` +
   `b!=""{${AWK_TEXT};t=t x}` +
   `END{e();exit !f}`;
+
+/** How much of the markup after the H1 the readable command prints, in characters. */
+const OPENING_SHOWN = 600;
 
 const SENTENCE = ours(
   `a sentence of ${ANSWER_SENTENCE_WORDS.min} to ${ANSWER_SENTENCE_WORDS.max} words that ends in a full stop`,
@@ -73,10 +78,16 @@ export const quotableOpening: PacketEntry<'quotable_opening'> = {
   }),
   stacks: {},
   verify: (fix, facts) => {
-    const probe = tagProbe(facts, firstFailingPage(fix), PROGRAM);
+    const page = firstFailingPage(fix);
+    const probe = tagProbe(facts, page, PROGRAM);
     return {
       command: probe.command,
       ua: probe.ua,
+      see: {
+        command: seeMarkup(facts, page, `</h1>.{0,${OPENING_SHOWN}}`),
+        today: line`The markup that follows the page’s H1, up to ${count(OPENING_SHOWN)} characters. The audit keeps no page text; its check found no block there, other than a list item, with ${SENTENCE}. ${firstFailing(fix)}`,
+        after: line`The same markup, with a paragraph that holds ${SENTENCE} within the first ${count(OPENING_WORDS)} words after the H1.`,
+      },
       expect: line`Exit status 0 when, within the first ${count(OPENING_WORDS)} words after the first ${mark('<h1>')} of the first failing page, a block other than a list item holds ${SENTENCE}; the audit's check failed that page. ${probe.sender} ${CHROME_GAP} ${RECHECK}`,
     };
   },

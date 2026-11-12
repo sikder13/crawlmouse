@@ -192,6 +192,13 @@ export async function statusesOn(
   return out;
 }
 
+/** What a builder's readable command prints once the fix has landed and not before, and what its packet says of it. */
+export interface SeeEvidence {
+  printed: RegExp;
+  today: RegExp;
+  after: RegExp;
+}
+
 /**
  * What each content builder's command is held to on a live site, beyond its own two states: a site
  * that redirects the engine's spelling of a page to the slashed one, and a record whose crawled
@@ -200,7 +207,61 @@ export async function statusesOn(
 export function contentCommandOnSites(
   type: ContentFixType,
   pages: Record<SiteState, string>,
+  see: SeeEvidence,
 ): void {
+  describe(`${type}: the readable command`, () => {
+    const serve = (html: string) => (_req: IncomingMessage, res: ServerResponse) =>
+      void res.end(html);
+
+    it('prints the evidence: without it before the fix, as `today` says, and with it after, as `after` says', async () => {
+      const site = await twoStateSite({ broken: serve(pages.broken), fixed: serve(pages.fixed) });
+      open.push(site);
+      const record = contentRecord(type, {
+        affected_urls: [`${site.base}/blog/a`, `${site.base}/blog/b`],
+        extent: { failing: 2, of: 13, unread: 0 },
+      });
+      const { verify } = writePacket(type, record, contentFacts())!;
+      const run = await inBothStates(site, verify.see!.command);
+      expect(run.fixed.stdout).not.toBe(run.broken.stdout);
+      expect(run.broken.stdout).not.toMatch(see.printed);
+      expect(run.fixed.stdout).toMatch(see.printed);
+      expect(run.broken.stderr + run.fixed.stderr).toBe('');
+      expect(verify.see!.today).toMatch(see.today);
+      expect(verify.see!.today).toMatch(/It is the first of the template’s failing pages \(2 of 13 decided\)\.$/);
+      expect(verify.see!.after).toMatch(see.after);
+      // the same request as the exact check: the same crawler, the same address
+      expect(site.userAgents()).toEqual(Array(2).fill(FIRST_TESTABLE_UA));
+      expect(verify.see!.command).toContain(` -A '${FIRST_TESTABLE_UA.replaceAll("'", `'\\''`)}' '${site.base}/blog/a' | `);
+    });
+
+    it('is short, and is not the check: it carries no awk program', () => {
+      for (const served of ['every_crawler', 'no_crawler'] as const) {
+        const { verify } = writePacket(type, contentRecord(type), contentFacts(served))!;
+        const command = verify.see!.command;
+        expect(command).toMatch(/^curl -sS --compressed /);
+        expect(command).not.toMatch(/awk|ARGV/);
+        const besides = command
+          .replace("'https://shop.test/blog/a'", '')
+          .replace(`'${FIRST_TESTABLE_UA.replaceAll("'", `'\\''`)}'`, '');
+        expect(besides.length).toBeLessThan(200);
+        expect(verify.ua === null).toBe(served === 'no_crawler');
+        expect(command.includes(' -A ')).toBe(served === 'every_crawler');
+      }
+    });
+
+    it('requests the address the page was read at, as the exact check does', () => {
+      const page = 'https://shop.test/blog/a';
+      const facts = contentFacts(
+        'every_crawler',
+        null,
+        new Map([servedRow(page, 'https://shop.test/en/blog/a', 200)]),
+      );
+      const { verify } = writePacket(type, contentRecord(type, { affected_urls: [page] }), facts)!;
+      expect(verify.command).toContain(" 'https://shop.test/en/blog/a' | ");
+      expect(verify.see!.command).toContain(" 'https://shop.test/en/blog/a' | ");
+    });
+  });
+
   describe(`${type}: the command on a trailing-slash site`, () => {
     it('requests the address the page is served at, fails before the fix and passes after', async () => {
       const serve = (html: string) => (req: IncomingMessage, res: ServerResponse) => {
@@ -301,9 +362,13 @@ export function contentCommandOnSites(
       expect(run.broken.status).not.toBe(0);
       expect(run.fixed.status).toBe(0);
       expect(run.broken.stderr + run.fixed.stderr + run.broken.stdout + run.fixed.stdout).toBe('');
+      const readable = packet.verify.see!.command;
+      expect(UNSHOWN.test(readable)).toBe(false);
+      const seeing = await inBothStates(site, readable);
+      expect(seeing.broken.stderr + seeing.fixed.stderr).toBe('');
       // one request per run, each for the record's page as the URL parser spells it
       const { pathname, search } = new URL(page);
-      expect(seen.map((u) => decodeURI(u))).toEqual(Array(2).fill(decodeURI(pathname + search)));
+      expect(seen.map((u) => decodeURI(u))).toEqual(Array(4).fill(decodeURI(pathname + search)));
       expect(existsSync('pwned')).toBe(false);
     });
   });
@@ -394,9 +459,16 @@ export function contentPacketProperties(type: ContentFixType): void {
         fc.property(hostileRecord(type), framework, served, (r, f, s) => {
           const hostile = writePacket(type, r, contentFacts(s, f))!;
           const plain = writePacket(type, calm(r), contentFacts(s, f))!;
-          for (const text of [...shownText(hostile), hostile.verify.command]) {
+          for (const text of [
+            ...shownText(hostile),
+            hostile.verify.command,
+            hostile.verify.see!.command,
+          ]) {
             expect(UNSHOWN.test(text)).toBe(false);
           }
+          // the readable command is the same words whatever the site put in its record
+          const words = (command: string) => command.replace(/ 'https?:[^']*' /, ' URL ');
+          expect(words(hostile.verify.see!.command)).toBe(words(plain.verify.see!.command));
           // What stands outside the code spans is the same whatever the site put in its record.
           expect(shownText(hostile).map((t) => outsideCodeSpans(t).replace(CUT_NOTE, ''))).toEqual(
             shownText(plain).map((t) => outsideCodeSpans(t)),

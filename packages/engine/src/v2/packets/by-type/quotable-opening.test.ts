@@ -154,4 +154,8 @@ describe('quotable_opening: the command and the engine’s check agree', () => {
 });
 
 contentPacketProperties(TYPE);
-contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED });
+contentCommandOnSites(TYPE, { broken: BROKEN, fixed: FIXED }, {
+  printed: /two crossed poles hold its shape\./,
+  today: /^The markup that follows the page’s H1, up to 600 characters\. .* found no block there/,
+  after: /a sentence of \d+ to \d+ words that ends in a full stop/,
+});
