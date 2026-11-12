@@ -4,27 +4,9 @@ import { freeFixes } from '../view/free-fixes';
 import { FIRST_AUDIT } from '../view/segment/test-helpers';
 import { buildPublicSnapshot } from './build-snapshot';
 import { isV2Snapshot, PublicSnapshotV2Schema } from './snapshot';
+import { packetText, strings } from './test-helpers';
 
 const MINTED = '2026-11-12T18:00:00.000Z';
-
-/** Every string value anywhere inside `value`. */
-function strings(value: unknown): string[] {
-  if (typeof value === 'string') return [value];
-  if (Array.isArray(value)) return value.flatMap(strings);
-  if (value !== null && typeof value === 'object') return Object.values(value).flatMap(strings);
-  return [];
-}
-
-/**
- * A packet's own text: each value of at least 24 characters with a space in it (a step, a command,
- * what a check prints), less the fix's title, which the report shows by design. Shorter values are
- * crawler names, framework keys and the like, which the report shows in its own right.
- */
-function packetText(d: ReturnType<typeof fixture>): string[] {
-  return d.fixes.flatMap((f) =>
-    strings(f.packet).filter((s) => s.length >= 24 && s.includes(' ') && s !== f.title),
-  );
-}
 
 describe.each(FIXTURE_NAMES)('buildPublicSnapshot on %s', (name: FixtureName) => {
   const d = fixture(name);

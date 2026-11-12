@@ -284,4 +284,11 @@ export const PREVIEWS: PreviewEntry[] = [
     kind: 'screen',
   },
   { path: '/v2-preview/screens/check/robots-ai', name: 'Check: robots.txt for AI', kind: 'screen' },
+  // CC-29 workstream B: the shared report. Its orange element is the audit form's "Start the audit".
+  { path: '/v2-preview/screens/public-report', name: 'Final-Public', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/public-report/withheld',
+    name: 'Public report, withheld',
+    kind: 'screen',
+  },
 ];

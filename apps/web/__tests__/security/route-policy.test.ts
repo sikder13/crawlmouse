@@ -302,6 +302,7 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/me',
       'api/reports/[slug]/claim',
       'api/reports/[slug]/logo',
+      'api/reports/[slug]/view',
       'api/reports/[slug]/visibility',
       'api/reports/[slug]/white-label',
       'api/sites',

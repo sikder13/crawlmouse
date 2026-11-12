@@ -565,3 +565,5 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Check: is GPTBot blocked?                    | `/v2-preview/screens/check/gptbot`                       | screen    |                                      |
 | Check: readable without JavaScript?          | `/v2-preview/screens/check/javascript`                   | screen    |                                      |
 | Check: robots.txt for AI                     | `/v2-preview/screens/check/robots-ai`                    | screen    |                                      |
+| Final-Public                                 | `/v2-preview/screens/public-report`                      | screen    |                                      |
+| Public report, withheld                      | `/v2-preview/screens/public-report/withheld`             | screen    |                                      |
