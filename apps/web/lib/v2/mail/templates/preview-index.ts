@@ -25,6 +25,14 @@ export const MAIL_PREVIEW_INDEX = [
   { slug: 'account-delete', name: 'Account deletion, confirm and restore', kind: 'account_delete' },
   { slug: 'alert', name: 'Alert', kind: 'alert' },
   { slug: 'weekly-summary', name: 'Weekly summary', kind: 'weekly_summary' },
+  { slug: 'seat-invite', name: 'Seat invitation, account manager', kind: 'seat_invite' },
+  {
+    slug: 'seat-invite-unnamed',
+    name: 'Seat invitation, developer, an account with no name',
+    kind: 'seat_invite',
+  },
+  { slug: 'report-confirm', name: 'Client report, confirm the address', kind: 'report_confirm' },
+  { slug: 'client-report', name: 'Client report', kind: 'client_report' },
 ] as const satisfies readonly { slug: string; name: string; kind: MailKind }[];
 
 export type MailPreviewSlug = (typeof MAIL_PREVIEW_INDEX)[number]['slug'];

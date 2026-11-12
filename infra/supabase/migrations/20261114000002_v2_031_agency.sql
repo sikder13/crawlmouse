@@ -593,4 +593,76 @@ grant execute on function public.remove_seat(uuid, uuid, timestamptz) to service
 
 -- ═══ C: erasure and mail kinds ════════════════════════════════════════════════════════════════════
 
+-- Three kinds of mail join the ledger (docs/specs/v2/31-agency.md §6 and §10). The list in code is
+-- MAIL_KINDS, apps/web/lib/v2/mail/types.ts:
+--   seat_invite     a seat's invitation                              a suppression does not stop it
+--   report_confirm  the confirmation asked of a client's contact     a suppression does not stop it
+--   client_report   a scheduled client report                        a suppression stops it
+--
+-- 028 lists the kinds in two places: the CHECK on email_sends.kind, and email_kind_suppressible. Both
+-- are rebuilt here from what they hold when this runs, with the three added, so a kind a migration
+-- before this one added stays, with its answer. The block reads the CHECK on the kind column alone
+-- and raises, changing nothing, unless there is one and it is a plain list of kinds. Run again, it
+-- finds the three there and writes the same two definitions.
+--
+-- Test: pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-m-mail-kinds.test.ts
+do $$
+declare
+  v_added constant text[] := array['seat_invite', 'report_confirm', 'client_report'];
+  v_added_suppressible constant text[] := array['client_report'];
+  v_count integer;
+  v_name name;
+  v_def text;
+  v_kinds text[];
+  v_suppressible text[];
+begin
+  select pg_catalog.count(*), pg_catalog.min(c.conname), pg_catalog.min(pg_catalog.pg_get_constraintdef(c.oid))
+    into v_count, v_name, v_def
+    from pg_catalog.pg_constraint c
+   where c.conrelid = 'public.email_sends'::pg_catalog.regclass
+     and c.contype = 'c'
+     and c.conkey = array[(select a.attnum
+                             from pg_catalog.pg_attribute a
+                            where a.attrelid = 'public.email_sends'::pg_catalog.regclass
+                              and a.attname = 'kind')];
+  if v_count <> 1 then
+    raise exception 'email_sends.kind: % CHECKs on the column, where one is read', v_count;
+  end if;
+  select pg_catalog.array_agg(m.k[1] order by m.n)
+    into v_kinds
+    from pg_catalog.regexp_matches(v_def, '''([a-z0-9_]+)''::text', 'g') with ordinality as m(k, n);
+  if v_kinds is null
+     or v_def <> 'CHECK ((kind = ANY (ARRAY['
+                 || (select pg_catalog.string_agg(pg_catalog.quote_literal(u.k) || '::text', ', ' order by u.n)
+                       from pg_catalog.unnest(v_kinds) with ordinality as u(k, n))
+                 || '])))' then
+    raise exception 'email_sends.kind: the CHECK % is not a plain list of kinds', v_name;
+  end if;
+
+  -- What a suppression stops now, asked of the function for each kind the CHECK lists.
+  select coalesce(pg_catalog.array_agg(u.k order by u.n), '{}')
+    into v_suppressible
+    from pg_catalog.unnest(v_kinds) with ordinality as u(k, n)
+   where u.k <> all (v_added) and public.email_kind_suppressible(u.k);
+  v_kinds := v_kinds || coalesce(
+    (select pg_catalog.array_agg(a.k order by a.n)
+       from pg_catalog.unnest(v_added) with ordinality as a(k, n)
+      where a.k <> all (v_kinds)), '{}');
+  v_suppressible := v_suppressible || v_added_suppressible;
+
+  execute pg_catalog.format('alter table public.email_sends drop constraint %I', v_name);
+  execute pg_catalog.format(
+    'alter table public.email_sends add constraint %I check (kind in (%s))', v_name,
+    (select pg_catalog.string_agg(pg_catalog.quote_literal(u.k), ', ' order by u.n)
+       from pg_catalog.unnest(v_kinds) with ordinality as u(k, n)));
+  execute pg_catalog.format(
+    'create or replace function public.email_kind_suppressible(p_kind text) returns boolean '
+    'language sql immutable set search_path = pg_catalog, pg_temp '
+    'as $f$ select p_kind = any (%L::text[]); $f$', v_suppressible);
+end;
+$$;
+
+revoke all on function public.email_kind_suppressible(text) from public, anon, authenticated;
+grant execute on function public.email_kind_suppressible(text) to service_role;
+
 -- ═══ end C ════════════════════════════════════════════════════════════════════════════════════════
