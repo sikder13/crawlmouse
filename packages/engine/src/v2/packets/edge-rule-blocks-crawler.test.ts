@@ -436,6 +436,47 @@ describe('the edge-rule verify command', () => {
     expect((await runCommand(own)).status).not.toBe(0);
   });
 
+  it('the readable command prints the status: the audit’s today, 200 once served', async () => {
+    site = await siteRefusing('PerplexityBot');
+    const { record, rows } = detected({
+      crawler: 'PerplexityBot',
+      pages: [`${site.base}/products/b`, `${site.base}/products/a`],
+    });
+    const { verify } = compose(builder, record, factsOf(rows));
+    const ua = userAgentOf(entryOf('PerplexityBot'));
+    expect(verify.see!.command).toBe(
+      `curl -sS -o /dev/null -w '%{http_code}\\n' -A '${ua}' '${site.base}/products/a'`,
+    );
+    const { broken, fixed } = await inBothStates(site, verify.see!.command);
+    expect(broken.stdout).toBe('403\n');
+    expect(fixed.stdout).toBe('200\n');
+    expect(verify.see!.today).toBe(
+      '`403`: the status the audit’s request for this page as `PerplexityBot` was answered with.',
+    );
+    expect(verify.see!.after).toBe(
+      '`200`. The exact check below also requires that no challenge header comes with it.',
+    );
+    expect(site.userAgents()).toEqual(Array(2).fill(ua));
+  });
+
+  it('the readable command’s `today` says so when the rows hold no status for the page', () => {
+    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: ['https://a.test/p'] });
+    const none = compose(builder, record, factsOf([{ ...rows[0]!, raw_status: null }])).verify;
+    expect(none.see!.today).toBe(
+      'The audit recorded no status for its request for this page as `PerplexityBot`.',
+    );
+    // the readable command requests the address the exact check requests
+    const pages = new Map([
+      [
+        'https://a.test/p',
+        { url: 'https://a.test/p', final_url: 'https://a.test/en/', status_code: 200 } as PageResult,
+      ],
+    ]);
+    const moved = compose(builder, record, factsOf(rows, NO_STACK, pages)).verify;
+    expect(moved.command).toContain(" 'https://a.test/en/' | ");
+    expect(moved.see!.command).toMatch(/ 'https:\/\/a\.test\/en\/'$/);
+  });
+
   it('passes behind 103 Early Hints once fixed: the last status line decides', async () => {
     const ua = userAgentOf(CRAWLER_REGISTRY_V2.find((e) => e.token === 'PerplexityBot')!);
     const serve =
@@ -564,7 +605,12 @@ describe('the edge-rule packet over hostile records (properties)', () => {
           // a line compose cut ends where the cut fell; compose.test.ts holds its code span closed
           if (!cut.test(t)) expect(ours(t)).toBe(ours(allText(q)[i]!));
         });
-        for (const t of [...allText(p), p.verify.command]) expect(UNSHOWN.test(t)).toBe(false);
+        for (const t of [...allText(p), p.verify.command, p.verify.see!.command]) {
+          expect(UNSHOWN.test(t)).toBe(false);
+        }
+        // the readable command is the same words whatever the site put in its record
+        const words = (command: string) => command.replace(/ 'https?:[^']*'$/, ' URL');
+        expect(words(p.verify.see!.command)).toBe(words(q.verify.see!.command));
       }),
     );
   });

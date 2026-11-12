@@ -386,6 +386,46 @@ describe('the client-rendered template verify command', () => {
     ).toBe(true);
   });
 
+  it('the readable command prints a rough count: not below the audit’s today, higher by the gained words once fixed', async () => {
+    site = await twoStateSite({ broken: html(SHELL), fixed: html(SERVER_RENDERED) });
+    const record = measured(site.base);
+    const page = record.evidence.pages[0]!;
+    const { verify } = compose(builder, record, factsOf());
+    expect(verify.see!.command).toMatch(
+      new RegExp(
+        `^curl -sS --compressed -A '[^']*OAI-SearchBot[^']*' '${page.url}' \\| sed 's/<\\[\\^>\\]\\*>/ /g' \\| wc -w$`,
+      ),
+    );
+    const { broken, fixed } = await inBothStates(site, verify.see!.command);
+    const before = Number(broken.stdout);
+    const after = Number(fixed.stdout);
+    // today: the audit's own count is named, and the rough count is not below it
+    expect(verify.see!.today).toBe(
+      `The audit counted ${page.raw_words} words in this page’s HTML response. This rough count also takes the text of scripts, styles and menus, which the audit and the exact check leave out, so it is usually higher.`,
+    );
+    expect(before).toBeGreaterThanOrEqual(page.raw_words);
+    // after: higher by about the words the page gains
+    expect(verify.see!.after).toBe(
+      `A number higher by about the words the page gains: the audit counted ${page.rendered_words} once rendered in a browser, ${page.rendered_words - page.raw_words} more.`,
+    );
+    expect(Math.abs(after - before - (page.rendered_words - page.raw_words))).toBeLessThanOrEqual(5);
+  });
+
+  it('the readable command says one word in the singular, and requests as the exact check does', () => {
+    const one = compose(builder, detected('https://a.test', [[1, 2]]), factsOf([])).verify;
+    expect(one.see!.today).toMatch(/^The audit counted 1 word in this page’s HTML response\./);
+    expect(one.see!.after).toMatch(/counted 2 once rendered in a browser, 1 more\.$/);
+    expect(one.see!.command).toBe(
+      "curl -sS --compressed 'https://a.test/guides/g-0' | sed 's/<[^>]*>/ /g' | wc -w",
+    );
+    const url = 'https://a.test/guides/g-0';
+    const pages = new Map([
+      [url, { url, final_url: 'https://a.test/en/g-0', status_code: 200 } as PageResult],
+    ]);
+    const moved = compose(builder, detected('https://a.test', [[1, 2]]), factsOf(SERVED, pages));
+    expect(moved.verify.see!.command).toContain(" 'https://a.test/en/g-0' | sed ");
+  });
+
   it('counts within a few words of the audit’s own count on both sides', async () => {
     site = await twoStateSite({ broken: html(SHELL), fixed: html(SERVER_RENDERED) });
     const record = measured(site.base);
@@ -640,7 +680,12 @@ describe('the client-rendered template packet over hostile records (properties)'
         const ours = (t: string) =>
           outsideCodeSpans(t).replace(/ \((line )?cut from \d+ characters\)/g, '');
         expect(allText(p).map(ours)).toEqual(allText(q).map(ours));
-        for (const t of [...allText(p), p.verify.command]) expect(UNSHOWN.test(t)).toBe(false);
+        for (const t of [...allText(p), p.verify.command, p.verify.see!.command]) {
+          expect(UNSHOWN.test(t)).toBe(false);
+        }
+        // the readable command is the same words whatever the site put in its record
+        const words = (command: string) => command.replace(/ 'https?:[^']*' \|/, ' URL |');
+        expect(words(p.verify.see!.command)).toBe(words(q.verify.see!.command));
       }),
     );
   });

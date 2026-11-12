@@ -14,6 +14,9 @@
  * `readAt`) with the crawler's user agent, must answer 200 without a header of MITIGATION, the
  * response headers the crawl worker reads a challenge from. A redirect is not followed, so a rule
  * that redirects the crawler to a challenge does not pass. The body is not read: `expect` says so.
+ *
+ * The readable command above it makes the same request and prints the status alone: what the audit's
+ * row for the page holds today, and 200 once the crawler is served.
  */
 import type { AccessCause, AccessTest } from '@crawlmouse/types/v2';
 import type { AccessDetection } from '../../access/types.js';
@@ -261,8 +264,19 @@ export const edgeRuleBlocksCrawler: PacketEntry<'edge_rule_blocks_crawler'> = {
     const pass = ours(
       `Exits 0 when the page answers status 200 to this user agent with no challenge header (${headers.text}), and prints nothing. A redirect is not followed and does not pass. The command reads the status and those headers, not the body: a block page served with status 200 and none of those headers passes.`,
     );
+    const agent = word(userAgentOf(entry));
+    const address = url(readAt(facts, page));
+    const crawler = code(record.crawler);
     return {
-      command: sh`curl -sS -o /dev/null -D - -A ${word(userAgentOf(entry))} ${url(readAt(facts, page))} | awk ${word(SERVED_UNCHALLENGED)}`,
+      command: sh`curl -sS -o /dev/null -D - -A ${agent} ${address} | awk ${word(SERVED_UNCHALLENGED)}`,
+      see: {
+        command: sh`curl -sS -o /dev/null -w ${word('%{http_code}\\n')} -A ${agent} ${address}`,
+        today:
+          today === null
+            ? line`The audit recorded no status for its request for this page as ${crawler}.`
+            : line`${ours(`\`${today}\``)}: the status the audit’s request for this page as ${crawler} was answered with.`,
+        after: line`${ours('`200`')}. The exact check below also requires that no challenge header comes with it.`,
+      },
       expect:
         today === null
           ? line`${pass}`

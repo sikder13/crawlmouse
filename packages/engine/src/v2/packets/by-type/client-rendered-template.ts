@@ -20,6 +20,10 @@
  * text outside SKIPPED already reaches `wordsNeeded` passes unfixed; `expect` says so, and gives the
  * audit's two counts so the printed number can be read against them. The audit closes the fix earlier
  * than the command passes (render/state.ts EMPTY_SHELL_LEAVES_ABOVE); `expect` says that too.
+ *
+ * The readable command above it strips the tags of the same response and counts what is left. It
+ * keeps the text of scripts, styles and menus, so its number is not the audit's: `today` and `after`
+ * give the audit's two counts and say which way the rough count differs.
  */
 import type { RenderedDetection, RenderedPage } from '../../detectors/rendered.js';
 import { EMPTY_SHELL_LEAVES_ABOVE, READABLE_FROM } from '../../render/state.js';
@@ -72,6 +76,7 @@ const COUNT_WORDS = [
 ].join(' ');
 
 const pagesOf = (n: number) => ours(n === 1 ? 'page' : 'pages');
+const wordsOf = (n: number) => ours(n === 1 ? 'word' : 'words');
 
 const byUrl = (a: RenderedPage, b: RenderedPage) => (a.url < b.url ? -1 : a.url > b.url ? 1 : 0);
 
@@ -99,7 +104,7 @@ function context(record: RenderedDetection, facts: PacketFacts): Line[] {
     line`The HTML response of the template ${code(record.template_key)} holds far fewer words than its pages show once rendered in a browser: the difference is content added in the browser. ${sample(record.extent)}`,
     ...shown.map(
       (p) =>
-        line`${code(servedAt(facts, p.url))}: ${count(p.raw_words)} ${ours(p.raw_words === 1 ? 'word' : 'words')} in the HTML response, ${count(p.rendered_words)} once rendered in a browser.`,
+        line`${code(servedAt(facts, p.url))}: ${count(p.raw_words)} ${wordsOf(p.raw_words)} in the HTML response, ${count(p.rendered_words)} once rendered in a browser.`,
     ),
   ];
   if (rest > 0) {
@@ -258,7 +263,17 @@ export const clientRenderedTemplate: PacketEntry<'client_rendered_template'> = {
       'element',
     );
     const percent = (share: number) => count(Math.round(share * 100));
+    const strip = word('s/<[^>]*>/ /g');
+    const gained = page.rendered_words - page.raw_words;
     return {
+      see: {
+        command:
+          entry === null
+            ? sh`curl -sS --compressed ${address} | sed ${strip} | wc -w`
+            : sh`curl -sS --compressed -A ${word(userAgentOf(entry))} ${address} | sed ${strip} | wc -w`,
+        today: line`The audit counted ${count(page.raw_words)} ${wordsOf(page.raw_words)} in this page’s HTML response. This rough count also takes the text of scripts, styles and menus, which the audit and the exact check leave out, so it is usually higher.`,
+        after: line`A number higher by about the words the page gains: the audit counted ${count(page.rendered_words)} once rendered in a browser, ${count(gained)} more.`,
+      },
       command:
         entry === null
           ? sh`curl -sSf --compressed ${address} | tr ${word('\\r\\n')} ${word('  ')} | tr ${word('<')} ${word('\\n')} | awk -v need=${int(need)} ${word(COUNT_WORDS)}`
