@@ -18,6 +18,7 @@ import {
   type ReportSendRequestedEvent,
   type ScheduleInput,
 } from './schedules';
+import type { ScheduleRunStore } from './schedules-run';
 
 const Saved = z.discriminatedUnion('outcome', [
   z.strictObject({ outcome: z.literal('saved'), next_run_at: z.string() }),
@@ -222,6 +223,102 @@ export function inngestClientReportMail(
     async report({ reportId }) {
       await send(reportSendRequestedEvent(reportId));
       return 'queued';
+    },
+  };
+}
+
+// ─── the hourly run ──────────────────────────────────────────────────────────────────────────────
+
+const Instant = z.string().nullable();
+const DueRow = z.strictObject({
+  site_id: z.uuid(),
+  account_id: z.uuid(),
+  slot: z.string(),
+  send_when_unchanged: z.boolean(),
+  has_contact: z.boolean(),
+  confirmed: z.boolean(),
+  confirmation_requested: z.boolean(),
+  contact_is_owner: z.boolean(),
+  state: z.enum(['free', 'pro_trial', 'pro', 'agency_trial', 'agency', 'past_due']),
+  tier: z.enum(['free', 'pro', 'agency']),
+  past_due_tier: z.enum(['pro', 'agency']).nullable(),
+  past_due_since: Instant,
+  trial_variant: z.enum(['no_card', 'card_required']).nullable(),
+  trial_ends_at: Instant,
+  check_id: z.uuid().nullable(),
+  changed: z.boolean(),
+});
+const Written = z.discriminatedUnion('outcome', [
+  z.strictObject({
+    outcome: z.enum(['written', 'exists']),
+    report_id: z.uuid(),
+    status: z.string(),
+  }),
+  z.strictObject({ outcome: z.literal('none') }),
+]);
+const Sent = z.discriminatedUnion('outcome', [
+  z.strictObject({ outcome: z.literal('sent'), account_id: z.uuid(), first: z.boolean() }),
+  z.strictObject({ outcome: z.enum(['already', 'not_found']) }),
+]);
+
+const dateOrNull = (v: string | null) => (v === null ? null : new Date(v));
+
+/** The hourly run's reads and writes (`schedules-run.ts`), over section B's functions. */
+export function supabaseScheduleRunStore(admin: SupabaseClient): ScheduleRunStore {
+  return {
+    async due(now, limit) {
+      const rows = await call(
+        admin,
+        'due_report_schedules',
+        { p_now: now.toISOString(), p_limit: limit },
+        z.array(DueRow),
+      );
+      return rows.map((r) => ({
+        siteId: r.site_id,
+        accountId: r.account_id,
+        slot: instant(r.slot),
+        sendWhenUnchanged: r.send_when_unchanged,
+        hasContact: r.has_contact,
+        confirmed: r.confirmed,
+        confirmationRequested: r.confirmation_requested,
+        contactIsOwner: r.contact_is_owner,
+        account: {
+          state: r.state,
+          tier: r.tier,
+          pastDueTier: r.past_due_tier,
+          pastDueSince: dateOrNull(r.past_due_since),
+          trialVariant: r.trial_variant,
+          trialEndsAt: dateOrNull(r.trial_ends_at),
+        },
+        checkId: r.check_id,
+        changed: r.changed,
+      }));
+    },
+    async writeReport(siteId, slot, checkId, now) {
+      const a = await call(
+        admin,
+        'write_client_report',
+        { p_site: siteId, p_slot: slot, p_check: checkId, p_now: now.toISOString() },
+        Written,
+      );
+      if (a.outcome === 'none') return null;
+      return { reportId: a.report_id, status: a.status === 'sent' ? 'sent' : 'scheduled' };
+    },
+    async markSent(reportId, now) {
+      const a = await call(
+        admin,
+        'mark_client_report_sent',
+        { p_report: reportId, p_now: now.toISOString() },
+        Sent,
+      );
+      return a.outcome === 'sent' ? { accountId: a.account_id, first: a.first } : null;
+    },
+    async markRun(siteId, now) {
+      const { error } = await admin.rpc('mark_report_schedule_run', {
+        p_site: siteId,
+        p_now: now.toISOString(),
+      });
+      if (error) throw new Error(`mark_report_schedule_run failed: ${error.message}`);
     },
   };
 }
