@@ -454,10 +454,12 @@ describe('the Slack URL at send time (D5)', () => {
 describe('recipients and unsubscribe (D5, D6, D7)', () => {
   it('sends alerts to an active seat with email in its channels, while change notes are on', async () => {
     const { accountId, seatId, email } = await account();
+    const { siteId } = await keptCheck(accountId);
     const recips = () =>
-      svc<{ seat_id: string; email: string }>(`select * from public.alert_email_recipients($1)`, [
-        accountId,
-      ]);
+      svc<{ seat_id: string; email: string }>(
+        `select * from public.alert_email_recipients($1, $2)`,
+        [accountId, siteId],
+      );
     expect(await recips()).toEqual([{ seat_id: seatId, email }]);
     await db.query(`update public.accounts set email_change_notes = false where id = $1`, [
       accountId,
@@ -467,13 +469,16 @@ describe('recipients and unsubscribe (D5, D6, D7)', () => {
 
   it('unsubscribes one seat from one kind only', async () => {
     const { accountId, seatId, email } = await account();
+    const { siteId } = await keptCheck(accountId);
     expect(
       (await svc<{ ok: boolean }>(`select public.unsubscribe_seat($1, 'alerts') ok`, [seatId]))[0]!
         .ok,
     ).toBe(true);
-    expect(await svc(`select * from public.alert_email_recipients($1)`, [accountId])).toEqual([]);
+    expect(
+      await svc(`select * from public.alert_email_recipients($1, $2)`, [accountId, siteId]),
+    ).toEqual([]);
     expect(await svc(`select * from public.summary_recipients($1)`, [accountId])).toEqual([
-      { seat_id: seatId, email },
+      { seat_id: seatId, email, sites: null },
     ]);
     await svc(`select public.unsubscribe_seat($1, 'summary')`, [seatId]);
     expect(await svc(`select * from public.summary_recipients($1)`, [accountId])).toEqual([]);
@@ -503,8 +508,88 @@ describe('recipients and unsubscribe (D5, D6, D7)', () => {
       `update public.accounts set deletion_confirmed_at = now(), purge_after = now() + interval '7 days' where id = $1`,
       [accountId],
     );
-    expect(await svc(`select * from public.alert_email_recipients($1)`, [accountId])).toEqual([]);
+    const { siteId } = await keptCheck(accountId);
+    expect(
+      await svc(`select * from public.alert_email_recipients($1, $2)`, [accountId, siteId]),
+    ).toEqual([]);
     expect(await svc(`select * from public.summary_recipients($1)`, [accountId])).toEqual([]);
+  });
+});
+
+describe('recipients honour a seat’s client scope (review r1, security S1)', () => {
+  /** An active seat on the account for a new user, scoped to `sites` (null: every site). */
+  async function seat(accountId: string, sites: string[] | null) {
+    const email = `scoped-${randomUUID()}@example.com`;
+    const userId = await signUp(db, email);
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at,
+                                 client_scope_all)
+       values ($1, $2, $3, 'account_manager', 'active', now(), $4) returning id`,
+      [accountId, userId, email, sites === null],
+    );
+    const seatId = rows[0]!.id;
+    for (const siteId of sites ?? [])
+      await insertRow(db, 'seat_sites', ROWS.seat_sites(seatId, siteId, accountId));
+    return { seatId, email };
+  }
+
+  async function staging(accountId: string, of: string) {
+    const id = randomUUID();
+    await insertRow(db, 'sites', {
+      ...ROWS.sites(id, accountId, `staging-${id.slice(0, 8)}.example`),
+      staging_of_site_id: of,
+    });
+    return id;
+  }
+
+  const alertTo = async (accountId: string, siteId: string) =>
+    (
+      await svc<{ seat_id: string }>(`select seat_id from public.alert_email_recipients($1, $2)`, [
+        accountId,
+        siteId,
+      ])
+    ).map((r) => r.seat_id);
+
+  it('mails a site’s alert to a seat scoped to it or to the site it stages, and to no other scoped seat', async () => {
+    const owner = await account();
+    const a = (await keptCheck(owner.accountId)).siteId;
+    const b = (await keptCheck(owner.accountId)).siteId;
+    const aStaging = await staging(owner.accountId, a);
+    const toA = await seat(owner.accountId, [a]);
+    const toB = await seat(owner.accountId, [b]);
+    const all = await seat(owner.accountId, null);
+    expect(await alertTo(owner.accountId, a)).toEqual([owner.seatId, toA.seatId, all.seatId]);
+    expect(await alertTo(owner.accountId, aStaging)).toEqual([
+      owner.seatId,
+      toA.seatId,
+      all.seatId,
+    ]);
+    expect(await alertTo(owner.accountId, b)).toEqual([owner.seatId, toB.seatId, all.seatId]);
+  });
+
+  it('mails nobody for a site that is not the account’s', async () => {
+    const owner = await account();
+    const other = await account();
+    const theirs = (await keptCheck(other.accountId)).siteId;
+    expect(await alertTo(owner.accountId, theirs)).toEqual([]);
+  });
+
+  it('names, for each summary recipient, the sites it may read: null for every site', async () => {
+    const owner = await account();
+    const a = (await keptCheck(owner.accountId)).siteId;
+    const b = (await keptCheck(owner.accountId)).siteId;
+    const aStaging = await staging(owner.accountId, a);
+    const toA = await seat(owner.accountId, [a]);
+    const none = await seat(owner.accountId, []);
+    const rows = await svc<{ seat_id: string; sites: string[] | null }>(
+      `select seat_id, sites from public.summary_recipients($1)`,
+      [owner.accountId],
+    );
+    const sitesOf = (seatId: string) => rows.find((r) => r.seat_id === seatId)?.sites;
+    expect(sitesOf(owner.seatId)).toBeNull();
+    expect([...(sitesOf(toA.seatId) ?? [])].sort()).toEqual([a, aStaging].sort());
+    expect(sitesOf(toA.seatId)).not.toContain(b);
+    expect(sitesOf(none.seatId)).toEqual([]);
   });
 });
 

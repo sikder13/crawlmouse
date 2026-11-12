@@ -7,7 +7,7 @@
  * (`evaluateAlerts`), so each Inngest step carries only a small answer, and the result is the same
  * on every retry because a finished check's changes do not change.
  *
- * - Email: one message per recipient seat (`alert_email_recipients`), keyed
+ * - Email: one message per recipient seat whose client scope covers the site (`alert_email_recipients`), keyed
  *   `alert:<checkId>:email:<seatId>` in the send ledger, so a retried step sends nobody twice; with
  *   List-Unsubscribe for that seat. Every seat is tried on every run (`sendEach`): a seat whose send
  *   throws stops no other, and the step throws after the channel is recorded. No `EMAIL_LINK_SECRET`, no mail (Q6): the miss is logged and
@@ -92,7 +92,8 @@ export interface AlertStore {
   /** Adds the account's default rules it does not hold yet (Q13, `seed_default_alert_rules`). */
   seedDefaultRules(accountId: string): Promise<void>;
   data(ctx: AlertContext & { accountId: string }): Promise<AlertData>;
-  emailRecipients(accountId: string): Promise<{ seatId: string; email: string }[]>;
+  /** The seats to mail about this site: those whose client scope covers it (`alert_email_recipients`). */
+  emailRecipients(accountId: string, siteId: string): Promise<{ seatId: string; email: string }[]>;
   slackUrl(accountId: string, now: Date): Promise<string | null>;
   claimSlack(key: string, accountId: string, now: Date): Promise<Claim>;
   finishSlack(
@@ -277,7 +278,7 @@ async function deliverEmail(
     });
   }
   const secret = deps.linkSecret;
-  const recipients = await deps.store.emailRecipients(ctx.accountId);
+  const recipients = await deps.store.emailRecipients(ctx.accountId, ctx.siteId);
   if (recipients.length === 0) {
     return record({
       status: 'suppressed',

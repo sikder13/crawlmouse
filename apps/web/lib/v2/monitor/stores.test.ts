@@ -161,3 +161,33 @@ describe('supabaseSummaryStore.account', () => {
     expect((await supabaseSummaryStore(client(), () => {}).account(a.accountId))?.zone).toBe('UTC');
   });
 });
+
+describe('the recipients through PostgREST’s set-returning calls (review r1, security S1)', () => {
+  it('alert recipients: the seats whose scope covers the site', async () => {
+    const a = await paidAccount();
+    const one = await site(a.accountId);
+    const two = await site(a.accountId);
+    const email = `scoped-${randomUUID()}@example.com`;
+    const userId = await signUp(db, email);
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at,
+                                 client_scope_all)
+       values ($1, $2, $3, 'account_manager', 'active', now(), false) returning id`,
+      [a.accountId, userId, email],
+    );
+    const scoped = rows[0]!.id;
+    await insertRow(db, 'seat_sites', ROWS.seat_sites(scoped, two, a.accountId));
+    const store = supabaseAlertStore(client());
+    expect(await store.emailRecipients(a.accountId, one)).toEqual([
+      { seatId: a.seatId, email: a.email },
+    ]);
+    expect(await store.emailRecipients(a.accountId, two)).toEqual([
+      { seatId: a.seatId, email: a.email },
+      { seatId: scoped, email },
+    ]);
+    expect(await supabaseSummaryStore(client(), () => {}).recipients(a.accountId)).toEqual([
+      { seatId: a.seatId, email: a.email, sites: null },
+      { seatId: scoped, email, sites: [two] },
+    ]);
+  });
+});

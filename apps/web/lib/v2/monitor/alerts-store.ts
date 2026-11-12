@@ -141,12 +141,10 @@ export function supabaseAlertStore(sb: SupabaseClient): AlertStore {
       };
     },
 
-    async emailRecipients(accountId) {
+    async emailRecipients(accountId, siteId) {
       const rows = await rpc<{ seat_id: string; email: string }[] | null>(
         'alert_email_recipients',
-        {
-          p_account: accountId,
-        },
+        { p_account: accountId, p_site: siteId },
       );
       return (rows ?? []).map((r) => ({ seatId: r.seat_id, email: r.email }));
     },

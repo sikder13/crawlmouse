@@ -7,7 +7,8 @@
  * `sendSummary` sends nothing to an account marked for deletion, nothing for a week with no change
  * (a `baseline` row is not a change of the site), and nothing without `EMAIL_LINK_SECRET` (Q6, logged);
  * otherwise one email per recipient seat (`summary_recipients`), keyed
- * `summary:<accountId>:<weekKey>:<seatId>`, with List-Unsubscribe for that seat.
+ * `summary:<accountId>:<weekKey>:<seatId>`, with List-Unsubscribe for that seat. A seat's summary
+ * lists only the sites its client scope covers, and a seat none of whose sites changed gets none.
  */
 import { unsubscribeHeaders } from '../mail/headers';
 import type { UnsubscribeLinks } from '../mail/links';
@@ -29,7 +30,14 @@ export interface SummaryStore {
   account(accountId: string): Promise<{ marked: boolean; zone: string } | null>;
   /** The account's live sites' changes detected in [since, until), baselines left out. */
   sites(accountId: string, since: string, until: string): Promise<SummarySite[]>;
-  recipients(accountId: string): Promise<{ seatId: string; email: string }[]>;
+  /** Each recipient seat, with the sites it may read; `sites` null for every site (`summary_recipients`). */
+  recipients(accountId: string): Promise<SummaryRecipient[]>;
+}
+
+export interface SummaryRecipient {
+  seatId: string;
+  email: string;
+  sites: readonly string[] | null;
 }
 
 export interface SummaryDeps {
@@ -101,7 +109,14 @@ export async function sendSummary(deps: SummaryDeps, due: SummaryDue): Promise<S
     return { skip: 'no_link_secret' };
   }
   const secret = deps.linkSecret;
-  const recipients = await deps.store.recipients(due.accountId);
+  // Each seat reads only the sites its client scope covers; a seat none of whose sites changed this
+  // week gets nothing.
+  const recipients = (await deps.store.recipients(due.accountId))
+    .map((r) => ({
+      ...r,
+      sites: r.sites === null ? sites : sites.filter((s) => r.sites!.includes(s.siteId)),
+    }))
+    .filter((r) => r.sites.length > 0);
   if (recipients.length === 0) return { skip: 'no_recipients' };
   const now = deps.now();
   const { outcomes, retry } = await sendEach(recipients, (r) => {
@@ -116,7 +131,7 @@ export async function sendSummary(deps: SummaryDeps, due: SummaryDue): Promise<S
           since,
           until: due.weekStart,
           zone: account.zone,
-          sites,
+          sites: r.sites,
           unsubscribeUrl: links.page,
         }),
       headers: () => unsubscribeHeaders({ url: links.oneClick }),

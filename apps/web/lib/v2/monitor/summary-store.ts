@@ -82,10 +82,9 @@ export function supabaseSummaryStore(
     async recipients(accountId) {
       const { data, error } = await sb.rpc('summary_recipients', { p_account: accountId });
       if (error) throw fail('summary_recipients', error);
-      return ((data ?? []) as { seat_id: string; email: string }[]).map((r) => ({
-        seatId: r.seat_id,
-        email: r.email,
-      }));
+      return ((data ?? []) as { seat_id: string; email: string; sites: string[] | null }[]).map(
+        (r) => ({ seatId: r.seat_id, email: r.email, sites: r.sites }),
+      );
     },
   };
 }

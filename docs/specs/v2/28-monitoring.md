@@ -94,6 +94,11 @@ before it changes anything. Both take the same signed token (`lib/v2/mail/links.
 kind and lasts 90 days. The POST route accepts a cross-site request (a mail client sends it), with the
 webhook policy class. Account mail carries neither.
 
+Alert and summary recipients honour a seat's client scope as `is_member_for_site` reads it (`client_scope_all`, or
+a `seat_sites` row for the site or the production site it stages): `alert_email_recipients(account, site)` answers
+only the seats that may read the site, and `summary_recipients` names each seat's sites, so a scoped seat's summary
+lists only those and a seat none of whose sites changed gets none.
+
 Slack is posted with `fetch` after the engine's `validateUrlOrThrow`, only to a `https://hooks.slack.com/services/…`
 URL, with no redirect followed and a timeout: the engine's `safeFetch` makes GET requests only. The message is
 plain text with Slack's `& < >` escapes and link previews off. `alert_events.destination_hash` is an HMAC under the

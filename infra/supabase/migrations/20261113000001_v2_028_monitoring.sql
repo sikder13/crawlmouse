@@ -620,9 +620,12 @@ as $$
      and public.account_effective_tier(p_account, p_now) in ('pro', 'agency');
 $$;
 
--- Who receives an account's alert email: each active seat with a user whose alert_channels hold
--- email, while the account's change notes are on and it is not deleted or marked for deletion.
-create or replace function public.alert_email_recipients(p_account uuid)
+-- Who receives an account's alert email about one of its sites: each active seat with a user whose
+-- alert_channels hold email and that may read the site, as is_member_for_site reads a seat's scope
+-- (client_scope_all, or a seat_sites row for the site or for the production site it stages), while
+-- the account's change notes are on and it is not deleted or marked for deletion. Nobody for a site
+-- that is not the account's.
+create or replace function public.alert_email_recipients(p_account uuid, p_site uuid)
 returns table (seat_id uuid, email text)
 language sql
 stable
@@ -633,20 +636,34 @@ as $$
     from public.seats st
     join public.users u on u.id = st.user_id
     join public.accounts a on a.id = st.account_id
+    join public.sites x on x.id = p_site and x.account_id = st.account_id
    where st.account_id = p_account and st.status = 'active' and 'email' = any (st.alert_channels)
      and a.email_change_notes and a.deleted_at is null and a.deletion_confirmed_at is null
+     and (st.client_scope_all
+          or exists (select 1 from public.seat_sites ss
+                      where ss.seat_id = st.id and ss.site_id in (x.id, x.staging_of_site_id)))
    order by st.created_at, st.id;
 $$;
 
--- Who receives an account's weekly summary: each active seat with a user and the summary on.
+-- Who receives an account's weekly summary: each active seat with a user and the summary on, with
+-- the sites it may read: null for a seat with client_scope_all (every site), else the account's sites
+-- its seat_sites rows cover, a staging site through the site it stages (is_member_for_site's rule).
 create or replace function public.summary_recipients(p_account uuid)
-returns table (seat_id uuid, email text)
+returns table (seat_id uuid, email text, sites uuid[])
 language sql
 stable
 security definer
 set search_path = pg_catalog, pg_temp
 as $$
-  select st.id, u.email
+  select st.id, u.email,
+         case when st.client_scope_all then null
+              else array(select x.id from public.sites x
+                          where x.account_id = st.account_id
+                            and exists (select 1 from public.seat_sites ss
+                                         where ss.seat_id = st.id
+                                           and ss.site_id in (x.id, x.staging_of_site_id))
+                          order by x.id)
+         end
     from public.seats st
     join public.users u on u.id = st.user_id
     join public.accounts a on a.id = st.account_id
@@ -829,7 +846,7 @@ revoke all on function public.claim_slack_send(text, uuid, timestamptz) from pub
 revoke all on function public.seed_default_alert_rules(uuid) from public, anon, authenticated;
 revoke all on function public.finish_slack_send(text, text, text, timestamptz) from public, anon, authenticated;
 revoke all on function public.account_slack_webhook_url(uuid, timestamptz) from public, anon, authenticated;
-revoke all on function public.alert_email_recipients(uuid) from public, anon, authenticated;
+revoke all on function public.alert_email_recipients(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.summary_recipients(uuid) from public, anon, authenticated;
 revoke all on function public.record_alert_delivery(jsonb) from public, anon, authenticated;
 revoke all on function public.due_summary_accounts(timestamptz) from public, anon, authenticated;
@@ -838,7 +855,7 @@ grant execute on function public.claim_slack_send(text, uuid, timestamptz) to se
 grant execute on function public.seed_default_alert_rules(uuid) to service_role;
 grant execute on function public.finish_slack_send(text, text, text, timestamptz) to service_role;
 grant execute on function public.account_slack_webhook_url(uuid, timestamptz) to service_role;
-grant execute on function public.alert_email_recipients(uuid) to service_role;
+grant execute on function public.alert_email_recipients(uuid, uuid) to service_role;
 grant execute on function public.summary_recipients(uuid) to service_role;
 grant execute on function public.record_alert_delivery(jsonb) to service_role;
 grant execute on function public.due_summary_accounts(timestamptz) to service_role;

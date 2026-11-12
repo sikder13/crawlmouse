@@ -4,12 +4,20 @@ import { MailRetry } from '../mail/send';
 import type { MailTransport } from '../mail/transport';
 import type { OutgoingMail } from '../mail/types';
 import type { SummaryChange, SummarySite } from '../mail/templates/weekly-summary';
-import { duePage, sendSummary, weekBefore, type SummaryDeps, type SummaryDue } from './summary';
+import {
+  duePage,
+  sendSummary,
+  weekBefore,
+  type SummaryDeps,
+  type SummaryDue,
+  type SummaryRecipient,
+} from './summary';
 
 const ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
 const SITE = '50000000-0000-4000-8000-000000000001';
 const SEAT_1 = 'e0000000-0000-4000-8000-000000000001';
 const SEAT_2 = 'e0000000-0000-4000-8000-000000000002';
+const SEAT_3 = 'e0000000-0000-4000-8000-000000000003';
 const NOW = new Date('2026-11-16T13:30:00.000Z');
 const DUE: SummaryDue = {
   accountId: ACCOUNT,
@@ -38,6 +46,7 @@ function harness(
     refuse?: Readonly<Record<string, { code: string; retryable: boolean }>>;
     /** How many of the first counts throw. */
     captureFailures?: number;
+    recipients?: SummaryRecipient[];
   } = {},
 ) {
   const sent: OutgoingMail[] = [];
@@ -64,10 +73,11 @@ function harness(
         asked.push([since, until]);
         return o.sites ?? [{ siteId: SITE, host: 'shop.example', changes: [change] }];
       },
-      recipients: async () => [
-        { seatId: SEAT_1, email: 'one@agency.example' },
-        { seatId: SEAT_2, email: 'two@agency.example' },
-      ],
+      recipients: async () =>
+        o.recipients ?? [
+          { seatId: SEAT_1, email: 'one@agency.example', sites: null },
+          { seatId: SEAT_2, email: 'two@agency.example', sites: null },
+        ],
     },
     mail: {
       ledger,
@@ -170,6 +180,34 @@ describe('sendSummary (D6)', () => {
     expect(await sendSummary(h.deps, DUE)).toEqual({ sent: 0, outcomes: ['done', 'done'] });
     expect(h.sent).toHaveLength(2);
     expect(h.captures).toEqual([{ accountId: ACCOUNT, properties: { sites: 1, changes: 1 } }]);
+  });
+
+  it('lists to a scoped seat only the sites it may read, and mails nothing to one whose sites did not change (review r1, security S1)', async () => {
+    const OTHER = '50000000-0000-4000-8000-000000000002';
+    const QUIET = '50000000-0000-4000-8000-000000000003';
+    const h = harness({
+      sites: [
+        { siteId: SITE, host: 'shop.example', changes: [change] },
+        { siteId: OTHER, host: 'client-b.example', changes: [change] },
+        { siteId: QUIET, host: 'quiet.example', changes: [] },
+      ],
+      recipients: [
+        { seatId: SEAT_1, email: 'one@agency.example', sites: null },
+        { seatId: SEAT_2, email: 'two@agency.example', sites: [OTHER] },
+        { seatId: SEAT_3, email: 'three@agency.example', sites: [QUIET] },
+      ],
+    });
+    expect(await sendSummary(h.deps, DUE)).toEqual({ sent: 2, outcomes: ['sent', 'sent'] });
+    const to = (a: string) => h.sent.find((m) => m.to === a)!;
+    expect(to('one@agency.example').html).toContain('shop.example');
+    expect(to('one@agency.example').html).toContain('client-b.example');
+    expect(to('two@agency.example').html).toContain('client-b.example');
+    expect(to('two@agency.example').html).not.toContain('shop.example');
+    expect(to('two@agency.example').text).not.toContain('shop.example');
+    expect(to('two@agency.example').subject).toBe(
+      'Your week on Crawlmouse: 1 change on 1 site, 1 problem',
+    );
+    expect(h.sent.map((m) => m.to)).not.toContain('three@agency.example');
   });
 
   it('is never sent empty', async () => {

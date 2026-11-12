@@ -172,11 +172,15 @@ function harness(
         reads.push('data');
         return o.data ?? data();
       },
-      emailRecipients: async () =>
-        o.recipients ?? [
-          { seatId: SEAT_1, email: ADDRESSES[0]! },
-          { seatId: SEAT_2, email: ADDRESSES[1]! },
-        ],
+      emailRecipients: async (accountId, siteId) => {
+        reads.push(`recipients:${accountId}:${siteId}`);
+        return (
+          o.recipients ?? [
+            { seatId: SEAT_1, email: ADDRESSES[0]! },
+            { seatId: SEAT_2, email: ADDRESSES[1]! },
+          ]
+        );
+      },
       slackUrl: async () => (o.slackUrl === undefined ? HOOK : o.slackUrl),
       claimSlack: async (...args) => {
         ledgerCalls.push(['claimSlack', ...args]);
@@ -283,6 +287,12 @@ describe('email (D5, D7)', () => {
     ]);
     expect(h.sent[0]!.headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
     expect(h.sent[0]!.subject).toBe('shop.example: 2 changes, 1 problem');
+  });
+
+  it('asks for the seats whose client scope covers this site (review r1, security S1)', async () => {
+    const h = harness();
+    await deliverAlert(h.deps, CHECK, 'email');
+    expect(h.reads).toContain(`recipients:${ACCOUNT}:${SITE}`);
   });
 
   it('records the email channel once, with each email rule and its changes', async () => {
