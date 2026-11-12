@@ -168,7 +168,10 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
 - Slack turns a bare URL in message text into a link (a fix title naming a page on the member's site); we build no
   link and previews are off.
 - The weekly summary reads at most 5,000 changes per account-week, a page at a time past PostgREST's 1,000-row
-  cap; past 5,000 it logs `summary.read_capped` and its counts are of the rows read.
+  cap; past 5,000 it logs `summary.read_capped` and its counts are of the rows read. The rows kept are those of
+  the sites read first, in site-id order, each oldest first: a site read later can be left out entirely.
+- A Free account's weekly schedule is timed monthly when it is saved (Q4). An upgrade that writes no site row
+  leaves that monthly time in place, so the first paid check waits for it; the claim moves the site weekly after.
 - The alert and summary recipients are each read in one call, so PostgREST's 1,000-row cap bounds an account's
   recipient seats to 1,000 per message.
 - `check_finished` replayed after Inngest's 24-hour idempotency window is counted again.
