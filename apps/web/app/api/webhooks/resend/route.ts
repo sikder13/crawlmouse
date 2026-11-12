@@ -35,18 +35,16 @@ export async function POST(req: Request) {
     return new Response('ignored', { status: 202 });
   }
 
-  const { error } = await supabaseAdmin()
-    .from('email_events')
-    .upsert(
-      {
-        resend_event_id: headers['svix-id'],
-        email_address: e.email,
-        event_type: e.eventType,
-        bounce_type: e.bounceType,
-        payload,
-      },
-      { onConflict: 'resend_event_id', ignoreDuplicates: true },
-    );
+  const { error } = await supabaseAdmin().from('email_events').upsert(
+    {
+      resend_event_id: headers['svix-id'],
+      email_address: e.email,
+      event_type: e.eventType,
+      bounce_type: e.bounceType,
+      payload,
+    },
+    { onConflict: 'resend_event_id', ignoreDuplicates: true },
+  );
   if (error) {
     console.error('[resend-webhook] email_events upsert failed:', error.message);
     return new Response('db error', { status: 500 });
