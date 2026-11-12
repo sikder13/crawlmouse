@@ -4,6 +4,7 @@ import { DevelopersScreen } from '@/components/v2/screens/developers/DevelopersS
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { developersView } from '@/lib/v2/view/developers';
+import { socialCardPath } from '@/lib/v2/social-card';
 import { socialMetadata } from '@/lib/v2/social-metadata';
 import '@/styles/v2/tokens.css';
 
@@ -18,7 +19,12 @@ export const metadata: Metadata = {
   title: view.title,
   description: view.description,
   alternates: { canonical: '/developers' },
-  ...socialMetadata({ path: '/developers', title: view.title, description: view.description }),
+  ...socialMetadata({
+    path: '/developers',
+    title: view.title,
+    description: view.description,
+    image: socialCardPath('developers'),
+  }),
 };
 
 /**

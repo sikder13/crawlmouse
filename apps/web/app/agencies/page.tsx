@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { AgenciesScreen } from '@/components/v2/screens/agencies/AgenciesScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
+import { socialCardPath } from '@/lib/v2/social-card';
 import { socialMetadata } from '@/lib/v2/social-metadata';
 import { agenciesView } from '@/lib/v2/view/agencies';
 import '@/styles/v2/tokens.css';
@@ -14,7 +15,12 @@ export const metadata: Metadata = {
   title: view.title,
   description: view.description,
   alternates: { canonical: '/agencies' },
-  ...socialMetadata({ path: '/agencies', title: view.title, description: view.description }),
+  ...socialMetadata({
+    path: '/agencies',
+    title: view.title,
+    description: view.description,
+    image: socialCardPath('agencies'),
+  }),
 };
 
 /**

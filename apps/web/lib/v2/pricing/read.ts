@@ -42,7 +42,10 @@ function failed(what: string, error: { message: string }): never {
   throw new Error(`agency accounts: ${what} failed: ${error.message}`);
 }
 
-/** The agency accounts the person holds an active seat on, each with its oldest live site. */
+/**
+ * The agency accounts the person holds an active seat on, each with its oldest live site and, when
+ * its subscription is set to cancel, when that takes effect.
+ */
 export async function readAgencyAccounts(
   session: SupabaseClient,
   userId: string,
@@ -92,6 +95,33 @@ export async function readAgencyAccounts(
     if (!firstSite.has(s.account_id)) firstSite.set(s.account_id, s.host);
   }
 
+  // The subscription mirror, as Settings reads it (loadSettingsDataset): a subscription set to
+  // cancel at its period's end ends then. Member-readable, so the person's own client reads it.
+  const followed = rows.flatMap((r) =>
+    r.current_subscription_id === null ? [] : [r.current_subscription_id],
+  );
+  const ending = new Map<string, Date>();
+  if (followed.length > 0) {
+    const subs = await session
+      .from('subscriptions')
+      .select('id, current_period_end, cancel_at_period_end')
+      .in('id', followed);
+    if (subs.error) failed('subscriptions read', subs.error);
+    for (const s of z
+      .array(
+        z.object({
+          id: z.string(),
+          current_period_end: date,
+          cancel_at_period_end: z.boolean(),
+        }),
+      )
+      .parse(subs.data)) {
+      if (s.cancel_at_period_end && s.current_period_end !== null) {
+        ending.set(s.id, s.current_period_end);
+      }
+    }
+  }
+
   return rows.map((r) => ({
     id: r.id,
     role: roles.get(r.id)!,
@@ -104,6 +134,8 @@ export async function readAgencyAccounts(
     trialEndsAt: r.trial_ends_at,
     trialUsedAt: r.trial_used_at,
     subscriptionId: r.current_subscription_id,
+    billingEnd:
+      r.current_subscription_id === null ? null : (ending.get(r.current_subscription_id) ?? null),
     firstSite: firstSite.get(r.id) ?? null,
   }));
 }

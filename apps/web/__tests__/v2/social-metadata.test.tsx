@@ -10,6 +10,8 @@ import type { Metadata } from 'next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PublicReportRow } from '@/lib/reports';
 import { CHECK_COPY, CHECK_QUESTIONS } from '../../lib/v2/copy/check-pages';
+import { PRICING_COPY } from '../../lib/v2/copy/pricing';
+import { SOCIAL_CARDS, socialCardPath } from '../../lib/v2/social-card';
 import { fixture } from '../../lib/v2/fixtures';
 import { buildPublicSnapshot } from '../../lib/v2/reports/build-snapshot';
 import { agenciesView } from '../../lib/v2/view/agencies';
@@ -18,6 +20,7 @@ import { FIRST_AUDIT } from '../../lib/v2/view/segment/test-helpers';
 
 const store = vi.hoisted(() => ({ row: null as unknown }));
 vi.mock('@/lib/reports', () => ({ getPublicReport: async () => store.row }));
+vi.mock('server-only', () => ({}));
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -26,8 +29,11 @@ afterEach(() => {
 
 const SUFFIX = ' · Crawlmouse';
 
-/** The page's own words, as each social object carries them. */
-function expectOwn(meta: Metadata, own: { url: string; title: string; description: string }) {
+/** The page's own words, as each social object carries them, and its card when it names one. */
+function expectOwn(
+  meta: Metadata,
+  own: { url: string; title: string; description: string; card?: string },
+) {
   const og = meta.openGraph as Record<string, unknown> | undefined;
   const tw = meta.twitter as Record<string, unknown> | undefined;
   expect(og?.url).toBe(own.url);
@@ -41,13 +47,39 @@ function expectOwn(meta: Metadata, own: { url: string; title: string; descriptio
   expect(tw?.description).toBe(own.description);
   // The canonical and the shared url are the same address.
   expect(meta.alternates?.canonical).toBe(own.url);
+  // SEO R2-N6: a v2 page's own card, not the root's v1 card, and not an address under a rewrite
+  // target, which answers 404 by its own address.
+  if (own.card !== undefined) {
+    const images = og?.images as { url: string }[];
+    expect(images).toEqual([{ url: socialCardPath(own.card) }]);
+    expect(images[0]!.url).not.toMatch(/^\/(?:opengraph-image|v2-)/);
+    expect(SOCIAL_CARDS[own.card]!.path).toBe(own.url);
+    // The card draws the page's title, without the site name the template adds.
+    expect(own.title).toBe(SOCIAL_CARDS[own.card]!.title + SUFFIX);
+  }
 }
 
 describe('social metadata of the CC-29 public pages', () => {
   it('/agencies', async () => {
     const { metadata } = await import('../../app/agencies/page');
     const v = agenciesView();
-    expectOwn(metadata, { url: '/agencies', title: v.title + SUFFIX, description: v.description });
+    expectOwn(metadata, {
+      url: '/agencies',
+      title: v.title + SUFFIX,
+      description: v.description,
+      card: 'agencies',
+    });
+  });
+
+  it('/pricing (v2)', async () => {
+    const { metadata } = await import('../../app/v2-pricing/page');
+    expect(metadata.title).toBe('Pricing');
+    expectOwn(metadata, {
+      url: '/pricing',
+      title: 'Pricing' + SUFFIX,
+      description: PRICING_COPY.description(),
+      card: 'pricing',
+    });
   });
 
   it('/developers (v2)', async () => {
@@ -57,6 +89,7 @@ describe('social metadata of the CC-29 public pages', () => {
       url: '/developers',
       title: v.title + SUFFIX,
       description: v.description,
+      card: 'developers',
     });
   });
 
@@ -68,6 +101,7 @@ describe('social metadata of the CC-29 public pages', () => {
       url: `/check/${question}`,
       title: copy.title + SUFFIX,
       description: copy.description,
+      card: `check-${question}`,
     });
   });
 
@@ -103,5 +137,19 @@ describe('social metadata of the CC-29 public pages', () => {
       { url: '/r/abc123/opengraph-image' },
     ]);
     expect(JSON.stringify(meta)).not.toMatch(/internal.linking/i);
+  });
+});
+
+// SEO R2-N6: with the flags off, `/pricing` and `/developers` are v1's pages, whose metadata the v2
+// cards leave as it was: no social object of their own, so the root's card.
+describe('v1 Pricing and Developers keep their metadata', () => {
+  it.each([
+    ['/pricing', () => import('../../app/pricing/page')],
+    ['/developers', () => import('../../app/developers/page')],
+  ] as const)('%s', async (_path, load) => {
+    const { metadata } = (await load()) as { metadata: Metadata };
+    expect(metadata.openGraph).toBeUndefined();
+    expect(metadata.twitter).toBeUndefined();
+    expect(JSON.stringify(metadata)).not.toMatch(/\/og\//);
   });
 });

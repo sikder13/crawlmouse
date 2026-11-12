@@ -276,14 +276,15 @@ nothing; a press outside it, or focus moving to an element outside it, closes it
 
 The page frame: canvas colours, the header with the brand, and the footer.
 
-| Prop       | Type                                | Required | Note                                                                                                                                                   |
-| ---------- | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `header`   | `"marketing" \| "app" \| undefined` | no       | `marketing`: 72px header, no rule. `app`: 64px header with a hairline under it.                                                                        |
-| `nav`      | `NavEntry[] \| undefined`           | no       | Links, and groups that open as a menu (NavMenu). The marketing header's entries are MARKETING_NAV in footer-links.ts; a planned entry renders as text. |
-| `actions`  | `ReactNode`                         | no       | Buttons at the right of the header.                                                                                                                    |
-| `footer`   | `boolean \| undefined`              | no       |                                                                                                                                                        |
-| `status`   | `ServiceStatus \| undefined`        | no       | What the footer's Status link shows (SiteFooter); the shell fetches nothing.                                                                           |
-| `children` | `ReactNode`                         | yes      |                                                                                                                                                        |
+| Prop             | Type                                | Required | Note                                                                                                                                                   |
+| ---------------- | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `header`         | `"marketing" \| "app" \| undefined` | no       | `marketing`: 72px header, no rule. `app`: 64px header with a hairline under it.                                                                        |
+| `nav`            | `NavEntry[] \| undefined`           | no       | Links, and groups that open as a menu (NavMenu). The marketing header's entries are MARKETING_NAV in footer-links.ts; a planned entry renders as text. |
+| `actions`        | `ReactNode`                         | no       | Buttons at the right of the header.                                                                                                                    |
+| `footer`         | `boolean \| undefined`              | no       |                                                                                                                                                        |
+| `status`         | `ServiceStatus \| undefined`        | no       | What the footer's Status link shows (SiteFooter); the shell fetches nothing.                                                                           |
+| `footerLineMark` | `ReactNode`                         | no       | Shown after the footer's line (SiteFooter `lineMark`).                                                                                                 |
+| `children`       | `ReactNode`                         | yes      |                                                                                                                                                        |
 
 ### Select
 
@@ -303,9 +304,10 @@ A labelled native select: the browser gives it its keyboard, its list and its fo
 
 The site footer: the brand block, and the four columns of links from footer-links.ts.
 
-| Prop     | Type                         | Required | Note                                                                                                                                     |
-| -------- | ---------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `status` | `ServiceStatus \| undefined` | no       | What the Status link shows. The page passes it in; the footer fetches nothing. Absent, or a value outside the three, the shape is muted. |
+| Prop       | Type                         | Required | Note                                                                                                                                     |
+| ---------- | ---------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`   | `ServiceStatus \| undefined` | no       | What the Status link shows. The page passes it in; the footer fetches nothing. Absent, or a value outside the three, the shape is muted. |
+| `lineMark` | `ReactNode`                  | no       | Shown after the footer's line: a page's "coming" mark for what the line names.                                                           |
 
 ### StatusPill
 

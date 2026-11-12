@@ -6,7 +6,8 @@
  * Read with the service role, for the caller's own id only: a deleted account is not
  * member-readable (`is_member` leaves it out), so the caller's own client cannot see it.
  * `__tests__/v2-029-public-pages.test.ts` holds this read to the function over a sweep of seats and
- * accounts.
+ * accounts, and, for a person holding two used agency accounts (the function refuses a third trial,
+ * not a second used account), to naming the live one before a deleted one.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';

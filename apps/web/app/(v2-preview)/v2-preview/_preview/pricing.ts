@@ -51,6 +51,7 @@ const agencyRow = (over: Partial<AgencyAccountRow>): AgencyAccountRow => ({
   trialEndsAt: null,
   trialUsedAt: null,
   subscriptionId: null,
+  billingEnd: null,
   firstSite: 'example-outfitter.com',
   ...over,
 });

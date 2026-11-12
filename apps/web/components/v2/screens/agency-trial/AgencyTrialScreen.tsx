@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import { AGENCY_TRIAL_COPY as COPY } from '@/lib/v2/copy/agency-trial';
 import type { AgencyTrialView, ManageView, PageForm } from '@/lib/v2/view/agency-trial';
 import { Button } from '../../Button';
-import { Capability } from '../agencies/Capability';
+import { Capability, ComingMark } from '../agencies/Capability';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
@@ -64,7 +64,10 @@ export function AgencyTrialScreen({
   form?: TrialFormState;
 }) {
   return (
-    <PageShell nav={MARKETING_NAV}>
+    <PageShell
+      nav={MARKETING_NAV}
+      footerLineMark={view.footerComing ? <ComingMark label={view.footerComing} /> : null}
+    >
       <main className={`${layout.wrap} ${styles.main}`}>
         {view.kind === 'form' ? (
           <div className={styles.grid}>

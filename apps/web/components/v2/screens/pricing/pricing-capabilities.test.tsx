@@ -3,10 +3,12 @@
  * on the rendered page is tagged with For agencies' `CAPABILITIES`, every coming one carries the
  * "coming" mark, and the meta description, which a search result shows with no mark, names none.
  */
+import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { FREE_START } from '../../../../lib/billing/state-machine';
 import { PRICING_COPY } from '../../../../lib/v2/copy/pricing';
+import { CAPABILITIES } from '../../../../lib/v2/view/agencies';
 import { pricingView, type PricingViewer } from '../../../../lib/v2/view/pricing';
 import { capabilitySweep, comingNamedIn } from '../../../../__tests__/helpers/capability-sweep';
 import { PricingScreen } from './PricingScreen';
@@ -56,9 +58,31 @@ describe('Pricing names only capabilities it can account for', () => {
     expect(r.loose).toEqual([]);
   });
 
-  it('the meta description and the h1 name no coming capability', () => {
+  it('the meta description names no coming capability', () => {
     expect(comingNamedIn(PRICING_COPY.description())).toEqual([]);
-    expect(comingNamedIn(PRICING_COPY.title)).toEqual([]);
+  });
+
+  // SEO R2-N2 (Q33): the artboard's h1 promises monitoring, and the footer's line on every page that
+  // the change is told; each carries what it names and is marked while that is coming.
+  it('the h1 and the footer line carry the monitoring they name, marked while it is coming', () => {
+    expect(PRICING_COPY.title.text).toBe('Every audit is free. Pay when you want it watched.');
+    expect(comingNamedIn(PRICING_COPY.title.text)).toContain('weekly_checks');
+    for (const [, html] of pages) {
+      const doc = new JSDOM(html).window.document;
+      const h1 = doc.querySelector('h1')!;
+      expect(h1.querySelector('[data-capability~="weekly_checks"]')).not.toBeNull();
+      expect(h1.querySelector('[data-v2-coming]') !== null).toBe(
+        CAPABILITIES.weekly_checks.status === 'coming',
+      );
+      const line = [...doc.querySelectorAll('footer p')].find((p) =>
+        p.textContent!.includes('tells you when that changes'),
+      )!;
+      expect(line.getAttribute('data-capability')).toBe('weekly_checks change_emails');
+      expect(line.querySelector('[data-v2-coming]') !== null).toBe(
+        CAPABILITIES.weekly_checks.status === 'coming' ||
+          CAPABILITIES.change_emails.status === 'coming',
+      );
+    }
   });
 
   it('the Agency Plus answer says only that the request is recorded', () => {
@@ -68,7 +92,7 @@ describe('Pricing names only capabilities it can account for', () => {
   });
 
   it('the emails question names the renewal reminders, as FACTS does', () => {
-    const emails = PRICING_COPY.faq.items().find((i) => i.q === 'Which emails will I get?')!;
+    const emails = PRICING_COPY.faq.items(true).find((i) => i.q === 'Which emails will I get?')!;
     expect(emails.a.text).toMatch(/Three kinds and no others/);
     expect(emails.a.text).toMatch(/renewal reminders 45 and 20 days before/);
   });

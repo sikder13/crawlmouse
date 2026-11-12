@@ -145,6 +145,14 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     jsonBody: true,
   },
   {
+    route: 'og/[card]',
+    methods: ['GET'],
+    class: 'public',
+    reason:
+      'a v2 public page’s social card: a fixed title per card key, nothing read from a session',
+    origin: 'any',
+  },
+  {
     route: 'api/checks/[id]/cancel',
     methods: ['POST'],
     class: 'public',

@@ -3,6 +3,7 @@
  * review 2, Q27): each capability phrase is tagged with For agencies' `CAPABILITIES`, each coming one
  * carries the "coming" mark, and nothing says Branding can be set today.
  */
+import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { capabilitySweep } from '../../../../__tests__/helpers/capability-sweep';
@@ -22,6 +23,7 @@ const row: AgencyAccountRow = {
   trialEndsAt: null,
   trialUsedAt: null,
   subscriptionId: null,
+  billingEnd: null,
   firstSite: 'clientsite.com',
 };
 
@@ -57,6 +59,25 @@ describe('the Agency trial page names only capabilities it can account for', () 
     expect(r.unmarked).toEqual([]);
     expect(r.overMarked).toEqual([]);
     expect(r.loose).toEqual([]);
+  });
+
+  // SEO R2-N5: where the card is taken, a row marked coming does not say "yes" beside it.
+  it('the aside gives a coming row the value "coming", never "yes"', () => {
+    for (const [, html] of pages) {
+      const rows = [
+        ...new JSDOM(html).window.document.querySelectorAll<HTMLTableRowElement>(
+          'table[aria-label="What Agency includes"] tr',
+        ),
+      ];
+      expect(rows.length).toBeGreaterThan(5);
+      const values = rows.map((tr) => [
+        tr.cells[0]!.querySelector('[data-v2-coming]') !== null,
+        tr.cells[1]!.textContent,
+      ]);
+      expect(values.filter(([coming, value]) => coming && value === 'yes')).toEqual([]);
+      expect(values.filter(([coming, value]) => !coming && value === 'coming')).toEqual([]);
+      expect(values.some(([, value]) => value === 'coming')).toBe(true);
+    }
   });
 
   it('does not say a domain and logo can be set under Branding', () => {

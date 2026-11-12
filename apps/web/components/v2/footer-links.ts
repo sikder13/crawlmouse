@@ -55,6 +55,7 @@ export const SUPPORT_EMAIL = 'support@crawlmouse.com';
 
 /** The footer's own words. */
 export const FOOTER_COPY = {
+  /** It names capabilities: lib/v2/copy/footer-line.ts (SEO R2-N2). */
   line: 'Crawlmouse fetches your site as each AI crawler and tells you when that changes.',
   company: 'Nahl Technologies Inc. · Indianapolis',
 } as const;

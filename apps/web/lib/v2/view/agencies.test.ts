@@ -37,13 +37,26 @@ function sources(dir: string): string[] {
   });
 }
 
-/** Whether a proof is true of the tree as it is. */
-function holds(proof: Proof): boolean {
+/** Whether a path is in the tree: on disk, unless `paths` gives the tree as a list of file paths. */
+function present(path: string, paths?: ReadonlySet<string>): boolean {
+  if (paths === undefined) return existsSync(join(REPO, path));
+  if (paths.has(path)) return true;
+  for (const p of paths) if (p.startsWith(`${path}/`)) return true;
+  return false;
+}
+
+/**
+ * Whether a proof is true of the tree as it is, or, with `paths`, of a tree whose file paths are
+ * those: the path proofs read the list, the text proofs read the files on disk.
+ */
+function holds(proof: Proof, paths?: ReadonlySet<string>): boolean {
   switch (proof.kind) {
     case 'exists':
-      return existsSync(join(REPO, proof.path));
+      return present(proof.path, paths);
     case 'absent':
-      return !existsSync(join(REPO, proof.path));
+      return !present(proof.path, paths);
+    case 'all':
+      return proof.of.every((p) => holds(p, paths));
     case 'holds':
       return readFileSync(join(REPO, proof.path), 'utf8').includes(proof.text);
     case 'nowhere': {
@@ -81,6 +94,14 @@ describe('the capability table', () => {
 
   // The proof readers themselves, on each side.
   it('tells a present path from an absent one, and text present from text absent', () => {
+    const one: Proof = { kind: 'absent', path: 'apps/web/app/agency' };
+    const other: Proof = { kind: 'absent', path: 'apps/web/app/api/checks/route.ts' };
+    expect(holds({ kind: 'all', of: [one, one] })).toBe(true);
+    expect(holds({ kind: 'all', of: [one, other] })).toBe(false);
+    expect(holds({ kind: 'all', of: [other, one] })).toBe(false);
+    const listed = new Set(['apps/web/app/agency/page.tsx']);
+    expect(holds(one, listed)).toBe(false);
+    expect(holds({ kind: 'absent', path: 'apps/web/app/agenc' }, listed)).toBe(true);
     expect(holds({ kind: 'exists', path: 'apps/web/app/api/checks/route.ts' })).toBe(true);
     expect(holds({ kind: 'exists', path: 'apps/web/app/agency' })).toBe(false);
     expect(holds({ kind: 'absent', path: 'apps/web/app/api/checks/route.ts' })).toBe(false);
@@ -108,6 +129,8 @@ const PARAPHRASES: Partial<Record<CapabilityKey, readonly string[]>> = {
     'checking again',
     'checked again',
     'Keeps monthly checks',
+    'Pay when you want it watched',
+    'developers watching up to 5 sites',
   ],
   change_emails: [
     'an email only if something changed',
@@ -116,6 +139,7 @@ const PARAPHRASES: Partial<Record<CapabilityKey, readonly string[]>> = {
     'a note when a re-check finds a change',
     'telling you what changed',
     'you hear first',
+    'Crawlmouse fetches your site as each AI crawler and tells you when that changes.',
   ],
   slack_alerts: ['alerts by email and Slack', 'Slack alerts'],
   exports: ['PDF, CSV and JSON', 'PDF/CSV/JSON export', 'export', 'Exports'],
@@ -151,6 +175,10 @@ const PARAPHRASES: Partial<Record<CapabilityKey, readonly string[]>> = {
     'Weekly or monthly client reports, sent for you',
     'client reports',
     'shown on client reports',
+  ],
+  evidence_condensed: [
+    'Evidence older than 90 days is condensed to headers and the parts of pages that changed.',
+    'evidence older than 30 days',
   ],
   agency_workspace: [
     'its first audit runs from the agency workspace',
@@ -357,5 +385,81 @@ describe('the figures follow GATES and prices.ts, not the values typed today', (
         (numberWord(n) !== String(n) && new RegExp(`\\b${numberWord(n)}\\b`, 'i').test(text)),
     );
     expect(left).toEqual([]);
+  });
+});
+
+// SEO R2-N3, the merge trap: each coming row's proof names the file its own step adds, so merging
+// CC-28 flips the rows CC-28 builds and no others. The proofs are run against the tree after that
+// merge as far as paths go: this tree's files plus those CC-28's branch adds, less those it deletes,
+// frozen in __tests__/__fixtures__/cc-28-paths.txt with the command that read them. Text proofs read
+// this tree; on CC-28's tree the ones that change answer are weekly_checks' and slack_alerts' text,
+// each beside a path proof that already flips its row, measured with
+//   git grep -lE '<the proof's pattern>' origin/build/cc-28-monitoring -- apps/web/lib apps/web/app inngest packages/worker/src
+describe('the capability table after CC-28 is merged', () => {
+  const fixture = readFileSync(
+    join(__dirname, '../../../__tests__/__fixtures__/cc-28-paths.txt'),
+    'utf8',
+  )
+    .split('\n')
+    .filter((l) => l !== '' && !l.startsWith('#'))
+    .map((l) => l.split('\t') as [string, string]);
+  const tracked = (dir: string): string[] =>
+    sources(join(REPO, dir)).map((f) => f.slice(REPO.length + 1));
+
+  /** This tree's paths, as far as the proofs look, with CC-28's additions and deletions applied. */
+  function merged(): Set<string> {
+    const paths = new Set<string>();
+    for (const c of Object.values(CAPABILITIES)) {
+      const walk = (p: Proof): void => {
+        if (p.kind === 'all') return p.of.forEach(walk);
+        if (p.kind === 'exists' || p.kind === 'absent') {
+          if (existsSync(join(REPO, p.path))) {
+            if (statSync(join(REPO, p.path)).isDirectory())
+              tracked(p.path).forEach((f) => paths.add(f));
+            else paths.add(p.path);
+          }
+        }
+      };
+      walk(c.proof);
+    }
+    for (const [status, path] of fixture) {
+      if (status === 'A') paths.add(path);
+      else paths.delete(path);
+    }
+    return paths;
+  }
+
+  it('reads the frozen list: CC-28’s mail templates and monitor files among its additions', () => {
+    expect(fixture.length).toBeGreaterThan(100);
+    expect(fixture.every(([status]) => status === 'A' || status === 'D')).toBe(true);
+    const added = fixture.map(([, p]) => p);
+    expect(added).toContain('apps/web/lib/v2/mail/templates/trial-reminder.ts');
+    expect(added).toContain('apps/web/lib/v2/monitor/schedule.ts');
+  });
+
+  it('flips exactly the trial reminder, the change email, scheduled checks and Slack', () => {
+    const tree = merged();
+    const flipped = ENTRIES.filter(([, c]) => c.status === 'coming' && !holds(c.proof, tree))
+      .map(([k]) => k)
+      .sort();
+    expect(flipped).toEqual(['change_emails', 'slack_alerts', 'trial_reminder', 'weekly_checks']);
+  });
+
+  it('keeps every built row built, and the renewal reminders and the Agency Plus reply coming', () => {
+    const tree = merged();
+    for (const [key, c] of ENTRIES.filter(([, c]) => c.status === 'built'))
+      expect(holds(c.proof, tree), key).toBe(true);
+    expect(holds(CAPABILITIES.renewal_reminders.proof, tree)).toBe(true);
+    expect(holds(CAPABILITIES.agency_plus_reply.proof, tree)).toBe(true);
+  });
+
+  // The two rows CC-28 does not build name template files of their own, not the folder CC-28 adds.
+  it('names, for each email CC-28 does not build, a template file of its own', () => {
+    for (const key of ['renewal_reminders', 'agency_plus_reply'] as const) {
+      const proof = CAPABILITIES[key].proof;
+      expect(proof.kind, key).toBe('absent');
+      if (proof.kind === 'absent')
+        expect(proof.path, key).toMatch(/^apps\/web\/lib\/v2\/mail\/templates\/[a-z-]+\.ts$/);
+    }
   });
 });

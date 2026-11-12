@@ -18,7 +18,7 @@ import { AgencyTrialScreen } from '../../components/v2/screens/agency-trial/Agen
 import { PricingScreen } from '../../components/v2/screens/pricing/PricingScreen';
 import * as authFlags from '../../lib/auth/flags';
 import * as billingFlags from '../../lib/billing/flags';
-import { FREE_START } from '../../lib/billing/state-machine';
+import { FREE_START, TRIAL_DAYS } from '../../lib/billing/state-machine';
 import { agencyStanding, agencyTrialView } from '../../lib/v2/view/agency-trial';
 import { pricingView, type PricingViewer } from '../../lib/v2/view/pricing';
 
@@ -118,6 +118,20 @@ const VIEWERS: [string, PricingViewer][] = [
       },
     },
   ],
+  [
+    'free, Pro trial used',
+    {
+      kind: 'signed_in',
+      account: {
+        id: ACCOUNT,
+        owner: true,
+        tier: 'free',
+        snapshot: { ...FREE_START, trialUsedAt: NOW },
+        customer: 'cus_1',
+      },
+      agency: { held: false, used: null },
+    },
+  ],
 ];
 
 function pages(env: Env): [string, string][] {
@@ -144,6 +158,7 @@ function pages(env: Env): [string, string][] {
     trialEndsAt: new Date('2026-11-20T00:00:00Z'),
     trialUsedAt: NOW,
     subscriptionId: 'sub_1',
+    billingEnd: null,
     firstSite: null,
   };
   const used = { accountId: AGENCY, trialUsedAt: NOW, deleted: false };
@@ -217,5 +232,67 @@ describe('the reader', () => {
       'checksPublicEnabled',
     ]);
     expect(resolve('/no-such-page')).toBeNull();
+  });
+});
+
+// SEO R2-N1: the Pro column's words follow its button. Where the button starts the no-card trial, or
+// signs in to a page that then offers it, the page says "no card"; where it takes a card (Checkout,
+// the portal, or a sign-in to a page with no trial route), nothing on the page says otherwise. The
+// way is read from the rendered button's target and the flags, not from the view.
+describe('the Pro column’s words follow its button, under each flag combination', () => {
+  const NO_CARD_TAG = `free for ${TRIAL_DAYS} days, no card`;
+  const NO_CARD_FAQ = `No. The ${TRIAL_DAYS} days start with your email.`;
+
+  /** The Pro card: the nearest ancestor of its heading that holds its button. */
+  function proCard(html: string): Element {
+    const doc = new JSDOM(html).window.document;
+    const h2 = [...doc.querySelectorAll('h2')].find((h) => h.textContent === 'Pro')!;
+    let el: Element | null = h2;
+    while (el && !el.querySelector('a[href], form[action]')) el = el.parentElement;
+    return el!;
+  }
+
+  const ways = new Set<string>();
+  it.each(ENVS)('%j', (env) => {
+    const flags = {
+      accountDoor: authFlags.accountDoorEnabled(env),
+      checksPublic: authFlags.checksPublicEnabled(env),
+    };
+    for (const [name, viewer] of VIEWERS) {
+      for (const interval of ['month', 'year'] as const) {
+        const html = renderToStaticMarkup(
+          <PricingScreen view={pricingView(viewer, interval, NOW, flags)} />,
+        );
+        const card = proCard(html);
+        const target = (
+          card.querySelector('form[action]')?.getAttribute('action') ??
+          card.querySelector('a[href]')!.getAttribute('href')!
+        ).split(/[?#]/)[0]!;
+        const trial =
+          target === '/signup' ||
+          target === '/api/billing/pro-trial/start' ||
+          (target === '/login' && flags.checksPublic);
+        ways.add(`${target}${target === '/login' ? ` checksPublic=${flags.checksPublic}` : ''}`);
+        const text = card.textContent ?? '';
+        const label = `${name}, ${interval}: ${target}`;
+        expect(text.includes(NO_CARD_TAG), label).toBe(trial);
+        expect(html.includes(NO_CARD_FAQ), label).toBe(trial);
+        expect(html.includes(`What happens when the ${TRIAL_DAYS} days end`), label).toBe(trial);
+        expect(/\bno card\b/i.test(text), label).toBe(trial);
+        if (!trial) expect(html, label).not.toMatch(/start with your email/);
+        else expect(text, label).not.toMatch(/card (?:is )?taken/);
+      }
+    }
+  });
+
+  it('reached every way the Pro button goes', () => {
+    expect([...ways].sort()).toEqual([
+      '/api/billing/checkout',
+      '/api/billing/portal',
+      '/api/billing/pro-trial/start',
+      '/login checksPublic=false',
+      '/login checksPublic=true',
+      '/signup',
+    ]);
   });
 });

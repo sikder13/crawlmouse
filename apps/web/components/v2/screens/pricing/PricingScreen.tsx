@@ -26,6 +26,7 @@ export function PricingScreen({ view, contact }: { view: PricingView; contact?: 
   return (
     <PageShell
       nav={MARKETING_NAV}
+      footerLineMark={view.footerComing ? <ComingMark label={view.footerComing} /> : null}
       actions={
         <Button variant="quiet" href={LOG_IN.href}>
           {LOG_IN.label}
@@ -35,7 +36,7 @@ export function PricingScreen({ view, contact }: { view: PricingView; contact?: 
       <main>
         <section className={`${layout.wrap} ${styles.hero}`}>
           <Heading level={1} size="xl" className={styles.title}>
-            {view.title}
+            <Capability item={view.title} comingLabel={view.comingLabel} />
           </Heading>
           <p className={styles.lead}>
             {view.lead.map((t, i) => (

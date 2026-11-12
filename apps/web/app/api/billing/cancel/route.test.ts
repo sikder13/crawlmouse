@@ -17,7 +17,8 @@ const h = vi.hoisted(() => {
     then: (resolve: (v: unknown) => unknown) => resolve({ data: state.seats, error: null }),
   };
   seatsChain.select = seatsChain.eq = () => seatsChain;
-  // The caller's owned accounts that are personal (ownedAccountId, for several owner seats).
+  // What ownedAccountId's accounts read answers, whatever filters it sends: the accounts this test
+  // calls personal. The read itself runs against the schema in app/api/account/email/route.test.ts.
   const accountsChain: Record<string, unknown> = {
     then: (resolve: (v: unknown) => unknown) => resolve({ data: state.personal, error: null }),
   };

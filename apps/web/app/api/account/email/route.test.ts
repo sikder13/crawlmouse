@@ -33,37 +33,14 @@ vi.mock('@/lib/supabase/server', () => ({
         error: null,
       }),
     },
-    // ownedAccountId's two reads, answered from the database: the caller's active owner seats,
-    // and which of the accounts it names (`in`) are personal.
+    // ownedAccountId's reads (lib/billing/owner.ts), sent as owner.ts builds them to the PostgREST
+    // stand-in over the migrated schema, as the signed-in caller: its own filters, row security and
+    // the column grants decide the answer, so a changed filter there changes what this route does.
     from: (table: string) => {
       h.log.push(`session.from ${table}`);
-      let ids: string[] = [];
-      const read = (): Promise<unknown[]> => {
-        if (!h.user) return Promise.resolve([]);
-        return table === 'seats'
-          ? h.db
-              .query(
-                `select account_id from public.seats
-                  where user_id = $1 and role = 'owner' and status = 'active'`,
-                [h.user.id],
-              )
-              .then((r) => r.rows)
-          : h.db
-              .query(`select id from public.accounts where id = any($1) and kind = 'personal'`, [
-                ids,
-              ])
-              .then((r) => r.rows);
-      };
-      const chain: Record<string, unknown> = {
-        then: (resolve: (v: unknown) => unknown) =>
-          read().then((rows) => resolve({ data: rows, error: null })),
-      };
-      chain.select = chain.eq = () => chain;
-      chain.in = (_: string, values: string[]) => {
-        ids = values;
-        return chain;
-      };
-      return chain;
+      return postgrestOver(h.db, {
+        as: { userId: h.user?.id ?? '00000000-0000-4000-8000-000000000000' },
+      }).from(table);
     },
     rpc: async (fn: string, args: unknown) => {
       h.log.push(`session.rpc ${fn}`);
