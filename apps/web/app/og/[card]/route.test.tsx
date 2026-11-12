@@ -57,7 +57,11 @@ describe('GET /og/<card>', () => {
     ALL_ON();
     const res = await get(card);
     expect(res.status).toBe(200);
-    expect(res.options).toEqual({ width: 1200, height: 630 });
+    expect(res.options).toEqual({
+      width: 1200,
+      height: 630,
+      headers: { 'CDN-Cache-Control': 'public, max-age=86400' },
+    });
     const markup = renderToStaticMarkup(res.element!).replace(/&#x27;/g, "'");
     expect(markup).toContain(`>${title}<`);
     expect(markup).toContain(`crawlmouse.com${SOCIAL_CARDS[card]!.path}`);
@@ -68,7 +72,26 @@ describe('GET /og/<card>', () => {
   it.each(TITLES)('%s: a 404 while its page’s flag is off', async (card, _title, flag) => {
     ALL_ON();
     vi.stubEnv(flag, '');
-    expect((await get(card)).status).toBe(404);
+    const res = await get(card);
+    expect(res.status).toBe(404);
+    // Nothing tells the CDN to keep the 404, so the card is served once its flag is back on.
+    expect(res.headers.get('cdn-cache-control')).toBeNull();
+  });
+
+  it('Next’s ImageResponse sends the CDN header beside its own Cache-Control', async () => {
+    ALL_ON();
+    const res = await get('pricing');
+    const { ImageResponse } = await vi.importActual<typeof import('next/og')>('next/og');
+    const real = new ImageResponse(
+      res.element!,
+      res.options as ConstructorParameters<typeof ImageResponse>[1],
+    );
+    await real.body?.cancel();
+    expect(real.headers.get('cdn-cache-control')).toBe('public, max-age=86400');
+    expect(real.headers.get('cache-control')).toBe(
+      'public, immutable, no-transform, max-age=31536000',
+    );
+    expect(real.headers.get('content-type')).toBe('image/png');
   });
 
   it.each(['', 'home', 'v2-pricing', 'check-other', '__proto__', 'constructor', 'toString'])(

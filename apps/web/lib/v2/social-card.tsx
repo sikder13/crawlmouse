@@ -21,6 +21,15 @@ import { PRICING_COPY } from './copy/pricing';
 export const SOCIAL_CARD_SIZE = { width: 1200, height: 630 } as const;
 
 /**
+ * A served card's `CDN-Cache-Control`, so Vercel's CDN keeps it for a day rather than rendering it per
+ * request. Next's ImageResponse sets the browser's `Cache-Control` itself and copies this header beside
+ * it (`next/dist/server/og/image-response.js`). The 404s below set no `CDN-Cache-Control`. A card
+ * fetched while its page's flag was on can be served from the CDN for up to a day after the flag goes
+ * off.
+ */
+export const SOCIAL_CARD_CDN_CACHE = 'public, max-age=86400';
+
+/**
  * The v2 light tokens the card draws with, as plain values: satori reads no CSS. `social-card.test.tsx`
  * holds each to its declaration in styles/v2/tokens.css.
  */
@@ -113,5 +122,8 @@ export function socialCardResponse(key: string): Response {
   if (!Object.hasOwn(SOCIAL_CARDS, key)) return new Response(null, { status: 404 });
   const card = SOCIAL_CARDS[key]!;
   if (!card.served()) return new Response(null, { status: 404 });
-  return new ImageResponse(<Card card={card} />, SOCIAL_CARD_SIZE);
+  return new ImageResponse(<Card card={card} />, {
+    ...SOCIAL_CARD_SIZE,
+    headers: { 'CDN-Cache-Control': SOCIAL_CARD_CDN_CACHE },
+  });
 }
