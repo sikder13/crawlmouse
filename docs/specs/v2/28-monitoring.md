@@ -12,7 +12,7 @@ registered before. The SQL is migration `20261113000001_v2_028_monitoring.sql` (
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | D1  | One mailer, `apps/web/lib/v2/mail/`: `send()` over an injected `MailTransport` (Resend's in production, a file or memory transport anywhere else). The send ledger `email_sends` is claimed before the send (`claim_email_send`), keyed by the caller's idempotency key, holding a peppered hash of the address and no address or body. With Resend or the pepper unconfigured, nothing is claimed and the miss is logged. |
 | D2  | Every promised email is a typed template, a pure function to `{subject, text, html}`, with a test, a development-only preview route and visual baselines at 600 and 390 px, light and dark.                                                                                                                                                                                                                                |
-| D3  | Crawled and user text in mail is escaped and bounded; no crawled string is a link target; the recipient is never in the copy; headers are built from validated values (`headers.ts`).                                                                                                                                                                                                                                      |
+| D3  | Crawled and user text in mail is escaped and bounded; our markup makes no crawled string a link target (a mail client may autolink text: known gaps); the recipient is never in the copy; headers are built from validated values (`headers.ts`).                                                                                                                                                                          |
 | D4  | `scheduleTickFn`, hourly, claims due sites in SQL (`claim_due_sites`) and calls `requestCheck` with `scheduled`.                                                                                                                                                                                                                                                                                                           |
 | D5  | `alertFn` on `check.finished` applies the account's rules and sends one message per site, check, channel and recipient.                                                                                                                                                                                                                                                                                                    |
 | D6  | The weekly summary, for paid tiers, Monday 08:00 in the account's zone, never empty.                                                                                                                                                                                                                                                                                                                                       |
@@ -39,7 +39,11 @@ claimed, `mail.unconfigured` logged); the address check (not a plain address: no
 
 The retry rule: a retryable transport failure (network, 409 concurrent, 429, 5xx) records `failed` and throws
 `MailRetry`, so the Inngest step retries and the next claim is the next attempt; three attempts in all. A
-claim left `sending` for more than 2 minutes is a worker that died mid-send, and the next claim takes it back.
+claim, render, header build or transport that throws, and a ledger write that fails, throw `MailRetry` as well
+(`send.ts`; a throw after `go` records `failed` first when the ledger answers). A claim left `sending` for more
+than 2 minutes is a worker that died mid-send, or a `finish` that failed, and the next claim takes it back. Every
+claim of a key not yet sent reads the suppressions, so a retry after a bounce recorded since the first attempt is
+answered `suppressed`.
 The transport sends the ledger key as Resend's `Idempotency-Key` (24 hours), so a send that did leave is not
 sent again; a repeat whose payload changed is refused by Resend with 409 `invalid_idempotent_request`, which
 the transport answers as sent.
@@ -47,6 +51,10 @@ the transport answers as sent.
 The address hash is HMAC-SHA256 under `TRIAL_LEDGER_PEPPER` over `mail:` and the address trimmed and
 lower-cased (`lib/v2/mail/address-hash.ts`). A `+tag` is not folded: a bounce on `x+tag@` suppresses that
 address only, so a stranger cannot silence someone's own address through a tagged one they typed.
+
+The Resend webhook (`app/api/webhooks/resend/route.ts`) keeps v1's `email_events` row, address and payload as
+received, for an event whose sender is not `alerts@`; an event about v2 mail (`isV2MailEvent`, its `data.from`)
+leaves no row there, only the suppression hash a bounce or complaint records.
 
 Verify: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/mail __tests__/v2-028-mail.test.ts`, and the
 two-transaction claim on a real Postgres: `scripts/db/monitoring-race.test.ts` (CI's `db-cli-files` job).
@@ -123,9 +131,14 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
 
 ## Known gaps
 
-- A worker that dies after Resend accepted an account email and before `finish` makes the retry mint a new
-  link token, which replaces the delivered one; Resend refuses the second send, so that email's link no
-  longer works (Q10).
+- A worker that dies after Resend accepted an account email and before `finish`, or a `finish` that fails
+  then, makes the retry mint a new link token, which replaces the delivered one; Resend refuses the second
+  send, so that email's link no longer works (Q10).
+- Gmail and Outlook turn a host or URL written as text into a link: the check-notify host, a packet's URLs,
+  an alert row's `where`. Our HTML links none of them (`templates/inspect.ts` reads every target). The
+  check-notify mail names a host the visitor chose, to an address the visitor typed; v1's notify mail
+  (`inngest/notify.ts`) showed the domain the same way. A defang (`example[.]com`) was not chosen: it would
+  change the host a legitimate visitor reads in the activation email.
 - Slack's incoming webhooks take no idempotency key: a worker that dies between the POST and
   `finish_slack_send` can repeat one Slack message when the claim is taken back.
 - The tick runs hourly at minute 0, so a site due at 06:37 starts at the 07:00 tick.
