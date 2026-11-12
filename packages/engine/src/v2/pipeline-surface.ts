@@ -39,3 +39,7 @@ export { safeFetch } from '../safe-fetch.js';
 export { discoverSitemaps, parseSitemapEntries, parseSitemapUrls } from '../sitemap.js';
 export { canonicalizeUrl } from '../url-canonical.js';
 export { templateKeyFor } from '../analysis/template-key.js';
+// The fix page reads these two (apps/web/lib/v2/view): why a fix type has no packet, and which
+// framework a check's stack puts first.
+export { PACKETS } from './packets/registry.js';
+export { frameworkOf } from './packets/stack.js';

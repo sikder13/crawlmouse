@@ -1,0 +1,497 @@
+import fc from 'fast-check';
+import { afterEach, describe, expect, it } from 'vitest';
+import { edge, site } from '../../../../fixtures/v2/detectors/builders.js';
+import { detectDeepPages } from '../../detectors/deep-pages.js';
+import { detectOrphans } from '../../detectors/orphans.js';
+import type { DetectorInput } from '../../detectors/types.js';
+import { shallowParent } from '../../grade/effects.js';
+import { factsFor } from '../test-support/facts.js';
+import {
+  anchors,
+  detected,
+  expectDeterministic,
+  expectHostileSafe,
+  hostileUrl,
+  packetOf,
+  pageAsRead,
+  HOME_AT_EN,
+  movedTo,
+  pageAt,
+  seen,
+  SERVED,
+  servedSite,
+} from '../test-support/structure.js';
+import { inBothStates, runCommand, type TwoStateSite } from '../test-support/verify.js';
+import type { PacketFacts } from '../types.js';
+
+let served: TwoStateSite | null = null;
+afterEach(async () => {
+  await served?.close();
+  served = null;
+});
+
+/** home → /a → /b and /c → /d → /deep: the last is five clicks down, /b and /c are two. */
+const chain = (base: string): DetectorInput =>
+  site(
+    [
+      { path: base, links: [`${base}/a`] },
+      { path: `${base}/a`, links: [`${base}/c`, `${base}/b`] },
+      { path: `${base}/b`, links: [base] },
+      { path: `${base}/c`, links: [`${base}/d`] },
+      { path: `${base}/d`, links: [`${base}/e`] },
+      { path: `${base}/e`, links: [`${base}/deep`] },
+      { path: `${base}/deep`, links: [base] },
+    ],
+    { homepage: base },
+  );
+
+describe('the deep_pages packet', () => {
+  const base = 'https://a.test';
+  const input = chain(base);
+  const facts = factsFor(input, SERVED);
+  const record = detected(detectDeepPages(input), `${base}/deep`);
+
+  it('gives the measured depth, the limit, and the pages on the path found', () => {
+    expect(packetOf('deep_pages', record, facts).context).toEqual([
+      '`https://a.test/deep` is 5 clicks from the homepage `https://a.test`; the audit counts more than 3 as deep.',
+      'The shortest path the crawl found passes through, in URL order: `https://a.test/a`, `https://a.test/c`, `https://a.test/d`, `https://a.test/e`.',
+    ]);
+  });
+
+  it('names the page the estimate links it from: the one grade/effects.ts chooses', () => {
+    const parent = shallowParent({ ...input, edges: input.edges });
+    expect(parent).toBe('https://a.test/b');
+    const p = packetOf('deep_pages', record, facts);
+    expect(p.change).toEqual([
+      'Add a link to `https://a.test/deep` on a page at most 2 clicks from the homepage, so that it lands within 3.',
+      'On the links as crawled, the estimate for this fix puts the link on `https://a.test/b`, a page that close. Another page as close does as well: pick the one a visitor would look on.',
+      'Write the link as an <a> element with an href, in the HTML the server sends. A link that only JavaScript adds is not there for a crawler that does not run scripts.',
+    ]);
+    expect(p.verify.command).toMatch(
+      /^curl -sS -f --compressed --max-time 20 -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/b' \| /,
+    );
+    expect(p.frameworks).toEqual(['generic']);
+  });
+
+  it('says no path reaches a page the crawl could not reach by links', () => {
+    const cut = site(
+      [
+        { path: base, links: [`${base}/a`] },
+        { path: `${base}/a`, links: [base] },
+        { path: `${base}/deep`, links: [base] },
+      ],
+      { homepage: base },
+    );
+    const unreachable = detected(detectDeepPages(cut), `${base}/deep`);
+    expect(unreachable.measured).toBeNull();
+    expect(packetOf('deep_pages', unreachable, factsFor(cut, SERVED)).context).toEqual([
+      'No path of links from the homepage `https://a.test` reaches `https://a.test/deep`; the audit counts more than 3 clicks as deep.',
+    ]);
+  });
+
+  it('writes no command that passes today: when the estimate’s page already links to the page, it names the next', () => {
+    const linked: PacketFacts = {
+      ...facts,
+      edges: [...facts.edges, edge(`${base}/b`, `${base}/deep`)],
+    };
+    expect(packetOf('deep_pages', record, facts).verify.expect).toContain('today it holds none');
+    const p = packetOf('deep_pages', record, linked);
+    expect(p.change[1]).toBe(
+      "`https://a.test/c` is that close and holds no link to this page in the crawl's record. Another page as close does as well: pick the one a visitor would look on.",
+    );
+    expect(p.verify.command).toContain(" 'https://a.test/c' | ");
+    expect(p.verify.expect).toContain('once `https://a.test/c` holds an <a>');
+  });
+
+  // round 2, security finding 2: the grade files a link recorded from a page that did not answer
+  // 200, and the detector's graph leaves it out, so the estimate's page can link to the deep page
+  describe('when the estimate’s page is reached through a page that did not answer 200', () => {
+    /** home → /moved (a 301 the record holds links from) → /mid → /deep. */
+    const through = (b: string): DetectorInput =>
+      site(
+        [
+          { path: b, links: [`${b}/moved`] },
+          { path: `${b}/moved`, status: 301, links: [`${b}/mid`] },
+          { path: `${b}/mid`, links: [`${b}/deep`] },
+          { path: `${b}/deep`, links: [b] },
+        ],
+        { homepage: b },
+      );
+
+    it('names a page the detector counts as close, where the builder used to throw', () => {
+      const live = through(base);
+      const held = factsFor(live, SERVED);
+      const deep = detected(detectDeepPages(live), `${base}/deep`);
+      expect(deep.measured).toBeNull();
+      // the estimate's page links to the deep page already
+      expect(shallowParent({ ...live, edges: live.edges })).toBe(`${base}/mid`);
+      const p = packetOf('deep_pages', deep, held);
+      expect(p.change[1]).toBe(
+        "`https://a.test` is that close and holds no link to this page in the crawl's record. Another page as close does as well: pick the one a visitor would look on.",
+      );
+      expect(p.verify.expect).toContain('today it holds none');
+    });
+
+    it('verify fails on the site as crawled and passes once the page named links to the deep one', async () => {
+      served = await servedSite({
+        broken: { '/': anchors(['/moved']), '/mid': anchors(['/deep']) },
+        fixed: { '/': anchors(['/moved', '/deep']), '/mid': anchors(['/deep']) },
+      });
+      const live = through(served.base);
+      const p = packetOf(
+        'deep_pages',
+        detected(detectDeepPages(live), `${served.base}/deep`),
+        factsFor(live, SERVED),
+      );
+      const { broken, fixed } = await inBothStates(served, p.verify.command);
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).toBe(0);
+    });
+  });
+
+  // round 3, SEO finding 6 (D3): this packet's command requested the homepage and said it could pass
+  // before the fix. It now names no page, and as written it cannot pass
+  describe('with no page it can vouch for: a homepage read at another crawled page that holds the link', () => {
+    // the homepage's request ended on /en, which the crawl also holds as a page of its own, with
+    // the link: a command that read the homepage would find the link there before any fix
+    const uncertain = (b: string) =>
+      site(
+        [
+          { path: b, facts: { final_url: `${b}/en` } },
+          { path: `${b}/en`, links: [`${b}/deep`] },
+          { path: `${b}/deep`, links: [b] },
+        ],
+        { homepage: b },
+      );
+    const packet = (b: string) =>
+      packetOf(
+        'deep_pages',
+        detected(detectDeepPages(uncertain(b)), `${b}/deep`),
+        factsFor(uncertain(b), SERVED),
+      );
+
+    it('names no page to request, and says the command stops as written', () => {
+      const p = packet(base);
+      expect(p.change[1]).toBe(
+        "The crawl's record names no page that close without a link here already: `https://a.test` was read at an address the crawl also holds as another page, and the links found there include this one. Put the link on a page a visitor reaches within 2 clicks of the homepage.",
+      );
+      expect(p.verify.expect).toBe(
+        'As written the command stops with an error and exits non-zero: the audit could not name a page to link from, since the record holds no page close to the homepage without a link to `https://a.test/deep`. Set the shell variable CRAWLMOUSE_PAGE to the URL of the page you added the link to, then run it: exit status 0 once that page holds an <a> whose href is `https://a.test/deep`, however the URL is written. The click depth is measured again on the next check. A page that itself prints "crawlmouse:end" does not pass.',
+      );
+      expect(p.verify.command).toContain(
+        ` "\${CRAWLMOUSE_PAGE:?set it to the URL of the page you added the link to}" | tr `,
+      );
+      // no address of the site is requested: the only URLs in the command are the deep page's own
+      expect(p.verify.command).not.toContain("'https://a.test/en'");
+      expect(p.verify.see?.today).toBe(
+        'The <a> tags at `https://a.test/en` (where `https://a.test` answers) that hold `/deep`. The crawl found no path of links from the homepage to `https://a.test/deep`. It read that address as another page too, and the links it found there include this one, so a visitor may be closer than the record says.',
+      );
+    });
+
+    it('verify exits non-zero as written, before the fix and after it, and says why; with the page chosen, it fails before the fix and passes after', async () => {
+      served = await servedSite({
+        broken: { '/': movedTo('/en'), '/en': anchors(['/deep']), '/hub': anchors(['/en']) },
+        fixed: {
+          '/': movedTo('/en'),
+          '/en': anchors(['/deep']),
+          '/hub': anchors(['/en', '/deep']),
+        },
+      });
+      const b = served.base;
+      const p = packet(b);
+      const written = await inBothStates(served, p.verify.command);
+      expect(written.broken.status).not.toBe(0);
+      expect(written.fixed.status).not.toBe(0);
+      expect(written.broken.stderr).toContain(
+        'CRAWLMOUSE_PAGE: set it to the URL of the page you added the link to',
+      );
+      // the developer's own shell may hold the variable: the same, set to the page they chose
+      const chosen = await inBothStates(served, `CRAWLMOUSE_PAGE='${b}/hub'; ${p.verify.command}`);
+      expect(chosen.broken.status).not.toBe(0);
+      expect(chosen.fixed.status).toBe(0);
+      // the page the old command requested holds the link today: naming it passes, which is why
+      // the command no longer names it
+      const old = await inBothStates(served, `CRAWLMOUSE_PAGE='${b}/en'; ${p.verify.command}`);
+      expect(old.broken.status).toBe(0);
+      // the readable command shows the link the record holds at the homepage's address
+      served.use('broken');
+      expect((await runCommand(p.verify.see!.command)).stdout).toBe('<a href="/deep">\n');
+    });
+  });
+
+  // round 2, SEO finding 1: the page read answers at another address than the one the crawl names it by
+  it('when the homepage answers at /en/ and is the page to link from, verify requests /en/ in both states', async () => {
+    served = await servedSite({
+      broken: { ...HOME_AT_EN, '/en/': anchors(['/a']) },
+      fixed: { ...HOME_AT_EN, '/en/': anchors(['/a', '/deep']) },
+    });
+    const b = served.base;
+    const live = site(
+      [
+        { path: b, links: [`${b}/a`], facts: { final_url: `${b}/en/` } },
+        { path: `${b}/a`, links: [b] },
+        { path: `${b}/deep`, links: [b] },
+      ],
+      { homepage: b },
+    );
+    const held = factsFor(live, SERVED);
+    const pages = new Map(held.pages);
+    pages.set(`${b}/deep`, { ...pages.get(`${b}/deep`)!, suggested_parent_url: b });
+    const p = packetOf('deep_pages', detected(detectDeepPages(live), `${b}/deep`), {
+      ...held,
+      pages,
+    });
+    expect(p.verify.command).toContain(` '${b}/en/' | `);
+    expect(p.verify.expect).toContain(`once \`${b}/en/\` (where \`${b}\` answers) holds`);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    const printed = await seen(served, p);
+    expect(printed.broken).toBe('');
+    expect(printed.fixed).toBe('<a href="/deep">\n');
+  });
+
+  it('shows the link with a command to read, and what it prints today and after', async () => {
+    served = await servedSite({
+      broken: { '/b': anchors(['/']) },
+      fixed: { '/b': anchors(['/', '/deep']) },
+    });
+    const live = chain(served.base);
+    const p = packetOf(
+      'deep_pages',
+      detected(detectDeepPages(live), `${served.base}/deep`),
+      factsFor(live, SERVED),
+    );
+    expect(p.verify.see).toEqual({
+      command: expect.stringMatching(
+        /^curl -sS --compressed --max-time 20 -A '[^']*GPTBot[^']*' '[^']*\/b' \| tr '[^']*' ' {3}' \| grep -aioE '<a \[\^>\]\*>' \| grep -F -e '\/deep"' .* -e '\/deep>'$/,
+      ),
+      today: `Nothing: the crawl found no link to \`${served.base}/deep\` on that page.`,
+      after:
+        'The <a> tag you added: a line that holds `/deep`. A link that spells the path another way is not printed; the exact check reads it.',
+    });
+    const printed = await seen(served, p);
+    expect(printed.broken).toBe('');
+    expect(printed.fixed).toBe('<a href="/deep">\n');
+  });
+
+  // round 3: SEO finding 1 (a tag written over several lines printed nothing) and correctness
+  // finding 1 (a link to /deep-dive was printed while `today` read "Nothing")
+  it('the readable command prints the link written over several lines, and no link to a page whose path starts the same', async () => {
+    const other = '<a href="/deep-dive">Dive</a><a href=\'/deeper\'>Deeper</a>';
+    served = await servedSite({
+      broken: { '/b': `<html><body>${other}</body></html>` },
+      fixed: {
+        '/b': `<html><body>${other}<a class="card"\n href="/deep">\n  Deep\n</a></body></html>`,
+      },
+    });
+    const live = chain(served.base);
+    const p = packetOf(
+      'deep_pages',
+      detected(detectDeepPages(live), `${served.base}/deep`),
+      factsFor(live, SERVED),
+    );
+    const printed = await seen(served, p);
+    expect(printed.broken).toBe('');
+    expect(printed.fixed.replace(/\s+/g, ' ').trim()).toBe('<a class="card" href="/deep">');
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  describe('a page that is also an orphan', () => {
+    /** home → /a → /b → /c; nothing links to /deep, and /island is out of reach too. */
+    const cut = site(
+      [
+        { path: base, links: [`${base}/a`] },
+        { path: `${base}/a`, links: [`${base}/b`] },
+        { path: `${base}/b`, links: [`${base}/c`] },
+        { path: `${base}/c`, links: [base] },
+        { path: `${base}/island`, links: [base] },
+        { path: `${base}/deep`, links: [base] },
+      ],
+      { homepage: base },
+    );
+    const unreachable = detected(detectDeepPages(cut), `${base}/deep`);
+    const suggesting = (parent: string): PacketFacts => {
+      const all = factsFor(cut, SERVED);
+      const pages = new Map(all.pages);
+      pages.set(`${base}/deep`, {
+        ...pages.get(`${base}/deep`)!,
+        is_orphan: true,
+        suggested_parent_url: `${base}${parent}`,
+      });
+      return { ...all, pages };
+    };
+
+    it('names the parent the orphan fix suggests when it is close enough, so the two fixes ask for one link', () => {
+      const withParent = suggesting('/a');
+      const deep = packetOf('deep_pages', unreachable, withParent);
+      expect(deep.change[1]).toBe(
+        "No other page links to this one, and the audit's fix for that suggests `https://a.test/a`, a page that close: one link there settles both. The estimate for this fix was computed with the link on `https://a.test/b`; any page as close does as well.",
+      );
+      const orphan = packetOf(
+        'orphan_pages',
+        detected(detectOrphans(cut), `${base}/deep`),
+        withParent,
+      );
+      expect(orphan.change[0]).toContain('on `https://a.test/a`.');
+      expect(deep.verify.command).toBe(orphan.verify.command);
+    });
+
+    it.each(['/c', '/island'])(
+      'keeps the estimate’s page when the suggested parent %s is too far, and says so',
+      (parent) => {
+        const deep = packetOf('deep_pages', unreachable, suggesting(parent));
+        expect(deep.change.slice(1, 3)).toEqual([
+          'On the links as crawled, the estimate for this fix puts the link on `https://a.test/b`, a page that close. Another page as close does as well: pick the one a visitor would look on.',
+          `No other page links to this one, and the audit's fix for that suggests \`https://a.test${parent}\`, which is not that close to the homepage: a link there alone leaves the page deep, and a link on \`https://a.test/b\` settles both.`,
+        ]);
+        expect(deep.verify.command).toContain(" 'https://a.test/b' | ");
+      },
+    );
+  });
+
+  it.each([
+    ['a comment', '<!-- <a href="/deep">Deep</a> -->'],
+    ['a script string', `<script>var nav='<a href="/deep">Deep</a>'</script>`],
+  ])('is not passed by a link written inside %s', async (_name, inert) => {
+    served = await servedSite({
+      broken: { '/b': `<a href="/">home</a>${inert}` },
+      fixed: { '/b': `<a href="/">home</a>${inert}<a href="/deep">Deep</a>` },
+    });
+    const live = chain(served.base);
+    const p = packetOf(
+      'deep_pages',
+      detected(detectDeepPages(live), `${served.base}/deep`),
+      factsFor(live, SERVED),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('verify fails while the shallow page does not link to the deep one and passes once it does', async () => {
+    const pages = (b: string[]) => ({
+      '/': anchors(['/a']),
+      '/a': anchors(['/c', '/b']),
+      '/b': anchors(b),
+      '/c': anchors(['/d']),
+      '/d': anchors(['/e']),
+      '/e': anchors(['/deep']),
+      '/deep': anchors(['/']),
+    });
+    served = await servedSite({ broken: pages(['/']), fixed: pages(['/', '/deep']) });
+    const live = chain(served.base);
+    const p = packetOf(
+      'deep_pages',
+      detected(detectDeepPages(live), `${served.base}/deep`),
+      factsFor(live, SERVED),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  /** The chain's pages as HTML; `b` is what /b links to. With `slash`, every page is served at a slashed address. */
+  const chainHtml = (b: string[], slash = '') =>
+    Object.fromEntries(
+      Object.entries({
+        '/': ['/a'],
+        '/a': ['/c', '/b'],
+        '/b': b,
+        '/c': ['/d'],
+        '/d': ['/e'],
+        '/e': ['/deep'],
+        '/deep': ['/'],
+      }).map(([path, links]) => [
+        path === '/' ? path : `${path}${slash}`,
+        anchors(links.map((l) => (l === '/' ? l : `${l}${slash}`))),
+      ]),
+    );
+
+  it('on a site that serves its pages with a trailing slash, requests and names the served addresses', async () => {
+    served = await servedSite({
+      broken: chainHtml(['/'], '/'),
+      fixed: chainHtml(['/', '/deep'], '/'),
+    });
+    const u = (path: string) => `${served!.base}${path}`;
+    const live = site(
+      chain(served.base).pages.map((p) => ({
+        path: p.url,
+        links: chain(served!.base)
+          .edges.filter((e) => e.from_url === p.url)
+          .map((e) => e.to_url),
+        facts: { final_url: p.url === served!.base ? p.url : `${p.url}/` },
+      })),
+      { homepage: served.base },
+    );
+    const p = packetOf(
+      'deep_pages',
+      detected(detectDeepPages(live), u('/deep')),
+      factsFor(live, SERVED),
+    );
+    expect(p.change[0]).toContain(`Add a link to \`${u('/deep/')}\` on a page`);
+    expect(p.verify.command).toContain(` '${u('/b/')}' | `);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('agrees with the engine’s own reading of the pages served', async () => {
+    const states = { broken: chainHtml(['/']), fixed: chainHtml(['/', '/deep']) };
+    served = await servedSite(states);
+    const read = (state: 'broken' | 'fixed') =>
+      site(
+        Object.entries(states[state]).map(([path, body]) =>
+          pageAsRead(path === '/' ? served!.base : `${served!.base}${path}`, body),
+        ),
+        { homepage: served!.base },
+      );
+    const url = `${served.base}/deep`;
+    const p = packetOf(
+      'deep_pages',
+      detected(detectDeepPages(read('broken')), url),
+      factsFor(read('broken'), SERVED),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    expect(detected(detectDeepPages(read('fixed')), url, 'not_detected').measured).toBe(3);
+  });
+});
+
+describe('the deep_pages packet over hostile records (properties)', () => {
+  const arb = fc.record({ home: hostileUrl(), mid: hostileUrl(), deep: hostileUrl() });
+  const build = ({ home, mid, deep }: { home: string; mid: string; deep: string }) => {
+    const record = { ...detected(detectDeepPages(chain('https://a.test')), 'https://a.test/deep') };
+    record.key = `depth:${deep}`;
+    record.affected_urls = [deep];
+    record.evidence = { pages: [deep, mid, home].sort(), edges: [] };
+    const facts: PacketFacts = {
+      ...factsFor(chain('https://a.test'), SERVED),
+      homepage_url: home,
+      pages: new Map([home, mid, deep].map((u) => [u, pageAt(u)])),
+      edges: [edge(home, mid)],
+    };
+    return { record, facts };
+  };
+
+  it('lets nothing crawled out of a code span or a quoted word, and adds no line', () => {
+    fc.assert(
+      fc.property(arb, (r) => {
+        const { record, facts } = build(r);
+        expectHostileSafe(packetOf('deep_pages', record, facts));
+      }),
+    );
+  });
+
+  it('gives the same packet for the same record and facts', () => {
+    fc.assert(
+      fc.property(arb, (r) => {
+        const { record, facts } = build(r);
+        expectDeterministic('deep_pages', record, facts);
+      }),
+    );
+  });
+});

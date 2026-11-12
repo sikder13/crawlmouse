@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 /**
  * A fix's packet (CC-26b D9, the copyFix action): a 404 with V2_CHECKS_PUBLIC unset, for a fix that
  * is not the caller's, and for no such fix; 402 `packets` for a fix the tier does not see.
+ * `?framework=` asks for the body written for one framework (lib/v2/account/fixes.ts `packet`).
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!checksPublicEnabled()) return notFound();
@@ -34,5 +35,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       now: () => new Date(),
     },
     { fixId: id, userId: user.id },
+    new URL(req.url).searchParams.get('framework'),
   );
 }

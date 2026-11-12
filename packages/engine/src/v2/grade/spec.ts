@@ -70,8 +70,10 @@ export const COUNTERFACTUALS: Readonly<Record<FixType, string>> = {
   specs_as_images: "the template's failing pages pass the check, when the check counts",
   missing_schema_description: "the template's failing pages pass the check, when the check counts",
   no_question_headings: "the template's failing pages pass the check, when the check counts",
-  client_rendered_template: 'none yet: the fix type needs rendered pages (CC-14)',
-  js_only_navigation: 'none yet: the fix type needs rendered pages (CC-14)',
+  client_rendered_template:
+    'the `text_share` of every graded page of the template becomes 1, rendered this check or not; only Readable moves',
+  js_only_navigation:
+    'none: the fix type is not opened. The render step records word counts and no link of the rendered side, and `js_only` is written false on every page and edge',
 };
 
 /** The URL each crawlability detector's record marks (technical-seo.ts defectUrls). */

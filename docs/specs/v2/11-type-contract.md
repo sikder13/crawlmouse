@@ -501,66 +501,74 @@ Fixture collection: `fixes`.
 | Final-Agencies       | "Link the 7 orphan pages from their collections" |
 | Final-Seg-Content    | "Fixes for quotable content"                     |
 
-| Field                              | Type                         | Null | Variant            | Added for            |
-| ---------------------------------- | ---------------------------- | ---- | ------------------ | -------------------- |
-| `id`                               | `uuid`                       | no   |                    |                      |
-| `site_id`                          | `uuid`                       | no   |                    |                      |
-| `fingerprint`                      | `string`                     | no   |                    |                      |
-| `number`                           | `integer`                    | no   |                    | Final-Site           |
-| `type`                             | `FixType`                    | no   |                    |                      |
-| `section`                          | `FixSection`                 | no   |                    | Final-Site           |
-| `title`                            | `string`                     | no   |                    | Final-Fix            |
-| `detail`                           | `string`                     | yes  |                    | Final-Seg-Structure  |
-| `recommendation_class`             | `RecommendationClass`        | no   |                    |                      |
-| `status`                           | `FixStatus`                  | no   |                    |                      |
-| `last_state`                       | `DetectionState`             | no   |                    |                      |
-| `last_measured_check_id`           | `uuid`                       | no   |                    |                      |
-| `first_seen_check_id`              | `uuid`                       | no   |                    |                      |
-| `confidence`                       | `Confidence`                 | no   |                    |                      |
-| `affected_pages`                   | `integer`                    | no   |                    |                      |
-| `template_key`                     | `string`                     | yes  |                    |                      |
-| `crawler_uas`                      | `string[]`                   | no   |                    | Final-Segment        |
-| `rank`                             | `integer`                    | yes  |                    | Final-Dashboard-Day0 |
-| `effect`                           | `object`                     | no   |                    |                      |
-| `effect.technical_seo`             | `number`                     | yes  |                    |                      |
-| `effect.technical_seo_pending_on`  | `TechnicalSeoPending[]`      | no   |                    |                      |
-| `effect.ai_readability`            | `number`                     | yes  |                    |                      |
-| `effect.ai_readability_pending_on` | `string or WithheldReason[]` | no   |                    |                      |
-| `effect.absorbed_by`               | `integer`                    | yes  |                    |                      |
-| `effect.estimate`                  | `true`                       | no   |                    |                      |
-| `effort`                           | `one of 2 variants`          | yes  |                    | Final-Public         |
-| `effort.kind`                      | `"minutes"`                  | no   | `kind = minutes`   |                      |
-| `effort.minutes`                   | `integer`                    | no   | `kind = minutes`   |                      |
-| `effort.kind`                      | `"templates"`                | no   | `kind = templates` |                      |
-| `effort.templates`                 | `integer`                    | no   | `kind = templates` |                      |
-| `effort.deploys`                   | `integer`                    | no   | `kind = templates` |                      |
-| `before_after`                     | `object[]`                   | no   |                    | Final-Fix            |
-| `before_after[].measure`           | `FixMeasure`                 | no   |                    |                      |
-| `before_after[].today`             | `number or boolean`          | no   |                    |                      |
-| `before_after[].after`             | `number or boolean`          | no   |                    |                      |
-| `before_after[].after_bound`       | `EstimateBound`              | no   |                    |                      |
-| `before_after[].after_is_estimate` | `true`                       | no   |                    |                      |
-| `packet`                           | `object`                     | yes  |                    | Final-Fix            |
-| `packet.framework`                 | `PacketFramework`            | no   |                    |                      |
-| `packet.frameworks`                | `PacketFramework[]`          | no   |                    |                      |
-| `packet.context`                   | `string[]`                   | no   |                    |                      |
-| `packet.change`                    | `string[]`                   | no   |                    |                      |
-| `packet.keep`                      | `string[]`                   | no   |                    |                      |
-| `packet.verify`                    | `object`                     | no   |                    |                      |
-| `packet.verify.command`            | `string`                     | no   |                    |                      |
-| `packet.verify.expect`             | `string`                     | no   |                    |                      |
-| `packet.verify.ua`                 | `string`                     | yes  |                    |                      |
-| `packet.packets`                   | `object[]`                   | no   |                    | PR #49               |
-| `packet.packets[].framework`       | `PacketFramework`            | no   |                    |                      |
-| `packet.packets[].context`         | `string[]`                   | no   |                    |                      |
-| `packet.packets[].change`          | `string[]`                   | no   |                    |                      |
-| `packet.packets[].keep`            | `string[]`                   | no   |                    |                      |
-| `packet.packets[].verify`          | `object`                     | no   |                    |                      |
-| `packet.packets[].verify.command`  | `string`                     | no   |                    |                      |
-| `packet.packets[].verify.expect`   | `string`                     | no   |                    |                      |
-| `packet.packets[].verify.ua`       | `string`                     | yes  |                    |                      |
-| `gone`                             | `object`                     | yes  |                    | PR #47               |
-| `gone.status_code`                 | `integer`                    | no   |                    |                      |
+| Field                                 | Type                         | Null | Variant            | Added for            |
+| ------------------------------------- | ---------------------------- | ---- | ------------------ | -------------------- |
+| `id`                                  | `uuid`                       | no   |                    |                      |
+| `site_id`                             | `uuid`                       | no   |                    |                      |
+| `fingerprint`                         | `string`                     | no   |                    |                      |
+| `number`                              | `integer`                    | no   |                    | Final-Site           |
+| `type`                                | `FixType`                    | no   |                    |                      |
+| `section`                             | `FixSection`                 | no   |                    | Final-Site           |
+| `title`                               | `string`                     | no   |                    | Final-Fix            |
+| `detail`                              | `string`                     | yes  |                    | Final-Seg-Structure  |
+| `recommendation_class`                | `RecommendationClass`        | no   |                    |                      |
+| `status`                              | `FixStatus`                  | no   |                    |                      |
+| `last_state`                          | `DetectionState`             | no   |                    |                      |
+| `last_measured_check_id`              | `uuid`                       | no   |                    |                      |
+| `first_seen_check_id`                 | `uuid`                       | no   |                    |                      |
+| `confidence`                          | `Confidence`                 | no   |                    |                      |
+| `affected_pages`                      | `integer`                    | no   |                    |                      |
+| `template_key`                        | `string`                     | yes  |                    |                      |
+| `crawler_uas`                         | `string[]`                   | no   |                    | Final-Segment        |
+| `rank`                                | `integer`                    | yes  |                    | Final-Dashboard-Day0 |
+| `effect`                              | `object`                     | no   |                    |                      |
+| `effect.technical_seo`                | `number`                     | yes  |                    |                      |
+| `effect.technical_seo_pending_on`     | `TechnicalSeoPending[]`      | no   |                    |                      |
+| `effect.ai_readability`               | `number`                     | yes  |                    |                      |
+| `effect.ai_readability_pending_on`    | `string or WithheldReason[]` | no   |                    |                      |
+| `effect.absorbed_by`                  | `integer`                    | yes  |                    |                      |
+| `effect.estimate`                     | `true`                       | no   |                    |                      |
+| `effort`                              | `one of 2 variants`          | yes  |                    | Final-Public         |
+| `effort.kind`                         | `"minutes"`                  | no   | `kind = minutes`   |                      |
+| `effort.minutes`                      | `integer`                    | no   | `kind = minutes`   |                      |
+| `effort.kind`                         | `"templates"`                | no   | `kind = templates` |                      |
+| `effort.templates`                    | `integer`                    | no   | `kind = templates` |                      |
+| `effort.deploys`                      | `integer`                    | no   | `kind = templates` |                      |
+| `before_after`                        | `object[]`                   | no   |                    | Final-Fix            |
+| `before_after[].measure`              | `FixMeasure`                 | no   |                    |                      |
+| `before_after[].today`                | `number or boolean`          | no   |                    |                      |
+| `before_after[].after`                | `number or boolean`          | no   |                    |                      |
+| `before_after[].after_bound`          | `EstimateBound`              | no   |                    |                      |
+| `before_after[].after_is_estimate`    | `true`                       | no   |                    |                      |
+| `packet`                              | `object`                     | yes  |                    | Final-Fix            |
+| `packet.framework`                    | `PacketFramework`            | no   |                    |                      |
+| `packet.frameworks`                   | `PacketFramework[]`          | no   |                    |                      |
+| `packet.context`                      | `string[]`                   | no   |                    |                      |
+| `packet.change`                       | `string[]`                   | no   |                    |                      |
+| `packet.keep`                         | `string[]`                   | no   |                    |                      |
+| `packet.verify`                       | `object`                     | no   |                    |                      |
+| `packet.verify.command`               | `string`                     | no   |                    |                      |
+| `packet.verify.expect`                | `string`                     | no   |                    |                      |
+| `packet.verify.ua`                    | `string`                     | yes  |                    |                      |
+| `packet.verify.see`                   | `object`                     | yes  |                    |                      |
+| `packet.verify.see.command`           | `string`                     | no   |                    |                      |
+| `packet.verify.see.today`             | `string`                     | no   |                    |                      |
+| `packet.verify.see.after`             | `string`                     | no   |                    |                      |
+| `packet.packets`                      | `object[]`                   | no   |                    | PR #49               |
+| `packet.packets[].framework`          | `PacketFramework`            | no   |                    |                      |
+| `packet.packets[].context`            | `string[]`                   | no   |                    |                      |
+| `packet.packets[].change`             | `string[]`                   | no   |                    |                      |
+| `packet.packets[].keep`               | `string[]`                   | no   |                    |                      |
+| `packet.packets[].verify`             | `object`                     | no   |                    |                      |
+| `packet.packets[].verify.command`     | `string`                     | no   |                    |                      |
+| `packet.packets[].verify.expect`      | `string`                     | no   |                    |                      |
+| `packet.packets[].verify.ua`          | `string`                     | yes  |                    |                      |
+| `packet.packets[].verify.see`         | `object`                     | yes  |                    |                      |
+| `packet.packets[].verify.see.command` | `string`                     | no   |                    |                      |
+| `packet.packets[].verify.see.today`   | `string`                     | no   |                    |                      |
+| `packet.packets[].verify.see.after`   | `string`                     | no   |                    |                      |
+| `gone`                                | `object`                     | yes  |                    | PR #47               |
+| `gone.status_code`                    | `integer`                    | no   |                    |                      |
 
 ### FixEvent
 

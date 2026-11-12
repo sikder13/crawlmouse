@@ -46,7 +46,7 @@ export const FIX_MAP_INVENTORY: PageInventoryEntry[] = [
   ]),
   entry('fix-stack', ['fix'], 'The stack the packet is written for, and the framework switch', [
     'fixes[].packet.framework',
-    'fixes[].packet.frameworks',
+    'fixes[].packet.packets',
     'checks[].stack.frontend',
     'checks[].stack.backend',
   ]),

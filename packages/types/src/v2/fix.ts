@@ -105,6 +105,18 @@ const packetBody = {
      * robots.txt). Nothing here enforces that; the engine chooses it.
      */
     ua: z.string().min(1).nullable(),
+    /**
+     * The readable layer above `command`: a short command that prints the evidence, what it prints
+     * today (from the record) and what it prints once the fix has landed. `command` stays the strict
+     * check. Null on a packet that has none (one written by hand, or by a builder without one).
+     */
+    see: z
+      .strictObject({
+        command: z.string().min(1),
+        today: z.string().min(1),
+        after: z.string().min(1),
+      })
+      .nullable(),
   }),
 };
 

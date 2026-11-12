@@ -65,6 +65,7 @@ export function summariesOf(
       ai_readability: ai.withheld ? null : ai.total,
       ai_readability_withheld: ai.withheld,
       fixes_written: diff.fixes.length,
+      packets_not_written: graded.packet_faults.length,
       changes: diff.changes.length,
     },
   ];

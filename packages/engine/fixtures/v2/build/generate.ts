@@ -31,7 +31,7 @@ import type {
 import { createFetcher } from '../../../../worker/src/fetch/fetcher.js';
 import { Sites } from '../../../../worker/src/politeness/sites.js';
 import { InstantClock } from '../../../../worker/src/test-support/clock.js';
-import { startServer } from '../../../../worker/src/test-support/http.js';
+import { startServer, type FixtureServer } from '../../../../worker/src/test-support/http.js';
 import { DeclarationCache } from '../../../../worker/src/batch/declarations.js';
 import type { BatchRequest } from '../../../../worker/src/batch/request.js';
 import { runBatch } from '../../../../worker/src/batch/run.js';
@@ -49,17 +49,9 @@ import {
 import { templateKeyFor } from '../../../src/analysis/template-key.js';
 import { fakeClient, memoryDailyBudget } from '../../../src/v2/render/fakes.js';
 import { renderCheck, type RenderOutcome } from '../../../src/v2/render/run.js';
-import { handler } from './site/serve.js';
-import { CLIENT_RENDERED, pages, renderedGuide } from './site/site.js';
-import {
-  CHECK,
-  HOST,
-  PAGE_CAP,
-  recordedBuild,
-  recordedInput,
-  seedsOf,
-  SITE_ID,
-} from './recorded.js';
+import { handler, servedSite, type SiteVariant } from './site/serve.js';
+import { CLIENT_RENDERED } from './site/site.js';
+import { CHECK, HOST, PAGE_CAP, recordedBuild, recordedInput, SITE_ID } from './recorded.js';
 
 const OUT = new URL('./', import.meta.url);
 const BUDGET = { max_requests: 2000, max_bytes: 100_000_000, max_seconds: 1800 };
@@ -79,11 +71,22 @@ function request(kind: 'crawl' | 'access', batch: number, urls: string[]): Batch
     : { ...common, kind, pages: urls.map((url) => ({ url, template_key: templateKeyFor(url) })) };
 }
 
-/** The worker's batches for the site, crawl then access, planned by the builder's own planners. */
-async function record(
-  variant: boolean,
+/**
+ * The worker's batches for the site as `variant` serves it, crawl then access, planned by the
+ * builder's own planners, and the render outcome (none when the variant adds the redirect link: that
+ * recording is the crawl alone). `open` is a server already serving the variant, which is left open;
+ * without it one is started here and closed.
+ *
+ * The planners plan a site on the default port (plan.ts `crawlableSeeds`, `crawlableDiscovered`), and
+ * the test server listens on another. So they are given the batches under the fixture's own name
+ * (`renamed`, as the recording is stored), and each URL they plan is requested at the server's
+ * address. The batches returned are the worker's, at that address; the render outcome is under HOST.
+ */
+export async function record(
+  variant: SiteVariant,
+  open?: FixtureServer,
 ): Promise<{ base: string; batches: BatchResult[]; render: RenderOutcome | null }> {
-  const server = await startServer(handler({ linkRedirectTarget: variant }));
+  const server = open ?? (await startServer(handler(variant)));
   try {
     const clock = new InstantClock(STARTED);
     const deps = {
@@ -93,52 +96,40 @@ async function record(
       robotsCache: new RobotsCache(clock),
       declarationCache: new DeclarationCache(clock),
     };
-    const seeds = seedsOf(server.base);
-    const input = { ...recordedInput(), homepage_url: server.base, seeds };
+    // No page is rendered yet while the batches are planned.
+    const input = { ...recordedInput(), render: null };
+    const atServer = (urls: readonly string[]) => urls.map((u) => u.replace(HOST, server.base));
     const batches: BatchResult[] = [];
+    const named = () => renamed(batches, server.base);
     let n = 0;
     for (;;) {
-      const crawl = batches.filter((b): b is CrawlBatchResult => b.kind === 'crawl');
-      const urls = nextCrawlBatch(seeds, crawl, PAGE_CAP);
+      const crawl = named().filter((b): b is CrawlBatchResult => b.kind === 'crawl');
+      const urls = nextCrawlBatch(input.seeds, crawl, PAGE_CAP);
       if (urls === null) break;
-      batches.push(await runBatch(request('crawl', n++, urls), deps));
+      batches.push(await runBatch(request('crawl', n++, atServer(urls)), deps));
     }
-    if (variant) return { base: server.base, batches, render: null };
+    if (variant.linkRedirectTarget) return { base: server.base, batches, render: null };
     const planned = () => {
-      const a = assemble(input, readBatches(batches, input.check, input.lineage.worker_release));
+      const a = assemble(input, readBatches(named(), input.check, input.lineage.worker_release));
       return { a, s: sample(a) };
     };
     let { s } = planned();
     batches.push(
-      await runBatch(
-        request(
-          'access',
-          n++,
-          s.stage1.map((p) => p.url),
-        ),
-        deps,
-      ),
+      await runBatch(request('access', n++, atServer(s.stage1.map((p) => p.url))), deps),
     );
     ({ s } = planned());
     if (s.stage2_needed)
       batches.push(
-        await runBatch(
-          request(
-            'access',
-            n++,
-            s.stage2.map((p) => p.url),
-          ),
-          deps,
-        ),
+        await runBatch(request('access', n++, atServer(s.stage2.map((p) => p.url))), deps),
       );
     const { a, s: last } = planned();
     const plan = renderCandidates(a, [...last.stage1, ...last.stage2], [], new Map());
-    const site = pages();
+    const site = servedSite(variant);
     const replies = plan.candidates.map((c) => {
-      const path = c.url.slice(server.base.length) || '/';
-      const html = site.get(path)!.body;
+      const path = c.url.slice(HOST.length) || '/';
+      const html = site.pages.get(path)!.body;
       const rendered = (CLIENT_RENDERED as readonly string[]).includes(path)
-        ? renderedGuide(path)
+        ? site.renderedGuide(path)
         : html;
       return {
         provenance: 'built-site',
@@ -156,12 +147,12 @@ async function record(
     });
     return { base: server.base, batches, render };
   } finally {
-    await server.close();
+    if (!open) await server.close();
   }
 }
 
 /** JSON with the loopback base renamed, as the access fixtures rename theirs. */
-function renamed<T>(value: T, base: string): T {
+export function renamed<T>(value: T, base: string): T {
   const loopback = base.replace(/^http:\/\//, '');
   return JSON.parse(
     JSON.stringify(value)
@@ -200,10 +191,10 @@ function writeBatches(dir: string, batches: BatchResult[]): void {
 
 async function main(): Promise<void> {
   if (!process.argv.includes('--expected-only')) {
-    const golden = await record(false);
+    const golden = await record({ linkRedirectTarget: false });
     writeBatches('batches', renumbered(renamed(golden.batches, golden.base)));
-    writeFileSync(new URL('render.json', OUT), json(renamed(golden.render, golden.base)));
-    const variant = await record(true);
+    writeFileSync(new URL('render.json', OUT), json(golden.render));
+    const variant = await record({ linkRedirectTarget: true });
     writeBatches('variant', renamed(variant.batches, variant.base));
   }
   const built = buildCheck(recordedBuild());

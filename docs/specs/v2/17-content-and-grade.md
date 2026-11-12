@@ -234,24 +234,24 @@ An effect is the change in the grades as given, each to 2 places, so it can diff
 
 Technical SEO is null, waiting on `grade_refused`, when the grade is refused as checked, or before or after the fix: there is no score to move. AI readability is the change in the grade's total. It is null while the grade is withheld as checked, before or after the fix, and waits on the grade's withheld reasons; it also waits when the fix cannot move a score: a content fix's check does not count in Quotable (`check_not_scored`), or an edge fix's crawler has too few pages for a share (`crawler_too_few_pages`). Until a check counts in Quotable, AI readability is withheld on every check, so no AI effect is stated (owner ruling, 2026-11-05; component deltas on the screen are UI work). The projected grades leave out fixes on checks that do not count. A link a counterfactual adds carries no anchor text, and anchor diversity leaves it out.
 
-| Fix                          | Counterfactual                                                                                                                                 |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `orphan_pages`               | a link to the page from its `suggested_parent_url`, or from the homepage when it has none                                                      |
-| `deep_pages`                 | a link to the page from the deepest graded page within 2 clicks of the homepage (the lowest URL among them), or from the homepage when none is |
-| `generic_anchor_text`        | the hub's outbound links get descriptive anchors                                                                                               |
-| `redirect_chain`             | the record becomes `not_detected`, and the redirecting URL leaves the crawl (the links point at the final URL)                                 |
-| `canonical_mismatch`         | the record becomes `not_detected`, so it marks no page                                                                                         |
-| `duplicate_pagination`       | the record becomes `not_detected`, so it marks no page                                                                                         |
-| `hreflang_gap`               | the record becomes `not_detected`, so it marks no page                                                                                         |
-| `edge_rule_blocks_crawler`   | the crawler's `blocked_by_ua_rule` pages become `allowed`                                                                                      |
-| `robots_txt_blocks_crawler`  | none: respected intent opens no fix                                                                                                            |
-| `quotable_opening`           | the template's failing pages pass the check, when the check counts                                                                             |
-| `missing_author_date`        | the template's failing pages pass the check, when the check counts                                                                             |
-| `specs_as_images`            | the template's failing pages pass the check, when the check counts                                                                             |
-| `missing_schema_description` | the template's failing pages pass the check, when the check counts                                                                             |
-| `no_question_headings`       | the template's failing pages pass the check, when the check counts                                                                             |
-| `client_rendered_template`   | none yet: the fix type needs rendered pages (CC-14)                                                                                            |
-| `js_only_navigation`         | none yet: the fix type needs rendered pages (CC-14)                                                                                            |
+| Fix                          | Counterfactual                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `orphan_pages`               | a link to the page from its `suggested_parent_url`, or from the homepage when it has none                                                                     |
+| `deep_pages`                 | a link to the page from the deepest graded page within 2 clicks of the homepage (the lowest URL among them), or from the homepage when none is                |
+| `generic_anchor_text`        | the hub's outbound links get descriptive anchors                                                                                                              |
+| `redirect_chain`             | the record becomes `not_detected`, and the redirecting URL leaves the crawl (the links point at the final URL)                                                |
+| `canonical_mismatch`         | the record becomes `not_detected`, so it marks no page                                                                                                        |
+| `duplicate_pagination`       | the record becomes `not_detected`, so it marks no page                                                                                                        |
+| `hreflang_gap`               | the record becomes `not_detected`, so it marks no page                                                                                                        |
+| `edge_rule_blocks_crawler`   | the crawler's `blocked_by_ua_rule` pages become `allowed`                                                                                                     |
+| `robots_txt_blocks_crawler`  | none: respected intent opens no fix                                                                                                                           |
+| `quotable_opening`           | the template's failing pages pass the check, when the check counts                                                                                            |
+| `missing_author_date`        | the template's failing pages pass the check, when the check counts                                                                                            |
+| `specs_as_images`            | the template's failing pages pass the check, when the check counts                                                                                            |
+| `missing_schema_description` | the template's failing pages pass the check, when the check counts                                                                                            |
+| `no_question_headings`       | the template's failing pages pass the check, when the check counts                                                                                            |
+| `client_rendered_template`   | the `text_share` of every graded page of the template becomes 1, rendered this check or not; only Readable moves                                              |
+| `js_only_navigation`         | none: the fix type is not opened. The render step records word counts and no link of the rendered side, and `js_only` is written false on every page and edge |
 
 A structure fix takes its recommendation class from its type; the structure detectors read our own crawl, so its confidence is `likely`. A content fix takes its check's class and confidence (the content checks table).
 

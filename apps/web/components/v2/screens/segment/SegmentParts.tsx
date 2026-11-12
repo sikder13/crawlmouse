@@ -5,7 +5,6 @@ import { Card } from '../../Card';
 import { CoverageLine, type Coverage } from '../../CoverageLine';
 import { Heading } from '../../Heading';
 import { StatusPill, type PillState } from '../../StatusPill';
-import { NO_PACKET } from '../../../../lib/v2/view/no-packet';
 import type {
   OpenFixView,
   RecommendationView,
@@ -129,7 +128,7 @@ function OpenFix({ f, primary, ask }: { f: OpenFixView; primary: boolean; ask: s
         </span>
       </div>
       {f.packet === null || f.handoff === null || f.prompt === null ? (
-        <p className={styles.fixPara}>{NO_PACKET}</p>
+        <p className={styles.fixPara}>{f.notWritten}</p>
       ) : (
         <>
           {f.paragraph.map((p) => (
@@ -156,7 +155,7 @@ function OpenFix({ f, primary, ask }: { f: OpenFixView; primary: boolean; ask: s
 
 /**
  * A section's fixes: its open ones with their packets, and the rest as Pro rows. An open fix with no
- * packet shows its head and `NO_PACKET`. The copy button of the first open fix that has a packet is
+ * packet shows its head and why it has none (`notWritten`). The copy button of the first open fix that has a packet is
  * the page's orange element (FACTS orange convention).
  */
 export function SectionFixes({

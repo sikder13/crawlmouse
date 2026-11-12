@@ -13,13 +13,20 @@ import {
 } from '@crawlmouse/types/v2';
 import { fixesAsOf } from '../../fixtures';
 import { listOf } from '../../format';
+import { oneLine } from '../../packet-text';
 import { numberWord, plural } from '../../words';
 import { effectHeadline } from '../effect-headline';
 import { openFixes, type FixPlan } from '../free-fixes';
+import { noPacketLine } from '../no-packet';
+import { noPacketReason } from '../packet-reason';
 import type { ViewDataset } from '../../fixtures';
 
 /** A fix's packet; the contract names the schema, not the type. */
 export type FixPacket = NonNullable<Fix['packet']>;
+/** A packet's framework. */
+export type PacketFramework = FixPacket['framework'];
+/** A packet as written for one framework: the packet's own body, or one of `packets`. */
+export type PacketBody = FixPacket['packets'][number];
 
 /** The four recommendation classes as a reader sees them (the CC-23 brief's wording). */
 export const RECOMMENDATION_LABELS: Record<RecommendationClass, string> = {
@@ -46,14 +53,16 @@ export interface OpenFixView {
   /** What the packet says about the problem; empty when the fix has no packet. */
   paragraph: string[];
   /**
-   * The steps, what to keep, and the check we run afterwards, as the packet block shows them. Null
-   * when the audit wrote no packet for the fix: `handoff` and `prompt` are then null too, and the
-   * screen says `NO_PACKET` (`../no-packet`) in their place.
+   * The steps, what to keep, and the check we run afterwards, as the packet block shows them, from
+   * the body written for the packet's own framework. Null when the fix has no packet: `handoff` and
+   * `prompt` are then null too, and the screen says `notWritten` in their place.
    */
   packet: string | null;
   handoff: string | null;
   /** The whole packet as plain text, for "Copy as a prompt". */
   prompt: string | null;
+  /** Why the fix has no packet, as a sentence; null exactly when it has one. */
+  notWritten: string | null;
 }
 
 export interface ProFixView {
@@ -168,31 +177,110 @@ export function effectOf(
     : { points: '—', unit: 'Technical SEO, not estimated' };
 }
 
-/** The packet's problem lines: its context without the line naming the site and audit. */
-export const packetParagraph = (p: FixPacket) => p.context.filter((l) => !SITE_LINE.test(l));
+/**
+ * The bodies a packet holds, its own framework's first, then `packets` in their order, each string
+ * on one line (`oneLine`). `frameworks` is not read: a framework it lists without a body is not in
+ * this list, which is what the fix page's switch and the packet route offer.
+ */
+export function packetBodies(p: FixPacket): PacketBody[] {
+  const own: PacketBody = {
+    framework: p.framework,
+    context: p.context,
+    change: p.change,
+    keep: p.keep,
+    verify: p.verify,
+  };
+  return [own, ...p.packets].map(cleanBody);
+}
 
-/** The verify lines of the segment's packet block and of the prompt. */
-const verifyLines = (p: FixPacket) => [
-  'Verify (we run this after you mark done):',
-  `  ${p.verify.command}`,
-  `  → expect ${p.verify.expect}`,
-];
+/** `b` with each of its strings on one line. */
+const cleanBody = (b: PacketBody): PacketBody => ({
+  framework: b.framework,
+  context: b.context.map(oneLine),
+  change: b.change.map(oneLine),
+  keep: b.keep.map(oneLine),
+  verify: {
+    command: oneLine(b.verify.command),
+    expect: oneLine(b.verify.expect),
+    ua: b.verify.ua,
+    see: b.verify.see && {
+      command: oneLine(b.verify.see.command),
+      today: oneLine(b.verify.see.today),
+      after: oneLine(b.verify.see.after),
+    },
+  },
+});
+
+/** The packet's problem lines: its context without the line naming the site and audit. */
+export const packetParagraph = (b: Pick<PacketBody, 'context'>) =>
+  b.context.filter((l) => !SITE_LINE.test(l));
+
+/** What heads the short command of a packet that has both layers, in a block and in a prompt. */
+export const SEE_IT = 'See it (a short command that prints the evidence; it decides nothing):';
+/** What heads the strict command of such a packet. */
+export const EXACT_CHECK = 'Exact check (this command decides whether the fix has landed):';
 
 /**
- * The whole packet as plain text, for "Copy as a prompt": the fix page and the segment copy this,
- * so the same fix is handed over in the same words wherever it is copied from.
+ * The verify lines of the segment's packet block and of the prompt. A body with a readable command
+ * (`verify.see`) gets two labelled layers, that command first with what it prints today and after
+ * the fix, then the strict command; a body without one gets the strict command alone.
  */
-export function packetPrompt(f: Pick<Fix, 'title'>, p: FixPacket): string {
+function verifyLines(b: Pick<PacketBody, 'verify'>): string[] {
+  const { command, expect, see } = b.verify;
+  if (see === null) {
+    return ['Verify (we run this after you mark done):', `  ${command}`, `  → expect ${expect}`];
+  }
   return [
-    f.title,
+    'Verify (we run the exact check after you mark done):',
+    SEE_IT,
+    `  ${see.command}`,
+    `  Today: ${see.today}`,
+    `  After the fix: ${see.after}`,
+    EXACT_CHECK,
+    `  ${command}`,
+    `  → expect ${expect}`,
+  ];
+}
+
+/** The label a prompt's first line gives the fix's title under. */
+export const PROMPT_TITLE_LABEL = 'The audit’s title for this fix:';
+
+/** The marks a reader or a coding tool can take for the end of a quotation. */
+const QUOTATION_MARKS = /["“”„‟«»]/g;
+
+/**
+ * The first line of a prompt: the title on one line, in double quotes. So that the title cannot
+ * appear to end the quotation it is in, each quotation mark in it (`QUOTATION_MARKS`) is written as
+ * an apostrophe, and backslashes at its end are dropped with the spaces among them: one left there
+ * would stand before the closing quote and read as escaping it (fixes.property.test.ts).
+ */
+export const promptTitle = (title: string): string =>
+  `${PROMPT_TITLE_LABEL} "${oneLine(title)
+    .replace(QUOTATION_MARKS, "'")
+    .replace(/[\\\s]+$/u, '')}"`;
+
+/**
+ * One body of a packet as plain text, for "Copy as a prompt": the fix page, the segment and the
+ * packet route copy this, so the same fix is handed over in the same words wherever it is copied
+ * from. The title and each string of the body are put on one line here (`oneLine`), so the prompt
+ * has one line per string, whatever a stored string holds (fixes.property.test.ts).
+ *
+ * A fix's title holds text a crawled site chose (a URL, a template key), and the first line of a
+ * prompt is where a coding tool looks for what it is asked to do. So the title is given as a quoted
+ * string under a label of ours (`promptTitle`), not as a line of its own.
+ */
+export function packetPrompt(f: Pick<Fix, 'title'>, body: PacketBody): string {
+  const b = cleanBody(body);
+  return [
+    promptTitle(f.title),
     '',
-    ...p.context,
+    ...b.context,
     '',
     'Change:',
-    ...p.change,
-    ...(p.keep.length ? ['', 'Keep:', ...p.keep] : []),
+    ...b.change,
+    ...(b.keep.length ? ['', 'Keep:', ...b.keep] : []),
     '',
-    ...verifyLines(p),
+    ...verifyLines(b),
   ].join('\n');
 }
 
@@ -207,16 +295,31 @@ export function openFix(f: Fix, siteFixes: readonly Fix[]): OpenFixView {
     effort: effortText(f),
     recommendation: recommendation(f),
   };
-  const p = f.packet;
-  if (!p) return { ...head, paragraph: [], packet: null, handoff: null, prompt: null };
-  const block = [...p.change, ...(p.keep.length ? ['', ...p.keep] : []), '', ...verifyLines(p)];
-  const check = p.verify.ua ? 'request' : 'check';
+  if (!f.packet) {
+    return {
+      ...head,
+      paragraph: [],
+      packet: null,
+      handoff: null,
+      prompt: null,
+      notWritten: noPacketLine(noPacketReason(f.type)),
+    };
+  }
+  const own = packetBodies(f.packet)[0]!;
+  const block = [
+    ...own.change,
+    ...(own.keep.length ? ['', ...own.keep] : []),
+    '',
+    ...verifyLines(own),
+  ];
+  const check = own.verify.ua ? 'request' : 'check';
   return {
     ...head,
-    paragraph: packetParagraph(p),
+    paragraph: packetParagraph(own),
     packet: block.join('\n'),
     handoff: `Handing this to your coding tool or your developer? The packet contains the steps above and the ${check} we’ll run afterwards to confirm it worked.`,
-    prompt: packetPrompt(f, p),
+    prompt: packetPrompt(f, own),
+    notWritten: null,
   };
 }
 

@@ -10,18 +10,22 @@
  * filing.ts over the detectors' input; filing.test.ts holds filing.ts to the detectors' own filing. The withheld reasons, refusals and
  * fix effects are theirs, passed through.
  */
-import type { PageResult } from '@crawlmouse/types/v2';
+import type { FixType, PageResult } from '@crawlmouse/types/v2';
 import { buildCorpus } from '../../projection/relevance.js';
 import { enumerateFixes } from '../../projection/ledger.js';
 import { detectAccess } from '../access/index.js';
 import type { AccessResult } from '../access/types.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
+import { detectRendered } from '../detectors/rendered.js';
 import { detectStructure } from '../detectors/index.js';
 import type { Detection } from '../detectors/types.js';
 import type { DetectorOutcome } from '../diff/types.js';
 import { gradeCheck, type Grades } from '../grade/index.js';
 import { detectorOutcomes } from '../grade/outcomes.js';
+import type { PacketFacts } from '../packets/types.js';
+import { writtenFrom } from '../packets/written.js';
 import type { Assembled } from './assemble.js';
+import { stackOf } from './record.js';
 import type { BuildInput } from './types.js';
 
 export interface Graded {
@@ -32,6 +36,8 @@ export interface Graded {
   structure: Detection[];
   grades: Grades;
   outcomes: DetectorOutcome[];
+  /** The detected fixes whose packet builder threw: each carries no packet. */
+  packet_faults: { type: FixType; fingerprint: string }[];
 }
 
 export function gradeAssembled(
@@ -76,12 +82,30 @@ export function gradeAssembled(
     robots_txt,
     refusal: assembled.refusal,
   });
-  const { outcomes } = detectorOutcomes(grades, access.detections, structure);
+  // What a fix's packet is written from besides its own record (packets/types.ts).
+  const facts: PacketFacts = {
+    homepage_url: assembled.homepage_url,
+    stack: stackOf(assembled),
+    crawlers: access.crawlers,
+    pages: new Map(withOrphans.map((p) => [p.url, p])),
+    edges: assembled.edges,
+    access_tests: assembled.access_tests,
+  };
+  // A builder that throws leaves its fix without a packet (packets/written.ts); the grading summary
+  // counts them, so a fault is seen where the check's steps are logged.
+  const packet_faults: Graded['packet_faults'] = [];
+  const { outcomes } = detectorOutcomes(
+    grades,
+    access.detections,
+    structure,
+    detectRendered(withOrphans),
+    writtenFrom(facts, ({ type, fingerprint }) => packet_faults.push({ type, fingerprint })),
+  );
   const pages = withOrphans.map((p) => ({
     ...p,
     content_failures: grades.content_failures.get(p.url) ?? null,
   }));
-  return { pages, robots_txt, access, structure, grades, outcomes };
+  return { pages, robots_txt, access, structure, grades, outcomes, packet_faults };
 }
 
 /**
