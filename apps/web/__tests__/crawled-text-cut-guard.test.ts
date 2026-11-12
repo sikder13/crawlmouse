@@ -613,24 +613,12 @@ const INVENTORY: [entry: string, why: string][] = [
     'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). A fix title past MAX_TITLE_CHARS, marked with an ellipsis (CC-30, titleOf).',
   ],
   [
-    'packages/engine/src/v2/packets/by-type/client-rendered-template.ts :: const shown = record.evidence.pages.slice(0, PAGES_SHOWN);',
+    'packages/engine/src/v2/packets/by-type/client-rendered-template.ts :: const shown = all.slice(0, PAGES_SHOWN);',
     'ARRAY slice of the record’s rendered pages (`RenderedPage[]`), to bound how many a packet lists; the line counts the rest. No string is cut (CC-30).',
-  ],
-  [
-    'packages/engine/src/v2/packets/by-type/generic-anchor-text.ts :: const named = texts.slice(0, MAX_TEXTS);',
-    'ARRAY slice of the distinct generic link texts, to bound how many the verify command names; no string is cut, and each text goes through `crawledWord` (CC-30).',
   ],
   [
     'packages/engine/src/v2/packets/by-type/generic-anchor-text.ts :: const shown = links.slice(0, MAX_LINKS).map(({ to, text }): Line => {',
     'ARRAY slice of the hub’s generic links, to bound how many steps the packet lists; the packet counts the rest. No string is cut (CC-30).',
-  ],
-  [
-    'packages/engine/src/v2/packets/by-type/hreflang-gap.ts :: const back = needs.back.slice(0, MAX_NAMED);',
-    'ARRAY slice of the alternate URLs (`string[]`) a page must name back, to bound the verify command; no string is cut (CC-30).',
-  ],
-  [
-    'packages/engine/src/v2/packets/by-type/hreflang-gap.ts :: stale.slice(0, MAX_NAMED).map((s) => s.word),',
-    'ARRAY slice of the stale hreflang entries, to bound what the packet names; `list` counts the rest. No string is cut (CC-30).',
   ],
   [
     'packages/engine/src/v2/packets/compose.ts :: ...texts.slice(0, PACKET_BOUNDS.section_lines),',
@@ -639,6 +627,14 @@ const INVENTORY: [entry: string, why: string][] = [
   [
     "packages/engine/src/v2/packets/compose.ts :: const kept = points.slice(0, PACKET_BOUNDS.line_chars).join('');",
     'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). A packet line past PACKET_BOUNDS.line_chars; the line says how long it was (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/html-checks.ts :: for (const item of items.slice(0, max)) {',
+    'ARRAY slice of the URLs or phrases a verify command names (`listed`), bounded by count and by total length; `expect` says how many were left out. No string is cut (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/shell.ts :: const rest = parsed.href.slice(parsed.origin.length);',
+    'STRING slice of a URL the parser serialised (`URL.href`), at the end of its origin: the origin is ASCII (a host is punycoded), so the cut falls on an ASCII boundary and cannot split a surrogate pair. Nothing is dropped: the two parts are joined again after encoding (CC-30, url).',
   ],
   [
     "packages/engine/src/v2/packets/shell.ts :: return quoted([...clean(crawled)].slice(0, max).join(''));",
