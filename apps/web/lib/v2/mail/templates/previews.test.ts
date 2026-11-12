@@ -49,3 +49,22 @@ describe('the alert and summary previews show the lines rulings-3 added', () => 
     expect(m.text).toContain('  in robots.txt · ');
   });
 });
+
+describe('the previews a sample is built from', () => {
+  it.each(['alert', 'weekly-summary'])(
+    '%s takes a real unsubscribe link in place of its stand-in, in both bodies',
+    (slug) => {
+      const url = 'https://crawlmouse.com/unsubscribe?t=REALpayload.REALsig';
+      const m = mailPreview(slug)!.render({ unsubscribeUrl: url });
+      expect(m.html).toContain(url);
+      expect(m.text).toContain(url);
+      expect(`${m.html}${m.text}`).not.toContain('PREVIEW');
+    },
+  );
+
+  it('the summary’s days hold every change it lists', () => {
+    const m = mailPreview('weekly-summary')!.render();
+    expect(m.text).toMatch(/from \d+ \w+ to \d+ \w+/);
+    expect(m.text).not.toContain('No changes');
+  });
+});

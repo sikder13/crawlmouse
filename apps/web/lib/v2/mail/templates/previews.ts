@@ -21,7 +21,15 @@ export interface MailPreview {
   slug: string;
   name: string;
   kind: MailKind;
-  render(): RenderedMail;
+  /**
+   * The message over fixture data. `unsubscribeUrl` replaces the stand-in footer link of alert and
+   * summary mail, so a sample built with real `unsubscribeLinks` shows one token throughout.
+   */
+  render(opts?: PreviewOptions): RenderedMail;
+}
+
+export interface PreviewOptions {
+  unsubscribeUrl?: string;
 }
 
 /** Stand-in link tokens: the shape `issue_account_link` returns, minted by nothing. */
@@ -51,10 +59,19 @@ const alertCheck = () =>
       new Set(cs.map((c) => c.where)).size > 1
     );
   })!;
+/** The days the fixture's changes fall on, so the summary's "from … to …" holds what it lists. */
+const summaryWeek = () => {
+  const days = siteChanges().map((c) => Date.parse(c.detected_at));
+  const day = 86_400_000;
+  return {
+    since: new Date(Math.floor(Math.min(...days) / day) * day).toISOString(),
+    until: new Date((Math.floor(Math.max(...days) / day) + 1) * day).toISOString(),
+  };
+};
 /** What one alert lists: that check's changes. */
 const alertChanges = () => siteChanges().filter((c) => c.check_id === alertCheck().id);
 
-const RENDERS: Record<MailPreviewSlug, () => RenderedMail> = {
+const RENDERS: Record<MailPreviewSlug, (opts?: PreviewOptions) => RenderedMail> = {
   'check-notify': () => checkNotify({ host: badHost(), checkId: badCheck(), outcome: 'finished' }),
   'check-notify-failed': () =>
     checkNotify({ host: badHost(), checkId: badCheck(), outcome: 'failed' }),
@@ -76,22 +93,21 @@ const RENDERS: Record<MailPreviewSlug, () => RenderedMail> = {
   'email-change-confirm': () => emailChangeConfirm({ token: TOKEN }),
   'email-change-notice': () => emailChangeNotice({ token: TOKEN }),
   'account-delete': () => accountDelete({ confirmToken: TOKEN, restoreToken: RESTORE }),
-  alert: () =>
+  alert: (opts) =>
     alertTemplate({
       host: badHost(),
       checkId: alertCheck().id,
       checkedAt: alertCheck().finished_at ?? '2026-11-09T06:00:00.000Z',
       zone: 'America/Indiana/Indianapolis',
       changes: alertChanges(),
-      unsubscribeUrl: UNSUBSCRIBE,
+      unsubscribeUrl: opts?.unsubscribeUrl ?? UNSUBSCRIBE,
     }),
-  'weekly-summary': () =>
+  'weekly-summary': (opts) =>
     weeklySummaryTemplate({
-      since: '2026-11-02T05:00:00.000Z',
-      until: '2026-11-09T05:00:00.000Z',
+      ...summaryWeek(),
       zone: 'America/Indiana/Indianapolis',
       sites: [{ siteId: badSite(), host: badHost(), changes: siteChanges() }],
-      unsubscribeUrl: UNSUBSCRIBE,
+      unsubscribeUrl: opts?.unsubscribeUrl ?? UNSUBSCRIBE,
     }),
 };
 
