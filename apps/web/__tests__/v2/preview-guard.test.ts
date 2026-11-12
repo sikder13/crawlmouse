@@ -227,6 +227,7 @@ describe('v2 stays out of live pages', () => {
       'app/dashboard/v2/page.tsx',
       'app/invite/page.tsx',
       'app/reports/[id]/page.tsx',
+      'app/reports/page.tsx',
       'app/s/view/[reportId]/page.tsx',
       'app/seats/page.tsx',
       'app/sites/[id]/page.tsx',

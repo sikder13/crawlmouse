@@ -56,3 +56,39 @@ export async function memberProof(
   const doc = parseStoredDoc(await deps.files.read(path));
   return doc === null ? null : { accountId: report.account_id, doc };
 }
+
+/** Whether a report's file is in the bucket, as the Reports screen is told it. */
+type FileState = 'pending' | 'stored';
+
+/**
+ * The file state of each of `reports`, which the caller's own session read (so the ids are ones
+ * their seat covers). The stored object's name is not granted to a client; the service role reads
+ * it here and only whether there is one leaves this function: `stored` with a file, `pending` for a
+ * report that is `ready` and has none yet, and no entry for any other (a client report that was
+ * sent has no file).
+ */
+export async function reportFileStates(
+  admin: SupabaseClient,
+  reports: readonly { id: string; status: string }[],
+): Promise<Map<string, FileState>> {
+  const states = new Map<string, FileState>();
+  if (reports.length === 0) return states;
+  const { data, error } = await admin
+    .from('reports')
+    .select('id, storage_path')
+    .in(
+      'id',
+      reports.map((r) => r.id),
+    );
+  if (error) throw new Error(`reports read failed: ${error.message}`);
+  const stored = new Set(
+    ((data ?? []) as { id: string; storage_path: string | null }[])
+      .filter((r) => r.storage_path !== null)
+      .map((r) => r.id),
+  );
+  for (const r of reports) {
+    if (stored.has(r.id)) states.set(r.id, 'stored');
+    else if (r.status === 'ready') states.set(r.id, 'pending');
+  }
+  return states;
+}
