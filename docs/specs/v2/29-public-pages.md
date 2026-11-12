@@ -63,6 +63,8 @@ Where an artboard's figure disagrees with `prices.ts` (Agency $69, $9 a seat), t
   `buildOutgoing` accepts are `EXTRA_HEADERS` (List-Unsubscribe and List-Unsubscribe-Post), and an
   unverified address does not steer a reply.
 - The kind is own-inbox mail (`OWN_INBOX_KINDS`): no unsubscribe, and a suppression does not stop it.
+  So `send()` refuses an own-inbox kind addressed to anything but `AGENCY_PLUS_INBOX` (`invalid_address`,
+  nothing claimed; `lib/v2/mail/send.test.ts`).
 - `crawlmouse.mail.contact-purge` runs `purge_contact_requests` daily at 05:43 UTC.
 - The mail functions and the purge are registered with `V2_CHECKS_PUBLIC=1` and send with
   `RESEND_API_KEY` and the mail pepper set (CC-28). `POST /api/contact/agency-plus` answers 404 unless
