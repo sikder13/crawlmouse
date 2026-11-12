@@ -9,7 +9,7 @@
  * Modelled: `from(table)` with `select`, `insert`, `upsert` (`onConflict` required,
  * `ignoreDuplicates`) and `update`, each optionally followed by `select(columns)`, which returns the
  * written rows as PostgREST's `return=representation` does; the filters `eq`, `is`,
- * `not(column, 'is' | 'eq', value)` and `in`; `order`, `limit`, `range` after a `select` that reads,
+ * `not(column, 'is' | 'eq', value)`, `filter(column, 'is' | 'not.is', value)` and `in`; `order`, `limit`, `range` after a `select` that reads,
  * and `maybeSingle` after either kind of `select`; and `rpc(fn, args)` for a
  * function that returns one value. `maxRows` caps every read as PostgREST's `db-max-rows` does. The builders carry no other method, so a call a port adds throws in its test
  * until it is modelled here.
@@ -182,6 +182,16 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
         } else {
           throw new Error(`the stand-in does not model not.${operator}`);
         }
+        return filters;
+      },
+      /** `filter(column, 'is' | 'not.is', null | boolean)`, PostgREST's raw operator form. */
+      filter(column: string, operator: string, value: unknown) {
+        calls.push(['filter', column, operator, value]);
+        if (value !== null && typeof value !== 'boolean')
+          throw new Error('the stand-in models filter with is / not.is only');
+        if (operator === 'is') where.push(`${ident(column)} is ${String(value)}`);
+        else if (operator === 'not.is') where.push(`${ident(column)} is not ${String(value)}`);
+        else throw new Error(`the stand-in does not model filter ${operator}`);
         return filters;
       },
       in(column: string, values: readonly unknown[]) {

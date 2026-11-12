@@ -19,7 +19,7 @@ export async function fetchIndexableReportSlugs(
   limit: number,
 ): Promise<SitemapReportEntry[]> {
   try {
-    const query = sb
+    let query = sb
       .from('public_reports')
       .select('slug, created_at')
       .eq('indexable', true)
@@ -31,9 +31,9 @@ export async function fetchIndexableReportSlugs(
     // A v2 report (CC-29) is a 404 while V2_CHECKS_PUBLIC is off (`isReportGoneEitherKind`), so it is
     // listed only while the flag is on. It is told apart by its grade, which a v2 row never has (the
     // insert trigger copies it from `audits`); a v1 row without one is a 404 on v1's page as well.
-    const { data, error } = await (checksPublicEnabled() ? query : query.not('grade', 'is', null))
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    // `filter` rather than `.not(…)`, whose column-typed overload is too deep for tsc on this chain.
+    if (!checksPublicEnabled()) query = query.filter('grade', 'not.is', null);
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(limit);
     if (error) return [];
     const rows = (data as Array<{ slug: string; created_at: string }> | null) ?? [];
     if (rows.length >= limit) {

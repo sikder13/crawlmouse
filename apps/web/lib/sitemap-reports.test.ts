@@ -27,6 +27,10 @@ function makeSb(result: { data: unknown; error: unknown }) {
       record.filters.push(['is', ...a]);
       return chain;
     },
+    filter: (...a: unknown[]) => {
+      record.filters.push(['filter', ...a]);
+      return chain;
+    },
     order: (...a: unknown[]) => {
       record.filters.push(['order', ...a]);
       return chain;
@@ -111,11 +115,11 @@ describe('fetchIndexableReportSlugs', () => {
     };
 
     it('with the flag off reads graded (v1) reports only', async () => {
-      expect(await filtersWith('')).toContainEqual(['not', 'grade', 'is', null]);
+      expect(await filtersWith('')).toContainEqual(['filter', 'grade', 'not.is', null]);
     });
 
     it('with the flag on reads every claimed, indexable report', async () => {
-      expect(await filtersWith('1')).not.toContainEqual(['not', 'grade', 'is', null]);
+      expect(await filtersWith('1')).not.toContainEqual(['filter', 'grade', 'not.is', null]);
     });
   });
 });
