@@ -129,6 +129,13 @@ export const NOTICE_CODES = [
   'email_mismatch',
   'invite_full',
   'already_member',
+  // buying seats and sites (CC-31)
+  'extras_changed',
+  'extras_unchanged',
+  'in_use',
+  'payment_failed',
+  'subscription_unchangeable',
+  'billing_unavailable',
   // any body the route could not read
   'invalid',
 ] as const;

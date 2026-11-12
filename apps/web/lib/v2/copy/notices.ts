@@ -83,6 +83,16 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   invite_full: () =>
     'The account has no seat free, so the invitation was not accepted. Its owner can free one.',
   already_member: () => 'You already have a seat on this account.',
+  extras_changed: () =>
+    'The change was sent to billing. The new limits show here once the payment is confirmed.',
+  extras_unchanged: () => 'The plan already has those quantities, so nothing was changed.',
+  in_use: () =>
+    'More seats or sites are in use than that would leave. Remove a seat or a site first, then lower the quantity.',
+  payment_failed: () => 'The card was declined, so nothing was changed.',
+  subscription_unchangeable: () =>
+    'This plan cannot be changed here: it is set to end, or its last payment has not gone through. Settings › Plan has the details.',
+  billing_unavailable: () =>
+    'Billing cannot be reached right now, so nothing was changed. Try again later.',
   invalid: () => 'That request was not understood, so nothing was changed.',
 };
 
