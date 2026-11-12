@@ -146,7 +146,7 @@ describe('auditDoc on the contract fixtures', () => {
   });
 
   it('lists each open fix with its effect, in the audit’s order', () => {
-    const fixes = tableOf(doc, 'Open fixes, effects estimated');
+    const fixes = tableOf(doc, 'In the audit’s order');
     expect(fixes.columns).toEqual(['Fix', 'Pages', 'Estimated effect', 'Effort', 'Kind']);
     expect(fixes.rows).toHaveLength(13);
     expect(fixes.rows.slice(0, 2)).toEqual([

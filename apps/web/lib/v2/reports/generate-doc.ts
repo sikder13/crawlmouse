@@ -154,7 +154,7 @@ function fixesSection(p: Pages): DocSection | null {
     blocks: [
       {
         type: 'table',
-        caption: COPY.fixes,
+        caption: COPY.fixesCaption,
         columns: [COPY.fix, COPY.pages, COPY.effect, COPY.effort, COPY.kind],
         rows: p.result.fixes.rows.map((r) => {
           const fix = open.get(r.key);

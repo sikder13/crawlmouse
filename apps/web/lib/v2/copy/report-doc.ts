@@ -31,6 +31,7 @@ export const REPORT_DOC_COPY = {
   inTheWay: 'What is in the way',
 
   /** The fixes table. */
+  fixesCaption: 'In the audit’s order',
   fix: 'Fix',
   pages: 'Pages',
   effect: 'Estimated effect',
