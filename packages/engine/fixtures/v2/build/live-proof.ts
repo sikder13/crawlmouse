@@ -16,6 +16,10 @@
  */
 import { startServer } from '../../../../worker/src/test-support/http.js';
 import { buildCheck, type BuiltCheck } from '../../../src/v2/build/index.js';
+import {
+  TECHNICAL_SEO_PENDING_MEANINGS,
+  WITHHELD_REASON_MEANINGS,
+} from '../../../src/v2/grade/withheld.js';
 import { runCommand } from '../../../src/v2/packets/test-support/verify.js';
 import { record, renamed } from './generate.js';
 import { HOST, recordedInput } from './recorded.js';
@@ -29,11 +33,33 @@ type Body = NonNullable<Fix['packet']>['packets'][number];
 const numbered = (lines: readonly string[]) => lines.map((l, i) => `${i + 1}. ${l}`);
 const bullets = (lines: readonly string[]) => lines.map((l) => `- ${l}`);
 
+/** Each recommendation class and confidence in words: the owner reads this file, not the contract. */
+const CLASS: Readonly<Record<Fix['recommendation_class'], string>> = {
+  documented_requirement: 'a documented requirement',
+  best_practice: 'a best practice',
+  confirmed_defect: 'a confirmed defect',
+  experimental: 'an experimental practice',
+};
+const CONFIDENCE: Readonly<Record<Fix['confidence'], string>> = {
+  confirmed: 'confirmed',
+  likely: 'likely',
+  inconclusive: 'inconclusive',
+};
+
+const points = (n: number) => `${n >= 0 ? '+' : ''}${n}`;
+
+/** The estimated effect in words; a grade that is not estimated gives its reasons as sentences. */
 function effectOf(fix: Fix): string {
-  const part = (points: number | null, waits: readonly string[]) =>
-    points === null ? `waits on ${waits.join(', ')}` : `${points >= 0 ? '+' : ''}${points}`;
   const e = fix.effect;
-  return `Technical SEO ${part(e.technical_seo, e.technical_seo_pending_on)}; AI readability ${part(e.ai_readability, e.ai_readability_pending_on)}`;
+  const seo =
+    e.technical_seo === null
+      ? `not estimated. ${e.technical_seo_pending_on.map((r) => TECHNICAL_SEO_PENDING_MEANINGS[r]).join(' ')}`
+      : `${points(e.technical_seo)}.`;
+  const ai =
+    e.ai_readability === null
+      ? `not estimated. ${e.ai_readability_pending_on.map((r) => (r in WITHHELD_REASON_MEANINGS ? WITHHELD_REASON_MEANINGS[r as keyof typeof WITHHELD_REASON_MEANINGS] : 'It waits on another fix.')).join(' ')}`
+      : `${points(e.ai_readability)}.`;
+  return `Technical SEO ${seo} AI readability ${ai}`;
 }
 
 function bodyOf(body: Body): string[] {
@@ -52,7 +78,9 @@ async function fixOf(fix: Fix, base: string): Promise<string[]> {
   const head = [
     `## ${fix.rank}. ${fix.title}`,
     '',
-    `\`${fix.type}\` · ${fix.recommendation_class} · ${fix.confidence} · ${fix.affected_pages} affected pages · effect: ${effectOf(fix)}`,
+    `${fix.affected_pages} affected ${fix.affected_pages === 1 ? 'page' : 'pages'}. ${CLASS[fix.recommendation_class][0]!.toUpperCase()}${CLASS[fix.recommendation_class].slice(1)}, ${CONFIDENCE[fix.confidence]}.`,
+    '',
+    `Estimated effect: ${effectOf(fix)}`,
     '',
   ];
   const p = fix.packet;
