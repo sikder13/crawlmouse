@@ -63,10 +63,13 @@ describe('Pricing names only capabilities it can account for', () => {
   });
 
   // SEO R2-N2 (Q33): the artboard's h1 promises monitoring, and the footer's line on every page that
-  // the change is told; each carries what it names and is marked while that is coming.
+  // the change is told; each carries what it names and is marked while that is coming. With CC-28
+  // merged both are built, so neither is marked (rulings-2).
   it('the h1 and the footer line carry the monitoring they name, marked while it is coming', () => {
     expect(PRICING_COPY.title.text).toBe('Every audit is free. Pay when you want it watched.');
-    expect(comingNamedIn(PRICING_COPY.title.text)).toContain('weekly_checks');
+    expect(PRICING_COPY.title.capabilities).toEqual(['weekly_checks', 'change_emails']);
+    expect(CAPABILITIES.weekly_checks.status).toBe('built');
+    expect(CAPABILITIES.change_emails.status).toBe('built');
     for (const [, html] of pages) {
       const doc = new JSDOM(html).window.document;
       const h1 = doc.querySelector('h1')!;
@@ -85,10 +88,15 @@ describe('Pricing names only capabilities it can account for', () => {
     }
   });
 
-  it('the Agency Plus answer says only that the request is recorded', () => {
-    expect(PRICING_COPY.agencyPlus.sent).toBe('Sent. Your request is recorded.');
+  // Rulings-3 Q38: with the agency_plus_contact template, the answer says the request goes to the
+  // team, and nothing of when it is answered.
+  it('the Agency Plus answer says the request goes to the team, and no reply time', () => {
+    expect(CAPABILITIES.agency_plus_reply.status).toBe('built');
+    expect(PRICING_COPY.agencyPlus.sent).toBe('Sent. Your request goes to our team.');
     const [, sent] = pages.find(([n]) => n.endsWith('contact sent'))!;
-    expect(sent).toContain('Sent. Your request is recorded.');
+    expect(sent).toContain('Sent. Your request goes to our team.');
+    const said = `${PRICING_COPY.agencyPlus.sent} ${PRICING_COPY.agencyPlus.reply.text}`;
+    expect(said).not.toMatch(/\b(?:hours?|days?|minutes?|soon|shortly|within|business)\b/i);
   });
 
   it('the emails question names the renewal reminders, as FACTS does', () => {

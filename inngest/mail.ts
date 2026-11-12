@@ -3,7 +3,8 @@
  * (apps/web/lib/v2/pipeline/functions.ts). What each one does is injected (`MailHandlers`), so this
  * package imports nothing from the app; the production handlers are apps/web/lib/v2/mail/handlers.ts.
  *
- * - accountMailFn, on `email.requested`: the trial reminder and CC-27b's three account-link emails.
+ * - accountMailFn, on `email.requested`: the trial reminder, CC-27b's three account-link emails, and
+ *   CC-29's Agency Plus request (`agency_plus_contact`), which goes to our own sales inbox.
  * - checkNotifyFn, on `check.notify_requested`, `check.finished` and `check.failed`: the visitor's
  *   "tell me when it ends". The request can arrive before or after the check ends, so the function
  *   runs on all three and sends once the check has ended and an address is stored; the send ledger's
@@ -11,6 +12,8 @@
  * - fixToDeveloperFn, on `fix.email_developer_requested`.
  * - checkFinishedEventFn, on `check.finished`: the product event `check_finished`, once per check
  *   (Inngest's idempotency on the check id, and one step).
+ * - contactPurgeFn, daily: deletes the Agency Plus requests sent more than 30 days ago
+ *   (`purge_sent_contact_requests`, migration 20261114000001); an unsent request is kept.
  *
  * Each runs its handler in one step. A `MailRetry` (a send worth retrying, or a claim another worker
  * holds) is thrown on, so Inngest retries the step; any other error is logged by name and the step
@@ -22,6 +25,7 @@ export const ACCOUNT_MAIL_FN_ID = 'crawlmouse.mail.account';
 export const CHECK_NOTIFY_FN_ID = 'crawlmouse.mail.check-notify';
 export const FIX_TO_DEVELOPER_FN_ID = 'crawlmouse.mail.fix-to-developer';
 export const CHECK_FINISHED_EVENT_FN_ID = 'crawlmouse.events.check-finished';
+export const CONTACT_PURGE_FN_ID = 'crawlmouse.mail.contact-purge';
 
 /**
  * Retries of a mail step. A claim held by a worker that died is taken back after two minutes
@@ -38,7 +42,9 @@ export type EmailRequestedData =
       accountId: string;
       template: 'email_change_confirm' | 'email_change_notice' | 'account_delete';
       tokenId: string;
-    };
+    }
+  // CC-29: names the contact_requests row, never the address (inngest/client.ts).
+  | { template: 'agency_plus_contact'; contactId: string };
 
 /** What each function does; every one answers a short outcome word for the run's output. */
 export interface MailHandlers {
@@ -120,5 +126,18 @@ export function createCheckFinishedEventFn(handlers: () => MailHandlers) {
       step.run('capture', () =>
         guarded(CHECK_FINISHED_EVENT_FN_ID, () => handlers().checkFinished(event.data.checkId)),
       ),
+  );
+}
+
+/**
+ * The daily deletion of sent Agency Plus requests: one step, whose answer is the count deleted. Safe to
+ * run again: a retried step deletes what is still past the line.
+ */
+export function createContactPurgeFn(purge: () => Promise<number>) {
+  return inngest.createFunction(
+    { id: CONTACT_PURGE_FN_ID, concurrency: { limit: 1 } },
+    // Off the hour, and away from v1's cleanup (04:00), the reconcile (03:00) and the expiry (05:17).
+    { cron: '43 5 * * *' },
+    async ({ step }) => ({ deleted: await step.run('purge-sent', () => purge()) }),
   );
 }

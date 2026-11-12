@@ -1,9 +1,11 @@
--- v2 public pages (CC-29): the Agency trial's second account, the Agency Plus contact form, and one
--- public report per check. Spec: docs/specs/v2/29-public-pages.md.
+-- v2 public pages (CC-29): the Agency trial's second account, the Agency Plus contact form with its
+-- mail kind and retention, and one public report per check. Spec: docs/specs/v2/29-public-pages.md.
 --
--- Additive only. Nothing in auth is touched and no cascade is added. The function is security
--- definer, search_path pg_catalog, pg_temp, owned by postgres, and executable by service_role only:
--- the route establishes the caller from their own session before it calls it.
+-- Additive, except that CC-28's email_sends.kind check is replaced by a wider one. Nothing in auth is
+-- touched and no cascade is added. start_agency_trial_account is security definer, search_path
+-- pg_catalog, pg_temp, owned by postgres, and executable by service_role only: the route establishes
+-- the caller from their own session before it calls it. purge_sent_contact_requests is security
+-- invoker and executable by service_role only.
 --
 -- The statements are re-runnable (the tests apply the file twice).
 -- The revert is infra/supabase/rollbacks/20261114000001_v2_029_public_pages.revert.sql.
@@ -133,8 +135,10 @@ grant execute on function public.start_agency_trial_account(uuid, text, text) to
 
 -- ─── contact_requests ────────────────────────────────────────────────────────────────────────────
 -- The Agency Plus form (FACTS A3: a contact form only). The route writes a row with the service role
--- and sends email.requested naming the row, never the address (as fix_email_requests). The row holds
--- an address and no user id; its retention is set with the mail template (CC-28).
+-- and sends email.requested naming the row, never the address (as fix_email_requests). The mailer
+-- sends it to the sales inbox as `agency_plus_contact` and sets sent_at. The row holds an address and
+-- no user id; a sent row is deleted 30 days after it was sent (purge_sent_contact_requests, below),
+-- and an unsent one is kept.
 
 create table if not exists public.contact_requests (
   id uuid primary key default gen_random_uuid(),
@@ -149,6 +153,36 @@ create table if not exists public.contact_requests (
 alter table public.contact_requests enable row level security;
 revoke all on table public.contact_requests from public, anon, authenticated, service_role;
 grant select, insert, update, delete on table public.contact_requests to service_role;
+
+-- Deletes the requests sent more than 30 days before p_now and answers how many. Unsent rows are kept,
+-- so the operator still sees a request no message carried. Run daily by the mailer's
+-- crawlmouse.mail.contact-purge (inngest/mail.ts). Security invoker: service_role holds the delete.
+create or replace function public.purge_sent_contact_requests(p_now timestamptz)
+returns integer
+language sql
+security invoker
+set search_path = pg_catalog, pg_temp
+as $$
+  with gone as (
+    delete from public.contact_requests
+     where sent_at is not null and sent_at < p_now - interval '30 days'
+    returning 1
+  )
+  select count(*)::integer from gone;
+$$;
+revoke all on function public.purge_sent_contact_requests(timestamptz) from public, anon, authenticated;
+grant execute on function public.purge_sent_contact_requests(timestamptz) to service_role;
+
+-- ─── email_sends: the Agency Plus request's kind ─────────────────────────────────────────────────
+-- CC-28's mailer ledger (20261113000001) checks `kind` against its eight kinds; the request mail adds
+-- a ninth. The column's check is replaced under its own name, so applying this again leaves one.
+-- `email_kind_suppressible` is not changed: it answers false for this kind, so a suppression does
+-- not stop mail to our own inbox.
+alter table public.email_sends drop constraint if exists email_sends_kind_check;
+alter table public.email_sends add constraint email_sends_kind_check
+  check (kind in ('check_notify', 'fix_to_developer', 'trial_reminder', 'email_change_confirm',
+                  'email_change_notice', 'account_delete', 'alert', 'weekly_summary',
+                  'agency_plus_contact'));
 
 -- ─── public_reports: one report per check ────────────────────────────────────────────────────────
 -- v1 holds one report per audit through audit_id's unique constraint; this is its v2 counterpart, so

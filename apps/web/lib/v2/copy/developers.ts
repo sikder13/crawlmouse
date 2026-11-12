@@ -1,6 +1,6 @@
 /**
  * The words of the v2 Developers page (CC-29 D5), from Final-Developers with FACTS Part 2 applied:
- * A1 (`ai_readability`), A4 (the request line, the `cm_ro_` key and the roadmap rows unchanged,
+ * A1 (`ai_readability`), A4 (the request line, the `cm_ro_` key and the roadmap rows unchanged but two,
  * J13 and K8) and B2 (the crawler rows' fields). The JSON example is not written here: it is built
  * from the fixture by `lib/v2/view/developers.ts`.
  *
@@ -12,6 +12,8 @@
  *   carries the "coming" mark.
  * - "unsubscribe in one click" is cut from the developer list's promise: the list has no unsubscribe
  *   link today.
+ * - The roadmap's "Write API" and "MCP server" rows read "planned", not the artboard's "building"
+ *   (owner ruling, rulings-3 Q37); the other rows keep the artboard's statuses.
  */
 
 /** The read API's rate limit and key prefix (FACTS A4, DECISION J13); no plan gate holds them. */
@@ -39,13 +41,14 @@ export const DEVELOPERS_COPY = {
     title: 'Being built, in this order, top first',
     sub: 'No dates. Each ships when it is as reliable as the web app.',
     rows: [
+      // Owner ruling (rulings-3 Q37): planned, with no date. MCP is after v1 (OPERATING-RULES §8).
       {
         item: 'Write API: start an audit, mark a fix done, trigger a re-check',
-        status: 'building',
+        status: 'planned',
       },
       {
         item: 'MCP server, so Claude Code, Cursor and agents can audit and fix in one loop',
-        status: 'building',
+        status: 'planned',
       },
       { item: 'GitHub check: audit the preview deploy on every pull request', status: 'designed' },
       { item: 'CLI, ', code: 'npx crawlmouse audit', status: 'designed' },

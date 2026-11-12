@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildOutgoing, SUBJECT_MAX } from '../headers';
 import type { RenderedMail } from '../types';
 import { accountDelete, emailChangeConfirm, emailChangeNotice } from './account-links';
+import { agencyPlusContact, type AgencyPlusContactInput } from './agency-plus-contact';
 import { alertTemplate, type AlertMailInput, type MailChange } from './alert';
 import { checkNotify, type CheckNotifyInput } from './check-notify';
 import { fixToDeveloper, type FixToDeveloperInput } from './fix-to-developer';
@@ -176,6 +177,17 @@ const CASES: readonly Case<unknown>[] = [
       'sites.*.changes.*.grade_deltas.*.to_grade',
     ],
   }),
+  kase({
+    name: 'agency-plus-contact',
+    input: {
+      email: 'ops@summit.example',
+      sites: 40,
+      note: 'We run 40 client sites.',
+    } satisfies AgencyPlusContactInput,
+    render: agencyPlusContact,
+    outside: ['email', 'note'],
+    ours: [],
+  }),
 ];
 
 /** Every string leaf of `v`, as a path with `*` for each array index. */
@@ -212,7 +224,13 @@ describe('D3: every outside string, set to each hostile value, leaves a sendable
 
   it('sweeps each template that takes an outside string', () => {
     expect(new Set(sweep.map(([, c]) => c.name))).toEqual(
-      new Set(['check-notify', 'fix-to-developer', 'alert', 'weekly-summary']),
+      new Set([
+        'check-notify',
+        'fix-to-developer',
+        'alert',
+        'weekly-summary',
+        'agency-plus-contact',
+      ]),
     );
   });
 

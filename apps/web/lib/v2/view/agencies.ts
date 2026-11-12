@@ -12,10 +12,9 @@
  * other way leaves the proof true, and the "coming" mark stays until the row is changed. Every piece
  * of copy names its capabilities, and a piece that names one that is coming is marked (`coming`).
  *
- * A file a coming proof names is the one its step adds, by name, so the row flips at the merge that
- * brings that file and not before (SEO R2-N3): CC-28's templates for its own emails, and for the
- * emails CC-28 does not build, the path their template would take beside them.
- * `agencies.test.ts` runs these proofs against the paths CC-28's branch adds.
+ * A file a coming proof names is the one its step adds, by name, so the row's test fails at the merge
+ * that brings that file and not before (SEO R2-N3). CC-28's merge flipped its four rows this way; the
+ * Agency Plus request's template (CC-29) flipped `agency_plus_reply`.
  */
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
@@ -86,7 +85,7 @@ export interface Capability {
 /** Where a coming capability's code would be: the app, its jobs and the crawl worker. */
 const SOURCE_DIRS = ['apps/web/lib', 'apps/web/app', 'inngest', 'packages/worker/src'] as const;
 
-/** Where v2 mail templates live: CC-28 adds the folder, one file per kind of email. */
+/** Where v2 mail templates live (CC-28's folder), one file per kind of email. */
 const MAIL_TEMPLATES = 'apps/web/lib/v2/mail/templates';
 
 export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
@@ -127,28 +126,14 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     named: /competitor/i,
   },
   weekly_checks: {
-    status: 'coming',
-    what: 'Checks on a schedule, weekly or monthly: nothing requests a scheduled check yet (CC-28).',
-    proof: {
-      kind: 'all',
-      of: [
-        { kind: 'absent', path: 'apps/web/lib/v2/monitor/schedule.ts' },
-        {
-          kind: 'nowhere',
-          dirs: SOURCE_DIRS,
-          text: /trigger:\s*(?:['"]scheduled['"]|[A-Z_]*SCHEDULED\b)/,
-        },
-      ],
-    },
-    named:
-      /\bweekly\b|re-?check|checked (?:again|monthly)|checking again|scheduled checks?|every week|monthly checks|\bwatch(?:ed|ing|es)?\b/i,
+    status: 'built',
+    what: 'Checks on a schedule: weekly on Pro and Agency, monthly on Free’s one site (CC-28’s scheduler, `claim_due_sites`).',
+    proof: { kind: 'exists', path: 'apps/web/lib/v2/monitor/schedule.ts' },
   },
   change_emails: {
-    status: 'coming',
+    status: 'built',
     what: 'The email when a check finds a change, per the rules under Alerts: CC-28’s alert.',
-    proof: { kind: 'absent', path: `${MAIL_TEMPLATES}/alert.ts` },
-    named:
-      /finds a change|hear first|email only if something changed|alerts by email|telling you what changed|note when a (?:re-)?check|tells? you when/i,
+    proof: { kind: 'exists', path: `${MAIL_TEMPLATES}/alert.ts` },
   },
   client_report_page: {
     status: 'coming',
@@ -187,20 +172,9 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     proof: { kind: 'exists', path: 'apps/web/app/api/fixes/[id]/packet/route.ts' },
   },
   slack_alerts: {
-    status: 'coming',
-    what: 'Alerts sent to Slack: a seat can choose Slack, but nothing posts to it.',
-    proof: {
-      kind: 'all',
-      of: [
-        { kind: 'absent', path: 'apps/web/lib/v2/monitor/slack.ts' },
-        {
-          kind: 'nowhere',
-          dirs: SOURCE_DIRS,
-          text: /hooks\.slack\.com|slack\.com\/api|chat\.postMessage/,
-        },
-      ],
-    },
-    named: /\bslack\b/i,
+    status: 'built',
+    what: 'Alerts posted to the account’s Slack webhook: CC-28’s alert, through `slackPoster`.',
+    proof: { kind: 'exists', path: 'apps/web/lib/v2/monitor/slack.ts' },
   },
   exports: {
     status: 'coming',
@@ -225,10 +199,9 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     named: /\brenders\b|JavaScript renders?|full renders?/i,
   },
   trial_reminder: {
-    status: 'coming',
+    status: 'built',
     what: 'The email three days before a trial ends: CC-28’s trial reminder.',
-    proof: { kind: 'absent', path: `${MAIL_TEMPLATES}/trial-reminder.ts` },
-    named: /email you (?:three|\d+) days before|reminder (?:three|\d+) days before/i,
+    proof: { kind: 'exists', path: `${MAIL_TEMPLATES}/trial-reminder.ts` },
   },
   renewal_reminders: {
     status: 'coming',
@@ -237,11 +210,9 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     named: /renewal reminders?|before an annual renewal/i,
   },
   agency_plus_reply: {
-    status: 'coming',
-    what: 'A reply to an Agency Plus request: it is stored and its `email.requested` sent, and no template answers it yet.',
-    // The event's template is `agency_plus_contact` (app/api/contact/agency-plus/_lib/contact.ts).
-    proof: { kind: 'absent', path: `${MAIL_TEMPLATES}/agency-plus-contact.ts` },
-    named: /we reply|talk to us/i,
+    status: 'built',
+    what: 'An Agency Plus request mailed to the inbox the reply comes from: the `agency_plus_contact` template.',
+    proof: { kind: 'exists', path: `${MAIL_TEMPLATES}/agency-plus-contact.ts` },
   },
   observed_crawlers: {
     status: 'coming',

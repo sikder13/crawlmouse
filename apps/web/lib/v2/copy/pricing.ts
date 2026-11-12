@@ -309,7 +309,7 @@ export const PRICING_COPY = {
     price: () => `from ${usd(AGENCY_PLUS.fromMonthly)} a month`,
     link: 'Send a request',
     formTitle: 'Tell us about your agency',
-    /** Nothing tells anyone of a request until CC-28's mailer (Q27). */
+    /** The request is mailed to this inbox (`agency_plus_contact`, AGENCY_PLUS_INBOX). */
     reply: {
       text: 'We reply from support@crawlmouse.com.',
       capabilities: ['agency_plus_reply'],
@@ -319,8 +319,11 @@ export const PRICING_COPY = {
     note: 'Anything we should know',
     noteHint: 'optional',
     submit: 'Send',
-    /** What is true once the route answers: the request is stored. */
-    sent: 'Sent. Your request is recorded.',
+    /**
+     * What is true once the route answers: the request is stored and its `email.requested` sent, which
+     * the mailer turns into a message to the team. Nothing is said of when they reply.
+     */
+    sent: 'Sent. Your request goes to our team.',
     errors: {
       invalid: 'Check the address and the number of sites, then send it again.',
       rate_limited:

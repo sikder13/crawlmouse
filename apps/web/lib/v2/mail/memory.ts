@@ -10,7 +10,10 @@
  */
 import type { Claim, ClaimInput, MailLedger } from './ledger';
 import type { MailTransport, TransportResult } from './transport';
-import { ACCOUNT_KINDS, type OutgoingMail } from './types';
+import { ACCOUNT_KINDS, OWN_INBOX_KINDS, type MailKind, type OutgoingMail } from './types';
+
+/** Whether a suppression stops a kind: `email_kind_suppressible`'s answer. */
+const suppressible = (k: MailKind) => !ACCOUNT_KINDS.has(k) && !OWN_INBOX_KINDS.has(k);
 
 export interface MemoryLedger extends MailLedger {
   rows: Map<
@@ -30,7 +33,7 @@ export function memoryLedger(suppressed: ReadonlySet<string> = new Set()): Memor
       claims.push(c);
       const r = rows.get(c.key);
       if (!r) {
-        const suppress = !ACCOUNT_KINDS.has(c.kind) && suppressed.has(c.addressHash);
+        const suppress = suppressible(c.kind) && suppressed.has(c.addressHash);
         rows.set(c.key, {
           status: suppress ? 'suppressed' : 'sending',
           attempts: suppress ? 0 : 1,
@@ -41,7 +44,7 @@ export function memoryLedger(suppressed: ReadonlySet<string> = new Set()): Memor
       if (r.status === 'sent') return { outcome: 'done' };
       if (r.status === 'suppressed') return { outcome: 'suppressed' };
       if (r.status === 'sending') return { outcome: 'busy' };
-      if (!ACCOUNT_KINDS.has(c.kind) && suppressed.has(c.addressHash)) {
+      if (suppressible(c.kind) && suppressed.has(c.addressHash)) {
         r.status = 'failed';
         r.errorCode = 'suppressed';
         return { outcome: 'suppressed' };
