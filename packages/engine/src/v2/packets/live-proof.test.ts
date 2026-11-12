@@ -47,7 +47,7 @@ describe('the lab site, crawled over HTTP', () => {
     expect(proof).toMatch(/^## \d+\. Serve the text of guides without JavaScript$/m);
     expect(proof).toMatch(/^## \d+\. Let ClaudeBot through the user-agent rule$/m);
     expect(proof).toContain(
-      '- The template `/guides/{slug}` serves its main content by JavaScript. The audit rendered 3 of its 3 graded pages in a browser, and without JavaScript each of them is an empty shell.',
+      '- The HTML response of the template `/guides/{slug}` holds far fewer words than its pages show once rendered in a browser: the difference is content added in the browser. The audit rendered each of its 3 graded pages in a browser.',
     );
     const statuses = [...proof.matchAll(/before any fix: exit status (\d+)/g)].map((m) => m[1]);
     expect(statuses.length).toBeGreaterThanOrEqual(2);
