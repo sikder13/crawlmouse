@@ -255,4 +255,16 @@ export const PREVIEWS: PreviewEntry[] = [
   },
   { path: '/v2-preview/screens/continue', name: 'Continue', kind: 'screen' },
   { path: '/v2-preview/screens/continue/expired', name: 'Continue, link expired', kind: 'screen' },
+  // CC-29 workstream C. For agencies' orange element is the trial button; Developers' is the
+  // closing audit's button. The /check pages have no artboard: each is the Home screen's parts,
+  // with the hero form's button orange.
+  { path: '/v2-preview/screens/agencies', name: 'Final-Agencies', kind: 'screen' },
+  { path: '/v2-preview/screens/developers', name: 'Final-Developers', kind: 'screen' },
+  { path: '/v2-preview/screens/check/gptbot', name: 'Check: is GPTBot blocked?', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/check/javascript',
+    name: 'Check: readable without JavaScript?',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/check/robots-ai', name: 'Check: robots.txt for AI', kind: 'screen' },
 ];

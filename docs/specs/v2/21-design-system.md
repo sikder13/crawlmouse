@@ -555,3 +555,8 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Check-email, sign-in                         | `/v2-preview/screens/check-email/signin`                 | screen    |                                      |
 | Continue                                     | `/v2-preview/screens/continue`                           | screen    |                                      |
 | Continue, link expired                       | `/v2-preview/screens/continue/expired`                   | screen    |                                      |
+| Final-Agencies                               | `/v2-preview/screens/agencies`                           | screen    |                                      |
+| Final-Developers                             | `/v2-preview/screens/developers`                         | screen    |                                      |
+| Check: is GPTBot blocked?                    | `/v2-preview/screens/check/gptbot`                       | screen    |                                      |
+| Check: readable without JavaScript?          | `/v2-preview/screens/check/javascript`                   | screen    |                                      |
+| Check: robots.txt for AI                     | `/v2-preview/screens/check/robots-ai`                    | screen    |                                      |
