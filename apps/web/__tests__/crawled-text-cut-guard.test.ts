@@ -608,6 +608,54 @@ const INVENTORY: [entry: string, why: string][] = [
     "packages/engine/src/url-canonical.ts :: if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);",
     'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
+  [
+    "packages/engine/src/v2/grade/outcomes.ts :: : `${points.slice(0, MAX_TITLE_CHARS).join('')}…`;",
+    'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). A fix title past MAX_TITLE_CHARS, marked with an ellipsis (CC-30, titleOf).',
+  ],
+  [
+    'packages/engine/src/v2/packets/by-type/client-rendered-template.ts :: const shown = record.evidence.pages.slice(0, PAGES_SHOWN);',
+    'ARRAY slice of the record’s rendered pages (`RenderedPage[]`), to bound how many a packet lists; the line counts the rest. No string is cut (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/by-type/generic-anchor-text.ts :: const named = texts.slice(0, MAX_TEXTS);',
+    'ARRAY slice of the distinct generic link texts, to bound how many the verify command names; no string is cut, and each text goes through `crawledWord` (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/by-type/generic-anchor-text.ts :: const shown = links.slice(0, MAX_LINKS).map(({ to, text }): Line => {',
+    'ARRAY slice of the hub’s generic links, to bound how many steps the packet lists; the packet counts the rest. No string is cut (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/by-type/hreflang-gap.ts :: const back = needs.back.slice(0, MAX_NAMED);',
+    'ARRAY slice of the alternate URLs (`string[]`) a page must name back, to bound the verify command; no string is cut (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/by-type/hreflang-gap.ts :: stale.slice(0, MAX_NAMED).map((s) => s.word),',
+    'ARRAY slice of the stale hreflang entries, to bound what the packet names; `list` counts the rest. No string is cut (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/compose.ts :: ...texts.slice(0, PACKET_BOUNDS.section_lines),',
+    'ARRAY slice of a packet section’s lines at PACKET_BOUNDS.section_lines; the section’s last line counts the lines left out. No string is cut (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/compose.ts :: const kept = points.slice(0, PACKET_BOUNDS.line_chars).join('');",
+    'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). A packet line past PACKET_BOUNDS.line_chars; the line says how long it was (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/shell.ts :: return quoted([...clean(crawled)].slice(0, max).join(''));",
+    'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). Crawled text in a verify command, cut to its bound before it is single-quoted (CC-30, crawledWord).',
+  ],
+  [
+    'packages/engine/src/v2/packets/test-support/content.ts :: const shown = span.slice(1, -1);',
+    'STRING slice in a test helper that removes the two ASCII backticks around a code span matched by a regex anchored on them; never persisted or rendered (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/packets/text.ts :: const shown = items.slice(0, max).map((s) => s.text);',
+    'ARRAY slice of `Safe` values in `list`, to bound how many a line names; the line counts the rest. No string is cut (CC-30).',
+  ],
+  [
+    "packages/engine/src/v2/packets/text.ts :: return safe(`\\`${points.slice(0, max).join('')}\\` (cut from ${points.length} characters)`);",
+    'CODE-POINT cut, not a char-index one: the receiver is `[...text]`, an array of whole code points, so the cut cannot split a surrogate pair; `clean` (packets/text.ts) has already removed lone surrogates (`\\p{Cs}`). Crawled text in a packet line, cut to its bound; the line says how long the text was (CC-30, code).',
+  ],
 ];
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
