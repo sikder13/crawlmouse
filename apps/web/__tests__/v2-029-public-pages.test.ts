@@ -22,6 +22,7 @@ import { supabaseMailStore } from '../lib/v2/mail/store';
 
 const MIGRATION = '20261114000001_v2_029_public_pages.sql';
 const ROLLBACK = '20261114000001_v2_029_public_pages.revert.sql';
+const ROLLBACK_028 = '20261113000001_v2_028_monitoring.revert.sql';
 
 let db: PGlite;
 beforeAll(async () => {
@@ -412,7 +413,19 @@ describe('the rollback', () => {
   it('removes what the migration adds, twice over, and the migration applies again', async () => {
     const own = await freshDb();
     try {
-      await applyAllMigrations(own);
+      const kindCheck = async () =>
+        (
+          await own.query<{ def: string }>(
+            `select pg_get_constraintdef(oid) as def from pg_constraint
+              where conrelid = 'public.email_sends'::regclass and conname = 'email_sends_kind_check'`,
+          )
+        ).rows.map((r) => r.def);
+      // CC-28's check as it stands before this migration, to hold the rollback's restore to.
+      await applyAllMigrations(own, undefined, (f) => f < MIGRATION);
+      const before = await kindCheck();
+      expect(before).toHaveLength(1);
+      expect(before[0]).not.toContain('agency_plus_contact');
+      await applyAllMigrations(own, undefined, (f) => f >= MIGRATION);
       const present = async () =>
         (
           await own.query<{ n: number }>(
@@ -440,16 +453,35 @@ describe('the rollback', () => {
       await own.exec(readRollback(ROLLBACK));
       await own.exec(readRollback(ROLLBACK));
       expect(Number(await present())).toBe(0);
-      // CC-28's eight-kind check is back, with exactly one email_sends kind check in force.
-      const checks = await own.query<{ def: string }>(
-        `select pg_get_constraintdef(oid) as def from pg_constraint
-          where conrelid = 'public.email_sends'::regclass and conname = 'email_sends_kind_check'`,
-      );
-      expect(checks.rows).toHaveLength(1);
-      expect(checks.rows[0]!.def).toContain('weekly_summary');
+      // CC-28's check is back exactly as it was before this migration, and the only one in force.
+      expect(await kindCheck()).toEqual(before);
       await own.exec(readMigration(MIGRATION));
       await own.exec(readMigration(MIGRATION));
       expect(Number(await present())).toBe(9);
+    } finally {
+      await own.close();
+    }
+  }, 300_000);
+
+  // db-rollback-prod.yml runs one file at a time, so the owner can revert 028 first.
+  it('runs, twice over, after 028 has been reverted', async () => {
+    const own = await freshDb();
+    try {
+      await applyAllMigrations(own);
+      await own.exec(readRollback(ROLLBACK_028));
+      await own.exec(readRollback(ROLLBACK));
+      await own.exec(readRollback(ROLLBACK));
+      const { rows } = await own.query<{
+        sends: string | null;
+        contacts: string | null;
+        n: number;
+      }>(
+        `select pg_catalog.to_regclass('public.email_sends')::text as sends,
+                pg_catalog.to_regclass('public.contact_requests')::text as contacts,
+                (select count(*) from pg_proc
+                  where proname in ('purge_contact_requests', 'start_agency_trial_account'))::int as n`,
+      );
+      expect(rows[0]).toEqual({ sends: null, contacts: null, n: 0 });
     } finally {
       await own.close();
     }
