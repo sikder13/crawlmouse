@@ -144,8 +144,8 @@ create table if not exists public.contact_requests (
 );
 
 alter table public.contact_requests enable row level security;
-revoke all on table public.contact_requests from public, anon, authenticated;
-grant all on table public.contact_requests to service_role;
+revoke all on table public.contact_requests from public, anon, authenticated, service_role;
+grant select, insert, update, delete on table public.contact_requests to service_role;
 
 -- ─── public_reports: one report per check ────────────────────────────────────────────────────────
 -- v1 holds one report per audit through audit_id's unique constraint; this is its v2 counterpart, so

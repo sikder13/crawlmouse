@@ -65,6 +65,8 @@ const READ_SCOPE: Record<string, ReadScope> = {
   pending_erasures: 'none',
   deletion_cancellations: 'none',
   account_slack_destinations: 'none',
+  // 029: the Agency Plus contact form. Service only.
+  contact_requests: 'none',
 };
 
 let db: PGlite;

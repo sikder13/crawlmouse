@@ -41,7 +41,15 @@ const POSTURE: Record<
     policies: ['accounts_member_read'],
     // 027b's deletion mark is read by the membership functions and the purge, never by a client.
     authenticatedSelect: {
-      columnsWithout: ['stripe_customer_id', 'deletion_confirmed_at', 'purge_after'],
+      columnsWithout: [
+        'stripe_customer_id',
+        'deletion_confirmed_at',
+        'purge_after',
+        // CC-29: the agency trial's open Checkout and its consent time, read by the service role only.
+        'agency_checkout_url',
+        'agency_checkout_at',
+        'agency_trial_consent_at',
+      ],
     },
   },
   subscriptions: {
