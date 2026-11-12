@@ -176,7 +176,10 @@ function harness(
       log: (event, fields) => logs.push({ event, fields }),
     },
     linkSecret: o.linkSecret === undefined ? SECRET : o.linkSecret,
-    unsubscribeUrl: (_s, seat) => `https://crawlmouse.com/unsubscribe?t=${seat}`,
+    unsubscribeLinks: (_s, seat) => ({
+      page: `https://crawlmouse.com/unsubscribe?t=${seat}`,
+      oneClick: `https://crawlmouse.com/api/unsubscribe?t=${seat}`,
+    }),
     postSlack: async (url, text) => {
       posts.push({ url, text });
       return o.slack ?? { ok: true };
@@ -231,12 +234,12 @@ describe('email (D5, D7)', () => {
       [
         ADDRESSES[0],
         `alert:${CHECK}:email:${SEAT_1}`,
-        `<https://crawlmouse.com/unsubscribe?t=${SEAT_1}>`,
+        `<https://crawlmouse.com/api/unsubscribe?t=${SEAT_1}>`,
       ],
       [
         ADDRESSES[1],
         `alert:${CHECK}:email:${SEAT_2}`,
-        `<https://crawlmouse.com/unsubscribe?t=${SEAT_2}>`,
+        `<https://crawlmouse.com/api/unsubscribe?t=${SEAT_2}>`,
       ],
     ]);
     expect(h.sent[0]!.headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');

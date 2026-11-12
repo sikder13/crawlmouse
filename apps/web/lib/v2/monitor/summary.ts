@@ -10,6 +10,7 @@
  * `summary:<accountId>:<weekKey>:<seatId>`, with List-Unsubscribe for that seat.
  */
 import { unsubscribeHeaders } from '../mail/headers';
+import type { UnsubscribeLinks } from '../mail/links';
 import { send, type MailDeps, type SendOutcome } from '../mail/send';
 import { weeklySummaryTemplate, type SummarySite } from '../mail/templates/weekly-summary';
 
@@ -34,7 +35,8 @@ export interface SummaryDeps {
   store: SummaryStore;
   mail: MailDeps;
   linkSecret: string | null;
-  unsubscribeUrl(secret: string, seatId: string, now: Date): string;
+  /** The seat's unsubscribe page (footer) and RFC 8058 one-click target (header) for this kind. */
+  unsubscribeLinks(secret: string, seatId: string, now: Date): UnsubscribeLinks;
   capture(accountId: string, properties: { sites: number; changes: number }): Promise<void>;
   log(event: 'summary.no_link_secret', fields: Readonly<Record<string, string>>): void;
   now(): Date;
@@ -103,7 +105,7 @@ export async function sendSummary(deps: SummaryDeps, due: SummaryDue): Promise<S
   const now = deps.now();
   const outcomes: SendOutcome[] = [];
   for (const r of recipients) {
-    const url = deps.unsubscribeUrl(secret, r.seatId, now);
+    const links = deps.unsubscribeLinks(secret, r.seatId, now);
     outcomes.push(
       await send(deps.mail, {
         kind: 'weekly_summary',
@@ -116,9 +118,9 @@ export async function sendSummary(deps: SummaryDeps, due: SummaryDue): Promise<S
             until: due.weekStart,
             zone: account.zone,
             sites,
-            unsubscribeUrl: url,
+            unsubscribeUrl: links.page,
           }),
-        headers: () => unsubscribeHeaders({ url }),
+        headers: () => unsubscribeHeaders({ url: links.oneClick }),
       }),
     );
   }

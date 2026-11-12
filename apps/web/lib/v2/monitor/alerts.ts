@@ -23,6 +23,7 @@
 import { createHmac } from 'node:crypto';
 import { hashMailAddress } from '../mail/address-hash';
 import { unsubscribeHeaders } from '../mail/headers';
+import type { UnsubscribeLinks } from '../mail/links';
 import { send, type MailDeps, type SendOutcome } from '../mail/send';
 import { alertTemplate, type MailChange } from '../mail/templates/alert';
 import type { Claim } from '../mail/ledger';
@@ -105,7 +106,8 @@ export interface AlertDeps {
   mail: MailDeps;
   /** EMAIL_LINK_SECRET, or null when unset (Q6). */
   linkSecret: string | null;
-  unsubscribeUrl(secret: string, seatId: string, now: Date): string;
+  /** The seat's unsubscribe page (footer) and RFC 8058 one-click target (header) for this kind. */
+  unsubscribeLinks(secret: string, seatId: string, now: Date): UnsubscribeLinks;
   postSlack: PostSlack;
   capture(accountId: string, properties: { channel: Channel; changes: number }): Promise<void>;
   log(event: AlertLogEvent, fields: Readonly<Record<string, string | number>>): void;
@@ -252,7 +254,7 @@ async function deliverEmail(
   }
   const outcomes: SendOutcome[] = [];
   for (const r of recipients) {
-    const url = deps.unsubscribeUrl(secret, r.seatId, now);
+    const links = deps.unsubscribeLinks(secret, r.seatId, now);
     outcomes.push(
       await send(deps.mail, {
         kind: 'alert',
@@ -266,9 +268,9 @@ async function deliverEmail(
             checkedAt: ctx.finishedAt ?? now.toISOString(),
             zone: ctx.zone,
             changes,
-            unsubscribeUrl: url,
+            unsubscribeUrl: links.page,
           }),
-        headers: () => unsubscribeHeaders({ url }),
+        headers: () => unsubscribeHeaders({ url: links.oneClick }),
       }),
     );
   }

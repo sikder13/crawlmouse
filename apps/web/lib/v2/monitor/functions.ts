@@ -20,7 +20,7 @@ import { supabaseAlertStore } from './alerts-store';
 import { slackPoster } from './slack';
 import { duePage, sendSummary, type SummaryDeps } from './summary';
 import { supabaseSummaryStore } from './summary-store';
-import { unsubscribeLink } from './unsubscribe-link';
+import { unsubscribeLinks } from '../mail/links';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -49,7 +49,7 @@ export function alertDeps(env: Env): AlertDeps {
     store: supabaseAlertStore(sb),
     mail: mailDeps(env, sb),
     linkSecret: linkSecret(env),
-    unsubscribeUrl: (secret, seatId, now) => unsubscribeLink(secret, seatId, 'alerts', now),
+    unsubscribeLinks: (secret, seatId, now) => unsubscribeLinks(secret, seatId, 'alerts', now),
     postSlack: slackPoster(),
     capture: (accountId, properties) =>
       captureServerEvent(null, {
@@ -68,7 +68,7 @@ export function summaryDeps(env: Env): SummaryDeps {
     store: supabaseSummaryStore(sb, log),
     mail: mailDeps(env, sb),
     linkSecret: linkSecret(env),
-    unsubscribeUrl: (secret, seatId, now) => unsubscribeLink(secret, seatId, 'summary', now),
+    unsubscribeLinks: (secret, seatId, now) => unsubscribeLinks(secret, seatId, 'summary', now),
     capture: (accountId, properties) =>
       captureServerEvent(null, {
         event: 'summary_sent',

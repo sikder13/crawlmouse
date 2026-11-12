@@ -69,7 +69,10 @@ function harness(o: { marked?: boolean; sites?: SummarySite[]; linkSecret?: stri
       log: (event, fields) => logs.push({ event, fields }),
     },
     linkSecret: o.linkSecret === undefined ? 's'.repeat(40) : o.linkSecret,
-    unsubscribeUrl: (_s, seat) => `https://crawlmouse.com/unsubscribe?t=${seat}`,
+    unsubscribeLinks: (_s, seat) => ({
+      page: `https://crawlmouse.com/unsubscribe?t=${seat}`,
+      oneClick: `https://crawlmouse.com/api/unsubscribe?t=${seat}`,
+    }),
     capture: async (accountId, properties) => {
       captures.push({ accountId, properties });
     },
@@ -104,10 +107,19 @@ describe('sendSummary (D6)', () => {
     const h = harness();
     expect(await sendSummary(h.deps, DUE)).toEqual({ sent: 2, outcomes: ['sent', 'sent'] });
     expect(h.sent.map((m) => [m.idempotencyKey, m.headers['List-Unsubscribe']])).toEqual([
-      [`summary:${ACCOUNT}:2026-W47:${SEAT_1}`, `<https://crawlmouse.com/unsubscribe?t=${SEAT_1}>`],
-      [`summary:${ACCOUNT}:2026-W47:${SEAT_2}`, `<https://crawlmouse.com/unsubscribe?t=${SEAT_2}>`],
+      [
+        `summary:${ACCOUNT}:2026-W47:${SEAT_1}`,
+        `<https://crawlmouse.com/api/unsubscribe?t=${SEAT_1}>`,
+      ],
+      [
+        `summary:${ACCOUNT}:2026-W47:${SEAT_2}`,
+        `<https://crawlmouse.com/api/unsubscribe?t=${SEAT_2}>`,
+      ],
     ]);
     expect(h.sent[0]!.subject).toBe('Your week on Crawlmouse: 1 change on 1 site, 1 problem');
+    // The footer links the page that asks; the header names the one-click route (RFC 8058).
+    expect(h.sent[0]!.html).toContain(`https://crawlmouse.com/unsubscribe?t=${SEAT_1}`);
+    expect(h.sent[0]!.html).not.toContain('/api/unsubscribe');
     expect(h.captures).toEqual([{ accountId: ACCOUNT, properties: { sites: 1, changes: 1 } }]);
     expect(JSON.stringify([h.captures, h.logs])).not.toContain('@agency.example');
   });
