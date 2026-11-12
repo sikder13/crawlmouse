@@ -62,59 +62,86 @@ therefore costs the cheap jobs only.
 See `tests/visual/perf.spec.ts`. The three crawl-screen windows were judged on the 95th-percentile
 interval between `requestAnimationFrame` callbacks. On a runner that renders at 30 fps every
 interval is 33.3 ms, so the window failed with its work unchanged (run of `b23d4ca6`: 33.3 ms in
-all five runs against 17.5 ms), and passed on re-run.
+all five runs against 17.5 ms), and passed on re-run. Two layers replace it (owner ruling,
+2026-11-11).
 
-The windows are now judged on the main thread's busy time in each 16.7 ms slice of the traced
-window (`packages/timing/src/busy.ts`; its tests pin the arithmetic against sums computed without
-slices). The slices are fixed in time, so the reading is the page's work whatever refresh rate the
-runner manages. Judged on the median of five runs, as before:
+**1. The gate: the crawl map's writes per frame, counted.** The crawl window is replayed on
+Playwright's fake clock, paused from the start and stepped one frame at a time, with the layout
+Worker switched off so each layout runs on the main thread at a fixed point in replay time. It
+counts every DOM change inside a map (`svg[data-v2-map]`) and every animation started on a map
+element, per 60 Hz frame of replay time, against `MAP_WRITES_PER_FRAME`. The window is counted
+three times: twice at 60 fps, which must read the same number or the run is invalid, and once
+stepped at 30 fps, which must be within the limit too. A count failure is not a budget miss to
+`perf-retry.sh`, so it is never retried. A first version installed the fake clock without pausing
+it, and the same window read 3,908 and then 3,501 writes: real time leaked in while the page loaded.
 
-- `meanWorkMs`, the mean busy time per slice, at most the window's `MEAN_WORK_MS` (each window
-  does its own amount of work, as its long-task cap already says);
-- `p95WorkMs`, its 95th percentile (the bursts), at most `BUDGET.p95WorkMs`;
-- `maxFrameMs`, no frame interval over 100 ms (a stall at any refresh rate), unchanged.
+| crawl window, counted                        | writes | per frame | 60 fps, twice | 30 fps | limit 5.4 |
+| -------------------------------------------- | ------ | --------- | ------------- | ------ | --------- |
+| the page as it is, workstation (five passes) | 3,111  | 4.321     | equal         | 3,111  | green     |
+| the map rendered twice, workstation          | 6,222  | 8.642     | equal         | 6,222  | **red**   |
+| the page as it is, CI (run 43117782092)      | 3,111  | 4.321     | equal         | 3,111  | green     |
+| the map rendered twice, CI (run 43117820543) | 6,222  | 8.642     | equal         | 6,222  | **red**   |
 
-The 95th-percentile interval and the share of intervals over 34 ms are printed and recorded for the
-nightly trend, not judged (`ADVISORY` in `tests/visual/budgets.ts`). A run must draw more than 20
-frames a second to count as measured; it was 50, which failed a 30 fps runner as "measurement
-invalid", an error the retry never excuses.
+The limit is 1.25 times the count: room for a change to the map that writes a little more, and well
+under the doubled map's 2.0. Stepping at 30 fps read exactly the 60 fps count on every pass, on both machines. The CI run of the
+doubled map came from a scratch branch dispatched with `visual: true` and then deleted; its failure
+was `map writes per frame, at 60 fps` (8.642 against 5.4), which `perf-retry.sh` reported as "not a
+budget failure" and did not retry.
 
-Read the limits: `sed -n '/^export const BUDGET/,/^};/p;/^export const MEAN_WORK_MS/,/^};/p' tests/visual/budgets.ts`.
+**2. The safety net: main-thread work in a reference runner's milliseconds.** The traced pass
+reads the main thread's busy time in each 16.7 ms slice (`packages/timing/src/busy.ts`; its tests
+pin the arithmetic against sums computed without slices). Its mean per slice is divided by the
+runner probe's ratio to its 105 ms reference (`meanWorkRefMs`), and held per window against
+`MEAN_WORK_MS`, on the median of five runs: advisory, for the reason below. A run with no probe reading (`PERF_PROBE`, which CI and
+the nightly set) is invalid, not a pass. **This layer catches a large regression, not a third more
+work:** across normal CI runners the raw reading moved by about 27% with no change to `apps` or `packages` between them (2.077 ms
+on a runner probing 103 ms, 2.633 ms on one probing 121.5 ms), which is the size of the doubled
+map's effect on the whole page (+33% on a workstation). Normalised, CI's readings are:
 
-**Measured on the production build, the crawl window, five runs each** (a workstation, 2026-11-11;
-logs beside the PR notes). This machine draws about 50 frames a second, so the old rule failed it
-with nothing changed:
+| CI run          | probe     | crawl     | crawler tests | phone     |
+| --------------- | --------- | --------- | ------------- | --------- |
+| 43092736453     | 102.96 ms | 2.118     | 0.513         | 1.905     |
+| 43100098012 (1) | 121.5 ms  | 2.275     | 0.509         | 2.001     |
+| 43100098012 (2) | 121.5 ms  | 2.270     | —             | —         |
+| 43117782092     | 100.48 ms | 2.136     | 0.531         | 1.454     |
+| 43125738080     | 101.35 ms | 2.690     | 0.614         | 2.306     |
+| **spread**      |           | **27.0%** | **20.6%**     | **58.6%** |
 
-| run                                                 | mean work / slice (median) | p95 work / slice | p95 frame interval | old rule | new rule |
-| --------------------------------------------------- | -------------------------- | ---------------- | ------------------ | -------- | -------- |
-| the page as it is                                   | 2.195 ms                   | 5.61 ms          | 33.4 ms            | red      | green    |
-| every `requestAnimationFrame` callback held a frame | 2.094 ms                   | 5.37 ms          | 50.1 ms            | red      | green    |
-| the map rendered and animated twice (a hidden twin) | 2.93 ms                    | 7.5 ms           | 33.4 ms            | red      | **red**  |
+Reference milliseconds, medians of five; the spread is (highest − lowest) / lowest. The first two
+runs predate the normalisation and are normalised here by the same formula (×105 / probe); run
+43100098012's second attempt re-ran only the window that missed. **Every window spread by more than
+15% with the crawl screen's own code unchanged, so this layer is advisory** (`MEAN_WORK_ADVISORY` in
+`tests/visual/budgets.ts`): recorded for the nightly trend, never failing a run, while the count is
+the gate. With four readings already over 15%, a fifth could only widen the spread. The crawl
+screen's own code is the same at every head these runs read, though `main` was merged in between
+(other screens and shared components changed): `git diff --name-only 83b7590e 05ede0b9 --
+apps/web/components/v2/screens/crawl apps/web/components/v2/map apps/web/lib/v2/map-layout.ts
+apps/web/lib/v2/map-layout.worker.ts apps/web/lib/v2/layout-scheduler.ts apps/web/lib/v2/player.ts
+apps/web/lib/v2/progress.ts` prints nothing. The limits are
+about 1.2 times each window's highest reading, so the trend shows a night that runs well above them.
 
-The twin map (a second `MapSvg` with its own `useFlip`, invisible) is the mutation for "the map does
-twice the work per frame": the page's work rises by about a third (2.195 to 2.93 ms), because the map is part of it, and the
-mean crosses its limit. The 95th percentile moves less, which is why the mean is the budget held
-closely. Held callbacks model the CI symptom (frame intervals of two vsyncs or more); they slow the
-page's own callbacks, not the browser's compositor.
+Unchanged and still judged: `p95WorkMs`, the 95th percentile per slice, at most `BUDGET.p95WorkMs`;
+no frame interval over 100 ms (`maxFrameMs`), a stall at any refresh rate. Printed and recorded for
+the nightly trend, not judged: the 95th-percentile interval and the share of intervals over 34 ms
+(`ADVISORY`). A run must draw more than 20 frames a second to count as measured; it was 50, which
+failed a 30 fps runner as invalid, an error the retry never excuses.
 
-**The limits are absolute milliseconds**, so a slower CPU reads more work. That is what the runner
-probe and the one retry in `packages/timing/scripts/perf-retry.sh` already handle
-(`docs/ops/ci-timing.md`): a budget-only failure that repeats on a runner the probe rates slow passes
-as inconclusive.
+Read the limits:
+`sed -n '/^export const BUDGET/,/^};/p;/^export const MEAN_WORK/,/^};/p;/^export const MAP_WRITES/p' tests/visual/budgets.ts`.
 
-**The limits, against CI and a workstation.** Medians of five, the production build. CI is the
-pull request run 43092736453, shard 1, on a runner the probe rated normal (103 ms against a
-105 ms reference), which drew 60 frames a second there:
+**Before the count, on a workstation** (raw milliseconds, five runs each; this machine draws about
+50 frames a second, so the old rule failed it with nothing changed):
 
-| window                                          | CI       | workstation | limit  |
-| ----------------------------------------------- | -------- | ----------- | ------ |
-| the crawl, the map growing                      | 2.077 ms | 2.198 ms    | 2.5 ms |
-| the crawler tests, the log and verdicts landing | 0.503 ms | 0.719 ms    | 0.9 ms |
-| on a phone, the crawler tests beginning         | 1.868 ms | 2.704 ms    | 3.2 ms |
+| run                                                 | mean work / slice | p95 frame interval | old rule |
+| --------------------------------------------------- | ----------------- | ------------------ | -------- |
+| the page as it is                                   | 2.195 ms          | 33.4 ms            | red      |
+| every `requestAnimationFrame` callback held a frame | 2.094 ms          | 50.1 ms            | red      |
+| the map rendered and animated twice                 | 2.93 ms           | 33.4 ms            | red      |
 
-Each limit is about 1.2 times the slower of the two readings, the crawl window's rounded down to
-keep the twin-map mutation red: a third more than CI's 2.077 ms is about 2.77 ms. The nightly trend
-shows how close each night runs to them.
+**Transient, recorded:** the pull request run 43092736453 ran every shard green, then its `visual`
+job failed to start with GitHub's "Internal server error" (correlation 53045ed6-3f44-49bd-909b-dc59a68f1dfc)
+and stayed queued; GitHub refused a re-run of that run. The next run's `visual` job, with the same
+name expression, started and reported normally.
 
 ## D4 — superseded runs are cancelled
 
