@@ -3,8 +3,11 @@
  * to search engines when it is lit.
  *
  * - With V2_BILLING unset, `/pricing` and `/developers` are v1's files, byte for byte as main has
- *   them, and neither reaches a v2 module; that the middleware does not rewrite them is pinned in
- *   `middleware.test.ts` ("the CC-29 rows").
+ *   them, and so is `/r/<slug>`'s page, which v1 serves with V2_CHECKS_PUBLIC unset (and the v2
+ *   route hands every v1 row). None imports a v2 module directly; that no import chain from a live
+ *   page reaches one is held by `preview-guard.test.ts` ("v2 stays out of live pages"), which walks
+ *   the graph. That the middleware does not rewrite them is pinned in `middleware.test.ts` ("the
+ *   CC-29 rows").
  * - `/agencies` and the `/v2-developers` target are 404s with V2_BILLING unset; the three `/check`
  *   pages are 404s with V2_CHECKS_PUBLIC unset, and every other `/check` segment is a 404 always.
  * - Lit, each has its own canonical, no robots of its own (the root layout's, which index), one h1,
@@ -40,7 +43,7 @@ function flags(f: { billing?: boolean; checks?: boolean }) {
   vi.stubEnv('V2_CHECKS_PUBLIC', f.checks ? '1' : '');
 }
 
-describe('v1’s /pricing and /developers with V2_BILLING unset (D1)', () => {
+describe('v1’s /pricing, /developers and /r/<slug> pages, as main has them (D1)', () => {
   // main's files, pinned by content so the test needs no git ref (a shallow CI checkout has no
   // origin/main), as live-home.test.tsx pins the home. Taken at origin/main ac9605e5; when main's
   // page changes, recompute with
@@ -48,6 +51,7 @@ describe('v1’s /pricing and /developers with V2_BILLING unset (D1)', () => {
   const MAIN_SHA256 = {
     'app/pricing/page.tsx': 'df30ef5ed6f50016236d7c930071689d7e61d5548eba027dde3c8ff94aeafca7',
     'app/developers/page.tsx': 'becdc256b7c335885adeef5b3b731f53152572ad334d124f139dd98ac354488f',
+    'app/r/[slug]/page.tsx': '8b27c68e5bf26b7a014d071fa7a684de809ade03b2e160b1603f90d1ddfe9d00',
   };
 
   it.each(Object.entries(MAIN_SHA256))('%s is the file main has', (file, sha) => {
@@ -55,12 +59,15 @@ describe('v1’s /pricing and /developers with V2_BILLING unset (D1)', () => {
     expect(createHash('sha256').update(source).digest('hex')).toBe(sha);
   });
 
-  it.each(Object.keys(MAIN_SHA256))('%s reaches no v2 module, by import or import()', (file) => {
-    const source = readFileSync(join(WEB_ROOT, file), 'utf8');
-    const reached = [...source.matchAll(/(?:from\s+|import\(\s*)'([^']+)'/g)].map((m) => m[1]!);
-    expect(reached.length).toBeGreaterThan(2);
-    expect(reached.filter((m) => /components\/v2|styles\/v2|lib\/v2/.test(m))).toEqual([]);
-  });
+  it.each(Object.keys(MAIN_SHA256))(
+    '%s imports no v2 module directly, by import or import()',
+    (file) => {
+      const source = readFileSync(join(WEB_ROOT, file), 'utf8');
+      const reached = [...source.matchAll(/(?:from\s+|import\(\s*)'([^']+)'/g)].map((m) => m[1]!);
+      expect(reached.length).toBeGreaterThan(2);
+      expect(reached.filter((m) => /components\/v2|styles\/v2|lib\/v2/.test(m))).toEqual([]);
+    },
+  );
 
   it('serves the v2 Developers page from the target the rewrite row names, under the billing flag', () => {
     expect(V2_REWRITES.find((r) => r.from === '/developers')).toEqual({
