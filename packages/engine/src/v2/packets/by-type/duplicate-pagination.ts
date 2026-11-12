@@ -8,25 +8,27 @@
  * the near-duplicate condition the packet says only what follows from the record: a detected page
  * that does not declare the first page as canonical was detected for its content.
  *
- * Verify reads the first affected page. For the canonical: its `rel="canonical"` is its own URL. For
- * the content: it links to a page the first page does not link to, leaving out the list's own pages.
- * A list page shows its items as links, so a later page that repeats the first has none of its own;
- * the content hash itself is measured again on the next check.
+ * Verify reads the first affected page, at the address it is served at. For the canonical: the one
+ * `rel="canonical"` in its head is its own URL. For the content: the audit's signal is a hash of the
+ * main content, which one line of shell cannot compute, so the command compares the two pages' links
+ * instead (html-checks.ts `listsDiffer`): each must link somewhere the other does not, the list's
+ * own pages left out. A later page that serves the first page's items again has every link the first
+ * has, whatever it adds, so it does not pass; a later page that was removed does not pass either,
+ * which is how the detector reads a later page that is gone. The hash is measured again on the next
+ * check.
  */
 import { firstPageOf } from '../../detectors/duplicate-pagination.js';
 import { SIMHASH_HAMMING_K } from '../../detectors/thresholds.js';
 import {
-  ANCHOR_HREFS,
-  anyOf,
   both,
-  CANONICAL_HREF,
+  canonicalIs,
   command,
   fetchOf,
-  hrefForms,
   joined,
-  linksBeyondFirst,
+  listsDiffer,
   spelled,
 } from '../html-checks.js';
+import { servedAt } from '../served-at.js';
 import { crawledWord } from '../shell.js';
 import { GOOGLE_DOCS, pagesShown, plural, rowOf, subjectOf } from '../structure.js';
 import { code, count, line, ours, type Line } from '../text.js';
@@ -73,6 +75,11 @@ export function listMark(later: string): string {
   return `/${segment}/`;
 }
 
+/** What the content half of the command proves, and what it leaves to the next check. */
+const LINKS_NOT_HASH = ours(
+  'A later page that repeats the first has every link the first has, so it does not pass. The command compares links; the content hash the audit measures is measured again on the next check.',
+);
+
 export const duplicatePagination: PacketEntry<'duplicate_pagination'> = {
   kind: 'builder',
   context: (fix, facts) => {
@@ -112,7 +119,6 @@ export const duplicatePagination: PacketEntry<'duplicate_pagination'> = {
       if (condition === 'pagination_near_duplicate') {
         change.push(
           line`Make each later page list its own items. A later page that serves the first page again usually means the page number in the URL does not reach the query that builds the list.`,
-          line`If a list has no items for a later page, stop linking to that page and let it answer 404.`,
         );
       }
     }
@@ -130,15 +136,15 @@ export const duplicatePagination: PacketEntry<'duplicate_pagination'> = {
       throw new Error('packets: a duplicate_pagination record names no later page');
     }
     const first = firstOf(later);
+    const [own, firstAt] = [servedAt(facts, later), servedAt(facts, first)];
     const one = fetchOf(facts, [later]);
     const canonical = declaringFirst(fix, facts).includes(later)
-      ? joined(one.fragment, CANONICAL_HREF, anyOf(hrefForms(later)))
+      ? joined(one.fragment, canonicalIs(own, own))
       : null;
     const content = fix.conditions.includes('pagination_near_duplicate')
       ? joined(
           fetchOf(facts, [first, later]).fragment,
-          ANCHOR_HREFS,
-          linksBeyondFirst(crawledWord(listMark(later)), hrefForms(first)),
+          listsDiffer(firstAt, crawledWord(listMark(later))),
         )
       : null;
     const others = ours(
@@ -146,17 +152,20 @@ export const duplicatePagination: PacketEntry<'duplicate_pagination'> = {
         ? ''
         : ' The command reads the first of the later pages; the others are measured again on the next check.',
     );
+    const head = ours(
+      'The command reads the <head> of the HTML: a canonical sent in an HTTP Link header is not read.',
+    );
     if (canonical !== null && content !== null) {
       return {
         command: command(both(canonical, content)),
-        expect: line`Exit status 0 once the rel="canonical" of ${code(later)} is its own URL (today it is ${code(first)}), and the page links to a page that ${code(first)} does not link to and that is not another page of the list: items of its own. The content hash is measured again on the next check.${others}`,
+        expect: line`Exit status 0 once the <head> of ${code(own)} holds one <link rel="canonical">, naming its own URL (today it names ${code(first)}), and ${code(own)} and ${code(firstAt)} each link to a page the other does not link to, links to the list's own pages left out. ${LINKS_NOT_HASH} ${head}${others}`,
         ua: one.ua,
       };
     }
     if (canonical !== null) {
       return {
         command: command(canonical),
-        expect: line`Exit status 0 once the rel="canonical" of ${code(later)} is its own URL, in full or from the root, in quotes; today it is ${code(first)}.${others}`,
+        expect: line`Exit status 0 once the <head> of ${code(own)} holds one <link rel="canonical">, naming its own URL in full or from the root; today it names ${code(first)}. ${head}${others}`,
         ua: one.ua,
       };
     }
@@ -165,7 +174,7 @@ export const duplicatePagination: PacketEntry<'duplicate_pagination'> = {
     }
     return {
       command: command(content),
-      expect: line`Exit status 0 once ${code(later)} links to a page that ${code(first)} does not link to and that is not another page of the list: items of its own. The content hash is measured again on the next check.${others}`,
+      expect: line`Exit status 0 once ${code(own)} and ${code(firstAt)} each link to a page the other does not link to, links to the list's own pages left out. ${LINKS_NOT_HASH}${others}`,
       ua: one.ua,
     };
   },
