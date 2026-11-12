@@ -7,6 +7,7 @@
  */
 import type { Check } from '@crawlmouse/types/v2';
 import { keptOutClauses, thinSentence } from '../sentences';
+import { capitalise } from '../words';
 import { findCheck, siteOf, type ViewDataset } from '../fixtures';
 import { CAUSE_SHORT } from '../view/segment/access';
 import { crawlerRows, resultView } from '../view/result';
@@ -21,7 +22,7 @@ function headline(check: Check, host: string): string {
     ...(thin ? [thin] : []),
   ];
   return sentences.length
-    ? sentences.map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')
+    ? sentences.map(capitalise).join(' ')
     : `Every crawler we tested reads ${host}.`;
 }
 
