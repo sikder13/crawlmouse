@@ -66,12 +66,14 @@ describe('POST /api/unsubscribe (D7)', () => {
     expect(rpc).toHaveBeenCalledWith('unsubscribe_seat', { p_seat: SEAT, p_kind: 'summary' });
   });
 
-  it('the page’s form goes back to the page with the done cookie, which says it is done', async () => {
+  it('the page’s form goes back to its own link with a done cookie naming that seat and kind', async () => {
     const res = await post(form(token('summary')));
     expect(res.status).toBe(303);
-    expect(res.headers.get('location')).toBe('https://crawlmouse.com/unsubscribe');
+    expect(res.headers.get('location')).toBe(
+      `https://crawlmouse.com/unsubscribe?t=${encodeURIComponent(token('summary'))}`,
+    );
     expect(res.headers.get('set-cookie')).toBe(
-      'cm_unsubscribed=summary; Path=/unsubscribe; Max-Age=120; HttpOnly; Secure; SameSite=Lax',
+      `cm_unsubscribed=summary.${SEAT}; Path=/unsubscribe; Max-Age=120; HttpOnly; Secure; SameSite=Lax`,
     );
     expect(rpc).toHaveBeenCalledWith('unsubscribe_seat', { p_seat: SEAT, p_kind: 'summary' });
   });

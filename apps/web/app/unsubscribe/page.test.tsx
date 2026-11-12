@@ -40,10 +40,16 @@ describe('GET /unsubscribe (D7): shows the choice, changes nothing', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it('says what was done when the POST’s cookie says so, and why a link cannot be used', async () => {
-    jar = { cm_unsubscribed: 'summary' };
-    expect(await render({})).toContain('The weekly summary is no longer emailed');
-    jar = {};
+  it('says done for the link the POST went back to, when its cookie names that seat and kind', async () => {
+    const t = signUnsubscribe(SECRET, SEAT, 'summary', new Date());
+    jar = { cm_unsubscribed: `summary.${SEAT}` };
+    const out = await render({ t });
+    expect(out).toContain('The weekly summary is no longer emailed');
+    expect(out).not.toContain('<form');
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('says why a link cannot be used', async () => {
     expect(await render({ t: 'nope' })).toContain('not one we can read');
     const old = signUnsubscribe(SECRET, SEAT, 'alerts', new Date(Date.now() - 91 * 86_400_000));
     expect(await render({ t: old })).toContain('has expired');
@@ -51,16 +57,30 @@ describe('GET /unsubscribe (D7): shows the choice, changes nothing', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it('a crafted link cannot make it say done: ?done= is not read, and a cookie names a kind or nothing', async () => {
+  it('a crafted link cannot make it say done: ?done= is not read, and a cookie needs its own link', async () => {
     for (const done of ['alerts', 'summary']) {
       const out = await render({ done });
       expect(out).not.toContain('Done.');
       expect(out).toContain('not one we can read');
     }
-    jar = { cm_unsubscribed: 'everything' };
+    // A cookie with no link, or a cookie of the old shape, says nothing.
+    jar = { cm_unsubscribed: `alerts.${SEAT}` };
     expect(await render({})).not.toContain('Done.');
     jar = { cm_unsubscribed: 'alerts' };
-    expect(await render({})).toContain('Done. Alerts are no longer emailed');
+    expect(await render({ t: signUnsubscribe(SECRET, SEAT, 'alerts', new Date()) })).not.toContain(
+      'Done.',
+    );
+  });
+
+  it('within the cookie’s two minutes, a link for the other kind or another seat still asks (review r2)', async () => {
+    jar = { cm_unsubscribed: `alerts.${SEAT}` };
+    const other = '99999999-2222-4333-8444-555555555555';
+    const summary = await render({ t: signUnsubscribe(SECRET, SEAT, 'summary', new Date()) });
+    expect(summary).toContain('Stop the weekly summary email to this address?');
+    expect(summary).not.toContain('Done.');
+    const otherSeat = await render({ t: signUnsubscribe(SECRET, other, 'alerts', new Date()) });
+    expect(otherSeat).toContain('Stop alert emails to this address?');
+    expect(otherSeat).not.toContain('Done.');
   });
 
   it('is a 404 with V2_CHECKS_PUBLIC off', async () => {

@@ -41,18 +41,23 @@ export type UnsubscribePageView =
   | { state: 'done'; text: string }
   | { state: 'refused'; text: string };
 
-const KINDS: readonly UnsubscribeKind[] = ['alerts', 'summary'];
 const refusalOf = (v: Extract<Verified, { ok: false }>): Refusal =>
   v.reason === 'expired' ? 'expired' : 'invalid';
 
 /**
- * The cookie the POST sets for the page it sends the form back to, naming the kind it turned off. The
- * page says "Done" only when it holds it, so a crafted `/unsubscribe` link cannot show a false "Done"
- * on our domain (security review r1, N5): no page of another site can set a cookie for crawlmouse.com.
- * Short-lived, HttpOnly, and sent to `/unsubscribe` only. A refusal stays a query (`?error=`): a
- * crafted one says a link cannot be used, which asks the reader to sign in rather than claiming a change.
+ * The cookie the POST sets for the page it sends the form back to, naming the seat and the kind it
+ * turned off (`<kind>.<seat id>`). The POST sends the form back to the same link, `?t=<token>`, and
+ * the page says "Done" only when the link's token verifies and names that same seat and kind: a
+ * crafted `/unsubscribe` link cannot show a false "Done" (security review r1, N5), no page of another
+ * site can set a cookie for crawlmouse.com, and within the cookie's two minutes another link (the other
+ * kind, another seat) still asks (correctness review r2). Short-lived, HttpOnly, sent to
+ * `/unsubscribe` only. A refusal stays a query (`?error=`): a crafted one says a link cannot be used,
+ * which asks the reader to sign in rather than claiming a change.
  */
 export const UNSUBSCRIBE_DONE_COOKIE = 'cm_unsubscribed';
+
+/** The done cookie's value for one seat and one kind. */
+export const doneValue = (kind: UnsubscribeKind, seatId: string): string => `${kind}.${seatId}`;
 
 /** What the page shows, from its query and the done cookie. Reads the token; changes nothing. */
 export function unsubscribePageView(
@@ -61,14 +66,15 @@ export function unsubscribePageView(
   env: Env,
   now: Date,
 ): UnsubscribePageView {
-  const done = KINDS.find((k) => k === doneCookie);
-  if (done) return { state: 'done', text: UNSUBSCRIBE_COPY.done[done] };
   const error = (Object.keys(UNSUBSCRIBE_COPY.refused) as Refusal[]).find((k) => k === query.error);
   if (error) return { state: 'refused', text: UNSUBSCRIBE_COPY.refused[error] };
   const secret = linkSecret(env);
   if (secret === null) return { state: 'refused', text: UNSUBSCRIBE_COPY.refused.unconfigured };
   const v = verifyUnsubscribe(secret, query.t ?? '', now);
   if (!v.ok) return { state: 'refused', text: UNSUBSCRIBE_COPY.refused[refusalOf(v)] };
+  if (doneCookie === doneValue(v.kind, v.seatId)) {
+    return { state: 'done', text: UNSUBSCRIBE_COPY.done[v.kind] };
+  }
   return { state: 'ask', kind: v.kind, text: UNSUBSCRIBE_COPY.ask[v.kind], token: query.t! };
 }
 
@@ -94,7 +100,7 @@ export async function readBounded(req: Request, max = BODY_MAX): Promise<string 
 }
 
 export type UnsubscribeRequest =
-  | { ok: true; seatId: string; kind: UnsubscribeKind; oneClick: boolean }
+  | { ok: true; seatId: string; kind: UnsubscribeKind; oneClick: boolean; token: string }
   | { ok: false; status: 400 | 413 | 503; code: Refusal | 'too_large'; oneClick: boolean };
 
 /**
@@ -118,7 +124,7 @@ export async function verifyUnsubscribeRequest(
   const token = inUrl ?? form.get('t') ?? '';
   const v = verifyUnsubscribe(secret, token, now);
   if (!v.ok) return { ok: false, status: 400, code: refusalOf(v), oneClick };
-  return { ok: true, seatId: v.seatId, kind: v.kind, oneClick };
+  return { ok: true, seatId: v.seatId, kind: v.kind, oneClick, token };
 }
 
 /**
@@ -138,8 +144,8 @@ export function unsubscribeAnswer(r: UnsubscribeRequest, origin: string): Respon
       status: 303,
       headers: {
         ...headers,
-        Location: `${origin}/unsubscribe`,
-        'Set-Cookie': `${UNSUBSCRIBE_DONE_COOKIE}=${r.kind}; Path=/unsubscribe; Max-Age=120; HttpOnly; Secure; SameSite=Lax`,
+        Location: `${origin}/unsubscribe?t=${encodeURIComponent(r.token)}`,
+        'Set-Cookie': `${UNSUBSCRIBE_DONE_COOKIE}=${doneValue(r.kind, r.seatId)}; Path=/unsubscribe; Max-Age=120; HttpOnly; Secure; SameSite=Lax`,
       },
     });
   }
