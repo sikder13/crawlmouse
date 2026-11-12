@@ -41,6 +41,13 @@ const nextConfig = {
     ];
   },
   transpilePackages: ['@crawlmouse/engine', '@crawlmouse/types'],
+  // The report PDF's fonts are read from disk when a report is made (lib/v2/reports/pdf.ts), which
+  // the file tracer does not follow, so they are named for the route that makes a report and for
+  // the Inngest route.
+  outputFileTracingIncludes: {
+    '/api/reports': ['./lib/v2/reports/fonts/*'],
+    '/api/webhooks/inngest': ['./lib/v2/reports/fonts/*'],
+  },
   serverExternalPackages: [
     'crawlee',
     '@crawlee/basic',
