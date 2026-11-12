@@ -4,7 +4,7 @@
 -- themselves expire in Stripe. It deletes the ledger's agency_plus_contact rows (email_sends), which
 -- record the mail of the contact_requests it drops, and restores CC-28's eight-kind check.
 drop index if exists public.public_reports_check_uq;
-drop function if exists public.purge_sent_contact_requests(timestamptz);
+drop function if exists public.purge_contact_requests(timestamptz);
 drop table if exists public.contact_requests;
 delete from public.email_sends where kind = 'agency_plus_contact';
 alter table public.email_sends drop constraint if exists email_sends_kind_check;

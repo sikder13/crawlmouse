@@ -326,27 +326,45 @@ describe('contact_requests: the mail store reads, marks and deletes them (CC-29,
     expect((await store().contactRequest(id))!.sentAt).toBe(NOW.toISOString());
   });
 
-  it('deletes the requests sent more than 30 days before now, and keeps the rest', async () => {
-    const old = await request(new Date(NOW.getTime() - 30 * DAY - 1000));
-    const edge = await request(new Date(NOW.getTime() - 30 * DAY));
-    const recent = await request(new Date(NOW.getTime() - 29 * DAY));
-    const unsentOld = await request(null);
-    await db.query(`update public.contact_requests set created_at = $2 where id = $1`, [
-      unsentOld,
-      new Date(NOW.getTime() - 400 * DAY).toISOString(),
-    ]);
-    const deleted = await store().purgeSentContacts(NOW);
-    expect(deleted).toBeGreaterThanOrEqual(1);
-    expect(await exists(old)).toBe(false);
-    expect(await exists(edge)).toBe(true);
-    expect(await exists(recent)).toBe(true);
-    expect(await exists(unsentOld)).toBe(true);
-    expect(await store().purgeSentContacts(NOW)).toBe(0);
+  // A sent row goes 30 days after sent_at, an unsent one 30 days after created_at: the line is strict,
+  // so a row exactly 30 days old is kept and one a millisecond older is deleted.
+  it('deletes each request 30 days after it was sent, or after it was made when it was not', async () => {
+    const ago = (ms: number) => new Date(NOW.getTime() - ms);
+    const made = async (createdAt: Date, sentAt: Date | null) => {
+      const id = await request(sentAt);
+      await db.query(`update public.contact_requests set created_at = $2 where id = $1`, [
+        id,
+        createdAt.toISOString(),
+      ]);
+      return id;
+    };
+    const rows = {
+      sentPast: await made(ago(31 * DAY), ago(30 * DAY + 1)),
+      sentEdge: await made(ago(31 * DAY), ago(30 * DAY)),
+      sentRecentMadeLongAgo: await made(ago(400 * DAY), ago(29 * DAY)),
+      unsentPast: await made(ago(30 * DAY + 1), null),
+      unsentEdge: await made(ago(30 * DAY), null),
+      unsentRecent: await made(ago(29 * DAY), null),
+    };
+    const deleted = await store().purgeContacts(NOW);
+    expect(deleted).toBeGreaterThanOrEqual(2);
+    const kept = Object.fromEntries(
+      await Promise.all(Object.entries(rows).map(async ([k, id]) => [k, await exists(id)])),
+    );
+    expect(kept).toEqual({
+      sentPast: false,
+      sentEdge: true,
+      sentRecentMadeLongAgo: true,
+      unsentPast: false,
+      unsentEdge: true,
+      unsentRecent: true,
+    });
+    expect(await store().purgeContacts(NOW)).toBe(0);
   });
 
   it.each(['anon', 'authenticated'] as const)('%s cannot run the deletion', async (role) => {
     await expect(
-      asRole(db, role, null, (tx) => tx.query('select public.purge_sent_contact_requests(now())')),
+      asRole(db, role, null, (tx) => tx.query('select public.purge_contact_requests(now())')),
     ).rejects.toThrow(/permission denied/);
   });
 });
@@ -399,7 +417,7 @@ describe('the rollback', () => {
         (
           await own.query<{ n: number }>(
             `select (select count(*) from pg_proc where proname = 'start_agency_trial_account')
-                  + (select count(*) from pg_proc where proname = 'purge_sent_contact_requests')
+                  + (select count(*) from pg_proc where proname = 'purge_contact_requests')
                   + (select count(*) from pg_constraint
                       where conname = 'email_sends_kind_check'
                         and pg_get_constraintdef(oid) like '%agency_plus_contact%')

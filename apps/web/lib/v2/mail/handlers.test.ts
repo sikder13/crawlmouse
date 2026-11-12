@@ -69,7 +69,7 @@ function store(over: Partial<MailStore> = {}): MailStore {
       }),
     ),
     markContactSent: vi.fn(async () => undefined),
-    purgeSentContacts: vi.fn(async () => 0),
+    purgeContacts: vi.fn(async () => 0),
     ...over,
   };
 }

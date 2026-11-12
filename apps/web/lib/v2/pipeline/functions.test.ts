@@ -317,7 +317,7 @@ const limitsOf = (configs: readonly Config[]): number[] =>
   });
 
 /**
- * CC-28's mail functions and CC-29's deletion of sent Agency Plus requests, registered with
+ * CC-28's mail functions and CC-29's deletion of Agency Plus requests, registered with
  * V2_CHECKS_PUBLIC=1 only (lib/v2/mail/functions.ts).
  */
 const MAIL_IDS = [

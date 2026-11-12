@@ -3,7 +3,7 @@
  * cancel handler, the reaper and the daily expiry (CC-22b D8) only when V2_PIPELINE=1 in the
  * environment the route module loads with. CC-03's two billing functions follow, only when
  * V2_BILLING=1, then CC-27b's three deletion functions, CC-28's four mail functions and CC-29's
- * deletion of sent Agency Plus requests, only when V2_CHECKS_PUBLIC=1. CC-28's scheduler tick, alert and summary functions follow, only when both
+ * deletion of Agency Plus requests, only when V2_CHECKS_PUBLIC=1. CC-28's scheduler tick, alert and summary functions follow, only when both
  * V2_PIPELINE=1 and V2_CHECKS_PUBLIC=1. With the flags unset the list is v1's four objects, unchanged
  * (functions.test.ts).
  *

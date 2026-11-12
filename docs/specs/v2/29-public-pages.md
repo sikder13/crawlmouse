@@ -37,9 +37,11 @@ Where an artboard's figure disagrees with `prices.ts` (Agency $69, $9 a seat), t
   are hidden from clients by the table's per-column grants
   (`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-029-public-pages.test.ts`).
 - `contact_requests (id, email, sites, note, created_at, sent_at)`: RLS on, all revoked from anon and
-  authenticated. It holds an address and no user id. `purge_sent_contact_requests(p_now)` (security
-  invoker, service_role only) deletes the rows sent more than 30 days before `p_now`; an unsent row is
-  kept, so the operator still sees a request no message carried.
+  authenticated. It holds an address and no user id. `purge_contact_requests(p_now)` (security
+  invoker, service_role only) deletes the rows sent more than 30 days before `p_now`, and the unsent
+  rows made more than 30 days before it, so no submitted address is kept past 30 days (the table's
+  30-day TTL, rulings-3 Q38;
+  `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-029-public-pages.test.ts`).
 - `email_sends_kind_check` is replaced by the same list plus `agency_plus_contact`; the rollback deletes
   that kind's ledger rows and restores CC-28's list. `email_kind_suppressible` is unchanged, so it
   answers false for the new kind. `email_events.kind` (v2_005) is not touched: v2 mail writes no
@@ -61,7 +63,7 @@ Where an artboard's figure disagrees with `prices.ts` (Agency $69, $9 a seat), t
   `buildOutgoing` accepts are `EXTRA_HEADERS` (List-Unsubscribe and List-Unsubscribe-Post), and an
   unverified address does not steer a reply.
 - The kind is own-inbox mail (`OWN_INBOX_KINDS`): no unsubscribe, and a suppression does not stop it.
-- `crawlmouse.mail.contact-purge` runs `purge_sent_contact_requests` daily at 05:43 UTC.
+- `crawlmouse.mail.contact-purge` runs `purge_contact_requests` daily at 05:43 UTC.
 - The mail functions and the purge are registered with `V2_CHECKS_PUBLIC=1` and send with
   `RESEND_API_KEY` and the mail pepper set (CC-28). `POST /api/contact/agency-plus` answers 404 unless
   both `V2_BILLING` and `V2_CHECKS_PUBLIC` are on, so no request is stored that the mailer and the
