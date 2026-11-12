@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { fixesAsOf } from '../../fixtures';
 import { FREE_FIXES } from '../free-fixes';
-import { RECOMMENDATION_LABELS, sectionFixes } from './fixes';
+import { noPacketLine } from '../no-packet';
+import { noPacketReason } from '../packet-reason';
+import { bodyFor, withBodies } from '../test-support/multi-body';
+import { RECOMMENDATION_LABELS, packetBodies, packetPrompt, sectionFixes } from './fixes';
 import { edited } from './test-helpers';
 
 describe('sectionFixes', () => {
@@ -71,6 +74,44 @@ describe('sectionFixes', () => {
     ]);
     expect(f!.packet).toContain('Verify (we run this after you mark done):');
     expect(f!.prompt).toContain('Site: example-outfitter.com');
+  });
+
+  it('shows the body of the packet’s own framework, and copies that body, when the packet holds several', () => {
+    const { d, check } = edited('bad-site', (_c, ds) => {
+      const f = ds.fixes.find((x) => x.type === 'edge_rule_blocks_crawler' && x.packet)!;
+      f.packet = withBodies(f.packet!, ['wordpress', 'nextjs']);
+    });
+    const [f] = sectionFixes(d, check, 'crawler_access').open;
+    const stored = d.fixes.find((x) => x.id === f!.id)!;
+    expect(f!.notWritten).toBeNull();
+    expect(f!.packet).toContain(stored.packet!.change[0]);
+    expect(f!.prompt).toBe(packetPrompt(stored, packetBodies(stored.packet!)[0]!));
+    for (const other of ['wordpress', 'nextjs'] as const) {
+      expect(f!.packet).not.toContain(bodyFor(other).change[0]);
+      expect(f!.prompt).not.toContain(bodyFor(other).change[0]);
+    }
+  });
+
+  it('says why an open fix has no packet, in the packet’s place', () => {
+    const { d, check } = edited('bad-site', (_c, ds) => {
+      for (const f of ds.fixes) f.packet = null;
+    });
+    const [f] = sectionFixes(d, check, 'crawler_access').open;
+    const stored = d.fixes.find((x) => x.id === f!.id)!;
+    expect(f).toMatchObject({ paragraph: [], packet: null, handoff: null, prompt: null });
+    expect(f!.notWritten).toBe(noPacketLine(noPacketReason(stored.type)));
+  });
+
+  it('lists a packet’s bodies, its own first, and none for a framework it only lists', () => {
+    const { d } = edited('bad-site');
+    const p = d.fixes.find((x) => x.packet)!.packet!;
+    expect(p.frameworks.length).toBeGreaterThan(1);
+    expect(packetBodies(p).map((b) => b.framework)).toEqual([p.framework]);
+    const others = (['wordpress', 'nextjs', 'webflow'] as const).filter((f) => f !== p.framework);
+    expect(packetBodies(withBodies(p, others)).map((b) => b.framework)).toEqual([
+      p.framework,
+      ...others,
+    ]);
   });
 
   it('labels every recommendation class', () => {
