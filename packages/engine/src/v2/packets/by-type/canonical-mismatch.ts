@@ -20,6 +20,12 @@
  * read at (served-at.ts). Verify reads the `<link rel="canonical">` in the page's head for the expected
  * URL, and, when links move, a linking page for a link to the canonical and none to the page
  * (html-checks.ts).
+ *
+ * Two URLs of a record can be one to the programs (`/x%7Ey` and `/x~y`; html-checks.ts
+ * `sameInCommand`), and a command that compared them as the programs do would pass before the fix.
+ * Where the canonical declared and the one expected are such a pair, the command compares the href
+ * as it is spelled (`canonicalIs`, `'spelled'`); where the page and the canonical its links move to
+ * are, it compares the links' hrefs so (`linksSpelled`).
  */
 import type { PageResult } from '@crawlmouse/types/v2';
 import { SEARCH_ENGINES } from '../../detectors/scope.js';
@@ -30,6 +36,7 @@ import {
   fetchOf,
   holds,
   httpUrl,
+  linksSpelled,
   linksTo,
   sameInCommand,
   spelled,
@@ -37,23 +44,28 @@ import {
 import { servedAt } from '../served-at.js';
 import {
   addressesOf,
+  code,
   DOCS_READ,
+  fitting,
   GOOGLE_DOCS,
+  list,
+  MARKER_LIMIT,
   NEXT_LIMITED_BOTS_SOURCE,
   NEXT_METADATA,
   NEXT_STREAMING,
   pagesShown,
   pathOf,
-  pathWord,
+  pathWords,
   plural,
   readShown,
   rowOf,
   seeTags,
+  slashCounts,
   subjectOf,
   TAGS,
   UNREAD_HREF,
 } from '../structure.js';
-import { code, count, line, list, ours, type Line } from '../text.js';
+import { count, line, ours, type Line } from '../text.js';
 import type { Change, PacketEntry, PacketFacts, RecordOf, See } from '../types.js';
 
 type Fix = RecordOf<'canonical_mismatch'>;
@@ -293,7 +305,7 @@ function nextjs(r: Reading, facts: PacketFacts): Change | null {
 /** What the canonical half of the command does not read. */
 const NOT_READ = ours('A canonical sent in an HTTP Link header is not read.');
 
-export const canonicalMismatch: PacketEntry<'canonical_mismatch'> = {
+export const canonicalMismatch: PacketEntry<'canonical_mismatch'> = fitting({
   kind: 'builder',
   context: (fix, facts) => {
     const r = read(fix, facts);
@@ -323,76 +335,81 @@ export const canonicalMismatch: PacketEntry<'canonical_mismatch'> = {
     const r = read(fix, facts);
     const own = fetchOf(facts, [r.page]);
     const expected = servedAt(facts, r.expected);
-    const canonical = r.stands ? null : canonicalIs(expected);
-    const [linker] = r.linking;
-    // a link to the canonical that the programs read as a link to the page cannot be told from the
-    // old one (html-checks.ts `sameInCommand`): the links are then left to the next check
-    const told = r.linksTo !== null && !sameInCommand(r.linksTo, r.page);
-    const moved =
-      r.linksTo === null || linker === undefined || !told
-        ? null
-        : {
-            from: readShown(facts, linker),
-            to: servedAt(facts, r.linksTo),
-            linker,
-            links: (page: number) => linksTo(addressesOf(facts, r.linksTo!), [r.page], page),
-          };
-    const more = ours(
-      r.linking.length > 1 ? ' The command reads the first linking page: run it for each.' : '',
+    // the canonical declared and the one expected can be one URL to the programs: the href is then
+    // compared as it is spelled, or the command would pass on the canonical the page has today
+    const alike = r.target !== null && sameInCommand(r.target, r.expected);
+    const how = alike ? 'spelled' : slashCounts(facts, r.expected) ? 'slashed' : 'alike';
+    const canonical = (page: number) => canonicalIs(expected, page, how);
+    const written = ours(
+      how === 'spelled'
+        ? ', spelled so character for character'
+        : how === 'slashed'
+          ? ', however the URL is written but for the slash that ends its path, which counts'
+          : ', however the URL is written',
     );
-    const untold = ours(
-      r.linksTo !== null && !told
-        ? ' The command cannot tell a link to the one URL from a link to the other, so the links are measured on the next check.'
-        : '',
+    const [linker] = r.linking;
+    const twoLinkers = r.linking.length > 1;
+    // a link to the canonical that the programs read as a link to the page cannot be told from the
+    // old one by `linksTo` (html-checks.ts `sameInCommand`): its href is compared as it is spelled
+    const told = r.linksTo !== null && !sameInCommand(r.linksTo, r.page);
+    const more = ours(
+      twoLinkers ? ' The command reads the first linking page: run it for each.' : '',
     );
     const seeCanonical: See = {
       command: seeTags(facts, [r.page], TAGS.canonical),
       today: line`The page's canonical tag, which names ${code(r.declared)}.`,
       after: line`The page's canonical tag, naming ${code(expected)}.`,
     };
-    if (canonical !== null && moved !== null) {
+    if (!r.stands) {
+      if (r.linksTo === null || linker === undefined) {
+        return {
+          command: command(holds(own, canonical(1))),
+          expect: line`Exit status 0 once the <head> of ${readShown(facts, r.page)} holds one <link rel="canonical">, naming ${code(expected)}${written}. Today it names ${code(r.declared)}. ${NOT_READ} ${MARKER_LIMIT}`,
+          ua: own.ua,
+          see: seeCanonical,
+        };
+      }
+      const links = told
+        ? linksTo(addressesOf(facts, r.linksTo), [r.page], 2)
+        : linksSpelled(addressesOf(facts, r.linksTo), 2);
+      const linked = ours(
+        told
+          ? 'links to that URL and no longer to this page'
+          : 'links to that URL spelled so, and to no other spelling of it',
+      );
       return {
         // one request for the two pages: the page first, then the page that links to it
-        command: command(
-          fetchOf(facts, [r.page, moved.linker]).fragment,
-          holds(canonicalIs(expected, 1), moved.links(2)),
-        ),
-        // short, and with each URL once: a line past its bound is cut, and the limits are at its end
-        expect: line`Exit status 0 once the <head> of ${readShown(facts, r.page)} holds one <link rel="canonical">, naming ${code(expected)} (today: ${code(r.declared)}), and ${moved.from} links to that URL and no longer to this page, however a URL is written. ${NOT_READ} ${UNREAD_HREF}${more}`,
+        command: command(holds(fetchOf(facts, [r.page, linker]), canonical(1), links)),
+        expect: line`Exit status 0 once the <head> of ${readShown(facts, r.page)} holds one <link rel="canonical"> naming ${code(expected)}${written} (today: ${code(r.declared)}), and ${readShown(facts, linker)} ${linked}. ${NOT_READ} ${UNREAD_HREF}${more} ${MARKER_LIMIT}`,
         ua: own.ua,
         see: seeCanonical,
       };
     }
-    if (canonical !== null) {
-      return {
-        command: command(own.fragment, holds(canonical)),
-        expect: line`Exit status 0 once the <head> of ${readShown(facts, r.page)} holds one <link rel="canonical">, naming ${code(expected)}, however the URL is written. Today it names ${code(r.declared)}. ${NOT_READ}${untold}`,
-        ua: own.ua,
-        see: seeCanonical,
-      };
+    if (linker === undefined || r.linksTo === null) {
+      throw new Error('packets: a canonical_mismatch record proves no fault and no link');
     }
-    if (moved === null || linker === undefined || r.linksTo === null) {
-      if (linker === undefined || r.linksTo === null) {
-        throw new Error('packets: a canonical_mismatch record proves no fault and no link');
-      }
-      // the canonical stands and the links cannot be told apart: the command shows the canonical,
-      // which is there today, and its `expect` says what it cannot show
+    const from = fetchOf(facts, [linker]);
+    const to = servedAt(facts, r.linksTo);
+    const seeLinks: See = {
+      command: seeTags(facts, [linker], TAGS.a, [...pathWords(r.page), ...pathWords(r.linksTo)]),
+      today: line`The <a> tags that link to ${code(r.own)}: lines that hold ${code(pathOf(r.page))}.`,
+      after: line`The <a> tags that link to ${code(to)}, lines that hold ${code(pathOf(r.linksTo))}, and none that links to ${code(r.own)}.`,
+    };
+    if (!told) {
+      // the canonical stands and the two URLs are one to the programs: the links' hrefs are
+      // compared as they are spelled, which the old spelling does not pass
       return {
-        command: command(own.fragment, holds(canonicalIs(expected))),
-        expect: line`Exit status 0 while the <head> of ${readShown(facts, r.page)} holds one <link rel="canonical">, naming ${code(expected)}, which it does today: the fix is to the links, and the command cannot tell a link to ${code(r.own)} from a link to ${code(expected)}. The links are measured on the next check.`,
+        command: command(holds(from, linksSpelled(addressesOf(facts, r.linksTo), 1))),
+        expect: line`Exit status 0 once ${readShown(facts, linker)} links to ${code(to)} spelled so, character for character once the href is resolved, and to no other spelling of that URL. Today it links to ${code(r.own)}, which most readers take for the same URL. An href the command cannot read counts as another spelling.${more} ${MARKER_LIMIT}`,
         ua: own.ua,
-        see: seeCanonical,
+        see: seeLinks,
       };
     }
     return {
-      command: command(fetchOf(facts, [moved.linker]).fragment, holds(moved.links(1))),
-      expect: line`Exit status 0 once ${moved.from} links to ${code(moved.to)} and no longer to ${code(r.own)} (an <a> href, however the URL is written). Today it links to ${code(r.own)}. ${UNREAD_HREF}${more}`,
+      command: command(holds(from, linksTo(addressesOf(facts, r.linksTo), [r.page], 1))),
+      expect: line`Exit status 0 once ${readShown(facts, linker)} links to ${code(to)} and no longer to ${code(r.own)} (an <a> href, however the URL is written). Today it links to ${code(r.own)}. ${UNREAD_HREF}${more} ${MARKER_LIMIT}`,
       ua: own.ua,
-      see: {
-        command: seeTags(facts, [linker], TAGS.a, [pathWord(r.page), pathWord(r.linksTo)]),
-        today: line`The <a> tags that link to ${code(r.own)}: lines that hold ${code(pathOf(r.page))}.`,
-        after: line`The <a> tags that link to ${code(moved.to)}, lines that hold ${code(pathOf(r.linksTo))}, and none that links to ${code(r.own)}.`,
-      },
+      see: seeLinks,
     };
   },
-};
+});

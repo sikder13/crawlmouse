@@ -120,7 +120,7 @@ describe('the duplicate_pagination packet', () => {
     // the first page marked is the stoves list's, which keeps its own canonical: the command leaves the canonical out
     expect(p.verify.command).not.toContain('"canonical"');
     expect(packetFor(listSite(base, 'canonical')).verify.command).toContain('"canonical"');
-    expect(p.verify.expect).toContain('The command reads the first of the later pages');
+    expect(p.verify.expect).toContain('Only the first of the later pages is read.');
   });
 
   it('writes a step for each condition, and none for a condition not proved', () => {
@@ -140,22 +140,22 @@ describe('the duplicate_pagination packet', () => {
     const canonical = packetFor(listSite(base, 'canonical')).verify.command;
     const content = packetFor(listSite(base, 'content')).verify.command;
     expect(canonical).toMatch(
-      /^curl -sS -f --compressed -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/collections\/tents\?page=2' \| tr '[^']*' ' {4}' \| LC_ALL=C awk '.*\}' 'https:\/\/a\.test\/collections\/tents\?page=2'$/,
+      /^curl -sS -f --compressed --max-time 20 -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/collections\/tents\?page=2' \| tr '[^']*' '[^']*' \| LC_ALL=C awk '.*\}' '1' 'https:\/\/a\.test\/collections\/tents\?page=2' '0'$/,
     );
     expect(content).toMatch(
-      /^curl -sS -f --compressed -A '[^']*' -w '\\ncrawlmouse:end %\{url_effective\}\\n' 'https:\/\/a\.test\/collections\/tents' 'https:\/\/a\.test\/collections\/tents\?page=2' \| tr '[^']*' ' {4}' \| LC_ALL=C awk '.*\}' 'page='$/,
+      /^curl -sS -f --compressed --max-time 20 -A '[^']*' -w '\\ncrawlmouse:end %\{http_code\} %\{url_effective\}\\n' 'https:\/\/a\.test\/collections\/tents' 'https:\/\/a\.test\/collections\/tents\?page=2' \| tr '[^']*' '[^']*' \| LC_ALL=C awk '.*\}' '2' 'page='$/,
     );
     // both: the two pages are requested once, and one program reads the later page for both
     const both = packetFor(listSite(base, 'both')).verify.command;
     expect(both).toMatch(
-      /^curl -sS -f --compressed -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/collections\/tents' 'https:\/\/a\.test\/collections\/tents\?page=2' \| tr '[^']*' ' {4}' \| LC_ALL=C awk '.*canon\(2\) && differ\(\) && !odd\) \}' 'https:\/\/a\.test\/collections\/tents\?page=2' 'page='$/,
+      /^curl -sS -f --compressed --max-time 20 -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/collections\/tents' 'https:\/\/a\.test\/collections\/tents\?page=2' \| tr '[^']*' '[^']*' \| LC_ALL=C awk '.*canon\(2\) && differ\(\) && !odd\) \}' '2' 'https:\/\/a\.test\/collections\/tents\?page=2' '0' 'page='$/,
     );
     expect(both.match(/curl|awk/g)).toEqual(['curl', 'awk']);
   });
 
   it('marks the other pages of a list written as a path by its page segment', () => {
     const p = packetFor(listSite(base, 'content', '/collections/tents/page/2'));
-    expect(p.verify.command).toMatch(/\}' '\/page\/'$/);
+    expect(p.verify.command).toMatch(/\}' '2' '\/page\/'$/);
   });
 
   const LIST = '/collections/tents';
@@ -267,7 +267,7 @@ describe('the duplicate_pagination packet', () => {
     const p = packetFor(listSite(b, 'canonical'));
     expect(p.verify.see).toEqual({
       command: expect.stringMatching(
-        /^curl -sS -A '[^']*' '[^']*\/collections\/tents\?page=2' \| grep -io '<link\[\^>\]\*rel="canonical"\[\^>\]\*>'$/,
+        /^curl -sS --compressed --max-time 20 -A '[^']*' '[^']*\/collections\/tents\?page=2' \| tr '[^']*' ' {3}' \| grep -aioE '<link \[\^>\]\*rel=\.\?canonical\[\^>\]\*>'$/,
       ),
       today: `The page's canonical tag, which names the first page of the list: \`${b}/collections/tents\`.`,
       after: `The page's canonical tag, naming its own URL: \`${b}/collections/tents?page=2\`.`,
@@ -281,7 +281,7 @@ describe('the duplicate_pagination packet', () => {
     served = await servedSite({ broken: BROKEN.content, fixed: list(LATER, OWN) });
     const p = packetFor(listSite(served.base, 'content'));
     expect(p.verify.see?.command).toMatch(
-      /^curl -sS -A '[^']*' '[^']*\/collections\/tents' '[^']*\/collections\/tents\?page=2' \| grep -io '<a \[\^>\]\*>' \| sort \| uniq -u$/,
+      /^curl -sS --compressed --max-time 20 -A '[^']*' '[^']*\/collections\/tents' \| tr '[^']*' ' {3}' \| grep -aioE '<a \[\^>\]\*>' \| sort -u \| \{ cat; curl -sS --compressed --max-time 20 -A '[^']*' '[^']*\/collections\/tents\?page=2' \| tr '[^']*' ' {3}' \| grep -aioE '<a \[\^>\]\*>' \| sort -u; \} \| sort \| uniq -u$/,
     );
     expect(p.verify.see?.today).toBe(
       "The <a> tags that are on one of the two pages and not on the other. The record does not hold the pages' links: it holds that their main content is nearly identical, so expect few lines or none besides the links between the list's own pages.",
@@ -295,7 +295,7 @@ describe('the duplicate_pagination packet', () => {
     const p = packetFor(listSite(base, 'content'));
     expect([...p.change, ...p.keep].join(' ')).not.toMatch(/404/);
     expect(p.verify.expect).toBe(
-      "Exit status 0 once `https://a.test/collections/tents?page=2` and `https://a.test/collections/tents` each link to a page the other does not link to, the list's own pages left out: a later page that repeats the first has every link the first has. The command compares links, not the content hash the audit measures, which the next check measures again.",
+      'Exit status 0 once `https://a.test/collections/tents?page=2` and `https://a.test/collections/tents` each link to two or more site pages the other lacks, list pages aside: a later page that repeats the first has every link the first has. Links stand in for the content hash (measured on the next check): a later page with fewer than two items of its own does not pass, and repeated items go unseen when each page also holds two links of its own. A page that itself prints "crawlmouse:end" does not pass.',
     );
   });
 
@@ -306,7 +306,7 @@ describe('the duplicate_pagination packet', () => {
     });
     served = await servedSite({
       broken: slashedList(`${LIST}/`, ['/products/ridge/', '/products/dome/']),
-      fixed: slashedList(`${LIST}/?page=2`, ['/products/alpine/']),
+      fixed: slashedList(`${LIST}/?page=2`, ['/products/alpine/', '/products/trail/']),
     });
     const b = served.base;
     const input = listSite(b, 'both');
@@ -426,5 +426,87 @@ describe('the duplicate_pagination packet over hostile records (properties)', ()
         expectDeterministic('duplicate_pagination', record, facts);
       }),
     );
+  });
+});
+
+// Round 3. Each input is a reviewer's, and each test was red before the change it names.
+describe('the duplicate_pagination packet, round 3', () => {
+  const LIST = '/collections/tents';
+  const LATER = `${LIST}?page=2`;
+  const page = (canonical: string, links: string[]) =>
+    `<html><head><link rel="canonical" href="${canonical}"></head><body>${links
+      .map((l) => `<a href="${l}">${l}</a>`)
+      .join('')}</body></html>`;
+  const ITEMS = ['/products/ridge', '/products/dome', '/products/tarp'];
+
+  // SEO finding 3 (D3): both pages list the same items; page 1 adds one link, page 2 another
+  it('verify is not passed by two pages that repeat their items and each add one link of their own', async () => {
+    const pages = {
+      [LIST]: page(LIST, [LATER, ...ITEMS, '/promo']),
+      [LATER]: page(LATER, [LIST, ...ITEMS, '/list/all']),
+    };
+    served = await servedSite({
+      broken: pages,
+      fixed: {
+        [LIST]: pages[LIST]!,
+        [LATER]: page(LATER, [LIST, '/products/alpine', '/products/trail', '/list/all']),
+      },
+    });
+    const p = packetFor(listSite(served.base, 'content'));
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    // what the rule cannot tell is said, and nothing says the command passes on the site as it is
+    expect(p.verify.expect).toContain(
+      'a later page with fewer than two items of its own does not pass, and repeated items go unseen when each page also holds two links of its own.',
+    );
+  });
+
+  // SEO finding 1: `sort | uniq -u` over the two pages' tags together dropped a tag one page holds twice
+  it('the readable command prints an item a fixed page links twice by the same tag', async () => {
+    const twice = (items: string[]) => items.flatMap((i) => [i, i]);
+    served = await servedSite({
+      broken: {
+        [LIST]: page(LIST, [LATER, ...twice(ITEMS)]),
+        [LATER]: page(LATER, [LIST, ...twice(ITEMS)]),
+      },
+      fixed: {
+        [LIST]: page(LIST, [LATER, ...twice(ITEMS)]),
+        [LATER]: page(LATER, [LIST, ...twice(['/products/alpine', '/products/trail'])]),
+      },
+    });
+    const p = packetFor(listSite(served.base, 'content'));
+    const printed = await seen(served, p);
+    expect(printed.broken).not.toContain('/products/');
+    expect(printed.fixed.trim().split('\n').sort()).toEqual(
+      [
+        `<a href="${LIST}">`,
+        `<a href="${LATER}">`,
+        ...ITEMS.map((i) => `<a href="${i}">`),
+        '<a href="/products/alpine">',
+        '<a href="/products/trail">',
+      ].sort(),
+    );
+  });
+
+  it('the readable commands print a tag written unquoted, in single quotes or over several lines', async () => {
+    const SHAPES = {
+      unquoted: (href: string) => `<link rel=canonical href=${href}>`,
+      single: (href: string) => `<link rel='canonical' href='${href}'>`,
+      lines: (href: string) => `<link\n  rel="canonical"\n  href="${href}"\n/>`,
+    };
+    for (const [name, tag] of Object.entries(SHAPES)) {
+      const html = (href: string) =>
+        `<html><head>${tag(href)}</head><body><a\n class="card"\n href="${LIST}">\n  list\n</a></body></html>`;
+      await served?.close();
+      served = await servedSite({
+        broken: { [LIST]: html(LIST), [LATER]: html(LIST) },
+        fixed: { [LIST]: html(LIST), [LATER]: html(LATER) },
+      });
+      const p = packetFor(listSite(served.base, 'canonical'));
+      const printed = await seen(served, p);
+      expect(printed.broken.replace(/\s+/g, ' ').trim(), name).toBe(tag(LIST).replace(/\s+/g, ' '));
+      expect(printed.fixed.replace(/\s+/g, ' ').trim(), name).toBe(tag(LATER).replace(/\s+/g, ' '));
+    }
   });
 });

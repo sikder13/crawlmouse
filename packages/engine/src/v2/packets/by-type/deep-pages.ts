@@ -17,10 +17,12 @@
  * page whose request ended on another crawled page is read there, where that page's links are. A
  * command that named such a page would pass before the fix.
  *
- * When no page passes the test (`certain` false) the packet names the homepage and says what its
- * command cannot prove. That takes a homepage whose request ended on another crawled page that links
- * to the deep page: to a visitor the page is then one click away, and the depth the record holds is
- * the filing's, not the site's.
+ * When no page passes the test (`certain` false) the packet names no page to request: a command
+ * that requested the homepage would pass before the fix. Its command reads the address from a shell
+ * variable the developer sets to the page they chose (html-checks.ts `fetchOfChosen`), and as
+ * written, with the variable unset, it stops with an error and exits non-zero. That case takes a
+ * homepage whose request ended on another crawled page that links to the deep page: to a visitor the
+ * page is then one click away, and the depth the record holds is the filing's, not the site's.
  *
  * The estimate applies fixes in rank order, so a fix ranked above this one can have added links
  * before it; the estimate's page here is the one chosen on the links the crawl recorded.
@@ -28,23 +30,28 @@
 import { MAX_HEALTHY_DEPTH } from '../../detectors/thresholds.js';
 import { shallowParent } from '../../grade/effects.js';
 import { isGraded } from '../../grade/technical-seo.js';
-import { command, fetchOf, holds, linksTo } from '../html-checks.js';
+import { CHOSEN_PAGE, command, fetchOf, fetchOfChosen, holds, linksTo } from '../html-checks.js';
 import { servedAt } from '../served-at.js';
 import {
   addressesOf,
   clicksFromHome,
+  code,
   CRAWLABLE_LINK,
   filedLinks,
+  fitting,
   holdsLink,
+  MARKER_LIMIT,
   pagesShown,
   pathOf,
-  pathWord,
+  pathWords,
+  phrase,
+  plural,
   readShown,
   seeTags,
   subjectOf,
   TAGS,
 } from '../structure.js';
-import { code, count, line, type Line } from '../text.js';
+import { count, line, ours, type Line } from '../text.js';
 import type { PacketEntry, PacketFacts } from '../types.js';
 
 /** A check has one shallow page for all its deep pages, so it is chosen once per check's facts. */
@@ -132,7 +139,7 @@ function whyThere(from: LinkFrom, facts: PacketFacts): Line[] {
   ];
 }
 
-export const deepPages: PacketEntry<'deep_pages'> = {
+export const deepPages: PacketEntry<'deep_pages'> = fitting({
   kind: 'builder',
   context: (fix, facts) => {
     const url = subjectOf(fix);
@@ -169,21 +176,36 @@ export const deepPages: PacketEntry<'deep_pages'> = {
     const url = subjectOf(fix);
     const shown = code(servedAt(facts, url));
     const { parent, certain } = linkFrom(facts, url);
-    const fetch = fetchOf(facts, [parent]);
     const on = readShown(facts, parent);
+    const link = linksTo(addressesOf(facts, url));
+    if (!certain) {
+      // no page to request that the record shows without the link: the developer names theirs
+      const chosen = fetchOfChosen(facts);
+      const depth =
+        fix.measured === null
+          ? phrase`The crawl found no path of links from the homepage to ${shown}.`
+          : phrase`The crawl counted ${shown} ${count(fix.measured)} ${plural(fix.measured, 'click', 'clicks')} from the homepage.`;
+      return {
+        command: command(holds(chosen, link)),
+        expect: line`As written the command stops with an error and exits non-zero: the audit could not name a page to link from, since the record holds no page close to the homepage without a link to ${shown}. Set the shell variable ${ours(CHOSEN_PAGE)} to the URL of the page you added the link to, then run it: exit status 0 once that page holds an <a> whose href is ${shown}, however the URL is written. The click depth is measured again on the next check. ${MARKER_LIMIT}`,
+        ua: chosen.ua,
+        see: {
+          command: seeTags(facts, [parent], TAGS.a, pathWords(url)),
+          today: line`The <a> tags at ${on} that hold ${code(pathOf(url))}. ${depth} It read that address as another page too, and the links it found there include this one, so a visitor may be closer than the record says.`,
+          after: line`The same lines: the link you add goes on a page you choose, and the exact check reads that page.`,
+        },
+      };
+    }
+    const fetch = fetchOf(facts, [parent]);
     return {
-      command: command(fetch.fragment, holds(linksTo(addressesOf(facts, url)))),
-      expect: certain
-        ? line`Exit status 0 once ${on} holds an <a> whose href is ${shown}, however the URL is written; today it holds none. If you put the link on another page, request that page instead. The command proves the link; the click depth is measured again on the next check.`
-        : line`Exit status 0 when the page requested holds an <a> whose href is ${shown}, however the URL is written. The record names no page to request that is close to the homepage and without the link, so the command requests ${on}, and can pass before the fix: put the URL of the page you added the link to in its place. The click depth is measured again on the next check.`,
+      command: command(holds(fetch, link)),
+      expect: line`Exit status 0 once ${on} holds an <a> whose href is ${shown}, however the URL is written; today it holds none. If you put the link on another page, request that page instead. The command proves the link; the click depth is measured again on the next check. ${MARKER_LIMIT}`,
       ua: fetch.ua,
       see: {
-        command: seeTags(facts, [parent], TAGS.a, [pathWord(url)]),
-        today: certain
-          ? line`Nothing: the crawl found no link to ${shown} on that page.`
-          : line`The record does not say: the crawl holds links to ${shown} at the address requested, under another page.`,
+        command: seeTags(facts, [parent], TAGS.a, pathWords(url)),
+        today: line`Nothing: the crawl found no link to ${shown} on that page.`,
         after: line`The <a> tag you added: a line that holds ${code(pathOf(url))}. A link that spells the path another way is not printed; the exact check reads it.`,
       },
     };
   },
-};
+});

@@ -8,11 +8,110 @@ import { fileEdges, landingsOf } from '../build/filing.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
 import { byText } from '../detectors/scope.js';
 import type { Detection } from '../detectors/types.js';
-import { command, COMMAND_BOUNDS, joined, part, printOf, type Fragment } from './html-checks.js';
+import { PACKET_BOUNDS } from './compose.js';
+import { command, joined, PAGE_END, part, printOf, type Fragment } from './html-checks.js';
 import { readAt, servedAt } from './served-at.js';
 import { crawledWord, url as urlWord, word, type Command, type Word } from './shell.js';
-import { code, line, list, ours, textOf, type Line, type Safe } from './text.js';
-import type { PacketFacts } from './types.js';
+import {
+  code as codeOf,
+  line,
+  list as listOf,
+  MAX_CRAWLED_CHARS,
+  ours,
+  textOf,
+  type Line,
+  type Safe,
+} from './text.js';
+import type { Change, PacketBuilder, PacketFacts, Verify } from './types.js';
+
+/**
+ * How much crawled text the lines being written show: the code points of one value, and the items
+ * of one list. `fitting` tightens it for a section whose line would pass the composer's bound.
+ */
+interface Fit {
+  chars: number;
+  most: number;
+}
+
+/** From what a builder asks for, down to a few characters of one item. */
+const FITS: readonly Fit[] = [
+  { chars: Infinity, most: Infinity },
+  { chars: Infinity, most: 4 },
+  { chars: Infinity, most: 2 },
+  { chars: 160, most: 2 },
+  { chars: 120, most: 2 },
+  { chars: 120, most: 1 },
+  { chars: 80, most: 1 },
+  { chars: 48, most: 1 },
+  { chars: 32, most: 1 },
+  { chars: 20, most: 1 },
+  { chars: 20, most: 0 },
+];
+
+let fit: Fit = FITS[0]!;
+
+/** text.ts `code`, cut to what the section being written has room for (`fitting`). */
+export const code = (crawled: string, max: number = MAX_CRAWLED_CHARS): Safe =>
+  codeOf(crawled, Math.min(max, fit.chars));
+
+/**
+ * text.ts `list`, of as many items as the section being written has room for (`fitting`); with room
+ * for none, how many there are.
+ */
+export function list(items: readonly Safe[], max: number, noun: string): Safe {
+  const most = Math.min(max, fit.most);
+  if (most > 0 || items.length === 0) return listOf(items, most, noun);
+  return ours(`${items.length} ${noun}${items.length === 1 ? '' : 's'} (not listed)`);
+}
+
+/** Writes with `write` at the first of `FITS` at which every line `linesOf` reads from it is within the composer's bound. */
+function fitted<T>(write: () => T, linesOf: (written: T) => readonly Line[]): T {
+  const before = fit;
+  try {
+    let written!: T;
+    for (const next of FITS) {
+      fit = next;
+      written = write();
+      const fits = linesOf(written).every((l) => [...textOf(l)].length <= PACKET_BOUNDS.line_chars);
+      if (fits) break;
+    }
+    return written;
+  } finally {
+    fit = before;
+  }
+}
+
+const changeLines = (c: Change | null): Line[] => (c === null ? [] : [...c.change, ...c.keep]);
+const verifyLines = (v: Verify): Line[] => [v.expect, v.see.today, v.see.after];
+
+/**
+ * `builder`, with each section written so that no line of it passes the composer's bound
+ * (compose.ts `PACKET_BOUNDS.line_chars`), where a line is cut wherever it happens to be. A section
+ * with a line too long is written again with shorter lists, then with its crawled values cut
+ * shorter, each cut saying how long the value was (`FITS`); the builder's lines take their crawled
+ * values through this module's `code` and `list`. A command is not written from them, and is the
+ * same at every fit.
+ */
+export function fitting<R>(builder: PacketBuilder<R>): PacketBuilder<R> {
+  const stacks: PacketBuilder<R>['stacks'] = {};
+  for (const [framework, body] of Object.entries(builder.stacks)) {
+    stacks[framework as keyof typeof stacks] = {
+      sources: body.sources,
+      write: (fix, facts) => fitted(() => body.write(fix, facts), changeLines),
+    };
+  }
+  return {
+    kind: 'builder',
+    context: (fix, facts) =>
+      fitted(
+        () => builder.context(fix, facts),
+        (lines) => lines,
+      ),
+    generic: (fix, facts) => fitted(() => builder.generic(fix, facts), changeLines),
+    stacks,
+    verify: (fix, facts) => fitted(() => builder.verify(fix, facts), verifyLines),
+  };
+}
 
 /** The page URL, or template key, a structure record is about. */
 export const subjectOf = (fix: Pick<Detection, 'key'>): string => subjectOfKey(fix.key);
@@ -160,13 +259,24 @@ export function readShown(facts: Pick<PacketFacts, 'pages'>, url: string): Safe 
   return read === own ? code(read) : phrase`${code(read)} (where ${code(own)} answers)`;
 }
 
-/** What a "see it" command greps a response for (types.ts `See`): patterns of ours. */
+/**
+ * What a "see it" command greps a response for (types.ts `See`): extended patterns of ours, over a
+ * response made one line. `rel=.?canonical` reads the value in double quotes, in single quotes and
+ * unquoted.
+ */
 export const TAGS = {
   a: '<a [^>]*>',
   aWithText: '<a [^>]*>[^<]*</a>',
-  canonical: '<link[^>]*rel="canonical"[^>]*>',
-  hreflang: '<link[^>]*hreflang[^>]*>',
+  canonical: '<link [^>]*rel=.?canonical[^>]*>',
+  hreflang: '<link [^>]*hreflang[^>]*>',
 } as const;
+
+/**
+ * ` | tr … | grep -aioE <pattern>`: the response as one line, so that a tag written over several
+ * lines is one match, then each match of `pattern` on a line of its own.
+ */
+export const matchesOf = (pattern: string): Fragment =>
+  part` | tr ${word('\\r\\n\\t')} ${word('   ')} | grep -aioE ${word(pattern)}`;
 
 /** The path and query of a page's URL, as a link to it most often writes them; the origin left out. */
 export function pathOf(target: string): string {
@@ -180,9 +290,9 @@ const holding = (anyCase: boolean, texts: readonly Word[]): Fragment =>
   joined(anyCase ? part` | grep -iF` : part` | grep -F`, ...texts.map((t) => part` -e ${t}`));
 
 /**
- * The readable command of a packet that reads a page: `curl` of the page as the strict command
- * requests it, the matches of `pattern` printed one to a line, and, with `texts`, only those that
- * hold one of them (`anyCase`: whatever their case).
+ * The readable command of a packet that reads a page: `curl` of the page at the address the strict
+ * command requests (html-checks.ts `printOf`), the matches of `pattern` printed one to a line, and,
+ * with `texts`, only those that hold one of them (`anyCase`: whatever their case).
  */
 export function seeTags(
   facts: Pick<PacketFacts, 'pages' | 'crawlers'>,
@@ -193,14 +303,31 @@ export function seeTags(
 ): Command {
   return command(
     printOf(facts, pages).fragment,
-    part` | grep -io ${word(pattern)}`,
+    matchesOf(pattern),
     texts.length === 0 ? part`` : holding(anyCase, texts),
   );
 }
 
-/** A path, or other text of a URL, as a word `seeTags` keeps lines by. */
-export const pathWord = (target: string): Word =>
-  crawledWord(pathOf(target), COMMAND_BOUNDS.url_chars);
+/**
+ * What can follow a path where a tag's href ends with it: the quote that closes the href, a query, a
+ * fragment, a slash before the quote, or the end of the tag after an unquoted value.
+ */
+const PATH_ENDS = ['"', "'", '?', '#', '/"', "/'", '>'] as const;
+/** The characters of a path's end a readable command looks for: a longer path is told by its end. */
+const PATH_TAIL_CHARS = 80;
+
+/**
+ * The texts `seeTags` keeps a tag by when it links to `target`: the end of the URL's path and query
+ * (the whole of it up to `PATH_TAIL_CHARS` characters), each time with what can follow it at the end
+ * of an href (`PATH_ENDS`), as fixed strings. The path alone would keep a link to another page whose
+ * path starts the same (`/deep-dive` for `/deep`). The homepage's path is kept between its quotes.
+ */
+export function pathWords(target: string): Word[] {
+  const path = pathOf(target);
+  if (path === '"/"') return [crawledWord(path), crawledWord("'/'")];
+  const tail = [...path].slice(-PATH_TAIL_CHARS).join('');
+  return PATH_ENDS.map((end) => crawledWord(`${tail}${end}`, PATH_TAIL_CHARS + 2));
+}
 
 /** "page" or "pages", and the like, for a count. */
 export const plural = (n: number, one: string, many: string): Safe => ours(n === 1 ? one : many);
@@ -214,10 +341,28 @@ export const titleOf = (page: PageResult | undefined): string | null => {
 /** The step every packet that adds a link carries: what makes the link one a crawler follows. */
 export const CRAWLABLE_LINK: Line = line`Write the link as an <a> element with an href, in the HTML the server sends. A link that only JavaScript adds is not there for a crawler that does not run scripts.`;
 
-/** What a command that looks for an old link says of an href it cannot read (html-checks.ts `linksTo`). */
-export const UNREAD_HREF = ours(
-  'An href with a named character reference the command does not know counts as the old link.',
-);
+/**
+ * What a command that looks for an old link says of an href it cannot read (html-checks.ts
+ * `linksTo`): one with a named character reference it does not know, or longer than it reads.
+ */
+export const UNREAD_HREF = ours('An href the command cannot read counts as the old link.');
+
+/** What every command that reads a page says of a page that prints the words curl is made to write (html-checks.ts `load`). */
+export const MARKER_LIMIT = ours(`A page that itself prints "${PAGE_END}" does not pass.`);
+
+/**
+ * Whether a canonical that names `url` must end its path as the page's served address does: the
+ * crawl requested the page without the slash, or with it, and was answered at the other spelling,
+ * so the one the engine files the page under is known to redirect.
+ */
+export function slashCounts(facts: Pick<PacketFacts, 'pages'>, url: string): boolean {
+  try {
+    const [filed, served] = [new URL(url), new URL(servedAt(facts, url))];
+    return filed.pathname.endsWith('/') !== served.pathname.endsWith('/');
+  } catch {
+    return false;
+  }
+}
 
 /** The pages Google's documentation is cited from, as the packets print them. */
 export const GOOGLE_DOCS = {

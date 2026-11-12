@@ -14,12 +14,21 @@ import { FixPacketSchema } from '@crawlmouse/types/v2';
 import { site, u, type PageSpec } from '../../../fixtures/v2/detectors/builders.js';
 import { detectStructure } from '../detectors/index.js';
 import type { HreflangLink, PageFacts } from '../detectors/types.js';
+import { MAX_URL_LENGTH } from '../batch-bounds.js';
 import { shallowParent } from '../grade/effects.js';
+import { PACKET_BOUNDS } from './compose.js';
 import { spelled } from './html-checks.js';
 import { writePacket } from './registry.js';
 import { filedLinks, subjectOf } from './structure.js';
-import { factsFor } from './test-support/facts.js';
-import { expectOwnWords, NOT_A_URL, SERVED } from './test-support/structure.js';
+import { factsFor, NO_STACK } from './test-support/facts.js';
+import {
+  expectOwnWords,
+  largestSites,
+  NOT_A_URL,
+  proseOf,
+  SERVED,
+  stringsOf,
+} from './test-support/structure.js';
 
 const PATHS = [
   '/',
@@ -148,7 +157,8 @@ describe('the structure builders over generated crawls (property)', () => {
   it('write a packet the contract accepts for every record a detector reports as detected', () => {
     const written = new Map<string, number>();
     // deep pages whose estimate's page already links to them on the links as the grade files them:
-    // round 2, security finding 2, where the builder threw
+    // round 2, security finding 2, where the builder threw. The run reaches the shape by the pinned
+    // seed, not by construction: no generated site is made to hold it
     let alreadyLinked = 0;
     // pages answering 200 whose request ended on another crawled page
     let landedOnAPage = 0;
@@ -179,6 +189,8 @@ describe('the structure builders over generated crawls (property)', () => {
           expect(packet!.verify.see).not.toBeNull();
           // owner rulings 2 and 3: no count of one before a plural, no internal identifier
           expectOwnWords(packet!);
+          // D3: no packet says its command passes on the site as it is
+          for (const text of proseOf(packet!)) expect(text).not.toMatch(PASSES_UNFIXED);
           written.set(record.type, (written.get(record.type) ?? 0) + 1);
         }
       }),
@@ -189,5 +201,61 @@ describe('the structure builders over generated crawls (property)', () => {
     for (const type of TYPES) expect(written.get(type), type).toBeGreaterThanOrEqual(10);
     expect(alreadyLinked).toBeGreaterThan(0);
     expect(landedOnAPage).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * What an `expect` must not say (D3, round 3 ruling): that its command passes on the site as it is.
+ * Two packets said so until this round: a deep page with no page to link from, and a canonical whose
+ * links move to a URL the programs read as the page's own.
+ */
+const PASSES_UNFIXED =
+  /pass(es)? before the fix|which it does today|passes today|can pass (early|already)/i;
+
+describe('no line of a structure packet is cut (round 3, SEO finding 2)', () => {
+  const origin = 'https://a.test';
+  /** A URL of `length` characters whose path repeats `fill`. */
+  const urlOf =
+    (length: number, fill: string) =>
+    (name: string): string =>
+      `${origin}/${name}/${fill.repeat(length)}`.slice(0, length);
+  const stacks = [
+    NO_STACK,
+    {
+      ...NO_STACK,
+      frontend: {
+        name: 'x',
+        framework: 'nextjs' as const,
+        version: null,
+        router: null,
+        detected_from: 'a test',
+      },
+    },
+  ];
+
+  it('for URLs of 120 characters and more, and the largest lists a record holds: every line is within the composer’s bound', () => {
+    const seen = new Set<string>();
+    for (const length of [120, 200, 600, MAX_URL_LENGTH]) {
+      for (const fill of ['a', "'", '%C3%A9']) {
+        for (const stack of stacks) {
+          for (const input of largestSites(origin, urlOf(length, fill))) {
+            const facts = factsFor(input, SERVED, stack);
+            for (const record of detectStructure(input)) {
+              if (record.state !== 'detected') continue;
+              const packet = writePacket(record.type, record, facts)!;
+              seen.add(record.type);
+              for (const text of stringsOf(packet)) {
+                expect(text, `${record.type} at ${length}`).not.toContain('(line cut from');
+              }
+              for (const text of proseOf(packet)) {
+                expect([...text].length, text).toBeLessThanOrEqual(PACKET_BOUNDS.line_chars);
+                expect(text, record.type).not.toMatch(PASSES_UNFIXED);
+              }
+            }
+          }
+        }
+      }
+    }
+    expect([...seen].sort()).toEqual([...TYPES]);
   });
 });

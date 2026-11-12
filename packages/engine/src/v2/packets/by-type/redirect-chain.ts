@@ -20,18 +20,23 @@ import {
   fetchOf,
   holds,
   httpUrl,
+  joined,
   linksTo,
   part,
   requestOf,
   sameInCommand,
   spelled,
+  TIMED,
 } from '../html-checks.js';
 import { word } from '../shell.js';
 import {
   addressesOf,
+  code,
+  fitting,
+  MARKER_LIMIT,
   pagesShown,
   pathOf,
-  pathWord,
+  pathWords,
   plural,
   readShown,
   rowOf,
@@ -40,7 +45,7 @@ import {
   TAGS,
   UNREAD_HREF,
 } from '../structure.js';
-import { code, count, line, ours, type Line } from '../text.js';
+import { count, line, ours, type Line } from '../text.js';
 import type { PacketEntry, PacketFacts, RecordOf } from '../types.js';
 
 type Fix = RecordOf<'redirect_chain'>;
@@ -78,7 +83,7 @@ function hopLines(fix: Fix, facts: PacketFacts): Line[] {
   );
 }
 
-export const redirectChain: PacketEntry<'redirect_chain'> = {
+export const redirectChain: PacketEntry<'redirect_chain'> = fitting({
   kind: 'builder',
   context: (fix, facts) => {
     const target = code(subjectOf(fix));
@@ -151,18 +156,26 @@ export const redirectChain: PacketEntry<'redirect_chain'> = {
     const told = end.at === 'page' && !sameInCommand(end.final, target);
     if (end.at !== 'page' || first === undefined || !told) {
       const from = requested(fix, facts);
-      const fetch = requestOf(facts, [from], part` -f -o /dev/null -L --max-redirs 1`);
+      const fetch = requestOf(
+        facts,
+        [from],
+        joined(part` -f -o /dev/null -L --max-redirs 1`, TIMED),
+      );
       const counted = requestOf(
         facts,
         [from],
-        part` -o /dev/null -L --max-redirs 10 -w ${word('%{num_redirects} %{http_code}\\n')}`,
+        joined(
+          part` -o /dev/null -L --max-redirs 10`,
+          TIMED,
+          part` -w ${word('%{num_redirects} %{http_code}\\n')}`,
+        ),
       );
       const answered = end.at === 'same' || end.at === 'page';
       return {
         command: command(fetch.fragment),
         expect: answered
           ? line`Exit status 0 once ${code(from)}, the address the crawl requested, reaches a page that answers below 400 through at most one redirect. Today the crawl recorded ${count(hops)} ${redirects} before ${code(end.final)} answered. The command follows the redirects; links rewritten to ${code(end.final)} are measured on the next check.`
-          : line`Exit status 0 once ${code(from)}, the address the crawl requested, reaches a page that answers below 400 through at most one redirect. Today the crawl recorded ${count(hops)} ${redirects} and no page at the end of them.`,
+          : line`Exit status 0 once ${code(from)}, the address the crawl requested, reaches a page that answers below 400 through at most one redirect. Today the crawl recorded ${count(hops)} ${redirects} and no page at the end of ${plural(hops, 'it', 'them')}.`,
         ua: fetch.ua,
         see: {
           command: command(counted.fragment),
@@ -184,17 +197,14 @@ export const redirectChain: PacketEntry<'redirect_chain'> = {
         : ` The command reads the first of the ${linking} linking pages: run it for each.`,
     );
     return {
-      command: command(
-        fetch.fragment,
-        holds(linksTo(addressesOf(facts, spelled(end.final)), [target])),
-      ),
-      expect: line`Exit status 0 once ${on} links to ${code(end.final)} and no longer to ${code(target)} (an <a> href, however the URL is written). Today it links to ${code(target)}. ${UNREAD_HREF}${more}`,
+      command: command(holds(fetch, linksTo(addressesOf(facts, spelled(end.final)), [target]))),
+      expect: line`Exit status 0 once ${on} links to ${code(end.final)} and no longer to ${code(target)} (an <a> href, however the URL is written). Today it links to ${code(target)}. ${UNREAD_HREF}${more} ${MARKER_LIMIT}`,
       ua: fetch.ua,
       see: {
-        command: seeTags(facts, [first], TAGS.a, [pathWord(target), pathWord(end.final)]),
+        command: seeTags(facts, [first], TAGS.a, [...pathWords(target), ...pathWords(end.final)]),
         today: line`The <a> tags that link to ${code(target)}: lines that hold ${code(pathOf(target))}.`,
         after: line`The <a> tags that link to ${code(end.final)}, lines that hold ${code(pathOf(end.final))}, and none that links to ${code(target)}.`,
       },
     };
   },
-};
+});
