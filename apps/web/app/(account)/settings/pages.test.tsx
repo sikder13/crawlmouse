@@ -20,6 +20,8 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('server-only', () => ({}));
+// No switcher cookie on these requests: each person acts in their default account.
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => ({
     ...postgrestOver(h.db as PGlite, h.user ? { as: { userId: h.user.id } } : {}),

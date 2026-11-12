@@ -24,9 +24,17 @@ const h = vi.hoisted(() => ({
   send: vi.fn(async (_e: unknown) => undefined),
   capture: vi.fn(async (..._a: unknown[]) => undefined),
   refused: new Set<string>(),
+  /** The switcher cookie's value on this request, or null for none. */
+  chosen: null as string | null,
 }));
 
 vi.mock('server-only', () => ({}));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      name === 'cm_account' && h.chosen !== null ? { name, value: h.chosen } : undefined,
+  }),
+}));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => {
     h.log.push('supabaseServer');
@@ -72,6 +80,7 @@ afterAll(async () => {
 beforeEach(() => {
   h.log.length = 0;
   h.user = null;
+  h.chosen = null;
   h.send.mockClear();
   h.capture.mockClear();
   h.refused = new Set(['private.example']);
@@ -317,6 +326,26 @@ describe('POST /api/sites', () => {
       [client.host, null],
       ['managed.example', 'weekly'],
     ]);
+  });
+
+  it('a person with two seats adds to the account their switcher names; a forged choice is not followed', async () => {
+    const owner = await person(h.db, 'agency-owner3');
+    await makePaid(h.db, owner.accountId, 'agency');
+    const manager = await person(h.db, 'two-seats');
+    await addSeat(h.db, owner.accountId, manager, 'account_manager');
+    const other = await person(h.db, 'bystander');
+    as(manager);
+
+    h.chosen = owner.accountId;
+    expect((await POST(json({ url: 'switched.example' }))).status).toBe(201);
+    expect((await sitesOf(owner.accountId)).map((s) => s.host)).toEqual(['switched.example']);
+    expect(await sitesOf(manager.accountId)).toEqual([]);
+
+    // Another person's account: no choice, so the default (their own) account takes the site.
+    h.chosen = other.accountId;
+    expect((await POST(json({ url: 'own.example' }))).status).toBe(201);
+    expect((await sitesOf(manager.accountId)).map((s) => s.host)).toEqual(['own.example']);
+    expect(await sitesOf(other.accountId)).toEqual([]);
   });
 
   it('a user on several accounts with no default is 409, writing nothing', async () => {

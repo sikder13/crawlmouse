@@ -1,6 +1,7 @@
 /**
  * What the live Settings, Settings › Plan, Settings › Delete and Trial ending pages read (CC-27b D6,
- * D8): the caller, the account they act in, their role on it, and that account's records. The role
+ * D8): the caller, the account they act in (the switcher's choice, as `loadViewer` reads it), their
+ * role on it, and that account's records. The role
  * is the session's own `member_role`, read before any service-role read of the account's records.
  */
 import 'server-only';
@@ -10,7 +11,7 @@ import { supabaseCheckReader } from '../pipeline/load';
 import type { Viewer } from '../view/account';
 import type { SeatRole } from './profile';
 import { loadSettingsDataset, viewInput } from './settings-dataset';
-import { readViewer } from './viewer';
+import { chosenFromRequest, readViewer } from './viewer';
 import type { FixtureDataset } from '@crawlmouse/types/v2';
 
 export type SettingsPageRead =
@@ -37,6 +38,7 @@ export async function readSettingsPage(now = new Date()): Promise<SettingsPageRe
   const found = await readViewer(
     { session, admin, now: () => now },
     { id: user.id, email: user.email ?? null },
+    await chosenFromRequest(),
   );
   if (found.kind !== 'viewer') return { kind: 'none' };
   const accountId = found.viewer.account.id;
