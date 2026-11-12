@@ -93,6 +93,10 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
     'This plan cannot be changed here: it is set to end, or its last payment has not gone through. Settings › Plan has the details.',
   billing_unavailable: () =>
     'Billing cannot be reached right now, so nothing was changed. Try again later.',
+  share_made: () =>
+    'The link is made. It is shown here once: copy it now. Making another replaces it.',
+  share_revoked: () => 'The link was withdrawn and no longer opens.',
+  not_ready: () => 'That report’s file is not stored yet, so no link was made.',
   invalid: () => 'That request was not understood, so nothing was changed.',
 };
 

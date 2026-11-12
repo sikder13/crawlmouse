@@ -136,6 +136,10 @@ export const NOTICE_CODES = [
   'payment_failed',
   'subscription_unchangeable',
   'billing_unavailable',
+  // share links (CC-31)
+  'share_made',
+  'share_revoked',
+  'not_ready',
   // any body the route could not read
   'invalid',
 ] as const;
@@ -144,9 +148,9 @@ export type NoticeCode = (typeof NOTICE_CODES)[number];
 
 const NOTICE_SET: ReadonlySet<string> = new Set(NOTICE_CODES);
 
-/** The pages a form posts from: the dashboard, Seats, an invitation's page, or one site's page. */
+/** The pages a form posts from: the dashboard, Seats, Reports, an invitation's page, or one site's page. */
 const BACK =
-  /^\/(?:dashboard|seats|invite|sites\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+  /^\/(?:dashboard|seats|reports|invite|sites\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 /**
  * The page a form was posted from, when it is one a form can go back to (the dashboard or a site
