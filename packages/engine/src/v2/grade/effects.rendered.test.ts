@@ -12,7 +12,13 @@ import type { JsTextState } from '../render/state.js';
 import { applyFix, effectsOf, type FixRecord } from './effects.js';
 import { aiFrom, gradeCheck, type Grades } from './index.js';
 import { round } from './numbers.js';
-import { detectorOutcomes, NOTHING_WRITTEN, RENDERED_CLASS } from './outcomes.js';
+import {
+  detectorOutcomes,
+  NOTHING_WRITTEN,
+  RENDERED_CLASS,
+  renderedConfidence,
+} from './outcomes.js';
+import { PAGES_PER_FIX_TEMPLATE } from '../render/sample.js';
 import { readableScore } from './readable.js';
 
 type Render = [share: number, state: JsTextState] | null;
@@ -131,6 +137,26 @@ describe('the client-rendered template fix', () => {
       (f) => f.type === 'client_rendered_template',
     )!;
     expect(one.confidence).toBe('likely');
+  });
+
+  it('is a best practice: no operator of a tested crawler documents the rule', () => {
+    expect(RENDERED_CLASS).toBe('best_practice');
+  });
+
+  it('is confirmed when every graded page of the template was rendered, however few', () => {
+    const extent = (pages: number, rendered: number) => ({ extent: { pages, rendered } });
+    expect(PAGES_PER_FIX_TEMPLATE).toBe(2);
+    expect(renderedConfidence(extent(1, 1))).toBe('confirmed');
+    expect(renderedConfidence(extent(2, 1))).toBe('likely');
+    expect(renderedConfidence(extent(2, 2))).toBe('confirmed');
+    expect(renderedConfidence(extent(40, 1))).toBe('likely');
+    expect(renderedConfidence(extent(40, 2))).toBe('confirmed');
+    // through the outcomes: a template of one graded page, rendered
+    const only = fixesOf(site([[0.1, SHELL]]).outcomes).find(
+      (f) => f.type === 'client_rendered_template',
+    )!;
+    expect(only.affected_pages).toBe(1);
+    expect(only.confidence).toBe('confirmed');
   });
 
   it('gives an outcome for every record: not detected, and indeterminate with no gone page', () => {
