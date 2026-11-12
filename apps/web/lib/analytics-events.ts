@@ -71,6 +71,11 @@ export const FUNNEL_EVENTS = [
   'account_deletion_confirmed',
   'account_restored',
   'account_purged',
+  // CC-28 — monitoring. Sent from the server (lib/v2/monitor/functions.ts), keyed by the account's id,
+  // with no address or webhook URL: an alert sent on one channel `{channel, changes}`, and a weekly
+  // summary sent `{sites, changes}`.
+  'alert_sent',
+  'summary_sent',
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];

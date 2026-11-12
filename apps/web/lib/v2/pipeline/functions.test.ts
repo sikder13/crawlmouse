@@ -318,6 +318,31 @@ const limitsOf = (configs: readonly Config[]): number[] =>
 
 const SWEEP = [undefined, '', '0', '-1', '2', '5', '6', '50', '1000', 'abc', '5.5'] as const;
 
+/** CC-28's alert and summary functions: registered with V2_PIPELINE and V2_CHECKS_PUBLIC both set. */
+const MONITOR_IDS = [
+  'crawlmouse-crawlmouse.alert.dispatch',
+  'crawlmouse-crawlmouse.summary.tick',
+  'crawlmouse-crawlmouse.summary.send',
+];
+
+describe('CC-28’s monitoring functions (D5, D6)', () => {
+  it('register with V2_PIPELINE and V2_CHECKS_PUBLIC both set, and with neither alone', () => {
+    const ids = (env: Record<string, string>) => configsOf(inngestFunctions(env)).map((c) => c.id);
+    expect(ids({ V2_PIPELINE: '1', V2_CHECKS_PUBLIC: '1' })).toEqual(
+      expect.arrayContaining(MONITOR_IDS),
+    );
+    const envs: Record<string, string>[] = [
+      {},
+      { V2_PIPELINE: '1' },
+      { V2_CHECKS_PUBLIC: '1' },
+      { V2_BILLING: '1' },
+    ];
+    for (const env of envs) {
+      for (const id of MONITOR_IDS) expect(ids(env), JSON.stringify(env)).not.toContain(id);
+    }
+  });
+});
+
 describe('no registered function can declare a concurrency limit above the plan cap (D4)', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -345,9 +370,11 @@ describe('no registered function can declare a concurrency limit above the plan 
                 (flag === '1' ? 10 : 5) +
                   (billing === '1' ? 2 : 0) +
                   (pub === '1' ? 3 : 0) +
-                  // CC-28's scheduler tick.
-                  (pub === '1' && flag === '1' ? 1 : 0),
+                  // CC-28's scheduler tick, and its alert and summary functions.
+                  (pub === '1' && flag === '1' ? 1 + MONITOR_IDS.length : 0),
               );
+              for (const id of MONITOR_IDS)
+                expect(configs.map((c) => c.id).includes(id), id).toBe(pub === '1' && flag === '1');
               const deletionIds = [
                 'crawlmouse-crawlmouse.account.deletion-cancel',
                 'crawlmouse-crawlmouse.account.deletion-resume',

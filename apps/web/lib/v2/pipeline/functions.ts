@@ -40,6 +40,7 @@ import { billingFunctions } from '../../billing/inngest-functions';
 import { deletionFunctions } from '../account/deletion-ports';
 import { scheduleFunctions } from '../monitor/schedule';
 import { workerClientFromEnv } from '../../worker-client/client';
+import { monitorFunctions } from '../monitor/functions';
 import { CRAWL_USER_AGENT } from './discover';
 import { supabaseEvidenceStore } from './evidence';
 import { expireUnkept, settleKept, type ExpireDeps } from './expire';
@@ -133,6 +134,8 @@ export function inngestFunctions(
     ...deletion,
     // CC-28's scheduler tick, with V2_CHECKS_PUBLIC=1 as well (lib/v2/monitor/schedule.ts).
     ...(checksPublicEnabled(env) ? scheduleFunctions(env) : []),
+    // CC-28's alerts and weekly summary, with V2_CHECKS_PUBLIC=1 as well (lib/v2/monitor/functions.ts).
+    ...(checksPublicEnabled(env) ? monitorFunctions(env) : []),
   ];
 }
 
