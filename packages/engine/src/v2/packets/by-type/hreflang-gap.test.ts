@@ -218,7 +218,7 @@ describe('the hreflang_gap packet', () => {
     const p = packetFor(cluster(base, 'hreflang_invalid_code'), base);
     expect(p.frameworks).toEqual(['generic', 'nextjs']);
     expect(p.packets[0]!.change).toEqual([
-      'In the App Router the annotations come from alternates.languages (an hreflang value to a URL) in the metadata export, or in generateMetadata, of the page.js of the route or of a layout.js above it. Make the changes below there.',
+      'In the App Router the annotations come from alternates.languages (a map from hreflang value to URL) in the metadata export, or in generateMetadata, of the page.js of the route or of a layout.js above it. Make the changes below there.',
       ...p.change,
     ]);
   });
@@ -230,11 +230,11 @@ describe('the hreflang_gap packet', () => {
     const back = packetFor(cluster(base, 'hreflang_missing_return'), base).verify;
     expect(back.command.endsWith("' 'https://a.test/en' '1' 'https://a.test/de'")).toBe(true);
     expect(back.expect).toBe(
-      'Exit status 0 once `https://a.test/en` lists itself under a language code, holds an x-default, names `https://a.test/de`. Annotations are read from <link> elements with quoted, absolute URLs.',
+      'Exit status 0 once `https://a.test/en` lists itself under a language code and holds an x-default. It must also name `https://a.test/de`. Annotations are read from <link> elements with quoted, absolute URLs.',
     );
     const gone = packetFor(cluster(base, 'hreflang_alternate_gone'), base).verify;
     expect(gone.command.endsWith("' 'https://a.test/en' '0' 'https://a.test/fr'")).toBe(true);
-    expect(gone.expect).toContain(', and no longer holds `https://a.test/fr`.');
+    expect(gone.expect).toContain(' It must no longer hold `https://a.test/fr`. ');
   });
 
   const head = (ls: Links, origin: string) =>

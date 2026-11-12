@@ -188,7 +188,7 @@ export const hreflangGap: PacketEntry<'hreflang_gap'> = {
         const { change, keep } = generic(fix);
         return {
           change: [
-            line`In the App Router the annotations come from alternates.languages (an hreflang value to a URL) in the metadata export, or in generateMetadata, of the page.js of the route or of a layout.js above it. Make the changes below there.`,
+            line`In the App Router the annotations come from alternates.languages (a map from hreflang value to URL) in the metadata export, or in generateMetadata, of the page.js of the route or of a layout.js above it. Make the changes below there.`,
             ...change,
           ],
           keep,
@@ -231,11 +231,11 @@ export const hreflangGap: PacketEntry<'hreflang_gap'> = {
           stale.slice(0, MAX_NAMED).map((s) => s.word),
         ),
       ),
-      expect: line`Exit status 0 once ${code(needs.page)} lists itself under a language code, holds an x-default${ours(needs.back.length === 0 ? '' : ', names ')}${pagesShown(needs.back, MAX_NAMED)}${ours(stale.length === 0 ? '' : ', and no longer holds ')}${list(
+      expect: line`Exit status 0 once ${code(needs.page)} lists itself under a language code and holds an x-default.${ours(needs.back.length === 0 ? '' : ' It must also name ')}${pagesShown(needs.back, MAX_NAMED)}${ours(needs.back.length === 0 ? '' : '.')}${ours(stale.length === 0 ? '' : ' It must no longer hold ')}${list(
         stale.map((s) => s.shown),
         MAX_NAMED,
         'annotation',
-      )}. Annotations are read from <link> elements with quoted, absolute URLs.${others}`,
+      )}${ours(stale.length === 0 ? '' : '.')} Annotations are read from <link> elements with quoted, absolute URLs.${others}`,
       ua: fetch.ua,
     };
   },

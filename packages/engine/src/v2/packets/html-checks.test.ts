@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import fc from 'fast-check';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { commandOf, crawledWord } from './shell.js';
 import {
   ANCHOR_HREFS,
@@ -273,6 +273,7 @@ describe('a command over hostile values', () => {
   const dir = mkdtempSync(join(tmpdir(), 'packets-html-checks-'));
   const marker = join(dir, 'ran');
   afterEach(() => rmSync(marker, { force: true }));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   const hostile = fc
     .tuple(

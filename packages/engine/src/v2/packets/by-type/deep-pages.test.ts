@@ -59,7 +59,7 @@ describe('the deep_pages packet', () => {
     const p = packetOf('deep_pages', record, facts);
     expect(p.change).toEqual([
       'Add a link to `https://a.test/deep` on a page at most 2 clicks from the homepage, so that it lands within 3.',
-      'The estimate for this fix puts the link on `https://a.test/b`, which is that close. Another page as close does as well: pick the one a visitor would look on.',
+      'On the links as crawled, the estimate for this fix puts the link on `https://a.test/b`, a page that close. Another page as close does as well: pick the one a visitor would look on.',
       'Write the link as an <a> element with an href, in the HTML the server sends. A link that only JavaScript adds is not there for a crawler that does not run scripts.',
     ]);
     expect(p.verify.command).toMatch(/^curl -sS -A '[^']*' 'https:\/\/a\.test\/b' \| /);

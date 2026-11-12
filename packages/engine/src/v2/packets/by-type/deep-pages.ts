@@ -14,14 +14,16 @@ import { CRAWLABLE_LINK, filedLinks, pagesShown, subjectOf } from '../structure.
 import { code, count, line } from '../text.js';
 import type { PacketEntry, PacketFacts } from '../types.js';
 
+/** A check has one shallow page for all its deep pages, so it is chosen once per check's facts. */
+const parents = new WeakMap<PacketFacts, string>();
+
 /** The page the estimate links a deep page from, and whether the recorded links already hold that link. */
 function parentOf(facts: PacketFacts, url: string): { parent: string; linked: boolean } {
   const edges = filedLinks(facts);
-  const parent = shallowParent({
-    pages: [...facts.pages.values()],
-    edges,
-    homepage_url: facts.homepage_url,
-  });
+  const parent =
+    parents.get(facts) ??
+    shallowParent({ pages: [...facts.pages.values()], edges, homepage_url: facts.homepage_url });
+  parents.set(facts, parent);
   return { parent, linked: edges.some((e) => e.from_url === parent && e.to_url === url) };
 }
 
@@ -48,7 +50,7 @@ export const deepPages: PacketEntry<'deep_pages'> = {
     return {
       change: [
         line`Add a link to ${code(url)} on a page at most ${count(MAX_HEALTHY_DEPTH - 1)} clicks from the homepage, so that it lands within ${count(MAX_HEALTHY_DEPTH)}.`,
-        line`The estimate for this fix puts the link on ${code(parent)}, which is that close. Another page as close does as well: pick the one a visitor would look on.`,
+        line`On the links as crawled, the estimate for this fix puts the link on ${code(parent)}, a page that close. Another page as close does as well: pick the one a visitor would look on.`,
         CRAWLABLE_LINK,
       ],
       keep: [

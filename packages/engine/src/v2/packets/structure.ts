@@ -27,14 +27,23 @@ export function rowOf(facts: Pick<PacketFacts, 'pages'>, url: string): PageResul
 /**
  * The crawl's links filed under the page they were found on, as the detectors and the grade file
  * them (build/filing.ts), read in the detectors' order (by source, then target), so that of two
- * links that file to one pair the same one is kept.
+ * links that file to one pair the same one is kept. The result is remembered by the facts' own `pages` and `edges`.
  */
-export function filedLinks(facts: Pick<PacketFacts, 'pages' | 'edges'>): LinkEdge[] {
+export function filedLinks(facts: Pick<PacketFacts, 'pages' | 'edges'>): readonly LinkEdge[] {
+  const byEdges = filed.get(facts.pages) ?? new WeakMap<object, readonly LinkEdge[]>();
+  filed.set(facts.pages, byEdges);
+  const known = byEdges.get(facts.edges);
+  if (known !== undefined) return known;
   const ordered = [...facts.edges].sort(
     (a, b) => byText(a.from_url, b.from_url) || byText(a.to_url, b.to_url),
   );
-  return fileEdges(ordered, landingsOf([...facts.pages.values()]));
+  const links = fileEdges(ordered, landingsOf([...facts.pages.values()]));
+  byEdges.set(facts.edges, links);
+  return links;
 }
+
+/** A check's links are filed once for its pages and links, however many of its fixes read them. */
+const filed = new WeakMap<object, WeakMap<object, readonly LinkEdge[]>>();
 
 /** Up to `max` URLs in code spans; a longer list says how many pages it leaves out. */
 export const pagesShown = (urls: readonly string[], max = 8): Safe =>

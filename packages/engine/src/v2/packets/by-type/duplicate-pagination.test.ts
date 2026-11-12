@@ -66,20 +66,20 @@ describe('the duplicate_pagination packet', () => {
   it('names the template and the later pages, then one sentence for each condition proved', () => {
     expect(packetFor(listSite(base, 'canonical')).context).toEqual([
       `Template \`/collections/{slug}\`: 1 later page of a paginated list repeats its first page: ${later}.`,
-      `Declares the first page of its list as its canonical: ${later}.`,
+      `Canonical set to the first page of the list: ${later}.`,
       'Google asks that each page of a sequence have its own canonical, and that the first page not be the canonical of the others: https://developers.google.com/search/docs/specialty/ecommerce/pagination-and-incremental-page-loading',
     ]);
     expect(packetFor(listSite(base, 'content')).context).toEqual([
       `Template \`/collections/{slug}\`: 1 later page of a paginated list repeats its first page: ${later}.`,
-      `Serves nearly the same main content as the first page (a 64-bit content hash within 3 bits of it): ${later}.`,
+      `Main content nearly identical to the first page's (64-bit content hashes within 3 bits): ${later}.`,
     ]);
   });
 
   it('does not say which page repeats the content when the record does not', () => {
     const p = packetFor(listSite(base, 'both'));
-    expect(p.context[1]).toBe(`Declares the first page of its list as its canonical: ${later}.`);
+    expect(p.context[1]).toBe(`Canonical set to the first page of the list: ${later}.`);
     expect(p.context[3]).toBe(
-      'At least one of the pages above also serves nearly the same main content as its first page (a 64-bit content hash within 3 bits of it).',
+      "At least one of the pages above also has main content nearly identical to its first page's (64-bit content hashes within 3 bits).",
     );
   });
 

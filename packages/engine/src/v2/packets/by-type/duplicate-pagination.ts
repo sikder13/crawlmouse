@@ -86,15 +86,15 @@ export const duplicatePagination: PacketEntry<'duplicate_pagination'> = {
     for (const condition of fix.conditions) {
       if (condition === 'pagination_canonical_to_first') {
         lines.push(
-          line`${plural(declaring.length, 'Declares the first page of its list as its canonical', 'Declare the first page of their list as their canonical')}: ${pagesShown(declaring)}.`,
+          line`Canonical set to the first page of the list: ${pagesShown(declaring)}.`,
           line`Google asks that each page of a sequence have its own canonical, and that the first page not be the canonical of the others: ${ours(GOOGLE_DOCS.pagination)}`,
         );
       }
       if (condition === 'pagination_near_duplicate') {
         lines.push(
           others.length === 0
-            ? line`At least one of the pages above also serves nearly the same main content as its first page (a 64-bit content hash within ${count(SIMHASH_HAMMING_K)} bits of it).`
-            : line`${plural(others.length, 'Serves', 'Serve')} nearly the same main content as the first page (a 64-bit content hash within ${count(SIMHASH_HAMMING_K)} bits of it): ${pagesShown(others)}.`,
+            ? line`At least one of the pages above also has main content nearly identical to its first page's (64-bit content hashes within ${count(SIMHASH_HAMMING_K)} bits).`
+            : line`Main content nearly identical to the first page's (64-bit content hashes within ${count(SIMHASH_HAMMING_K)} bits): ${pagesShown(others)}.`,
         );
       }
     }
