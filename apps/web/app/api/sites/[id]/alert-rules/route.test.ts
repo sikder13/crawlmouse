@@ -317,4 +317,50 @@ describe('PUT /api/sites/[id]/alert-rules', () => {
     expect(res.status).toBe(405);
     expect(await rulesOf(m.accountId)).toHaveLength(2);
   });
+
+  it('a form that does not name PUT goes back to the site with its notice, as the account route does (N3)', async () => {
+    const m = await member('verb-form', 'pro');
+    h.user = m.user;
+    const res = await POST(form(m.siteId, 'rule=any_change&enabled=false'), ctx(m.siteId));
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe(`/sites/${m.siteId}?notice=method_not_allowed`);
+    expect(await rulesOf(m.accountId)).toHaveLength(2);
+  });
+
+  it('answers 404 to a seat whose client scope leaves the site out, and writes on the site it covers (N1)', async () => {
+    const owner = await member('scope', 'pro');
+    const other = await h.db.query<{ id: string }>(
+      `insert into public.sites (account_id, host) values ($1, $2) returning id`,
+      [owner.accountId, `scope-out-${randomUUID().slice(0, 8)}.example.com`],
+    );
+    const outside = other.rows[0]!.id;
+    const email = `scoped-${randomUUID().slice(0, 8)}@example.com`;
+    const scopedId = await signUp(h.db, email);
+    const seat = randomUUID();
+    await h.db.query(
+      `insert into public.seats (id, account_id, user_id, invited_email, role, status, accepted_at, client_scope_all)
+       values ($1, $2, $3, $4, 'account_manager', 'active', now(), false)`,
+      [seat, owner.accountId, scopedId, email],
+    );
+    await h.db.query(
+      `insert into public.seat_sites (seat_id, site_id, account_id) values ($1, $2, $3)`,
+      [seat, owner.siteId, owner.accountId],
+    );
+    h.user = { id: scopedId, email };
+    h.log.length = 0;
+    const out = await PUT(put(outside, { rule: 'any_change', enabled: false }), ctx(outside));
+    expect(out.status).toBe(404);
+    expect(h.log).not.toContain('supabaseAdmin');
+    expect(await rulesOf(owner.accountId)).toEqual([
+      'account any_change true email -',
+      'account text_drop true email 10',
+    ]);
+    // The control: the same seat on the site its scope covers.
+    const inside = await PUT(
+      put(owner.siteId, { rule: 'any_change', enabled: false }),
+      ctx(owner.siteId),
+    );
+    expect(inside.status).toBe(200);
+    expect(await rulesOf(owner.accountId)).toContain(`${owner.siteId} any_change false email -`);
+  });
 });
