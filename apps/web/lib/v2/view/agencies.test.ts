@@ -106,7 +106,7 @@ const PARAPHRASES: Partial<Record<CapabilityKey, readonly string[]>> = {
     'every week',
     'checking again',
     'checked again',
-    'Pay when you want it watched.',
+    'Keeps monthly checks',
   ],
   change_emails: [
     'an email only if something changed',
@@ -139,6 +139,10 @@ const PARAPHRASES: Partial<Record<CapabilityKey, readonly string[]>> = {
   client_report_page: ['reports on your domain with your logo', 'client report page'],
   sender_address: ['emails from your address', 'Emails to clients from your address'],
   client_matrix: ['Client matrix', 'every client on one screen'],
+  observed_crawlers: [
+    'Pro also lists the crawlers it has seen on your site (observed activity).',
+    'observed activity',
+  ],
   one_pagers: ['client one-pagers', 'Prospect one-pagers', 'one-page summary'],
   client_reports: [
     'Weekly or monthly client reports, sent for you',

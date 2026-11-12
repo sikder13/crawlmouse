@@ -22,6 +22,8 @@ import { portalRefusal } from '../../billing/portal-v2';
 import { usd } from '../../billing/prices';
 import { trialRefusal, type EntitlementSnapshot } from '../../billing/state-machine';
 import type { PaidTier, Tier } from '../../entitlement-v2';
+import { AGENCIES_COPY } from '../copy/agencies';
+import { tagged, type TaggedView } from './agencies';
 import { agencyTrialPath } from './agency-trial';
 import { PRICING_COPY as COPY, per, planCopy, priceOf, type PlanRow } from '../copy/pricing';
 
@@ -83,23 +85,40 @@ export interface PlanView {
   tag: string;
   price: string;
   per: string;
-  description: string;
-  rows: PlanRow[];
+  description: TaggedView;
+  rows: (TaggedView & Pick<PlanRow, 'label'>)[];
   action: PlanAction;
 }
 
+/**
+ * Every sentence that names a capability is a `TaggedView` (For agencies' table): the page marks it
+ * "coming" (`comingLabel`) when one of its capabilities is not built.
+ */
 export interface PricingView {
   title: string;
-  lead: string;
+  lead: TaggedView[];
   interval: Interval;
   intervals: { interval: Interval; label: string; href: string; current: boolean }[];
   plans: PlanView[];
-  crawlers: string;
-  annual: string;
-  agencyPlus: { name: string; limits: string; price: string; link: string; formTitle: string };
-  after: { title: string; lead: string; columns: readonly string[]; rows: [string, string][] };
-  why: { title: string; text: string };
-  faq: { title: string; items: { q: string; a: string }[] };
+  crawlers: TaggedView[];
+  annual: TaggedView[];
+  agencyPlus: {
+    name: string;
+    limits: TaggedView;
+    price: string;
+    link: string;
+    formTitle: string;
+    reply: TaggedView;
+  };
+  after: {
+    title: string;
+    lead: TaggedView[];
+    columns: readonly string[];
+    rows: [string, TaggedView][];
+  };
+  why: { title: string; text: TaggedView[] };
+  faq: { title: string; items: { q: string; a: TaggedView }[] };
+  comingLabel: string;
 }
 
 const PRO_TRIAL_START = '/api/billing/pro-trial/start';
@@ -225,7 +244,7 @@ export function pricingView(
   const tiers: Tier[] = ['free', 'pro', 'agency'];
   return {
     title: COPY.title,
-    lead: COPY.lead(),
+    lead: COPY.lead().map(tagged),
     interval,
     intervals: (['month', 'year'] as const).map((i) => ({
       interval: i,
@@ -235,28 +254,36 @@ export function pricingView(
     })),
     plans: tiers.map((tier) => ({
       tier,
-      ...copy[tier],
+      name: copy[tier].name,
+      tag: copy[tier].tag,
+      description: tagged(copy[tier].description),
+      rows: copy[tier].rows.map((r) => ({ label: r.label, ...tagged(r) })),
       price: usd(priceOf(tier, interval)),
       per: per(interval),
       action: actions[tier],
     })),
-    crawlers: COPY.crawlers,
-    annual: COPY.annual(),
+    crawlers: COPY.crawlers().map(tagged),
+    annual: COPY.annual().map(tagged),
     agencyPlus: {
       name: COPY.agencyPlus.name,
-      limits: COPY.agencyPlus.limits(),
+      limits: tagged({ text: COPY.agencyPlus.limits(), capabilities: ['sites', 'seats'] }),
       price: COPY.agencyPlus.price(),
       link: COPY.agencyPlus.link,
       formTitle: COPY.agencyPlus.formTitle,
+      reply: tagged(COPY.agencyPlus.reply),
     },
     after: {
       title: COPY.after.title,
-      lead: COPY.after.lead(),
+      lead: COPY.after.lead().map(tagged),
       columns: COPY.after.columns,
-      rows: COPY.after.rows(interval),
+      rows: COPY.after.rows(interval).map(([what, happens]) => [what, tagged(happens)]),
     },
-    why: COPY.why,
-    faq: { title: COPY.faq.title, items: COPY.faq.items() },
+    why: { title: COPY.why.title, text: COPY.why.text().map(tagged) },
+    faq: {
+      title: COPY.faq.title,
+      items: COPY.faq.items().map(({ q, a }) => ({ q, a: tagged(a) })),
+    },
+    comingLabel: AGENCIES_COPY.coming,
   };
 }
 

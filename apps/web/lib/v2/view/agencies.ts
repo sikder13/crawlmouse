@@ -45,7 +45,8 @@ export type CapabilityKey =
   | 'trial_reminder'
   | 'renewal_reminders'
   | 'agency_plus_reply'
-  | 'agency_workspace';
+  | 'agency_workspace'
+  | 'observed_crawlers';
 
 /** Paths are from the repository root. */
 export type Proof =
@@ -122,7 +123,7 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
       text: /trigger:\s*(?:['"]scheduled['"]|[A-Z_]*SCHEDULED\b)/,
     },
     named:
-      /\bweekly\b|re-?check|checked (?:again|monthly)|checking again|scheduled checks?|every week|when you want it watched/i,
+      /\bweekly\b|re-?check|checked (?:again|monthly)|checking again|scheduled checks?|every week|monthly checks/i,
   },
   change_emails: {
     status: 'coming',
@@ -215,6 +216,12 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     what: 'A reply to an Agency Plus request: it is stored, and nothing tells anyone yet (CC-28).',
     proof: { kind: 'absent', path: 'apps/web/lib/v2/mail' },
     named: /we reply|talk to us/i,
+  },
+  observed_crawlers: {
+    status: 'coming',
+    what: 'The crawlers seen visiting your own site (observed activity): nothing reads a site’s visits yet.',
+    proof: { kind: 'nowhere', dirs: SOURCE_DIRS, text: 'observed_activity' },
+    named: /observed activity|crawlers it has seen|seen on your site/i,
   },
   agency_workspace: {
     status: 'coming',
