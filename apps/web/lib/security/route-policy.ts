@@ -207,7 +207,8 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     route: 'api/reports/mint',
     methods: ['POST'],
     class: 'public',
-    reason: 'capability (a completed audit id); per-user and per-IP caps, Turnstile once exhausted',
+    reason:
+      "capability (a completed audit id); per-user and per-IP caps, Turnstile once exhausted. A v2 body ({checkId}, CC-29 D7) needs a session and the check's site's membership",
     session: 'optional',
     origin: 'lenient',
     jsonBody: true,
