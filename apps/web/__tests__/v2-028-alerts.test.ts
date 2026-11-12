@@ -271,6 +271,118 @@ describe('record_alert_delivery (D5)', () => {
   });
 });
 
+describe('the Slack ledger: claim before post (D5; review r1, test quality B1)', () => {
+  const T0 = '2026-11-13T10:00:00.000Z';
+  const at = (minutes: number) => new Date(Date.parse(T0) + minutes * 60_000).toISOString();
+  const claimSlack = async (key: string, now: string | null, accountId: string | null = null) =>
+    (
+      await svc<{ r: { outcome: string; attempt?: number } }>(
+        `select public.claim_slack_send($1, $2, $3) r`,
+        [key, accountId, now],
+      )
+    )[0]!.r;
+  const finishSlack = async (key: string, status: string, now: string, code: string | null = null) =>
+    (
+      await svc<{ r: boolean }>(`select public.finish_slack_send($1, $2, $3, $4) r`, [
+        key,
+        status,
+        code,
+        now,
+      ])
+    )[0]!.r;
+  const rowOf = async (key: string) =>
+    (
+      await db.query<{
+        status: string;
+        attempts: number;
+        error_code: string | null;
+        sent_at: Date | null;
+      }>(
+        `select status, attempts, error_code, sent_at from public.slack_sends where idempotency_key = $1`,
+        [key],
+      )
+    ).rows[0];
+  const key = () => `alert:${randomUUID()}:slack`;
+
+  it('lets the first claim of a key go, at attempt 1, and records it as sending', async () => {
+    const { accountId } = await account();
+    const k = key();
+    expect(await claimSlack(k, T0, accountId)).toEqual({ outcome: 'go', attempt: 1 });
+    expect(await rowOf(k)).toMatchObject({ status: 'sending', attempts: 1, sent_at: null });
+  });
+
+  it('answers busy to a second claim inside two minutes, and done once the first is posted', async () => {
+    const k = key();
+    await claimSlack(k, T0);
+    expect(await claimSlack(k, at(1.9))).toEqual({ outcome: 'busy' });
+    expect(await finishSlack(k, 'sent', at(1))).toBe(true);
+    expect(await claimSlack(k, at(2))).toEqual({ outcome: 'done' });
+    // A retried step long after: still done, so the message is not posted again.
+    expect(await claimSlack(k, at(60 * 24 * 30))).toEqual({ outcome: 'done' });
+    expect(await rowOf(k)).toMatchObject({ status: 'sent', attempts: 1, error_code: null });
+  });
+
+  it('retries a failed post at most three attempts, then answers exhausted', async () => {
+    const k = key();
+    expect(await claimSlack(k, T0)).toEqual({ outcome: 'go', attempt: 1 });
+    await finishSlack(k, 'failed', at(1), 'slack_503');
+    expect(await rowOf(k)).toMatchObject({ status: 'failed', error_code: 'slack_503' });
+    expect(await claimSlack(k, at(2))).toEqual({ outcome: 'go', attempt: 2 });
+    expect(await rowOf(k)).toMatchObject({ status: 'sending', error_code: null });
+    await finishSlack(k, 'failed', at(3), 'slack_503');
+    expect(await claimSlack(k, at(4))).toEqual({ outcome: 'go', attempt: 3 });
+    await finishSlack(k, 'failed', at(5), 'network');
+    expect(await claimSlack(k, at(6))).toEqual({ outcome: 'exhausted' });
+    expect(await claimSlack(k, at(7))).toEqual({ outcome: 'exhausted' });
+    expect(await rowOf(k)).toMatchObject({ status: 'failed', attempts: 3 });
+  });
+
+  it('takes back a claim left sending for more than two minutes (a worker that died mid-post)', async () => {
+    const k = key();
+    await claimSlack(k, T0);
+    expect(await claimSlack(k, at(1.9))).toEqual({ outcome: 'busy' });
+    expect(await claimSlack(k, at(2.1))).toEqual({ outcome: 'go', attempt: 2 });
+    // and a claim left sending on its third attempt is exhausted, not posted a fourth time
+    expect(await claimSlack(k, at(4.3))).toEqual({ outcome: 'go', attempt: 3 });
+    expect(await claimSlack(k, at(6.5))).toEqual({ outcome: 'exhausted' });
+    expect(await rowOf(k)).toMatchObject({ status: 'failed', attempts: 3 });
+  });
+
+  it('records a result only for a key that is sending', async () => {
+    const k = key();
+    expect(await finishSlack(k, 'sent', T0)).toBe(false);
+    await claimSlack(k, T0);
+    expect(await finishSlack(k, 'sent', at(1))).toBe(true);
+    expect(await finishSlack(k, 'failed', at(2), 'late')).toBe(false);
+    expect(await rowOf(k)).toMatchObject({ status: 'sent', error_code: null });
+    expect((await rowOf(k))!.sent_at!.toISOString()).toBe(at(1));
+  });
+
+  it('refuses a missing key or time, another status, and an error that is not a code', async () => {
+    await expect(claimSlack(key(), null)).rejects.toThrow(/required/);
+    const k = key();
+    await claimSlack(k, T0);
+    await expect(finishSlack(k, 'sending', at(1))).rejects.toThrow(/sent or failed/);
+    await expect(
+      finishSlack(k, 'failed', at(1), 'https://hooks.slack.com/services/T/B/x'),
+    ).rejects.toThrow(/check constraint/);
+  });
+
+  it('is executable by service_role only', async () => {
+    const { rows } = await db.query<{ fn: string; r: string; ok: boolean }>(
+      `select fn, r, has_function_privilege(r, fn, 'execute') ok
+         from unnest(array['public.claim_slack_send(text, uuid, timestamptz)',
+                           'public.finish_slack_send(text, text, text, timestamptz)']) fn,
+              unnest(array['anon', 'authenticated', 'service_role']) r
+        order by fn, r`,
+    );
+    expect(rows.filter((x) => x.ok).map((x) => [x.fn, x.r])).toEqual([
+      ['public.claim_slack_send(text, uuid, timestamptz)', 'service_role'],
+      ['public.finish_slack_send(text, text, text, timestamptz)', 'service_role'],
+    ]);
+  });
+});
+
 describe('the Slack URL at send time (D5)', () => {
   it('answers the URL for a paid account, and null once it is Free', async () => {
     const { accountId } = await account('pro');

@@ -230,3 +230,118 @@ describe.skipIf(!URL_ENV)('migration 028 under two real transactions', () => {
     TEST_TIMEOUT_MS,
   );
 });
+
+/**
+ * The Slack ledger under two real transactions (D5; review r1, test quality B1): two workers claiming
+ * one alert's Slack message (`claim_slack_send`, a replayed `check.finished` or a step retried while
+ * the first still runs). Its own databases, so it stands apart from the races above: the migration as
+ * written, and one built with the claim's guard taken out (the unique key replaced by a check-then-
+ * insert), where both workers must go.
+ *
+ * Each race also records whether B's call was still waiting when A committed. In the real database it
+ * must be (B waits on A's uncommitted key, then reads it); in the mutation database it must not be (no
+ * key to wait on). So a pass shows the window was hit, not only that B ran after A.
+ */
+const SLACK_UNIQUE_KEY =
+  'idempotency_key text not null unique check (length(idempotency_key) between 1 and 200),\n  account_id uuid references public.accounts (id) on delete set null,\n  status text not null check (status in';
+const SLACK_SENDING_INSERT =
+  "  values (p_key, p_account, 'sending', 1, p_now, p_now)\n  on conflict (idempotency_key) do nothing;\n";
+
+/** A's call is made and A stays open while B's runs; then A commits, then B. */
+async function slackRace(sql: Sql, key: string) {
+  const claim = async (t: postgres.ReservedSql) => {
+    const [x] = await t`select public.claim_slack_send(${key}, null, now()) as r`;
+    return (x!.r as { outcome: string }).outcome;
+  };
+  const ta = await sql.reserve();
+  const tb = await sql.reserve();
+  try {
+    await ta`begin`;
+    await ta`set local role service_role`;
+    const a = await claim(ta);
+    await tb`begin`;
+    await tb`set local role service_role`;
+    let settled = false;
+    const pending = claim(tb).then(
+      (outcome) => {
+        settled = true;
+        return { outcome };
+      },
+      (error: unknown) => {
+        settled = true;
+        return { error };
+      },
+    );
+    await new Promise((r) => setTimeout(r, 500));
+    const waitingAtCommit = !settled;
+    await ta`commit`;
+    const b = await pending;
+    if ('error' in b) throw b.error;
+    await tb`commit`;
+    return { a, b: b.outcome, waitingAtCommit };
+  } finally {
+    for (const t of [ta, tb]) {
+      await t`rollback`.catch(() => {});
+      t.release();
+    }
+  }
+}
+
+describe.skipIf(!URL_ENV)('migration 028: the Slack ledger under two real transactions', () => {
+  const suffix = `${process.pid}_${Date.now()}`;
+  const names = {
+    real: `monitoring_race_slack_${suffix}`,
+    unkeyed: `monitoring_race_slack_unkeyed_${suffix}`,
+  };
+  let admin: Sql;
+  let real: Sql;
+  let unkeyed: Sql;
+
+  beforeAll(async () => {
+    admin = postgres(URL_ENV!, { max: 1, onnotice: () => {} });
+    real = await migrated(admin, names.real);
+    unkeyed = await migrated(
+      admin,
+      names.unkeyed,
+      editing(
+        [
+          SLACK_UNIQUE_KEY,
+          SLACK_UNIQUE_KEY.replace('not null unique check', 'not null check'),
+        ],
+        [
+          SLACK_SENDING_INSERT,
+          "  select p_key, p_account, 'sending', 1, p_now, p_now\n" +
+            '   where not exists (select 1 from public.slack_sends e where e.idempotency_key = p_key);\n',
+        ],
+      ),
+    );
+  }, 2 * HOOK_TIMEOUT_MS);
+
+  afterAll(async () => {
+    for (const s of [real, unkeyed]) await s?.end({ timeout: 5 });
+    for (const n of Object.values(names))
+      await admin?.unsafe(`drop database if exists ${n} with (force)`);
+    await admin?.end({ timeout: 5 });
+  }, HOOK_TIMEOUT_MS);
+
+  it(
+    'two workers claiming one Slack message: B waits for A, then is told busy, and one row is written',
+    async () => {
+      const key = `alert:${randomUUID()}:slack`;
+      expect(await slackRace(real, key)).toEqual({ a: 'go', b: 'busy', waitingAtCommit: true });
+      const [n] =
+        await real`select count(*)::int as n from public.slack_sends where idempotency_key = ${key}`;
+      expect(n!.n).toBe(1);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'mutation: without the unique key, B does not wait and both workers go (two posts)',
+    async () => {
+      const key = `alert:${randomUUID()}:slack`;
+      expect(await slackRace(unkeyed, key)).toEqual({ a: 'go', b: 'go', waitingAtCommit: false });
+    },
+    TEST_TIMEOUT_MS,
+  );
+});
