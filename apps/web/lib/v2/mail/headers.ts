@@ -23,12 +23,22 @@ export class HeaderRefused extends Error {
 // Any C0 control (CR and LF among them), DEL, and the Unicode line and paragraph separators.
 const CONTROL = /[\u0000-\u001f\u007f\u2028\u2029]/;
 
-/** A plain address: one @, no spaces, no angle brackets, no comma or semicolon, at most 254 characters. */
-const ADDRESS =
-  /^[^\s@<>,;"()\\]{1,64}@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+/**
+ * A plain address, at most 254 characters: a dot-atom local part of RFC 5322's atext (letters, digits
+ * and ``!#$%&'*+/=?^_`{|}~-``, no leading, trailing or doubled dot, at most 64 characters), one `@`,
+ * and a hostname of letters, digits and hyphens. No quoted local part and none of the specials a parser
+ * could read as a group, a route or a second address (`:`, `;`, `,`, `<`, `>`, `[`, `]`, `(`, `)`, `"`,
+ * `\`, `@`, space).
+ */
+const ATEXT = "[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+";
+const LOCAL = new RegExp(`^${ATEXT}(?:\\.${ATEXT})*$`);
+const DOMAIN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
 
 export function isPlainAddress(value: string): boolean {
-  return value.length <= 254 && !CONTROL.test(value) && ADDRESS.test(value);
+  if (value.length > 254 || CONTROL.test(value)) return false;
+  const at = value.lastIndexOf('@');
+  const local = value.slice(0, at);
+  return at > 0 && local.length <= 64 && LOCAL.test(local) && DOMAIN.test(value.slice(at + 1));
 }
 
 /** One header value, or HeaderRefused naming `field`. */
@@ -52,6 +62,15 @@ export function unsubscribeHeaders(u: UnsubscribeHeaderInput): Record<string, st
   };
 }
 
+/**
+ * The only extra headers a message may carry: the ones `unsubscribeHeaders` builds. Anything else
+ * (`From`, `Bcc`, `Reply-To`, a name of any other spelling) is refused.
+ */
+export const EXTRA_HEADERS: ReadonlySet<string> = new Set([
+  'List-Unsubscribe',
+  'List-Unsubscribe-Post',
+]);
+
 export function buildOutgoing(input: {
   to: string;
   mail: RenderedMail;
@@ -61,7 +80,7 @@ export function buildOutgoing(input: {
   if (!isPlainAddress(input.to)) throw new HeaderRefused('to');
   const headers: Record<string, string> = {};
   for (const [name, value] of Object.entries(input.headers ?? {})) {
-    if (!/^[A-Za-z][A-Za-z0-9-]{0,62}$/.test(name)) throw new HeaderRefused('header name');
+    if (!EXTRA_HEADERS.has(name)) throw new HeaderRefused('header name');
     headers[name] = headerValue(name, value);
   }
   return {

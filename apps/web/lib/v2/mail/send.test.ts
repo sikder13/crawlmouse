@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { hashMailAddress } from './address-hash';
-import { buildOutgoing, HeaderRefused, isPlainAddress, unsubscribeHeaders } from './headers';
+import {
+  buildOutgoing,
+  EXTRA_HEADERS,
+  HeaderRefused,
+  isPlainAddress,
+  unsubscribeHeaders,
+} from './headers';
 import type { MailLedger } from './ledger';
 import { memoryLedger, type MemoryLedger } from './memory';
 import { keyRef, MailRetry, send, type MailDeps, type SendRequest } from './send';
@@ -305,7 +311,12 @@ describe('headers (D3): CR or LF in any field never reaches a header', () => {
   });
   it.each(injections)('refuses %j in an extra header value and the idempotency key', (bad) => {
     expect(() =>
-      buildOutgoing({ to: 'a@b.com', mail, idempotencyKey: 'k', headers: { 'X-A': bad } }),
+      buildOutgoing({
+        to: 'a@b.com',
+        mail,
+        idempotencyKey: 'k',
+        headers: { 'List-Unsubscribe': bad },
+      }),
     ).toThrow(HeaderRefused);
     expect(() => buildOutgoing({ to: 'a@b.com', mail, idempotencyKey: bad })).toThrow(
       HeaderRefused,
@@ -325,6 +336,37 @@ describe('headers (D3): CR or LF in any field never reaches a header', () => {
         idempotencyKey: 'k',
       }),
     ).toThrow(HeaderRefused);
+  });
+  it('refuses any extra header but the two unsubscribe headers, whatever its value', () => {
+    for (const name of ['From', 'Bcc', 'Reply-To', 'To', 'X-A', 'list-unsubscribe', 'Sender']) {
+      expect(() =>
+        buildOutgoing({ to: 'a@b.com', mail, idempotencyKey: 'k', headers: { [name]: 'v' } }),
+      ).toThrow(HeaderRefused);
+    }
+    expect(EXTRA_HEADERS).toEqual(new Set(['List-Unsubscribe', 'List-Unsubscribe-Post']));
+  });
+  it('takes a dot-atom local part only: no specials a parser could read as a group or a route', () => {
+    for (const ok of ["o'brien+tag@example.co.uk", 'a.b-c_d@x.io', 'x!#$%&*/=?^`{|}~@ex.com']) {
+      expect(isPlainAddress(ok)).toBe(true);
+    }
+    for (const bad of [
+      'a:b@c.com',
+      'a[b]@c.com',
+      'a;b@c.com',
+      '"a b"@c.com',
+      '.a@c.com',
+      'a.@c.com',
+      'a..b@c.com',
+      'a(b)@c.com',
+      'a\\b@c.com',
+      'a@b@c.com',
+      '@c.com',
+      `${'x'.repeat(65)}@c.com`,
+      'a@c',
+      'a@-c.com',
+    ]) {
+      expect(isPlainAddress(bad), bad).toBe(false);
+    }
   });
   it('sends from alerts@ and builds RFC 8058 headers from an https URL only', () => {
     const out = buildOutgoing({
