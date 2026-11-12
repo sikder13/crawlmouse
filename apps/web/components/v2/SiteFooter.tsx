@@ -4,6 +4,7 @@ import { CookieSettings } from './CookieSettings';
 import { CopyEmail } from './CopyEmail';
 import { Glyph } from './StatusPill';
 import { VisuallyHidden } from './VisuallyHidden';
+import { FOOTER_LINE_CAPABILITIES } from '../../lib/v2/copy/footer-line';
 import { FOOTER_COLUMNS, FOOTER_COPY, SUPPORT_EMAIL, type FooterItem } from './footer-links';
 import type { PillState } from './pill-states';
 import layout from './layout.module.css';
@@ -65,7 +66,7 @@ export function SiteFooter({ status, lineMark }: SiteFooterProps) {
       <div className={`${layout.wrap} ${styles.grid}`}>
         <div className={styles.brand} data-v2-footer-brand="">
           <BrandLink />
-          <p className={styles.line} data-capability={FOOTER_COPY.lineCapabilities.join(' ')}>
+          <p className={styles.line} data-capability={FOOTER_LINE_CAPABILITIES.join(' ')}>
             {FOOTER_COPY.line}
             {lineMark ? <> {lineMark}</> : null}
           </p>

@@ -27,7 +27,7 @@ import { toneOf } from '../letters';
 import { CHECKS } from '../recordings';
 import { buildPublicSnapshot } from '../reports/build-snapshot';
 import { numberWord } from '../words';
-import { FOOTER_COPY } from '../../../components/v2/footer-links';
+import { FOOTER_LINE_CAPABILITIES } from '../copy/footer-line';
 
 export type CapabilityKey =
   | 'free_audit'
@@ -295,7 +295,7 @@ export const tagged = ({ text, capabilities }: Tagged): TaggedView => ({
  * it names is built (SEO R2-N2). A page that marks capabilities passes it to its PageShell.
  */
 export function footerComing(): string | null {
-  const keys = FOOTER_COPY.lineCapabilities.map((k) => {
+  const keys = FOOTER_LINE_CAPABILITIES.map((k) => {
     if (!Object.hasOwn(CAPABILITIES, k))
       throw new Error(`the footer line names ${k}, not a capability`);
     return k as CapabilityKey;
