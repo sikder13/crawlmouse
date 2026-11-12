@@ -393,13 +393,16 @@ describe('migration 001 catalog posture', () => {
   });
 
   it('the client-executable routines in public are exactly the membership helpers and usage_counts, for authenticated only', async () => {
-    // is_member_for_site arrives with migration 003, usage_counts with 006b and is_member_for_fix with
-    // 20261112000001; this suite applies every migration.
+    // is_member_for_site arrives with migration 003, usage_counts with 006b, is_member_for_fix with
+    // 20261112000001, member_covers_all and seat_may with 20261114000002; this suite applies every
+    // migration.
     expect(await clientExecutable(db)).toEqual([
       { name: 'is_member', anon: false, authed: true },
       { name: 'is_member_for_fix', anon: false, authed: true },
       { name: 'is_member_for_site', anon: false, authed: true },
+      { name: 'member_covers_all', anon: false, authed: true },
       { name: 'member_role', anon: false, authed: true },
+      { name: 'seat_may', anon: false, authed: true },
       { name: 'usage_counts', anon: false, authed: true },
     ]);
   });
