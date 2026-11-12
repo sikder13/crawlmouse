@@ -59,15 +59,19 @@ describe('readAt', () => {
   });
 
   it.each([
+    'http://a.test/p',
     'https://evil.test/landing',
     'https://a.test.evil.test/p',
     'https://a.test:8443/p',
     'https://sub.a.test/p',
-  ])('never returns an address on another host or port: %s', (final) => {
-    expect(readAt(row('https://a.test/p', final, 200), 'https://a.test/p')).toBe(
-      'https://a.test/p',
-    );
-  });
+  ])(
+    'never returns an address on another host or port, or down from https to http: %s',
+    (final) => {
+      expect(readAt(row('https://a.test/p', final, 200), 'https://a.test/p')).toBe(
+        'https://a.test/p',
+      );
+    },
+  );
 
   it('never returns an address with credentials or another scheme', () => {
     expect(readAt(row('https://a.test/p', 'https://x@b.test/p', 200), 'https://a.test/p')).toBe(

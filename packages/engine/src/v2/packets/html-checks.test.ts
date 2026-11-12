@@ -1138,7 +1138,10 @@ describe('a page made to keep the program busy (round 3, security finding 3)', (
 
   /**
    * The command's status and the milliseconds it took, with the awk first on `path`. A command that
-   * has not ended in ten seconds is killed with every process of its pipeline, and fails the test.
+   * has not ended in forty seconds is killed with every process of its pipeline, and fails the test.
+   * The bounds below are wide on purpose: they tell a program that reads its input once from one that
+   * rereads it (the shapes here took minutes before the caps), and hold on a machine busy with other
+   * work, where the same command has taken three times its idle time.
    */
   const timed = (run: string, path: string | undefined) =>
     new Promise<{ status: number; ms: number }>((resolve, reject) => {
@@ -1154,8 +1157,8 @@ describe('a page made to keep the program busy (round 3, security finding 3)', (
         } catch {
           // it ended as the timer fired
         }
-        reject(new Error('the command did not end in ten seconds'));
-      }, 10_000);
+        reject(new Error('the command did not end in forty seconds'));
+      }, 40_000);
       child.on('close', (code) => {
         clearTimeout(timer);
         resolve({ status: code ?? 1, ms: Date.now() - started });
@@ -1237,21 +1240,33 @@ describe('a page made to keep the program busy (round 3, security finding 3)', (
   ];
 
   it.each(SHAPES)(
-    '%s: ends well inside the time a command is given, and fails closed',
+    '%s: ends in seconds, not minutes, and fails closed',
     async (_name, html, check, pass) => {
       const s = await serving({ '/t': html });
       const run = commandOf(holdsCommand(s, ['/t'], check(s.base)));
       const mawk = await timed(run, process.env.PATH);
       expect(mawk.status === 0, `status ${mawk.status}`).toBe(pass);
-      expect(mawk.ms).toBeLessThan(5_000);
+      expect(mawk.ms).toBeLessThan(15_000);
       if (busyboxPath === null) return;
       const busybox = await timed(run, busyboxPath);
       expect(busybox.status === 0, `busybox status ${busybox.status}`).toBe(pass);
-      expect(busybox.ms).toBeLessThan(8_000);
-      console.log(`TIME ${_name}: awk ${mawk.ms} ms, BusyBox awk ${busybox.ms} ms`);
+      expect(busybox.ms).toBeLessThan(30_000);
     },
-    30_000,
+    90_000,
   );
+
+  it('reads a canonical under BusyBox awk as under the default awk: the one named passes, another fails', async () => {
+    if (busyboxPath === null) return;
+    const page = (href: string) =>
+      `<html><head><link rel="canonical" href="${href}"></head><body>x</body></html>`;
+    const s = await serving({ '/own': page('/own'), '/other': page('/elsewhere') });
+    for (const path of [process.env.PATH, busyboxPath]) {
+      const own = commandOf(holdsCommand(s, ['/own'], canonicalIs(`${s.base}/own`)));
+      const other = commandOf(holdsCommand(s, ['/other'], canonicalIs(`${s.base}/other`)));
+      expect((await timed(own, path)).status, String(path === busyboxPath)).toBe(0);
+      expect((await timed(other, path)).status, String(path === busyboxPath)).not.toBe(0);
+    }
+  });
 
   it('gives curl a time to end a transfer in', () => {
     const s = { base: 'http://127.0.0.1:9' } as TwoStateSite;

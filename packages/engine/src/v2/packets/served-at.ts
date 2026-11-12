@@ -41,12 +41,13 @@ export function readAt(facts: Pick<PacketFacts, 'pages'>, url: string): string {
 const bare = (host: string) => host.replace(/^www\./, '');
 
 /**
- * `landed` is an address of the page's own site: http or https with no credentials, on the page's
- * host give or take a leading `www.`, and on its port. A command a developer runs with a crawler's
+ * `landed` is an address of the page's own site: over the page's scheme or https, with no
+ * credentials, on the page's host give or take a leading `www.`, and on its port. A command a developer runs with a crawler's
  * user agent requests no other host, whatever a row holds.
  */
 function sameSite(landed: URL, page: URL): boolean {
-  const web = landed.protocol === 'http:' || landed.protocol === 'https:';
+  // the page's own scheme, or https where the page was asked for over http: never down to http
+  const web = landed.protocol === page.protocol || landed.protocol === 'https:';
   return (
     web &&
     landed.username === '' &&

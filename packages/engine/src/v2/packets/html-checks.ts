@@ -305,7 +305,7 @@ const AWK = {
    * `u` resolved and no more: its origin in lower case, its path and its query as written. What two
    * spellings `norm` joins are told apart by.
    */
-  spelt: `function spelt(u) { if (!res(u)) return RX; return RO RP (RT ? "/" : "") RQ }`,
+  spelt: `function spelt(u) { if (!res(u)) return RX; return RO RP "" (RT ? "/" : "") RQ }`,
   /**
    * Resolves `u` against the base (`bs` scheme, `bo` origin, `bp` path, `bd` directory, `bq` query).
    * For an http or https URL: 1, with `RO` its origin, `RP` its path without dot segments, empty

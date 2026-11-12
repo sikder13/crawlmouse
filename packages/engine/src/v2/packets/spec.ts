@@ -77,11 +77,14 @@ import { userAgentOf } from './crawler.js';
 import { EFFORT_RULES } from './effort.js';
 import {
   canonicalIs,
+  CAP,
   command,
   COMMAND_BOUNDS,
   fetchOf,
   holds,
   linksTo,
+  MAX_ATTRS,
+  MAX_PARAMS,
   PAGE_END,
   sameInCommand,
 } from './html-checks.js';
@@ -693,12 +696,12 @@ const NOTES: { readonly [K in FixType]: TypeNotes } = {
   deep_pages: {
     rule: `Context: the clicks from the homepage (\`measured\`), or that no path of links reaches the page when it is null; the limit of ${MAX_HEALTHY_DEPTH} (\`MAX_HEALTHY_DEPTH\`); the pages on the recorded path, in URL order. Change: a link from a page at most ${MAX_HEALTHY_DEPTH - 1} clicks down. The page named (\`linkFrom\`) is the first of these that is that close on the detector’s graph and holds no link to the page in the crawl’s record: the parent the orphan fix for the same URL suggests; the page the effect estimate links from (\`shallowParent\`, grade/effects.ts); the next page that close. The change says which of them it is.`,
     verify:
-      'Requests that page and passes when one of its `<a>` elements links to the deep page. When no page passes the test above (`certain` false), it requests the homepage.',
+      'Requests that page and passes when one of its `<a>` elements links to the deep page. When no page passes the test above (`certain` false), it requests the page the developer names in the shell variable `CRAWLMOUSE_PAGE` (`fetchOfChosen`) and exits non-zero while the variable is unset.',
     see: 'The `<a>` tags of that page that hold the deep page’s path. `today`: nothing, or, with no page to name, that the record does not say.',
     stated: [
       'If the link goes on another page, request that page instead (`expect`).',
       'The command proves the link; the click depth is measured again on the next check (`expect`).',
-      'With no page to name, the command requests the homepage “and can pass before the fix” (`expect`).',
+      'With no page the audit can vouch for, the command reads the page named in `CRAWLMOUSE_PAGE` and fails until it is set (`expect`).',
     ],
     unsaid: [
       'The depth the page will have after the fix.',
@@ -768,7 +771,7 @@ const NOTES: { readonly [K in FixType]: TypeNotes } = {
   duplicate_pagination: {
     rule: `Context: the template key and the later pages detected; then, per condition the record holds: the pages whose row declares the first page of their list as canonical (\`firstPageOf\`), with Google’s pagination page; and the near-duplicates (64-bit content hashes within ${SIMHASH_HAMMING_K} bits, \`SIMHASH_HAMMING_K\`): the detected pages that do not declare the first page, or “At least one of the pages above” when each detected page declares it. Change: a step per condition.`,
     verify:
-      'On the first affected page. Canonical: the `<head>` holds one `rel="canonical"`, naming the page’s own address. Content: requests the first page and the later page in one `curl`, and passes when each links to a page the other does not link to, leaving out the first page itself and targets that hold the list’s own mark (`listMark`, `listsDiffer`). When the first affected page carries both, one program asks both.',
+      'On the first affected page. Canonical: the `<head>` holds one `rel="canonical"`, naming the page’s own address. Content: requests the first page and the later page in one `curl`, and passes when each links to two pages of the site the other does not link to, leaving out the first page itself and targets that hold the list’s own mark (`listMark`, `listsDiffer`). When the first affected page carries both, one program asks both.',
     see: 'Canonical: the page’s canonical tag. Content alone: the `<a>` tags that are on one of the two pages and not on the other (`sort | uniq -u`).',
     stated: [
       'The command compares links, not the content hash the audit measures, which the next check measures again (`expect`).',
@@ -782,7 +785,7 @@ const NOTES: { readonly [K in FixType]: TypeNotes } = {
   canonical_mismatch: {
     rule: 'Context: the canonical the page declares; one sentence per condition the record holds, from the rows it names; and, when no fault of the target is proven and the canonical is not taken to stand, why not. The canonical the packet asks for (`read`, `expectedOf`) comes from rows: the page’s own URL when the target is on another host, gone or disallowed; where the target landed, or the canonical the target declares, when the check holds that page answering 200 at itself and declaring itself or none; otherwise the page’s own URL. With no fault of the target, the canonical stands when the check holds the target answering 200 at itself, and the links move to it. For a target on another host the first step asks whether the canonical is deliberate.',
     verify:
-      'Passes when the `<head>` of the page holds one `<link rel="canonical">`, naming the expected URL, and, when links move and the programs can tell the two URLs apart (`sameInCommand`), the first linking page links to the canonical and no longer to the page; both are asked by one program. A record of links alone checks the links.',
+      'Passes when the `<head>` of the page holds one `<link rel="canonical">`, naming the expected URL, and, when links move and the programs can tell the two URLs apart (`sameInCommand`), the first linking page links to the canonical and no longer to the page; both are asked by one program. A record of links alone checks the links. Where the declared and the expected URL, or the stale and the kept one, are one URL to the programs (`sameInCommand`), the href is compared as written (`canonicalIs` in its `spelled` mode, `linksSpelled`).',
     see: 'The page’s canonical tag; for a record of links alone, the `<a>` tags of the linking page that hold either path.',
     stated: [
       'If another live URL is the one meant to be indexed, name that one; the command checks for the URL the packet offers (change).',
@@ -837,6 +840,12 @@ const SHARED_LIMITS: readonly SharedLimit[] = [
       'missing_author_date',
     ],
   },
+  {
+    name: 'path-end “See it”',
+    limit:
+      'Where the readable command prints the `<a>` tags that hold a page’s path, it matches the end of the path: a link to another page whose path ends the same way (`/blog/deep` for `/deep`), or to that path on another host, is printed too, on a page where `today` says nothing is; and a link written without quotes is not printed. The exact check reads neither wrongly (re-review after round 3, S4).',
+    types: ['orphan_pages', 'deep_pages', 'redirect_chain', 'canonical_mismatch'],
+  },
 ];
 
 const OPEN_LIMITS: { readonly [K in FixType]: readonly string[] } = {
@@ -863,7 +872,7 @@ const OPEN_LIMITS: { readonly [K in FixType]: readonly string[] } = {
   js_only_navigation: [],
   redirect_chain: [],
   duplicate_pagination: [
-    'The content check asks each page for two same-site links of its own that the other lacks. A later page that repeats the first page’s items and also holds two such links of its own passes it. `expect` says so.',
+    'The content check asks each page for two same-site links of its own that the other lacks. A later page that repeats the first page’s items and also holds two such links of its own passes it, while the audit’s content hash still finds the pages alike: a pass before the fix. `expect` says so. D3 does not allow it, and no one-line check of links closes it (the audit’s signal is the content hash); it stands as a disclosed limit for the owner to accept or refuse (§12).',
   ],
   canonical_mismatch: [],
   hreflang_gap: [],
@@ -1474,7 +1483,7 @@ export function renderPacketSpec(): string {
     bullets([
       `The catch and the listener: ${held('packets/written.test.ts', 'leaves a fix without a packet, and does not throw, on %s')}.`,
       `A throw the catch would hide is looked for by calling the registry’s writer itself over generated crawls: ${held('packets/structure-fuzz.test.ts', 'write a packet the contract accepts for every record a detector reports as detected')}.`,
-      `The count in the summary is compared as part of the fixture: ${held('build/build.test.ts', 'gives exactly expected.json')}. No test builds a check whose builder throws and reads the count.`,
+      `The count in the summary is compared as part of the fixture: ${held('build/build.test.ts', 'gives exactly expected.json')}. A builder made to throw, through the whole check builder: ${held('build/packet-faults.test.ts', 'counts the faults in the grading summary')}.`,
       `The fix page says of such a fix that its last check wrote no steps: ${held('apps/web/lib/v2/view/packet-reason.test.ts', 'says the last check wrote no steps when the type has a builder, and promises no later ones')}.`,
     ]),
     '',
@@ -1531,7 +1540,7 @@ export function renderPacketSpec(): string {
     '',
     bullets([
       '`servedAt(facts, url)`: the address a page is **named** at in a line. The row’s `final_url` when it is the same page (it canonicalises to the page’s URL) and carries no credentials; else the page’s URL.',
-      '`readAt(facts, url)`: the address a command **requests** to read a page. Where the request for the page ended, when that answered 200 and is an http or https address without credentials; else `servedAt`. A homepage that answers at `/en/` is requested there.',
+      '`readAt(facts, url)`: the address a command **requests** to read a page. Where the request for the page ended, when that answered 200 at an address of the page’s own site (`sameSite`: the page’s scheme or https, no credentials, the page’s host give or take a leading `www.`, the page’s port); else `servedAt`. A homepage that answers at `/en/` is requested there.',
     ]),
     '',
     `Held by ${held('packets/served-at.test.ts', 'is the slashed address when the server redirects the page to it')} and ${held('packets/served-at.test.ts', 'is where the request ended, when that answered 200: a homepage that redirects to /en/')}.`,
@@ -1542,6 +1551,7 @@ export function renderPacketSpec(): string {
     '',
     bullets([
       `**What it strips.** Comments and markup declarations, and the bodies of ${codes(READER.unread)} elements (\`scan\`). A \`>\` inside a quoted attribute value does not end its tag. A tag whose quotes do not close within a few \`<\` stops the reading, and the command exits non-zero (\`odd\`).`,
+      `**What it will not read.** An href or a link text longer than ${CAP} bytes (\`CAP\`), a query of more than ${MAX_PARAMS} parameters (\`MAX_PARAMS\`), and a tag of more than ${MAX_ATTRS} attributes (\`MAX_ATTRS\`): the program does not read them, and where a stale link is asked about it takes what it cannot read for the old link, so the command exits non-zero. \`curl\` writes a line after each page, with its status and address; the program takes a page whose status is 200, counts the lines against the pages requested, and exits non-zero when they differ, as they do when a page prints that line itself. Content between \`<noscript>\` tags does not end the head. The request ends after 20 seconds (\`--max-time\`).`,
       `**Attributes.** The first attribute of a name counts, in double quotes, in single quotes or unquoted (\`attrs\`).`,
       `**What it decodes.** Numeric character references, and these named ones: ${codes(READER.named)} (\`ent\`). Another named reference is left as written and flagged (\`unk\`); \`linksTo\` then counts the href as the old link when it was asked about one.`,
       `**What it keeps escaped.** Percent-escapes are decoded for comparison, except ${READER.kept.map(escapeShown).join(', ')}, which stay escaped, in upper case (\`dec\`).`,
@@ -1711,6 +1721,7 @@ export function renderPacketSpec(): string {
       '**Q3.** `js_only_navigation` needs the rendered side’s links, which the render step does not keep. Acted on: the type stays unopened with its reason in the registry. Proposed: a CC-14 follow-up that keeps the rendered same-site link targets.',
       '**Q4.** `effort` is a label field, so a fix first found before this step keeps `effort: null` until it resolves and reopens. Acted on: the diff is left alone. Proposed, if such fixes exist in production: take `effort` in the diff when the stored one is null.',
       '**Q5.** A route that serves an empty root is thin, not graded and not rendered, so a pure-shell site gets no `client_rendered_template` fix, and rendering thin pages alone would give one an effect of 0. Acted on: the fix opens on what the render step measured (§6). For the owner: whether the graded population should change is an OPERATING-RULES §5 question.',
+      '**Pagination and D3.** The near-duplicate half of the `duplicate_pagination` exact check can exit 0 on an unfixed site (§5, its open limit). Acted on: kept, disclosed in `expect`, here and in the PR text. For the owner: accept it as an exception to D3, or have the packet carry no exact check for that condition.',
       `**Q9.** Edits outside the allowed paths: \`packets_not_written\` in ${file('build/summaries.ts')}; the exports \`PACKETS\` and \`frameworkOf\` in ${file('pipeline-surface.ts')}; the locked-fix scan in ${file('tests/visual/production.spec.ts')}; and ${file('clean-text.ts')} outside \`packets/\`. Acted on: kept. The owner approved them (\`rulings-3.md\`).`,
       '**Q10.** An open client-rendered fix can go stale: a template that loses its graded pages gets no record, the diff reads that as absent, and the fix stays open on old evidence. Not fixed here (the diff is outside this step). Proposed: the detector emits `indeterminate` for a template an open fix names. The owner agreed and logged it as a follow-up (`rulings-3.md`).',
     ]),
