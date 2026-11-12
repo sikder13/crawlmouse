@@ -226,10 +226,14 @@ describe('the registry finds the row a request path reaches', () => {
   it("each row's own path matches that row alone: no two rows overlap", () => {
     // A static route's path also matches a dynamic sibling's pattern, so this catches the overlap Next
     // would settle by preferring the static route, and the lookup would settle by registry order.
+    // A route group's segment is not in the URL.
     const samples = (route: string) =>
-      [route.replace(/\[\[?\.\.\.[^\]]+\]\]?/g, 'a/b').replace(/\[[^\]]+\]/g, 'sample')].map(
-        (p) => `/${p}`,
-      );
+      [
+        route
+          .replace(/\([^)]*\)\//g, '')
+          .replace(/\[\[?\.\.\.[^\]]+\]\]?/g, 'a/b')
+          .replace(/\[[^\]]+\]/g, 'sample'),
+      ].map((p) => `/${p}`);
     for (const p of ROUTE_POLICIES) {
       for (const path of samples(p.route)) {
         expect(
@@ -269,12 +273,19 @@ describe('cross-site refusal covers every state change a session or a visitor ca
     expect(open.map((p) => p.route)).toEqual([]);
   });
 
-  it('the strict rule is on exactly these twenty-two routes', () => {
+  it('the strict rule is on exactly these routes', () => {
     expect(
       ROUTE_POLICIES.filter((p) => p.origin === 'strict')
         .map((p) => p.route)
         .sort(),
     ).toEqual([
+      'api/account',
+      'api/account/delete/confirm',
+      'api/account/email',
+      'api/account/email/confirm',
+      'api/account/email/undo',
+      'api/account/restore',
+      'api/alert-rules',
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
       'api/auth/logout',

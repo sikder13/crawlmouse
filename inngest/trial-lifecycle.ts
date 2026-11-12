@@ -42,6 +42,11 @@ export interface TrialClock {
   expire(accountId: string, at: Date): Promise<ClockDecision>;
   /** Sends a plan that a deciding step recorded. Throws when the send fails. */
   dispatch(planned: unknown[]): Promise<void>;
+  /**
+   * Whether the account is being deleted (CC-27b): `marked` inside its restore window, `gone` once
+   * erased, `live` otherwise. A deletion does not cancel this run, so a restore finds it still there.
+   */
+  deletion(accountId: string): Promise<'live' | 'marked' | 'gone'>;
 }
 
 /** The `remind` step's output when it woke at or after the trial's end: nothing applied, nothing sent. */
@@ -51,12 +56,21 @@ export interface SkippedReminder {
 }
 
 const REMINDER_TOO_LATE: SkippedReminder = { outcome: 'skipped', reason: 'the trial has ended' };
+const BEING_DELETED: SkippedReminder = {
+  outcome: 'skipped',
+  reason: 'the account is being deleted',
+};
+const ACCOUNT_GONE: SkippedReminder = { outcome: 'skipped', reason: 'the account was erased' };
 
 export function createTrialLifecycleFn(clock: () => TrialClock) {
   return inngest.createFunction(
     {
       id: TRIAL_LIFECYCLE_FN_ID,
       idempotency: 'event.data.accountId',
+      // A paid checkout ends the run. A deletion does not (CC-27b): the run sends no reminder while
+      // the account is marked and stops once it is erased, so a restore within the window keeps it.
+      // Sending trial.started again on a restore would not do: Inngest drops it within 24 hours of
+      // the first under this run's idempotency key.
       cancelOn: [{ event: 'trial.converted', match: 'data.accountId' }],
       concurrency: { limit: 2 },
     },
@@ -76,7 +90,9 @@ export function createTrialLifecycleFn(clock: () => TrialClock) {
         'remind',
         async (): Promise<ClockDecision | SkippedReminder> => {
           const c = clock();
-          return c.now() >= end ? REMINDER_TOO_LATE : c.remind(accountId, reminderAt);
+          if (c.now() >= end) return REMINDER_TOO_LATE;
+          if ((await c.deletion(accountId)) !== 'live') return BEING_DELETED;
+          return c.remind(accountId, reminderAt);
         },
       );
       if (remind.outcome !== 'skipped') {
@@ -84,8 +100,18 @@ export function createTrialLifecycleFn(clock: () => TrialClock) {
       }
 
       await step.sleepUntil('trial-ends', endsAt);
-      const expire = await step.run('expire', () => clock().expire(accountId, endsAt));
-      await step.run('expire-effects', () => clock().dispatch(expire.planned));
+      const expire = await step.run(
+        'expire',
+        async (): Promise<ClockDecision | SkippedReminder> => {
+          const c = clock();
+          return (await c.deletion(accountId)) === 'gone'
+            ? ACCOUNT_GONE
+            : c.expire(accountId, endsAt);
+        },
+      );
+      if (expire.outcome !== 'skipped') {
+        await step.run('expire-effects', () => clock().dispatch(expire.planned));
+      }
 
       return { remind: remind.outcome, expire: expire.outcome };
     },

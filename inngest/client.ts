@@ -43,7 +43,24 @@ type Events = {
   'trial.converted': { data: { accountId: string } };
   'entitlement.changed': { data: { accountId: string; from: AccountState; to: AccountState } };
   // CC-28's mailer handles it; nothing in CC-03 does.
-  'email.requested': { data: { accountId: string; template: 'trial_reminder' } };
+  // CC-27b's three account emails name one link row (account_tokens), never an address or a token;
+  // the mailer mints the link through issue_account_link (apps/web/lib/v2/account/emails.ts).
+  'email.requested': {
+    data:
+      | { accountId: string; template: 'trial_reminder' }
+      | {
+          accountId: string;
+          template: 'email_change_confirm' | 'email_change_notice' | 'account_delete';
+          tokenId: string;
+        };
+  };
+  // CC-27b: a deletion was confirmed, one event per account it marked. deletionCancelFn ends the
+  // account's subscription through CC-03's cancel, and the account's trialLifecycleFn stops (cancelOn,
+  // matched on the account). Names the person and the account only.
+  'account.deletion_confirmed': { data: { userId: string; accountId: string } };
+  // CC-27b: a deletion was undone in its window. deletionResumeFn continues the subscriptions the
+  // deletion set to end (restore_account names them), and a deletionCancelFn still waiting stops.
+  'account.restored': { data: { userId: string; subscriptionIds: string[] } };
   // The v2 check pipeline (CC-20b, check.ts). Registered only when V2_PIPELINE=1.
   'check.requested': { data: CheckRequested };
   'check.finished': { data: CheckFinished };

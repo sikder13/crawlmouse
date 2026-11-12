@@ -197,6 +197,20 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
       await insertRow(db, 'site_fixes', ROWS.site_fixes(fix, site, check, 7));
       return ROWS.fix_email_requests(randomUUID(), fix, world.accountId, world.ownerSeatId);
     }
+    case 'account_tokens':
+      return ROWS.account_tokens(randomUUID(), world.accountId, world.ownerId);
+    case 'account_events':
+      return ROWS.account_events(randomUUID(), world.accountId, world.ownerId);
+    case 'pending_erasures':
+      return ROWS.pending_erasures(randomUUID(), world.accountId);
+    case 'deletion_cancellations':
+      return ROWS.deletion_cancellations(`sub_${hex.slice(0, 16)}`, world.ownerId, world.accountId);
+    case 'account_slack_destinations': {
+      // One destination per account: a fresh account for the fresh row.
+      const owner = await signUp(db, `slack-${hex.slice(0, 8)}@example.com`);
+      const { accountId } = await personalAccount(db, owner);
+      return ROWS.account_slack_destinations(accountId, randomUUID());
+    }
   }
 }
 
@@ -286,6 +300,11 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   crawl_batches: null,
   persist_chunks: null,
   fix_email_requests: null,
+  account_tokens: null,
+  account_events: null,
+  pending_erasures: null,
+  deletion_cancellations: null,
+  account_slack_destinations: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -342,6 +361,8 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   // 008 grants service_role the four statements the pipeline runs, and 026b the same on its table.
   if (['crawl_batches', 'persist_chunks', 'fix_email_requests'].includes(table))
     expectedTable.service_role = 'arwd';
+  // 027b keeps the Slack destination from service_role too: its functions are the only way in.
+  if (table === 'account_slack_destinations') delete expectedTable.service_role;
   const actualTable = Object.fromEntries(tableAcl.map((a) => [a.grantee, sorted(a.privileges)]));
   for (const g of new Set([...Object.keys(expectedTable), ...Object.keys(actualTable)])) {
     if ((actualTable[g] ?? '') !== sorted(expectedTable[g] ?? ''))

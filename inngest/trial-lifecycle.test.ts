@@ -60,6 +60,7 @@ function fakeClock(over: Partial<TrialClock> = {}) {
       over.expire ?? (async () => decided([{ kind: 'send', id: 'expiry' }])),
     ),
     dispatch: vi.fn<TrialClock['dispatch']>(over.dispatch ?? (async () => {})),
+    deletion: vi.fn<TrialClock['deletion']>(over.deletion ?? (async () => 'live' as const)),
   };
 }
 
@@ -77,7 +78,9 @@ describe('trialLifecycleFn config (CC-03 D9a)', () => {
     appPrefix: inngest.id,
   });
 
-  it('runs on trial.started, once per account, cancelled by the account’s trial.converted', () => {
+  it('runs on trial.started, once per account, cancelled by the account’s trial.converted only', () => {
+    // Not by a deletion: a restore must find the trial's run still there (CC-27b C3). The run skips its
+    // steps while the account is marked or gone instead.
     expect(config).toMatchObject({
       id: `crawlmouse-${TRIAL_LIFECYCLE_FN_ID}`,
       triggers: [{ event: 'trial.started' }],
@@ -134,6 +137,34 @@ describe('trialLifecycleFn steps', () => {
       expect(clock.dispatch.mock.calls).toEqual([[[{ kind: 'send', id: 'expiry' }]]]);
       expect(out).toEqual({ remind: 'skipped', expire: 'applied' });
     }
+  });
+
+  it('sends no reminder while the account is marked for deletion or gone, and expires a marked one', async () => {
+    for (const state of ['marked', 'gone'] as const) {
+      const clock = fakeClock({ deletion: async () => state });
+      const { step, ran, memo } = memoStep();
+      const out = await handlerOf(clock)({ event: event(), step });
+      expect(clock.remind).not.toHaveBeenCalled();
+      expect(memo.get('remind')).toEqual({
+        outcome: 'skipped',
+        reason: 'the account is being deleted',
+      });
+      if (state === 'marked') {
+        // A restored account's trial still ends on time.
+        expect(ran).toEqual(['remind', 'expire', 'expire-effects']);
+        expect(out).toEqual({ remind: 'skipped', expire: 'applied' });
+      } else {
+        expect(clock.expire).not.toHaveBeenCalled();
+        expect(ran).toEqual(['remind', 'expire']);
+        expect(out).toEqual({ remind: 'skipped', expire: 'skipped' });
+      }
+    }
+  });
+
+  it('a restored account’s run reminds as before', async () => {
+    const clock = fakeClock({ deletion: async () => 'live' });
+    await handlerOf(clock)({ event: event(), step: memoStep().step });
+    expect(clock.remind).toHaveBeenCalledTimes(1);
   });
 
   it('still reminds one millisecond before the end', async () => {

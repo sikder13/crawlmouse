@@ -29,7 +29,12 @@ describe('docs/specs/v2/01-accounts.md', () => {
       member_role: ['authenticated', 'service_role'],
     });
     const byTable = Object.fromEntries(catalog.tables.map((t) => [t.name, t.grants]));
-    expect(byTable.accounts!.hiddenColumns).toEqual(['stripe_customer_id']);
+    // 027b adds the deletion mark, which no client reads.
+    expect(byTable.accounts!.hiddenColumns).toEqual([
+      'stripe_customer_id',
+      'deletion_confirmed_at',
+      'purge_after',
+    ]);
     expect(byTable.seats!.hiddenColumns).toEqual(['invite_token_hash']);
     expect(byTable.trial_ledger!.authenticatedColumns).toBeNull();
     for (const t of catalog.tables) {

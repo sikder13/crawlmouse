@@ -16,12 +16,20 @@ export const TRIAL_END_COPY = {
   runCheck: 'Run an audit now',
   bannerTitle: (plan: string, date: string) =>
     `${plan} ends ${date}. Here is exactly what changes, and what doesn't.`,
-  sentToday: 'We sent this once, today, as promised.',
-  sentOn: (date: string) => `We sent this once, on ${date}, as promised.`,
+  /**
+   * When the reminder is due, never that it was sent: nothing records a send until CC-28's mailer.
+   * Shown while the reminder is on and its day has not passed.
+   */
+  reminderDue: (date: string) => `The reminder is due once, on ${date}.`,
   noCard: 'No card is on file, so nothing is charged either way.',
   /** A trial with a card on file becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
   card: (last4: string, date: string) =>
     `The card ending ${last4} is charged on ${date} unless you cancel.`,
+  /** A card trial set to cancel at its end: not charged (CC-27b review, item 1). */
+  cardCancelled: (last4: string, date: string) =>
+    `The trial is cancelled: it ends on ${date} and the card ending ${last4} is not charged.`,
+  cancelledKeepText: (last4: string, date: string) =>
+    `The trial ends on ${date} and the card ending ${last4} is not charged.`,
   keepNoCard: (plan: string, price: number) => `Keep ${plan}, $${price} a month · add a card`,
   letItEnd: (date: string) => `Let it end on ${date}`,
   cancelBefore: (date: string) => `Cancel before ${date}`,
@@ -122,6 +130,16 @@ export const TRIAL_END_COPY = {
           }; add ${plan} any time to resume ${others ? 'them' : 'it'}.`
         : ''
     }`,
+  /** After the end, on Free (CC-27b D8; ARCH-2 §5 "free after trial"). */
+  ended: {
+    title: (plan: string) => `Back on Free: the ${plan} trial ended`,
+    banner: (plan: string, date: string) =>
+      `${plan} ended ${date}. Here is what stays, and what is paused.`,
+    sub: (plan: string) =>
+      `Nothing you can see was deleted. Choose ${plan} any time to resume what is paused.`,
+    choose: (plan: string, price: number) => `Choose ${plan}, $${price} a month`,
+    pausesTitle: (plan: string) => `Paused, until ${plan}`,
+  },
   tables: { stays: 'Stays', pauses: 'Pauses', did: 'Trial summary' },
   columns: { what: 'What', how: 'How', item: 'Item', value: 'Count', detail: 'Detail' },
 };
@@ -135,6 +153,14 @@ const A8 =
   'FACTS A8: the screen is read at the reminder, three days before the end (5 Nov 02:41Z, Wed 4 Nov 21:41 in the account’s zone, where A8 wrote the UTC date, Thu 5 Nov)';
 
 export const TRIAL_END_CHANGES: CopyChange[] = [
+  {
+    screen: 'trial-end',
+    kind: 'ruling',
+    locked: 'We sent this once, today, as promised.',
+    rendered: 'The reminder is due once, on Wed 4 Nov.',
+    source:
+      'Owner ruling (CC-27b Q17, 2026-11-11): nothing records that the reminder was sent (CC-28 sends it), so the sentence says when it is due, and nothing once its day has passed',
+  },
   {
     screen: 'trial-end',
     kind: 'facts',

@@ -59,6 +59,12 @@ const READ_SCOPE: Record<string, ReadScope> = {
   usage_events: 'none',
   // 026b: the address a member asked a fix's packet be sent to; the service role writes and reads it.
   fix_email_requests: 'none',
+  // 027b: account settings, the deletion and its queue, the Slack destination. Service only.
+  account_tokens: 'none',
+  account_events: 'none',
+  pending_erasures: 'none',
+  deletion_cancellations: 'none',
+  account_slack_destinations: 'none',
 };
 
 let db: PGlite;
@@ -66,6 +72,12 @@ let tables: NewTable[];
 let A: World;
 let B: World;
 const pkCols: Record<string, string[]> = {};
+/**
+ * Tables whose rows belong to a site, read from the catalog: `sites` itself and every table whose
+ * foreign keys reach it, directly or through another table (share_links through reports). A table that
+ * reaches no site holds account rows.
+ */
+const perSite = new Set<string>();
 
 beforeAll(async () => {
   const pre = await freshDb();
@@ -94,6 +106,18 @@ beforeAll(async () => {
     );
     pkCols[t] = rows.map((r) => r.col);
   }
+  const { rows: reach } = await db.query<{ t: string }>(
+    `with recursive fk(src, dst) as (
+       select c.conrelid::regclass::text, c.confrelid::regclass::text from pg_constraint c
+        where c.contype = 'f' and c.connamespace = 'public'::regnamespace
+     ), reaches(t) as (
+       select 'sites'
+       union
+       select fk.src from fk join reaches r on fk.dst = r.t
+     )
+     select t from reaches`,
+  );
+  for (const r of reach) perSite.add(r.t.replace(/^public\./, ''));
   A = await seedWorld(db, 'A');
   B = await seedWorld(db, 'B');
 }, 240_000);
@@ -165,7 +189,9 @@ describe('the cross-account test covers what 003 creates', () => {
   });
   it('each account holds rows of both its sites in every site table, and account rows in the others', async () => {
     for (const t of tables) {
-      const siteScoped = !['account', 'account_managers', 'signed_in'].includes(READ_SCOPE[t]!);
+      // A table that reaches no site holds account rows, whatever its read scope.
+      const siteScoped =
+        perSite.has(t) && !['account', 'account_managers', 'signed_in'].includes(READ_SCOPE[t]!);
       for (const w of [A, B]) {
         const scopes = new Set(w.seeded[t].map((r) => r.scope));
         if (siteScoped) {

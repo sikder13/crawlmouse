@@ -1,6 +1,6 @@
 import { Card } from '../../Card';
 import { Table } from '../../Table';
-import type { TrialEndView, TrialRowView } from '../../../../lib/v2/view/trial-end';
+import type { TrialEndedView, TrialEndView, TrialRowView } from '../../../../lib/v2/view/trial-end';
 import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
 import { CardHead } from '../account/parts';
@@ -72,7 +72,7 @@ export function TrialEndScreen({ data }: { data: TrialEndView }) {
           </div>
           <div className={shared.actions}>
             {banner.keep ? <ActionControl action={banner.keep} size="md" /> : null}
-            <ActionControl action={banner.end} variant="quiet" size="md" />
+            {banner.end ? <ActionControl action={banner.end} variant="quiet" size="md" /> : null}
           </div>
         </div>
         <div className={styles.lists}>
@@ -120,6 +120,45 @@ export function TrialEndScreen({ data }: { data: TrialEndView }) {
           <p className={styles.text}>{data.endText}</p>
         </Card>
       </div>
+    </AccountFrame>
+  );
+}
+
+/**
+ * Trial ending after the end: the account back on Free, what stays and what is paused, and the
+ * plan to choose again, the page's one orange element.
+ */
+export function TrialEndedScreen({ data }: { data: TrialEndedView }) {
+  const { header, banner, columns, tables } = data;
+  return (
+    <AccountFrame shell={data.shell} currentIs="location">
+      <header className={shared.header}>
+        <div>
+          <h1 className={shared.title}>{header.title}</h1>
+          <div className={shared.line}>{header.line}</div>
+        </div>
+      </header>
+
+      <Card as="section" className={styles.banner}>
+        <div className={styles.bannerHead}>
+          <div className={styles.bannerText}>
+            <h2 className={styles.bannerTitle}>{banner.title}</h2>
+            <div className={styles.bannerSub}>{banner.sub}</div>
+          </div>
+          <div className={shared.actions}>
+            {banner.keep ? <ActionControl action={banner.keep} size="md" /> : null}
+          </div>
+        </div>
+        <div className={styles.lists}>
+          <List title={data.staysTitle} label={tables.stays} rows={data.stays} columns={columns} />
+          <List
+            title={data.pausesTitle}
+            label={tables.pauses}
+            rows={data.pauses}
+            columns={columns}
+          />
+        </div>
+      </Card>
     </AccountFrame>
   );
 }

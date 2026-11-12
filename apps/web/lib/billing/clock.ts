@@ -155,6 +155,23 @@ export interface ClockDeps {
   reads: SweepReads;
   sinks: EffectSinks;
   now: () => number;
+  /** Whether the account is being deleted (CC-27b): `supabaseDeletionState`. */
+  deletion: TrialClock['deletion'];
+}
+
+/** An account's deletion state from its row: marked while `deletion_confirmed_at` is set, gone with no row. */
+export function supabaseDeletionState(sb: SupabaseClient): TrialClock['deletion'] {
+  return async (accountId) => {
+    const { data, error } = await sb
+      .from('accounts')
+      .select('deletion_confirmed_at')
+      .eq('id', accountId)
+      .limit(1);
+    if (error) throw new Error(`accounts read failed: ${error.message}`);
+    const row = (data as { deletion_confirmed_at: string | null }[] | null)?.[0];
+    if (!row) return 'gone';
+    return row.deletion_confirmed_at === null ? 'live' : 'marked';
+  };
 }
 
 /** What the trial and sweep functions' steps call. */
@@ -171,5 +188,6 @@ export function billingClock(deps: ClockDeps): TrialClock & SweepClock {
     // The plan comes back from Inngest's record of the deciding step: read it as strictly as a
     // stored plan is, so a malformed one is refused whole rather than half sent.
     dispatch: async (planned) => dispatchPlanned(PlannedEffectsSchema.parse(planned), deps.sinks),
+    deletion: deps.deletion,
   };
 }

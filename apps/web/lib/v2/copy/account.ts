@@ -26,6 +26,8 @@ export const ACCOUNT_COPY = {
   noCard: 'No card on file.',
   /** Where the page carries the plan (the Trial-ending screen), the card says only what the card on file means. */
   nothingCharged: 'Nothing is charged unless you choose Pro.',
+  cardNotCharged: (last4: string, date: string) =>
+    `The trial ends on ${date} and the card ending ${last4} is not charged.`,
   cardCharged: (last4: string, date: string) =>
     `The card ending ${last4} is charged on ${date} unless you cancel.`,
 };

@@ -32,7 +32,13 @@ export const PLATFORM_SHIM = `
   create role service_role bypassrls;
   create schema if not exists auth;
   grant usage on schema auth to anon, authenticated, service_role;
-  create table if not exists auth.users (id uuid primary key, email text);
+  -- created_at and banned_until: 027b's email undo reads them (Q10's conditions).
+  create table if not exists auth.users (
+    id uuid primary key,
+    email text,
+    created_at timestamptz not null default now(),
+    banned_until timestamptz
+  );
   create or replace function auth.uid() returns uuid language sql stable as $shim$
     select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
   $shim$;
@@ -88,6 +94,46 @@ export const PLATFORM_SHIM = `
     for each statement execute function storage.protect_delete();
   create trigger protect_objects_delete before delete on storage.objects
     for each statement execute function storage.protect_delete();
+
+  -- SUPABASE VAULT AND AUTH SESSION STAND-INS (027b). Vault is installed on ezspnfeyzwsisymytssm
+  -- (supabase_vault 0.3.1, measured 2026-11-10); 027b keeps the account's Slack webhook URL in
+  -- it. Modelled: vault.secrets, vault.create_secret, vault.update_secret and the
+  -- decrypted_secrets view, with no client role holding anything on them. The secret is stored as
+  -- given (no encryption): the tests read what 027b writes and who may read it, not the cipher.
+  -- auth.sessions and auth.refresh_tokens carry only the columns end_user_sessions touches. What this
+  -- cannot show: that the real objects accept 027b's statements under postgres's grants. That is the
+  -- dry-run branch's (docs/specs/v2/27b-account-wiring.md).
+  create schema if not exists vault;
+  create table vault.secrets (
+    id uuid primary key default gen_random_uuid(),
+    name text unique,
+    description text not null default '',
+    secret text not null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  );
+  create view vault.decrypted_secrets as
+    select id, name, description, secret, secret as decrypted_secret, created_at, updated_at from vault.secrets;
+  create function vault.create_secret(new_secret text, new_name text default null, new_description text default '')
+    returns uuid language sql as $shim$
+    insert into vault.secrets (secret, name, description) values (new_secret, new_name, new_description) returning id
+  $shim$;
+  create function vault.update_secret(secret_id uuid, new_secret text default null, new_name text default null,
+                                      new_description text default null)
+    returns void language sql as $shim$
+    update vault.secrets set secret = coalesce(new_secret, secret), name = coalesce(new_name, name),
+           description = coalesce(new_description, description), updated_at = now()
+     where id = secret_id
+  $shim$;
+  revoke all on schema vault from public;
+  revoke all on all tables in schema vault from public;
+  revoke all on all functions in schema vault from public;
+  create table auth.sessions (id uuid primary key, user_id uuid not null);
+  create table auth.refresh_tokens (
+    id bigserial primary key,
+    user_id varchar(255),
+    session_id uuid references auth.sessions (id) on delete cascade
+  );
 
   -- ⚠ PRODUCTION'S DEFAULT PRIVILEGES. Without these the sandbox is STRICTLY SAFER than production,
   -- which is the one direction that manufactures false greens on a security control (gate 7 / B3).

@@ -8,7 +8,10 @@ import { ActionControl } from '../account/ActionControl';
 import { CardHead } from '../account/parts';
 import field from '../../Field.module.css';
 import shared from '../account/AccountScreen.module.css';
+import { PlanCard } from './PlanCard';
+import { NoticeLine } from './NoticeLine';
 import { StoppedForm } from './StoppedForm';
+import type { Notice } from '../../../../lib/v2/copy/settings-notices';
 import settings from './SettingsTable.module.css';
 import styles from './SettingsScreen.module.css';
 
@@ -30,6 +33,7 @@ function Input({ f, type }: { f: FieldView; type: 'email' | 'text' }) {
         defaultValue={f.value}
         placeholder={f.placeholder ?? undefined}
         aria-describedby={hint}
+        readOnly={f.readOnly}
         className={`${field.input} ${styles.input} ${type === 'email' ? '' : styles.text}`}
       />
       <div id={hint} className={styles.hint}>
@@ -43,7 +47,14 @@ function Input({ f, type }: { f: FieldView; type: 'email' | 'text' }) {
  * Final-Settings: the account's address and name, its three kinds of email, deleting it, and its
  * plan. The one orange element is Save. Nothing posts in the preview (CC-27b builds the routes).
  */
-export function SettingsScreen({ data }: { data: SettingsView }) {
+export function SettingsScreen({
+  data,
+  notice = null,
+}: {
+  data: SettingsView;
+  /** What the form's last post did, on a live page (`settingsNotice`). */
+  notice?: Notice | null;
+}) {
   const { header, account, email, danger, plan, columns: C } = data;
   return (
     <AccountFrame shell={data.shell}>
@@ -53,6 +64,7 @@ export function SettingsScreen({ data }: { data: SettingsView }) {
           <div className={shared.line}>{header.line}</div>
         </div>
       </header>
+      <NoticeLine notice={notice} />
 
       <div className={styles.columns}>
         <div className={styles.column}>
@@ -135,7 +147,9 @@ export function SettingsScreen({ data }: { data: SettingsView }) {
                     <span key="t" className={shared.muted}>
                       {danger.text}
                     </span>,
-                    <ActionControl key="a" action={danger.action} variant="quiet" />,
+                    danger.action ? (
+                      <ActionControl key="a" action={danger.action} variant="quiet" />
+                    ) : null,
                   ],
                 },
               ]}
@@ -144,52 +158,7 @@ export function SettingsScreen({ data }: { data: SettingsView }) {
         </div>
 
         <div className={styles.column}>
-          <Card as="section" className={shared.panel}>
-            <CardHead title={plan.title} />
-            <div className={styles.plan}>
-              <div className={styles.planHead}>
-                <span className={styles.planName}>{plan.name}</span>
-                {plan.left ? <span className={shared.mono}>{plan.left}</span> : null}
-              </div>
-              {plan.note ? <div className={styles.hint}>{plan.note}</div> : null}
-              <Table
-                label={plan.usageLabel}
-                headersHidden
-                rowHeader
-                className={styles.usage}
-                columns={[{ header: C.item }, { header: C.value, numeric: true, mono: true }]}
-                rows={plan.usage.map(([label, value]) => ({ key: label, cells: [label, value] }))}
-              />
-              {plan.keep ? (
-                <div className={styles.keep}>
-                  <ActionControl action={plan.keep} size="md" />
-                </div>
-              ) : null}
-              <div className={styles.hint}>
-                {plan.other}{' '}
-                <a href={plan.compare.href} className={styles.inlineLink}>
-                  {plan.compare.label}
-                </a>
-              </div>
-              <Table
-                label={plan.termsLabel}
-                headersHidden
-                rowHeader
-                className={styles.usage}
-                columns={[{ header: C.item }, { header: C.detail }]}
-                rows={plan.terms.map((t) => ({
-                  key: t.label,
-                  cells: [
-                    t.label,
-                    <span key="t" className={styles.term}>
-                      <span className={shared.muted}>{t.text}</span>
-                      {t.action ? <ActionControl action={t.action} variant="quiet" /> : null}
-                    </span>,
-                  ],
-                }))}
-              />
-            </div>
-          </Card>
+          <PlanCard plan={plan} columns={C} />
         </div>
       </div>
     </AccountFrame>
