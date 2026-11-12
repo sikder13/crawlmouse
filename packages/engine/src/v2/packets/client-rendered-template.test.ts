@@ -218,9 +218,11 @@ describe('the client-rendered template packet, from its record', () => {
   it('names no URL its record does not hold, and verifies on a rendered page of the record', () => {
     const record = detected('https://a.test', [[41, 312]], 3);
     const p = compose(builder, record, factsOf());
-    const command = p.verify.command.replace(/-A '[^']*'/, '');
-    const urls = [...allText(p), command].flatMap((t) => t.match(/https?:\/\/[^\s`']+/g) ?? []);
-    expect(urls.length).toBeGreaterThan(1);
+    const commands = [p.verify.command, p.verify.see!.command].map((c) =>
+      c.replace(/-A '[^']*'/, ''),
+    );
+    const urls = [...allText(p), ...commands].flatMap((t) => t.match(/https?:\/\/[^\s`']+/g) ?? []);
+    expect(urls.length).toBeGreaterThan(2);
     for (const u of urls)
       expect(
         record.evidence.pages.map((x) => x.url),

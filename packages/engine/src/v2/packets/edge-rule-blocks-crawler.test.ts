@@ -186,9 +186,11 @@ describe('the edge-rule packet, from its record', () => {
     );
     const p = compose(builder, record, factsOf([others[0]!, ...rows, others[1]!], CLOUDFLARE));
     // the user-agent word is the registry's, and holds the operator's own URL
-    const command = p.verify.command.replace(/-A '[^']*'/, '');
-    const urls = [...allText(p), command].flatMap((t) => t.match(/https?:\/\/[^\s`']+/g) ?? []);
-    expect(urls.length).toBe(record.affected_urls.length + 1);
+    const commands = [p.verify.command, p.verify.see!.command].map((c) =>
+      c.replace(/-A '[^']*'/, ''),
+    );
+    const urls = [...allText(p), ...commands].flatMap((t) => t.match(/https?:\/\/[^\s`']+/g) ?? []);
+    expect(urls.length).toBe(record.affected_urls.length + 2);
     for (const u of urls) expect(record.affected_urls, u).toContain(u.replace(/\/$/, ''));
   });
 

@@ -22,6 +22,7 @@ import { PACKET_BOUNDS } from '../compose.js';
 import { EXAMPLE_PAGES } from '../content-rule.js';
 import { userAgentOf } from '../crawler.js';
 import { writePacket } from '../registry.js';
+import { url } from '../shell.js';
 import { clean } from '../text.js';
 import type { FixPacket, PacketFacts, PacketFramework } from '../types.js';
 import { NO_STACK } from './facts.js';
@@ -540,6 +541,11 @@ export function contentPacketProperties(type: ContentFixType): void {
               ).toBe(true);
             }
             expect(outsideCodeSpans(text)).not.toMatch(/https?:\/\//);
+          }
+          // both commands request one address: the record's first failing page
+          const first = url(r.affected_urls[0]!).word;
+          for (const command of [p.verify.command, p.verify.see!.command]) {
+            expect(command.replace(/ -A '[^']*'/, '').match(/'https?:[^']*'/g)).toEqual([first]);
           }
         }),
       );
