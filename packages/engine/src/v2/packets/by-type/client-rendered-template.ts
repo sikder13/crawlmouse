@@ -65,10 +65,13 @@ export const SKIPPED = [
  * starts with a tag's name. From an opening tag of SKIPPED (not self-closed) to that element's
  * closing tag, lines are dropped; of every other line the tag is removed and the words are counted.
  * It prints the count and exits 0 when the count is `need` or more. A closing tag ends its element
- * with or without a space before its `>`.
+ * with or without a space before its `>`. A comment's lines are dropped up to its `-->` (`com`), and
+ * the text after that is counted.
  */
 const COUNT_WORDS = [
   '{ t = tolower($0) }',
+  'com { i = index($0, "-->"); if (!i) next; com = 0; n += split(substr($0, i + 3), w); next }',
+  'skip == "" && index(t, "!--") == 1 { i = index($0, "-->"); if (i) n += split(substr($0, i + 3), w); else com = 1; next }',
   `skip == "" && t !~ "^[^>]*/>" && match(t, "^(${SKIPPED.join('|')})[ \\t>]") { skip = substr(t, 1, RLENGTH - 1) }`,
   'skip != "" { if (t !~ ("^/" skip "[ \\t/>]")) next; skip = "" }',
   '{ sub(/^[^>]*>/, ""); n += split($0, w) }',

@@ -580,6 +580,30 @@ describe('the client-rendered template verify command', () => {
     expect(Math.abs(Number(broken.stdout) - record.evidence.pages[0]!.raw_words)).toBeLessThanOrEqual(5);
   });
 
+  it('does not count commented-out markup, on one line or across tags', async () => {
+    const need = wordsNeeded(measured('https://a.test').evidence.pages[0]!);
+    const commented = guidePage({
+      body: `<!-- ${words(need, 'old')} --><!--<p>${words(need, 'gone')}</p><script>x</script>-->`,
+    });
+    site = await twoStateSite({
+      broken: html(commented),
+      fixed: html(SERVER_RENDERED.replace('<main>', '<main><!-- a <b>note</b> --><!---->')),
+    });
+    const record = measured(site.base);
+    const { broken, fixed } = await inBothStates(
+      site,
+      compose(builder, record, factsOf()).verify.command,
+    );
+    expect(broken.status).not.toBe(0);
+    expect(Math.abs(Number(broken.stdout) - record.evidence.pages[0]!.raw_words)).toBeLessThanOrEqual(
+      5,
+    );
+    expect(fixed.status).toBe(0);
+    expect(
+      Math.abs(Number(fixed.stdout) - record.evidence.pages[0]!.rendered_words),
+    ).toBeLessThanOrEqual(5);
+  });
+
   it('passes on a server-rendered page whose head is not closed', async () => {
     const unclosed = SERVER_RENDERED.replace('</head>', '');
     expect(unclosed).not.toBe(SERVER_RENDERED);
