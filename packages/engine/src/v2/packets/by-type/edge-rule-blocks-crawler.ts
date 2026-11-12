@@ -94,11 +94,12 @@ export const MITIGATION: ReadonlyArray<readonly [header: string, contains: strin
 ];
 
 /**
- * The awk program of the verify command, over the response's header lines: exits 0 when the status
- * line says 200 and no header of MITIGATION is among them.
+ * The awk program of the verify command, over the response's header lines: exits 0 when the last
+ * status line says 200 and no header of MITIGATION follows it. A server that sends `103 Early Hints`
+ * prints that status line first, so each status line starts the verdict again.
  */
 const SERVED_UNCHALLENGED =
-  'NR==1{ok=($2==200)}' +
+  '/^HTTP\\//{ok=($2==200)}' +
   MITIGATION.map(([header, value]) => `tolower($0)~/^${header}:.*${value}/{ok=0}`).join('') +
   'END{exit !ok}';
 

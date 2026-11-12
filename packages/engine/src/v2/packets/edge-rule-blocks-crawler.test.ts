@@ -364,6 +364,26 @@ describe('the edge-rule verify command', () => {
     expect((await runCommand(slashless)).status).not.toBe(0);
   });
 
+  it('passes behind 103 Early Hints once fixed: the last status line decides', async () => {
+    const ua = userAgentOf(CRAWLER_REGISTRY_V2.find((e) => e.token === 'PerplexityBot')!);
+    const serve =
+      (refuse: boolean): RequestListener =>
+      (req, res) => {
+        const send = () => {
+          if (refuse && String(req.headers['user-agent']).includes(ua)) res.statusCode = 403;
+          res.end('<html><body>page</body></html>');
+        };
+        res.writeEarlyHints({ link: '</style.css>; rel=preload; as=style' }, send);
+      };
+    site = await twoStateSite({ broken: serve(true), fixed: serve(false) });
+    const page = `${site.base}/p`;
+    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: [page] });
+    const { command } = compose(builder, record, factsOf(rows)).verify;
+    const { broken, fixed } = await inBothStates(site, command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
   it('does not pass on a 200 that carries a challenge header the worker reads, and says what it does not read', async () => {
     expect(MITIGATION).toEqual(MITIGATION_HEADERS);
     let headers: Record<string, string> = {};
