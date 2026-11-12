@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { scoreToLetter } from '../../../../packages/engine/src/grade';
-import { bandOf, letterFor, nextBandFloor, toneOf } from './letters';
+import { bandOf, isLetter, letterFor, nextBandFloor, toneOf } from './letters';
 
 describe('the letter scale', () => {
   it('matches the engine at every whole score', () => {
     for (let s = 0; s <= 100; s++) expect(letterFor(s), String(s)).toBe(scoreToLetter(s));
+  });
+
+  it('knows each letter the scale gives, and nothing else', () => {
+    for (let s = 0; s <= 100; s++) expect(isLetter(letterFor(s)), String(s)).toBe(true);
+    for (const x of ['E', 'A+', 'a', 'B ', '', 'withheld']) expect(isLetter(x), x).toBe(false);
   });
 
   it('finds the floor of the band above', () => {
