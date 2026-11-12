@@ -418,6 +418,20 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
         },
       ],
     },
+    checkStatus: {
+      answers: [ok({ status: 'running' })],
+      call: (s) => s.checkStatus!(C),
+      calls: [
+        {
+          root: ['from', 'checks'],
+          chain: [
+            ['select', ['status']],
+            ['eq', ['id', C]],
+            ['maybeSingle', []],
+          ],
+        },
+      ],
+    },
   };
 
   it('has a case for each of the store’s methods', () => {
@@ -482,6 +496,13 @@ describe('supabasePipelineStore: answers', () => {
     const store = supabasePipelineStore(sb);
     expect(await store.insertQueued(QUEUED_ROW)).toBe(true);
     expect(await store.insertQueued(QUEUED_ROW)).toBe(false);
+  });
+
+  it('reads a check’s status, or null when there is no such check (D11)', async () => {
+    const { sb } = recorder(ok({ status: 'running' }), ok(null));
+    const store = supabasePipelineStore(sb);
+    expect(await store.checkStatus!(C)).toBe('running');
+    expect(await store.checkStatus!(C)).toBeNull();
   });
 
   it('throws on a PostgREST error, naming the statement', async () => {

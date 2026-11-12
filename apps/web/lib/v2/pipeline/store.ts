@@ -95,6 +95,12 @@ export interface PipelineStore {
   endBatch(checkId: string, batch: number, end: BatchEnd): Promise<void>;
   /** Inserts a queued check unless its id exists; true when it inserted. */
   insertQueued(row: QueuedCheck): Promise<boolean>;
+  /**
+   * A check's status, or null when there is no such check: requestCheck's next-bucket rule for a
+   * re-check (CC-28 D11). Optional, so a store written before it still types; a requestCheck whose
+   * store lacks it keeps the current bucket.
+   */
+  checkStatus?(checkId: string): Promise<Check['status'] | null>;
 }
 
 /**
@@ -340,6 +346,14 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
           .select('id'),
       );
       return (inserted ?? []).length > 0;
+    },
+
+    async checkStatus(checkId) {
+      const row = must<{ status: Check['status'] } | null>(
+        'check status',
+        await sb.from('checks').select('status').eq('id', checkId).maybeSingle(),
+      );
+      return row?.status ?? null;
     },
   };
 }
