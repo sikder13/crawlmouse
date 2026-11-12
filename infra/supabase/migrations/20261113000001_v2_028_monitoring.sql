@@ -7,7 +7,7 @@
 -- functions here write them). Columns are added to seats (email_weekly_summary) and alert_events
 -- (reason); authenticated may read each, as it reads the columns beside them (001, 003).
 -- sites.next_check_at gains two writers: a trigger on sites and one on accounts (section B). erase_rules (027b) is redefined
--- with three more rules and the accounts rule renumbered after them (section D). No foreign key added
+-- with two more rules and the accounts rule renumbered after them (section D). No foreign key added
 -- here cascades: the new tables name an account with ON DELETE SET NULL, and the erasure deletes
 -- their rows before the accounts go.
 --
@@ -844,7 +844,7 @@ grant execute on function public.unsubscribe_seat(uuid, text) to service_role;
 -- ═══ end C ════════════════════════════════════════════════════════════════════════════════════════
 
 -- ═══ D: the erasure (D9) ══════════════════════════════════════════════════════════════════════════
--- erase_rules as 027b defines it, with three rules added before `accounts deleted` (which moves from
+-- erase_rules as 027b defines it, with two rules added before `accounts deleted` (which moves from
 -- 32 to 35): the ledgers' rows that name one of the person's accounts. Their account reference is set
 -- null when an account goes, so they are deleted first. Rows that name the person only by an address
 -- hash are not reachable from SQL (the pepper is the app's); erase_mail_records takes the hashes the
