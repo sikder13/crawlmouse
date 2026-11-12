@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildOutgoing } from '../headers';
 import { alertTemplate, BOUNDS, MAIL_ROWS_MAX, pageUrl, type MailChange } from './alert';
+import { htmlTargets } from './inspect';
 
 const CHECK = 'c0000000-0000-4000-8000-000000000006';
 const UNSUB = 'https://crawlmouse.com/unsubscribe?t=abc.def';
@@ -28,7 +29,8 @@ const base = {
   unsubscribeUrl: UNSUB,
 };
 
-const hrefs = (h: string) => [...h.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+// Every target in any spelling (inspect.ts), so a crawled string linked with `href='…'` is caught.
+const hrefs = htmlTargets;
 
 describe('the alert email (D5, D3)', () => {
   const mail = alertTemplate({

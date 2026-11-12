@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildOutgoing } from '../headers';
 import { BOUNDS } from './alert';
+import { htmlTargets } from './inspect';
 import {
   gradeMovement,
   SUMMARY_SITE_ROWS,
@@ -47,7 +48,8 @@ const input = (sites: WeeklySummaryInput['sites']): WeeklySummaryInput => ({
   unsubscribeUrl: UNSUB,
 });
 
-const hrefs = (h: string) => [...h.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+// Every target in any spelling (inspect.ts), so a crawled string linked with `href='…'` is caught.
+const hrefs = htmlTargets;
 
 describe('the weekly summary (D6)', () => {
   const mail = weeklySummaryTemplate(
