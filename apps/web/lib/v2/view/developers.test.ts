@@ -1,8 +1,9 @@
 /**
  * The Developers page's JSON example is a public contract (CC-29 D5, DECISION J13). It is built from
- * the fixture; these tests parse every part of what the page prints against the v2 type contract,
- * pin its field names to the artboard's as FACTS revised them (A1, B2), and hold its values to the
- * fixture's check, read here directly rather than through the builder.
+ * the fixture; these tests parse every part of the view's JSON against the v2 type contract, pin its
+ * field names to the artboard's as FACTS revised them (A1, B2), and hold its values to the fixture's
+ * check, read here directly rather than through the builder. That the rendered page prints this JSON
+ * and no other is `__tests__/v2/public-pages.test.tsx`'s ("/developers, v2").
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,7 +19,7 @@ import {
   VerdictSchema,
 } from '@crawlmouse/types/v2';
 import { READ_API } from '../copy/developers';
-import { findCheck, fixture } from '../fixtures';
+import { FIXTURE_NAMES, findCheck, fixture } from '../fixtures';
 import { API_SAMPLE_CHECK, ELIDED, apiSample, developersView, formatSample } from './developers';
 
 const view = developersView();
@@ -113,6 +114,36 @@ describe('the JSON example on the Developers page', () => {
   });
 });
 
+describe('apiSample on other checks', () => {
+  it('gives a withheld AI readability grade as null, beside a scored technical grade', () => {
+    const d = fixture('built-site');
+    const withheld = d.checks.find(
+      (c) => c.status === 'finished' && c.structure && c.coverage && c.ai_readability?.withheld,
+    )!;
+    expect(withheld).toBeDefined();
+    expect(apiSample(d, withheld.id).sample.grades).toEqual({
+      technical_seo: withheld.technical_seo!.score,
+      ai_readability: null,
+    });
+  });
+
+  it('refuses every check of every fixture that has not finished, and builds every one that has', () => {
+    let refused = 0;
+    for (const name of FIXTURE_NAMES) {
+      const d = fixture(name);
+      for (const c of d.checks) {
+        const complete = c.status === 'finished' && c.finished_at && c.structure && c.coverage;
+        if (complete) expect(() => apiSample(d, c.id), c.id).not.toThrow();
+        else {
+          expect(() => apiSample(d, c.id), c.id).toThrow(/has not finished/);
+          refused++;
+        }
+      }
+    }
+    expect(refused).toBeGreaterThan(0);
+  });
+});
+
 describe('formatSample', () => {
   it('parses back to what it printed, for empty and full arrays alike', () => {
     const { sample } = apiSample(fixture('bad-site'), API_SAMPLE_CHECK);
@@ -123,20 +154,40 @@ describe('formatSample', () => {
 });
 
 describe('the read-only API the page calls coming', () => {
-  // The page says the API is not here yet. It is true while no app code names its key prefix;
-  // when the API ships, this fails and the page's words change with it.
-  const files = (dir: string): string[] =>
+  // The page says the API is not here yet: no route serves it and no key can be created. These read
+  // the places either would have to appear; they fail when one does, and the page's words change then.
+  const WEB = join(__dirname, '../../..');
+  const REPO = join(WEB, '../..');
+  const files = (dir: string, ext = /\.tsx?$/): string[] =>
     !existsSync(dir)
       ? []
       : readdirSync(dir).flatMap((n) => {
           const p = join(dir, n);
-          return statSync(p).isDirectory() ? files(p) : /\.tsx?$/.test(n) ? [p] : [];
+          if (n === 'node_modules' || n === '.next') return [];
+          return statSync(p).isDirectory() ? files(p, ext) : ext.test(n) ? [p] : [];
         });
-  const app = files(join(__dirname, '../../../app'));
+  const notTest = (f: string) => !/\.test\.tsx?$/.test(f);
+  const app = files(join(WEB, 'app'));
 
-  it('is served by no route: no file under app/ names the key prefix', () => {
+  it('is served by no route: none under a v1 path or for a site’s latest audit, none naming the key prefix', () => {
     expect(app.length).toBeGreaterThan(100);
+    const routes = app.filter((f) => /\/route\.tsx?$/.test(f)).map((f) => f.slice(WEB.length));
+    expect(routes.length).toBeGreaterThan(20);
+    expect(routes.filter((r) => /\/v1\/|\/latest\//.test(r))).toEqual([]);
     expect(app.filter((f) => readFileSync(f, 'utf8').includes(READ_API.keyPrefix))).toEqual([]);
+  });
+
+  it('can create no key: no source or migration inserts an api_keys row', () => {
+    const sources = [
+      ...['app', 'lib', 'components'].flatMap((d) => files(join(WEB, d))),
+      ...['inngest', 'packages', 'scripts'].flatMap((d) => files(join(REPO, d))),
+    ].filter(notTest);
+    const sql = files(join(REPO, 'infra/supabase/migrations'), /\.sql$/);
+    expect(sources.length).toBeGreaterThan(200);
+    expect(sql.length).toBeGreaterThan(20);
+    const writes =
+      /from\(\s*['"]api_keys['"]\s*\)\s*\.\s*(insert|upsert)|insert\s+into\s+(public\.)?api_keys/i;
+    expect([...sources, ...sql].filter((f) => writes.test(readFileSync(f, 'utf8')))).toEqual([]);
   });
 
   it('is marked coming in the heading and not claimed in the present', () => {

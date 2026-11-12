@@ -21,6 +21,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CHECK_COPY, CHECK_QUESTIONS } from '../../lib/v2/copy/check-pages';
 import { V2_REWRITES } from '../../lib/v2/rewrites';
+import { JSDOM } from 'jsdom';
+import { fixture } from '../../lib/v2/fixtures';
+import { API_SAMPLE_CHECK, apiSample, developersView } from '../../lib/v2/view/developers';
 import { WEB_ROOT } from './_lib/tokens-css';
 
 afterEach(() => {
@@ -131,6 +134,20 @@ describe('/developers, v2 (D5)', () => {
     expect(markup).not.toContain('href="#"');
     expect(markup.match(/data-v2-primary=""/g)).toHaveLength(1);
     expect(markup).toContain('name="email"');
+  }, 60_000);
+
+  it('prints, as its JSON example, the sample built from the fixture and nothing else (D5)', async () => {
+    flags({ billing: true, checks: true });
+    const { default: Page } = await load();
+    const { document } = new JSDOM(renderToStaticMarkup(Page() as ReactElement)).window;
+    const pres = [...document.querySelectorAll('pre')].map((p) => p.textContent ?? '');
+    expect(pres).toHaveLength(1);
+    const printed = pres[0]!;
+    const json = printed.slice(printed.indexOf('\n{') + 1);
+    expect(printed.slice(0, printed.length - json.length)).toBe(
+      `${developersView().sample.request}\n`,
+    );
+    expect(JSON.parse(json)).toEqual(apiSample(fixture('bad-site'), API_SAMPLE_CHECK).sample);
   }, 60_000);
 });
 

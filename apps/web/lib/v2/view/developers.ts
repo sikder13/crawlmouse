@@ -56,7 +56,6 @@ export function apiSample(d: ViewDataset, checkId: string): ApiSampleShown {
   }
   const fixes = fixesAsOf(d, check);
   const first = fixes[0];
-  const ai = check.ai_readability;
   return {
     host: siteOf(d, check).host,
     crawlersTotal: check.crawlers.length,
@@ -65,7 +64,8 @@ export function apiSample(d: ViewDataset, checkId: string): ApiSampleShown {
       audited_at: check.finished_at,
       grades: {
         technical_seo: check.technical_seo?.score ?? null,
-        ai_readability: ai && !ai.withheld ? ai.total : null,
+        // A withheld grade's total is null by the type contract (`AiReadabilitySchema`).
+        ai_readability: check.ai_readability?.total ?? null,
       },
       crawlers: check.crawlers
         .filter((c) => BLOCKED.includes(c.verdict))
