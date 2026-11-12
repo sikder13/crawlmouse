@@ -359,19 +359,23 @@ drop trigger if exists sites_schedule_next on public.sites;
 create trigger sites_schedule_next before insert or update on public.sites
   for each row execute function public.sites_schedule_next();
 
--- An account's zone moves its sites' next checks.
+-- An account's zone moves its sites' next checks that are still ahead of now. A site already due
+-- keeps its time, so the next tick claims it, as claim_due_sites would have. The cadence is the one
+-- claim_due_sites would advance by: the saved one on a paid tier, monthly on any other (Q4).
 create or replace function public.accounts_timezone_reschedule()
 returns trigger
 language plpgsql
 security definer
 set search_path = pg_catalog, pg_temp
 as $$
+declare
+  v_paid boolean := public.account_effective_tier(new.id, pg_catalog.now()) in ('pro', 'agency');
 begin
   update public.sites s
-     set next_check_at = public.next_check_after(s.schedule_cadence, s.schedule_iso_weekday,
-                                                 s.schedule_hour_local, s.schedule_offset_min,
-                                                 new.timezone, pg_catalog.now())
-   where s.account_id = new.id and s.next_check_at is not null;
+     set next_check_at = public.next_check_after(
+           case when v_paid then s.schedule_cadence else 'monthly' end, s.schedule_iso_weekday,
+           s.schedule_hour_local, s.schedule_offset_min, new.timezone, pg_catalog.now())
+   where s.account_id = new.id and s.next_check_at > pg_catalog.now();
   return null;
 end;
 $$;

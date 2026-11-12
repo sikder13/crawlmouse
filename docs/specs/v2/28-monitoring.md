@@ -58,7 +58,9 @@ after)`: weekly, the next ISO weekday at that local time; monthly, the first suc
 time the clocks skip runs an hour later; a local time that happens twice runs once, at the later instant
 (`__tests__/v2-028-schedule.test.ts` pins both for New York and London). `sites.next_check_at` is written by
 a trigger on `sites` (schedule columns, `account_id`, `removed_at`) and one on `accounts.timezone`, for every
-writer (owner ruling Q3); a site with no `schedule_offset_min` gets one from its id.
+writer (owner ruling Q3); a site with no `schedule_offset_min` gets one from its id. A zone change moves only the
+next checks still ahead of now (a site already due keeps its time, so the next tick claims it), by the saved
+cadence on a paid tier and monthly on any other, as the claim advances.
 
 `claim_due_sites(now, limit, slot)` claims kept, live, unpaused weekly or monthly sites whose `next_check_at`
 has passed, of accounts neither deleted nor marked for deletion, whose tier allows it at `now`: any site of a

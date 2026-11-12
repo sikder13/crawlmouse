@@ -304,6 +304,30 @@ describe('the triggers that keep next_check_at', () => {
     await db.query(`update public.accounts set timezone = 'Asia/Tokyo' where id = $1`, [acc]);
     expect((await siteRow(id)).next_check_at!.getUTCHours()).toBe(21);
   });
+
+  it('leaves a site that is already due as it is when the account’s zone changes', async () => {
+    const acc = await account('pro', 'UTC');
+    const id = await site(acc, { weekday: 1, hour: 6, offset: 0 });
+    // Due and not yet claimed (the tick has not come, or the ceiling held it back).
+    await db.query(`update public.sites set next_check_at = '2026-11-01T06:00:00Z' where id = $1`, [
+      id,
+    ]);
+    await db.query(`update public.accounts set timezone = 'Asia/Tokyo' where id = $1`, [acc]);
+    expect((await siteRow(id)).next_check_at!.toISOString()).toBe('2026-11-01T06:00:00.000Z');
+  });
+
+  it('moves a Free account’s site to its monthly time when the zone changes, whatever its saved cadence', async () => {
+    const acc = await account('free', 'UTC');
+    const id = await site(acc, { cadence: 'weekly', weekday: 1, hour: 6, offset: 0 });
+    // London is UTC in November, so the instant reads as the local time.
+    await db.query(`update public.accounts set timezone = 'Europe/London' where id = $1`, [acc]);
+    const at = (await siteRow(id)).next_check_at!;
+    // Monthly: the first Monday of a month. A weekly time is the next Monday, which on a date whose
+    // next Monday falls past the 7th (as from 2026-11-12) is not in the first seven days.
+    expect([at.getUTCDay(), at.getUTCHours(), at.getUTCMinutes()]).toEqual([1, 6, 0]);
+    expect(at.getUTCDate()).toBeLessThanOrEqual(7);
+    expect(at.getTime()).toBeGreaterThan(Date.now());
+  });
 });
 
 // ─── the claim ──────────────────────────────────────────────────────────────────────────────────
