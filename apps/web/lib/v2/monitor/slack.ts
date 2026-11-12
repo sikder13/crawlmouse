@@ -7,9 +7,11 @@
  * engine's SSRF guard (`validateUrlOrThrow`, the check `safeFetch` makes on every hop) must pass it
  * before the request; redirects are not followed. `safeFetch` itself only makes GET requests, so the
  * POST is `fetch` behind that guard (report-C.md, "Slack"). The URL is never logged, returned, or put
- * in an error or an event: every failure is answered as a fixed code.
+ * in an error or an event: every failure is answered as a fixed code. A lookup of Slack's host that
+ * fails is `slack_dns`, retried; an address the guard refuses is `slack_url_refused`, not retried.
  */
-import { validateUrlOrThrow } from '@crawlmouse/engine';
+import { promises as dns } from 'node:dns';
+import { validateUrlOrThrow, type DnsResolver } from '@crawlmouse/engine';
 import { dayDate, hourMinute } from '../format';
 import { count, plural } from '../words';
 import { oneLine } from '../mail/escape';
@@ -77,6 +79,36 @@ export function isSlackWebhook(url: string): boolean {
   }
 }
 
+/** A lookup of Slack's host that failed (no answer, a timeout, a resolver error): worth retrying. */
+export class DnsUnavailable extends Error {
+  constructor() {
+    super('slack host lookup failed');
+    this.name = 'DnsUnavailable';
+  }
+}
+
+type Lookup = (host: string) => Promise<readonly { address: string }[]>;
+
+/**
+ * The SSRF guard's resolver for the Slack POST. The engine's default answers a failed lookup with no
+ * address, which the guard refuses like a forbidden one; this one throws `DnsUnavailable` instead, so
+ * the poster can tell a lookup that failed for the moment from an address the guard refuses.
+ */
+export function slackResolver(
+  lookup: Lookup = (host) => dns.lookup(host, { all: true }),
+): DnsResolver {
+  return async (host) => {
+    let records: readonly { address: string }[];
+    try {
+      records = await lookup(host);
+    } catch {
+      throw new DnsUnavailable();
+    }
+    if (records.length === 0) throw new DnsUnavailable();
+    return records.map((r) => r.address);
+  };
+}
+
 export interface SlackPostDeps {
   fetch: typeof fetch;
   /** The engine's SSRF check; throws for a URL it refuses. */
@@ -85,13 +117,17 @@ export interface SlackPostDeps {
 }
 
 export function slackPoster(
-  deps: SlackPostDeps = { fetch, validate: (url) => validateUrlOrThrow(url) },
+  deps: SlackPostDeps = {
+    fetch,
+    validate: (url) => validateUrlOrThrow(url, { resolver: slackResolver() }),
+  },
 ): PostSlack {
   return async (url, text) => {
     if (!isSlackWebhook(url)) return { ok: false, code: 'slack_url_refused', retryable: false };
     try {
       await deps.validate(url);
-    } catch {
+    } catch (e) {
+      if (e instanceof DnsUnavailable) return { ok: false, code: 'slack_dns', retryable: true };
       return { ok: false, code: 'slack_url_refused', retryable: false };
     }
     let res: Response;
