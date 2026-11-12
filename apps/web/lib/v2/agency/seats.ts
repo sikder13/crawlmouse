@@ -27,6 +27,12 @@ export const INVITED_ROLES = ['account_manager', 'developer'] as const;
 /** The roles a seat is invited as or changed to: an owner is neither. */
 export type InvitedRole = (typeof INVITED_ROLES)[number];
 
+/**
+ * How long an invitation's link works, in days: `issue_seat_invite`'s interval (migration
+ * 20261114000002). The invitation's mail states it, and its test reads the interval from the SQL.
+ */
+export const INVITE_LINK_DAYS = 7;
+
 /** The page the seat forms are on. */
 export const SEATS_PAGE = '/seats';
 /** The page an invitation's link lands on (`LINK_FLOWS.invite.page`). */
