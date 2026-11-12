@@ -9,12 +9,7 @@
  * `requestCheck` reaches its send, so a refused request sends nothing.
  */
 import { randomUUID } from 'node:crypto';
-import {
-  AlertRuleKindSchema,
-  ChannelSchema,
-  type AlertRuleKind,
-  type Channel,
-} from '@crawlmouse/types/v2';
+import { AlertRuleKindSchema, ChannelSchema, type AlertRuleKind } from '@crawlmouse/types/v2';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { inngest } from '../../../../../inngest/client';
@@ -333,6 +328,8 @@ export async function removeSite(
 }
 
 // ── A site's alert rules (CC-28 D8, `PUT /api/sites/[id]/alert-rules`) ──────────────────────────────
+
+type Channel = z.infer<typeof ChannelSchema>;
 
 /**
  * What a site's rule switch asks for: the kind it overrides, and its switch, its channels or both.
