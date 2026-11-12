@@ -133,16 +133,17 @@ describe('the hourly run over the schedule functions', () => {
       covers_check_ids: [ready.checkId],
       recipient_email: 'reader@client.example',
     });
-    expect(sent).toEqual([
-      {
-        id: `client_report:${row!.id}`,
-        name: 'report.send.requested',
-        data: { report_id: row!.id },
-      },
+    // Two schedules due at one moment run in the order of their site ids, which are random.
+    expect([...sent].sort((x, y) => x.name.localeCompare(y.name))).toEqual([
       {
         id: `report_confirm:${pending.siteId}:2026-11-16T09:00:00.000Z`,
         name: 'report.confirmation.requested',
         data: { site_id: pending.siteId },
+      },
+      {
+        id: `client_report:${row!.id}`,
+        name: 'report.send.requested',
+        data: { report_id: row!.id },
       },
     ]);
     expect(JSON.stringify(sent)).not.toContain('@');

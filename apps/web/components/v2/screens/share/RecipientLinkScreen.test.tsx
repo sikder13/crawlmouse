@@ -75,9 +75,9 @@ describe('recipientLinkView', () => {
     expect(recipientLinkView('confirm', null, 'report_paused').state).toBe('gone');
     expect(recipientLinkView('pause', null, 'report_confirmed').state).toBe('gone');
     expect(recipientLinkView('confirm', null, 'report_link_gone').state).toBe('gone');
-    expect(recipientLinkView('confirm', { kind: 'confirm', ...LINK }, 'seat_invited').state).toBe(
-      'link',
-    );
+    expect(
+      recipientLinkView('confirm', { kind: 'confirm', ...LINK }, 'seat_invited'),
+    ).toMatchObject({ state: 'link' });
   });
 });
 
