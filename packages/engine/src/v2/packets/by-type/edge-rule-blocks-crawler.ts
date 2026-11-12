@@ -147,20 +147,28 @@ function context(record: AccessDetection, facts: PacketFacts): Line[] {
     const shown = [...statuses]
       .sort(([a], [b]) => byOrder(a, b))
       .map(([status, n]) => ours(`${status} (${plural(n, 'request')})`));
-    lines.push(line`Status of the refused requests: ${list(shown, shown.length, 'status')}.`);
+    const [only] = [...statuses.keys()];
+    lines.push(
+      rows.length === 1 && only !== undefined
+        ? line`Status of the refused request: ${count(only)}.`
+        : line`Status of the refused requests: ${list(shown, shown.length, 'status')}.`,
+    );
   }
 
+  const responses = ours(rows.length === 1 ? 'response names' : 'responses name');
   const causes = [...new Set(record.evidence.causes)]
     .sort(byOrder)
     .map((c) => ours(CAUSE_TEXT[c]));
   lines.push(
     causes.length > 0
-      ? line`Cause the responses name: ${list(causes, causes.length, 'cause')}.`
-      : line`The responses name no product: the audit did not identify what holds the rule.`,
+      ? line`${ours(causes.length === 1 ? 'Cause' : 'Causes')} the ${responses}: ${list(causes, causes.length, 'cause')}.`
+      : line`The ${responses} no product: the audit did not identify what holds the rule.`,
   );
   if (record.evidence.signatures.length > 0) {
     const shown = [...record.evidence.signatures].sort(byOrder).map((s) => code(s, 80));
-    lines.push(line`Response headers: ${list(shown, SIGNATURES_SHOWN, 'header')}.`);
+    lines.push(
+      line`Response ${ours(shown.length === 1 ? 'header' : 'headers')}: ${list(shown, SIGNATURES_SHOWN, 'header')}.`,
+    );
   }
 
   const witnessed = rows.flatMap((t) => (t.witness === null ? [] : [t.witness.ua]));

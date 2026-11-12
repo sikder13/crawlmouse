@@ -19,7 +19,7 @@ import {
 } from './by-type/edge-rule-blocks-crawler.js';
 import { compose } from './compose.js';
 import { userAgentOf } from './crawler.js';
-import { identifiersIn } from './test-support/content.js';
+import { identifiersIn, pluralsAtOne } from './test-support/content.js';
 import { NO_STACK } from './test-support/facts.js';
 import { hostileText, outsideCodeSpans, UNSHOWN } from './test-support/hostile.js';
 import type { RequestListener } from 'node:http';
@@ -172,7 +172,7 @@ describe('the edge-rule packet, from its record', () => {
       factsOf(rows),
     );
     expect(context).toContain(
-      'Cause the responses name: Cloudflare’s error 1020, a rate limit (status 429).',
+      'Causes the responses name: Cloudflare’s error 1020, a rate limit (status 429).',
     );
   });
 
@@ -234,6 +234,69 @@ describe('the edge-rule packet, from its record', () => {
     expect(compose(builder, { ...two.record, extent: null }, factsOf(two.rows)).context[0]).toBe(
       '`PerplexityBot` was refused on 2 sampled pages by a rule that matches its user agent.',
     );
+  });
+
+  it('says 1 of anything in the singular: each count at 1 and at 2 (property)', () => {
+    const oneOrTwo = fc.constantFrom(1, 2);
+    fc.assert(
+      fc.property(
+        fc.constantFrom(1, 2, PAGES_SHOWN + 1, PAGES_SHOWN + 2),
+        fc.constantFrom(0, 1, 2),
+        fc.constantFrom(0, 1, 2, 5, 6),
+        oneOrTwo,
+        oneOrTwo,
+        fc.constantFrom(NO_STACK, CLOUDFLARE),
+        fc.boolean(),
+        (refused, served, headers, statuses, witnessed, stack, noExtent) => {
+          const { record, rows } = detected({
+            crawler: 'PerplexityBot',
+            pages: SITE_PAGES.slice(0, refused),
+            judged: refused + served,
+            signatures: Array.from({ length: headers }, (_, i) => `x-h${i}: v`),
+          });
+          const shaped = rows.map((t, i) => ({
+            ...t,
+            raw_status: i < statuses ? 403 + i : 403,
+            witness: i < witnessed ? t.witness : null,
+          }));
+          const p = compose(
+            builder,
+            noExtent ? { ...record, extent: null } : record,
+            factsOf(shaped, stack),
+          );
+          for (const text of allText(p)) expect(pluralsAtOne(text), text).toEqual([]);
+        },
+      ),
+    );
+  });
+
+  it('names one status, one cause and one header in the singular', () => {
+    const { record, rows } = detected({
+      crawler: 'PerplexityBot',
+      pages: SITE_PAGES.slice(0, 1),
+      cause: 'cloudflare_1020',
+      signatures: ['cf-ray'],
+    });
+    const one = compose(builder, record, factsOf(rows)).context;
+    expect(one).toContain('Status of the refused request: 403.');
+    expect(one).toContain('Cause the response names: Cloudflare’s error 1020.');
+    expect(one).toContain('Response header: `cf-ray`.');
+    const two = detected({
+      crawler: 'PerplexityBot',
+      pages: SITE_PAGES.slice(0, 2),
+      signatures: ['cf-ray', 'server: cloudflare'],
+    });
+    const causes = ['cloudflare_1020', 'rate_limit_429'] as const;
+    const both = compose(
+      builder,
+      { ...two.record, evidence: { ...two.record.evidence, causes: [...causes] } },
+      factsOf(two.rows),
+    ).context;
+    expect(both).toContain('Status of the refused requests: 403 (2 requests).');
+    expect(both).toContain(
+      'Causes the responses name: Cloudflare’s error 1020, a rate limit (status 429).',
+    );
+    expect(both).toContain('Response headers: `cf-ray`, `server: cloudflare`.');
   });
 
   it('gives the same packet whatever order the record lists its pages, causes and headers in', () => {

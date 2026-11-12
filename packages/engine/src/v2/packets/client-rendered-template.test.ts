@@ -16,7 +16,7 @@ import {
 } from './by-type/client-rendered-template.js';
 import { jsOnlyNavigation } from './by-type/js-only-navigation.js';
 import { compose } from './compose.js';
-import { identifiersIn } from './test-support/content.js';
+import { identifiersIn, pluralsAtOne } from './test-support/content.js';
 import { NO_STACK } from './test-support/facts.js';
 import { hostileText, outsideCodeSpans, UNSHOWN } from './test-support/hostile.js';
 import {
@@ -154,6 +154,26 @@ describe('the client-rendered template packet, from its record', () => {
       ).context;
     expect(shownPlus(1)).toContain('1 more rendered page is not shown.');
     expect(shownPlus(2)).toContain('2 more rendered pages are not shown.');
+  });
+
+  it('says 1 of anything in the singular: each count at 1 and at 2 (property)', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(1, 2, PAGES_SHOWN + 1, PAGES_SHOWN + 2),
+        fc.constantFrom(0, 1, 2),
+        fc.constantFrom<[number, number]>([1, 2], [1, 100], [2, 100], [0, 1]),
+        fc.constantFrom<PacketFacts['crawlers']>(SERVED, []),
+        (rendered, more, words, crawlers) => {
+          const record = detected(
+            'https://a.test',
+            Array.from({ length: rendered }, () => words),
+            more,
+          );
+          const p = compose(builder, record, factsOf(crawlers));
+          for (const text of allText(p)) expect(pluralsAtOne(text), text).toEqual([]);
+        },
+      ),
+    );
   });
 
   it('gives the same packet whatever order the record lists its rendered pages in', () => {

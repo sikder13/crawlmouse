@@ -160,18 +160,31 @@ export function tagProbe(facts: PacketFacts, page: string, program: string): Tag
 /**
  * The readable command of a content packet (types.ts `See`): the same request as `tagProbe`'s, the
  * response put on one line, and each match of `pattern` (an extended regular expression of ours,
- * letter case ignored) printed on a line of its own. It is there to be read and to show the markup;
- * its exit status proves nothing.
+ * letter case ignored) printed on a line of its own, cut to its first `cut` characters when `cut` is
+ * given. It is there to be read and to show the markup; its exit status proves nothing.
  */
-export function seeMarkup(facts: PacketFacts, page: string, pattern: string): Command {
+export function seeMarkup(
+  facts: PacketFacts,
+  page: string,
+  pattern: string,
+  cut?: number,
+): Command {
   const entry = verifyCrawler(facts);
   const address = url(readAt(facts, page));
   const from = word('\\n');
   const to = word(' ');
   const find = word(pattern);
+  if (cut !== undefined && !Number.isSafeInteger(cut)) {
+    throw new Error('packets: a readable command cuts at a whole number of characters');
+  }
+  if (cut === undefined) {
+    return entry === null
+      ? sh`curl -sS --compressed ${address} | tr ${from} ${to} | grep -aioE ${find}`
+      : sh`curl -sS --compressed -A ${word(userAgentOf(entry))} ${address} | tr ${from} ${to} | grep -aioE ${find}`;
+  }
   return entry === null
-    ? sh`curl -sS --compressed ${address} | tr ${from} ${to} | grep -aioE ${find}`
-    : sh`curl -sS --compressed -A ${word(userAgentOf(entry))} ${address} | tr ${from} ${to} | grep -aioE ${find}`;
+    ? sh`curl -sS --compressed ${address} | tr ${from} ${to} | grep -aioE ${find} | cut -c ${word(`1-${cut}`)}`
+    : sh`curl -sS --compressed -A ${word(userAgentOf(entry))} ${address} | tr ${from} ${to} | grep -aioE ${find} | cut -c ${word(`1-${cut}`)}`;
 }
 
 /** For `today`: which page the readable command requests, by the record's extent. */

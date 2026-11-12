@@ -84,7 +84,7 @@ export const quotableOpening: PacketEntry<'quotable_opening'> = {
       command: probe.command,
       ua: probe.ua,
       see: {
-        command: seeMarkup(facts, page, `</h1>.{0,${OPENING_SHOWN}}`),
+        command: seeMarkup(facts, page, '</h1>.*', OPENING_SHOWN),
         today: line`The markup that follows the page’s H1, up to ${count(OPENING_SHOWN)} characters. The audit keeps no page text; its check found no block there, other than a list item, with ${SENTENCE}. ${firstFailing(fix)}`,
         after: line`The same markup, with a paragraph that holds ${SENTENCE} within the first ${count(OPENING_WORDS)} words after the H1.`,
       },

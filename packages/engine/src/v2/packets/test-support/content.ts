@@ -19,6 +19,7 @@ import { CONTENT_CHECKS, type PageVerdict } from '../../content/checks.js';
 import { readPage } from '../../content/read.js';
 import { CRAWLER_REGISTRY_V2 } from '../../crawler-registry.js';
 import { PACKET_BOUNDS } from '../compose.js';
+import { EXAMPLE_PAGES } from '../content-rule.js';
 import { userAgentOf } from '../crawler.js';
 import { writePacket } from '../registry.js';
 import { clean } from '../text.js';
@@ -61,6 +62,22 @@ export function contentRecord(
     affected_urls,
     ...over,
   };
+}
+
+/** The nouns the packets count. */
+const COUNTED =
+  'pages|words|requests|crawlers|headers|statuses|causes|identities|characters|lines|elements|links|redirects|hops|rewrites';
+
+/**
+ * Each place `text` says 1 of something in the plural, outside its code spans: "1 pages", and with a
+ * word or two between, "1 sampled pages". "1 of those pages" is one of several, and stays.
+ */
+export function pluralsAtOne(text: string): string[] {
+  const ours = outsideCodeSpans(text).replace(/\b1 of those pages\b/g, '');
+  return [
+    ...(ours.match(/\b1 [a-z]+s\b/g) ?? []),
+    ...(ours.match(new RegExp(`\\b1 (?:[a-z]+ ){1,2}(?:${COUNTED})\\b`, 'g')) ?? []),
+  ];
 }
 
 /** The first testable crawler of the registry: the one a command requests as when every crawler is served. */
@@ -426,6 +443,34 @@ export function contentPacketProperties(type: ContentFixType): void {
         }
       },
     );
+  });
+
+  describe(`${type}: each count at 1 and at 2`, () => {
+    it('says 1 of anything in the singular', () => {
+      const count = fc.constantFrom(1, 2);
+      fc.assert(
+        fc.property(
+          count,
+          fc.constantFrom(0, 1, 2),
+          fc.constantFrom(0, 1, 2),
+          fc.constantFrom(0, 1, 2),
+          framework,
+          served,
+          (failing, passing, unread, unnamed, f, s) => {
+            const affected_urls = Array.from(
+              { length: unnamed === 0 ? failing : EXAMPLE_PAGES + unnamed },
+              (_, i) => `https://shop.test/blog/${i}`,
+            );
+            const record = contentRecord(type, {
+              affected_urls,
+              extent: { failing: affected_urls.length, of: affected_urls.length + passing, unread },
+            });
+            const p = writePacket(type, record, contentFacts(s, f))!;
+            for (const text of shownText(p)) expect(pluralsAtOne(text), text).toEqual([]);
+          },
+        ),
+      );
+    });
   });
 
   describe(`${type}: properties over hostile records`, () => {
