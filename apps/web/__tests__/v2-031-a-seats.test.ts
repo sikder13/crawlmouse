@@ -801,6 +801,48 @@ describe('remove_seat', () => {
   });
 });
 
+describe('apply_entitlement_transition (migration 20261102000001) and the seats of this section', () => {
+  it('removes active seats beyond a lowered limit, later acceptances first, and leaves an invitation and its link', async () => {
+    const owner = await paidOwner('agency');
+    const site = await keptSite(db, owner.accountId);
+    const [early, late] = [await person(db, 'early'), await person(db, 'late')];
+    const earlySeat = await addSeat(db, owner.accountId, early, 'developer');
+    const lateSeat = await addSeat(db, owner.accountId, late, 'account_manager', [site.id]);
+    await db.query(`update public.seats set accepted_at = $2 where id = $1`, [earlySeat, at(-2)]);
+    await db.query(`update public.seats set accepted_at = $2 where id = $1`, [lateSeat, at(-1)]);
+    await db.query(`update public.sites set owner_seat_id = $2 where id = $1`, [site.id, lateSeat]);
+    const guest = await person(db, 'guest');
+    const pending = await invited(owner.accountId, guest.email);
+
+    // The account moves to Pro's two seats: the owner's and one other.
+    await service(
+      `select public.apply_entitlement_transition(
+         a.id, a.entitlement_version, 'pro', 'pro', null, null, null, null, null, null,
+         2, 5, 1, $2::timestamptz, a.current_subscription_id, $2::timestamptz)
+         from public.accounts a where a.id = $1`,
+      [owner.accountId, NOW],
+    );
+
+    expect((await seat(owner.seatId)).status).toBe('active');
+    expect((await seat(earlySeat)).status).toBe('active');
+    expect((await seat(lateSeat)).status).toBe('removed');
+    // What remove_seat clears and moves, the transition leaves.
+    expect(await scopeOf(lateSeat)).toEqual([site.id]);
+    const { rows } = await db.query<{ owner_seat_id: string }>(
+      `select owner_seat_id from public.sites where id = $1`,
+      [site.id],
+    );
+    expect(rows[0]!.owner_seat_id).toBe(lateSeat);
+    // The invitation is as it was, and is refused while the active seats fill the limit.
+    expect(await seat(pending.seatId)).toMatchObject({
+      status: 'invited',
+      invite_token_hash: sha256(pending.token),
+    });
+    expect((await read(pending.token)).outcome).toBe('invite');
+    expect(await accept(pending.token, guest.id)).toEqual({ outcome: 'full' });
+  });
+});
+
 describe('grants', () => {
   it('lets service_role execute each function of the section, and no client role or PUBLIC', async () => {
     const { rows } = await db.query<{ f: string; role: string; can: boolean }>(
