@@ -3,51 +3,14 @@ import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { hashMailAddress } from './address-hash';
 import { buildOutgoing, HeaderRefused, isPlainAddress, unsubscribeHeaders } from './headers';
-import type { Claim, ClaimInput, MailLedger } from './ledger';
-import { MailRetry, send, type MailDeps, type SendRequest } from './send';
+import type { MailLedger } from './ledger';
+import { memoryLedger, type MemoryLedger } from './memory';
+import { keyRef, MailRetry, send, type MailDeps, type SendRequest } from './send';
 import { resendTransport, type MailTransport, type TransportResult } from './transport';
 import { ACCOUNT_KINDS, MAIL_KINDS, type OutgoingMail } from './types';
 
 const PEPPER = 'p'.repeat(40);
 const NOW = new Date('2026-11-13T10:00:00.000Z');
-
-/**
- * An in-memory ledger with the migration's claim rule, minus time: a key is `sending` until finished,
- * `sent` after; three attempts. The real rule, leases and the two-transaction race are
- * __tests__/v2-028-mail.test.ts and scripts/db/mail-race.test.ts.
- */
-function memoryLedger(suppressed: ReadonlySet<string> = new Set()) {
-  const rows = new Map<string, { status: string; attempts: number }>();
-  const claims: ClaimInput[] = [];
-  const ledger: MailLedger = {
-    async claim(c): Promise<Claim> {
-      claims.push(c);
-      const r = rows.get(c.key);
-      if (!r) {
-        if (!ACCOUNT_KINDS.has(c.kind) && suppressed.has(c.addressHash)) {
-          rows.set(c.key, { status: 'suppressed', attempts: 0 });
-          return { outcome: 'suppressed' };
-        }
-        rows.set(c.key, { status: 'sending', attempts: 1 });
-        return { outcome: 'go', attempt: 1 };
-      }
-      if (r.status === 'sent') return { outcome: 'done' };
-      if (r.status === 'suppressed') return { outcome: 'suppressed' };
-      if (r.status === 'sending') return { outcome: 'busy' };
-      if (r.attempts >= 3) return { outcome: 'exhausted' };
-      r.status = 'sending';
-      r.attempts += 1;
-      return { outcome: 'go', attempt: r.attempts };
-    },
-    async finish(f) {
-      const r = rows.get(f.key);
-      if (!r || r.status !== 'sending') return false;
-      r.status = f.status;
-      return true;
-    },
-  };
-  return { ledger, rows, claims };
-}
 
 function fakeTransport(results: TransportResult[] = [{ ok: true, providerId: 'msg_1' }]) {
   const sent: OutgoingMail[] = [];
@@ -60,12 +23,11 @@ function fakeTransport(results: TransportResult[] = [{ ok: true, providerId: 'ms
   return { transport, sent };
 }
 
-function deps(over: Partial<MailDeps> = {}) {
-  const mem = memoryLedger();
+function deps(over: Partial<MailDeps> = {}, mem: MemoryLedger = memoryLedger()) {
   const t = fakeTransport();
   const log = vi.fn();
   const d: MailDeps = {
-    ledger: mem.ledger,
+    ledger: mem,
     transport: t.transport,
     pepper: PEPPER,
     now: () => NOW,
@@ -111,9 +73,9 @@ describe('send: claim before send (D1)', () => {
   it('renders only after the claim answers go (an account link is minted inside render)', async () => {
     const { d, mem } = deps();
     const render = vi.fn(async () => ({ subject: 's', text: 't', html: 'h' }));
-    mem.rows.set('k', { status: 'sent', attempts: 1 });
+    mem.rows.set('k', { status: 'sent', attempts: 1, addressHash: '' });
     expect(await send(d, request({ idempotencyKey: 'k', render }))).toBe('done');
-    mem.rows.set('k2', { status: 'sending', attempts: 1 });
+    mem.rows.set('k2', { status: 'sending', attempts: 1, addressHash: '' });
     await expect(send(d, request({ idempotencyKey: 'k2', render }))).rejects.toBeInstanceOf(
       MailRetry,
     );
@@ -135,7 +97,7 @@ describe('send: claim before send (D1)', () => {
     for (let i = 0; i < 3; i++) await expect(send(d, request())).rejects.toBeInstanceOf(MailRetry);
     expect(await send(d, request())).toBe('exhausted');
     expect(t.sent).toHaveLength(3);
-    expect(mem.rows.get('check_notify:c1')).toEqual({ status: 'failed', attempts: 3 });
+    expect(mem.rows.get('check_notify:c1')).toMatchObject({ status: 'failed', attempts: 3 });
     expect(log).toHaveBeenCalledWith('mail.exhausted', expect.any(Object));
   });
 
@@ -161,7 +123,7 @@ describe('send: claim before send (D1)', () => {
     const mem = memoryLedger(new Set([hash]));
     const t = fakeTransport();
     const d: MailDeps = {
-      ledger: mem.ledger,
+      ledger: mem,
       transport: t.transport,
       pepper: PEPPER,
       now: () => NOW,
@@ -183,6 +145,152 @@ describe('send: claim before send (D1)', () => {
       expect(await send(d, request({ to }))).toBe('invalid_address');
     }
     expect(mem.claims).toHaveLength(0);
+  });
+});
+
+describe('send: every failure after the claim (correctness review r1, B1)', () => {
+  /** The memory ledger with one of its calls failing, as a PostgREST error would. */
+  const failing = (mem: MemoryLedger, which: 'claim' | 'finish', times = Infinity): MailLedger => {
+    let left = times;
+    return {
+      claim: (c) => {
+        if (which === 'claim' && left-- > 0)
+          return Promise.reject(new Error('claim_email_send: 503'));
+        return mem.claim(c);
+      },
+      finish: (f) => {
+        if (which === 'finish' && left-- > 0)
+          return Promise.reject(new Error('finish_email_send: 503'));
+        return mem.finish(f);
+      },
+    };
+  };
+
+  it('a claim that fails is retried, with nothing rendered or sent', async () => {
+    const mem = memoryLedger();
+    const render = vi.fn(request().render);
+    const { d, t } = deps({ ledger: failing(mem, 'claim') }, mem);
+    await expect(send(d, request({ render }))).rejects.toMatchObject({
+      name: 'MailRetry',
+      code: 'claim_failed',
+    });
+    expect(render).not.toHaveBeenCalled();
+    expect(t.sent).toHaveLength(0);
+  });
+
+  it('a render that throws records failed (render_failed) and is retried; the next claim is attempt 2', async () => {
+    const { d, mem, t } = deps();
+    let calls = 0;
+    const render = async () => {
+      if (++calls === 1) throw new Error('issue_account_link: 503');
+      return { subject: 's', text: 't', html: 'h' };
+    };
+    await expect(send(d, request({ render }))).rejects.toMatchObject({ code: 'render_failed' });
+    expect(mem.rows.get('check_notify:c1')).toMatchObject({
+      status: 'failed',
+      attempts: 1,
+      errorCode: 'render_failed',
+    });
+    expect(await send(d, request({ render }))).toBe('sent');
+    expect(mem.claims).toHaveLength(2);
+    expect(t.sent).toHaveLength(1);
+  });
+
+  it('a render that keeps throwing ends exhausted after three attempts, never left sending', async () => {
+    const { d, mem } = deps();
+    const render = async () => {
+      throw new Error('boom');
+    };
+    for (let i = 0; i < 3; i++) {
+      await expect(send(d, request({ render }))).rejects.toBeInstanceOf(MailRetry);
+      expect(mem.rows.get('check_notify:c1')!.status).toBe('failed');
+    }
+    expect(await send(d, request({ render }))).toBe('exhausted');
+  });
+
+  it('a header builder or transport that throws records failed and is retried', async () => {
+    const built = deps();
+    await expect(
+      send(
+        built.d,
+        request({
+          headers: () => {
+            throw new TypeError('not a header error');
+          },
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'build_failed' });
+    expect(built.mem.rows.get('check_notify:c1')).toMatchObject({
+      status: 'failed',
+      errorCode: 'build_failed',
+    });
+    const thrown = deps({
+      transport: {
+        send: () => Promise.reject(new Error('socket hang up')),
+      },
+    });
+    await expect(send(thrown.d, request())).rejects.toMatchObject({ code: 'transport_threw' });
+    expect(thrown.mem.rows.get('check_notify:c1')).toMatchObject({
+      status: 'failed',
+      errorCode: 'transport_threw',
+    });
+  });
+
+  it('a render that throws while the ledger is down is still retried (the lease takes the claim back)', async () => {
+    const mem = memoryLedger();
+    const { d } = deps({ ledger: failing(mem, 'finish') }, mem);
+    const render = () => Promise.reject(new Error('boom'));
+    await expect(send(d, request({ render }))).rejects.toMatchObject({ code: 'render_failed' });
+    expect(mem.rows.get('check_notify:c1')!.status).toBe('sending');
+  });
+
+  it('a finish that fails after Resend accepted is retried, and the retry sends under the same key', async () => {
+    const mem = memoryLedger();
+    const { d, t } = deps({ ledger: failing(mem, 'finish', 1) }, mem);
+    await expect(send(d, request())).rejects.toMatchObject({ code: 'finish_failed' });
+    expect(t.sent).toHaveLength(1);
+    // The key is still sending; past the two-minute lease the SQL answers go (memory has no clock).
+    mem.rows.get('check_notify:c1')!.status = 'failed';
+    expect(await send(d, request())).toBe('sent');
+    expect(t.sent.map((m) => m.idempotencyKey)).toEqual(['check_notify:c1', 'check_notify:c1']);
+    expect(mem.rows.get('check_notify:c1')!.status).toBe('sent');
+  });
+
+  it('a finish that fails on a retryable or permanent provider answer is retried', async () => {
+    for (const result of [
+      { ok: false, code: 'provider_500', retryable: true },
+      { ok: false, code: 'provider_422', retryable: false },
+    ] as const) {
+      const mem = memoryLedger();
+      const tr = fakeTransport([result]);
+      const { d } = deps({ ledger: failing(mem, 'finish'), transport: tr.transport }, mem);
+      await expect(send(d, request())).rejects.toMatchObject({ code: 'finish_failed' });
+    }
+  });
+
+  it('logs the kind and a hash of the key, never the key (it can hold a check id)', async () => {
+    const key = 'check_notify:c0000000-0000-4000-8000-0000000000aa';
+    const logs: unknown[] = [];
+    for (const over of [
+      { transport: null },
+      {
+        transport: fakeTransport([{ ok: false, code: 'provider_422', retryable: false }]).transport,
+      },
+    ] as const) {
+      const { d, log } = deps(over);
+      await send(d, request({ idempotencyKey: key }));
+      logs.push(...log.mock.calls);
+    }
+    const { d, log } = deps();
+    await send(d, request({ idempotencyKey: key, to: 'not an address' }));
+    logs.push(...log.mock.calls);
+    expect(logs).toHaveLength(3);
+    expect(JSON.stringify(logs)).not.toContain('c0000000');
+    expect(logs[0]).toEqual([
+      'mail.unconfigured',
+      expect.objectContaining({ key_ref: keyRef(key) }),
+    ]);
+    expect(keyRef(key)).toMatch(/^[0-9a-f]{16}$/);
   });
 });
 

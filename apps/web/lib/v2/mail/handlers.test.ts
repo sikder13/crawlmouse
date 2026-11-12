@@ -4,6 +4,7 @@ import { fixture } from '../fixtures';
 import { checkRef } from '../pipeline/public';
 import { packetPrompt } from '../view/segment/fixes';
 import { hashMailAddress } from './address-hash';
+import { guarded } from '../../../../../inngest/mail';
 import { mailHandlers, type CaptureEvent } from './handlers';
 import { memoryLedger, memoryTransport } from './memory';
 import { MailRetry, type MailDeps } from './send';
@@ -291,6 +292,61 @@ describe('the fix to a developer', () => {
     const { h, ledger } = setup(s);
     expect(await h.fixToDeveloper('r1')).toBe('no_packet');
     expect(ledger.claims).toEqual([]);
+  });
+});
+
+describe('a failure around the claim retries the step (inngest/mail.ts `guarded` throws it on)', () => {
+  const link = {
+    accountId: ACCOUNT,
+    template: 'email_change_confirm',
+    tokenId: TOKEN_ID,
+  } as const;
+  const step = (run: () => Promise<string>) => guarded('crawlmouse.mail.test', run);
+
+  it('a claim that fails', async () => {
+    const t = setup();
+    t.ledger.claim = () => Promise.reject(new Error('claim_email_send: 503'));
+    await expect(step(() => t.h.accountEmail(link))).rejects.toMatchObject({ name: 'MailRetry' });
+    expect(t.transport.sent).toEqual([]);
+  });
+
+  it('a mint that fails after go: recorded failed, retried, and the retry sends', async () => {
+    const issue = vi
+      .fn<MailStore['issueAccountLink']>()
+      .mockRejectedValueOnce(new Error('issue_account_link: 503'))
+      .mockResolvedValue([{ kind: 'email_change', token: RAW }]);
+    const t = setup(store({ issueAccountLink: issue }));
+    await expect(step(() => t.h.accountEmail(link))).rejects.toMatchObject({
+      code: 'render_failed',
+    });
+    expect(t.ledger.rows.get(`account_link:${TOKEN_ID}`)).toMatchObject({
+      status: 'failed',
+      errorCode: 'render_failed',
+    });
+    expect(await step(() => t.h.accountEmail(link))).toBe('sent');
+    expect(t.transport.sent).toHaveLength(1);
+  });
+
+  it('a finish that fails after the send', async () => {
+    const t = setup();
+    t.ledger.finish = () => Promise.reject(new Error('finish_email_send: 503'));
+    await expect(step(() => t.h.checkNotify(CHECK))).rejects.toMatchObject({
+      code: 'finish_failed',
+    });
+  });
+
+  it('a sent_at write that fails: retried, and the retry marks it without sending again', async () => {
+    const mark = vi
+      .fn<MailStore['markFixEmailSent']>()
+      .mockRejectedValueOnce(new Error('fix_email_requests update: 503'))
+      .mockResolvedValue(undefined);
+    const t = setup(store({ markFixEmailSent: mark }));
+    await expect(step(() => t.h.fixToDeveloper('r1'))).rejects.toMatchObject({
+      code: 'mark_sent_failed',
+    });
+    expect(await step(() => t.h.fixToDeveloper('r1'))).toBe('done');
+    expect(t.transport.sent).toHaveLength(1);
+    expect(mark).toHaveBeenCalledTimes(2);
   });
 });
 

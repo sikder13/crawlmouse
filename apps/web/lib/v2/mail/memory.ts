@@ -9,7 +9,10 @@ import type { MailTransport, TransportResult } from './transport';
 import { ACCOUNT_KINDS, type OutgoingMail } from './types';
 
 export interface MemoryLedger extends MailLedger {
-  rows: Map<string, { status: string; attempts: number; addressHash: string }>;
+  rows: Map<
+    string,
+    { status: string; attempts: number; addressHash: string; errorCode?: string | null }
+  >;
   claims: ClaimInput[];
 }
 
@@ -34,15 +37,20 @@ export function memoryLedger(suppressed: ReadonlySet<string> = new Set()): Memor
       if (r.status === 'sent') return { outcome: 'done' };
       if (r.status === 'suppressed') return { outcome: 'suppressed' };
       if (r.status === 'sending') return { outcome: 'busy' };
-      if (r.attempts >= 3) return { outcome: 'exhausted' };
+      if (r.attempts >= 3) {
+        r.status = 'failed';
+        return { outcome: 'exhausted' };
+      }
       r.status = 'sending';
       r.attempts += 1;
+      r.errorCode = null;
       return { outcome: 'go', attempt: r.attempts };
     },
     async finish(f) {
       const r = rows.get(f.key);
       if (!r || r.status !== 'sending') return false;
       r.status = f.status;
+      r.errorCode = f.status === 'failed' ? f.errorCode : null;
       return true;
     },
   };
