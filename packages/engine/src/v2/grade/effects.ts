@@ -84,7 +84,9 @@ function addEdge(seo: TechnicalSeoInput, from: string, to: string): TechnicalSeo
  * URL), so the page lands within MAX_HEALTHY_DEPTH clicks with the smallest change to the link graph;
  * the shallowest page there is when none is that deep.
  */
-function shallowParent(seo: TechnicalSeoInput): string {
+export function shallowParent(
+  seo: Pick<TechnicalSeoInput, 'pages' | 'edges' | 'homepage_url'>,
+): string {
   const depth = new Map([[seo.homepage_url, 0]]);
   const out = new Map<string, string[]>();
   for (const e of seo.edges) out.set(e.from_url, [...(out.get(e.from_url) ?? []), e.to_url]);
