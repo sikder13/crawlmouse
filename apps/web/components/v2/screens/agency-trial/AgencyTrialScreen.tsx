@@ -1,6 +1,8 @@
+import { Fragment } from 'react';
 import { AGENCY_TRIAL_COPY as COPY } from '@/lib/v2/copy/agency-trial';
 import type { AgencyTrialView, ManageView, PageForm } from '@/lib/v2/view/agency-trial';
 import { Button } from '../../Button';
+import { Capability } from '../agencies/Capability';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
@@ -70,7 +72,14 @@ export function AgencyTrialScreen({
               <Heading level={1} size="m">
                 {view.title}
               </Heading>
-              <p className={styles.lead}>{view.lead}</p>
+              <p className={styles.lead}>
+                {view.lead.map((t, i) => (
+                  <Fragment key={t.text}>
+                    {i > 0 ? ' ' : null}
+                    <Capability item={t} comingLabel={view.comingLabel} />
+                  </Fragment>
+                ))}
+              </p>
               {view.returning ? (
                 <p className={styles.notice} role="status">
                   {view.returning}
@@ -91,19 +100,31 @@ export function AgencyTrialScreen({
             <Card as="section" className={styles.aside}>
               <div className={styles.asideHead}>
                 <div className={styles.asideKicker}>{view.aside.kicker}</div>
-                <div className={styles.asideTitle}>{view.aside.title}</div>
+                <Capability
+                  as="div"
+                  className={styles.asideTitle}
+                  item={view.aside.title}
+                  comingLabel={view.comingLabel}
+                />
               </div>
               <table className={styles.table} aria-label="What Agency includes">
                 <tbody>
                   {view.aside.rows.map(([what, value]) => (
-                    <tr key={what}>
-                      <td>{what}</td>
+                    <tr key={what.text}>
+                      <td>
+                        <Capability item={what} comingLabel={view.comingLabel} />
+                      </td>
                       <td className={styles.n}>{value}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <div className={styles.foot}>{view.aside.foot}</div>
+              <Capability
+                as="div"
+                className={styles.foot}
+                item={view.aside.foot}
+                comingLabel={view.comingLabel}
+              />
             </Card>
           </div>
         ) : (

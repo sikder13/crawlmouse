@@ -145,6 +145,8 @@ const PARAPHRASES: Partial<Record<CapabilityKey, readonly string[]>> = {
   ],
   one_pagers: ['client one-pagers', 'Prospect one-pagers', 'one-page summary'],
   client_reports: [
+    'reports under your name',
+    'Agencies reporting to clients under their own name.',
     'Weekly or monthly client reports, sent for you',
     'client reports',
     'shown on client reports',

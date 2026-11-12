@@ -2,7 +2,9 @@
  * The Agency trial page's sentences (Final-AgencyTrial, with FACTS-proposed Part 2's A6, A8, A9, D5
  * and K10, and J15 as overruled: Checkout is Stripe's hosted page, so the artboard's card fields
  * become the consent checkbox and the first client site, then the redirect). Every price comes from
- * `prices.ts`, every limit from `GATES`, the trial's length from `TRIAL_DAYS`.
+ * `prices.ts`, every limit from `GATES`, the trial's length from `TRIAL_DAYS`. A sentence that names a
+ * capability carries it, as For agencies' copy does, and the page marks "coming" each one that is
+ * not built (Q27).
  */
 import { EMAIL_KINDS, TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
 import type { Interval } from '../../billing/catalog';
@@ -10,7 +12,8 @@ import { AGENCY_YEARLY, EXTRA_SEAT, usd } from '../../billing/prices';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { GATES } from '../../entitlement-v2';
 import { count, numberWord, capitalise } from '../words';
-import { monthsFree, priceOf } from './pricing';
+import type { Tagged } from './agencies';
+import { ANNUAL_RENEWAL_REMINDER_DAYS, monthsFree, priceOf } from './pricing';
 import { CANCEL_CLICKS } from './settings';
 
 const agency = GATES.agency;
@@ -19,17 +22,28 @@ const period = (interval: Interval) => (interval === 'month' ? 'month' : 'year')
 export const AGENCY_TRIAL_COPY = {
   /** The page's title and h1. */
   title: 'Start your Agency trial.',
-  lead: (interval: Interval, chargeDate: string) =>
-    `${TRIAL_DAYS} days, nothing charged. On day ${TRIAL_DAYS + 1} — ${chargeDate} if you start today — the card is charged ${usd(priceOf('agency', interval))} for the ${period(interval)} unless you cancel, from this page, any day before, ${numberWord(CANCEL_CLICKS)} clicks; canceling puts the account on Free; nothing you can see is deleted. We email you ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before, as with every trial.`,
+  lead: (interval: Interval, chargeDate: string): Tagged[] => [
+    {
+      text: `${TRIAL_DAYS} days, nothing charged. On day ${TRIAL_DAYS + 1} — ${chargeDate} if you start today — the card is charged ${usd(priceOf('agency', interval))} for the ${period(interval)} unless you cancel, from this page, any day before, ${numberWord(CANCEL_CLICKS)} clicks; canceling puts the account on Free; nothing you can see is deleted.`,
+      capabilities: ['agency_trial', 'cancel'],
+    },
+    {
+      text: `We email you ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before, as with every trial.`,
+      capabilities: ['trial_reminder'],
+    },
+  ],
   /** Q16: an agency account with no subscription and no trial used is a Checkout that did not finish. */
   returning:
     'Your last visit to the card page did not finish, so nothing started. Check the details and continue to the card again.',
   signedInAs: 'Signed in as',
   agencyName: 'Agency name',
-  agencyNameHint: 'shown on client reports',
+  agencyNameHint: { text: 'shown on client reports', capabilities: ['client_reports'] } as Tagged,
   site: 'First client site',
   /** Q5: the site is stored, not audited, before the card is taken. */
-  siteHint: 'its first audit runs from the agency workspace',
+  siteHint: {
+    text: 'its first audit runs from the agency workspace',
+    capabilities: ['agency_workspace'],
+  } as Tagged,
   sitePlaceholder: 'clientsite.com',
   interval: (interval: Interval) =>
     interval === 'month'
@@ -49,8 +63,14 @@ export const AGENCY_TRIAL_COPY = {
   privacy: 'Privacy',
   card: 'The card is taken on Stripe’s own page next; the number never reaches our servers. Nothing is charged for the trial.',
   submit: `Start a ${TRIAL_DAYS}-day trial`,
-  /** A9: Stripe sends the receipts. */
-  fine: `${capitalise(numberWord(EMAIL_KINDS.length))} kinds of email and no others: sign-in links, a note when a check finds a change, and the reminder ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before the trial ends. Stripe sends the receipts.`,
+  /** A9: Stripe sends the receipts. FACTS: renewal reminders are the annual subscriber's exception. */
+  fine: (): Tagged => {
+    const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
+    return {
+      text: `${capitalise(numberWord(EMAIL_KINDS.length))} kinds of email and no others: sign-in links, a note when a check finds a change, and the reminder ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before the trial ends; paid yearly, also renewal reminders ${first} and ${second} days before it renews. Stripe sends the receipts.`,
+      capabilities: ['change_emails', 'trial_reminder', 'renewal_reminders'],
+    };
+  },
   /** Q15: where the trialist lands until the agency workspace (CC-31) has its switcher. */
   secondAccount:
     'The trial is a second account for the agency, separate from your own. After the card page you return to your own account’s plan; the agency account’s billing and its Cancel are on this page.',
@@ -101,24 +121,55 @@ export const AGENCY_TRIAL_COPY = {
   aside: {
     kicker: (interval: Interval) =>
       `Agency · ${usd(priceOf('agency', interval))} a ${period(interval)} after the trial`,
-    title: `${agency.sites} sites, ${agency.seats} seats, reports under your name`,
-    rows: (): [string, string][] => [
+    title: {
+      text: `${agency.sites} sites, ${agency.seats} seats, reports under your name`,
+      capabilities: ['sites', 'seats', 'client_reports'],
+    } as Tagged,
+    rows: (): [Tagged, string][] => [
       [
-        `Client sites, up to ${count(agency.pagesPerCheck)} pages each, checked weekly`,
+        {
+          text: `Client sites, up to ${count(agency.pagesPerCheck)} pages each, checked weekly`,
+          capabilities: ['sites', 'weekly_checks'],
+        },
         String(agency.sites),
       ],
       [
-        `Seats · owner, account managers, developers · ${usd(EXTRA_SEAT)} a seat a month beyond`,
+        {
+          text: `Seats · owner, account managers, developers · ${usd(EXTRA_SEAT)} a seat a month beyond`,
+          capabilities: ['seats'],
+        },
         String(agency.seats),
       ],
-      ['Reports and client report pages on your domain, your logo', 'yes'],
-      ['Emails to clients from your address', 'yes'],
-      ['Prospect one-pagers from any audit you run', 'yes'],
-      ['Scheduled client reports, weekly or monthly, sent for you', 'yes'],
-      ['Competitors per site', String(agency.competitorsPerSite)],
-      ['Everything in Pro, on every site', 'yes'],
+      [
+        {
+          text: 'Reports and client report pages on your domain, your logo',
+          capabilities: ['client_report_page'],
+        },
+        'yes',
+      ],
+      [{ text: 'Emails to clients from your address', capabilities: ['sender_address'] }, 'yes'],
+      [{ text: 'Prospect one-pagers from any audit you run', capabilities: ['one_pagers'] }, 'yes'],
+      [
+        {
+          text: 'Scheduled client reports, weekly or monthly, sent for you',
+          capabilities: ['client_reports', 'weekly_checks'],
+        },
+        'yes',
+      ],
+      [
+        { text: 'Competitors per site', capabilities: ['competitors'] },
+        String(agency.competitorsPerSite),
+      ],
+      [{ text: 'Everything in Pro, on every site', capabilities: ['sites'] }, 'yes'],
     ],
-    foot: (interval: Interval) =>
-      `Day 1: audit your first prospect and set your domain and logo under Branding. Day ${TRIAL_DAYS + 1}: ${usd(priceOf('agency', interval))}, or nothing if you canceled. Annual ${usd(AGENCY_YEARLY)}, ${numberWord(monthsFree())} months free, from Settings.`,
+    /** D11: no Branding screen in this step, so day 1 names only what is built. */
+    foot: (interval: Interval): Tagged => ({
+      text:
+        `Day 1: audit your first prospect. Day ${TRIAL_DAYS + 1}: ${usd(priceOf('agency', interval))}, or nothing if you canceled.` +
+        (interval === 'month'
+          ? ` Annual ${usd(AGENCY_YEARLY)}, ${numberWord(monthsFree())} months free: switch to yearly above.`
+          : ''),
+      capabilities: ['free_audit', 'agency_trial', 'cancel'],
+    }),
   },
 } as const;

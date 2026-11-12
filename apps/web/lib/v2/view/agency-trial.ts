@@ -15,7 +15,9 @@ import type { Interval } from '../../billing/catalog';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { effectiveTier, type Tier } from '../../entitlement-v2';
 import type { AccountState } from '@crawlmouse/types/v2';
+import { AGENCIES_COPY } from '../copy/agencies';
 import { AGENCY_TRIAL_COPY as COPY } from '../copy/agency-trial';
+import { tagged, type TaggedView } from './agencies';
 import { portalRefusal } from '../../billing/portal-v2';
 import { dayDate } from '../format';
 import type { UsedTrial } from '../pricing/used-trial';
@@ -101,10 +103,14 @@ export interface ManageView {
   cancel: { ask: PageForm; confirm: (PageForm & { text: string }) | null } | null;
 }
 
+/**
+ * A sentence that names a capability is a `TaggedView` (For agencies' table), marked "coming"
+ * (`comingLabel`) when one of its capabilities is not built.
+ */
 export interface AgencyTrialForm {
   kind: 'form';
   title: string;
-  lead: string;
+  lead: TaggedView[];
   returning: string | null;
   email: string | null;
   interval: Interval;
@@ -112,7 +118,10 @@ export interface AgencyTrialForm {
   otherIntervalHref: string;
   defaults: { agencyName: string; site: string };
   consent: string;
-  aside: { kicker: string; title: string; rows: [string, string][]; foot: string };
+  hints: { agencyName: TaggedView; site: TaggedView };
+  fine: TaggedView;
+  aside: { kicker: string; title: TaggedView; rows: [TaggedView, string][]; foot: TaggedView };
+  comingLabel: string;
 }
 
 export type AgencyTrialView = (
@@ -190,7 +199,7 @@ export function agencyTrialView(input: AgencyTrialInput, now: Date): AgencyTrial
     kind: 'form',
     manage,
     title: COPY.title,
-    lead: COPY.lead(interval, chargeDate(now, input.timeZone)),
+    lead: COPY.lead(interval, chargeDate(now, input.timeZone)).map(tagged),
     returning: standing.open ? COPY.returning : null,
     email: input.email,
     interval,
@@ -201,11 +210,14 @@ export function agencyTrialView(input: AgencyTrialInput, now: Date): AgencyTrial
       site: standing.open?.firstSite ?? '',
     },
     consent: COPY.consent(interval),
+    hints: { agencyName: tagged(COPY.agencyNameHint), site: tagged(COPY.siteHint) },
+    fine: tagged(COPY.fine()),
     aside: {
       kicker: COPY.aside.kicker(interval),
-      title: COPY.aside.title,
-      rows: COPY.aside.rows(),
-      foot: COPY.aside.foot(interval),
+      title: tagged(COPY.aside.title),
+      rows: COPY.aside.rows().map(([what, value]) => [tagged(what), value]),
+      foot: tagged(COPY.aside.foot(interval)),
     },
+    comingLabel: AGENCIES_COPY.coming,
   };
 }

@@ -154,7 +154,8 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     status: 'coming',
     what: 'Client reports sent on a schedule: CC-31.',
     proof: { kind: 'absent', path: 'apps/web/app/api/report-files' },
-    named: /client reports?\b(?! page)|report to them|report from you/i,
+    named:
+      /client reports?\b(?! page)|report to them|report from you|under (?:your|their) (?:own )?name/i,
   },
   client_matrix: {
     status: 'coming',

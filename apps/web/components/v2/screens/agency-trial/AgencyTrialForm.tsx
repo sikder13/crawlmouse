@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from 'react';
 import { AGENCY_TRIAL_COPY as COPY } from '@/lib/v2/copy/agency-trial';
 import type { AgencyTrialForm as FormView } from '@/lib/v2/view/agency-trial';
 import { Button } from '../../Button';
+import { Capability } from '../agencies/Capability';
 import fieldStyles from '../../Field.module.css';
 import styles from './AgencyTrial.module.css';
 
@@ -85,7 +86,10 @@ export function AgencyTrialForm({
         </div>
       ) : null}
       <label htmlFor={`${ids}-name`} className={styles.label}>
-        {COPY.agencyName} <span className={styles.mut}>· {COPY.agencyNameHint}</span>
+        {COPY.agencyName}{' '}
+        <span className={styles.mut}>
+          · <Capability item={view.hints.agencyName} comingLabel={view.comingLabel} />
+        </span>
       </label>
       <input
         id={`${ids}-name`}
@@ -99,7 +103,10 @@ export function AgencyTrialForm({
         className={`${fieldStyles.input} ${styles.wide}`}
       />
       <label htmlFor={`${ids}-site`} className={styles.label}>
-        {COPY.site} <span className={styles.mut}>· {COPY.siteHint}</span>
+        {COPY.site}{' '}
+        <span className={styles.mut}>
+          · <Capability item={view.hints.site} comingLabel={view.comingLabel} />
+        </span>
       </label>
       <input
         id={`${ids}-site`}
@@ -136,7 +143,7 @@ export function AgencyTrialForm({
         {error}
       </p>
       <p className={styles.fine}>
-        {COPY.fine}{' '}
+        <Capability item={view.fine} comingLabel={view.comingLabel} />{' '}
         <a className={styles.underline} href="/terms">
           {COPY.terms}
         </a>{' '}

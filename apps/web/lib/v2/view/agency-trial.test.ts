@@ -137,10 +137,12 @@ describe('agencyTrialView', () => {
     expect(v.kind).toBe('form');
     if (v.kind !== 'form') return;
     expect(v.title).toBe('Start your Agency trial.');
-    expect(v.lead).toContain(
+    expect(v.lead.map((t) => t.text).join(' ')).toContain(
       `${TRIAL_DAYS} days, nothing charged. On day ${TRIAL_DAYS + 1} — Sun 8 Nov`,
     );
-    expect(v.lead).toContain(`charged $${AGENCY_MONTHLY} for the month`);
+    expect(v.lead.map((t) => t.text).join(' ')).toContain(
+      `charged $${AGENCY_MONTHLY} for the month`,
+    );
     expect(v.returning).toBeNull();
     expect(v.defaults).toEqual({ agencyName: '', site: '' });
     expect(v.consent).toContain('renewing each month until I cancel');
@@ -152,7 +154,7 @@ describe('agencyTrialView', () => {
   it('yearly: the year’s price, and a link back to monthly', () => {
     const v = view(NONE, 'year');
     if (v.kind !== 'form') throw new Error('form expected');
-    expect(v.lead).toContain(`charged $${AGENCY_YEARLY} for the year`);
+    expect(v.lead.map((t) => t.text).join(' ')).toContain(`charged $${AGENCY_YEARLY} for the year`);
     expect(v.otherIntervalHref).toBe('/agency-trial');
   });
 
