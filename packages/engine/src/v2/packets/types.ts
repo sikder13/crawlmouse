@@ -56,6 +56,21 @@ export interface Verify {
   expect: Line;
   /** The registry token of the crawler the command requests as; null when it requests as none. */
   ua: string | null;
+  /** The readable layer above the strict command. */
+  see?: See;
+}
+
+/**
+ * A short command a developer reads in ten seconds, which prints the evidence, with what it prints
+ * today and what it prints once the fix has landed. It proves nothing by its exit status: `command`
+ * is the check.
+ */
+export interface See {
+  command: Command;
+  /** What it prints today, from the record. */
+  today: Line;
+  /** What it prints once the fix has landed. */
+  after: Line;
 }
 
 /** A page of the platform's own documentation that a stack's steps rest on. */

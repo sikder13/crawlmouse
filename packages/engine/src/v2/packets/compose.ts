@@ -71,6 +71,13 @@ export function compose<R>(builder: PacketBuilder<R>, fix: R, facts: PacketFacts
     command: commandOf(proof.command),
     expect: boundedLine(textOf(proof.expect)),
     ua: proof.ua,
+    see: proof.see
+      ? {
+          command: commandOf(proof.see.command),
+          today: boundedLine(textOf(proof.see.today)),
+          after: boundedLine(textOf(proof.see.after)),
+        }
+      : null,
   };
   const body = (framework: PacketFramework, c: Change): Body => {
     const change = boundedSection(c.change);

@@ -20,3 +20,22 @@ export function servedAt(facts: Pick<PacketFacts, 'pages'>, url: string): string
     return url;
   }
 }
+
+/**
+ * The address a page's content was read at: where the request for it ended, when that answered 200.
+ * A page whose request lands on another address (a homepage that redirects to `/en/`, a bare host to
+ * `www`) is still that page to the crawl, which files what it read under the requested URL; a
+ * command that reads the page requests the address that answered, since it follows no redirect.
+ */
+export function readAt(facts: Pick<PacketFacts, 'pages'>, url: string): string {
+  const page = facts.pages.get(url);
+  const final = page?.final_url ?? null;
+  if (final === null || page?.status_code !== 200) return servedAt(facts, url);
+  try {
+    const { username, password, protocol } = new URL(final);
+    const web = protocol === 'http:' || protocol === 'https:';
+    return web && username === '' && password === '' ? final : servedAt(facts, url);
+  } catch {
+    return servedAt(facts, url);
+  }
+}

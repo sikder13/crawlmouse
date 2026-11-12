@@ -18,6 +18,7 @@ export const bodyFor = (framework: PacketFramework): PacketBody => ({
     command: `curl -s https://example.test/${framework}/page | grep -c "${framework}-marker"`,
     expect: `1 or more for the ${framework} body (today: 0)`,
     ua: null,
+    see: null,
   },
 });
 

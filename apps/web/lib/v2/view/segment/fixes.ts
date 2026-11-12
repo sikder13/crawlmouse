@@ -203,6 +203,11 @@ const cleanBody = (b: PacketBody): PacketBody => ({
     command: oneLine(b.verify.command),
     expect: oneLine(b.verify.expect),
     ua: b.verify.ua,
+    see: b.verify.see && {
+      command: oneLine(b.verify.see.command),
+      today: oneLine(b.verify.see.today),
+      after: oneLine(b.verify.see.after),
+    },
   },
 });
 
