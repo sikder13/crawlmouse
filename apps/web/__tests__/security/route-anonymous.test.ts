@@ -91,6 +91,7 @@ const ANONYMOUS: Record<
   'api/reports/[slug]/mine': { status: 200, body: { owned: false } },
   'api/reports/[slug]/visibility': { status: 401, body: { error: 'auth_required' } },
   'api/reports/[slug]/white-label': { status: 401, body: { error: 'auth_required' } },
+  'api/seats/switch': { status: 401, body: { code: 'auth_required' } },
   'api/sites': { status: 401, body: { code: 'auth_required' } },
   'api/sites/[id]': { status: 401, body: { code: 'auth_required' } },
   'api/sites/[id]/checks': { status: 401, body: { code: 'auth_required' } },
