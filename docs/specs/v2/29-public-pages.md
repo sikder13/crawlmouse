@@ -62,9 +62,11 @@ Where an artboard's figure disagrees with `prices.ts` (Agency $69, $9 a seat), t
   unverified address does not steer a reply.
 - The kind is own-inbox mail (`OWN_INBOX_KINDS`): no unsubscribe, and a suppression does not stop it.
 - `crawlmouse.mail.contact-purge` runs `purge_sent_contact_requests` daily at 05:43 UTC.
-- The mail functions are registered with `V2_CHECKS_PUBLIC=1` and send with `RESEND_API_KEY` and the
-  mail pepper set (CC-28). `V2_BILLING` already requires `V2_CHECKS_PUBLIC` (Q35), so the notifier is
-  not a further switch-on precondition.
+- The mail functions and the purge are registered with `V2_CHECKS_PUBLIC=1` and send with
+  `RESEND_API_KEY` and the mail pepper set (CC-28). `POST /api/contact/agency-plus` answers 404 unless
+  both `V2_BILLING` and `V2_CHECKS_PUBLIC` are on, so no request is stored that the mailer and the
+  purge are not registered to handle
+  (`pnpm --filter @crawlmouse/web exec vitest run app/api/contact/agency-plus/route.test.ts`).
 - With the template on main, `CAPABILITIES.agency_plus_reply` reads built, and the form's answer says
   the request goes to the team, with no reply time. CC-28's merge flipped `trial_reminder`,
   `change_emails`, `weekly_checks` and `slack_alerts` to built; `renewal_reminders` stays coming.
