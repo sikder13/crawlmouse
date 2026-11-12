@@ -20,6 +20,9 @@ import type { Catalog, Interval } from '../../billing/catalog';
 import { CatalogError } from '../../billing/stripe-catalog';
 import { mirrorOf } from '../../billing/subscription-mirror';
 import { noticeTo, refuse, type NoticeCode, type RequestBody } from '../account/route';
+import { MAX_EXTRA_SEATS } from './extras-bounds';
+
+export { MAX_EXTRA_SEATS } from './extras-bounds';
 
 /**
  * A raised quantity is invoiced at once for the rest of the period, and the change is refused when
@@ -34,12 +37,6 @@ export const RAISE = {
 export const LOWER = {
   proration_behavior: 'none',
 } as const satisfies Stripe.SubscriptionUpdateParams;
-
-/**
- * The most extra seats one request may ask for. A raise is charged at once, so a mistyped quantity
- * is money taken; no plan fact bounds seats as `GATES.agency.maxSites` bounds sites.
- */
-export const MAX_EXTRA_SEATS = 100;
 
 /** A form posts each quantity as digits; JSON sends the number. */
 const quantity = z.preprocess(
