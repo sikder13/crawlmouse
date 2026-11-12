@@ -18,10 +18,33 @@ export async function pageCapture(): Promise<AgencyCapture> {
   return agencyCaptureFor(new Request(siteUrl('/'), { headers: cookie ? { cookie } : {} }));
 }
 
+/**
+ * The stored object's name of each of `reportIds` whose file is stored, by report id. This is the
+ * one place this code asks whether a report's file is stored: `memberProof` and `reportFileStates`
+ * both read it here. The column is not granted to a client, so the read is the service role's, by
+ * ids the caller's own session returned.
+ */
+export async function storedObjects(
+  admin: SupabaseClient,
+  reportIds: readonly string[],
+): Promise<Map<string, string>> {
+  const stored = new Map<string, string>();
+  if (reportIds.length === 0) return stored;
+  const { data, error } = await admin
+    .from('reports')
+    .select('id, storage_path')
+    .in('id', [...reportIds]);
+  if (error) throw new Error(`reports read failed: ${error.message}`);
+  for (const r of (data ?? []) as { id: string; storage_path: string | null }[]) {
+    if (r.storage_path !== null) stored.set(r.id, r.storage_path);
+  }
+  return stored;
+}
+
 export interface MemberProofDeps {
   /** The caller's own client: its read of `reports` is decided by row security. */
   session: SupabaseClient;
-  /** Reads the one column the caller's client is not granted, `storage_path`, by the id found. */
+  /** Reads the stored object's name, which the caller's client is not granted, by the id found. */
   admin: SupabaseClient;
   files: ShareFiles;
 }
@@ -45,14 +68,8 @@ export async function memberProof(
   const report = found.data as { id: string; account_id: string; format: string } | null;
   if (report === null || report.format !== 'html') return null;
 
-  const stored = await deps.admin
-    .from('reports')
-    .select('storage_path')
-    .eq('id', report.id)
-    .maybeSingle();
-  if (stored.error) throw new Error(`reports read failed: ${stored.error.message}`);
-  const path = (stored.data as { storage_path: string | null } | null)?.storage_path ?? null;
-  if (path === null) return null;
+  const path = (await storedObjects(deps.admin, [report.id])).get(report.id);
+  if (path === undefined) return null;
   const doc = parseStoredDoc(await deps.files.read(path));
   return doc === null ? null : { accountId: report.account_id, doc };
 }
@@ -62,30 +79,19 @@ type FileState = 'pending' | 'stored';
 
 /**
  * The file state of each of `reports`, which the caller's own session read (so the ids are ones
- * their seat covers). The stored object's name is not granted to a client; the service role reads
- * it here and only whether there is one leaves this function: `stored` with a file, `pending` for a
- * report that is `ready` and has none yet, and no entry for any other (a client report that was
- * sent has no file).
+ * their seat covers). Only whether there is a stored file leaves this function: `stored` with one,
+ * `pending` for a report that is `ready` and has none yet, and no entry for any other (a client
+ * report that was sent has no file).
  */
 export async function reportFileStates(
   admin: SupabaseClient,
   reports: readonly { id: string; status: string }[],
 ): Promise<Map<string, FileState>> {
-  const states = new Map<string, FileState>();
-  if (reports.length === 0) return states;
-  const { data, error } = await admin
-    .from('reports')
-    .select('id, storage_path')
-    .in(
-      'id',
-      reports.map((r) => r.id),
-    );
-  if (error) throw new Error(`reports read failed: ${error.message}`);
-  const stored = new Set(
-    ((data ?? []) as { id: string; storage_path: string | null }[])
-      .filter((r) => r.storage_path !== null)
-      .map((r) => r.id),
+  const stored = await storedObjects(
+    admin,
+    reports.map((r) => r.id),
   );
+  const states = new Map<string, FileState>();
   for (const r of reports) {
     if (stored.has(r.id)) states.set(r.id, 'stored');
     else if (r.status === 'ready') states.set(r.id, 'pending');

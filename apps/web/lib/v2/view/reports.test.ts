@@ -257,12 +257,19 @@ describe('Reports, with what a live page knows', () => {
     expect(row(v, PDF).linkUntil).toBeNull();
   });
 
-  it('a reader whose role may not share gets the file and no share form', () => {
-    const v = live({ mayShare: false });
+  it('a developer gets the file and no share form, and a rail without the owner’s billing; an account manager shares', () => {
+    const v = live({ role: 'developer' });
     expect(labels(v, PDF)).toEqual(['Download · 1.2 MB']);
     expect(labels(v, COMPARE)).toEqual(['Open']);
     expect(labels(v, CSV)).toEqual(['Download · 310 KB']);
     expect(row(v, CSV).linkUntil).toBe('Link · until Tue 24 Nov');
+    expect(labels(live({ role: 'account_manager' }), PDF)).toEqual(['Download · 1.2 MB', 'Link']);
+    expect(v.shell).toEqual(
+      reportsView(bad, ACCOUNT_VIEWERS.home(), {}, BASE, {
+        role: 'account_manager',
+      }).shell,
+    );
+    expect(v.shell).not.toEqual(home().shell);
   });
 
   it('shows a link just made on its own report’s row and no other', () => {
@@ -300,7 +307,7 @@ describe('Reports, a share link after it expires', () => {
 });
 
 describe('Reports, the compare form', () => {
-  it('posts the latest two results of the site: the latest as checkId, the one before as beforeCheckId', () => {
+  it('posts the latest two results of the site: the latest as checkId, the one before as previousCheckId', () => {
     expect(home().make.compare.action).toMatchObject({
       label: 'Compare these two',
       href: '/api/reports',
@@ -308,7 +315,7 @@ describe('Reports, the compare form', () => {
         siteId: '50000000-0000-4000-8000-000000000001',
         checkId: 'c0000000-0000-4000-8000-000000000006',
         kind: 'compare',
-        beforeCheckId: 'c0000000-0000-4000-8000-000000000005',
+        previousCheckId: 'c0000000-0000-4000-8000-000000000005',
       },
       context: 'Thu 29 vs Fri 30 Oct',
     });

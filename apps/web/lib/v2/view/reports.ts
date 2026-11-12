@@ -11,9 +11,10 @@
  * offered for download, opening or sharing only when its file is stored; a pending one and a failed
  * one say so and offer nothing. A proof page (`html`) opens at `/reports/<id>`.
  */
-import { instant, type Check, type Report } from '@crawlmouse/types/v2';
+import { instant, type Check, type Report, type Seat } from '@crawlmouse/types/v2';
 import { GATES, type Tier } from '../../entitlement-v2';
 import { gateMessage } from '../agency/gates';
+import { roleMay } from '../agency/guard';
 import {
   RAW_FORMATS,
   RAW_TYPES,
@@ -27,6 +28,7 @@ import {
   PLAN_NAMES,
   primarySite,
   primarySites,
+  readerRole,
   resultChecks,
   viewAt,
   type AccountDataset,
@@ -51,8 +53,12 @@ export interface ReportsSide {
    * download, no Open and no share link. Left out (a preview), a row's own columns decide.
    */
   fileStates?: ReadonlyMap<string, FileState>;
-  /** Whether the reader's role may make and withdraw a share link; a preview reads as the owner. */
-  mayShare?: boolean;
+  /**
+   * The reader's role on the account, as the page's own session read it: it decides the rail and
+   * whether a share link may be made and withdrawn. Left out, the reader is the viewer's seat (a
+   * preview reads as the owner).
+   */
+  role?: Seat['role'];
   /** A share link made a moment ago, shown once on its report's row. */
   madeLink?: { reportId: string; url: string } | null;
 }
@@ -139,6 +145,7 @@ export function reportsView(
   side: ReportsSide = {},
 ): ReportsView {
   const v = viewAt(d, viewer);
+  const role = side.role ?? readerRole(v) ?? 'developer';
   const zone = v.account.timezone;
   const when = (ts: string) => `${dayDate(ts, zone)} ${hourMinute(ts, zone)}`;
   const at = (ts: string) => instant(ts);
@@ -221,7 +228,7 @@ export function reportsView(
   /** Whether the report has a file to hand over: the page's word for it, else the row's own. */
   const hasFile = (r: Report): boolean =>
     side.fileStates ? stateOf(r) === 'stored' : r.byte_count !== null || r.format === 'html';
-  const mayShare = side.mayShare ?? true;
+  const mayShare = roleMay(role, 'share_report');
   /** A new link needs the plan's exports as well as the role; withdrawing one needs the role. */
   const mayLink = mayShare && v.gates.exports;
   const sharedUntil = (r: Report): string | null =>
@@ -271,7 +278,7 @@ export function reportsView(
   const branding = v.gates.agencyBranding ? v.account.branding : null;
 
   return {
-    shell: accountShellView(v, 'Reports'),
+    shell: accountShellView(v, 'Reports', { role }),
     header: { title: COPY.title, line },
     make: {
       title: COPY.makeTitle,
@@ -299,7 +306,7 @@ export function reportsView(
         action:
           canMake && pair.length === 2
             ? {
-                ...make('compare', COPY.makeCompare, { beforeCheckId: pair[0]!.id }),
+                ...make('compare', COPY.makeCompare, { previousCheckId: pair[0]!.id }),
                 context: twoDates(pair).replace(/\.$/, ''),
               }
             : null,

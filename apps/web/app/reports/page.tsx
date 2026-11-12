@@ -8,7 +8,6 @@ import { checksPublicEnabled } from '@/lib/auth/flags';
 import { siteOrigin } from '@/lib/site-url';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { readSettingsPage } from '@/lib/v2/account/settings-pages';
-import { roleMay } from '@/lib/v2/agency/guard';
 import { noticeLine } from '@/lib/v2/copy/notices';
 import { madeLinkIn, SHARE_FLASH_COOKIE, shareUrl } from '@/lib/v2/reports/share';
 import { reportFileStates } from '@/lib/v2/reports/share-proof';
@@ -55,7 +54,7 @@ export default async function ReportsPage({
           '/reports',
           {
             fileStates: await reportFileStates(supabaseAdmin(), page.d.reports),
-            mayShare: roleMay(page.role, 'share_report'),
+            role: page.role,
             madeLink: made && {
               reportId: made.reportId,
               url: shareUrl(siteOrigin(), made.token),

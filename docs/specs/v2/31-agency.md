@@ -288,14 +288,15 @@ sha256, and the CHECK `share_links_token_hash` refuses a value that is not 64 lo
 characters. The rules are four SQL functions in migration `20261114000002`, section B, granted to
 `service_role`:
 
-| Function             | What it does                                                                                                                                                                      |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `create_share_link`  | Needs a stored file (`storage_path`); revokes the report's earlier links; writes the new one, expiring 30 days on, and sets `reports.share_expires_at`. `not_ready`, `not_found`. |
-| `open_share_link`    | In one statement counts the view and returns the report's id, account, site, kind, format and path. `gone` for a link that exists and does not open; `unknown` for none.          |
-| `read_share_link`    | The same answer with no count: the shared page's own read.                                                                                                                        |
-| `revoke_share_links` | Sets `revoked_at` on the report's links and clears `reports.share_expires_at`.                                                                                                    |
+| Function             | What it does                                                                                                                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_share_link`  | Needs a stored file (`report_file_stored`); revokes the report's earlier links; writes the new one, expiring 30 days on, and sets `reports.share_expires_at`. `not_ready`, `not_found`. |
+| `open_share_link`    | In one statement counts the view and returns the report's id, account, site, kind, format and path. `gone` for a link that exists and does not open; `unknown` for none.                |
+| `read_share_link`    | The same answer with no count: the shared page's own read.                                                                                                                              |
+| `revoke_share_links` | Sets `revoked_at` on the report's links and clears `reports.share_expires_at`.                                                                                                          |
 
-A link does not open once it is revoked, from the moment of its expiry, when its report's file is
+Whether a report's file is stored is asked in one SQL function, `report_file_stored`, which the
+three functions above that need it call. A link does not open once it is revoked, from the moment of its expiry, when its report's file is
 no longer stored, and while its account is deleted or marked for deletion.
 
 ```bash
@@ -335,11 +336,11 @@ pnpm --filter @crawlmouse/web exec vitest run __tests__/security/headers.test.ts
 ```
 
 `/reports` lists the reports the caller's session reads, with what the page alone knows handed to
-the view (`ReportsSide`, `lib/v2/view/reports.ts`): each report's file state, whether the reader's
-role may share, and a link just made. On this branch the file state is read as `stored` or
-`pending` from whether `storage_path` is set (`reportFileStates`, `lib/v2/reports/share-proof.ts`);
-`failed` is the generator's `reports.file_state`, which that function reads once the column is on
-the branch.
+the view (`ReportsSide`, `lib/v2/view/reports.ts`): each report's file state, the reader's role on
+the account, and a link just made. Whether a report's file is stored is asked in one
+place in this code, `storedObjects` (`lib/v2/reports/share-proof.ts`), which the Reports page's file
+states and the signed-in proof page both read. On this branch it answers from whether `storage_path`
+is set, so a report is `stored` or `pending`; `failed` is the generator's `reports.file_state`.
 
 ```bash
 pnpm --filter @crawlmouse/web exec vitest run app/reports/page.test.tsx lib/v2/view/reports.test.ts __tests__/v2/reports.test.tsx

@@ -25,6 +25,7 @@ const at = (days: number, ms = 0) => new Date(Date.parse(NOW) + days * DAY_MS + 
 const sha256 = (v: string) => createHash('sha256').update(v, 'utf8').digest('hex');
 
 const FUNCTIONS = [
+  'public.report_file_stored(reports)',
   'public.create_share_link(uuid, text, uuid, timestamptz)',
   'public.open_share_link(text, timestamptz)',
   'public.read_share_link(text, timestamptz)',
@@ -274,6 +275,35 @@ describe('read_share_link', () => {
   });
 });
 
+describe('report_file_stored', () => {
+  it('is the one test of a stored file the share functions make: each calls it, and none tests storage_path or file_state itself', () => {
+    const sql = readMigration(MIGRATION);
+    const body = (name: string) => {
+      const from = sql.indexOf(`create or replace function public.${name}(`);
+      expect(from, name).toBeGreaterThan(-1);
+      return sql.slice(from, sql.indexOf('$$;', from));
+    };
+    for (const name of ['create_share_link', 'open_share_link', 'read_share_link']) {
+      expect(body(name), name).toContain('public.report_file_stored(r)');
+      expect(body(name), name).not.toMatch(
+        /storage_path\s+is\s+(not\s+)?null|file_state\s*(=|<>|is|in)/,
+      );
+    }
+  });
+
+  it('answers for a report’s row: true with a stored file, false without', async () => {
+    const [stored, pending] = [await report(), await report({ stored: false })];
+    const { rows } = await db.query<{ id: string; stored: boolean }>(
+      `select r.id, public.report_file_stored(r) stored from public.reports r where r.id = any($1::uuid[])`,
+      [`{${stored.reportId},${pending.reportId}}`],
+    );
+    expect(Object.fromEntries(rows.map((r) => [r.id, r.stored]))).toEqual({
+      [stored.reportId]: true,
+      [pending.reportId]: false,
+    });
+  });
+});
+
 describe('revoke_share_links', () => {
   it('revokes the report’s link, clears share_expires_at, and leaves another report’s link', async () => {
     const [a, b] = [await report(), await report()];
@@ -350,7 +380,8 @@ describe('the migration', () => {
         await db.query<{ proname: string }>(
           `select proname from pg_proc
             where pronamespace = 'public'::regnamespace
-              and proname in ('create_share_link', 'open_share_link', 'read_share_link', 'revoke_share_links')
+              and proname in ('report_file_stored', 'create_share_link', 'open_share_link',
+                              'read_share_link', 'revoke_share_links')
             order by 1`,
         )
       ).rows.map((r) => r.proname),
@@ -362,7 +393,13 @@ describe('the migration', () => {
       ).rows.length,
     });
     const applied = {
-      functions: ['create_share_link', 'open_share_link', 'read_share_link', 'revoke_share_links'],
+      functions: [
+        'create_share_link',
+        'open_share_link',
+        'read_share_link',
+        'report_file_stored',
+        'revoke_share_links',
+      ],
       column: 1,
     };
     const reverted = { functions: [], column: 0 };

@@ -603,12 +603,24 @@ grant execute on function public.remove_seat(uuid, uuid, timestamptz) to service
 --   pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-share.test.ts
 alter table public.share_links add column if not exists revoked_at timestamptz;
 
+-- Whether a report's file is stored. This is the one place the share functions ask it: making a
+-- link, opening one and reading one each call this function, and the expression below is the whole
+-- of the test.
+create or replace function public.report_file_stored(r public.reports)
+returns boolean
+language sql
+stable
+set search_path = pg_catalog, pg_temp
+as $$
+  select (r).storage_path is not null;
+$$;
+
 -- Makes the link of p_report: a row for p_token_hash that expires 30 days after p_now, with
 -- reports.share_expires_at set to the same time. The report's row is locked first, so two calls for
 -- one report run one after the other, and the links it held before are revoked: a report has one
 -- link that opens.
 -- Answers {outcome}: 'created' with expires_at; 'not_found' (no report p_report); 'not_ready' (the
--- report has no stored file: storage_path is null).
+-- report has no stored file: report_file_stored).
 create or replace function public.create_share_link(
   p_report uuid, p_token_hash text, p_user uuid, p_now timestamptz)
 returns jsonb
@@ -618,17 +630,20 @@ security definer
 set search_path = pg_catalog, pg_temp
 as $$
 declare
-  v_path text;
+  v_stored boolean;
   v_expires timestamptz;
 begin
   if p_report is null or p_token_hash is null or p_now is null then
     raise exception 'create_share_link: a required argument is null' using errcode = '22004';
   end if;
-  select r.storage_path into v_path from public.reports r where r.id = p_report for update;
+  select public.report_file_stored(r) into v_stored
+    from public.reports r
+   where r.id = p_report
+     for update;
   if not found then
     return pg_catalog.jsonb_build_object('outcome', 'not_found');
   end if;
-  if v_path is null then
+  if not v_stored then
     return pg_catalog.jsonb_build_object('outcome', 'not_ready');
   end if;
   v_expires := p_now + interval '30 days';
@@ -663,7 +678,7 @@ as $$
        and r.id = l.report_id
        and l.revoked_at is null
        and l.expires_at > p_now
-       and r.storage_path is not null
+       and public.report_file_stored(r)
        and a.deleted_at is null
        and a.deletion_confirmed_at is null
     returning r.id, r.account_id, r.site_id, r.kind, r.format, r.storage_path
@@ -699,7 +714,7 @@ as $$
       where l.token_hash = p_token_hash
         and l.revoked_at is null
         and l.expires_at > p_now
-        and r.storage_path is not null
+        and public.report_file_stored(r)
         and a.deleted_at is null
         and a.deletion_confirmed_at is null),
     (select pg_catalog.jsonb_build_object('outcome', 'gone')
@@ -733,11 +748,13 @@ begin
 end;
 $$;
 
+revoke all on function public.report_file_stored(public.reports) from public, anon, authenticated;
 revoke all on function public.create_share_link(uuid, text, uuid, timestamptz)
   from public, anon, authenticated;
 revoke all on function public.open_share_link(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.read_share_link(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.revoke_share_links(uuid, timestamptz) from public, anon, authenticated;
+grant execute on function public.report_file_stored(public.reports) to service_role;
 grant execute on function public.create_share_link(uuid, text, uuid, timestamptz) to service_role;
 grant execute on function public.open_share_link(text, timestamptz) to service_role;
 grant execute on function public.read_share_link(text, timestamptz) to service_role;

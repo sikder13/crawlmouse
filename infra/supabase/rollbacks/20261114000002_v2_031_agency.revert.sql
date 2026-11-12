@@ -36,6 +36,7 @@ drop function if exists public.revoke_share_links(uuid, timestamptz);
 drop function if exists public.read_share_link(text, timestamptz);
 drop function if exists public.open_share_link(text, timestamptz);
 drop function if exists public.create_share_link(uuid, text, uuid, timestamptz);
+drop function if exists public.report_file_stored(public.reports);
 alter table public.share_links drop column if exists revoked_at;
 
 -- ─── A ────────────────────────────────────────────────────────────────────────────────────────────
