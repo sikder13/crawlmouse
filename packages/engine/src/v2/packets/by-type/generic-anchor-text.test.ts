@@ -117,7 +117,7 @@ describe('the generic_anchor_text packet', () => {
     const p = packetOf('generic_anchor_text', record, facts);
     expect(p.verify.command).toMatch(/' 'https:\/\/a\.test' 'Click here' 'Read more' 'here'$/);
     expect(p.verify.expect).toBe(
-      'Exit status 0 once `https://a.test/hub` has links and the first link to each target says none of `Click here`, `Read more`, `here`, compared without case, with spaces collapsed and the tags inside a link removed. The crawl keeps one text for a target, the first, so a later link to the same target is not read. The command knows these recorded phrases only: another stock phrase in their place passes it, and is judged on the next check. Today the crawl recorded 4 such links.',
+      'Exit status 0 once `https://a.test/hub` has links and the first link to each target says none of the recorded generic texts: `Click here`, `Read more`, `here`, compared without case, with spaces collapsed and the tags inside a link removed. The crawl keeps one text for a target, the first, so a later link to the same target is not read. The command knows these recorded phrases only: another stock phrase in their place passes it, and is judged on the next check. Today the crawl recorded 4 such links.',
     );
   });
 

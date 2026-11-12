@@ -8,9 +8,17 @@
  *
  * Bounds (`PACKET_BOUNDS`). A line longer than `line_chars` code points is cut and says how long it
  * was. A section longer than `section_lines` lines keeps its first `section_lines` and a last line
- * counts the rest. A packet longer than `packet_chars` characters as JSON keeps the body for its own
- * framework only, and its context says the others were left out. A verify command is never cut: a cut
- * command is a different command.
+ * counts the rest.
+ *
+ * `packet_chars` bounds a packet that holds more than one body: past that many characters as JSON, a
+ * packet keeps the body for its own framework and its context says the others were left out. It is
+ * not a bound on what is left. One body is as long as its three sections, its `expect` and its
+ * command, and a command is not cut here: a cut command is a different command. Its length is bounded
+ * where it is written: the structure builders name a fixed number of URLs, none longer than the
+ * worker stores, and stop a list at a stated length, the `expect` saying what was left out
+ * (html-checks.ts `COMMAND_BOUNDS`). compose.test.ts holds those builders' packets to
+ * `one_body_chars` over records whose URLs are the worker's longest and whose lists are its largest;
+ * that is a measured bound for those builders, and `compose` enforces none on a single body.
  */
 import { PacketFrameworkSchema } from '@crawlmouse/types/v2';
 import { commandOf } from './shell.js';
@@ -25,7 +33,12 @@ import type {
   StackFramework,
 } from './types.js';
 
-export const PACKET_BOUNDS = { line_chars: 600, section_lines: 12, packet_chars: 40_000 } as const;
+export const PACKET_BOUNDS = {
+  line_chars: 600,
+  section_lines: 12,
+  packet_chars: 40_000,
+  one_body_chars: 64_000,
+} as const;
 
 type Body = FixPacket['packets'][number];
 

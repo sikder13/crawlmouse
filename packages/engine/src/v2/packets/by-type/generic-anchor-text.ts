@@ -106,11 +106,12 @@ export const genericAnchorText: PacketEntry<'generic_anchor_text'> = {
     const generic = fix.evidence.edges.length;
     return {
       command: command(fetch.fragment, noLinkSays(on, named.map(wordOf))),
-      expect: line`Exit status 0 once ${code(on)} has links and the first link to each target says none of ${list(
+      // what the command leaves out is said before the list, which a long line is cut in
+      expect: line`Exit status 0 once ${code(on)} has links and the first link to each target says none of the recorded generic texts${ours(left === 0 ? '' : ` the command names (it leaves ${left} of the ${texts.length} out, for length)`)}: ${list(
         named.map((t) => code(t, MAX_TEXT_CHARS)),
         MAX_TEXTS,
         'text',
-      )}, compared without case, with spaces collapsed and the tags inside a link removed.${ours(left === 0 ? '' : ` ${left} more recorded ${left === 1 ? 'text is' : 'texts are'} left out of the command.`)} The crawl keeps one text for a target, the first, so a later link to the same target is not read. The command knows these recorded phrases only: another stock phrase in their place passes it, and is judged on the next check. Today the crawl recorded ${count(generic)} such ${plural(generic, 'link', 'links')}.`,
+      )}, compared without case, with spaces collapsed and the tags inside a link removed. The crawl keeps one text for a target, the first, so a later link to the same target is not read. The command knows these recorded phrases only: another stock phrase in their place passes it, and is judged on the next check. Today the crawl recorded ${count(generic)} such ${plural(generic, 'link', 'links')}.`,
       ua: fetch.ua,
     };
   },

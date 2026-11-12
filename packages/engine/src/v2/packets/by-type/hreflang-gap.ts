@@ -253,11 +253,12 @@ export const hreflangGap: PacketEntry<'hreflang_gap'> = {
           goneUrls,
         }),
       ),
-      expect: line`Exit status 0 once ${code(own)} lists itself under a value with the form of a language code${ours(fallback ? ' and holds an x-default' : '')}, and carries no value of another form.${ours(needs.back.length === 0 ? '' : ' It must also name ')}${pagesShown(needs.back, MAX_NAMED)}${ours(needs.back.length === 0 ? '' : '.')}${ours(stale.length === 0 ? '' : ' It must no longer hold ')}${list(
+      // what the command leaves out is said before the lists, which a long line is cut in
+      expect: line`Exit status 0 once ${code(own)} lists itself under a value with the form of a language code${ours(fallback ? ' and holds an x-default' : '')}, and carries no value of another form.${ours(left === 0 ? '' : ` Of the ${needs.back.length + stale.length} URLs and values that follow, the command leaves ${left} out: it names what fits its length.`)}${ours(needs.back.length === 0 ? '' : ' It must also name ')}${pagesShown(needs.back, MAX_NAMED)}${ours(needs.back.length === 0 ? '' : '.')}${ours(stale.length === 0 ? '' : ' It must no longer hold ')}${list(
         stale,
         MAX_NAMED,
         'annotation',
-      )}${ours(stale.length === 0 ? '' : '.')}${ours(left === 0 ? '' : ` The command leaves ${left} of these out: it names what fits its length.`)} It reads <link> elements in the <head> of the HTML, with absolute URLs; annotations in an HTTP Link header or a sitemap are not read, no alternate is requested, and a value is checked for its form, not against the registry of codes.${ours(fallback ? '' : ' An x-default is recommended and not required: the command does not ask for one.')}${others}`,
+      )}${ours(stale.length === 0 ? '' : '.')} It reads <link> elements in the <head> of the HTML, with absolute URLs; annotations in an HTTP Link header or a sitemap are not read, no alternate is requested, and a value is checked for its form, not against the registry of codes.${ours(fallback ? '' : ' An x-default is recommended and not required: the command does not ask for one.')}${others}`,
       ua: fetch.ua,
     };
   },
