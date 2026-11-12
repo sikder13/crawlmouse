@@ -40,8 +40,11 @@ import {
 } from './generate-doc';
 import { renderPdf } from './pdf';
 
-/** Why a report's file was not made: building it threw, or storing it did. */
-export const FAIL_REASONS = ['build_failed', 'store_failed'] as const;
+/**
+ * Why a report has no file: building it threw; storing it did; or storing it did and the object
+ * could not then be removed, so one may remain at the report's own name with no row naming it.
+ */
+export const FAIL_REASONS = ['build_failed', 'store_failed', 'object_left'] as const;
 export type FailReason = (typeof FAIL_REASONS)[number];
 
 const ReportRow = z.object({
@@ -78,14 +81,17 @@ export interface ReportStore {
 }
 
 export interface ReportBucket {
+  /** Stores the object at `path`, over one already there. */
   put(path: string, file: ReportFile): Promise<void>;
+  /** Removes the object at `path`; removing one that is not there is not an error. */
+  remove(path: string): Promise<void>;
   /** An address that serves the object as a download for `seconds`. */
   signedUrl(path: string, seconds: number): Promise<string>;
 }
 
 export interface GenerateDeps {
   store: Pick<ReportStore, 'report' | 'finish' | 'fail'>;
-  bucket: Pick<ReportBucket, 'put'>;
+  bucket: Pick<ReportBucket, 'put' | 'remove'>;
   read: CheckReader;
   /** The home page's address, for a document's footer. */
   home: string;
@@ -175,10 +181,24 @@ async function build(read: CheckReader, row: ReportRow, options: DocOptions): Pr
 }
 
 /**
- * Makes the file of the pending report `reportId`, stores it at the report's own path and marks the
- * row stored. A throw while building marks it `build_failed`; a throw while storing, `store_failed`.
- * For a row that is not pending nothing is built or stored, so a stored report's file is not
- * written again.
+ * Makes the file of the pending report `reportId`, stores it and marks the row stored.
+ *
+ * A report has one object, at `reportPath` of its own account, id and format, put over whatever is
+ * there, so a second attempt writes the same name; nothing is stored under another name. For a row
+ * that is not pending nothing is built or stored.
+ *
+ * The bucket holds a report's object only while its row names it (the erasure finds a report's file
+ * by `reports.storage_path`). So when the row does not come to name the object, the object is
+ * removed: after a throw while putting it or while marking the row stored, and when the row stopped
+ * being pending while the file was made. Before removing, the row is read again, and an object the
+ * row does name is kept (a `finish_report` that took although its answer was lost, or another run
+ * that stored the same report). The row is then marked `store_failed`.
+ *
+ * When the removal itself throws, an object may remain that no row names: the row is marked
+ * `object_left` instead, which is the record of it, at the name `report_file_path` gives for the
+ * row. If the row had stopped being pending there is no state left to mark, and nothing records it.
+ * When the row cannot be read again after a throw, the object is removed all the same: a stored row
+ * whose file is gone is preferred to a file no row names.
  */
 export async function generateReport(deps: GenerateDeps, reportId: string): Promise<Generated> {
   const row = await deps.store.report(reportId);
@@ -196,14 +216,36 @@ export async function generateReport(deps: GenerateDeps, reportId: string): Prom
   }
   const format: ReportFormat = row.format;
   const path = reportPath(row.account_id, row.id, format);
+  const stored: Generated = { outcome: 'stored', bytes: bytes.length };
+  /** Whether the row now names the object: null when it could not be read. */
+  const named = async (): Promise<boolean | null> => {
+    try {
+      return (await deps.store.report(reportId))?.file_state === 'stored';
+    } catch {
+      return null;
+    }
+  };
+  /** Removes the object; false when the removal threw. */
+  const removed = async (): Promise<boolean> => {
+    try {
+      await deps.bucket.remove(path);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  let finished: boolean;
   try {
     await deps.bucket.put(path, { bytes, contentType: REPORT_FILES[format].contentType });
-    return (await deps.store.finish(reportId, path, bytes.length))
-      ? { outcome: 'stored', bytes: bytes.length }
-      : { outcome: 'not_pending' };
+    finished = await deps.store.finish(reportId, path, bytes.length);
   } catch {
-    return fail('store_failed');
+    if ((await named()) === true) return stored;
+    return fail((await removed()) ? 'store_failed' : 'object_left');
   }
+  if (finished) return stored;
+  if ((await named()) !== true) await removed();
+  return { outcome: 'not_pending' };
 }
 
 const REPORT_COLUMNS =
@@ -271,6 +313,10 @@ export function supabaseReportBucket(admin: SupabaseClient): ReportBucket {
         contentType: file.contentType,
       });
       if (error) throw new Error(`reports: put: ${error.message}`);
+    },
+    async remove(path) {
+      const { error } = await bucket().remove([path]);
+      if (error) throw new Error(`reports: remove: ${error.message}`);
     },
     async signedUrl(path, seconds) {
       const { data, error } = await bucket().createSignedUrl(path, seconds, { download: true });

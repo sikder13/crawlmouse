@@ -168,7 +168,7 @@ each is a test in `route.test.ts` beside it.
 
 The file is made inside the request and the row is written first: `create_report` writes it
 `pending`, `finish_report` marks it `stored` with its path and size, `fail_report` marks it `failed`
-with `build_failed` or `store_failed`. What was thrown is not stored or returned
+with `build_failed`, `store_failed` or `object_left`. What was thrown is not stored or returned
 (`generate-run.test.ts`), and `generate-run.ts` writes no log line
 (`grep -c 'console\.' apps/web/lib/v2/reports/generate-run.ts` prints 0). A row still
 `pending` fifteen minutes after it was asked for is marked `failed`, `abandoned`, by the account's
@@ -176,8 +176,17 @@ next request (`fail_abandoned_reports`). `reports.file_state` is the one of thes
 reads; `storage_path`, `failed_reason` and `subject_fix_id` are granted to no client role:
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b-reports.test.ts`.
 
-An object's name is `<account id>/<report id>.<extension>` (`reportPath`), and `finish_report`
-stores no other name for a report.
+A report has one object. Its name is `<account id>/<report id>.<extension>` (`reportPath`), it is
+put over whatever is at that name, and `finish_report` stores no other name for a report.
+
+The bucket holds a report's object only while its row names it, because the erasure finds a report's
+file by `reports.storage_path`. When the row does not come to name the object (a throw while putting
+it or while marking the row stored, or a row that stopped being pending while the file was made),
+`generateReport` reads the row again, keeps an object the row does name, and otherwise removes the
+object before it marks the row `store_failed`. When the removal throws, the row is marked
+`object_left`: an object may remain at the report's own name with no row naming it, and that reason
+is the record of it (`select id, account_id, format from reports where failed_reason =
+'object_left'`). Each case is a test in `lib/v2/reports/generate-run.test.ts`.
 
 ### What a document holds
 

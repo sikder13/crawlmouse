@@ -109,12 +109,16 @@ export async function reportWorld(db: PGlite): Promise<ReportWorld> {
 export function memoryReportBucket() {
   const objects = new Map<string, ReportFile>();
   const signed: [path: string, seconds: number][] = [];
-  const state = { refuse: false, puts: 0 };
+  const state = { refuse: false, refuseRemoval: false, puts: 0 };
   const bucket: ReportBucket = {
     async put(path, file) {
       if (state.refuse) throw new Error('the bucket refused the file');
       state.puts++;
       objects.set(path, file);
+    },
+    async remove(path) {
+      if (state.refuseRemoval) throw new Error('the bucket refused the removal');
+      objects.delete(path);
     },
     async signedUrl(path, seconds) {
       signed.push([path, seconds]);

@@ -254,19 +254,121 @@ describe('generateReport', () => {
     expect((await row(unread.id)).failed_reason).toBe('build_failed');
   });
 
-  it('marks the row store_failed when the bucket refuses the file', async () => {
-    const refusing: GenerateDeps['bucket'] = {
-      put: async () => {
-        throw new Error('storage: 503 for /reports/secret-path');
-      },
-    };
-    const { id, made } = await make({}, { bucket: refusing });
+  it('marks the row store_failed when the bucket refuses the file, and leaves no object', async () => {
+    const id = (await store.create(request()))!;
+    const memory = memoryReportBucket();
+    memory.state.refuse = true;
+    const made = await generateReport({ store, bucket: memory.bucket, read, home: HOME }, id);
     expect(made).toEqual({ outcome: 'failed', reason: 'store_failed' });
+    expect(memory.objects.size).toBe(0);
     expect(await row(id)).toMatchObject({
       file_state: 'failed',
       storage_path: null,
       failed_reason: 'store_failed',
     });
+  });
+
+  it('an upload followed by a failing finish_report leaves no object and a failed row', async () => {
+    const failing: ReportStore = {
+      ...store,
+      finish: async () => {
+        throw new Error('finish_report: connection reset');
+      },
+    };
+    const { id, made, memory } = await make({}, { store: failing });
+    expect(made).toEqual({ outcome: 'failed', reason: 'store_failed' });
+    expect(memory.state.puts).toBe(1);
+    expect(memory.objects.size).toBe(0);
+    expect(await row(id)).toEqual({
+      file_state: 'failed',
+      storage_path: null,
+      byte_count: null,
+      failed_reason: 'store_failed',
+    });
+  });
+
+  it('when the removal fails too, the row records that an object was left, at the report’s own name', async () => {
+    const id = (await store.create(request()))!;
+    const memory = memoryReportBucket();
+    memory.state.refuseRemoval = true;
+    const failing: ReportStore = {
+      ...store,
+      finish: async () => {
+        throw new Error('finish_report: connection reset');
+      },
+    };
+    const made = await generateReport(
+      { store: failing, bucket: memory.bucket, read, home: HOME },
+      id,
+    );
+    expect(made).toEqual({ outcome: 'failed', reason: 'object_left' });
+    expect([...memory.objects.keys()]).toEqual([reportPath(owner.accountId, id, 'pdf')]);
+    expect(await row(id)).toMatchObject({ file_state: 'failed', failed_reason: 'object_left' });
+  });
+
+  it('a retry of the same report overwrites the same name: one object, whatever the first attempt left', async () => {
+    const id = (await store.create(request()))!;
+    const path = reportPath(owner.accountId, id, 'pdf');
+    const memory = memoryReportBucket();
+    // The first attempt: the database stops answering once the file is up, and the removal fails.
+    memory.state.refuseRemoval = true;
+    const down = async (): Promise<never> => {
+      throw new Error('the database did not answer');
+    };
+    let reads = 0;
+    const stopping: ReportStore = {
+      ...store,
+      report: (reportId) => (reads++ === 0 ? store.report(reportId) : down()),
+      finish: down,
+      fail: down,
+    };
+    await expect(
+      generateReport({ store: stopping, bucket: memory.bucket, read, home: HOME }, id),
+    ).rejects.toThrow(/did not answer/);
+    expect([...memory.objects.keys()]).toEqual([path]);
+    expect((await row(id)).file_state).toBe('pending');
+    const left = memory.objects.get(path);
+
+    memory.state.refuseRemoval = false;
+    const made = await generateReport({ store, bucket: memory.bucket, read, home: HOME }, id);
+    expect(made.outcome).toBe('stored');
+    expect(memory.state.puts).toBe(2);
+    expect([...memory.objects.keys()]).toEqual([path]);
+    expect(memory.objects.get(path)).not.toBe(left);
+    expect(await row(id)).toMatchObject({ file_state: 'stored', storage_path: path });
+  });
+
+  it('keeps the object the row names: a finish_report that took although its answer was lost', async () => {
+    const lost: ReportStore = {
+      ...store,
+      finish: async (reportId, path, bytes) => {
+        await store.finish(reportId, path, bytes);
+        throw new Error('finish_report: the answer was lost');
+      },
+    };
+    const { id, made, memory } = await make({}, { store: lost });
+    const path = reportPath(owner.accountId, id, 'pdf');
+    expect(made).toEqual({ outcome: 'stored', bytes: memory.objects.get(path)!.bytes.length });
+    expect([...memory.objects.keys()]).toEqual([path]);
+    expect(await row(id)).toMatchObject({ file_state: 'stored', storage_path: path });
+  });
+
+  it('keeps the object the row names: another run stored the same report first', async () => {
+    const id = (await store.create(request()))!;
+    const path = reportPath(owner.accountId, id, 'pdf');
+    const memory = memoryReportBucket();
+    const overtaken: GenerateDeps['bucket'] = {
+      async put(at, file) {
+        await memory.bucket.put(at, file);
+        await store.finish(id, at, file.bytes.length);
+      },
+      remove: memory.bucket.remove,
+    };
+    expect(await generateReport({ store, bucket: overtaken, read, home: HOME }, id)).toEqual({
+      outcome: 'not_pending',
+    });
+    expect([...memory.objects.keys()]).toEqual([path]);
+    expect(await row(id)).toMatchObject({ file_state: 'stored', storage_path: path });
   });
 
   it('builds and stores nothing for a report that is not pending, so a stored file is not written again', async () => {
@@ -289,7 +391,7 @@ describe('generateReport', () => {
     expect(memory.state.puts).toBe(1);
   });
 
-  it('answers not_pending, leaving the row, when the row stopped being pending while the file was made', async () => {
+  it('removes the object when the row stopped being pending while the file was made', async () => {
     const id = (await store.create(request()))!;
     const memory = memoryReportBucket();
     const racing: GenerateDeps['bucket'] = {
@@ -297,10 +399,13 @@ describe('generateReport', () => {
         await memory.bucket.put(path, file);
         await store.failAbandoned(owner.accountId, new Date(Date.now() + 60_000));
       },
+      remove: memory.bucket.remove,
     };
     expect(await generateReport({ store, bucket: racing, read, home: HOME }, id)).toEqual({
       outcome: 'not_pending',
     });
+    expect(memory.state.puts).toBe(1);
+    expect(memory.objects.size).toBe(0);
     expect(await row(id)).toMatchObject({
       file_state: 'failed',
       failed_reason: 'abandoned',
@@ -347,6 +452,7 @@ describe('supabaseReportBucket', () => {
       storage: {
         from: (bucket: string) => ({
           upload: (...a: unknown[]) => answer('upload', bucket, ...a),
+          remove: (...a: unknown[]) => answer('remove', bucket, ...a),
           createSignedUrl: (...a: unknown[]) => answer('createSignedUrl', bucket, ...a),
         }),
       },
@@ -354,25 +460,28 @@ describe('supabaseReportBucket', () => {
     return { calls, bucket: supabaseReportBucket(client as never) };
   }
 
-  it('puts and signs in the private reports bucket', async () => {
+  it('puts over what is there, removes and signs, in the private reports bucket', async () => {
     const { calls, bucket } = fakeStorage({
       createSignedUrl: { data: { signedUrl: 'https://storage.example/signed' } },
     });
     const bytes = new Uint8Array([1, 2, 3]);
     await bucket.put('a/b.pdf', { bytes, contentType: 'application/pdf' });
+    await bucket.remove('a/b.pdf');
     expect(await bucket.signedUrl('a/b.pdf', 600)).toBe('https://storage.example/signed');
     expect(REPORTS_BUCKET).toBe('reports');
     expect(calls).toEqual([
       ['upload', 'reports', 'a/b.pdf', bytes, { upsert: true, contentType: 'application/pdf' }],
+      ['remove', 'reports', ['a/b.pdf']],
       ['createSignedUrl', 'reports', 'a/b.pdf', 600, { download: true }],
     ]);
   });
 
   it('throws when Storage refuses', async () => {
     const refused = { error: { message: 'no' } };
-    const { bucket } = fakeStorage({ upload: refused, createSignedUrl: refused });
+    const { bucket } = fakeStorage({ upload: refused, remove: refused, createSignedUrl: refused });
     const file = { bytes: new Uint8Array(), contentType: 'application/pdf' };
     await expect(bucket.put('a/b.pdf', file)).rejects.toThrow(/put/);
+    await expect(bucket.remove('a/b.pdf')).rejects.toThrow(/remove/);
     await expect(bucket.signedUrl('a/b.pdf', 600)).rejects.toThrow(/sign/);
   });
 });
