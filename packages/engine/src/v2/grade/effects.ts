@@ -19,7 +19,8 @@
  * a check Quotable does not count (CONTENT_CHECKS `scored`) waits on `check_not_scored`, and the
  * overview leaves it out; an edge fix whose crawler has too few pages for a share waits on
  * `crawler_too_few_pages`. A robots.txt disallow is the site's stated intent: it opens no fix, so it
- * has no counterfactual here.
+ * has no counterfactual here. A client-rendered template's fix moves Readable alone: its pages'
+ * `text_share` becomes 1.
  *
  * Absorbed. A fix that alone would raise a grade (Technical SEO plus AI readability above 0) and whose
  * effect in the order is 0 or less was absorbed by a fix ranked above it. That fix is looked for among
@@ -39,6 +40,7 @@ import type { AccessDetection } from '../access/types.js';
 import type { ContentDetection } from '../content/aggregate.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
+import type { RenderedDetection } from '../detectors/rendered.js';
 import type { Detection } from '../detectors/types.js';
 import { accessScore, crawlerShare, type CrawlerTally } from './access.js';
 import { aiReadability } from './ai-readability.js';
@@ -54,7 +56,8 @@ import { isGraded, seoParts, type TechnicalSeoInput } from './technical-seo.js';
 export type FixRecord =
   | { family: 'structure'; record: Detection }
   | { family: 'access'; record: AccessDetection }
-  | { family: 'content'; record: ContentDetection };
+  | { family: 'content'; record: ContentDetection }
+  | { family: 'rendered'; record: RenderedDetection };
 
 interface Inputs {
   seo: TechnicalSeoInput;
@@ -214,6 +217,23 @@ export function applyFix(
     };
     return { seo, ai: { ...ai, quotable: { checks } } };
   }
+  if (f.family === 'rendered') {
+    // The render step keeps no link, so only the client-rendered template has a counterfactual: the
+    // template's graded pages serve their words without JavaScript, rendered this check or not.
+    if (f.record.type !== 'client_rendered_template') {
+      throw new Error(`effects: no counterfactual for ${f.record.type}`);
+    }
+    const template = f.record.template_key;
+    return {
+      seo,
+      ai: {
+        ...ai,
+        readable: ai.readable.map((p) =>
+          p.template_key === template ? { ...p, text_share: 1 } : p,
+        ),
+      },
+    };
+  }
   const r = f.record;
   const url = subjectOfKey(r.key);
   switch (r.type) {
@@ -326,7 +346,9 @@ const fingerprintOf = (f: FixRecord) => f.record.fingerprint;
 /** What a fix names: its pages, its crawler or its template. */
 function names(f: FixRecord): Set<string> {
   if (f.family === 'access') return new Set([`crawler:${f.record.crawler}`]);
-  if (f.family === 'content') return new Set([`template:${f.record.template_key}`]);
+  if (f.family === 'content' || f.family === 'rendered') {
+    return new Set([`template:${f.record.template_key}`]);
+  }
   return new Set([subjectOfKey(f.record.key), ...f.record.affected_urls]);
 }
 

@@ -261,6 +261,40 @@ export function renderedGuide(path: string): string {
   return page({ title: anchorFor(path), body: article(anchorFor(path)) });
 }
 
+/**
+ * The guides as the live proof serves them (serve.ts `guidesWithIntro`; the recorded fixture does
+ * not): the heading and a line of intro are in the HTML response, which makes the page a content page
+ * to the classifier, and the sections arrive by JavaScript. The state the script reads is inline in
+ * the response, so a word count that keeps script text would count the sections too.
+ */
+const guideIntro = (title: string) =>
+  `<h1>${title}</h1><p>${title} takes some preparation before a first trip, and this guide walks ` +
+  'through what to pack first and how to keep your kit dry on the trail.</p>';
+
+const guideSections = (title: string) =>
+  `<h2>What should you pack first?</h2><p>${words(60, `${title}pack`)}</p>` +
+  `<h2>How do you keep it dry?</h2><p>${words(60, `${title}dry`)}</p>`;
+
+function guideDocument(path: string, root: string): string {
+  const title = anchorFor(path);
+  const state = JSON.stringify({ sections: guideSections(title) }).replace(/</g, '\\u003c');
+  return (
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>` +
+    '<script src="/static/app.js" defer></script></head>' +
+    `<body><nav><a href="/">Home</a></nav><main>${guideIntro(title)}<div id="root">${root}</div></main>` +
+    `<script id="__STATE__" type="application/json">${state}</script>` +
+    '<noscript>You need to enable JavaScript to read this guide.</noscript>' +
+    '<footer>Built Site outdoor shop</footer></body></html>'
+  );
+}
+
+/** A guide's HTML response with its intro served and its sections left to the script. */
+export const guideWithIntro = (path: string): string => guideDocument(path, '');
+
+/** What a browser shows of `guideWithIntro` once the script has filled the root in. */
+export const renderedGuideWithIntro = (path: string): string =>
+  guideDocument(path, guideSections(anchorFor(path)));
+
 export const ROBOTS_TXT =
   'User-agent: *\nAllow: /\n\n' +
   `User-agent: ${ROBOTS_BLOCKED}\nDisallow: /\n\n` +
