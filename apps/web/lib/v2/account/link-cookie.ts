@@ -26,6 +26,8 @@ export const LINK_FLOWS = {
     api: '/api/account/delete/confirm',
   },
   restore: { cookie: 'cm_link_restore', page: '/account/restore', api: '/api/account/restore' },
+  // A seat's invitation (CC-31 D3).
+  invite: { cookie: 'cm_link_invite', page: '/invite', api: '/api/seats/accept' },
 } as const;
 
 export type LinkFlow = keyof typeof LINK_FLOWS;
