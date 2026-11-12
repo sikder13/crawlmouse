@@ -74,6 +74,9 @@ type Events = {
   // fix_email_requests row; the event names only that row, so no address sits in Inngest's event
   // history. CC-28's mailer reads the row and sends; nothing in CC-26b does.
   'fix.email_developer_requested': { data: { requestId: string } };
+  // CC-28 D6: one account's weekly summary is due (inngest/summary.ts). Names the account and the
+  // week only; the recipients are read when it is sent.
+  'summary.requested': { data: { accountId: string; weekKey: string; weekStart: string } };
 };
 
 export const inngest = new Inngest({
