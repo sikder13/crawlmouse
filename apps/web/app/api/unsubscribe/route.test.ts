@@ -24,7 +24,10 @@ const oneClick = (t: string, init: RequestInit = {}) =>
 const form = (t: string) =>
   new Request(URL_BASE, {
     method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://crawlmouse.com' },
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      origin: 'https://crawlmouse.com',
+    },
     body: new URLSearchParams({ t }).toString(),
   });
 
@@ -56,7 +59,9 @@ describe('POST /api/unsubscribe (D7)', () => {
   it('takes a multipart one-click body too (RFC 8058 prefers it)', async () => {
     const fd = new FormData();
     fd.set('List-Unsubscribe', 'One-Click');
-    const res = await post(new Request(`${URL_BASE}?t=${token('summary')}`, { method: 'POST', body: fd }));
+    const res = await post(
+      new Request(`${URL_BASE}?t=${token('summary')}`, { method: 'POST', body: fd }),
+    );
     expect(res.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith('unsubscribe_seat', { p_seat: SEAT, p_kind: 'summary' });
   });
@@ -70,7 +75,11 @@ describe('POST /api/unsubscribe (D7)', () => {
 
   it.each([
     ['a forged signature', () => `${token().split('.')[0]}.${'A'.repeat(43)}`, 'invalid'],
-    ['a token for another seat, re-signed with another key', () => signUnsubscribe('x'.repeat(40), SEAT, 'alerts', new Date()), 'invalid'],
+    [
+      'a token for another seat, re-signed with another key',
+      () => signUnsubscribe('x'.repeat(40), SEAT, 'alerts', new Date()),
+      'invalid',
+    ],
     ['an expired token', () => token('alerts', new Date(Date.now() - 91 * 86_400_000)), 'expired'],
     ['no token', () => '', 'invalid'],
   ])('changes nothing for %s', async (_, make, code) => {

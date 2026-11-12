@@ -58,7 +58,11 @@ export async function guarded(fn: string, run: () => Promise<string>): Promise<s
   } catch (e) {
     if (isMailRetry(e)) throw e;
     console.error(
-      JSON.stringify({ event: 'mail.handler_error', fn, error: e instanceof Error ? e.name : 'unknown' }),
+      JSON.stringify({
+        event: 'mail.handler_error',
+        fn,
+        error: e instanceof Error ? e.name : 'unknown',
+      }),
     );
     return 'error';
   }

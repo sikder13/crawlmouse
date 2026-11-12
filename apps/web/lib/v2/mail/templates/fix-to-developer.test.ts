@@ -23,7 +23,9 @@ describe('fix-to-developer (D2)', () => {
   it('sends the packet as text, names who asked by the site only, and links nothing', () => {
     const m = fixToDeveloper(input);
     expect(m.subject).toBe('A fix for example.com: Let GPTBot read the site');
-    expect(m.text).toContain('Someone working on example.com asked Crawlmouse to send you this fix.');
+    expect(m.text).toContain(
+      'Someone working on example.com asked Crawlmouse to send you this fix.',
+    );
     expect(m.text).toContain(PACKET);
     expect(htmlTargets(m.html)).toEqual([]);
   });
@@ -36,7 +38,9 @@ describe('fix-to-developer (D2)', () => {
     });
     expect(m.html).not.toContain('<img');
     expect(m.html).not.toContain('<a href="https://evil.example"');
-    expect(m.html).toContain('&lt;a href=&quot;https://evil.example&quot;&gt;click&lt;/a&gt;\nline two &amp; more');
+    expect(m.html).toContain(
+      '&lt;a href=&quot;https://evil.example&quot;&gt;click&lt;/a&gt;\nline two &amp; more',
+    );
     expect(foreignTargets(m)).toEqual([]);
     expect(m.subject).not.toMatch(/[\r\n]/);
   });

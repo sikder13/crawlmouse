@@ -54,7 +54,11 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe('the Resend webhook: v1’s record, kept', () => {
   it('refuses a bad signature and records nothing', async () => {
-    const req = signed(complaint, 'msg_bad', `whsec_${Buffer.from('b'.repeat(32)).toString('base64')}`);
+    const req = signed(
+      complaint,
+      'msg_bad',
+      `whsec_${Buffer.from('b'.repeat(32)).toString('base64')}`,
+    );
     expect((await post(req)).status).toBe(400);
     expect(upsert).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
@@ -63,7 +67,11 @@ describe('the Resend webhook: v1’s record, kept', () => {
   it('records every verified event in email_events, as before', async () => {
     expect((await post(signed(delivered, 'msg_d'))).status).toBe(200);
     expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ resend_event_id: 'msg_d', email_address: 'ok@example.com', event_type: 'delivered' }),
+      expect.objectContaining({
+        resend_event_id: 'msg_d',
+        email_address: 'ok@example.com',
+        event_type: 'delivered',
+      }),
       { onConflict: 'resend_event_id', ignoreDuplicates: true },
     );
     expect(rpc).not.toHaveBeenCalled();

@@ -18,7 +18,11 @@ export interface Suppression {
 }
 
 const strings = (v: unknown): string[] =>
-  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' ? [v] : [];
+  Array.isArray(v)
+    ? v.filter((x): x is string => typeof x === 'string')
+    : typeof v === 'string'
+      ? [v]
+      : [];
 
 /** What a webhook payload suppresses, or null for any other event (a soft bounce among them). */
 export function suppressionOf(payload: unknown): Suppression | null {
@@ -28,7 +32,10 @@ export function suppressionOf(payload: unknown): Suppression | null {
   };
   let reason: SuppressionReason;
   if (p.type === 'email.complained') reason = 'complaint';
-  else if (p.type === 'email.bounced' && String(p.data?.bounce?.type ?? '').toLowerCase() === 'permanent')
+  else if (
+    p.type === 'email.bounced' &&
+    String(p.data?.bounce?.type ?? '').toLowerCase() === 'permanent'
+  )
     reason = 'hard_bounce';
   else return null;
   const addresses = [...new Set([...strings(p.data?.to), ...strings(p.data?.email)])]

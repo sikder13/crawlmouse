@@ -43,6 +43,8 @@ describe('GET /unsubscribe (D7): shows the choice, changes nothing', () => {
 
   it('is a 404 with V2_CHECKS_PUBLIC off', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
-    await expect(render({})).rejects.toMatchObject({ digest: expect.stringMatching(/404|NOT_FOUND/) });
+    await expect(render({})).rejects.toMatchObject({
+      digest: expect.stringMatching(/404|NOT_FOUND/),
+    });
   });
 });

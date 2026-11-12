@@ -22,7 +22,9 @@ describe('the mail preview registry (D2)', () => {
     (_, p) => {
       const m = p.render();
       expect(foreignTargets(m)).toEqual([]);
-      expect(() => buildOutgoing({ to: 'a@example.com', mail: m, idempotencyKey: 'k' })).not.toThrow();
+      expect(() =>
+        buildOutgoing({ to: 'a@example.com', mail: m, idempotencyKey: 'k' }),
+      ).not.toThrow();
       expect(m.text.length).toBeGreaterThan(0);
     },
   );

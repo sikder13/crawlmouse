@@ -22,7 +22,8 @@ export const TITLE_MAX = 120;
 /** Longest packet sent; a packet is a few hundred characters, so this bounds only a hostile one. */
 export const PACKET_MAX = 20_000;
 
-const IGNORE = "If you weren't expecting this, you can ignore it; nothing was set up for this address.";
+const IGNORE =
+  "If you weren't expecting this, you can ignore it; nothing was set up for this address.";
 
 export const fixToDeveloper: Template<FixToDeveloperInput> = ({ host, fixTitle, packet }) => {
   const site = hostText(host);

@@ -21,7 +21,10 @@ const FIX: Fix = fixture('bad-site').fixes.find((f) => f.packet !== null)!;
 
 function store(over: Partial<MailStore> = {}): MailStore {
   return {
-    accountLinkRecipient: vi.fn(async () => ({ kind: 'email_change', recipient: 'new@example.com' })),
+    accountLinkRecipient: vi.fn(async () => ({
+      kind: 'email_change',
+      recipient: 'new@example.com',
+    })),
     issueAccountLink: vi.fn(async () => [{ kind: 'email_change', token: RAW }]),
     trialAccount: vi.fn(
       async (): Promise<TrialAccount> => ({
@@ -50,7 +53,11 @@ function store(over: Partial<MailStore> = {}): MailStore {
       fix: FIX,
     })),
     markFixEmailSent: vi.fn(async () => undefined),
-    finishedCheck: vi.fn(async () => ({ trigger: 'scheduled', status: 'finished', accountId: ACCOUNT })),
+    finishedCheck: vi.fn(async () => ({
+      trigger: 'scheduled',
+      status: 'finished',
+      accountId: ACCOUNT,
+    })),
     ...over,
   };
 }
@@ -67,7 +74,11 @@ function setup(s: MailStore = store(), suppressed: string[] = []) {
 describe('the account-link emails (Q10)', () => {
   it('claims on the recipient read without minting, then mints once and sends the link', async () => {
     const { h, transport, ledger, s } = setup();
-    const data = { accountId: ACCOUNT, template: 'email_change_confirm', tokenId: TOKEN_ID } as const;
+    const data = {
+      accountId: ACCOUNT,
+      template: 'email_change_confirm',
+      tokenId: TOKEN_ID,
+    } as const;
     expect(await h.accountEmail(data)).toBe('sent');
     expect(ledger.claims[0]).toMatchObject({
       key: `account_link:${TOKEN_ID}`,
@@ -83,7 +94,11 @@ describe('the account-link emails (Q10)', () => {
 
   it('a replayed event sends nothing and mints nothing: the delivered link stays the live one', async () => {
     const { h, transport, s } = setup();
-    const data = { accountId: ACCOUNT, template: 'email_change_confirm', tokenId: TOKEN_ID } as const;
+    const data = {
+      accountId: ACCOUNT,
+      template: 'email_change_confirm',
+      tokenId: TOKEN_ID,
+    } as const;
     await h.accountEmail(data);
     expect(await h.accountEmail(data)).toBe('done');
     expect(transport.sent).toHaveLength(1);
@@ -92,7 +107,10 @@ describe('the account-link emails (Q10)', () => {
 
   it('the deletion email carries the confirm link and its paired restore link', async () => {
     const s = store({
-      accountLinkRecipient: vi.fn(async () => ({ kind: 'delete_confirm', recipient: 'me@example.com' })),
+      accountLinkRecipient: vi.fn(async () => ({
+        kind: 'delete_confirm',
+        recipient: 'me@example.com',
+      })),
       issueAccountLink: vi.fn(async () => [
         { kind: 'delete_confirm', token: RAW },
         { kind: 'delete_restore', token: RAW2 },
@@ -107,12 +125,20 @@ describe('the account-link emails (Q10)', () => {
   it('an unusable link claims nothing; a link of another kind sends nothing', async () => {
     const gone = setup(store({ accountLinkRecipient: vi.fn(async () => null) }));
     expect(
-      await gone.h.accountEmail({ accountId: ACCOUNT, template: 'email_change_notice', tokenId: TOKEN_ID }),
+      await gone.h.accountEmail({
+        accountId: ACCOUNT,
+        template: 'email_change_notice',
+        tokenId: TOKEN_ID,
+      }),
     ).toBe('link_unusable');
     expect(gone.ledger.claims).toEqual([]);
     const other = setup();
     expect(
-      await other.h.accountEmail({ accountId: ACCOUNT, template: 'account_delete', tokenId: TOKEN_ID }),
+      await other.h.accountEmail({
+        accountId: ACCOUNT,
+        template: 'account_delete',
+        tokenId: TOKEN_ID,
+      }),
     ).toBe('kind_mismatch');
     expect(other.ledger.claims).toEqual([]);
   });
@@ -120,7 +146,11 @@ describe('the account-link emails (Q10)', () => {
   it('a link that was used between the claim and the mint is recorded as nothing to send', async () => {
     const { h, transport, ledger } = setup(store({ issueAccountLink: vi.fn(async () => []) }));
     expect(
-      await h.accountEmail({ accountId: ACCOUNT, template: 'email_change_confirm', tokenId: TOKEN_ID }),
+      await h.accountEmail({
+        accountId: ACCOUNT,
+        template: 'email_change_confirm',
+        tokenId: TOKEN_ID,
+      }),
     ).toBe('nothing_to_send');
     expect(transport.sent).toEqual([]);
     expect(ledger.rows.get(`account_link:${TOKEN_ID}`)!.status).toBe('failed');
@@ -149,7 +179,9 @@ describe('the trial reminder', () => {
     ['no_owner', { ownerEmail: null }],
   ] as const)('sends nothing and claims nothing: %s', async (outcome, over) => {
     const base = await store().trialAccount(ACCOUNT);
-    const { h, ledger } = setup(store({ trialAccount: vi.fn(async () => ({ ...base!, ...over })) }));
+    const { h, ledger } = setup(
+      store({ trialAccount: vi.fn(async () => ({ ...base!, ...over })) }),
+    );
     expect(await h.accountEmail(data)).toBe(outcome);
     expect(ledger.claims).toEqual([]);
   });
@@ -216,7 +248,9 @@ describe('check notify (v1’s rules, D2)', () => {
   });
 
   it('a failed read retries: nothing was claimed', async () => {
-    const { h, ledger } = setup(store({ notifyCheck: vi.fn(async () => Promise.reject(new Error('x'))) }));
+    const { h, ledger } = setup(
+      store({ notifyCheck: vi.fn(async () => Promise.reject(new Error('x'))) }),
+    );
     await expect(h.checkNotify(CHECK)).rejects.toBeInstanceOf(MailRetry);
     expect(ledger.claims).toEqual([]);
   });
@@ -274,7 +308,13 @@ describe('check_finished (D11)', () => {
 
   it('an unkept check is named by its reference', async () => {
     const { h, capture } = setup(
-      store({ finishedCheck: vi.fn(async () => ({ trigger: 'manual', status: 'partial', accountId: null })) }),
+      store({
+        finishedCheck: vi.fn(async () => ({
+          trigger: 'manual',
+          status: 'partial',
+          accountId: null,
+        })),
+      }),
     );
     await h.checkFinished(CHECK);
     expect(capture.mock.calls[0]![1]).toBe(`check:${checkRef(CHECK)}`);

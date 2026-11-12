@@ -165,7 +165,12 @@ export function supabaseMailStore(sb: SupabaseClient): MailStore {
       if (c === null) return null;
       const s = await site(c.site_id);
       if (s === null) return null;
-      return { status: c.status, notifyEmail: c.notify_email, host: s.host, accountId: s.account_id };
+      return {
+        status: c.status,
+        notifyEmail: c.notify_email,
+        host: s.host,
+        accountId: s.account_id,
+      };
     },
 
     async fixEmailRequest(requestId) {
@@ -181,7 +186,13 @@ export function supabaseMailStore(sb: SupabaseClient): MailStore {
       if (fix === null) return null;
       const s = await site(fix.site_id);
       if (s === null) return null;
-      return { toEmail: req.to_email, sentAt: req.sent_at, accountId: req.account_id, host: s.host, fix };
+      return {
+        toEmail: req.to_email,
+        sentAt: req.sent_at,
+        accountId: req.account_id,
+        host: s.host,
+        fix,
+      };
     },
 
     async markFixEmailSent(requestId, at) {

@@ -58,7 +58,11 @@ describe('the configs', () => {
       [
         createCheckNotifyFn(h),
         CHECK_NOTIFY_FN_ID,
-        [{ event: 'check.notify_requested' }, { event: 'check.finished' }, { event: 'check.failed' }],
+        [
+          { event: 'check.notify_requested' },
+          { event: 'check.finished' },
+          { event: 'check.failed' },
+        ],
       ],
       [
         createFixToDeveloperFn(h),
@@ -92,7 +96,10 @@ describe('the handlers run in one step, with the event’s ids', () => {
     expect(h.accountEmail).toHaveBeenCalledWith(data);
     const { step, ran } = steps();
     for (const name of ['check.notify_requested', 'check.finished', 'check.failed']) {
-      await handler(createCheckNotifyFn(() => h))({ event: { name, data: { checkId: 'c1' } }, step });
+      await handler(createCheckNotifyFn(() => h))({
+        event: { name, data: { checkId: 'c1' } },
+        step,
+      });
     }
     expect(h.checkNotify).toHaveBeenNthCalledWith(3, 'c1');
     expect(ran).toEqual(['send', 'send', 'send']);

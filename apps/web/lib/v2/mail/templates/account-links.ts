@@ -26,9 +26,7 @@ export const emailChangeConfirm: Template<{ token: string }> = ({ token }) => {
     text: [lead, '', `Confirm the change: ${link}`, '', life, ignore].join('\n'),
     html: layout({
       title: subject,
-      body: [para(lead), linkPara(link, 'Confirm the change'), small(`${life} ${ignore}`)].join(
-        '',
-      ),
+      body: [para(lead), linkPara(link, 'Confirm the change'), small(`${life} ${ignore}`)].join(''),
       why: WHY,
     }),
   };

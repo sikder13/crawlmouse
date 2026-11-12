@@ -30,7 +30,12 @@ function zoneOf(timezone: string): string {
   }
 }
 
-export const trialReminder: Template<TrialReminderInput> = ({ plan, variant, endsAt, timezone }) => {
+export const trialReminder: Template<TrialReminderInput> = ({
+  plan,
+  variant,
+  endsAt,
+  timezone,
+}) => {
   const zone = zoneOf(timezone);
   const name = PLAN[plan];
   const day = dayDate(endsAt, zone);

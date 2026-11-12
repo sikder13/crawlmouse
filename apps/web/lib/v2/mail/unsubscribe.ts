@@ -28,7 +28,8 @@ export const UNSUBSCRIBE_COPY = {
   },
   refused: {
     expired: 'This unsubscribe link has expired. Sign in and change your email settings instead.',
-    invalid: 'This unsubscribe link is not one we can read. Sign in and change your email settings instead.',
+    invalid:
+      'This unsubscribe link is not one we can read. Sign in and change your email settings instead.',
     unconfigured: 'Unsubscribing is not available right now. Please try again later.',
   },
 } as const;
