@@ -419,7 +419,7 @@ describe('the client-rendered template verify command', () => {
     const { verify } = compose(builder, record, factsOf());
     expect(verify.see!.command).toMatch(
       new RegExp(
-        `^curl -sS --compressed -A '[^']*OAI-SearchBot[^']*' '${page.url}' \\| sed 's/<\\[\\^>\\]\\*>/ /g' \\| wc -w$`,
+        `^curl -sS --compressed -A '[^']*OAI-SearchBot[^']*' '${page.url}' \\| tr '\\\\n' ' ' \\| tr '<' '\\\\n' \\| grep -viE '\\^\\(script\\|style\\)' \\| sed 's/\\^\\[\\^>\\]\\*>//' \\| wc -w$`,
       ),
     );
     const { broken, fixed } = await inBothStates(site, verify.see!.command);
@@ -427,9 +427,12 @@ describe('the client-rendered template verify command', () => {
     const after = Number(fixed.stdout);
     // today: the audit's own count is named, and the rough count is not below it
     expect(verify.see!.today).toBe(
-      `The audit counted ${page.raw_words} words in this page’s HTML response. This rough count also takes the text of scripts, styles and menus, which the audit and the exact check leave out, so it is usually higher.`,
+      `The audit counted ${page.raw_words} words in this page’s HTML response. This rough count leaves most script and style text out and keeps menus, headers and footers, which the audit leaves out, so it is somewhat higher; the exact check prints a closer count.`,
     );
     expect(before).toBeGreaterThanOrEqual(page.raw_words);
+    // the 200 words of the page's JSON state are not counted; the 120 after a `<` inside the boot
+    // script's code are, which is why the count is called rough
+    expect(before - page.raw_words).toBeLessThan(200);
     // after: higher by about the words the page gains
     expect(verify.see!.after).toBe(
       `A number higher by about the words the page gains: the audit counted ${page.rendered_words} once rendered in a browser, ${page.rendered_words - page.raw_words} more.`,
@@ -444,14 +447,14 @@ describe('the client-rendered template verify command', () => {
     expect(one.see!.today).toMatch(/^The audit counted 1 word in this page’s HTML response\./);
     expect(one.see!.after).toMatch(/counted 2 once rendered in a browser, 1 more\.$/);
     expect(one.see!.command).toBe(
-      "curl -sS --compressed 'https://a.test/guides/g-0' | sed 's/<[^>]*>/ /g' | wc -w",
+      "curl -sS --compressed 'https://a.test/guides/g-0' | tr '\\n' ' ' | tr '<' '\\n' | grep -viE '^(script|style)' | sed 's/^[^>]*>//' | wc -w",
     );
     const url = 'https://a.test/guides/g-0';
     const pages = new Map([
       [url, { url, final_url: 'https://a.test/en/g-0', status_code: 200 } as PageResult],
     ]);
     const moved = compose(builder, detected('https://a.test', [[1, 2]]), factsOf(SERVED, pages));
-    expect(moved.verify.see!.command).toContain(" 'https://a.test/en/g-0' | sed ");
+    expect(moved.verify.see!.command).toContain(" 'https://a.test/en/g-0' | tr ");
   });
 
   it('counts within a few words of the audit’s own count on both sides', async () => {

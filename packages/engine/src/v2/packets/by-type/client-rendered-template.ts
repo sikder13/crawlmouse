@@ -266,15 +266,17 @@ export const clientRenderedTemplate: PacketEntry<'client_rendered_template'> = {
       'element',
     );
     const percent = (share: number) => count(Math.round(share * 100));
-    const strip = word('s/<[^>]*>/ /g');
+    // the page on one line, then one tag to a line; the script and style lines dropped; then what
+    // follows each tag
+    const strip = word('s/^[^>]*>//');
     const gained = page.rendered_words - page.raw_words;
     return {
       see: {
         command:
           entry === null
-            ? sh`curl -sS --compressed ${address} | sed ${strip} | wc -w`
-            : sh`curl -sS --compressed -A ${word(userAgentOf(entry))} ${address} | sed ${strip} | wc -w`,
-        today: line`The audit counted ${count(page.raw_words)} ${wordsOf(page.raw_words)} in this page’s HTML response. This rough count also takes the text of scripts, styles and menus, which the audit and the exact check leave out, so it is usually higher.`,
+            ? sh`curl -sS --compressed ${address} | tr ${word('\\n')} ${word(' ')} | tr ${word('<')} ${word('\\n')} | grep -viE ${word('^(script|style)')} | sed ${strip} | wc -w`
+            : sh`curl -sS --compressed -A ${word(userAgentOf(entry))} ${address} | tr ${word('\\n')} ${word(' ')} | tr ${word('<')} ${word('\\n')} | grep -viE ${word('^(script|style)')} | sed ${strip} | wc -w`,
+        today: line`The audit counted ${count(page.raw_words)} ${wordsOf(page.raw_words)} in this page’s HTML response. This rough count leaves most script and style text out and keeps menus, headers and footers, which the audit leaves out, so it is somewhat higher; the exact check prints a closer count.`,
         after: line`A number higher by about the words the page gains: the audit counted ${count(page.rendered_words)} once rendered in a browser, ${count(gained)} more.`,
       },
       command:
