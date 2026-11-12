@@ -269,6 +269,33 @@ describe('the triggers that keep next_check_at', () => {
     expect(r.next_check_at!.getTime()).toBeGreaterThan(Date.now());
   });
 
+  it('times a Free account’s weekly schedule monthly, as the claim runs it (Q4)', async () => {
+    // A weekday whose next weekly time is not also the first of its month, so the two rules differ
+    // whatever today is (in UTC, the accounts' zone here).
+    const now = Date.now();
+    const nextWeekly = (wd: number) => {
+      for (let i = 0; i < 8; i++) {
+        const d = new Date(now + i * 86_400_000);
+        d.setUTCHours(6, 0, 0, 0);
+        if ((d.getUTCDay() || 7) === wd && d.getTime() > now + 60_000) return d;
+      }
+      throw new Error('no weekday');
+    };
+    const wd = [1, 2, 3, 4, 5, 6, 7].find((w) => nextWeekly(w).getUTCDate() > 7);
+    if (wd === undefined) return; // The seven days ahead are the 1st to 7th: the rules agree today.
+    const acc = await account('free');
+    const id = await site(acc, { weekday: wd, hour: 6, offset: 0 });
+    const { rows } = await db.query<{ ok: boolean; weekly: boolean }>(
+      `select s.next_check_at = public.next_check_after('monthly', $2::smallint, 6::smallint, 0::smallint,
+                                                         'UTC', s.created_at) as ok,
+              s.next_check_at = public.next_check_after('weekly', $2::smallint, 6::smallint, 0::smallint,
+                                                         'UTC', s.created_at) as weekly
+         from public.sites s where s.id = $1`,
+      [id, wd],
+    );
+    expect(rows[0]).toEqual({ ok: true, weekly: false });
+  });
+
   it('keeps a given minute', async () => {
     const r = await siteRow(await site(await account(), { offset: 42 }));
     expect(r.schedule_offset_min).toBe(42);

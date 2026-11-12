@@ -349,8 +349,11 @@ begin
   if new.schedule_offset_min is null then
     new.schedule_offset_min := (('x' || substr(md5(new.id::text), 1, 8))::bit(32)::bigint % 60)::smallint;
   end if;
+  -- Free runs monthly whatever the saved cadence (questions Q4), as claim_due_sites does.
   new.next_check_at := public.next_check_after(
-    new.schedule_cadence, new.schedule_iso_weekday, new.schedule_hour_local, new.schedule_offset_min,
+    case when public.account_effective_tier(new.account_id, pg_catalog.now()) in ('pro', 'agency')
+         then new.schedule_cadence else 'monthly' end,
+    new.schedule_iso_weekday, new.schedule_hour_local, new.schedule_offset_min,
     (select a.timezone from public.accounts a where a.id = new.account_id), pg_catalog.now());
   return new;
 end;
