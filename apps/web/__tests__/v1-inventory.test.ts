@@ -172,6 +172,7 @@ describe('the finders see what they claim to see', () => {
     );
     expect(hidden).toEqual([
       'app/agency-trial/page.tsx',
+      'app/agencies/page.tsx',
       'app/audit/[id]/access/page.tsx',
       'app/audit/[id]/changes/page.tsx',
       'app/audit/[id]/content/page.tsx',
@@ -181,8 +182,10 @@ describe('the finders see what they claim to see', () => {
       'app/audit/[id]/overview/page.tsx',
       'app/audit/[id]/signals/page.tsx',
       'app/audit/[id]/structure/page.tsx',
+      'app/check/[question]/page.tsx',
       'app/dashboard/v2/page.tsx',
       'app/sites/[id]/page.tsx',
+      'app/v2-developers/page.tsx',
       'app/v2-home/page.tsx',
       'app/v2-pricing/page.tsx',
       'app/api/account/delete/confirm/route.ts',

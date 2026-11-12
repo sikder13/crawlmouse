@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { robotsTxt } from '../lib/robots-txt';
 import sitemap from '../app/sitemap';
 import { allPostSlugs } from '../lib/blog/posts';
@@ -29,7 +29,15 @@ vi.mock('@/lib/sitemap-reports', () => ({ fetchIndexableReportSlugs: () => Promi
 const ROBOTS_DISALLOW = ['/embed/', '/audit/', '/dashboard', '/verify/'];
 // /r/ is NO LONGER categorically excluded — it is claim-gated (listed only when a report is claimed +
 // indexable). Everything below stays private/non-indexable and must never appear in the sitemap.
-const SITEMAP_EXCLUDE = ['/embed/', '/audit/', '/dashboard', '/verify/', '/login', '/api/', '/compare/'];
+const SITEMAP_EXCLUDE = [
+  '/embed/',
+  '/audit/',
+  '/dashboard',
+  '/verify/',
+  '/login',
+  '/api/',
+  '/compare/',
+];
 
 describe('robots.txt', () => {
   // robots moved from Next's `robots.ts` metadata convention to a route handler
@@ -40,12 +48,18 @@ describe('robots.txt', () => {
   const txt = robotsTxt();
 
   it('emits exactly one User-Agent:* group (allow / + private disallows) and references the sitemap', () => {
-    expect(txt.match(/^User-Agent: \*$/gm) ?? [], 'must be exactly ONE User-Agent:* group').toHaveLength(1);
+    expect(
+      txt.match(/^User-Agent: \*$/gm) ?? [],
+      'must be exactly ONE User-Agent:* group',
+    ).toHaveLength(1);
     const star = txt.slice(txt.indexOf('User-Agent: *'));
     const group = star.slice(0, star.indexOf('\n\n'));
     expect(group).toContain('Allow: /');
-    for (const p of ROBOTS_DISALLOW) expect(group, `robots must disallow ${p}`).toContain(`Disallow: ${p}`);
-    expect(txt, 'robots must NOT block /r/ — its indexing is page-controlled').not.toContain('Disallow: /r/');
+    for (const p of ROBOTS_DISALLOW)
+      expect(group, `robots must disallow ${p}`).toContain(`Disallow: ${p}`);
+    expect(txt, 'robots must NOT block /r/ — its indexing is page-controlled').not.toContain(
+      'Disallow: /r/',
+    );
     expect(txt).toContain('Sitemap: https://crawlmouse.com/sitemap.xml');
   });
 });
@@ -60,7 +74,19 @@ describe('sitemap.ts', () => {
   it('lists every indexable marketing / legal / blog URL as an absolute crawlmouse.com URL', () => {
     for (const u of urls) expect(u).toMatch(/^https:\/\/crawlmouse\.com(\/|$)/);
     expect(urls, 'home').toContain('https://crawlmouse.com');
-    for (const p of ['/pricing', '/ai-readiness-checker', '/developers', '/status', '/bot', '/privacy', '/terms', '/aup', '/subprocessors', '/takedown', '/blog']) {
+    for (const p of [
+      '/pricing',
+      '/ai-readiness-checker',
+      '/developers',
+      '/status',
+      '/bot',
+      '/privacy',
+      '/terms',
+      '/aup',
+      '/subprocessors',
+      '/takedown',
+      '/blog',
+    ]) {
       expect(has(p), `sitemap must include ${p}`).toBe(true);
     }
     // Leaderboards (/top/*) are page-controlled (noindex while empty/thin, indexable once
@@ -70,17 +96,24 @@ describe('sitemap.ts', () => {
       urls.some((u) => u.includes('/top/')),
       'leaderboards are page-controlled (noindex when empty), not sitemap-listed',
     ).toBe(false);
-    for (const slug of allPostSlugs()) expect(has('/blog/' + slug), `sitemap must include /blog/${slug}`).toBe(true);
+    for (const slug of allPostSlugs())
+      expect(has('/blog/' + slug), `sitemap must include /blog/${slug}`).toBe(true);
   });
 
   it('leaks NO /r/ URL when there are no claimed+indexable reports (the claim-gate guardrail)', () => {
     // With the report source stubbed empty, an unclaimed/empty world must advertise no report page.
-    expect(urls.some((u) => u.includes('/r/')), 'unclaimed/empty → no /r/ in the sitemap').toBe(false);
+    expect(
+      urls.some((u) => u.includes('/r/')),
+      'unclaimed/empty → no /r/ in the sitemap',
+    ).toBe(false);
   });
 
   it('excludes private / non-indexable paths (incl. /compare/ — noindex this phase, M3)', () => {
     for (const bad of SITEMAP_EXCLUDE) {
-      expect(urls.some((u) => u.includes(bad)), `sitemap must NOT include ${bad}`).toBe(false);
+      expect(
+        urls.some((u) => u.includes(bad)),
+        `sitemap must NOT include ${bad}`,
+      ).toBe(false);
     }
   });
 
@@ -90,5 +123,47 @@ describe('sitemap.ts', () => {
       const t = new Date(e.lastModified as string | number | Date).getTime();
       expect(Number.isNaN(t), `${e.url} lastModified must be a valid date`).toBe(false);
     }
+  });
+});
+
+// CC-29: the new public pages answer 404 while their flag is off (/agencies under V2_BILLING, the
+// three /check pages under V2_CHECKS_PUBLIC), and a sitemap entry must never answer an error
+// (OPERATING-RULES §13). So each is listed exactly while its own flag is on, and /pricing and
+// /developers, which v1 or v2 serves either way, are listed whatever the flags say.
+describe('sitemap.ts — the flag-gated pages (CC-29 D9)', () => {
+  const GATED = {
+    V2_BILLING: ['/agencies'],
+    V2_CHECKS_PUBLIC: ['/check/gptbot', '/check/javascript', '/check/robots-ai'],
+  } as const;
+  const ALL = Object.values(GATED).flat();
+  afterEach(() => vi.unstubAllEnvs());
+
+  const paths = async (flags: { V2_BILLING: string; V2_CHECKS_PUBLIC: string }) => {
+    for (const [name, value] of Object.entries(flags)) vi.stubEnv(name, value);
+    return (await sitemap()).map((e) => e.url.replace('https://crawlmouse.com', ''));
+  };
+
+  it('lists no flag-gated page while both flags are off', async () => {
+    const listed = await paths({ V2_BILLING: '', V2_CHECKS_PUBLIC: '' });
+    expect(listed.filter((p) => ALL.includes(p as never) || p.startsWith('/check'))).toEqual([]);
+    expect(listed).toEqual(expect.arrayContaining(['/pricing', '/developers']));
+  });
+
+  it.each([
+    ['V2_BILLING', { V2_BILLING: '1', V2_CHECKS_PUBLIC: '' }],
+    ['V2_CHECKS_PUBLIC', { V2_BILLING: '', V2_CHECKS_PUBLIC: '1' }],
+  ] as const)(
+    'lists the pages of %s, and only those, while it alone is on',
+    async (flag, flags) => {
+      const listed = await paths(flags);
+      expect(listed.filter((p) => ALL.includes(p as never))).toEqual([...GATED[flag]]);
+      expect(listed).toEqual(expect.arrayContaining(['/pricing', '/developers']));
+    },
+  );
+
+  it('lists every one, once, while both are on', async () => {
+    const listed = await paths({ V2_BILLING: '1', V2_CHECKS_PUBLIC: '1' });
+    expect(listed.filter((p) => ALL.includes(p as never))).toEqual(ALL);
+    expect(new Set(listed).size).toBe(listed.length);
   });
 });
