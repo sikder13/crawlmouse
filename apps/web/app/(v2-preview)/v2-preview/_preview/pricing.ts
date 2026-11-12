@@ -8,14 +8,17 @@ import {
   agencyTrialView,
   type AgencyAccountRow,
 } from '../../../../lib/v2/view/agency-trial';
+import type { UsedTrial } from '../../../../lib/v2/pricing/used-trial';
 import { pricingView } from '../../../../lib/v2/view/pricing';
 
 /** The fixture's dashboard sample day (FACTS: the trial ends Sun 8 Nov). */
 const AT = new Date('2026-10-25T15:00:00Z');
 const ACCOUNT = 'a0000000-0000-4000-8000-00000000000a';
+/** The flags the pages' buttons are designed for: Sign-up and the Pro trial served. */
+const FLAGS = { accountDoor: true, checksPublic: true };
 
 /** Signed out: Free and Pro go to Sign-up, Agency to the Agency trial. */
-export const pricingSignedOut = () => pricingView({ kind: 'signed_out' }, 'month', AT);
+export const pricingSignedOut = () => pricingView({ kind: 'signed_out' }, 'month', AT, FLAGS);
 
 /** Signed in on a Free account whose Pro trial was used: Pro is the paid checkout. */
 export const pricingSignedIn = () =>
@@ -27,11 +30,13 @@ export const pricingSignedIn = () =>
         owner: true,
         tier: 'free',
         snapshot: { ...FREE_START, trialUsedAt: new Date('2026-10-01T00:00:00Z') },
+        customer: null,
       },
-      agency: { held: false, trialUsedAccountId: null },
+      agency: { held: false, used: null },
     },
     'year',
     AT,
+    FLAGS,
   );
 
 const agencyRow = (over: Partial<AgencyAccountRow>): AgencyAccountRow => ({
@@ -50,18 +55,20 @@ const agencyRow = (over: Partial<AgencyAccountRow>): AgencyAccountRow => ({
   ...over,
 });
 
-const trial = (rows: AgencyAccountRow[]) =>
+const trial = (rows: AgencyAccountRow[], used: UsedTrial | null = null) =>
   agencyTrialView(
     {
       email: 'owner@summitdigital.co',
       interval: 'month',
       timeZone: 'UTC',
-      standing: agencyStanding(rows, AT),
+      standing: agencyStanding(rows, used, AT),
     },
     AT,
   );
 
 export const agencyTrialNew = () => trial([]);
 export const agencyTrialReturning = () => trial([agencyRow({})]);
-export const agencyTrialUsed = () =>
-  trial([agencyRow({ trialUsedAt: new Date('2026-10-01T10:00:00Z') })]);
+export const agencyTrialUsed = () => {
+  const row = agencyRow({ trialUsedAt: new Date('2026-10-01T10:00:00Z') });
+  return trial([row], { accountId: row.id, trialUsedAt: row.trialUsedAt!, deleted: false });
+};

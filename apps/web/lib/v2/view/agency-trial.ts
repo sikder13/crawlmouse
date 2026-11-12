@@ -6,7 +6,8 @@
  * `start_agency_trial_account` (migration 20261114000001) decides it:
  * - `held`: one of them is on Agency now (paid, trial, or the past-due grace), so there is nothing
  *   to start;
- * - `used`: they own one whose trial was used, so the function would answer `trial_used`;
+ * - `used`: they own one whose trial was used, a deleted one included, so the function would answer
+ *   `trial_used` (read by its rule, lib/v2/pricing/used-trial.ts);
  * - otherwise the form, which says the last Checkout did not finish when they own an agency account
  *   with no subscription and no trial used (owner ruling Q16: read from state, not from the URL).
  */
@@ -16,6 +17,7 @@ import { effectiveTier, type Tier } from '../../entitlement-v2';
 import type { AccountState } from '@crawlmouse/types/v2';
 import { AGENCY_TRIAL_COPY as COPY } from '../copy/agency-trial';
 import { dayDate } from '../format';
+import type { UsedTrial } from '../pricing/used-trial';
 
 export interface AgencyAccountRow {
   id: string;
@@ -36,16 +38,20 @@ export interface AgencyAccountRow {
 
 export interface AgencyStanding {
   held: boolean;
-  used: AgencyAccountRow | null;
+  used: UsedTrial | null;
   /** The account a Checkout that did not finish left: owned, Free, no trial used, no subscription. */
   open: AgencyAccountRow | null;
 }
 
-export function agencyStanding(rows: readonly AgencyAccountRow[], now: Date): AgencyStanding {
+export function agencyStanding(
+  rows: readonly AgencyAccountRow[],
+  used: UsedTrial | null,
+  now: Date,
+): AgencyStanding {
   const owned = rows.filter((r) => r.role === 'owner');
   return {
     held: rows.some((r) => effectiveTier(r, now) === 'agency'),
-    used: owned.find((r) => r.trialUsedAt !== null) ?? null,
+    used,
     open:
       owned.find(
         (r) => r.state === 'free' && r.trialUsedAt === null && r.subscriptionId === null,
@@ -97,7 +103,7 @@ export function agencyTrialView(input: AgencyTrialInput, now: Date): AgencyTrial
     return {
       kind: 'used',
       title: COPY.used.title,
-      text: COPY.used.text(dayDate(standing.used.trialUsedAt!.toISOString(), input.timeZone)),
+      text: COPY.used.text(dayDate(standing.used.trialUsedAt.toISOString(), input.timeZone)),
     };
   }
   const switched = COPY.interval(interval);

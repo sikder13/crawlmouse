@@ -68,8 +68,9 @@ const VIEWERS: [string, PricingViewer][] = [
         owner: true,
         tier: 'free',
         snapshot: FREE_START,
+        customer: null,
       },
-      agency: { held: false, trialUsedAccountId: null },
+      agency: { held: false, used: null },
     },
   ],
   [
@@ -81,8 +82,18 @@ const VIEWERS: [string, PricingViewer][] = [
         owner: true,
         tier: 'free',
         snapshot: { ...FREE_START, trialUsedAt: NOW },
+        customer: null,
       },
-      agency: { held: false, trialUsedAccountId: 'a0000000-0000-4000-8000-00000000000b' },
+      agency: {
+        held: false,
+        used: {
+          account: {
+            id: 'a0000000-0000-4000-8000-00000000000b',
+            snapshot: { ...FREE_START, trialUsedAt: NOW },
+            customer: null,
+          },
+        },
+      },
     },
   ],
 ];
@@ -92,7 +103,11 @@ const pages = VIEWERS.flatMap(([name, viewer]) =>
     (interval) =>
       [
         `${name}, ${interval}`,
-        renderToStaticMarkup(<PricingScreen view={pricingView(viewer, interval, NOW)} />),
+        renderToStaticMarkup(
+          <PricingScreen
+            view={pricingView(viewer, interval, NOW, { accountDoor: true, checksPublic: true })}
+          />,
+        ),
       ] as const,
   ),
 );

@@ -28,22 +28,35 @@ const row = (over: Partial<AgencyAccountRow> = {}): AgencyAccountRow => ({
 });
 
 const NONE: AgencyStanding = { held: false, used: null, open: null };
+const USED = {
+  accountId: 'a0000000-0000-4000-8000-00000000000b',
+  trialUsedAt: new Date('2026-10-01T10:00:00Z'),
+  deleted: false,
+};
 const view = (standing: AgencyStanding, interval: 'month' | 'year' = 'month') =>
   agencyTrialView({ email: 'me@agency.com', interval, timeZone: 'UTC', standing }, NOW);
 
 describe('agencyStanding', () => {
   it('no agency account: nothing held, used or open', () => {
-    expect(agencyStanding([], NOW)).toEqual(NONE);
+    expect(agencyStanding([], null, NOW)).toEqual(NONE);
   });
 
   it('an owned Free account with no trial and no subscription is the open Checkout (Q16)', () => {
     const r = row();
-    expect(agencyStanding([r], NOW)).toEqual({ held: false, used: null, open: r });
+    expect(agencyStanding([r], null, NOW)).toEqual({ held: false, used: null, open: r });
   });
 
   it('an owned account whose trial was used is used, and is not open', () => {
     const r = row({ trialUsedAt: new Date('2026-09-01T00:00:00Z') });
-    expect(agencyStanding([r], NOW)).toEqual({ held: false, used: r, open: null });
+    expect(agencyStanding([r], USED, NOW)).toEqual({ held: false, used: USED, open: null });
+  });
+
+  // N5: the used trial is the function's (readUsedAgencyTrial), a deleted account included, so the
+  // page refuses what start_agency_trial_account refuses even when no live row shows it.
+  it('a used trial on a deleted account is used, with no live account to show', () => {
+    const deleted = { ...USED, deleted: true };
+    expect(agencyStanding([], deleted, NOW)).toEqual({ held: false, used: deleted, open: null });
+    expect(view(agencyStanding([], deleted, NOW)).kind).toBe('used');
   });
 
   it.each([
@@ -59,7 +72,7 @@ describe('agencyStanding', () => {
       },
     ],
   ] as const)('%s is held', (_n, over) => {
-    expect(agencyStanding([row({ ...over, subscriptionId: 'sub_1' })], NOW).held).toBe(true);
+    expect(agencyStanding([row({ ...over, subscriptionId: 'sub_1' })], null, NOW).held).toBe(true);
   });
 
   it('past due beyond the grace is not held', () => {
@@ -71,19 +84,19 @@ describe('agencyStanding', () => {
       subscriptionId: 'sub_1',
       trialUsedAt: new Date('2026-09-01T00:00:00Z'),
     });
-    expect(agencyStanding([r], NOW)).toMatchObject({ held: false, used: r, open: null });
+    expect(agencyStanding([r], USED, NOW)).toMatchObject({ held: false, used: USED, open: null });
   });
 
-  it('a seat that does not own the account counts for held, never for used or open', () => {
+  it('a seat that does not own the account counts for held, never for open', () => {
     const member = row({ role: 'manager', trialUsedAt: new Date('2026-09-01T00:00:00Z') });
-    expect(agencyStanding([member], NOW)).toEqual(NONE);
+    expect(agencyStanding([member], null, NOW)).toEqual(NONE);
     expect(
-      agencyStanding([row({ role: 'manager', state: 'agency', tier: 'agency' })], NOW).held,
+      agencyStanding([row({ role: 'manager', state: 'agency', tier: 'agency' })], null, NOW).held,
     ).toBe(true);
   });
 
   it('an account with a subscription is not open', () => {
-    expect(agencyStanding([row({ subscriptionId: 'sub_1' })], NOW).open).toBeNull();
+    expect(agencyStanding([row({ subscriptionId: 'sub_1' })], null, NOW).open).toBeNull();
   });
 });
 
@@ -120,8 +133,7 @@ describe('agencyTrialView', () => {
   });
 
   it('a used trial: the reason and no form', () => {
-    const used = row({ trialUsedAt: new Date('2026-10-01T10:00:00Z') });
-    expect(view({ held: false, used, open: null })).toEqual({
+    expect(view({ held: false, used: USED, open: null })).toEqual({
       kind: 'used',
       title: 'Your Agency trial was used.',
       text: 'The trial is one per person, and yours started Thu 1 Oct. Agency can still be chosen, from Pricing.',
@@ -129,7 +141,7 @@ describe('agencyTrialView', () => {
   });
 
   it('Agency held: no form', () => {
-    expect(view({ held: true, used: row(), open: null }).kind).toBe('held');
+    expect(view({ held: true, used: USED, open: null }).kind).toBe('held');
   });
 });
 

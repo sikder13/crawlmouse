@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { after } from 'next/server';
 import { PricingScreen } from '@/components/v2/screens/pricing/PricingScreen';
+import { accountDoorEnabled, checksPublicEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { PRICING_COPY } from '@/lib/v2/copy/pricing';
 import { pricingCapture } from '@/lib/v2/pricing/events';
@@ -42,5 +43,6 @@ export default async function V2PricingPage({
   after(() =>
     capture('pricing_viewed', accountId, { interval, signedIn: viewer.kind === 'signed_in' }),
   );
-  return <PricingScreen view={pricingView(viewer, interval, now)} />;
+  const flags = { accountDoor: accountDoorEnabled(), checksPublic: checksPublicEnabled() };
+  return <PricingScreen view={pricingView(viewer, interval, now, flags)} />;
 }

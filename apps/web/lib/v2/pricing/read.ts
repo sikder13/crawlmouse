@@ -1,7 +1,9 @@
 /**
  * What the Pricing and Agency trial pages read about the signed-in person. The default account comes
  * from the viewer (lib/v2/account/viewer.ts) and its entitlement from the state machine's own reader
- * (`supabaseEntitlementStore`, the one CC-03's routes use), for that account's id only. The agency
+ * (`supabaseEntitlementStore`, the one CC-03's routes use) and its customer from the portal's, for
+ * that account's id and the used agency trial's only. A used agency trial is read by the rule of
+ * `start_agency_trial_account` (./used-trial.ts). The agency
  * accounts are read with the person's own client, so row security returns only the accounts they
  * sit on, and only the columns members may read.
  */
@@ -9,12 +11,14 @@ import 'server-only';
 import { AccountStateSchema } from '@crawlmouse/types/v2';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { supabasePortalAccounts } from '../../billing/portal-v2';
 import { supabaseEntitlementStore } from '../../billing/state-machine-apply';
 import { supabaseAdmin } from '../../supabase/admin';
 import { supabaseServer } from '../../supabase/server';
 import { loadViewer } from '../account/viewer';
 import { agencyStanding, type AgencyAccountRow } from '../view/agency-trial';
-import type { PricingViewer } from '../view/pricing';
+import type { PricingAccount, PricingViewer } from '../view/pricing';
+import { readUsedAgencyTrial } from './used-trial';
 
 const date = z
   .string()
@@ -104,21 +108,48 @@ export async function readAgencyAccounts(
   }));
 }
 
+/**
+ * An account as Pricing's paid buttons need it: its entitlement through the state machine's reader
+ * and its Stripe customer through the portal's, both over the service role (neither is
+ * member-readable). Null when the account is not there.
+ */
+async function pricingAccount(admin: SupabaseClient, id: string): Promise<PricingAccount | null> {
+  const stored = await supabaseEntitlementStore(admin).load(id);
+  if (stored === null) return null;
+  return {
+    id,
+    snapshot: stored.snapshot,
+    customer: await supabasePortalAccounts(admin).customerOf(id),
+  };
+}
+
 /** The person as the Pricing page's buttons need them. */
 export async function readPricingViewer(now: Date): Promise<PricingViewer> {
   const r = await loadViewer();
   if (r.kind === 'signed_out') return { kind: 'signed_out' };
   const userId = r.kind === 'viewer' ? r.viewer.userId : r.userId;
-  const standing = agencyStanding(await readAgencyAccounts(await supabaseServer(), userId), now);
-  const agency = { held: standing.held, trialUsedAccountId: standing.used?.id ?? null };
+  const admin = supabaseAdmin();
+  const used = await readUsedAgencyTrial(admin, userId);
+  const standing = agencyStanding(
+    await readAgencyAccounts(await supabaseServer(), userId),
+    used,
+    now,
+  );
+  const agency = {
+    held: standing.held,
+    used:
+      used === null
+        ? null
+        : { account: used.deleted ? null : await pricingAccount(admin, used.accountId) },
+  };
   if (r.kind !== 'viewer') return { kind: 'signed_in', account: null, agency };
 
   const { account, seat, tier } = r.viewer;
-  const stored = await supabaseEntitlementStore(supabaseAdmin()).load(account.id);
-  if (stored === null) return { kind: 'signed_in', account: null, agency };
+  const read = await pricingAccount(admin, account.id);
+  if (read === null) return { kind: 'signed_in', account: null, agency };
   return {
     kind: 'signed_in',
-    account: { id: account.id, owner: seat.role === 'owner', tier, snapshot: stored.snapshot },
+    account: { ...read, owner: seat.role === 'owner', tier },
     agency,
   };
 }

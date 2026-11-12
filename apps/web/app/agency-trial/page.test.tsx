@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   reads: 0,
   viewer: { kind: 'signed_out' } as Record<string, unknown>,
   rows: [] as unknown[],
+  used: null as unknown,
 }));
 
 vi.mock('server-only', () => ({}));
@@ -22,7 +23,9 @@ vi.mock('@/lib/v2/account/viewer', () => ({
     return h.viewer;
   },
 }));
+vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({}) }));
 vi.mock('@/lib/v2/pricing/read', () => ({ readAgencyAccounts: async () => h.rows }));
+vi.mock('@/lib/v2/pricing/used-trial', () => ({ readUsedAgencyTrial: async () => h.used }));
 
 import AgencyTrialPage, { dynamic, metadata } from './page';
 
@@ -54,6 +57,7 @@ beforeEach(() => {
   h.reads = 0;
   h.viewer = { kind: 'signed_out' };
   h.rows = [];
+  h.used = null;
   vi.stubEnv('V2_BILLING', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -106,9 +110,18 @@ describe('/agency-trial', () => {
     expect(html).toContain('value="clientsite.com"');
   });
 
-  it('a used trial: the reason and no form', async () => {
+  it.each([
+    ['a live account', [agencyRow({ trialUsedAt: new Date('2026-10-01T10:00:00Z') })], false],
+    // N5: the function counts a deleted account's used trial, which no live row shows.
+    ['a deleted account', [], true],
+  ] as const)('a used trial on %s: the reason and no form', async (_, rows, deleted) => {
     h.viewer = signedIn;
-    h.rows = [agencyRow({ trialUsedAt: new Date('2026-10-01T10:00:00Z') })];
+    h.rows = [...rows];
+    h.used = {
+      accountId: 'a0000000-0000-4000-8000-00000000000b',
+      trialUsedAt: new Date('2026-10-01T10:00:00Z'),
+      deleted,
+    };
     const html = renderToStaticMarkup(await render());
     expect(html).toContain('Your Agency trial was used.');
     expect(html).not.toContain('<form');

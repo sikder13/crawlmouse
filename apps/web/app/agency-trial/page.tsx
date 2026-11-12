@@ -3,9 +3,11 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { AgencyTrialScreen } from '@/components/v2/screens/agency-trial/AgencyTrialScreen';
 import { billingV2Enabled } from '@/lib/billing/flags';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { readAgencyAccounts } from '@/lib/v2/pricing/read';
+import { readUsedAgencyTrial } from '@/lib/v2/pricing/used-trial';
 import { agencyStanding, agencyTrialPath, agencyTrialView } from '@/lib/v2/view/agency-trial';
 import { intervalFrom } from '@/lib/v2/view/pricing';
 
@@ -39,12 +41,13 @@ export default async function AgencyTrialPage({
   const now = new Date();
   const userId = r.kind === 'viewer' ? r.viewer.userId : r.userId;
   const rows = await readAgencyAccounts(await supabaseServer(), userId);
+  const used = await readUsedAgencyTrial(supabaseAdmin(), userId);
   const view = agencyTrialView(
     {
       email: r.kind === 'viewer' ? r.viewer.email : null,
       interval,
       timeZone: r.kind === 'viewer' ? r.viewer.account.timezone : 'UTC',
-      standing: agencyStanding(rows, now),
+      standing: agencyStanding(rows, used, now),
     },
     now,
   );

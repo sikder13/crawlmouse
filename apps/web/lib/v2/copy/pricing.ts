@@ -169,6 +169,13 @@ export const PRICING_COPY = {
   },
   buttons: {
     free: { label: 'Create a free account', note: `Includes ${trialDays} of Pro` },
+    /** V2_ACCOUNT_DOOR off: v1's sign-in creates the account, and starts no trial. */
+    freeSignIn: { label: 'Create a free account', note: 'One email, no card' },
+    proSignIn: {
+      label: 'Choose Pro',
+      note: (interval: Interval) =>
+        `Sign in first; ${usd(priceOf('pro', interval))} ${per(interval)}, the card taken by Stripe`,
+    },
     proTrial: {
       label: `Start with ${trialDays} of Pro`,
       note: (interval: Interval) =>
@@ -188,6 +195,13 @@ export const PRICING_COPY = {
       note: (interval: Interval) =>
         `${usd(priceOf('agency', interval))} ${per(interval)}; your agency has used its trial`,
     },
+    /** CC-03 answers `subscription_open`: the account's subscription is changed in the portal. */
+    portal: {
+      label: 'Manage billing',
+      note: 'This account still has a subscription; change it from the billing page',
+    },
+    unavailable: { note: 'This account cannot choose this plan now' },
+    agencyUsed: { note: 'Your agency trial was used, on an agency account since deleted' },
     current: { label: 'Your plan', note: 'The plan your account is on now' },
     included: { label: 'Included in your plan', note: 'Agency includes all of Pro' },
     freeBelow: { note: 'If you cancel, from Settings, the account returns to Free' },

@@ -84,12 +84,24 @@ describe('/v2-pricing', () => {
     expect(html).toContain('href="/agency-trial?interval=year"');
   });
 
+  // Q24/Q31: the buttons follow the flags of the routes they reach, read per request. The header's
+  // "Log in" is a third /login link either way.
+  it.each([
+    ['1', 2, 1],
+    ['', 0, 3],
+  ])('V2_ACCOUNT_DOOR=%j: %i links to /signup, %i to /login', async (door, signup, login) => {
+    vi.stubEnv('V2_ACCOUNT_DOOR', door);
+    const html = renderToStaticMarkup(await render());
+    expect(html.split('href="/signup"').length - 1).toBe(signup);
+    expect(html.split('href="/login"').length - 1).toBe(login);
+  });
+
   it('sends pricing_viewed after the response, with the request’s cookie header', async () => {
     h.cookie = 'cm_consent=granted';
     h.viewer = {
       kind: 'signed_in',
-      account: { id: 'acct-1', owner: true, tier: 'free', snapshot: FREE_START },
-      agency: { held: false, trialUsedAccountId: null },
+      account: { id: 'acct-1', owner: true, tier: 'free', snapshot: FREE_START, customer: null },
+      agency: { held: false, used: null },
     };
     await render();
     expect(h.captured).toEqual([]);

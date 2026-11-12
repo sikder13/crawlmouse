@@ -1,40 +1,63 @@
 /**
  * Pricing (Final-Pricing, CC-29 D2) as data: the three plans on the chosen interval, the Agency Plus
  * row, and each plan's button for this viewer. Pure: the page reads the viewer (lib/v2/pricing/read.ts)
- * and passes it in.
+ * and the flags, and passes them in.
  *
- * The buttons follow the viewer. Signed out, Free and Pro go to Sign-up (one email creates the
- * account and starts the Pro trial) and Agency to the Agency trial page. Signed in, the default
- * account's tier is "Your plan"; Pro offers its trial only when the state machine's `trialRefusal`
- * says the account may start one, and the paid checkout otherwise; Agency is "Your plan" when one of
- * the viewer's agency accounts is on Agency, the paid checkout on the account whose trial was used
- * (a person has one agency trial), and the trial otherwise. Only the account's owner changes its plan.
+ * A button is offered only where the route it reaches would act (correctness B2, Q24):
+ * - Signed out, Free and Pro go to Sign-up (one email creates the account and starts the Pro trial)
+ *   while V2_ACCOUNT_DOOR serves it, and to v1's sign-in (`/login`) otherwise; Agency goes to the
+ *   Agency trial page.
+ * - Signed in, the default account's tier is "Your plan", and only the account's owner changes it.
+ *   Pro offers its trial when `trialRefusal` lets the account start one and V2_CHECKS_PUBLIC serves
+ *   the trial's route. Otherwise a paid plan is decided by CC-03's `checkoutRefusal`: no refusal is
+ *   the checkout; `subscription_open` is the billing portal for that account, when `portalRefusal`
+ *   lets it open; any other refusal is no button.
+ * - Agency is "Your plan" when one of the viewer's agency accounts is on Agency; on the agency
+ *   account whose trial was used (one trial a person), the paid plan as above; otherwise the trial.
  * The one orange button (DESIGN-LOCK rule 3) is the first of Pro, Agency and Free that is a button.
  */
 import type { Interval } from '../../billing/catalog';
+import { checkoutRefusal } from '../../billing/checkout-refusal';
+import { portalRefusal } from '../../billing/portal-v2';
 import { usd } from '../../billing/prices';
 import { trialRefusal, type EntitlementSnapshot } from '../../billing/state-machine';
-import type { Tier } from '../../entitlement-v2';
+import type { PaidTier, Tier } from '../../entitlement-v2';
 import { agencyTrialPath } from './agency-trial';
 import { PRICING_COPY as COPY, per, planCopy, priceOf, type PlanRow } from '../copy/pricing';
+
+/** An account a paid button may act on, as CC-03's refusals read it. */
+export interface PricingAccount {
+  id: string;
+  snapshot: EntitlementSnapshot;
+  /** The account's Stripe customer, which the portal needs; null when Stripe does not know it. */
+  customer: string | null;
+}
 
 export type PricingViewer =
   | { kind: 'signed_out' }
   | {
       kind: 'signed_in';
       /**
-       * The viewer's default account: its id, whether the viewer owns it, its tier now, and its
-       * entitlement as the state machine reads it. Null when the viewer has no account, or several
-       * and no default.
+       * The viewer's default account: whether the viewer owns it and its tier now, besides what the
+       * refusals read. Null when the viewer has no account, or several and no default.
        */
-      account: { id: string; owner: boolean; tier: Tier; snapshot: EntitlementSnapshot } | null;
+      account: (PricingAccount & { owner: boolean; tier: Tier }) | null;
       agency: {
         /** One of the viewer's agency accounts is on Agency now (paid, trial or grace). */
         held: boolean;
-        /** An agency account the viewer owns whose trial was used, or null. */
-        trialUsedAccountId: string | null;
+        /**
+         * The viewer's agency trial is used (lib/v2/pricing/used-trial.ts); `account` is that owned
+         * agency account, null when it is deleted. Null when no trial is used.
+         */
+        used: { account: PricingAccount | null } | null;
       };
     };
+
+/** The flags the buttons' routes are served under: V2_ACCOUNT_DOOR and V2_CHECKS_PUBLIC. */
+export interface PricingFlags {
+  accountDoor: boolean;
+  checksPublic: boolean;
+}
 
 interface ActionText {
   label: string;
@@ -81,7 +104,10 @@ export interface PricingView {
 
 const PRO_TRIAL_START = '/api/billing/pro-trial/start';
 const CHECKOUT = '/api/billing/checkout';
+const PORTAL = '/api/billing/portal';
 const SIGNUP = '/signup';
+/** v1's sign-in, which creates the account on a first sign-in. */
+const LOGIN = '/login';
 
 const pricingHref = (interval: Interval) =>
   interval === 'month' ? '/pricing' : '/pricing?interval=year';
@@ -99,27 +125,62 @@ const form = (action: string, fields: Record<string, string>, text: ActionText):
   ...text,
 });
 
-function freeAction(viewer: PricingViewer): Unranked {
+/**
+ * The paid button for `plan` on `account`: CC-03's checkout when `checkoutRefusal` lets it, the
+ * account's billing portal when the refusal is `subscription_open` and `portalRefusal` lets it
+ * open, and otherwise no button.
+ */
+function paidAction(
+  account: PricingAccount,
+  plan: PaidTier,
+  interval: Interval,
+  text: ActionText,
+): Unranked {
+  const refusal = checkoutRefusal(account.snapshot, plan);
+  if (refusal === null) return form(CHECKOUT, { plan, interval, accountId: account.id }, text);
+  if (refusal.error === 'subscription_open' && portalRefusal(account.customer) === null) {
+    return form(PORTAL, { accountId: account.id }, COPY.buttons.portal);
+  }
+  return { kind: 'note', note: COPY.buttons.unavailable.note };
+}
+
+function freeAction(viewer: PricingViewer, flags: PricingFlags): Unranked {
   const account = viewer.kind === 'signed_in' ? viewer.account : null;
-  if (account === null) return link(SIGNUP, COPY.buttons.free);
+  if (account === null) {
+    return flags.accountDoor
+      ? link(SIGNUP, COPY.buttons.free)
+      : link(LOGIN, COPY.buttons.freeSignIn);
+  }
   if (account.tier === 'free') return { kind: 'current', ...COPY.buttons.current };
   return { kind: 'note', note: COPY.buttons.freeBelow.note };
 }
 
-function proAction(viewer: PricingViewer, interval: Interval, now: Date): Unranked {
+function proAction(
+  viewer: PricingViewer,
+  interval: Interval,
+  now: Date,
+  flags: PricingFlags,
+): Unranked {
   const trial = { label: COPY.buttons.proTrial.label, note: COPY.buttons.proTrial.note(interval) };
   const account = viewer.kind === 'signed_in' ? viewer.account : null;
-  if (account === null) return link(SIGNUP, trial);
+  if (account === null) {
+    return flags.accountDoor
+      ? link(SIGNUP, trial)
+      : link(LOGIN, {
+          label: COPY.buttons.proSignIn.label,
+          note: COPY.buttons.proSignIn.note(interval),
+        });
+  }
   if (account.tier === 'pro') return { kind: 'current', ...COPY.buttons.current };
   if (account.tier === 'agency') return { kind: 'current', ...COPY.buttons.included };
   if (!account.owner) return { kind: 'note', note: COPY.buttons.notOwner.note };
-  if (trialRefusal(account.snapshot, now) === null)
+  if (flags.checksPublic && trialRefusal(account.snapshot, now) === null) {
     return form(PRO_TRIAL_START, { accountId: account.id }, trial);
-  return form(
-    CHECKOUT,
-    { plan: 'pro', interval, accountId: account.id },
-    { label: COPY.buttons.proBuy.label, note: COPY.buttons.proBuy.note(interval) },
-  );
+  }
+  return paidAction(account, 'pro', interval, {
+    label: COPY.buttons.proBuy.label,
+    note: COPY.buttons.proBuy.note(interval),
+  });
 }
 
 function agencyAction(viewer: PricingViewer, interval: Interval): Unranked {
@@ -128,15 +189,13 @@ function agencyAction(viewer: PricingViewer, interval: Interval): Unranked {
   if (viewer.agency.held || viewer.account?.tier === 'agency') {
     return { kind: 'current', ...COPY.buttons.current };
   }
-  const used = viewer.agency.trialUsedAccountId;
-  if (used !== null) {
-    return form(
-      CHECKOUT,
-      { plan: 'agency', interval, accountId: used },
-      { label: COPY.buttons.agencyBuy.label, note: COPY.buttons.agencyBuy.note(interval) },
-    );
-  }
-  return trial;
+  const used = viewer.agency.used;
+  if (used === null) return trial;
+  if (used.account === null) return { kind: 'note', note: COPY.buttons.agencyUsed.note };
+  return paidAction(used.account, 'agency', interval, {
+    label: COPY.buttons.agencyBuy.label,
+    note: COPY.buttons.agencyBuy.note(interval),
+  });
 }
 
 /** The first actionable of Pro, Agency and Free carries the orange; the rest are default buttons. */
@@ -151,11 +210,16 @@ function ranked(actions: Record<Tier, Unranked>): Record<Tier, PlanAction> {
   return out;
 }
 
-export function pricingView(viewer: PricingViewer, interval: Interval, now: Date): PricingView {
+export function pricingView(
+  viewer: PricingViewer,
+  interval: Interval,
+  now: Date,
+  flags: PricingFlags,
+): PricingView {
   const copy = planCopy(interval);
   const actions = ranked({
-    free: freeAction(viewer),
-    pro: proAction(viewer, interval, now),
+    free: freeAction(viewer, flags),
+    pro: proAction(viewer, interval, now, flags),
     agency: agencyAction(viewer, interval),
   });
   const tiers: Tier[] = ['free', 'pro', 'agency'];
