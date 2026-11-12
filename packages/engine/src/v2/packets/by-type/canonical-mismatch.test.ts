@@ -15,11 +15,14 @@ import {
   packetOf,
   pageAsRead,
   pageAt,
+  HOME_AT_EN,
+  seen,
   SERVED,
   servedSite,
   SPELLINGS,
 } from '../test-support/structure.js';
 import { inBothStates, type TwoStateSite } from '../test-support/verify.js';
+import { canonicalMismatch } from './canonical-mismatch.js';
 import type { PacketFacts } from '../types.js';
 
 let served: TwoStateSite | null = null;
@@ -165,9 +168,9 @@ describe('the canonical_mismatch packet', () => {
   ])('when the canonical %s, expects %s', (shape, expected) => {
     const p = packetFor(canonicalSite(base, shape), base);
     expect(p.verify.command).toMatch(
-      /^curl -sS -A '[^']*' 'https:\/\/a\.test\/p' \| LC_ALL=C awk '/,
+      /^curl -sS -f --compressed -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/p' \| tr '[^']*' ' {4}' \| LC_ALL=C awk '/,
     );
-    expect(p.verify.command.endsWith(`' 'https://a.test' '${expected}'`)).toBe(true);
+    expect(p.verify.command.endsWith(`}' '${expected}'`)).toBe(true);
     expect(p.change.join(' ')).toContain(
       expected === 'https://a.test/p'
         ? 'et the rel="canonical" of `https://a.test/p` to its own URL.'
@@ -179,13 +182,20 @@ describe('the canonical_mismatch packet', () => {
   it('sends the links to the new canonical too when it is another URL, and leaves them when it is the page', () => {
     const moved = packetFor(canonicalSite(base, 'redirects_and_linked'), base);
     expect(moved.change.join(' ')).toContain('so that they point at `https://a.test/t2`');
-    expect(moved.verify.command).toContain(" && curl -sS -A '");
+    // one request for the page and the page that links to it, read by one program
+    expect(moved.verify.command).toContain(" 'https://a.test/p' 'https://a.test/' | ");
+    expect(moved.verify.command.match(/curl|awk/g)).toEqual(['curl', 'awk']);
+    expect(
+      moved.verify.command.endsWith(
+        "}' 'https://a.test/t2' '1' 'https://a.test/p' '1' 'https://a.test/t2'",
+      ),
+    ).toBe(true);
     const kept = packetFor(canonicalSite(base, 'gone_and_linked'), base);
     expect(kept.change.join(' ')).not.toContain('Change the links');
     expect(kept.keep.at(-1)).toBe(
       'Keep the links to `https://a.test/p`: once it is its own canonical they point at the canonical URL.',
     );
-    expect(kept.verify.command).not.toContain(' && curl ');
+    expect(kept.verify.command).toContain(" 'https://a.test/p' | ");
   });
 
   it('writes a Next.js body when the canonical itself changes, citing the page it rests on', () => {
@@ -205,6 +215,43 @@ describe('the canonical_mismatch packet', () => {
       'Keep the other fields of alternates the page has today (languages, media, types).',
     );
     expect(packetFor(canonicalSite(base, 'linked'), base).frameworks).toEqual(['generic']);
+  });
+
+  // round 2, SEO finding 3: what the two Next.js pages say, and no more
+  it('says when Next.js sends metadata after the first HTML, and that a value replaces the default list', () => {
+    const next = packetFor(canonicalSite(base, 'gone'), base).packets[0]!;
+    expect(next.framework).toBe('nextjs');
+    const step = next.change.find((line) => line.includes('htmlLimitedBots'))!;
+    expect(step).toBe(
+      'When a page cannot be prerendered, or its generateMetadata introduces dynamic behavior, Next.js can send the metadata tags after the first HTML, appended to the <body>; user agents on its list of HTML-limited bots get them in the <head>. The command below reads the <head>. Either make the page one that can be prerendered, with a generateMetadata that introduces no dynamic behavior, or extend the default list: a value for htmlLimitedBots in the Next.js config overrides the default list, so repeat the default bots in it and add the crawler the command requests as.',
+    );
+    expect(step).not.toMatch(/waits on data|add the crawler to htmlLimitedBots/);
+    const sources =
+      canonicalMismatch.kind === 'builder' ? canonicalMismatch.stacks.nextjs!.sources : [];
+    expect(sources.map((s) => s.url)).toEqual([
+      'https://nextjs.org/docs/app/api-reference/functions/generate-metadata',
+      'https://nextjs.org/docs/app/api-reference/config/next-config-js/htmlLimitedBots',
+    ]);
+    expect(sources[1]!.supports).toContain("will override the Next.js' default list");
+  });
+
+  it('says a canonical that is not a web address is that, not that it is on another host', () => {
+    const u = (path: string) => `${base}${path}`;
+    const input = site(
+      [
+        { path: base, links: [u('/p')], facts: { canonical: { href: null } } },
+        { path: u('/p'), links: [base], facts: { canonical: { href: 'mailto:shop@other.test' } } },
+      ],
+      { homepage: base },
+    );
+    const record = detected(detectCanonicalMismatch(input), u('/p'));
+    expect(record.conditions).toContain('canonical_cross_host');
+    const p = packetOf('canonical_mismatch', record, factsFor(input, SERVED));
+    expect(p.context[1]).toBe(
+      '`mailto:shop@other.test` is not a web address (http or https), so it names no page a search engine can index in place of this one.',
+    );
+    expect(p.context.join(' ')).not.toContain('another host');
+    expect(p.change[0]).toBe('Set the rel="canonical" of `https://a.test/p` to its own URL.');
   });
 
   const page = (canonical: string) =>
@@ -228,6 +275,119 @@ describe('the canonical_mismatch packet', () => {
       expect(broken.status).not.toBe(0);
       expect(fixed.status).toBe(0);
     });
+  });
+
+  // round 2, SEO finding 6: a correct canonical, written as a page can write it
+  it.each<[string, (b: string) => string]>([
+    ['the path from the root', () => '/p'],
+    ['the path alone, from a page in the same directory', () => 'p'],
+    ['a protocol-relative URL', (b) => `//${new URL(b).host}/p`],
+    ['the scheme and host in upper case', (b) => `HTTP://${new URL(b).host.toUpperCase()}/p`],
+    ['a slash at its end', (b) => `${b}/p/`],
+    ['an empty query', (b) => `${b}/p?`],
+  ])('verify passes on the expected canonical written as %s', async (_name, written) => {
+    let origin = '';
+    served = await servedSite({
+      broken: { '/p': page('/t') },
+      fixed: {
+        get '/p'() {
+          return page(written(origin));
+        },
+      },
+    });
+    origin = served.base;
+    const p = packetFor(canonicalSite(origin, 'gone'), origin);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('verify passes on a self-canonical whose query writes its parameters in another order', async () => {
+    const path = '/list?page=2&sort=price';
+    served = await servedSite({
+      broken: { [path]: page('/gone') },
+      fixed: { [path]: page('/list?sort=price&page=2') },
+    });
+    const b = served.base;
+    const input = site(
+      [
+        { path: b, links: [`${b}${path}`], facts: { canonical: { href: null } } },
+        { path: `${b}${path}`, links: [b], facts: { canonical: { href: `${b}/gone` } } },
+        { path: `${b}/gone`, status: 404 },
+      ],
+      { homepage: b },
+    );
+    const p = packetOf(
+      'canonical_mismatch',
+      detected(detectCanonicalMismatch(input), `${b}${path}`),
+      factsFor(input, SERVED),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('shows the canonical with a command to read, and what it prints today and after', async () => {
+    served = await servedSite({ broken: { '/p': page('/t') }, fixed: { '/p': page('/p') } });
+    const b = served.base;
+    const p = packetFor(canonicalSite(b, 'gone'), b);
+    expect(p.verify.see).toEqual({
+      command: expect.stringMatching(
+        /^curl -sS -A '[^']*' '[^']*\/p' \| grep -io '<link\[\^>\]\*rel="canonical"\[\^>\]\*>'$/,
+      ),
+      today: `The page's canonical tag, which names \`${b}/t\`.`,
+      after: `The page's canonical tag, naming \`${b}/p\`.`,
+    });
+    const printed = await seen(served, p);
+    expect(printed.broken).toBe('<link rel="canonical" href="/t">\n');
+    expect(printed.fixed).toBe('<link rel="canonical" href="/p">\n');
+  });
+
+  // round 2, SEO finding 1: the linking page answers at another address than the one the crawl names it by
+  it('when the linking page is a homepage that answers at /en/, verify requests /en/ in both states', async () => {
+    served = await servedSite({
+      broken: { ...HOME_AT_EN, '/en/': anchors(['/p', '/t2']), '/p': page('/t2') },
+      fixed: { ...HOME_AT_EN, '/en/': anchors(['/t2']), '/p': page('/t2') },
+    });
+    const b = served.base;
+    const input = canonicalSite(b, 'linked');
+    const facts = factsFor(input, SERVED);
+    const pages = new Map(facts.pages);
+    pages.set(b, { ...pages.get(b)!, final_url: `${b}/en/` });
+    const live = { ...input, pages: [...pages.values()] };
+    const p = packetOf('canonical_mismatch', detected(detectCanonicalMismatch(live), `${b}/p`), {
+      ...facts,
+      pages,
+    });
+    expect(p.verify.command).toContain(` '${b}/en/' | `);
+    expect(p.verify.expect).toContain(
+      `Exit status 0 once \`${b}/en/\` (where \`${b}\` answers) links to \`${b}/t2\``,
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    const printed = await seen(served, p);
+    expect(printed.broken).toContain('<a href="/p">');
+    expect(printed.fixed).toBe('<a href="/t2">\n');
+  });
+
+  it('judges the canonical of no page whose request ended at another address, so the page read answers where it is named', () => {
+    const u = (path: string) => `${base}${path}`;
+    const input = site(
+      [
+        { path: base, links: [u('/p')], facts: { canonical: { href: null } } },
+        {
+          path: u('/p'),
+          links: [base],
+          facts: { final_url: u('/en/p'), canonical: { href: u('/t') } },
+        },
+        { path: u('/t'), status: 404 },
+      ],
+      { homepage: base },
+    );
+    expect(
+      detectCanonicalMismatch(input).filter((r) => r.state === 'detected' && r.key.endsWith('/p')),
+    ).toEqual([]);
   });
 
   it('verify, for links under a non-canonical URL, fails until the linking page links to the canonical', async () => {
@@ -302,7 +462,7 @@ describe('a canonical no fault is proven of, on a page the site links to', () =>
         /^Set the rel="canonical" of `https:\/\/a\.test\/p` to its own URL, or check /,
       );
       expect(p.change.join(' ')).not.toContain('Change the links');
-      expect(p.verify.command.endsWith(`' 'https://a.test' 'https://a.test/p'`)).toBe(true);
+      expect(p.verify.command.endsWith(`}' 'https://a.test/p'`)).toBe(true);
     });
 
     it('verify fails on the declared canonical and passes on the page’s own', async () => {

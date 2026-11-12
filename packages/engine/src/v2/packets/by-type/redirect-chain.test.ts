@@ -14,6 +14,8 @@ import {
   packetOf,
   pageAsRead,
   pageAt,
+  HOME_AT_EN,
+  seen,
   SERVED,
   servedSite,
   SPELLINGS,
@@ -81,12 +83,14 @@ describe('the redirect_chain packet', () => {
     });
 
     it('checks the first linking page, and says there are more', () => {
-      expect(p.verify.command).toMatch(/^curl -sS -A '[^']*' 'https:\/\/a\.test\/' \| /);
       expect(p.verify.command).toMatch(
-        /' 'https:\/\/a\.test' '1' 'https:\/\/a\.test\/old' 'https:\/\/a\.test\/new\/'$/,
+        /^curl -sS -f --compressed -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/' \| /,
+      );
+      expect(p.verify.command).toMatch(
+        /\}' '1' 'https:\/\/a\.test\/old' '1' 'https:\/\/a\.test\/new'$/,
       );
       expect(p.verify.expect).toBe(
-        'Exit status 0 once `https://a.test` links to `https://a.test/new/` and no longer to `https://a.test/old` (an <a> href in full or from the root). Today it links to `https://a.test/old`. The command reads the first of the 2 linking pages: run it for each.',
+        'Exit status 0 once `https://a.test` links to `https://a.test/new/` and no longer to `https://a.test/old` (an <a> href, however the URL is written). Today it links to `https://a.test/old`. An href with a named character reference the command does not know counts as the old link. The command reads the first of the 2 linking pages: run it for each.',
       );
     });
   });
@@ -266,6 +270,179 @@ describe('the redirect_chain packet', () => {
       const p = packetOf(
         'redirect_chain',
         detected(detectRedirectChains(live), `${served.base}${recorded}`),
+        factsFor(live, SERVED),
+      );
+      const { broken, fixed } = await inBothStates(served, p.verify.command);
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).toBe(0);
+    });
+  });
+
+  // round 2, SEO finding 1 (the reviewer's input): the linking page answers at another address
+  it('when the linking page is a homepage that answers at /en/, verify requests /en/ in both states', async () => {
+    served = await servedSite({
+      broken: { ...HOME_AT_EN, '/en/': anchors([['/old', 'Tents']]) },
+      fixed: { ...HOME_AT_EN, '/en/': anchors([['/new/', 'Tents']]) },
+    });
+    const b = served.base;
+    const live = site(
+      [
+        { path: b, links: [`${b}/old`], facts: { final_url: `${b}/en/` } },
+        {
+          path: `${b}/old`,
+          facts: { final_url: `${b}/new/`, redirect: { hops: 2, loop: false } },
+        },
+      ],
+      { homepage: b },
+    );
+    const p = packetOf(
+      'redirect_chain',
+      detected(detectRedirectChains(live), `${b}/old`),
+      factsFor(live, SERVED),
+    );
+    expect(p.verify.command).toContain(` '${b}/en/' | `);
+    expect(p.verify.expect).toContain(
+      `Exit status 0 once \`${b}/en/\` (where \`${b}\` answers) links to \`${b}/new/\``,
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    const printed = await seen(served, p);
+    expect(printed.broken).toBe('<a href="/old">\n');
+    expect(printed.fixed).toBe('<a href="/new/">\n');
+  });
+
+  it('shows the links with a command to read, and what it prints today and after', async () => {
+    const pages = (home: string[]) => ({ '/': anchors(home) });
+    served = await servedSite({
+      broken: pages(['/old', '/guide']),
+      fixed: pages(['/new/', '/guide']),
+    });
+    const live = chainSite(served.base);
+    const b = served.base;
+    const p = packetOf(
+      'redirect_chain',
+      detected(detectRedirectChains(live), `${b}/old`),
+      factsFor(live, SERVED),
+    );
+    expect(p.verify.see).toEqual({
+      command: expect.stringMatching(
+        /^curl -sS -A '[^']*' '[^']*\/' \| grep -io '<a \[\^>\]\*>' \| grep -F -e '\/old' -e '\/new\/'$/,
+      ),
+      today: `The <a> tags that link to \`${b}/old\`: lines that hold \`/old\`.`,
+      after: `The <a> tags that link to \`${b}/new/\`, lines that hold \`/new/\`, and none that links to \`${b}/old\`.`,
+    });
+    const printed = await seen(served, p);
+    expect(printed.broken).toBe('<a href="/old">\n');
+    expect(printed.fixed).toBe('<a href="/new/">\n');
+  });
+
+  it('shows the redirects with a command to read, for a chain it follows', async () => {
+    served = await twoStateSite({
+      broken: redirecting({ '/loop': '/loop-2', '/loop-2': '/loop-3', '/loop-3': '/loop' }),
+      fixed: redirecting({ '/loop': '/landed' }),
+    });
+    const live = loopSite(served.base);
+    const p = packetOf(
+      'redirect_chain',
+      detected(detectRedirectChains(live), `${served.base}/loop`),
+      factsFor(live, SERVED),
+    );
+    expect(p.verify.see).toEqual({
+      command: expect.stringMatching(
+        /^curl -sS -o \/dev\/null -L --max-redirs 10 -w '%\{num_redirects\} %\{http_code\}\\n' -A '[^']*' '[^']*\/loop'$/,
+      ),
+      today:
+        "curl's error for too many redirects, and the number 10 with the status of a redirect: the crawl recorded redirects that loop.",
+      after: '0 or 1, then a status below 400: at most one redirect before a page answers.',
+    });
+    const printed = await seen(served, p);
+    expect(printed.broken).toBe('10 301\n');
+    expect(printed.fixed).toBe('1 200\n');
+  });
+
+  // owner ruling 2: a count of one takes the singular
+  it('takes the singular at one redirect and at one linking page', () => {
+    const input = site(
+      [
+        { path: base, links: [`${base}/loop`] },
+        { path: `${base}/loop`, status: 301, facts: { redirect: { hops: 1, loop: true } } },
+      ],
+      { homepage: base },
+    );
+    const p = packetOf(
+      'redirect_chain',
+      detected(detectRedirectChains(input), `${base}/loop`),
+      factsFor(input, SERVED),
+    );
+    expect(p.context[0]).toBe(
+      '1 page links to `https://a.test/loop`, whose redirects loop: after 1 redirect a Location names a URL the chain had already requested.',
+    );
+    expect(p.verify.expect).toContain(
+      'Today the crawl recorded 1 redirect and no page at the end of them.',
+    );
+    const two = packetOf(
+      'redirect_chain',
+      detected(detectRedirectChains(loopSite(base)), `${base}/loop`),
+      factsFor(loopSite(base), SERVED),
+    );
+    expect(two.verify.expect).toContain('Today the crawl recorded 3 redirects and no page');
+  });
+
+  // round 2, security finding 4
+  describe('URLs the programs cannot tell apart, or must', () => {
+    it('follows the redirects when the final URL and the redirecting one differ only by an escape', async () => {
+      served = await twoStateSite({
+        broken: redirecting({ '/x%7Ey': '/x-moved', '/x-moved': '/x~y' }),
+        fixed: redirecting({ '/x%7Ey': '/x~y' }),
+      });
+      const b = served.base;
+      const live = site(
+        [
+          { path: b, links: [`${b}/x%7Ey`] },
+          {
+            path: `${b}/x%7Ey`,
+            facts: { final_url: `${b}/x~y`, redirect: { hops: 2, loop: false } },
+          },
+        ],
+        { homepage: b },
+      );
+      const p = packetOf(
+        'redirect_chain',
+        detected(detectRedirectChains(live), `${b}/x%7Ey`),
+        factsFor(live, SERVED),
+      );
+      expect(p.verify.command).toMatch(/^curl -sS -f -o \/dev\/null -L --max-redirs 1 /);
+      expect(p.verify.expect).toContain(
+        `Today the crawl recorded 2 redirects before \`${b}/x~y\` answered. The command follows the redirects; links rewritten to \`${b}/x~y\` are measured on the next check.`,
+      );
+      const { broken, fixed } = await inBothStates(served, p.verify.command);
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).toBe(0);
+    });
+
+    it.each([
+      ['an escaped slash', '/a/b', '/a%2Fb'],
+      ['an escaped question mark', '/a?b', '/a%3Fb'],
+    ])('is not passed by a link to another URL, written with %s', async (_name, final, wrong) => {
+      served = await servedSite({
+        broken: { '/': `<a href="${wrong}">x</a>` },
+        fixed: { '/': `<a href="${final}">x</a>` },
+      });
+      const b = served.base;
+      const live = site(
+        [
+          { path: b, links: [`${b}/old`] },
+          {
+            path: `${b}/old`,
+            facts: { final_url: `${b}${final}`, redirect: { hops: 2, loop: false } },
+          },
+        ],
+        { homepage: b },
+      );
+      const p = packetOf(
+        'redirect_chain',
+        detected(detectRedirectChains(live), `${b}/old`),
         factsFor(live, SERVED),
       );
       const { broken, fixed } = await inBothStates(served, p.verify.command);

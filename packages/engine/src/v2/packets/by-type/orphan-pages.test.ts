@@ -13,7 +13,9 @@ import {
   hostileUrl,
   packetOf,
   pageAsRead,
+  HOME_AT_EN,
   pageAt,
+  seen,
   SERVED,
   servedSite,
 } from '../test-support/structure.js';
@@ -89,17 +91,19 @@ describe('the orphan_pages packet', () => {
     const p = packetOf('orphan_pages', record, withParent(input, orphan, `${base}/hub`));
     expect(p.verify.ua).toBe('GPTBot');
     expect(p.verify.command).toMatch(
-      /^curl -sS -A '[^']*GPTBot[^']*' 'https:\/\/a\.test\/hub' \| /,
+      /^curl -sS -f --compressed -A '[^']*GPTBot[^']*' -w '[^']*' 'https:\/\/a\.test\/hub' \| /,
     );
     expect(p.verify.command).toMatch(
-      / \| LC_ALL=C awk '.*' 'https:\/\/a\.test' '0' 'https:\/\/a\.test\/products\/lantern'$/,
+      / \| LC_ALL=C awk '.*' '0' '1' 'https:\/\/a\.test\/products\/lantern'$/,
     );
     const none = packetOf('orphan_pages', record, {
       ...withParent(input, orphan, `${base}/hub`),
       crawlers: [],
     });
     expect(none.verify.ua).toBeNull();
-    expect(none.verify.command).toMatch(/^curl -sS 'https:\/\/a\.test\/hub' \| /);
+    expect(none.verify.command).toMatch(
+      /^curl -sS -f --compressed -w '[^']*' 'https:\/\/a\.test\/hub' \| /,
+    );
   });
 
   describe.each([
@@ -125,6 +129,72 @@ describe('the orphan_pages packet', () => {
       expect(fixed.status).toBe(0);
       expect(served.userAgents().every((ua) => ua.includes('GPTBot'))).toBe(true);
     });
+  });
+
+  // round 2, SEO finding 1: the page read answers at another address than the one the crawl names it by
+  describe.each([
+    ['the suggested parent', true],
+    ['the homepage, when no parent is suggested', false],
+  ])('when the homepage answers at /en/ and is %s', (_name, suggested) => {
+    it('verify requests /en/, fails while it holds no link to the orphan and passes once it does', async () => {
+      const lantern = '/products/lantern';
+      served = await servedSite({
+        broken: { ...HOME_AT_EN, '/en/': anchors(['/hub']) },
+        fixed: { ...HOME_AT_EN, '/en/': anchors(['/hub', lantern]) },
+      });
+      const b = served.base;
+      const live = site(
+        [
+          { path: b, links: [`${b}/hub`], facts: { final_url: `${b}/en/` } },
+          { path: `${b}/hub`, links: [b] },
+          { path: `${b}${lantern}` },
+        ],
+        { homepage: b },
+      );
+      const p = packetOf(
+        'orphan_pages',
+        detected(detectOrphans(live), `${b}${lantern}`),
+        withParent(live, `${b}${lantern}`, suggested ? b : null),
+      );
+      expect(p.verify.command).toContain(` '${b}/en/' | `);
+      if (suggested) {
+        expect(p.change[0]).toContain(`on \`${b}\`.`);
+        expect(p.verify.expect).toContain(`once \`${b}/en/\` (where \`${b}\` answers) holds`);
+      }
+      const { broken, fixed } = await inBothStates(served, p.verify.command);
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).toBe(0);
+      const printed = await seen(served, p);
+      expect(printed.broken).toBe('');
+      expect(printed.fixed).toContain(`href="${lantern}"`);
+    });
+  });
+
+  it('shows the link with a command to read, and what it prints today and after', async () => {
+    const lantern = '/products/lantern';
+    served = await servedSite({
+      broken: { '/hub': anchors(['/']) },
+      fixed: { '/hub': anchors(['/', lantern]) },
+    });
+    const live = orphanSite(served.base);
+    const url = `${served.base}${lantern}`;
+    const p = packetOf(
+      'orphan_pages',
+      detected(detectOrphans(live), url),
+      withParent(live, url, `${served.base}/hub`),
+    );
+    expect(p.verify.see).toEqual({
+      command: expect.stringMatching(
+        /^curl -sS -A '[^']*GPTBot[^']*' '[^']*\/hub' \| grep -io '<a \[\^>\]\*>' \| grep -F -e '\/products\/lantern'$/,
+      ),
+      today: `Nothing: the crawl found no link to \`${url}\` on any page.`,
+      after:
+        'The <a> tag you added: a line that holds `/products/lantern`. A link that spells the path another way is not printed; the exact check reads it.',
+    });
+    const printed = await seen(served, p);
+    // today: nothing; after: the tag
+    expect(printed.broken).toBe('');
+    expect(printed.fixed).toBe(`<a href="${lantern}">\n`);
   });
 
   it('is not passed by a link to another page whose URL starts the same', async () => {

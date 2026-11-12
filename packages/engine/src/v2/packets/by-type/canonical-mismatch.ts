@@ -16,27 +16,45 @@
  *     checked by hand.
  * Links to the page move too whenever the expected canonical is another URL than the page.
  *
- * The page is named and requested at the address it is served at (served-at.ts). Verify reads the
- * `<link rel="canonical">` in the page's head for the expected URL, and, when links move, a linking
- * page for a link to the canonical and none to the page (html-checks.ts).
+ * The page is named at the address it is served at, and requested at the address its content was
+ * read at (served-at.ts). Verify reads the `<link rel="canonical">` in the page's head for the expected
+ * URL, and, when links move, a linking page for a link to the canonical and none to the page
+ * (html-checks.ts).
  */
 import type { PageResult } from '@crawlmouse/types/v2';
 import { SEARCH_ENGINES } from '../../detectors/scope.js';
 import type { Condition } from '../../detectors/types.js';
 import {
-  both,
   canonicalIs,
   command,
   fetchOf,
+  holds,
   httpUrl,
-  joined,
   linksTo,
+  sameInCommand,
   spelled,
 } from '../html-checks.js';
 import { servedAt } from '../served-at.js';
-import { DOCS_READ, GOOGLE_DOCS, pagesShown, plural, rowOf, subjectOf } from '../structure.js';
+import {
+  addressesOf,
+  DOCS_READ,
+  GOOGLE_DOCS,
+  NEXT_LIMITED_BOTS_SOURCE,
+  NEXT_METADATA,
+  NEXT_STREAMING,
+  pagesShown,
+  pathOf,
+  pathWord,
+  plural,
+  readShown,
+  rowOf,
+  seeTags,
+  subjectOf,
+  TAGS,
+  UNREAD_HREF,
+} from '../structure.js';
 import { code, count, line, list, ours, type Line } from '../text.js';
-import type { Change, PacketEntry, PacketFacts, RecordOf } from '../types.js';
+import type { Change, PacketEntry, PacketFacts, RecordOf, See } from '../types.js';
 
 type Fix = RecordOf<'canonical_mismatch'>;
 
@@ -65,14 +83,14 @@ const answersAt = (row: PageResult, url: string): boolean =>
 interface Reading {
   /** The page, in the record's spelling. */
   page: string;
-  /** The address the page is served at: what the packet prints and requests. */
+  /** The address the page is served at: what the packet prints as the page's own URL. */
   own: string;
   /** The canonical the page declares, as resolved, or as written when it did not resolve. */
   declared: string;
   /** `declared` in the engine's spelling; null when it is not an http or https URL. */
   target: string | null;
   /** The crawled row that answered at the canonical's target; null when the check holds none. */
-  at: PageResult | null;
+  row: PageResult | null;
   /** The fault of the canonical's target the record proves; null when it proves none. */
   fault: Condition | null;
   /** The pages that link to the page, when the record proves that. */
@@ -119,7 +137,7 @@ function read(fix: Fix, facts: PacketFacts): Reading {
     own: servedAt(facts, page),
     declared,
     target,
-    at,
+    row: at,
     fault,
     linking,
     expected,
@@ -133,15 +151,15 @@ function unconfirmed(r: Reading): Line[] {
   if (r.fault !== null || r.stands) return [];
   const target = code(r.declared);
   if (r.target === null) return [line`${target} is not an http or https URL, so it names no page.`];
-  if (r.at === null) {
+  if (r.row === null) {
     return [
       line`The crawl holds no page that answered at ${target}, so the audit cannot say the canonical names a live page.`,
     ];
   }
   return [
-    r.at.status_code === 200
+    r.row.status_code === 200
       ? line`The crawl could not confirm that ${target} answers at that URL and declares itself, or nothing, as its canonical.`
-      : line`The crawl's request for ${target} ended with status ${count(r.at.status_code)}, so the audit cannot say the canonical names a live page.`,
+      : line`The crawl's request for ${target} ended with status ${count(r.row.status_code)}, so the audit cannot say the canonical names a live page.`,
   ];
 }
 
@@ -151,23 +169,25 @@ function sentence(condition: Condition, r: Reading): Line[] {
   switch (condition) {
     case 'canonical_cross_host':
       return [
-        line`${target} is on another host than the page: the canonical asks search engines to index that URL in place of this one.`,
+        r.target === null
+          ? line`${target} is not a web address (http or https), so it names no page a search engine can index in place of this one.`
+          : line`${target} is on another host than the page: the canonical asks search engines to index that URL in place of this one.`,
       ];
     case 'canonical_target_redirects':
-      if (r.at === null || r.at.final_url === null) return [line`${target} redirects.`];
+      if (r.row === null || r.row.final_url === null) return [line`${target} redirects.`];
       return [
-        r.at.status_code === 200
-          ? line`${target} redirects to ${code(r.at.final_url)}.`
-          : line`${target} is a redirect: the crawl's request for it ended with status ${count(r.at.status_code)}.`,
+        r.row.status_code === 200
+          ? line`${target} redirects to ${code(r.row.final_url)}.`
+          : line`${target} is a redirect: the crawl's request for it ended with status ${count(r.row.status_code)}.`,
       ];
     case 'canonical_target_gone':
       return [
-        r.at === null
+        r.row === null
           ? line`${target} is gone.`
-          : line`${target} answers ${count(r.at.status_code)}: the page the canonical names is gone.`,
+          : line`${target} answers ${count(r.row.status_code)}: the page the canonical names is gone.`,
       ];
     case 'canonical_target_not_canonical': {
-      const next = declaredBy(r.at);
+      const next = declaredBy(r.row);
       return [
         next === null
           ? line`${target} itself declares another canonical.`
@@ -226,7 +246,7 @@ function canonicalStep(r: Reading, facts: PacketFacts): Line[] {
       line`Set the rel="canonical" of ${code(r.own)} to its own URL, or check ${code(r.declared)} by hand: if it is a live page that is meant to be indexed for this content, the canonical can stay, and the links to ${code(r.own)} belong on that URL. The command below checks for the page's own URL.`,
     ];
   }
-  if (r.fault === 'canonical_cross_host') {
+  if (r.fault === 'canonical_cross_host' && r.target !== null) {
     return [
       line`Decide first whether ${code(r.declared)} is deliberate: a page republished from another site can name the original as its canonical on purpose. If it is, leave it; this fix does not apply.`,
       line`Otherwise set the rel="canonical" of ${code(r.own)} to its own URL.`,
@@ -251,8 +271,6 @@ const generic = (r: Reading, facts: PacketFacts): Change => ({
   keep: keepOf(r),
 });
 
-const NEXT_METADATA = 'https://nextjs.org/docs/app/api-reference/functions/generate-metadata';
-
 /** The Next.js body: where the tag comes from in the App Router. None when the canonical stands. */
 function nextjs(r: Reading, facts: PacketFacts): Change | null {
   if (r.stands) return null;
@@ -262,7 +280,7 @@ function nextjs(r: Reading, facts: PacketFacts): Change | null {
       ...canonicalStep(r, facts),
       line`Metadata objects are merged shallowly: a segment that sets alternates replaces the whole alternates object of the layouts above it. If a layout sets alternates.languages, media or types, carry them into the object you write (share them from one module, or read the parent's resolved metadata from the second argument of generateMetadata), or the page loses those tags.`,
       line`Give an absolute URL, or a path with metadataBase set in the root layout: Next.js composes the two.`,
-      line`Next.js can send the tags of a generateMetadata that waits on data after the first HTML, in the <body>, to user agents outside its list of HTML-limited bots. The command below reads the <head>: use the static metadata export where the value does not depend on the request, or add the crawler to htmlLimitedBots in the Next.js config.`,
+      NEXT_STREAMING,
       ...linkSteps(r, facts),
     ],
     keep: [
@@ -295,8 +313,9 @@ export const canonicalMismatch: PacketEntry<'canonical_mismatch'> = {
           url: NEXT_METADATA,
           read: DOCS_READ,
           supports:
-            'metadata and generateMetadata are exported from layout.js and page.js, in Server Components; alternates.canonical and its <link rel="canonical"> output; Merging: objects are shallowly merged and nested fields are overwritten by the last segment to define them, shared through a separate variable or the parent argument; metadataBase composes a relative path; Streaming metadata: tags appended to the <body> except for HTML-limited bots, htmlLimitedBots',
+            'metadata and generateMetadata are exported from layout.js and page.js, in Server Components; alternates.canonical and its <link rel="canonical"> output; Merging: objects are shallowly merged and nested fields are overwritten by the last segment to define them, shared through a separate variable or the parent argument; metadataBase composes a relative path; "If the page can be prerendered and generateMetadata doesn\'t introduce dynamic behavior, the resulting metadata is included in the page\'s initial HTML. Otherwise the metadata resolved from generateMetadata can be streamed"; Streaming metadata: tags appended to the <body>, and in the <head> for HTML-limited bots',
         },
+        NEXT_LIMITED_BOTS_SOURCE,
       ],
     },
   },
@@ -304,44 +323,76 @@ export const canonicalMismatch: PacketEntry<'canonical_mismatch'> = {
     const r = read(fix, facts);
     const own = fetchOf(facts, [r.page]);
     const expected = servedAt(facts, r.expected);
-    const canonical = r.stands ? null : joined(own.fragment, canonicalIs(r.own, expected));
+    const canonical = r.stands ? null : canonicalIs(expected);
     const [linker] = r.linking;
+    // a link to the canonical that the programs read as a link to the page cannot be told from the
+    // old one (html-checks.ts `sameInCommand`): the links are then left to the next check
+    const told = r.linksTo !== null && !sameInCommand(r.linksTo, r.page);
     const moved =
-      r.linksTo === null || linker === undefined
+      r.linksTo === null || linker === undefined || !told
         ? null
         : {
-            from: servedAt(facts, linker),
+            from: readShown(facts, linker),
             to: servedAt(facts, r.linksTo),
-            fragment: joined(
-              fetchOf(facts, [linker]).fragment,
-              linksTo(servedAt(facts, linker), [r.linksTo], [r.page]),
-            ),
+            linker,
+            links: (page: number) => linksTo(addressesOf(facts, r.linksTo!), [r.page], page),
           };
     const more = ours(
       r.linking.length > 1 ? ' The command reads the first linking page: run it for each.' : '',
     );
+    const untold = ours(
+      r.linksTo !== null && !told
+        ? ' The command cannot tell a link to the one URL from a link to the other, so the links are measured on the next check.'
+        : '',
+    );
+    const seeCanonical: See = {
+      command: seeTags(facts, [r.page], TAGS.canonical),
+      today: line`The page's canonical tag, which names ${code(r.declared)}.`,
+      after: line`The page's canonical tag, naming ${code(expected)}.`,
+    };
     if (canonical !== null && moved !== null) {
       return {
-        command: command(both(canonical, moved.fragment)),
+        // one request for the two pages: the page first, then the page that links to it
+        command: command(
+          fetchOf(facts, [r.page, moved.linker]).fragment,
+          holds(canonicalIs(expected, 1), moved.links(2)),
+        ),
         // short, and with each URL once: a line past its bound is cut, and the limits are at its end
-        expect: line`Exit status 0 once the <head> of ${code(r.own)} holds one <link rel="canonical">, naming ${code(expected)} (today: ${code(r.declared)}), and ${code(moved.from)} links to that URL and no longer to this page. A URL counts in full or from the root. ${NOT_READ}${more}`,
+        expect: line`Exit status 0 once the <head> of ${readShown(facts, r.page)} holds one <link rel="canonical">, naming ${code(expected)} (today: ${code(r.declared)}), and ${moved.from} links to that URL and no longer to this page, however a URL is written. ${NOT_READ} ${UNREAD_HREF}${more}`,
         ua: own.ua,
+        see: seeCanonical,
       };
     }
     if (canonical !== null) {
       return {
-        command: command(canonical),
-        expect: line`Exit status 0 once the <head> of ${code(r.own)} holds one <link rel="canonical">, naming ${code(expected)} in full or from the root. Today it names ${code(r.declared)}. ${NOT_READ}`,
+        command: command(own.fragment, holds(canonical)),
+        expect: line`Exit status 0 once the <head> of ${readShown(facts, r.page)} holds one <link rel="canonical">, naming ${code(expected)}, however the URL is written. Today it names ${code(r.declared)}. ${NOT_READ}${untold}`,
         ua: own.ua,
+        see: seeCanonical,
       };
     }
-    if (moved === null) {
-      throw new Error('packets: a canonical_mismatch record proves no fault and no link');
+    if (moved === null || linker === undefined || r.linksTo === null) {
+      if (linker === undefined || r.linksTo === null) {
+        throw new Error('packets: a canonical_mismatch record proves no fault and no link');
+      }
+      // the canonical stands and the links cannot be told apart: the command shows the canonical,
+      // which is there today, and its `expect` says what it cannot show
+      return {
+        command: command(own.fragment, holds(canonicalIs(expected))),
+        expect: line`Exit status 0 while the <head> of ${readShown(facts, r.page)} holds one <link rel="canonical">, naming ${code(expected)}, which it does today: the fix is to the links, and the command cannot tell a link to ${code(r.own)} from a link to ${code(expected)}. The links are measured on the next check.`,
+        ua: own.ua,
+        see: seeCanonical,
+      };
     }
     return {
-      command: command(moved.fragment),
-      expect: line`Exit status 0 once ${code(moved.from)} links to ${code(moved.to)} and no longer to ${code(r.own)} (an <a> href in full or from the root). Today it links to ${code(r.own)}.${more}`,
+      command: command(fetchOf(facts, [moved.linker]).fragment, holds(moved.links(1))),
+      expect: line`Exit status 0 once ${moved.from} links to ${code(moved.to)} and no longer to ${code(r.own)} (an <a> href, however the URL is written). Today it links to ${code(r.own)}. ${UNREAD_HREF}${more}`,
       ua: own.ua,
+      see: {
+        command: seeTags(facts, [linker], TAGS.a, [pathWord(r.page), pathWord(r.linksTo)]),
+        today: line`The <a> tags that link to ${code(r.own)}: lines that hold ${code(pathOf(r.page))}.`,
+        after: line`The <a> tags that link to ${code(moved.to)}, lines that hold ${code(pathOf(r.linksTo))}, and none that links to ${code(r.own)}.`,
+      },
     };
   },
 };

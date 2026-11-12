@@ -8,7 +8,7 @@
  * the near-duplicate condition the packet says only what follows from the record: a detected page
  * that does not declare the first page as canonical was detected for its content.
  *
- * Verify reads the first affected page, at the address it is served at. For the canonical: the one
+ * Verify reads the first affected page, at the address its content was read at. For the canonical: the one
  * `rel="canonical"` in its head is its own URL. For the content: the audit's signal is a hash of the
  * main content, which one line of shell cannot compute, so the command compares the two pages' links
  * instead (html-checks.ts `listsDiffer`): each must link somewhere the other does not, the list's
@@ -20,19 +20,29 @@
 import { firstPageOf } from '../../detectors/duplicate-pagination.js';
 import { SIMHASH_HAMMING_K } from '../../detectors/thresholds.js';
 import {
-  both,
   canonicalIs,
   command,
   fetchOf,
-  joined,
+  holds,
   listsDiffer,
+  part,
+  printOf,
   spelled,
 } from '../html-checks.js';
 import { servedAt } from '../served-at.js';
-import { crawledWord } from '../shell.js';
-import { GOOGLE_DOCS, pagesShown, plural, rowOf, subjectOf } from '../structure.js';
+import { crawledWord, word } from '../shell.js';
+import {
+  GOOGLE_DOCS,
+  pagesShown,
+  plural,
+  readShown,
+  rowOf,
+  seeTags,
+  subjectOf,
+  TAGS,
+} from '../structure.js';
 import { code, count, line, ours, type Line } from '../text.js';
-import type { PacketEntry, PacketFacts, RecordOf } from '../types.js';
+import type { PacketEntry, PacketFacts, RecordOf, See } from '../types.js';
 
 type Fix = RecordOf<'duplicate_pagination'>;
 
@@ -138,44 +148,58 @@ export const duplicatePagination: PacketEntry<'duplicate_pagination'> = {
       throw new Error('packets: a duplicate_pagination record names no later page');
     }
     const first = firstOf(later);
-    const [own, firstAt] = [servedAt(facts, later), servedAt(facts, first)];
+    // the canonical a page should name is its own address; the request goes where its content was read
+    const own = servedAt(facts, later);
+    const [shown, firstShown] = [readShown(facts, later), readShown(facts, first)];
     const one = fetchOf(facts, [later]);
-    const canonical = declaringFirst(fix, facts).includes(later)
-      ? joined(one.fragment, canonicalIs(own, own))
-      : null;
-    const content = fix.conditions.includes('pagination_near_duplicate')
-      ? joined(
-          fetchOf(facts, [first, later]).fragment,
-          listsDiffer(firstAt, own, crawledWord(listMark(later))),
-        )
-      : null;
+    const two = fetchOf(facts, [first, later]);
+    const canonical = declaringFirst(fix, facts).includes(later);
+    const content = fix.conditions.includes('pagination_near_duplicate');
+    const differ = listsDiffer(crawledWord(listMark(later)));
     const others = ours(
       fix.affected_urls.length === 1
         ? ''
         : ' The command reads the first of the later pages; the others are measured again on the next check.',
     );
-    if (canonical !== null && content !== null) {
+    const seeCanonical: See = {
+      command: seeTags(facts, [later], TAGS.canonical),
+      today: line`The page's canonical tag, which names the first page of the list: ${code(first)}.`,
+      after: line`The page's canonical tag, naming its own URL: ${code(own)}.`,
+    };
+    const seeContent: See = {
+      command: command(
+        printOf(facts, [first, later]).fragment,
+        part` | grep -io ${word(TAGS.a)} | sort | uniq -u`,
+      ),
+      today: line`The <a> tags that are on one of the two pages and not on the other. The record does not hold the pages' links: it holds that their main content is nearly identical, so expect few lines or none besides the links between the list's own pages.`,
+      after: line`The <a> tags of the items each page lists and the other does not.`,
+    };
+    if (canonical && content) {
       return {
-        command: command(both(canonical, content)),
+        // one request for the two pages: the later page, the second, is read for both
+        command: command(two.fragment, holds(canonicalIs(own, 2), differ)),
         // short, and with each URL once: a line past its bound is cut, and the limits are at its end
-        expect: line`Exit status 0 once the <head> of ${code(own)} holds one <link rel="canonical">, naming its own URL (today: ${code(first)}), and that page and the first page each link to a page the other does not link to, the list's own pages left out. ${LINKS_NOT_HASH} ${NOT_READ}${others}`,
+        expect: line`Exit status 0 once the <head> of ${shown} holds one <link rel="canonical">, naming its own URL (today: ${code(first)}), and that page and the first page each link to a page the other does not link to, the list's own pages left out. ${LINKS_NOT_HASH} ${NOT_READ}${others}`,
         ua: one.ua,
+        see: seeCanonical,
       };
     }
-    if (canonical !== null) {
+    if (canonical) {
       return {
-        command: command(canonical),
-        expect: line`Exit status 0 once the <head> of ${code(own)} holds one <link rel="canonical">, naming its own URL in full or from the root; today it names ${code(first)}. ${NOT_READ}${others}`,
+        command: command(one.fragment, holds(canonicalIs(own))),
+        expect: line`Exit status 0 once the <head> of ${shown} holds one <link rel="canonical">, naming its own URL, however the URL is written; today it names ${code(first)}. ${NOT_READ}${others}`,
         ua: one.ua,
+        see: seeCanonical,
       };
     }
-    if (content === null) {
+    if (!content) {
       throw new Error('packets: a duplicate_pagination record proves nothing of its first page');
     }
     return {
-      command: command(content),
-      expect: line`Exit status 0 once ${code(own)} and ${code(firstAt)} each link to a page the other does not link to, the list's own pages left out: a later page that repeats the first has every link the first has. ${LINKS_NOT_HASH}${others}`,
+      command: command(two.fragment, holds(differ)),
+      expect: line`Exit status 0 once ${shown} and ${firstShown} each link to a page the other does not link to, the list's own pages left out: a later page that repeats the first has every link the first has. ${LINKS_NOT_HASH}${others}`,
       ua: one.ua,
+      see: seeContent,
     };
   },
 };

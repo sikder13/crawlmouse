@@ -14,6 +14,7 @@ import {
   packetOf,
   pageAsRead,
   pageAt,
+  seen,
   SERVED,
   servedSite,
 } from '../test-support/structure.js';
@@ -135,23 +136,26 @@ describe('the duplicate_pagination packet', () => {
     expect(packetFor(listSite(base, 'both')).frameworks).toEqual(['generic']);
   });
 
-  it('checks the canonical with one request, the content with the two pages, and both when both are proved', () => {
+  it('checks the canonical with one request, the content with the two pages, and both in one command when both are proved', () => {
     const canonical = packetFor(listSite(base, 'canonical')).verify.command;
     const content = packetFor(listSite(base, 'content')).verify.command;
     expect(canonical).toMatch(
-      /^curl -sS -A '[^']*' 'https:\/\/a\.test\/collections\/tents\?page=2' \| LC_ALL=C awk '.*' 'https:\/\/a\.test' 'https:\/\/a\.test\/collections\/tents\?page=2'$/,
+      /^curl -sS -f --compressed -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/collections\/tents\?page=2' \| tr '[^']*' ' {4}' \| LC_ALL=C awk '.*\}' 'https:\/\/a\.test\/collections\/tents\?page=2'$/,
     );
     expect(content).toMatch(
-      /^curl -sS -A '[^']*' -w '\\ncrawlmouse:end\\n' 'https:\/\/a\.test\/collections\/tents' 'https:\/\/a\.test\/collections\/tents\?page=2' \| LC_ALL=C awk '.*' 'https:\/\/a\.test' 'page=' 'https:\/\/a\.test\/collections\/tents'$/,
+      /^curl -sS -f --compressed -A '[^']*' -w '\\ncrawlmouse:end %\{url_effective\}\\n' 'https:\/\/a\.test\/collections\/tents' 'https:\/\/a\.test\/collections\/tents\?page=2' \| tr '[^']*' ' {4}' \| LC_ALL=C awk '.*\}' 'page='$/,
     );
-    expect(packetFor(listSite(base, 'both')).verify.command).toBe(`${canonical} && ${content}`);
+    // both: the two pages are requested once, and one program reads the later page for both
+    const both = packetFor(listSite(base, 'both')).verify.command;
+    expect(both).toMatch(
+      /^curl -sS -f --compressed -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/collections\/tents' 'https:\/\/a\.test\/collections\/tents\?page=2' \| tr '[^']*' ' {4}' \| LC_ALL=C awk '.*canon\(2\) && differ\(\) && !odd\) \}' 'https:\/\/a\.test\/collections\/tents\?page=2' 'page='$/,
+    );
+    expect(both.match(/curl|awk/g)).toEqual(['curl', 'awk']);
   });
 
   it('marks the other pages of a list written as a path by its page segment', () => {
     const p = packetFor(listSite(base, 'content', '/collections/tents/page/2'));
-    expect(p.verify.command).toMatch(
-      /' 'https:\/\/a\.test' '\/page\/' 'https:\/\/a\.test\/collections\/tents'$/,
-    );
+    expect(p.verify.command).toMatch(/\}' '\/page\/'$/);
   });
 
   const LIST = '/collections/tents';
@@ -219,6 +223,74 @@ describe('the duplicate_pagination packet', () => {
     expect((await inBothStates(served, p.verify.command)).fixed.status).not.toBe(0);
   });
 
+  // round 2, SEO finding 1: this packet reads two pages, and neither can be one whose request ended
+  // at another address: the detector decides nothing of such a list (duplicate-pagination.ts `judge`,
+  // and its loop skips a later page that landed elsewhere), so the pages read answer where named
+  it('is written for no list whose first page answers at another address', () => {
+    const live = site(
+      [
+        {
+          path: base,
+          links: [`${base}/page/2`],
+          facts: { final_url: `${base}/en/`, simhash: HASH, canonical: { href: base } },
+        },
+        {
+          path: `${base}/page/2`,
+          template: TEMPLATE,
+          links: [base],
+          facts: { simhash: simhashAway(HASH, 1), canonical: { href: base } },
+        },
+      ],
+      { homepage: base },
+    );
+    expect(detectDuplicatePagination(live).map((r) => [r.state, r.reason])).toEqual([
+      ['indeterminate', 'first_page_not_crawled'],
+    ]);
+    const moved = site(
+      [
+        { path: base, links: [`${base}/page/2`], facts: { simhash: HASH } },
+        {
+          path: `${base}/page/2`,
+          template: TEMPLATE,
+          links: [base],
+          facts: { final_url: `${base}/en/page/2`, simhash: HASH, canonical: { href: base } },
+        },
+      ],
+      { homepage: base },
+    );
+    expect(detectDuplicatePagination(moved)).toEqual([]);
+  });
+
+  it('shows the canonical with a command to read, and what it prints today and after', async () => {
+    served = await servedSite({ broken: BROKEN.canonical, fixed: list(LATER, OWN) });
+    const b = served.base;
+    const p = packetFor(listSite(b, 'canonical'));
+    expect(p.verify.see).toEqual({
+      command: expect.stringMatching(
+        /^curl -sS -A '[^']*' '[^']*\/collections\/tents\?page=2' \| grep -io '<link\[\^>\]\*rel="canonical"\[\^>\]\*>'$/,
+      ),
+      today: `The page's canonical tag, which names the first page of the list: \`${b}/collections/tents\`.`,
+      after: `The page's canonical tag, naming its own URL: \`${b}/collections/tents?page=2\`.`,
+    });
+    const printed = await seen(served, p);
+    expect(printed.broken).toBe(`<link rel="canonical" href="${LIST}">\n`);
+    expect(printed.fixed).toBe(`<link rel="canonical" href="${LATER}">\n`);
+  });
+
+  it('shows the links one page has and the other lacks, and says the record does not hold them', async () => {
+    served = await servedSite({ broken: BROKEN.content, fixed: list(LATER, OWN) });
+    const p = packetFor(listSite(served.base, 'content'));
+    expect(p.verify.see?.command).toMatch(
+      /^curl -sS -A '[^']*' '[^']*\/collections\/tents' '[^']*\/collections\/tents\?page=2' \| grep -io '<a \[\^>\]\*>' \| sort \| uniq -u$/,
+    );
+    expect(p.verify.see?.today).toBe(
+      "The <a> tags that are on one of the two pages and not on the other. The record does not hold the pages' links: it holds that their main content is nearly identical, so expect few lines or none besides the links between the list's own pages.",
+    );
+    const printed = await seen(served, p);
+    expect(printed.broken).not.toContain('/products/');
+    expect(printed.fixed).toContain('<a href="/products/alpine">');
+  });
+
   it('asks for no step its own command does not pass, and says what the command compares', () => {
     const p = packetFor(listSite(base, 'content'));
     expect([...p.change, ...p.keep].join(' ')).not.toMatch(/404/);
@@ -257,7 +329,11 @@ describe('the duplicate_pagination packet', () => {
     expect(fixed.status).toBe(0);
   });
 
-  it('agrees with the engine’s own reading of the pages served', async () => {
+  // The canonical half is the engine's reading: the reader reads each page's canonical from the HTML
+  // served. The content half is not: the two content hashes are given here (30 bits apart, so the
+  // record proves the canonical alone), since the fixture pages are too short for the reader's own
+  // hash to tell a repeated list from one with its own items.
+  it('agrees with the engine’s own reading of the canonical on the pages served (the content hashes are given, not read)', async () => {
     const states = { broken: list(LIST, OWN), fixed: list(LATER, OWN) };
     served = await servedSite(states);
     const b = served.base;

@@ -8,15 +8,14 @@ import fc from 'fast-check';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { commandOf, crawledWord } from './shell.js';
 import {
-  both,
   canonicalIs,
   command,
   COMMAND_BOUNDS,
   compared,
   fetchOf,
+  holds,
   hreflangHolds,
   httpUrl,
-  joined,
   linksTo,
   listed,
   listsDiffer,
@@ -26,7 +25,7 @@ import {
   part,
   sameInCommand,
   spelled,
-  type Fragment,
+  type Check,
   type HreflangNeeds,
 } from './html-checks.js';
 import { hostileText, UNSHOWN } from './test-support/hostile.js';
@@ -57,18 +56,27 @@ async function serving(pages: Record<string, Html>): Promise<TwoStateSite> {
 }
 
 /** The exit status of the pages at `paths` put through `check`. */
-async function status(s: TwoStateSite, paths: string[], check: Fragment): Promise<number> {
+async function status(s: TwoStateSite, paths: string[], ...checks: Check[]): Promise<number> {
   const fetch = fetchOf(
     NO_CRAWLER,
     paths.map((p) => `${s.base}${p}`),
   );
-  return (await runCommand(commandOf(command(fetch.fragment, check)))).status;
+  return (await runCommand(commandOf(command(fetch.fragment, holds(...checks))))).status;
 }
+
+const holdsCommand = (s: TwoStateSite, paths: string[], ...checks: Check[]) =>
+  command(
+    fetchOf(
+      NO_CRAWLER,
+      paths.map((p) => `${s.base}${p}`),
+    ).fragment,
+    holds(...checks),
+  );
 
 /** Whether `check` passes on each of `pages`, served under its name. */
 async function passes(
   pages: Record<string, Html>,
-  check: (base: string, path: string) => Fragment,
+  check: (base: string, path: string) => Check,
 ): Promise<Record<string, boolean>> {
   const s = await serving(
     Object.fromEntries(Object.entries(pages).map(([name, html]) => [`/${name}`, html])),
@@ -87,7 +95,7 @@ describe('fetchOf', () => {
     ]);
     expect(fetch.ua).toBe('GPTBot');
     expect(commandOf(command(fetch.fragment))).toMatch(
-      /^curl -sS -f --compressed -A '[^']*GPTBot[^']*' 'https:\/\/a\.test\/x'$/,
+      /^curl -sS -f --compressed -A '[^']*GPTBot[^']*' -w '\\ncrawlmouse:end %\{url_effective\}\\n' 'https:\/\/a\.test\/x'$/,
     );
   });
 
@@ -97,17 +105,19 @@ describe('fetchOf', () => {
       ['https://a.test/x'],
     );
     expect(fetch.ua).toBeNull();
-    expect(commandOf(command(fetch.fragment))).toBe("curl -sS -f --compressed 'https://a.test/x'");
+    expect(commandOf(command(fetch.fragment))).toBe(
+      `curl -sS -f --compressed -w '\\n${PAGE_END} %{url_effective}\\n' 'https://a.test/x'`,
+    );
   });
 
-  it('requests each page at the address it is served at, and marks the end of each when it fetches two', () => {
+  it('requests each page at the address its content was read at, and marks the end of each with that address', () => {
     const pages = new Map([
       ['https://a.test/p', pageAt('https://a.test/p', { final_url: 'https://a.test/p/' })],
       ['https://a.test/q', pageAt('https://a.test/q', { final_url: 'https://a.test/elsewhere' })],
     ]);
     const fetch = fetchOf({ crawlers: [], pages }, ['https://a.test/p', 'https://a.test/q']);
     expect(commandOf(command(fetch.fragment))).toBe(
-      `curl -sS -f --compressed -w '\\n${PAGE_END}\\n' 'https://a.test/p/' 'https://a.test/elsewhere'`,
+      `curl -sS -f --compressed -w '\\n${PAGE_END} %{url_effective}\\n' 'https://a.test/p/' 'https://a.test/elsewhere'`,
     );
   });
 });
@@ -135,8 +145,7 @@ describe('listed', () => {
 });
 
 describe('linksTo', () => {
-  const to = (target: string) => (base: string, path: string) =>
-    linksTo(`${base}${path}`, [`${base}${target}`]);
+  const to = (target: string) => (base: string) => linksTo([`${base}${target}`]);
 
   it('finds a link however the page writes it', async () => {
     expect(
@@ -225,15 +234,14 @@ describe('linksTo', () => {
 
   it('keeps the root path and the origin as one target', async () => {
     const s = await serving({ '/p': '<a href="/">home</a>', '/q': '<a href="/x">x</a>' });
-    expect(await status(s, ['/p'], linksTo(`${s.base}/p`, [s.base]))).toBe(0);
-    expect(await status(s, ['/p'], linksTo(`${s.base}/p`, [`${s.base}/?a=1`]))).not.toBe(0);
-    expect(await status(s, ['/q'], linksTo(`${s.base}/q`, [s.base]))).not.toBe(0);
-    expect(await status(s, ['/missing'], linksTo(`${s.base}/missing`, [s.base]))).not.toBe(0);
+    expect(await status(s, ['/p'], linksTo([s.base]))).toBe(0);
+    expect(await status(s, ['/p'], linksTo([`${s.base}/?a=1`]))).not.toBe(0);
+    expect(await status(s, ['/q'], linksTo([s.base]))).not.toBe(0);
+    expect(await status(s, ['/missing'], linksTo([s.base]))).not.toBe(0);
   });
 
   it('passes on the new target only when the old one is gone', async () => {
-    const moved = (base: string, path: string) =>
-      linksTo(`${base}${path}`, [`${base}/new-url`], [`${base}/old-url`]);
+    const moved = (base: string) => linksTo([`${base}/new-url`], [`${base}/old-url`]);
     expect(
       await passes(
         {
@@ -266,11 +274,7 @@ describe('linksTo', () => {
         '/fixed': '<a href="/womens">y</a>',
       });
       const check = (path: string) =>
-        status(
-          s,
-          [path],
-          linksTo(`${s.base}${path}`, [`${s.base}/womens`], [`${s.base}${recorded}`]),
-        );
+        status(s, [path], linksTo([`${s.base}/womens`], [`${s.base}${recorded}`]));
       for (const i of written.keys()) expect(await check(`/broken${i}`), written[i]).not.toBe(0);
       expect(await check('/fixed')).toBe(0);
     },
@@ -282,10 +286,7 @@ describe('linksTo', () => {
       const s = await serving(Object.fromEntries(written.map((a, i) => [`/p${i}`, a])));
       for (const i of written.keys()) {
         const path = `/p${i}`;
-        expect(
-          await status(s, [path], linksTo(`${s.base}${path}`, [`${s.base}${recorded}`])),
-          written[i],
-        ).toBe(0);
+        expect(await status(s, [path], linksTo([`${s.base}${recorded}`])), written[i]).toBe(0);
       }
     },
   );
@@ -327,7 +328,7 @@ describe('linksTo, against the ways a page can spell a URL', () => {
       '/dir/fixed': kept,
     });
     const check = (path: string) =>
-      status(s, [path], linksTo(`${s.base}${path}`, [`${s.base}/new`], [`${s.base}/old`]));
+      status(s, [path], linksTo([`${s.base}/new`], [`${s.base}/old`]));
     expect(await check('/dir/page')).not.toBe(0);
     expect(await check('/dir/fixed')).toBe(0);
   });
@@ -337,19 +338,15 @@ describe('linksTo, against the ways a page can spell a URL', () => {
       '/dir/page': (base) => at(base, anchor),
       '/dir/other': '<a href="/older">x</a>',
     });
-    const check = (path: string) =>
-      status(s, [path], linksTo(`${s.base}${path}`, [`${s.base}/old`]));
+    const check = (path: string) => status(s, [path], linksTo([`${s.base}/old`]));
     expect(await check('/dir/page')).toBe(0);
     expect(await check('/dir/other')).not.toBe(0);
   });
 
   it('counts an href it cannot read as the stale link, and only when a stale link is asked about', async () => {
     const s = await serving({ '/p': '<a href="/ol&dscr;">x</a><a href="/new">y</a>' });
-    const page = `${s.base}/p`;
-    expect(await status(s, ['/p'], linksTo(page, [`${s.base}/new`], [`${s.base}/old`]))).not.toBe(
-      0,
-    );
-    expect(await status(s, ['/p'], linksTo(page, [`${s.base}/new`]))).toBe(0);
+    expect(await status(s, ['/p'], linksTo([`${s.base}/new`], [`${s.base}/old`]))).not.toBe(0);
+    expect(await status(s, ['/p'], linksTo([`${s.base}/new`]))).toBe(0);
   });
 
   // round 2, security finding 4: an escaped delimiter is not the delimiter
@@ -362,11 +359,7 @@ describe('linksTo, against the ways a page can spell a URL', () => {
       ampersand: '<a href="/q?a=1%26b=2">x</a>',
     };
     const links = (target: string) => async (name: keyof typeof pages) =>
-      (
-        await passes({ [name]: pages[name] }, (base, path) =>
-          linksTo(`${base}${path}`, [`${base}${target}`]),
-        )
-      )[name];
+      (await passes({ [name]: pages[name] }, (base) => linksTo([`${base}${target}`])))[name];
     expect(await links('/a/b')('slash')).toBe(false);
     expect(await links('/a%2Fb')('slash')).toBe(true);
     expect(await links('/a%2fb')('slash')).toBe(true);
@@ -393,7 +386,7 @@ describe('linksTo, against the ways a page can spell a URL', () => {
     const out: Record<string, boolean> = {};
     for (const name of Object.keys(pages)) {
       const path = `/dir/${name}`;
-      out[name] = (await status(s, [path], linksTo(`${s.base}${path}`, [`${s.base}/t`]))) === 0;
+      out[name] = (await status(s, [path], linksTo([`${s.base}/t`]))) === 0;
     }
     expect(out).toEqual({
       otherSite: false,
@@ -418,7 +411,7 @@ describe('linksTo, against the ways a page can spell a URL', () => {
           emptyComment: '<!--><a href="/t">x</a><!--->',
           lessThan: '<p>1 < 2 and a<b</p><a href="/t">x</a>',
         },
-        (base, path) => linksTo(`${base}${path}`, [`${base}/t`]),
+        (base) => linksTo([`${base}/t`]),
       ),
     ).toEqual({
       spacedEnd: true,
@@ -521,8 +514,8 @@ describe('what the request asks of the server', () => {
       fixed: (_req, res) => void res.writeHead(200, { 'content-type': 'text/html' }).end(html),
     });
     const page = `${site.base}/gone`;
-    for (const check of [canonicalIs(page, page), linksTo(page, [`${site.base}/t`])]) {
-      const run = commandOf(command(fetchOf(NO_CRAWLER, [page]).fragment, check));
+    for (const check of [canonicalIs(page), linksTo([`${site.base}/t`])]) {
+      const run = commandOf(command(fetchOf(NO_CRAWLER, [page]).fragment, holds(check)));
       site.use('broken');
       expect((await runCommand(run)).status).not.toBe(0);
       site.use('fixed');
@@ -539,7 +532,7 @@ describe('what the request asks of the server', () => {
     site = await twoStateSite({ broken: zipped, fixed: zipped });
     const page = `${site.base}/p`;
     const run = commandOf(
-      command(fetchOf(NO_CRAWLER, [page]).fragment, linksTo(page, [`${site.base}/t`])),
+      command(fetchOf(NO_CRAWLER, [page]).fragment, holds(linksTo([`${site.base}/t`]))),
     );
     expect((await runCommand(run)).status).toBe(0);
   });
@@ -557,16 +550,15 @@ describe('what the request asks of the server', () => {
     const s = await serving({ '/big': big });
     const page = `${s.base}/big`;
     const started = Date.now();
-    expect(await status(s, ['/big'], linksTo(page, [`${s.base}/t`], [`${s.base}/no`]))).toBe(0);
-    expect(await status(s, ['/big'], canonicalIs(page, page))).toBe(0);
-    expect(await status(s, ['/big'], noLinkSays(page, [crawledWord('read more')]))).not.toBe(0);
+    expect(await status(s, ['/big'], linksTo([`${s.base}/t`], [`${s.base}/no`]))).toBe(0);
+    expect(await status(s, ['/big'], canonicalIs(page))).toBe(0);
+    expect(await status(s, ['/big'], noLinkSays([crawledWord('read more')]))).not.toBe(0);
     expect(Date.now() - started).toBeLessThan(10_000);
   });
 });
 
 describe('canonicalIs', () => {
-  const is = (target: string) => (base: string, path: string) =>
-    canonicalIs(`${base}${path}`, `${base}${target}`);
+  const is = (target: string) => (base: string) => canonicalIs(`${base}${target}`);
   const head = (inner: string, body = '') =>
     `<html><head>${inner}</head><body>${body}</body></html>`;
   const tag = (href: string) => `<link rel="canonical" href="${href}">`;
@@ -737,8 +729,7 @@ describe('hreflangHolds', () => {
 });
 
 describe('noLinkSays', () => {
-  const check = (base: string, path: string) =>
-    noLinkSays(`${base}${path}`, [crawledWord('Click here'), crawledWord('read more')]);
+  const check = () => noLinkSays([crawledWord('Click here'), crawledWord('read more')]);
 
   it('passes when the page has links and the first text for each target is not a listed one', async () => {
     expect(
@@ -789,12 +780,7 @@ describe('listsDiffer', () => {
       '/own': `${nav}${items(3, 4)}`,
       '/own-last': `${nav}${items(5)}`,
     });
-    const run = (later: string) =>
-      status(
-        s,
-        ['/list', later],
-        listsDiffer(`${s.base}/list`, `${s.base}${later}`, crawledWord('page=')),
-      );
+    const run = (later: string) => status(s, ['/list', later], listsDiffer(crawledWord('page=')));
     expect(await run('/repeat')).not.toBe(0);
     expect(await run('/repeat-and-sort')).not.toBe(0);
     expect(await run('/repeat-and-unrelated')).not.toBe(0);
@@ -806,16 +792,34 @@ describe('listsDiffer', () => {
   });
 });
 
-describe('both', () => {
-  it('passes when each command passes', async () => {
+describe('holds', () => {
+  it('asks two things of two pages in one program, and passes when both hold', async () => {
+    const s = await serving({
+      '/p': '<head><link rel="canonical" href="/p"></head><a href="t">x</a>',
+      '/dir/q': '<a href="t">x</a>',
+    });
+    const run = (canonical: string, target: string) =>
+      status(
+        s,
+        ['/p', '/dir/q'],
+        canonicalIs(`${s.base}${canonical}`, 1),
+        linksTo([target], [], 2),
+      );
+    // each page's relative link starts from its own address
+    expect(await run('/p', `${s.base}/dir/t`)).toBe(0);
+    expect(await run('/p', `${s.base}/t`)).not.toBe(0);
+    expect(await run('/other', `${s.base}/dir/t`)).not.toBe(0);
+    const command = commandOf(
+      holdsCommand(s, ['/p', '/dir/q'], canonicalIs(`${s.base}/p`, 1), linksTo([s.base], [], 2)),
+    );
+    expect(command.match(/awk/g)).toHaveLength(1);
+    expect(command.match(/function scan\(/g)).toHaveLength(1);
+  });
+
+  it('does not pass when a page it is to read was not fetched', async () => {
     const s = await serving({ '/p': '<a href="/t">x</a>' });
-    const one = (target: string) =>
-      joined(fetchOf(NO_CRAWLER, [`${s.base}/p`]).fragment, linksTo(`${s.base}/p`, [target]));
-    const run = async (a: string, b: string) =>
-      (await runCommand(commandOf(command(both(one(a), one(b)))))).status;
-    expect(await run(`${s.base}/t`, `${s.base}/t`)).toBe(0);
-    expect(await run(`${s.base}/t`, `${s.base}/u`)).not.toBe(0);
-    expect(await run(`${s.base}/u`, `${s.base}/t`)).not.toBe(0);
+    expect(await status(s, ['/p'], linksTo([`${s.base}/t`], [], 1))).toBe(0);
+    expect(await status(s, ['/p'], linksTo([`${s.base}/t`], [], 2))).not.toBe(0);
   });
 });
 
@@ -838,29 +842,23 @@ describe('a command over hostile values', () => {
         const target = new URL(
           `http://127.0.0.1:9/${encodeURIComponent(path)}?q=${encodeURIComponent(text)}`,
         ).href;
-        const page = part`printf '<a href="/x">y</a>'`;
+        const page = part`printf '<a href="/x">y</a> crawlmouse:end http://127.0.0.1:9/p '`;
         const built = commandOf(
           command(
             page,
-            linksTo(target, [target], [target]),
-            part` ; `,
-            page,
-            canonicalIs(target, target),
-            part` ; `,
-            page,
-            noLinkSays(target, [crawledWord(text), crawledWord(path)]),
-            part` ; `,
-            page,
-            hreflangHolds({
-              self: target,
-              fallback: true,
-              must: [target],
-              goneValues: [crawledWord(text), crawledWord(path)],
-              goneUrls: [target],
-            }),
-            part` ; `,
-            page,
-            listsDiffer(target, target, crawledWord(text)),
+            holds(
+              linksTo([target], [target]),
+              canonicalIs(target),
+              noLinkSays([crawledWord(text), crawledWord(path)]),
+              hreflangHolds({
+                self: target,
+                fallback: true,
+                must: [target],
+                goneValues: [crawledWord(text), crawledWord(path)],
+                goneUrls: [target],
+              }),
+              listsDiffer(crawledWord(text)),
+            ),
           ),
         );
         expect(built).not.toMatch(/[\r\n]/);

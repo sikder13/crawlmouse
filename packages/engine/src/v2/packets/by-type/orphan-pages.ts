@@ -2,18 +2,33 @@
  * orphan_pages: a page no other crawled page links to (detectors/orphans.ts). The change is one link,
  * on the parent the audit suggests when it suggests one (build/grade.ts `suggestedParents`).
  *
- * Verify fetches the page the link goes on and looks for an `<a>` to the orphan. With no suggested
- * parent there is no such page to name: the command then requests the homepage, which holds no link
- * to the orphan today, and its `expect` tells the developer to put their own page in its place.
+ * Verify fetches the page the link goes on, at the address its content was read at (served-at.ts
+ * `readAt`: a homepage that answers at `/en/` is requested there), and looks for an `<a>` to the
+ * orphan. With no suggested parent there is no such page to name: the command then requests the
+ * homepage, which holds no link to the orphan today, and its `expect` tells the developer to put
+ * their own page in its place.
  *
  * A page no link reaches is also a deep page, so the same URL can carry a deep_pages fix. The two
  * packets name one page when they can (deep-pages.ts `linkFrom`): this one says how far the suggested
  * parent is from the homepage, and whether a link there settles the depth too.
  */
 import { MAX_HEALTHY_DEPTH } from '../../detectors/thresholds.js';
-import { command, fetchOf, linksTo } from '../html-checks.js';
+import { command, fetchOf, holds, linksTo } from '../html-checks.js';
 import { servedAt } from '../served-at.js';
-import { clicksFromHome, CRAWLABLE_LINK, plural, rowOf, subjectOf, titleOf } from '../structure.js';
+import {
+  addressesOf,
+  clicksFromHome,
+  CRAWLABLE_LINK,
+  pathOf,
+  pathWord,
+  plural,
+  readShown,
+  rowOf,
+  seeTags,
+  subjectOf,
+  TAGS,
+  titleOf,
+} from '../structure.js';
 import { code, count, line, type Line } from '../text.js';
 import type { PacketEntry, PacketFacts } from '../types.js';
 
@@ -71,12 +86,17 @@ export const orphanPages: PacketEntry<'orphan_pages'> = {
     const on = parent ?? facts.homepage_url;
     const fetch = fetchOf(facts, [on]);
     return {
-      command: command(fetch.fragment, linksTo(servedAt(facts, on), [url])),
+      command: command(fetch.fragment, holds(linksTo(addressesOf(facts, url)))),
       expect:
         parent === null
-          ? line`Exit status 0 once the page requested holds an <a> whose href is ${shown}, in full or from the root. The audit suggests no parent, so the command requests the homepage: put the URL of the page you added the link to in its place. Today no crawled page holds such a link.`
-          : line`Exit status 0 once ${code(servedAt(facts, parent))} holds an <a> whose href is ${shown}, in full or from the root. Today no crawled page holds such a link.`,
+          ? line`Exit status 0 once the page requested holds an <a> whose href is ${shown}, however the URL is written. The audit suggests no parent, so the command requests the homepage: put the URL of the page you added the link to in its place. Today no crawled page holds such a link.`
+          : line`Exit status 0 once ${readShown(facts, parent)} holds an <a> whose href is ${shown}, however the URL is written. Today no crawled page holds such a link.`,
       ua: fetch.ua,
+      see: {
+        command: seeTags(facts, [on], TAGS.a, [pathWord(url)]),
+        today: line`Nothing: the crawl found no link to ${shown} on any page.`,
+        after: line`The <a> tag you added: a line that holds ${code(pathOf(url))}. A link that spells the path another way is not printed; the exact check reads it.`,
+      },
     };
   },
 };
