@@ -364,6 +364,38 @@ describe('the edge-rule verify command', () => {
     expect((await runCommand(slashless)).status).not.toBe(0);
   });
 
+  it('on a site whose page answers 301 to another address: requests the address that answered 200', async () => {
+    const ua = userAgentOf(entryOf('PerplexityBot'));
+    const serve =
+      (refuse: boolean): RequestListener =>
+      (req, res) => {
+        if (req.url === '/') {
+          res.statusCode = 301;
+          res.setHeader('location', '/en/');
+        } else if (refuse && String(req.headers['user-agent']).includes(ua)) {
+          res.statusCode = 403;
+        }
+        res.end('<html><body>page</body></html>');
+      };
+    site = await twoStateSite({ broken: serve(true), fixed: serve(false) });
+    const page = site.base;
+    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: [page] });
+    const pages = new Map([
+      [page, { url: page, final_url: `${page}/en/`, status_code: 200 } as PageResult],
+    ]);
+    const p = compose(builder, record, factsOf(rows, NO_STACK, pages));
+    expect(p.verify.command).toContain(`'${page}/en/'`);
+    // the page keeps its own address where the packet names it
+    expect(p.context).toContain(`Page refused: \`${page}\`.`);
+    const { broken, fixed } = await inBothStates(site, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    // requested at its own address the command reads the redirect, fixed or not
+    const own = compose(builder, record, factsOf(rows)).verify.command;
+    site.use('fixed');
+    expect((await runCommand(own)).status).not.toBe(0);
+  });
+
   it('passes behind 103 Early Hints once fixed: the last status line decides', async () => {
     const ua = userAgentOf(CRAWLER_REGISTRY_V2.find((e) => e.token === 'PerplexityBot')!);
     const serve =

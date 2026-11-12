@@ -7,7 +7,7 @@
  * mechanism. The finding is for the template by that sample, and the context says its size.
  *
  * Verify. The record holds no phrase of the page, so the command counts words: it requests the first
- * rendered page of the record at the address it is served at (served-at.ts) and counts the words of
+ * rendered page of the record at the address the crawl read it at (served-at.ts `readAt`) and counts the words of
  * the HTML response outside the elements in SKIPPED. It exits 0 when the count reaches `wordsNeeded`:
  * the count at which the page's share of its measured rendered words is READABLE_FROM
  * (render/state.ts). Text inside a script, an inline JSON state included, is not counted.
@@ -22,7 +22,7 @@
 import type { RenderedDetection, RenderedPage } from '../../detectors/rendered.js';
 import { EMPTY_SHELL_LEAVES_ABOVE, READABLE_FROM } from '../../render/state.js';
 import { userAgentOf, verifyCrawler } from '../crawler.js';
-import { servedAt } from '../served-at.js';
+import { readAt, servedAt } from '../served-at.js';
 import { int, sh, url, word } from '../shell.js';
 import { code, count, line, list, ours, type Line, type Safe } from '../text.js';
 import type { Change, DocSource, PacketEntry, PacketFacts } from '../types.js';
@@ -247,7 +247,7 @@ export const clientRenderedTemplate: PacketEntry<'client_rendered_template'> = {
     }
     const need = wordsNeeded(page);
     const entry = verifyCrawler(facts);
-    const address = url(servedAt(facts, page.url));
+    const address = url(readAt(facts, page.url));
     const skipped = list(
       SKIPPED.map((tag) => ours(`\`${tag}\``)),
       SKIPPED.length,

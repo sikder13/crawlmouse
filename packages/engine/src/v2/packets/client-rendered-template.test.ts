@@ -418,6 +418,35 @@ describe('the client-rendered template verify command', () => {
     expect((await runCommand(slashless)).status).not.toBe(0);
   });
 
+  it('on a site whose page answers 301 to another address: requests the address that answered 200', async () => {
+    const at =
+      (body: string) =>
+      (
+        req: { url?: string },
+        res: { statusCode: number; setHeader(n: string, v: string): void; end(b: string): void },
+      ) => {
+        if (req.url === '/en/guides/winter') return html(body)(req, res);
+        res.statusCode = 301;
+        res.setHeader('location', '/en/guides/winter');
+        res.end('<html><body>Moved</body></html>');
+      };
+    site = await twoStateSite({ broken: at(SHELL), fixed: at(SERVER_RENDERED) });
+    const record = measured(site.base);
+    const url = record.evidence.pages[0]!.url;
+    const landed = `${site.base}/en/guides/winter`;
+    const pages = new Map([[url, { url, final_url: landed, status_code: 200 } as PageResult]]);
+    const p = compose(builder, record, factsOf(SERVED, pages));
+    expect(p.verify.command).toContain(`'${landed}'`);
+    // the page keeps its own address where the packet names it
+    expect(p.context[1]).toMatch(new RegExp(`^\`${url}\`: `));
+    const { broken, fixed } = await inBothStates(site, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    // requested at its own address the command counts the redirect's body, fixed or not
+    const own = compose(builder, record, factsOf()).verify.command;
+    expect((await runCommand(own)).status).not.toBe(0);
+  });
+
   it('passes on a server-rendered page whose head is not closed', async () => {
     const unclosed = SERVER_RENDERED.replace('</head>', '');
     expect(unclosed).not.toBe(SERVER_RENDERED);

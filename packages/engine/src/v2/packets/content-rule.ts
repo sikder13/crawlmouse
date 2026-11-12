@@ -11,7 +11,7 @@ import type { ContentDetection } from '../content/aggregate.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
 import { CHROME } from '../content/thresholds.js';
 import { userAgentOf, verifyCrawler } from './crawler.js';
-import { servedAt } from './served-at.js';
+import { readAt, servedAt } from './served-at.js';
 import { sh, url, word, type Command } from './shell.js';
 import { code, count, line, list, ours, type Line, type Safe } from './text.js';
 import type { PacketFacts } from './types.js';
@@ -117,8 +117,8 @@ export const RECHECK = ours(
 );
 
 /**
- * The command of a content packet: fetch the page at the address it is served at (served-at.ts), put
- * each tag on its own line (`tr` turns line
+ * The command of a content packet: fetch the page at the address the crawl read it at (served-at.ts
+ * `readAt`), put each tag on its own line (`tr` turns line
  * breaks into spaces and each `<` into a line break, so a line starts with a tag's name and holds the
  * text up to the next tag), and let `program`, an awk program of ours, exit 0 when what it looks for
  * is there. Requested as a crawler the site serves today (crawler.ts), or as none when the audit
@@ -128,7 +128,7 @@ export function tagProbe(facts: PacketFacts, page: string, program: string): Tag
   const from = word('\\r\\n<');
   const to = word('  \\n');
   const entry = verifyCrawler(facts);
-  const address = url(servedAt(facts, page));
+  const address = url(readAt(facts, page));
   if (entry === null) {
     return {
       command: sh`curl -sS ${address} | tr ${from} ${to} | awk ${word(program)}`,

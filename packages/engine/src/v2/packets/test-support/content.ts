@@ -97,10 +97,11 @@ export function contentFacts(
 }
 
 /** The check's row for a page the crawl requested at `url` and was answered at `final_url`. */
-export const servedRow = (url: string, final_url: string): [string, PageResult] => [
-  url,
-  { url, final_url } as PageResult,
-];
+export const servedRow = (
+  url: string,
+  final_url: string,
+  status_code?: number,
+): [string, PageResult] => [url, { url, final_url, status_code } as PageResult];
 
 /** The engine's verdict on one page for the check behind `type`: readPage, then the check's judge. */
 export const engineVerdict = (type: ContentFixType, html: string): PageVerdict =>
@@ -190,6 +191,32 @@ export function contentCommandOnSites(
       const run = await inBothStates(site, packet.verify.command);
       expect(run.broken.status).not.toBe(0);
       expect(run.fixed.status).toBe(0);
+    });
+  });
+
+  describe(`${type}: the command on a site whose page answers 301 to another address`, () => {
+    it('requests the address that answered 200, fails before the fix and passes after', async () => {
+      const serve = (html: string) => (req: IncomingMessage, res: ServerResponse) => {
+        if (req.url === '/en/blog/a') return void res.end(html);
+        res.statusCode = 301;
+        res.setHeader('location', '/en/blog/a');
+        res.end('<html><body>Moved</body></html>');
+      };
+      const site = await twoStateSite({ broken: serve(pages.broken), fixed: serve(pages.fixed) });
+      open.push(site);
+      const page = `${site.base}/blog/a`;
+      const landed = `${site.base}/en/blog/a`;
+      const facts = contentFacts('every_crawler', null, new Map([servedRow(page, landed, 200)]));
+      const packet = writePacket(type, contentRecord(type, { affected_urls: [page] }), facts)!;
+      expect(packet.verify.command).toContain(`'${landed}'`);
+      // the page keeps its own address where the packet names it
+      expect(packet.context).toContain(`Failing page: \`${page}\`.`);
+      const run = await inBothStates(site, packet.verify.command);
+      expect(run.broken.status).not.toBe(0);
+      expect(run.fixed.status).toBe(0);
+      // requested at its own address the command reads the redirect's body, fixed or not
+      const own = writePacket(type, contentRecord(type, { affected_urls: [page] }), contentFacts())!;
+      expect((await runCommand(own.verify.command)).status).not.toBe(0);
     });
   });
 

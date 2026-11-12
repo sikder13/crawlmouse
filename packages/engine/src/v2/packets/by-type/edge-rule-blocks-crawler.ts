@@ -10,16 +10,16 @@
  * Cloudflare's page for error 1020 says which rules answer with it, so a record whose rows name that
  * cause gets the steps that page supports and no other.
  *
- * Verify: the first affected page, requested at the address it is served at (served-at.ts) with the
- * crawler's user agent, must answer 200 without a header of MITIGATION, the response headers the
- * crawl worker reads a challenge from. A redirect is not followed, so a rule that redirects the
- * crawler to a challenge does not pass. The body is not read: `expect` says so.
+ * Verify: the first affected page, requested at the address the crawl read it at (served-at.ts
+ * `readAt`) with the crawler's user agent, must answer 200 without a header of MITIGATION, the
+ * response headers the crawl worker reads a challenge from. A redirect is not followed, so a rule
+ * that redirects the crawler to a challenge does not pass. The body is not read: `expect` says so.
  */
 import type { AccessCause, AccessTest } from '@crawlmouse/types/v2';
 import type { AccessDetection } from '../../access/types.js';
 import { CRAWLER_REGISTRY_V2 } from '../../crawler-registry.js';
 import { userAgentOf, verifyCrawler } from '../crawler.js';
-import { servedAt } from '../served-at.js';
+import { readAt, servedAt } from '../served-at.js';
 import { sh, url, word } from '../shell.js';
 import { code, count, line, list, ours, type Line } from '../text.js';
 import type { DocSource, PacketEntry, PacketFacts } from '../types.js';
@@ -254,7 +254,7 @@ export const edgeRuleBlocksCrawler: PacketEntry<'edge_rule_blocks_crawler'> = {
       `Exits 0 when the page answers status 200 to this user agent with no challenge header (${headers.text}), and prints nothing. A redirect is not followed and does not pass. The command reads the status and those headers, not the body: a block page served with status 200 and none of those headers passes.`,
     );
     return {
-      command: sh`curl -sS -o /dev/null -D - -A ${word(userAgentOf(entry))} ${url(servedAt(facts, page))} | awk ${word(SERVED_UNCHALLENGED)}`,
+      command: sh`curl -sS -o /dev/null -D - -A ${word(userAgentOf(entry))} ${url(readAt(facts, page))} | awk ${word(SERVED_UNCHALLENGED)}`,
       expect:
         today === null
           ? line`${pass}`
