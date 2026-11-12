@@ -430,6 +430,39 @@ describe('a failure around the claim retries the step (inngest/mail.ts `guarded`
     expect(t.transport.sent).toHaveLength(1);
     expect(mark).toHaveBeenCalledTimes(2);
   });
+
+  it('an Agency Plus sent_at write that fails: retried, and the retry marks it without sending again', async () => {
+    const CONTACT = 'd0000000-0000-4000-8000-000000000002';
+    let sentAt: string | null = null;
+    const mark = vi
+      .fn<MailStore['markContactSent']>()
+      .mockRejectedValueOnce(new Error('contact_requests update: 503'))
+      .mockImplementation(async (_id, at) => {
+        sentAt ??= at.toISOString();
+      });
+    const t = setup(
+      store({
+        contactRequest: vi.fn(async () => ({
+          email: 'buyer@agency.example',
+          sites: 40,
+          note: null,
+          sentAt,
+        })),
+        markContactSent: mark,
+      }),
+    );
+    const data = { template: 'agency_plus_contact', contactId: CONTACT } as const;
+    await expect(step(() => t.h.accountEmail(data))).rejects.toMatchObject({
+      code: 'mark_sent_failed',
+    });
+    expect(sentAt).toBeNull();
+    expect(await step(() => t.h.accountEmail(data))).toBe('done');
+    expect(t.transport.sent).toHaveLength(1);
+    expect(mark).toHaveBeenCalledTimes(2);
+    expect(sentAt).toBe(NOW.toISOString());
+    // Marked, so the next replay reads it as sent and claims nothing.
+    expect(await step(() => t.h.accountEmail(data))).toBe('already_sent');
+  });
 });
 
 describe('check_finished (D11)', () => {
