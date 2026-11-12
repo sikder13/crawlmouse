@@ -1,6 +1,6 @@
 import { expect, type Page } from './pw';
 import { PREVIEWS as REGISTRY } from '../../apps/web/app/(v2-preview)/v2-preview/_preview/registry';
-import { MAIL_PREVIEWS as MAIL_REGISTRY } from '../../apps/web/lib/v2/mail/templates/previews';
+import { MAIL_PREVIEW_INDEX as MAIL_REGISTRY } from '../../apps/web/lib/v2/mail/templates/preview-index';
 
 /** '/v2-preview/screens/home' -> 'screen-home'; '/v2-preview/button' -> 'button'. */
 export const slugOf = (path: string) =>
@@ -26,7 +26,7 @@ export const PREVIEWS = REGISTRY.flatMap((p) =>
 );
 
 /**
- * Every email template's preview page (`apps/web/lib/v2/mail/templates/previews.ts`), screenshotted at
+ * Every email template's preview page (`apps/web/lib/v2/mail/templates/preview-index.ts`), screenshotted at
  * a mail client's widths: 600 px, the layout's column, and 390 px, a phone.
  */
 export const MAIL_PREVIEWS = MAIL_REGISTRY.map((p) => ({

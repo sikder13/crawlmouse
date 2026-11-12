@@ -8,6 +8,7 @@
 import { fixture } from '../../fixtures';
 import { packetPrompt } from '../../view/segment/fixes';
 import type { MailKind, RenderedMail } from '../types';
+import { MAIL_PREVIEW_INDEX, type MailPreviewSlug } from './preview-index';
 import { accountDelete, emailChangeConfirm, emailChangeNotice } from './account-links';
 import { alertTemplate } from './alert';
 import { checkNotify } from './check-notify';
@@ -37,90 +38,51 @@ const badFix = () => bad().fixes.find((f) => f.packet !== null)!;
 const badChanges = () =>
   bad().changes.filter((c) => c.check_id === badCheck() && c.kind !== 'baseline');
 
-export const MAIL_PREVIEWS: readonly MailPreview[] = [
-  {
-    slug: 'check-notify',
-    name: 'Check notify, finished',
-    kind: 'check_notify',
-    render: () => checkNotify({ host: badHost(), checkId: badCheck(), outcome: 'finished' }),
+const RENDERS: Record<MailPreviewSlug, () => RenderedMail> = {
+  'check-notify': () => checkNotify({ host: badHost(), checkId: badCheck(), outcome: 'finished' }),
+  'check-notify-failed': () =>
+    checkNotify({ host: badHost(), checkId: badCheck(), outcome: 'failed' }),
+  'fix-to-developer': () => {
+    const fix = badFix();
+    return fixToDeveloper({
+      host: badHost(),
+      fixTitle: fix.title,
+      packet: packetPrompt(fix, fix.packet!),
+    });
   },
-  {
-    slug: 'check-notify-failed',
-    name: 'Check notify, failed',
-    kind: 'check_notify',
-    render: () => checkNotify({ host: badHost(), checkId: badCheck(), outcome: 'failed' }),
-  },
-  {
-    slug: 'fix-to-developer',
-    name: 'Fix to a developer',
-    kind: 'fix_to_developer',
-    render: () => {
-      const fix = badFix();
-      return fixToDeveloper({
-        host: badHost(),
-        fixTitle: fix.title,
-        packet: packetPrompt(fix, fix.packet!),
-      });
-    },
-  },
-  {
-    slug: 'trial-reminder',
-    name: 'Trial reminder, no card',
-    kind: 'trial_reminder',
-    render: () =>
-      trialReminder({
-        plan: 'pro',
-        variant: 'no_card',
-        endsAt: '2026-11-08T02:41:00.000Z',
-        timezone: 'America/Indiana/Indianapolis',
-      }),
-  },
-  {
-    slug: 'email-change-confirm',
-    name: 'Email change, confirm',
-    kind: 'email_change_confirm',
-    render: () => emailChangeConfirm({ token: TOKEN }),
-  },
-  {
-    slug: 'email-change-notice',
-    name: 'Email change, notice to the old address',
-    kind: 'email_change_notice',
-    render: () => emailChangeNotice({ token: TOKEN }),
-  },
-  {
-    slug: 'account-delete',
-    name: 'Account deletion, confirm and restore',
-    kind: 'account_delete',
-    render: () => accountDelete({ confirmToken: TOKEN, restoreToken: RESTORE }),
-  },
-  {
-    slug: 'alert',
-    name: 'Alert',
-    kind: 'alert',
-    render: () =>
-      alertTemplate({
-        host: badHost(),
-        checkId: badCheck(),
-        checkedAt: bad().checks[0]!.finished_at ?? '2026-11-09T06:00:00.000Z',
-        zone: 'America/Indiana/Indianapolis',
-        changes: badChanges(),
-        unsubscribeUrl: UNSUBSCRIBE,
-      }),
-  },
-  {
-    slug: 'weekly-summary',
-    name: 'Weekly summary',
-    kind: 'weekly_summary',
-    render: () =>
-      weeklySummaryTemplate({
-        since: '2026-11-02T05:00:00.000Z',
-        until: '2026-11-09T05:00:00.000Z',
-        zone: 'America/Indiana/Indianapolis',
-        sites: [{ siteId: bad().sites[0]!.id, host: badHost(), changes: badChanges() }],
-        unsubscribeUrl: UNSUBSCRIBE,
-      }),
-  },
-];
+  'trial-reminder': () =>
+    trialReminder({
+      plan: 'pro',
+      variant: 'no_card',
+      endsAt: '2026-11-08T02:41:00.000Z',
+      timezone: 'America/Indiana/Indianapolis',
+    }),
+  'email-change-confirm': () => emailChangeConfirm({ token: TOKEN }),
+  'email-change-notice': () => emailChangeNotice({ token: TOKEN }),
+  'account-delete': () => accountDelete({ confirmToken: TOKEN, restoreToken: RESTORE }),
+  alert: () =>
+    alertTemplate({
+      host: badHost(),
+      checkId: badCheck(),
+      checkedAt: bad().checks[0]!.finished_at ?? '2026-11-09T06:00:00.000Z',
+      zone: 'America/Indiana/Indianapolis',
+      changes: badChanges(),
+      unsubscribeUrl: UNSUBSCRIBE,
+    }),
+  'weekly-summary': () =>
+    weeklySummaryTemplate({
+      since: '2026-11-02T05:00:00.000Z',
+      until: '2026-11-09T05:00:00.000Z',
+      zone: 'America/Indiana/Indianapolis',
+      sites: [{ siteId: bad().sites[0]!.id, host: badHost(), changes: badChanges() }],
+      unsubscribeUrl: UNSUBSCRIBE,
+    }),
+};
+
+export const MAIL_PREVIEWS: readonly MailPreview[] = MAIL_PREVIEW_INDEX.map((p) => ({
+  ...p,
+  render: RENDERS[p.slug],
+}));
 
 export const mailPreview = (slug: string): MailPreview | undefined =>
   MAIL_PREVIEWS.find((p) => p.slug === slug);
