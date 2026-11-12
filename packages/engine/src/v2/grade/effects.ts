@@ -170,13 +170,29 @@ const cleared = (seo: TechnicalSeoInput, fingerprint: string): TechnicalSeoInput
   ),
 });
 
-function servedAll(c: CrawlerTally): CrawlerTally {
+/**
+ * The edge fix's counterfactual on its crawler's tally: served, and reading the text, on the pages a
+ * user-agent rule blocked it on. The fix's before and after reads it too (packets/before-after.ts).
+ */
+export function servedAll(c: CrawlerTally): CrawlerTally {
   const blocked = c.counts.blocked_by_ua_rule ?? 0;
   return {
     ...c,
     counts: { ...c.counts, blocked_by_ua_rule: 0, allowed: (c.counts.allowed ?? 0) + blocked },
   };
 }
+
+/**
+ * The content fix's counterfactual on its check's tally: the `failing` pages pass. The fix's before
+ * and after reads it too (packets/before-after.ts).
+ */
+export const allPassing = <T extends { passing: number }>(tally: T, failing: number): T => ({
+  ...tally,
+  passing: tally.passing + failing,
+});
+
+/** The text share of a page once its template is rendered on the server: the whole text. */
+export const SERVER_RENDERED_SHARE = 1;
 
 /** The content checks Quotable counts (CONTENT_CHECKS `scored`): none until CC-18 (labels.test.ts). */
 export const COUNTED: ReadonlySet<ContentCheck> = new Set(
@@ -213,7 +229,7 @@ export function applyFix(
     if (!counts(f, counted) || t === undefined) return inputs;
     const checks = {
       ...ai.quotable.checks,
-      [f.record.check]: { ...t, passing: t.passing + f.record.extent.failing },
+      [f.record.check]: allPassing(t, f.record.extent.failing),
     };
     return { seo, ai: { ...ai, quotable: { checks } } };
   }
@@ -229,7 +245,7 @@ export function applyFix(
       ai: {
         ...ai,
         readable: ai.readable.map((p) =>
-          p.template_key === template ? { ...p, text_share: 1 } : p,
+          p.template_key === template ? { ...p, text_share: SERVER_RENDERED_SHARE } : p,
         ),
       },
     };

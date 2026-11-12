@@ -10,7 +10,10 @@ import {
 import { PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/registry';
 import { RESULT_PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/screens';
 import { SEGMENT_PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/segments';
+import { FixScreen } from '../../components/v2/screens/fix/FixScreen';
 import { findCheck, fixture } from '../../lib/v2/fixtures';
+import { fixView, type FixPlan } from '../../lib/v2/view/fix';
+import { everyPacketString, withBodies } from '../../lib/v2/view/test-support/multi-body';
 import type { ResultView } from '../../lib/v2/view/result';
 import { holds } from './_lib/holds';
 import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
@@ -64,6 +67,24 @@ describe('the Pro wall', () => {
     for (const s of [...q.context, ...q.change, ...q.keep, q.verify.command]) {
       expect(holds(open, s), s).toBe(true);
     }
+  });
+
+  it('puts no body of a locked fix that holds several in the page', () => {
+    const d = structuredClone(fixture('bad-site'));
+    const f = d.fixes.find((x) => x.id === fixIdOf('locked'))!;
+    f.packet = withBodies(f.packet!, ['wordpress', 'generic']);
+    const { check, asFirstSeen } = FIX_SOURCES.locked;
+    const page = (plan: FixPlan) =>
+      renderToStaticMarkup(<FixScreen data={fixView(d, check, f.id, { asFirstSeen, plan })} />);
+    const lines = everyPacketString(f.packet);
+    expect(lines).toHaveLength(everyPacketString(p).length + 2 * 6);
+    const locked = page('free');
+    expect(locked).toContain('See this fix with Pro');
+    for (const s of lines) expect(holds(locked, s), s).toBe(false);
+    // The control: on Pro the page opens on the packet's own body and offers the other two.
+    const open = page('pro');
+    for (const s of [...p.change, p.verify.command]) expect(holds(open, s), s).toBe(true);
+    expect(open).toMatch(/aria-pressed="false"[^>]*>WordPress</);
   });
 
   it('asks for the keep bar instead, and offers no copy or email', () => {

@@ -26,8 +26,10 @@ import {
 import { fixesAsOf, fixture } from '../../../../lib/v2/fixtures';
 import { AI_WAITING } from '../../../../lib/v2/view/effect-headline';
 import { FREE_FIXES } from '../../../../lib/v2/view/free-fixes';
-import { NO_PACKET } from '../../../../lib/v2/view/no-packet';
+import { FOUND_ABOVE, noPacketLine } from '../../../../lib/v2/view/no-packet';
+import { noPacketReason } from '../../../../lib/v2/view/packet-reason';
 import type { SectionFixesView } from '../../../../lib/v2/view/segment/fixes';
+import { everyPacketString, withBodies } from '../../../../lib/v2/view/test-support/multi-body';
 import { SEGMENT_KEYS, type SegmentKey } from '../../../../lib/v2/view/segment/frame';
 import { datasetOfBuilds } from '../../../../lib/v2/view/test-support/built-dataset';
 import {
@@ -133,13 +135,25 @@ describe('/audit/[id]: the result of a measured check, read by a visitor', () =>
     expect(primaries(markup)).toHaveLength(1);
   });
 
-  it('the first-fix card does not say steps are open: the fix it names has no packet', () => {
-    const data = resultOf(one);
+  it('the first-fix card says the steps are open exactly when the fix it names has a packet', () => {
     const fix = fixesAsOf(one.dataset, one.dataset.checks[0]!)[0]!;
-    expect(data.first).toMatchObject({ kind: 'fix', title: fix.title });
-    expect(fix.packet).toBeNull();
-    expect(data.first.body).not.toMatch(/steps|open, free/i);
-    expect(html(<CheckPage read={one} />)).not.toMatch(/The steps\b/);
+    const STEPS = /The steps and the evidence are open, free\./;
+    // As built, and with the packet of each fix forced to each shape.
+    const packet = fixture('bad-site').fixes.find((f) => f.packet !== null)!.packet!;
+    const shaped = (to: typeof packet | null): ReadyCheck => ({
+      ...one,
+      dataset: { ...one.dataset, fixes: one.dataset.fixes.map((f) => ({ ...f, packet: to })) },
+    });
+    for (const [read, has] of [
+      [one, fix.packet !== null],
+      [shaped(null), false],
+      [shaped(packet), true],
+    ] as const) {
+      const data = resultOf(read);
+      expect(data.first).toMatchObject({ kind: 'fix', title: fix.title });
+      expect(STEPS.test(data.first.body)).toBe(has);
+      expect(STEPS.test(html(<CheckPage read={read} />).replace(/&#x27;/g, "'"))).toBe(has);
+    }
   });
 
   it('renders no control that has no route in this step', () => {
@@ -382,79 +396,116 @@ describe('an open fix on a segment page whose steps the audit did not write (rul
   const HANDOFF = 'The packet contains the steps above';
   const COPY = 'Copy as a prompt for your coding tool';
   const paid = (): ReadyCheck => ({ ...one, plan: 'pro' });
-  const withPackets = (read: ReadyCheck): ReadyCheck => ({
+  /** `read` with each fix's packet set by `to`: the two shapes a stored fix has, whatever the engine wrote. */
+  const shaped = (read: ReadyCheck, to: (f: { number: number }) => typeof PACKET | null) => ({
     ...read,
     dataset: {
       ...read.dataset,
-      fixes: read.dataset.fixes.map((f) => ({ ...f, packet: PACKET })),
+      fixes: read.dataset.fixes.map((f) => ({ ...f, packet: to(f) })),
     },
   });
+  const withPackets = (read: ReadyCheck): ReadyCheck => shaped(read, () => PACKET);
+  const withoutPackets = (read: ReadyCheck): ReadyCheck => shaped(read, () => null);
+  /** Every other fix with a packet, the rest without. */
+  const mixed = (read: ReadyCheck): ReadyCheck =>
+    shaped(read, (f) => (f.number % 2 === 0 ? PACKET : null));
   /** The open fixes a segment's view holds. */
   const openOn = (read: ReadyCheck, key: SegmentKey) =>
     (segmentScreen(read, key) as ReactElement<{ data: { fixes?: SectionFixesView } }>).props.data
       .fixes?.open ?? [];
+  /** The stored fix an open fix's view was built from. */
+  const stored = (read: ReadyCheck, id: string) => read.dataset.fixes.find((f) => f.id === id)!;
+  /** How many times the not-written sentence is said (each ends the same way). */
+  const said = (markup: string) => markup.split(escaped(FOUND_ABOVE)).length - 1;
   /** The segments whose page has a fixes card. Changes has none; Signals lists no fix of its own. */
   const PAGES = SEGMENT_KEYS.filter((k) => k !== 'changes');
   /** Those where the measured check, read with every fix open (a paid plan), has an open fix. */
   const withOpen = (read: ReadyCheck) => PAGES.filter((k) => openOn(read, k).length > 0);
 
-  it('the measured check has an open fix with no packet on more than one segment page', () => {
-    expect(first.fixes.map((f) => f.packet)).toEqual(first.fixes.map(() => null));
+  it('the measured check has open fixes on more than one segment page, each with a packet block exactly when the engine wrote its packet', () => {
     expect(withOpen(paid()).length).toBeGreaterThan(1);
     const shown = PAGES.flatMap((k) => openOn(paid(), k));
     expect(shown.length).toBeGreaterThan(FREE_FIXES);
-    expect(shown.map((f) => f.packet)).toEqual(shown.map(() => null));
-  });
-
-  it.each(PAGES)(
-    '%s: says the one line once for each open fix, under its title and effect, with no packet block, handoff or copy button',
-    (key) => {
-      const open = openOn(paid(), key);
-      const markup = html(<SegmentBody read={paid()} segment={key} />);
-      expect(markup.split(escaped(NO_PACKET))).toHaveLength(open.length + 1);
-      for (const f of open) {
-        expect(markup).toContain(escaped(f.title));
-        expect(markup).toContain(escaped(f.unit));
-        expect(f).toMatchObject({ paragraph: [], packet: null, handoff: null, prompt: null });
-      }
-      expect(markup).not.toContain(HANDOFF);
-      expect(markup).not.toContain(COPY);
-      expect(markup).not.toContain('Mark done and re-check now');
-      expect(markup).not.toMatch(/<pre[^>]*>\s*<\/pre>/);
-      // No copy button to hold the orange: the page's one orange element is its next step.
-      expect(primaries(markup)).toHaveLength(1);
-      expect(dead(markup)).toEqual([]);
-    },
-  );
-
-  it.each(PAGES)('%s: the line is absent when the fix has a packet', (key) => {
-    const read = withPackets(paid());
-    const open = openOn(read, key);
-    expect(withOpen(read)).toEqual(withOpen(paid()));
-    const markup = html(<SegmentBody read={read} segment={key} />);
-    expect(markup).not.toContain(escaped(NO_PACKET));
-    expect(markup.split(HANDOFF)).toHaveLength(open.length + 1);
-    expect(markup.split(COPY)).toHaveLength(open.length + 1);
-    expect(primaries(markup)).toHaveLength(1);
-  });
-
-  it('the line is absent for a locked fix: a visitor sees it on the Free three only', () => {
-    const live = fixesAsOf(one.dataset, one.dataset.checks[0]!);
-    const free = new Set(live.slice(0, FREE_FIXES).map((f) => f.id));
-    let lines = 0;
-    let lockedOnly = 0;
-    for (const key of PAGES) {
-      const open = openOn(one, key);
-      expect(open.every((f) => free.has(f.id))).toBe(true);
-      const markup = html(<SegmentBody read={one} segment={key} />);
-      const said = markup.split(escaped(NO_PACKET)).length - 1;
-      expect(said, key).toBe(open.length);
-      lines += said;
-      if (open.length === 0 && markup.includes('See this fix with Pro')) lockedOnly += 1;
+    for (const f of shown) {
+      const fix = stored(one, f.id);
+      expect(f.packet === null, f.title).toBe(fix.packet === null);
+      expect(f.notWritten, f.title).toBe(
+        fix.packet === null ? noPacketLine(noPacketReason(fix.type)) : null,
+      );
     }
-    expect(lines).toBe(FREE_FIXES);
-    // A page that lists locked fixes and no open one was met, and it did not say the line.
-    expect(lockedOnly).toBeGreaterThan(0);
+  });
+
+  describe.each([
+    ['as the engine built it', (r: ReadyCheck) => r],
+    ['every fix without a packet', withoutPackets],
+    ['every other fix with a packet', mixed],
+    ['every fix with a packet', withPackets],
+  ])('the not-written sentence, %s', (_shape, shape) => {
+    it.each(PAGES)(
+      '%s: said once for each open fix with no packet, and a fix with a packet shows its block, handoff and copy button',
+      (key) => {
+        const read = shape(paid());
+        const open = openOn(read, key);
+        expect(withOpen(read)).toEqual(withOpen(paid()));
+        const bare = open.filter((f) => stored(read, f.id).packet === null);
+        const written = open.filter((f) => stored(read, f.id).packet !== null);
+        const markup = html(<SegmentBody read={read} segment={key} />);
+        expect(said(markup)).toBe(bare.length);
+        for (const f of open) {
+          expect(markup).toContain(escaped(f.title));
+          expect(markup).toContain(escaped(f.unit));
+        }
+        for (const f of bare) {
+          expect(f).toMatchObject({ paragraph: [], packet: null, handoff: null, prompt: null });
+          expect(f.notWritten).toBe(noPacketLine(noPacketReason(stored(read, f.id).type)));
+          expect(markup).toContain(escaped(f.notWritten!));
+        }
+        for (const f of written) {
+          expect(f.notWritten).toBeNull();
+          expect(markup).toContain(escaped(f.packet!));
+        }
+        expect(markup.split(HANDOFF)).toHaveLength(written.length + 1);
+        expect(markup.split(COPY)).toHaveLength(written.length + 1);
+        expect(markup).not.toMatch(/<pre[^>]*>\s*<\/pre>/);
+        // One orange element: the first copy button, or the page's next step where there is none.
+        expect(primaries(markup)).toHaveLength(1);
+        expect(dead(markup)).toEqual([]);
+      },
+    );
+  });
+
+  it('the shapes above were both met: a page with a fix that has a packet beside one that has none', () => {
+    const both = PAGES.filter((key) => {
+      const open = openOn(mixed(paid()), key);
+      const packets = new Set(open.map((f) => f.packet === null));
+      return packets.size === 2;
+    });
+    expect(both.length).toBeGreaterThan(0);
+  });
+
+  it('the sentence is absent for a locked fix: a visitor sees it on the Free fixes that have no packet only', () => {
+    for (const read of [one, withoutPackets(one)]) {
+      const live = fixesAsOf(read.dataset, read.dataset.checks[0]!);
+      const free = live.slice(0, FREE_FIXES);
+      let lines = 0;
+      let lockedOnly = 0;
+      for (const key of PAGES) {
+        const open = openOn(read, key);
+        expect(open.every((f) => free.some((x) => x.id === f.id))).toBe(true);
+        const markup = html(<SegmentBody read={read} segment={key} />);
+        expect(said(markup), key).toBe(open.filter((f) => f.packet === null).length);
+        lines += said(markup);
+        if (open.length === 0 && markup.includes('See this fix with Pro')) lockedOnly += 1;
+      }
+      expect(lines).toBe(free.filter((f) => f.packet === null).length);
+      // A page that lists locked fixes and no open one was met, and it did not say the sentence.
+      expect(lockedOnly).toBeGreaterThan(0);
+    }
+    // With no packet stored, each of the Free fixes says it.
+    const bare = withoutPackets(one);
+    expect(
+      PAGES.reduce((n, key) => n + said(html(<SegmentBody read={bare} segment={key} />)), 0),
+    ).toBe(FREE_FIXES);
   });
 });
 
@@ -462,24 +513,50 @@ describe('/audit/[id]/fix/[fixId]', () => {
   const live = () => fixesAsOf(one.dataset, one.dataset.checks[0]!);
   /** A packet the contract accepts: the bad-site fixture's first. */
   const PACKET = fixture('bad-site').fixes.find((f) => f.packet !== null)!.packet!;
-  /** The check with that packet on each of its fixes. */
-  const withPackets = (): ReadyCheck => ({
+  /** The check with `packet` on each of its fixes. */
+  const withPacket = (packet: typeof PACKET | null): ReadyCheck => ({
     ...one,
-    dataset: {
-      ...one.dataset,
-      fixes: one.dataset.fixes.map((f) => ({ ...f, packet: PACKET })),
-    },
+    dataset: { ...one.dataset, fixes: one.dataset.fixes.map((f) => ({ ...f, packet })) },
+  });
+  const withPackets = () => withPacket(PACKET);
+  const said = (markup: string) => markup.split(escaped(FOUND_ABOVE)).length - 1;
+
+  it('an open fix of the measured check shows its packet, or one sentence saying why it has none', () => {
+    for (const read of [one, withPacket(null), withPackets()]) {
+      const fix = read.dataset.fixes.find((f) => f.id === live()[0]!.id)!;
+      const found = fixOf(read, fix.id)!;
+      const markup = html(<FixBody read={read} found={found} />);
+      expect(dead(markup)).toEqual([]);
+      expect(markup).toContain(escaped(fix.title));
+      if (fix.packet === null) {
+        const why = noPacketLine(noPacketReason(fix.type));
+        expect(found.view).toMatchObject({ kind: 'open', packet: null, notWritten: why });
+        // The page says so once, and shows what the audit does hold of the fix.
+        expect(markup.split(escaped(why))).toHaveLength(2);
+        expect(said(markup)).toBe(1);
+        expect(markup).not.toContain('<pre');
+      } else {
+        expect(found.view).toMatchObject({ kind: 'open', notWritten: null });
+        expect(said(markup)).toBe(0);
+        expect(markup).toContain(escaped(fix.packet.change[0]!));
+        expect(markup).toContain(escaped(fix.packet.verify.command));
+      }
+    }
   });
 
-  it('the engine writes no packet yet, so an open fix of a measured check shows none', () => {
-    expect(first.fixes.map((f) => f.packet)).toEqual(first.fixes.map(() => null));
-    const found = fixOf(one, live()[0]!.id)!;
-    expect(found.view).toMatchObject({ kind: 'open', packet: null });
-    const markup = html(<FixBody read={one} found={found} />);
-    expect(dead(markup)).toEqual([]);
-    // The page says so, in one line, and shows what the audit does hold of the fix.
-    expect(markup.split(NO_PACKET)).toHaveLength(2);
-    expect(markup).toContain(escaped(live()[0]!.title));
+  it('the sentence gives the engine’s reason for a fix type it writes no packet for, and names the last check otherwise', () => {
+    const read = withPacket(null);
+    const reasons = new Set(
+      live().map((f) => {
+        const found = fixOf({ ...read, plan: 'pro' }, f.id)!;
+        if (found.view.kind !== 'open') throw new Error(found.view.kind);
+        const reason = noPacketReason(f.type);
+        expect(found.view.notWritten).toBe(noPacketLine(reason));
+        if (reason !== null) expect(found.view.notWritten).toContain(reason);
+        return reason;
+      }),
+    );
+    expect(reasons.size).toBeGreaterThan(0);
   });
 
   it('a page with no way to mark a fix done leaves out the card that describes it', () => {
@@ -502,14 +579,15 @@ describe('/audit/[id]/fix/[fixId]', () => {
     const read = withPackets();
     const open = fixOf(read, live()[0]!.id)!;
     expect(open.view).toMatchObject({ kind: 'open' });
-    expect(html(<FixBody read={read} found={open} />)).not.toContain(NO_PACKET);
+    expect(said(html(<FixBody read={read} found={open} />))).toBe(0);
     // Locked, with no packet stored: the wall stands where the line would be.
-    const locked = fixOf(one, live()[FREE_FIXES]!.id)!;
+    const bare = withPacket(null);
+    const locked = fixOf(bare, live()[FREE_FIXES]!.id)!;
     expect(locked.view.kind).toBe('locked');
-    expect(html(<FixBody read={one} found={locked} />)).not.toContain(NO_PACKET);
+    expect(said(html(<FixBody read={bare} found={locked} />))).toBe(0);
     // Opened by a paid plan, still with no packet: the line is there.
-    const paid = fixOf({ ...one, plan: 'pro' }, live()[FREE_FIXES]!.id)!;
-    expect(html(<FixBody read={{ ...one, plan: 'pro' }} found={paid} />)).toContain(NO_PACKET);
+    const paid = fixOf({ ...bare, plan: 'pro' }, live()[FREE_FIXES]!.id)!;
+    expect(said(html(<FixBody read={{ ...bare, plan: 'pro' }} found={paid} />))).toBe(1);
   });
 
   it('a Free fix opens in full, with its packet', () => {
@@ -541,6 +619,32 @@ describe('/audit/[id]/fix/[fixId]', () => {
       expect(markup).not.toContain(escaped(line));
     }
     expect(markup).toContain('The packet');
+  });
+
+  it("no body of a locked fix's packet is in the view or the page, and each is in the view once a plan opens it", () => {
+    const several = withBodies(PACKET, ['wordpress', 'nextjs']);
+    const read = withPacket(several);
+    const fix = read.dataset.fixes.find((f) => f.id === live()[FREE_FIXES]!.id)!;
+    const secret = everyPacketString(fix.packet!);
+    // The packet's own body and two more, each with its context, change, keep, command and expectation.
+    expect(secret.length).toBe(everyPacketString(PACKET).length + 2 * 6);
+    const found = fixOf(read, fix.id)!;
+    expect(found.view.kind).toBe('locked');
+    const payload = JSON.stringify(found.view);
+    const markup = html(<FixBody read={read} found={found} />);
+    for (const line of secret) {
+      expect(payload, line).not.toContain(JSON.stringify(line).slice(1, -1));
+      expect(markup, line).not.toContain(escaped(line));
+    }
+    // The control: on a paid plan the view holds each body, and the page opens on the packet's own.
+    const paid = { ...read, plan: 'pro' as const };
+    const open = fixOf(paid, fix.id)!;
+    expect(open.view.kind).toBe('open');
+    const opened = JSON.stringify(open.view);
+    for (const line of secret) expect(opened, line).toContain(JSON.stringify(line).slice(1, -1));
+    const page = html(<FixBody read={paid} found={open} />);
+    for (const line of several.change) expect(page).toContain(escaped(line));
+    expect(page).toContain('>WordPress<');
   });
 
   it('on a paid plan the same fix opens', () => {

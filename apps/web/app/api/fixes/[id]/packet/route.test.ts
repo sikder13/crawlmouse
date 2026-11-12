@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // GET /api/fixes/[id]/packet (CC-26b D9). The route's own guards, then lib/v2/account/fixes.ts,
 // run over PGlite through the PostgREST stand-in: the session client as the caller (row security
@@ -33,6 +33,8 @@ vi.mock('@/lib/supabase/admin', async () => {
 
 import { fixture } from '@/lib/v2/fixtures';
 import { fixWorld, makePro, type FixWorld } from '@/lib/v2/account/test-support/fix-world';
+import { packetBodies, packetPrompt } from '@/lib/v2/view/segment/fixes';
+import { bodyFor, withBodies } from '@/lib/v2/view/test-support/multi-body';
 import { GET } from './route';
 
 const PACKET = fixture('bad-site').fixes.find((f) => f.packet !== null)!.packet!;
@@ -67,8 +69,8 @@ beforeEach(() => {
   h.user = fw.w.ownerId;
 });
 
-const get = (id: string) =>
-  GET(new Request(`https://crawlmouse.com/api/fixes/${id}/packet`), {
+const get = (id: string, query = '') =>
+  GET(new Request(`https://crawlmouse.com/api/fixes/${id}/packet${query}`), {
     params: Promise.resolve({ id }),
   });
 const answer = async (res: Response) => [res.status, await res.json()];
@@ -145,5 +147,92 @@ describe('GET /api/fixes/[id]/packet', () => {
       h.db = fw.db;
       await copy.close();
     }
+  });
+
+  describe('?framework=', () => {
+    /** The packet (written for any stack) with a WordPress and a Next.js body beside its own. */
+    const SEVERAL = withBodies(PACKET, ['wordpress', 'nextjs']);
+    let copy: PGlite;
+    let title: string;
+    beforeAll(async () => {
+      copy = (await fw.db.clone()) as PGlite;
+      await copy.query(`update public.site_fixes set packet = $2::jsonb where id = $1`, [
+        fw.ranked[0],
+        JSON.stringify(SEVERAL),
+      ]);
+      const row = await copy.query<{ title: string }>(
+        `select title from public.site_fixes where id = $1`,
+        [fw.ranked[0]],
+      );
+      title = row.rows[0]!.title;
+    });
+    afterAll(async () => {
+      await copy?.close();
+    });
+    beforeEach(() => {
+      h.db = copy;
+    });
+    afterEach(() => {
+      h.db = fw.db;
+    });
+
+    it('without it: the stored packet and the prompt of its own framework’s body, as before', async () => {
+      const [status, body] = await answer(await get(fw.ranked[0]!));
+      expect(status).toBe(200);
+      expect(body).toEqual({
+        packet: SEVERAL,
+        prompt: packetPrompt({ title }, packetBodies(SEVERAL)[0]!),
+      });
+    });
+
+    it('with a framework the packet holds a body for: that body and its prompt', async () => {
+      const bodies = packetBodies(SEVERAL);
+      expect(bodies.map((b) => b.framework)).toEqual(['generic', 'wordpress', 'nextjs']);
+      for (const b of bodies) {
+        const [status, body] = await answer(await get(fw.ranked[0]!, `?framework=${b.framework}`));
+        expect([status, body]).toEqual([200, { body: b, prompt: packetPrompt({ title }, b) }]);
+      }
+      // Independently of packetBodies: the WordPress answer is the hand-made WordPress body's.
+      const [, answered] = await answer(await get(fw.ranked[0]!, '?framework=wordpress'));
+      expect(answered.body).toEqual(bodyFor('wordpress'));
+      expect(answered.prompt).toContain(bodyFor('wordpress').change[0]);
+      expect(answered.prompt).not.toContain(PACKET.change[0]);
+    });
+
+    it('404 no_packet_for_framework for a framework the packet lists without a body, and for a value that names none', async () => {
+      // The fixture's own shape on the second fix: six frameworks listed, one body held.
+      expect([PACKET.frameworks.length, PACKET.packets.length]).toEqual([6, 0]);
+      const listed = PACKET.frameworks.find((f) => f !== PACKET.framework)!;
+      for (const [id, value] of [
+        [fw.ranked[1]!, listed],
+        [fw.ranked[0]!, 'webflow'],
+        [fw.ranked[0]!, 'nuxt'],
+        [fw.ranked[0]!, ''],
+        [fw.ranked[0]!, 'WORDPRESS'],
+        [fw.ranked[0]!, '__proto__'],
+      ] as const) {
+        expect(await answer(await get(id, `?framework=${value}`)), value).toEqual([
+          404,
+          { code: 'no_packet_for_framework' },
+        ]);
+      }
+    });
+
+    it('the tier is checked before the framework: 402 for a fix Free does not open, whatever is asked for', async () => {
+      for (const value of ['wordpress', 'nuxt']) {
+        expect(await answer(await get(fw.ranked[3]!, `?framework=${value}`))).toEqual([
+          402,
+          { code: 'upgrade_required', gate: 'packets' },
+        ]);
+      }
+    });
+
+    it('404 no_packet for a fix with no packet, whatever is asked for', async () => {
+      await copy.query(`update public.site_fixes set packet = null where id = $1`, [fw.ranked[2]]);
+      expect(await answer(await get(fw.ranked[2]!, '?framework=generic'))).toEqual([
+        404,
+        { code: 'no_packet' },
+      ]);
+    });
   });
 });

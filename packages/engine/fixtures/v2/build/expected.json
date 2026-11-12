@@ -31306,7 +31306,11 @@
         "absorbed_by": null,
         "estimate": true
       },
-      "effort": null,
+      "effort": {
+        "kind": "templates",
+        "templates": 1,
+        "deploys": 1
+      },
       "before_after": [],
       "packet": {
         "framework": "generic",
@@ -31401,7 +31405,15 @@
         "estimate": true
       },
       "effort": null,
-      "before_after": [],
+      "before_after": [
+        {
+          "measure": "crawlers_reading_text",
+          "today": 4,
+          "after": 5,
+          "after_bound": "approx",
+          "after_is_estimate": true
+        }
+      ],
       "packet": {
         "framework": "generic",
         "frameworks": [
@@ -31464,7 +31476,11 @@
         "absorbed_by": null,
         "estimate": true
       },
-      "effort": null,
+      "effort": {
+        "kind": "templates",
+        "templates": 1,
+        "deploys": 1
+      },
       "before_after": [],
       "packet": {
         "framework": "generic",
@@ -31521,7 +31537,11 @@
         "absorbed_by": null,
         "estimate": true
       },
-      "effort": null,
+      "effort": {
+        "kind": "templates",
+        "templates": 1,
+        "deploys": 1
+      },
       "before_after": [],
       "packet": {
         "framework": "generic",
@@ -31815,7 +31835,11 @@
         "absorbed_by": null,
         "estimate": true
       },
-      "effort": null,
+      "effort": {
+        "kind": "templates",
+        "templates": 1,
+        "deploys": 1
+      },
       "before_after": [],
       "packet": {
         "framework": "generic",

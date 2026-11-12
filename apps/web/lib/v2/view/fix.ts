@@ -1,10 +1,12 @@
 /**
  * The fix page (Final-Fix): one fix of one audit, its estimated effect and, when the reader's plan
- * opens it, the packet. Which plan opens which fix is the free-fix rule (free-fixes.ts); the
- * contract stores no plan (fix.ts, `packet`). A locked fix's view is built without reading its
- * packet at all, so no part of it can reach the page: everything but the open branch takes the
- * fix as `withoutPacket` copies it, and fix.test.ts makes the field throw when read.
+ * opens it, the packet: one body per framework the packet was written for, the packet's own first.
+ * Which plan opens which fix is the free-fix rule (free-fixes.ts); the contract stores no plan
+ * (fix.ts, `packet`). A locked fix's view is built without reading its packet at all, so no part of
+ * it, `packets` included, can reach the page: everything but the open branch takes the fix as
+ * `withoutPacket` copies it, and fix.test.ts makes the field throw when read.
  */
+import { frameworkOf } from '@crawlmouse/engine/v2/pipeline';
 import { RECHECK_MINUTES } from '../recheck';
 import type { Check, CrawlerResult, Fix } from '@crawlmouse/types/v2';
 import { instant } from '@crawlmouse/types/v2';
@@ -12,14 +14,18 @@ import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { dayTimeUtc, listOf, percent } from '../format';
 import { count, numberWord, plural } from '../words';
 import { freeFixes, type FixPlan } from './free-fixes';
+import { noPacketLine } from './no-packet';
+import { noPacketReason } from './packet-reason';
 import { keptUntilOf, points } from './result';
 import {
   effectOf,
   effortText,
+  packetBodies,
   packetParagraph,
   packetPrompt,
   recommendation,
-  type FixPacket,
+  type PacketBody,
+  type PacketFramework,
   type RecommendationView,
 } from './segment/fixes';
 import {
@@ -32,10 +38,7 @@ import {
 } from './segment/frame';
 import type { ViewDataset } from '../fixtures';
 
-/** A packet's framework; the contract names the schema, not the type. */
-export type PacketFramework = FixPacket['framework'];
-
-export type { FixPlan };
+export type { FixPlan, PacketFramework };
 
 export interface FixHrefs extends SegmentHrefs {
   /** A fix's own page, by id. Omitted, a fix links nowhere yet ("#"). */
@@ -107,29 +110,35 @@ interface FixBase {
   keep: FixKeep | null;
 }
 
+/** One choice of the framework switch: a framework the packet holds a body for. */
 export interface FrameworkOption {
   key: PacketFramework;
   label: string;
-  current: boolean;
-  /** What choosing it shows: null for the packet's own framework. */
-  note: string | null;
+}
+
+/** A packet as written for one framework. */
+export interface PacketBodyView extends FrameworkOption {
+  /** Which stack this body is written for, beside the stack the check detected. */
+  stack: string;
+  /** The body as the page's block shows it, under its four headings. */
+  block: string;
+  /** The body as plain text, for "Copy as a prompt" (the segment copies the same text). */
+  prompt: string;
 }
 
 export interface OpenFixPage extends FixBase {
   kind: 'open';
-  /** Null when no packet was written for this fix (the contract allows it); the page says so. */
+  /** Null when the fix has no packet (the contract allows it); `notWritten` then says why. */
   packet: {
-    /** Which stack the packet is written for, from the check's detected stack. */
-    stack: string;
-    /** The packet as the page's block shows it, under its four headings. */
-    block: string;
-    /** The packet as plain text, for "Copy as a prompt" (the segment copies the same text). */
-    prompt: string;
+    /** A body per framework the packet was written for, the packet's own first; never empty. */
+    bodies: PacketBodyView[];
     /** The file name "Download as .md" saves. */
     download: string;
   } | null;
-  /** The framework switch; null for a packet written for any stack. */
-  switcher: { heading: string; detected: string | null; options: FrameworkOption[] } | null;
+  /** Why the fix has no packet, as a sentence; null exactly when it has one. */
+  notWritten: string | null;
+  /** The framework switch, one option per body in their order; null for a packet with one body. */
+  switcher: { heading: string; detected: string; options: FrameworkOption[] } | null;
   /**
    * What happens once the fix ships, with the ask that opens the keep bar; null on a kept audit,
    * whose account action the preview does not have, and on a page that cannot re-check
@@ -245,7 +254,7 @@ function beforeAfterOf(
         return {
           label: 'AI crawlers that read the text',
           today: `${count(Number(r.today))} of ${ai.length}`,
-          after: `${count(after)} of ${ai.length}${waits ? '*' : ''}`,
+          after: `${bound(r.after_bound)}${count(after)} of ${ai.length}${waits ? '*' : ''}`,
         };
       }
       case 'quotable_opening': {
@@ -290,64 +299,86 @@ function stackOf(check: Check): string | null {
   return [front, back].filter(Boolean).join(', ') || null;
 }
 
-/** Whether the audit detected the stack a packet is written for: its front end, or its CMS. */
-function detects(check: Check, framework: PacketFramework): boolean {
-  const s = check.stack;
-  switch (framework) {
-    case 'nextjs':
-      return s?.frontend?.name === 'Next.js';
-    // A Liquid theme is Shopify's own front end; Hydrogen is a front end of its own.
-    case 'shopify_liquid':
-      return s?.backend?.cms === 'shopify' && !s.frontend;
-    case 'shopify_hydrogen':
-      return s?.frontend?.name === 'Hydrogen';
-    case 'wordpress':
-    case 'webflow':
-      return s?.backend?.cms === framework;
-    case 'generic':
-      return false;
-  }
-}
+/**
+ * Whether `framework` is the one the engine writes a packet for first on this check's stack
+ * (`frameworkOf`, packages/engine/src/v2/packets/stack.ts): the detected front end's framework, or
+ * the framework the CMS itself is. The engine's own function, so the page and the packet agree.
+ */
+const detects = (check: Check, framework: PacketFramework): boolean =>
+  framework !== 'generic' && check.stack !== null && frameworkOf(check.stack) === framework;
 
 /** "The audit detected Next.js from the asset paths and Shopify from the product API calls." */
-function detectedOf(check: Check): string | null {
+function detectedOf(check: Check): string {
   const s = check.stack;
   const parts = [
     s?.frontend ? `${s.frontend.name} from ${s.frontend.detected_from}` : null,
     s?.backend ? `${CMS_LABELS[s.backend.cms]} from ${s.backend.detected_from}` : null,
   ].filter((x): x is string => x !== null);
-  return parts.length ? `The audit detected ${listOf(parts)}.` : null;
+  return parts.length
+    ? `The audit detected ${listOf(parts)}.`
+    : 'The audit did not detect this site’s stack.';
 }
 
-/** The packet under its four headings, with the check's crawler and what we run afterwards. */
-function packetBlock(check: Check, f: Fix, p: FixPacket): string {
+/** What the switch card is headed with, which a packet's sentence names when it points there. */
+const CHOOSE = 'Choose your stack';
+
+/**
+ * Which stack a body is written for. The packet's own body (`own`) is the one the engine chose for
+ * the check's stack, so a generic one says what the audit detected and why no named stack came
+ * first; `switchable` is whether the page has a switch to point to.
+ */
+function writtenFor(
+  check: Check,
+  framework: PacketFramework,
+  { own, switchable }: { own: boolean; switchable: boolean },
+): string {
+  const stack = stackOf(check);
+  if (framework !== 'generic') {
+    return detects(check, framework) && stack
+      ? `Written for your stack as detected: ${stack}.`
+      : `Written for ${FRAMEWORK_LABELS[framework]}${stack ? `; the audit detected ${stack}` : ''}.`;
+  }
+  if (!own) return 'Written for any stack.';
+  const detected = check.stack ? frameworkOf(check.stack) : null;
+  if (stack && detected !== null && detected !== 'generic') {
+    return `Written for any stack; the audit detected ${stack} and has no steps specific to it for this fix.`;
+  }
+  const choose = switchable ? ` If yours is listed under “${CHOOSE}”, choose it.` : '';
+  if (!stack) return `Written for any stack: the audit did not detect yours.${choose}`;
+  return check.stack?.frontend
+    ? `Written for any stack; the audit detected ${stack}, which has no steps of its own.${choose}`
+    : `Written for any stack: the audit detected ${stack}, not which front end the site runs.${choose}`;
+}
+
+/** One body under its four headings, with the check's crawler and what we run afterwards. */
+function packetBlock(check: Check, f: Pick<Fix, 'affected_pages'>, b: PacketBody): string {
   const indent = (lines: readonly string[]) => lines.map((l) => `  ${l}`);
-  const crawler = p.verify.ua ? check.crawlers.find((c) => c.ua === p.verify.ua) : undefined;
+  // `verify.ua` is set when the command requests as a crawler (the contract's field); the command's
+  // own first word is not read, since a command can start with `test "$(curl …`.
+  const asCrawler = b.verify.ua !== null;
+  const crawler = asCrawler ? check.crawlers.find((c) => c.ua === b.verify.ua) : undefined;
   const got = crawler ? (crawler.status === null ? 'robots.txt' : String(crawler.status)) : null;
   const verify = [
-    p.verify.command,
-    `  → expect ${p.verify.expect}`,
-    // FACTS D1: a curl request is our tagged request's twin, not the same request.
-    ...(p.verify.command.startsWith('curl ')
+    b.verify.command,
+    `  → expect ${b.verify.expect}`,
+    // FACTS D1: a request as a crawler is our tagged request's twin, not the same request.
+    ...(asCrawler
       ? [
           '# we run the same request with a tagged user agent; your result and ours can differ only if a rule matches the exact string',
         ]
       : []),
-    // Only a request names the crawler it is made as; a re-check or a reading of robots.txt is not one.
-    ...(crawler && p.verify.command.startsWith('curl ')
-      ? [`Requests as ${crawler.ua}, which gets ${got} today.`]
-      : []),
+    ...(crawler ? [`Requests as ${crawler.ua}, which gets ${got} today.`] : []),
     f.affected_pages > 1
       ? `We run this on all ${count(f.affected_pages)} pages when you mark the fix done.`
       : 'We run this when you mark the fix done.',
   ];
   return [
     'Context',
-    ...indent(p.context),
+    ...indent(b.context),
     '',
     'Change',
-    ...indent(p.change),
-    ...(p.keep.length ? ['', 'Keep', ...indent(p.keep)] : []),
+    ...indent(b.change),
+    ...(b.keep.length ? ['', 'Keep', ...indent(b.keep)] : []),
     '',
     'Verify',
     ...indent(verify),
@@ -495,46 +526,37 @@ export function fixView(
       // With no packet to copy, keeping the audit is the reader's next step.
       keep: keep && { ...keep, primary: true },
       packet: null,
+      notWritten: noPacketLine(noPacketReason(bare.type)),
       switcher: null,
       shipped,
     };
   }
-  const stack = stackOf(check);
-  const label = FRAMEWORK_LABELS[p.framework];
+  const written = packetBodies(p);
+  const switchable = written.length > 1;
+  const bodies: PacketBodyView[] = written.map((b, i) => ({
+    key: b.framework,
+    label: FRAMEWORK_LABELS[b.framework],
+    stack: `${writtenFor(check, b.framework, { own: i === 0, switchable })} Copy it as a prompt or hand it to a developer.`,
+    block: packetBlock(check, bare, b),
+    prompt: packetPrompt(bare, b),
+  }));
+  const own = written[0]!;
   return {
     kind: 'open',
     frame,
-    head: headOf(bare, packetParagraph(p), siteFixes),
+    head: headOf(bare, packetParagraph(own), siteFixes),
     beforeAfter,
     keep,
-    packet: {
-      stack: `${
-        p.framework === 'generic'
-          ? 'Written for any stack.'
-          : detects(check, p.framework) && stack
-            ? `Written for your stack as detected: ${stack}.`
-            : `Written for ${label}${stack ? `; the audit detected ${stack}` : ''}.`
-      } Copy it as a prompt or hand it to a developer.`,
-      block: packetBlock(check, fix, p),
-      prompt: packetPrompt(fix, p),
-      download: `fix-${bare.number}-${slug(bare.title)}.md`,
-    },
-    switcher:
-      p.framework === 'generic'
-        ? null
-        : {
-            heading: `Not on ${FRAMEWORK_LABELS[p.framework]}?`,
-            detected: detectedOf(check),
-            options: p.frameworks.map((k) => ({
-              key: k,
-              label: FRAMEWORK_LABELS[k],
-              current: k === p.framework,
-              note:
-                k === p.framework
-                  ? null
-                  : `The audit has no packet for ${k === 'generic' ? 'other front ends' : FRAMEWORK_LABELS[k]} yet. The packet above is written for ${label}.`,
-            })),
-          },
+    packet: { bodies, download: `fix-${bare.number}-${slug(bare.title)}.md` },
+    notWritten: null,
+    switcher: switchable
+      ? {
+          heading:
+            own.framework === 'generic' ? CHOOSE : `Not on ${FRAMEWORK_LABELS[own.framework]}?`,
+          detected: detectedOf(check),
+          options: bodies.map(({ key, label }) => ({ key, label })),
+        }
+      : null,
     shipped,
   };
 }

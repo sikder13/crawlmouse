@@ -3,10 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Explorer } from '../../components/v2/screens/map/Explorer';
-import { FrameworkSwitch } from '../../components/v2/screens/fix/FrameworkSwitch';
+import { FrameworkSwitch, switchedTo } from '../../components/v2/screens/fix/FrameworkSwitch';
+import { ChosenPacket, PacketChoice } from '../../components/v2/screens/fix/PacketChoice';
 import { mapPreview } from '../../app/(v2-preview)/v2-preview/_preview/maps';
-import { fixPreview } from '../../app/(v2-preview)/v2-preview/_preview/fixes';
+import { FIX_SOURCES, fixIdOf } from '../../app/(v2-preview)/v2-preview/_preview/fixes';
 import { EXPLORER_KEYS } from '../../components/v2/screens/map/keys';
+import { fixture } from '../../lib/v2/fixtures';
+import { fixView } from '../../lib/v2/view/fix';
+import { withBodies } from '../../lib/v2/view/test-support/multi-body';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -214,18 +218,97 @@ describe('the explorer’s one orange element follows the page selected', () => 
 });
 
 describe('the framework switch, operated', () => {
-  it('presses the framework chosen and says the audit has no packet for it', () => {
-    const view = fixPreview('bad-site');
-    if (view.kind !== 'open' || !view.switcher) throw new Error('fix 2 has a switch');
-    const host = mount(<FrameworkSwitch options={view.switcher.options} />);
-    const buttons = [...host.querySelectorAll('button')];
-    expect(buttons.filter((b) => b.getAttribute('aria-pressed') === 'true')).toHaveLength(1);
-    const webflow = buttons.find((b) => b.textContent === 'Webflow')!;
-    click(webflow);
-    expect(webflow.getAttribute('aria-pressed')).toBe('true');
-    expect(buttons.filter((b) => b.getAttribute('aria-pressed') === 'true')).toHaveLength(1);
-    expect(host.querySelector('[role="status"]')!.textContent).toBe(
-      view.switcher.options.find((o) => o.key === 'webflow')!.note,
+  /** Fix 2 of the bad site with a WordPress body and one for any stack beside its Next.js one. */
+  const view = (() => {
+    const d = structuredClone(fixture('bad-site'));
+    const f = d.fixes.find((x) => x.id === fixIdOf('bad-site'))!;
+    f.packet = withBodies(f.packet!, ['wordpress', 'generic']);
+    const v = fixView(d, FIX_SOURCES['bad-site'].check, f.id, { asFirstSeen: true });
+    if (v.kind !== 'open' || !v.packet || !v.switcher) throw new Error('fix 2 opens with a switch');
+    return { packet: v.packet, switcher: v.switcher };
+  })();
+  const page = () =>
+    mount(
+      <PacketChoice>
+        <ChosenPacket bodies={view.packet.bodies} download={view.packet.download} ask="#keep" />
+        <FrameworkSwitch options={view.switcher.options} />
+      </PacketChoice>,
     );
+  const toggles = (host: HTMLElement) => [
+    ...host.querySelectorAll<HTMLButtonElement>('[role="group"][aria-label="Front end"] button'),
+  ];
+  const pressed = (host: HTMLElement) =>
+    toggles(host)
+      .filter((b) => b.getAttribute('aria-pressed') === 'true')
+      .map((b) => b.textContent);
+  const copyButton = (host: HTMLElement) =>
+    [...host.querySelectorAll('button')].find((b) =>
+      b.textContent?.startsWith('Copy as a prompt'),
+    )!;
+  const [next, wordpress, generic] = view.packet.bodies;
+
+  it('opens on the packet’s own body, its toggle pressed, with nothing said yet', () => {
+    const host = page();
+    expect(toggles(host).map((b) => b.textContent)).toEqual(['Next.js', 'WordPress', 'Other']);
+    expect(pressed(host)).toEqual(['Next.js']);
+    expect(host.querySelector('pre')!.textContent).toBe(next!.block);
+    expect(host.textContent).toContain(next!.stack);
+    expect(host.querySelector('p[role="status"]')!.textContent).toBe('');
+  });
+
+  it('shows the body of the framework chosen, presses its toggle alone, and says so', () => {
+    const host = page();
+    click(toggles(host)[1]!);
+    expect(pressed(host)).toEqual(['WordPress']);
+    expect(host.querySelector('pre')!.textContent).toBe(wordpress!.block);
+    expect(host.textContent).toContain(wordpress!.stack);
+    expect(host.textContent).not.toContain(next!.stack);
+    expect(host.querySelector('p[role="status"]')!.textContent).toBe(
+      'The packet now shows the steps written for WordPress.',
+    );
+    click(toggles(host)[2]!);
+    expect(pressed(host)).toEqual(['Other']);
+    expect(host.querySelector('pre')!.textContent).toBe(generic!.block);
+    expect(host.querySelector('p[role="status"]')!.textContent).toBe(switchedTo(generic!));
+    expect(switchedTo(generic!)).toBe('The packet now shows the steps written for any stack.');
+    // Back to the packet's own framework.
+    click(toggles(host)[0]!);
+    expect(host.querySelector('pre')!.textContent).toBe(next!.block);
+  });
+
+  it('copies the prompt of the body shown, under a button whose name does not change', async () => {
+    const writeText = vi.fn(async (_text: string) => {});
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const host = page();
+    const name = copyButton(host).textContent;
+    expect(name).toBe('Copy as a prompt for your coding tool');
+    await act(async () => copyButton(host).click());
+    click(toggles(host)[1]!);
+    expect(copyButton(host).textContent).toBe(name);
+    await act(async () => copyButton(host).click());
+    expect(writeText.mock.calls.map((c) => c[0])).toEqual([next!.prompt, wordpress!.prompt]);
+    expect(next!.prompt).not.toBe(wordpress!.prompt);
+  });
+
+  it('keeps the focus on the toggle chosen, by click and by keyboard', () => {
+    const host = page();
+    const [, second] = toggles(host);
+    second!.focus();
+    click(second!);
+    expect(document.activeElement).toBe(toggles(host)[1]);
+    // A toggle is a button: it is in the tab order, and the browser's Enter and Space click it.
+    for (const b of toggles(host)) {
+      expect(b.tagName).toBe('BUTTON');
+      expect(b.tabIndex).toBe(0);
+      expect(b.disabled).toBe(false);
+    }
+  });
+
+  it('a switch outside the choice it sets is a programming error, not a dead control', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => mount(<FrameworkSwitch options={view.switcher.options} />)).toThrow(
+      /outside PacketChoice/,
+    );
+    spy.mockRestore();
   });
 });
