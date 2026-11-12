@@ -130,15 +130,19 @@ describe('the edge-rule packet, from its record', () => {
   });
 
   it('names no URL its record does not hold', () => {
-    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES });
-    // a row of another crawler on another page is in the facts and is not this record's
-    const other = accessRow(99, 'https://a.test/not-in-the-record', 'GPTBot', 'allowed');
-    const p = compose(builder, record, factsOf([...rows, other], CLOUDFLARE));
+    // few enough pages that the list shows them all, so nothing hides in "more pages not shown"
+    const { record, rows } = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES.slice(0, 3) });
+    expect(record.affected_urls.length).toBeLessThan(PAGES_SHOWN);
+    // rows of another crawler on other pages are in the facts and are not this record's
+    const others = [0, 1].map((i) =>
+      accessRow(90 + i, `https://a.test/not-in-the-record-${i}`, 'GPTBot', 'allowed'),
+    );
+    const p = compose(builder, record, factsOf([others[0]!, ...rows, others[1]!], CLOUDFLARE));
     // the user-agent word is the registry's, and holds the operator's own URL
     const command = p.verify.command.replace(/-A '[^']*'/, '');
     const urls = [...allText(p), command].flatMap((t) => t.match(/https?:\/\/[^\s`']+/g) ?? []);
-    expect(urls.length).toBeGreaterThan(PAGES_SHOWN);
-    for (const u of urls) expect(record.affected_urls, u).toContain(u);
+    expect(urls.length).toBe(record.affected_urls.length + 1);
+    for (const u of urls) expect(record.affected_urls, u).toContain(u.replace(/\/$/, ''));
   });
 
   it('leaves the choice to the site owner for a training crawler, and to no one else', () => {
@@ -242,9 +246,10 @@ describe('the edge-rule verify command', () => {
   it('does not pass on a redirect, a challenge status, or a site that is not there', async () => {
     let status = 302;
     site = await twoStateSite({
-      broken: (_req, res) => {
-        res.statusCode = status;
-        if (status === 302) res.setHeader('location', '/challenge');
+      broken: (req, res) => {
+        // the challenge page itself answers 200: a command that followed the redirect would pass
+        res.statusCode = req.url === '/challenge' ? 200 : status;
+        if (res.statusCode === 302) res.setHeader('location', '/challenge');
         res.end('x');
       },
       fixed: (_req, res) => void res.end('x'),

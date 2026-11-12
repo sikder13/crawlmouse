@@ -80,10 +80,23 @@ describe('the client-rendered template fix', () => {
   it('gives every graded page of the template a share of 1, rendered or not, and no other page', () => {
     const s = site([[0.1, SHELL], null, null]);
     const record = s.rendered.find((r) => r.state === 'detected')!;
-    const after = applyFix(s.grades.inputs, { family: 'rendered', record });
+    // the homepage, of another template, read at half: a counterfactual that touched it would show
+    const inputs = {
+      ...s.grades.inputs,
+      ai: {
+        ...s.grades.inputs.ai,
+        readable: s.grades.inputs.ai.readable.map((p) =>
+          p.template_key === '/' ? { ...p, text_share: 0.5 } : p,
+        ),
+      },
+    };
+    const after = applyFix(inputs, { family: 'rendered', record });
+    expect(after.ai.readable.filter((p) => p.template_key === '/')).toEqual([
+      { template_key: '/', text_share: 0.5 },
+    ]);
     expect(after.seo).toBe(s.grades.inputs.seo);
     expect(after.ai.readable).toEqual(
-      s.grades.inputs.ai.readable.map((p) =>
+      inputs.ai.readable.map((p) =>
         p.template_key === '/blog/{slug}' ? { ...p, text_share: 1 } : p,
       ),
     );
