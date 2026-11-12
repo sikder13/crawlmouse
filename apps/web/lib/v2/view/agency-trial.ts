@@ -18,7 +18,7 @@ import type { AccountState } from '@crawlmouse/types/v2';
 import { AGENCIES_COPY } from '../copy/agencies';
 import { AGENCY_TRIAL_COPY as COPY } from '../copy/agency-trial';
 import { SETTINGS_COPY } from '../copy/settings';
-import { tagged, type TaggedView } from './agencies';
+import { footerComing, tagged, type TaggedView } from './agencies';
 import { portalRefusal } from '../../billing/portal-v2';
 import { dayDate } from '../format';
 import { PLAN_NAMES } from './account';
@@ -136,7 +136,11 @@ export type AgencyTrialView = (
   | AgencyTrialForm
   | { kind: 'held'; title: string; text: string }
   | { kind: 'used'; title: string; text: string }
-) & { manage: ManageView[] };
+) & {
+  manage: ManageView[];
+  /** The footer line's "coming" label (`footerComing`). */
+  footerComing: string | null;
+};
 
 const BILLED: ReadonlySet<AccountState> = new Set(['agency_trial', 'agency', 'past_due']);
 const PORTAL = '/api/billing/portal';
@@ -202,11 +206,13 @@ export const agencyTrialPath = (interval: Interval) =>
 export function agencyTrialView(input: AgencyTrialInput, now: Date): AgencyTrialView {
   const { standing, interval } = input;
   const manage = standing.billing.map((r) => manageView(r, input));
-  if (standing.held) return { kind: 'held', ...COPY.held, manage };
+  const footer = footerComing();
+  if (standing.held) return { kind: 'held', ...COPY.held, manage, footerComing: footer };
   if (standing.used !== null) {
     return {
       kind: 'used',
       manage,
+      footerComing: footer,
       title: COPY.used.title,
       text: COPY.used.text(dayDate(standing.used.trialUsedAt.toISOString(), input.timeZone)),
     };
@@ -215,6 +221,7 @@ export function agencyTrialView(input: AgencyTrialInput, now: Date): AgencyTrial
   return {
     kind: 'form',
     manage,
+    footerComing: footer,
     title: COPY.title,
     lead: COPY.lead(interval, chargeDate(now, input.timeZone)).map(tagged),
     returning: standing.open ? COPY.returning : null,
@@ -232,7 +239,11 @@ export function agencyTrialView(input: AgencyTrialInput, now: Date): AgencyTrial
     aside: {
       kicker: COPY.aside.kicker(interval),
       title: tagged(COPY.aside.title),
-      rows: COPY.aside.rows().map(([what, value]) => [tagged(what), value]),
+      // A coming capability's value says so, not "yes" (SEO R2-N5).
+      rows: COPY.aside.rows().map(([what, value]) => {
+        const row = tagged(what);
+        return [row, row.coming && value === COPY.aside.yes ? AGENCIES_COPY.coming : value];
+      }),
       foot: tagged(COPY.aside.foot(interval)),
     },
     comingLabel: AGENCIES_COPY.coming,

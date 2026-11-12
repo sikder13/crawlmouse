@@ -23,7 +23,7 @@ import { usd } from '../../billing/prices';
 import { trialRefusal, type EntitlementSnapshot } from '../../billing/state-machine';
 import type { PaidTier, Tier } from '../../entitlement-v2';
 import { AGENCIES_COPY } from '../copy/agencies';
-import { tagged, type TaggedView } from './agencies';
+import { footerComing, tagged, type TaggedView } from './agencies';
 import { agencyTrialPath } from './agency-trial';
 import { PRICING_COPY as COPY, per, planCopy, priceOf, type PlanRow } from '../copy/pricing';
 
@@ -95,7 +95,8 @@ export interface PlanView {
  * "coming" (`comingLabel`) when one of its capabilities is not built.
  */
 export interface PricingView {
-  title: string;
+  /** The h1 (the artboard's, Q33): it names the monitoring that is coming (SEO R2-N2). */
+  title: TaggedView;
   lead: TaggedView[];
   interval: Interval;
   intervals: { interval: Interval; label: string; href: string; current: boolean }[];
@@ -119,6 +120,8 @@ export interface PricingView {
   why: { title: string; text: TaggedView[] };
   faq: { title: string; items: { q: string; a: TaggedView }[] };
   comingLabel: string;
+  /** The footer line's "coming" label (`footerComing`). */
+  footerComing: string | null;
 }
 
 const PRO_TRIAL_START = '/api/billing/pro-trial/start';
@@ -273,7 +276,7 @@ export function pricingView(
   });
   const tiers: Tier[] = ['free', 'pro', 'agency'];
   return {
-    title: COPY.title,
+    title: tagged(COPY.title),
     lead: COPY.lead().map(tagged),
     interval,
     intervals: (['month', 'year'] as const).map((i) => ({
@@ -314,6 +317,7 @@ export function pricingView(
       items: COPY.faq.items(pro.trial).map(({ q, a }) => ({ q, a: tagged(a) })),
     },
     comingLabel: AGENCIES_COPY.coming,
+    footerComing: footerComing(),
   };
 }
 

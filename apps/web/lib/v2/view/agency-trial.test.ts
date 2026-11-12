@@ -10,6 +10,7 @@ import {
   type AgencyAccountRow,
   type AgencyStanding,
 } from './agency-trial';
+import { footerComing } from './agencies';
 
 const NOW = new Date('2026-10-25T15:00:00Z');
 
@@ -170,6 +171,7 @@ describe('agencyTrialView', () => {
     expect(view({ held: false, billing: [], used: USED, open: null })).toEqual({
       kind: 'used',
       manage: [],
+      footerComing: footerComing(),
       title: 'Your Agency trial was used.',
       text: 'The trial is one per person, and yours started Thu 1 Oct. Agency can still be chosen, from Pricing.',
     });

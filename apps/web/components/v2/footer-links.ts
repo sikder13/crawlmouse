@@ -56,6 +56,13 @@ export const SUPPORT_EMAIL = 'support@crawlmouse.com';
 /** The footer's own words. */
 export const FOOTER_COPY = {
   line: 'Crawlmouse fetches your site as each AI crawler and tells you when that changes.',
+  /**
+   * What the line names, as keys of `CAPABILITIES` (lib/v2/view/agencies.ts, whose `footerComing`
+   * refuses a key it does not hold): checking again and the change email. A page that marks
+   * capabilities passes the "coming" mark for it (SiteFooter `lineMark`) while either is not built
+   * (SEO R2-N2). Strings here, so the footer imports nothing of the capability table.
+   */
+  lineCapabilities: ['weekly_checks', 'change_emails'],
   company: 'Nahl Technologies Inc. · Indianapolis',
 } as const;
 

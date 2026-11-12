@@ -17,6 +17,8 @@ import { ANNUAL_RENEWAL_REMINDER_DAYS, monthsFree, priceOf } from './pricing';
 import { CANCEL_CLICKS } from './settings';
 
 const agency = GATES.agency;
+/** An aside row's value for a capability Agency has; a coming one shows "coming" instead (view). */
+const YES = 'yes';
 const period = (interval: Interval) => (interval === 'month' ? 'month' : 'year');
 
 export const AGENCY_TRIAL_COPY = {
@@ -119,6 +121,7 @@ export const AGENCY_TRIAL_COPY = {
       `The trial is one per person, and yours started ${on}. Agency can still be chosen, from Pricing.`,
   },
   aside: {
+    yes: YES,
     kicker: (interval: Interval) =>
       `Agency · ${usd(priceOf('agency', interval))} a ${period(interval)} after the trial`,
     title: {
@@ -145,22 +148,22 @@ export const AGENCY_TRIAL_COPY = {
           text: 'Reports and client report pages on your domain, your logo',
           capabilities: ['client_report_page'],
         },
-        'yes',
+        YES,
       ],
-      [{ text: 'Emails to clients from your address', capabilities: ['sender_address'] }, 'yes'],
-      [{ text: 'Prospect one-pagers from any audit you run', capabilities: ['one_pagers'] }, 'yes'],
+      [{ text: 'Emails to clients from your address', capabilities: ['sender_address'] }, YES],
+      [{ text: 'Prospect one-pagers from any audit you run', capabilities: ['one_pagers'] }, YES],
       [
         {
           text: 'Scheduled client reports, weekly or monthly, sent for you',
           capabilities: ['client_reports', 'weekly_checks'],
         },
-        'yes',
+        YES,
       ],
       [
         { text: 'Competitors per site', capabilities: ['competitors'] },
         String(agency.competitorsPerSite),
       ],
-      [{ text: 'Everything in Pro, on every site', capabilities: ['sites'] }, 'yes'],
+      [{ text: 'Everything in Pro, on every site', capabilities: ['sites'] }, YES],
     ],
     /** D11: no Branding screen in this step, so day 1 names only what is built. */
     foot: (interval: Interval): Tagged => ({

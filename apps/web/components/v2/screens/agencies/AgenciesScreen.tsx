@@ -8,7 +8,7 @@ import { VisuallyHidden } from '../../VisuallyHidden';
 import { LOG_IN, MARKETING_NAV } from '../../footer-links';
 import type { AgenciesView } from '../../../../lib/v2/view/agencies';
 import { AuditForm } from '../home/AuditForm';
-import { Capability } from './Capability';
+import { Capability, ComingMark } from './Capability';
 import layout from '../../layout.module.css';
 import styles from './AgenciesScreen.module.css';
 
@@ -33,6 +33,7 @@ export function AgenciesScreen({
   return (
     <PageShell
       nav={MARKETING_NAV}
+      footerLineMark={data.footerComing ? <ComingMark label={data.footerComing} /> : null}
       actions={
         <Button variant="quiet" href={LOG_IN.href}>
           {LOG_IN.label}

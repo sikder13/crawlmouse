@@ -7,10 +7,15 @@
  * the Agency trial page), with whether it is on main and the proof of it. A built capability's proof
  * is the file that does it. A coming one's proof is something `agencies.test.ts` checks against the
  * tree: the file its step will add is absent, a pattern the code that would do it has to contain is
- * nowhere in the source, or the code that would do it says it does not yet. Each proof fails when
- * its step adds that file or that text; a step that ships the capability some other way leaves the
- * proof true, and the "coming" mark stays until the row is changed. Every piece of copy names its
- * capabilities, and a piece that names one that is coming is marked (`coming`).
+ * nowhere in the source, or the code that would do it says it does not yet, or all of several such.
+ * Each proof fails when its step adds that file or that text; a step that ships the capability some
+ * other way leaves the proof true, and the "coming" mark stays until the row is changed. Every piece
+ * of copy names its capabilities, and a piece that names one that is coming is marked (`coming`).
+ *
+ * A file a coming proof names is the one its step adds, by name, so the row flips at the merge that
+ * brings that file and not before (SEO R2-N3): CC-28's templates for its own emails, and for the
+ * emails CC-28 does not build, the path their template would take beside them.
+ * `agencies.test.ts` runs these proofs against the paths CC-28's branch adds.
  */
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
@@ -22,6 +27,7 @@ import { toneOf } from '../letters';
 import { CHECKS } from '../recordings';
 import { buildPublicSnapshot } from '../reports/build-snapshot';
 import { numberWord } from '../words';
+import { FOOTER_COPY } from '../../../components/v2/footer-links';
 
 export type CapabilityKey =
   | 'free_audit'
@@ -46,7 +52,8 @@ export type CapabilityKey =
   | 'renewal_reminders'
   | 'agency_plus_reply'
   | 'agency_workspace'
-  | 'observed_crawlers';
+  | 'observed_crawlers'
+  | 'evidence_condensed';
 
 /** Paths are from the repository root. */
 export type Proof =
@@ -60,7 +67,9 @@ export type Proof =
    * Coming: no source file under `dirs` (tests, test support and this file aside) holds `text`, a
    * string or a pattern.
    */
-  | { kind: 'nowhere'; dirs: readonly string[]; text: string | RegExp };
+  | { kind: 'nowhere'; dirs: readonly string[]; text: string | RegExp }
+  /** Coming: each of these proofs holds, so the first of them to fail flips the row. */
+  | { kind: 'all'; of: readonly Proof[] };
 
 export interface Capability {
   status: 'built' | 'coming';
@@ -76,6 +85,9 @@ export interface Capability {
 
 /** Where a coming capability's code would be: the app, its jobs and the crawl worker. */
 const SOURCE_DIRS = ['apps/web/lib', 'apps/web/app', 'inngest', 'packages/worker/src'] as const;
+
+/** Where v2 mail templates live: CC-28 adds the folder, one file per kind of email. */
+const MAIL_TEMPLATES = 'apps/web/lib/v2/mail/templates';
 
 export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   free_audit: {
@@ -118,19 +130,25 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     status: 'coming',
     what: 'Checks on a schedule, weekly or monthly: nothing requests a scheduled check yet (CC-28).',
     proof: {
-      kind: 'nowhere',
-      dirs: SOURCE_DIRS,
-      text: /trigger:\s*(?:['"]scheduled['"]|[A-Z_]*SCHEDULED\b)/,
+      kind: 'all',
+      of: [
+        { kind: 'absent', path: 'apps/web/lib/v2/monitor/schedule.ts' },
+        {
+          kind: 'nowhere',
+          dirs: SOURCE_DIRS,
+          text: /trigger:\s*(?:['"]scheduled['"]|[A-Z_]*SCHEDULED\b)/,
+        },
+      ],
     },
     named:
-      /\bweekly\b|re-?check|checked (?:again|monthly)|checking again|scheduled checks?|every week|monthly checks/i,
+      /\bweekly\b|re-?check|checked (?:again|monthly)|checking again|scheduled checks?|every week|monthly checks|\bwatch(?:ed|ing|es)?\b/i,
   },
   change_emails: {
     status: 'coming',
-    what: 'The email when a check finds a change: the mailer is CC-28’s.',
-    proof: { kind: 'absent', path: 'apps/web/lib/v2/mail' },
+    what: 'The email when a check finds a change, per the rules under Alerts: CC-28’s alert.',
+    proof: { kind: 'absent', path: `${MAIL_TEMPLATES}/alert.ts` },
     named:
-      /finds a change|hear first|email only if something changed|alerts by email|telling you what changed|note when a (?:re-)?check/i,
+      /finds a change|hear first|email only if something changed|alerts by email|telling you what changed|note when a (?:re-)?check|tells? you when/i,
   },
   client_report_page: {
     status: 'coming',
@@ -172,9 +190,15 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     status: 'coming',
     what: 'Alerts sent to Slack: a seat can choose Slack, but nothing posts to it.',
     proof: {
-      kind: 'nowhere',
-      dirs: SOURCE_DIRS,
-      text: /hooks\.slack\.com|slack\.com\/api|chat\.postMessage/,
+      kind: 'all',
+      of: [
+        { kind: 'absent', path: 'apps/web/lib/v2/monitor/slack.ts' },
+        {
+          kind: 'nowhere',
+          dirs: SOURCE_DIRS,
+          text: /hooks\.slack\.com|slack\.com\/api|chat\.postMessage/,
+        },
+      ],
     },
     named: /\bslack\b/i,
   },
@@ -202,20 +226,21 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   trial_reminder: {
     status: 'coming',
-    what: 'The email three days before a trial ends: the mailer is CC-28’s.',
-    proof: { kind: 'absent', path: 'apps/web/lib/v2/mail' },
+    what: 'The email three days before a trial ends: CC-28’s trial reminder.',
+    proof: { kind: 'absent', path: `${MAIL_TEMPLATES}/trial-reminder.ts` },
     named: /email you (?:three|\d+) days before|reminder (?:three|\d+) days before/i,
   },
   renewal_reminders: {
     status: 'coming',
-    what: 'The emails 45 and 20 days before an annual renewal: the mailer is CC-28’s.',
-    proof: { kind: 'absent', path: 'apps/web/lib/v2/mail' },
+    what: 'The emails 45 and 20 days before an annual renewal: no step builds their template yet.',
+    proof: { kind: 'absent', path: `${MAIL_TEMPLATES}/renewal-reminder.ts` },
     named: /renewal reminders?|before an annual renewal/i,
   },
   agency_plus_reply: {
     status: 'coming',
-    what: 'A reply to an Agency Plus request: it is stored, and nothing tells anyone yet (CC-28).',
-    proof: { kind: 'absent', path: 'apps/web/lib/v2/mail' },
+    what: 'A reply to an Agency Plus request: it is stored and its `email.requested` sent, and no template answers it yet.',
+    // The event's template is `agency_plus_contact` (app/api/contact/agency-plus/_lib/contact.ts).
+    proof: { kind: 'absent', path: `${MAIL_TEMPLATES}/agency-plus-contact.ts` },
     named: /we reply|talk to us/i,
   },
   observed_crawlers: {
@@ -223,6 +248,23 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     what: 'The crawlers seen visiting your own site (observed activity): nothing reads a site’s visits yet.',
     proof: { kind: 'nowhere', dirs: SOURCE_DIRS, text: 'observed_activity' },
     named: /observed activity|crawlers it has seen|seen on your site/i,
+  },
+  evidence_condensed: {
+    status: 'coming',
+    what: 'Condensing old evidence to headers and the parts of pages that changed: no job does it; evidence is kept whole.',
+    proof: {
+      kind: 'nowhere',
+      dirs: [
+        'inngest',
+        'packages/worker/src',
+        'packages/engine/src',
+        'apps/web/app/api',
+        'apps/web/lib/v2/pipeline',
+        'apps/web/lib/v2/monitor',
+      ],
+      text: /condens/i,
+    },
+    named: /condensed|older than \d+ days/i,
   },
   agency_workspace: {
     status: 'coming',
@@ -247,6 +289,19 @@ export const tagged = ({ text, capabilities }: Tagged): TaggedView => ({
   capabilities,
   coming: isComing(capabilities),
 });
+
+/**
+ * The "coming" label for the shared footer's line (components/v2/footer-links.ts), or null once what
+ * it names is built (SEO R2-N2). A page that marks capabilities passes it to its PageShell.
+ */
+export function footerComing(): string | null {
+  const keys = FOOTER_COPY.lineCapabilities.map((k) => {
+    if (!Object.hasOwn(CAPABILITIES, k))
+      throw new Error(`the footer line names ${k}, not a capability`);
+    return k as CapabilityKey;
+  });
+  return isComing(keys) ? COPY.coming : null;
+}
 
 /**
  * "$4 a site" when the price divides evenly; otherwise "under $N", N the next whole dollar, which
@@ -297,6 +352,8 @@ export interface AgenciesView {
   uses: { title: string; steps: TaggedView[] };
   cost: { title: string; lines: TaggedView[]; compare: { label: string; href: string } };
   comingLabel: string;
+  /** The footer line's "coming" label (`footerComing`). */
+  footerComing: string | null;
 }
 
 /** The address of the agency trial (CC-29 D3) and of the plans. */
@@ -404,5 +461,6 @@ export function agenciesView(): AgenciesView {
       compare: { label: COPY.cost.compare, href: PRICING_HREF },
     },
     comingLabel: COPY.coming,
+    footerComing: footerComing(),
   };
 }

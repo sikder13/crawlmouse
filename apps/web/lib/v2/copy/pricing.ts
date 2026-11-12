@@ -216,7 +216,11 @@ export const PRICING_COPY = {
   /** The meta description: built capabilities only, since a search result carries no "coming" mark. */
   description: () =>
     `Every audit is free and complete. Pro is ${usd(PRO_MONTHLY)} a month for every fix the audit finds, on up to ${GATES.pro.sites} sites; Agency is ${usd(AGENCY_MONTHLY)} a month for ${GATES.agency.sites} client sites.`,
-  title: 'Every audit is free. Pay when you want it watched.',
+  /** The artboard's h1 (Q33): "watched" is checking again and telling you, which CC-28 builds. */
+  title: {
+    text: 'Every audit is free. Pay when you want it watched.',
+    capabilities: ['weekly_checks', 'change_emails'],
+  } as Tagged,
   lead: (): Tagged[] => [
     {
       text: `The first audit of any site is free and complete: every crawler, every page up to ${count(GATES.free.pagesPerCheck)}, the ${numberWord(freeFixes())} fixes with the largest effect.`,
@@ -331,9 +335,10 @@ export const PRICING_COPY = {
         : `What happens when the Agency trial’s ${trialDays} end`,
     /** FACTS A6 (long form) and A8. */
     lead: (): Tagged[] => [
+      { text: 'Nothing you can see is deleted.', capabilities: [] },
       {
-        text: `Nothing you can see is deleted. Evidence older than ${EVIDENCE_CONDENSED_AFTER_DAYS} days is condensed to headers and the parts of pages that changed.`,
-        capabilities: [],
+        text: `Evidence older than ${EVIDENCE_CONDENSED_AFTER_DAYS} days is condensed to headers and the parts of pages that changed.`,
+        capabilities: ['evidence_condensed'],
       },
       {
         text: `We email you ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before.`,
