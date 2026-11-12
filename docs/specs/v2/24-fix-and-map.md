@@ -59,7 +59,7 @@ One rule, `freeFixes` and `isFreeFix` in `apps/web/lib/v2/view/free-fixes.ts`: t
 
 A packet holds a body for its own framework and, in `packets`, one for each other framework it was written for. `packetBodies` in `apps/web/lib/v2/view/segment/fixes.ts` lists them, the packet’s own first; the fix page’s view holds a block and a prompt for each, and the switch has one toggle per body, named from `FRAMEWORK_LABELS` in `apps/web/lib/v2/view/fix.ts`. The switch is built from the bodies and not from `packet.frameworks`, so a framework listed there without a body is not offered, and a packet with one body has no switch. Choosing a framework shows that body’s block, and “Copy as a prompt” and “Download as .md” hand over that body’s prompt. The switch makes no request: an open fix’s bodies are in the page’s view. A locked fix’s view is built without reading its packet, so it holds none of them.
 
-Of the 16 packets in the contract fixtures, 0 hold more than one body, and 0 of the 6 fix previews show the switch. The tests of the switch give a fixture packet hand-made bodies (`apps/web/lib/v2/view/test-support/multi-body.ts`). Verify: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/fix.test.ts __tests__/v2/explorer.dom.test.tsx __tests__/v2/fix.test.tsx`.
+Of the 27 packets in the contract fixtures, 5 hold more than one body, and 0 of the 6 fix previews show the switch. The tests of the switch give a fixture packet hand-made bodies (`apps/web/lib/v2/view/test-support/multi-body.ts`). Verify: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/fix.test.ts __tests__/v2/explorer.dom.test.tsx __tests__/v2/fix.test.tsx`.
 
 | Framework          | Shown as           |
 | ------------------ | ------------------ |
@@ -92,31 +92,17 @@ The last three of the packet’s own cases add “If yours is listed under “Ch
 
 ## A fix with no packet
 
-An open fix whose `packet` is null shows one sentence in the packet’s place, on the fix page and in a segment’s open fix (`noPacketLine` in `apps/web/lib/v2/view/no-packet.ts`). The reason is read from the engine’s packet registry (`noPacketReason` in `apps/web/lib/v2/view/packet-reason.ts`). Of the 16 fix types, the registry has a builder for 0 and a reason for 16.
+An open fix whose `packet` is null shows one sentence in the packet’s place, on the fix page and in a segment’s open fix (`noPacketLine` in `apps/web/lib/v2/view/no-packet.ts`). The reason is read from the engine’s packet registry (`noPacketReason` in `apps/web/lib/v2/view/packet-reason.ts`). Of the 16 fix types, the registry has a builder for 14 and a reason for 2.
 
 | The fix type’s registry entry                         | The sentence                                                                                                                          |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | a builder (the stored fix has no packet all the same) | The check that last measured this fix wrote no steps for it. The next check that finds it writes them. What the audit found is above. |
 | no packet, with a reason                              | The audit writes no steps for this kind of fix. (the engine’s reason) What the audit found is above.                                  |
 
-| Fix type                     | The engine’s reason                                                                                  |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `robots_txt_blocks_crawler`  | robots.txt disallows the crawler, which is the site’s stated intent: the engine opens no fix for it. |
-| `edge_rule_blocks_crawler`   | The packet builder is not written yet.                                                               |
-| `client_rendered_template`   | The packet builder is not written yet.                                                               |
-| `orphan_pages`               | The packet builder is not written yet.                                                               |
-| `quotable_opening`           | The packet builder is not written yet.                                                               |
-| `generic_anchor_text`        | The packet builder is not written yet.                                                               |
-| `deep_pages`                 | The packet builder is not written yet.                                                               |
-| `specs_as_images`            | The packet builder is not written yet.                                                               |
-| `missing_author_date`        | The packet builder is not written yet.                                                               |
-| `js_only_navigation`         | The packet builder is not written yet.                                                               |
-| `redirect_chain`             | The packet builder is not written yet.                                                               |
-| `duplicate_pagination`       | The packet builder is not written yet.                                                               |
-| `canonical_mismatch`         | The packet builder is not written yet.                                                               |
-| `hreflang_gap`               | The packet builder is not written yet.                                                               |
-| `missing_schema_description` | The packet builder is not written yet.                                                               |
-| `no_question_headings`       | The packet builder is not written yet.                                                               |
+| Fix type                    | The engine’s reason                                                                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `robots_txt_blocks_crawler` | robots.txt disallows the crawler, which is the site’s stated intent: the engine opens no fix for it.                                                                                        |
+| `js_only_navigation`        | Not measured: the render step records word counts only. No link of the rendered side is kept, and js_only is written false on every page and edge, so the engine opens no fix of this type. |
 
 The prompt and the blocks put each packet string and the fix’s title on one line (`oneLine` in `apps/web/lib/v2/packet-text.ts`), so a packet stored with a line break or a control character in a string adds no line to what is copied. Verify: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/segment/fixes.property.test.ts lib/v2/packet-text.test.ts`.
 
