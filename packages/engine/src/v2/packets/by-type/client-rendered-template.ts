@@ -156,7 +156,7 @@ const NEXTJS_SOURCES: readonly DocSource[] = [
     url: 'https://nextjs.org/docs/app/getting-started/server-and-client-components',
     read: READ,
     supports:
-      'App Router: pages are Server Components by default, fetch data on the server and pass it to Client Components as props; Client Components are for browser-only APIs such as window; a Server Component passed to a Client Component as children is rendered on the server',
+      'App Router: pages are Server Components by default, fetch data on the server and pass it to Client Components as props; Client Components are for browser-only APIs such as window',
   },
   {
     title: 'Fetching Data',
@@ -187,7 +187,8 @@ const NEXTJS_SOURCES: readonly DocSource[] = [
     title: 'How to lazy load Client Components and libraries',
     url: 'https://nextjs.org/docs/app/guides/lazy-loading',
     read: READ,
-    supports: 'next/dynamic with ssr: false disables prerendering for a Client Component',
+    supports:
+      'next/dynamic with ssr: false disables prerendering for a Client Component; the option works in Client Components only',
   },
 ];
 
@@ -198,7 +199,7 @@ function nextjs(record: RenderedDetection): Change {
       line`Find what adds the content of the pages of ${template} in the browser. The audit measured the words, not what adds them. One place to look: a Client Component that fetches its data in the browser, with a library such as SWR or React Query.`,
       line`App Router (the route is under app/): fetch the data in the page's Server Component, an async function that awaits it, and render the content there. Pass it as props to any Client Component that needs it.`,
       line`Pages Router (the route is under pages/): export getStaticProps from the page to prerender it at build time, or getServerSideProps to render it at request time, and render the content from the props.`,
-      line`If the component that renders the content is imported with next/dynamic and ssr: false, that option disables prerendering for it. Remove the option if the component can render on the server. If it cannot, because it uses a browser-only API such as window, leave it as it is and render the content's text in a Server Component, passed to it as children or placed beside it.`,
+      line`If the component that renders the content is imported with next/dynamic and ssr: false, that option disables prerendering for it. Remove the option if the component can render on the server. If it cannot, because it uses a browser-only API such as window, leave it as it is and render the content's text in a Server Component placed beside it, not inside it.`,
       line`App Router, optional: export generateStaticParams from the page to generate the template's pages at build time.`,
       DEPLOY,
     ],

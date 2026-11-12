@@ -203,11 +203,14 @@ describe('the client-rendered template packet, from its record', () => {
     expect(next.change.join('\n')).toMatch(/getStaticProps.*getServerSideProps/);
     // ssr: false is often there for a reason: the step says what to do when it cannot be removed
     expect(next.change.join('\n')).toMatch(
-      /Remove the option if the component can render on the server\. If it cannot, because it uses a browser-only API such as window, leave it as it is and render the content's text in a Server Component/,
+      /Remove the option if the component can render on the server\. If it cannot, because it uses a browser-only API such as window, leave it as it is and render the content's text in a Server Component placed beside it, not inside it\./,
     );
-    expect(builder.stacks.nextjs!.sources.map((s) => s.supports).join('\n')).toMatch(
-      /browser-only APIs such as window.*passed to a Client Component as children is rendered on the server/,
-    );
+    // with ssr: false the component is not prerendered, and neither is what is passed into it
+    expect(next.change.join('\n')).not.toMatch(/children/);
+    const supports = builder.stacks.nextjs!.sources.map((s) => s.supports).join('\n');
+    expect(supports).toMatch(/browser-only APIs such as window/);
+    expect(supports).toMatch(/ssr: false disables prerendering for a Client Component/);
+    expect(supports).not.toMatch(/children/);
     expect(p.packets.find((b) => b.framework === 'shopify_hydrogen')!.change.join('\n')).toMatch(
       /loader/,
     );
