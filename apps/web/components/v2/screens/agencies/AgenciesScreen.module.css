@@ -1,0 +1,184 @@
+/* Final-Agencies layout: sizes and spacing from the locked screen's inline styles. */
+
+.hero {
+  padding-top: 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.title {
+  max-width: 820px;
+}
+
+.sub {
+  margin: 0;
+  font-size: var(--v2-text-s);
+  line-height: 1.5;
+  color: var(--v2-fg2);
+  max-width: 720px;
+}
+
+.trialRow {
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: var(--v2-text-small);
+}
+
+.sec {
+  margin-top: 56px;
+}
+
+.prospect {
+  padding: 24px 28px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.prospectTitle {
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.small {
+  font-size: var(--v2-text-small);
+  margin-top: 2px;
+}
+
+.micro {
+  font-size: var(--v2-text-micro);
+}
+
+.form {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1 1 420px;
+  max-width: 520px;
+}
+
+.formInput {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.cardHead {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--v2-line);
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.paper {
+  padding: 28px 32px;
+  background: var(--v2-s2);
+}
+
+.onePager {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 32px;
+}
+
+.between {
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.agency {
+  gap: 8px;
+  font-weight: 600;
+}
+
+.logo {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-fg);
+  display: inline-block;
+}
+
+.opHeading {
+  margin-top: 22px;
+}
+
+.grades {
+  gap: 28px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.fixes {
+  margin-top: 18px;
+}
+
+.opFoot {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--v2-line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.g2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.padded {
+  padding: 22px 24px;
+}
+
+.steps {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.costLine {
+  margin: 8px 0 12px;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+/* Half-width cards collapse to one column rather than scroll inside a half (DESIGN-LOCK §7.7). */
+@media (max-width: 1100px) {
+  .g2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 759px) {
+  .paper {
+    padding: 16px;
+  }
+
+  .onePager {
+    padding: 20px;
+  }
+}
